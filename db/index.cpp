@@ -127,7 +127,6 @@ namespace mongo {
     void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &changedId) {
         int z = d.nIndexesBeingBuilt();
         v.resize(z);
-        NamespaceDetails::IndexIterator i = d.ii();
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }

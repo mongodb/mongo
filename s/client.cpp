@@ -100,7 +100,11 @@ namespace mongo {
             return;
         }
 
-        all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
+        string ident = "";
+        if ( gle["instanceIdent"].type() == String )
+            ident = gle["instanceIdent"].String();
+
+        all.push_back( WBInfo( WriteBackListener::ConnectionIdent( ident , cid.numberLong() ) , w.OID() ) );
     }
 
     vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
@@ -115,7 +119,7 @@ namespace mongo {
         }
         
         for ( unsigned i=0; i<all.size(); i++ ) {
-            res.push_back( WriteBackListener::waitFor( all[i].connectionId , all[i].id ) );
+            res.push_back( WriteBackListener::waitFor( all[i].ident , all[i].id ) );
         }
 
         return res;

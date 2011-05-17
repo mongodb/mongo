@@ -175,7 +175,7 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) {
+    bool Chunk::singleSplit( bool force , BSONObj& res , ChunkPtr* low, ChunkPtr* high) {
         vector<BSONObj> splitPoint;
 
         // if splitting is not obligatory we may return early if there are not enough data
@@ -190,7 +190,7 @@ namespace mongo {
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
                 log(1) << "chunk not full enough to trigger auto-split" << endl;
-                return ChunkPtr();
+                return false;
             }
 
             splitPoint.push_back( candidates.front() );
@@ -228,13 +228,24 @@ namespace mongo {
         if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
             log() << "want to split chunk, but can't find split point chunk " << toString()
                   << " got: " << ( splitPoint.empty() ? "<empty>" : splitPoint.front().toString() ) << endl;
-            return ChunkPtr();
+            return false;
         }
 
-        return multiSplit( splitPoint , res );
+        if (!multiSplit( splitPoint , res , true ))
+            return false;
+
+        if (low && high) {
+            low->reset( new Chunk(_manager, _min, splitPoint[0], _shard));
+            high->reset(new Chunk(_manager, splitPoint[0], _max, _shard));
+        }
+        else {
+            assert(!low && !high); // can't have one without the other
+        }
+
+        return true;
     }
 
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
+    bool Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res , bool resetIfSplit) {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -261,27 +272,19 @@ namespace mongo {
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
             // but we issue here so that mongos may refresh wihtout needing to be written/read against
-            _manager->_reload();
+            grid.getDBConfig(_manager->getns())->getChunkManager(_manager->getns(), true);
 
-            return ChunkPtr();
+            return false;
         }
 
         conn.done();
-        _manager->_reload();
 
-        // The previous multisplit logic adjusted the boundaries of 'this' chunk. Any call to 'this' object hereafter
-        // will see a different _max for the chunk.
-        // TODO Untie this dependency since, for metadata purposes, the reload() above already fixed boundaries
-        {
-            rwlock lk( _manager->_lock , true );
+	if ( resetIfSplit ) {
+	  // force reload of chunks
+	  grid.getDBConfig(_manager->getns())->getChunkManager(_manager->getns(), true);
+	}
 
-            setMax(m[0].getOwned());
-            DEV assert( shared_from_this() );
-            _manager->_chunkMap[_max] = shared_from_this();
-        }
-
-        // return the second half, if a single split, or the first new chunk, if a multisplit.
-        return _manager->findChunk( m[0] );
+        return true;
     }
 
     bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) {
@@ -311,7 +314,7 @@ namespace mongo {
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
         // reload is excessive here as the failure could be simply because collection metadata is taken
-        _manager->_reload();
+        grid.getDBConfig(_manager->getns())->getChunkManager(_manager->getns(), true);
 
         return worked;
     }
@@ -334,21 +337,23 @@ namespace mongo {
             _dataWritten = 0; // reset so we check often enough
 
             BSONObj res;
-            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ , res );
-            if ( newShard.get() == NULL ) {
+            ChunkPtr low;
+            ChunkPtr high;
+            bool worked = singleSplit( false /* does not force a split if not enough data */ , res , &low, &high);
+            if ( !worked ) {
                 // singleSplit would have issued a message if we got here
                 _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data
                 return false;
             }
 
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
-                  << " on: " << newShard->getMax() << "(splitThreshold " << splitThreshold << ")"
+                  << " on: " << low->getMax() << "(splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
 #endif
                   << endl;
 
-            moveIfShould( newShard );
+            low->moveIfShould( high );
 
             return true;
 
@@ -671,7 +676,7 @@ namespace mongo {
         log() << "successfully created first chunk for " << c->toString() << endl;
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ) {
+    ChunkPtr ChunkManager::findChunk( const BSONObj & obj) {
         BSONObj key = _key.extractKey(obj);
 
         {
@@ -695,20 +700,13 @@ namespace mongo {
                 PRINT(*c);
                 PRINT(key);
 
-                _reload_inlock();
+                grid.getDBConfig(getns())->getChunkManager(getns(), true);
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
 
-        if ( retry ) {
-            stringstream ss;
-            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key;
-            throw UserException( 8070 , ss.str() );
-        }
-
-        log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload_inlock();
-        return findChunk( obj , true );
+        massert(8070, str::stream() << "couldn't find a chunk aftry retry which should be impossible extracted: " << key, false);
+        return ChunkPtr(); // unreachable
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
@@ -874,24 +872,26 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
-    void ChunkManager::maybeChunkCollection() {
+    bool ChunkManager::maybeChunkCollection() {
+        ensureIndex_inlock(); 
+        
         uassert( 13346 , "can't pre-split already splitted collection" , (_chunkMap.size() == 1) );
-
+        
         ChunkPtr soleChunk = _chunkMap.begin()->second;
         vector<BSONObj> splitPoints;
         soleChunk->pickSplitVector( splitPoints , Chunk::MaxChunkSize );
         if ( splitPoints.empty() ) {
             log(1) << "not enough data to warrant chunking " << getns() << endl;
-            return;
+            return false;
         }
-
+        
         BSONObj res;
-        ChunkPtr p;
-        p = soleChunk->multiSplit( splitPoints , res );
-        if ( p.get() == NULL ) {
+        bool worked = soleChunk->multiSplit( splitPoints , res , false );
+        if (!worked) {
             log( LL_WARNING ) << "could not split '" << getns() << "': " << res << endl;
-            return;
+            return false;
         }
+        return true;
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {

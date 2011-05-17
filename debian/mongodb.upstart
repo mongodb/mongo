@@ -2,6 +2,8 @@
 
 limit nofile 20000 20000
 
+kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
+
 pre-start script
     mkdir -p /var/lib/mongodb/
     mkdir -p /var/log/mongodb/

@@ -124,6 +124,7 @@ namespace mongo {
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
 
         int _find( const string& server ) const ;
+        int _find_inlock( const string& server ) const ;
         int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes
@@ -147,7 +148,7 @@ namespace mongo {
         vector<Node> _nodes;
 
         int _master; // which node is the current master.  -1 means no master is known
-
+        int _nextSlave; // which node is the current slave
 
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor

@@ -74,7 +74,7 @@ namespace mongo {
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1), _nextSlave(0) {
         
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 
@@ -221,19 +221,19 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        int x = rand() % _nodes.size();
+
         {
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
-                int p = ( i + x ) % _nodes.size();
-                if ( p == _master )
+                _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+                if ( _nextSlave == _master )
                     continue;
-                if ( _nodes[p].ok )
-                    return _nodes[p].addr;
+                if ( _nodes[ _nextSlave ].ok )
+                    return _nodes[ _nextSlave ].addr;
             }
         }
 
-        return _nodes[0].addr;
+        return _nodes[ 0 ].addr;
     }
 
     /**
@@ -292,6 +292,10 @@ namespace mongo {
             newConn->connect( h , temp );
             {
                 scoped_lock lk( _lock );
+                if ( _find_inlock( toCheck ) >= 0 ) {
+                    // we need this check inside the lock so there isn't thread contention on adding to vector
+                    continue;
+                }
                 _nodes.push_back( Node( h , newConn ) );
             }
             log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
@@ -312,7 +316,6 @@ namespace mongo {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << '\n';
 
             // add other nodes
-            string maybePrimary;
             if ( o["hosts"].type() == Array ) {
                 if ( o["primary"].type() == String )
                     maybePrimary = o["primary"].String();
@@ -394,11 +397,16 @@ namespace mongo {
 
     int ReplicaSetMonitor::_find( const string& server ) const {
         scoped_lock lk( _lock );
+        return _find_inlock( server );
+    }
+
+    int ReplicaSetMonitor::_find_inlock( const string& server ) const {
         for ( unsigned i=0; i<_nodes.size(); i++ )
             if ( _nodes[i].addr == server )
                 return i;
         return -1;
     }
+
 
     int ReplicaSetMonitor::_find( const HostAndPort& server ) const {
         scoped_lock lk( _lock );
@@ -534,8 +542,8 @@ namespace mongo {
                 try {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                 }
             }
         }
@@ -552,8 +560,8 @@ namespace mongo {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                 }
             }
         }
@@ -588,8 +596,8 @@ namespace mongo {
                             *actualServer = s->getServerAddress();
                         return s->call( toSend , response , assertOk );
                     }
-                    catch ( DBException & ) {
-                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    catch ( DBException &e ) {
+                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                         if ( actualServer )
                             *actualServer = "";
                     }

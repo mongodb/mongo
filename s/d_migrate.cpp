@@ -490,29 +490,45 @@ namespace mongo {
                 return false;
             }
 
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            ElapsedTracker tracker (128, 10); // same as ClientCursor::_yieldSometimesTracker
 
-            NamespaceDetails *d = nsdetails( _ns.c_str() );
-            assert( d );
+            int allocSize;
+            {
+                readlock l(_ns);
+                Client::Context ctx( _ns );
+                NamespaceDetails *d = nsdetails( _ns.c_str() );
+                assert( d );
+                allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
+            }
+            BSONArrayBuilder a (allocSize);
 
-            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
+            bool keepGoing = true;
+            while (keepGoing && !_cloneLocs.empty()){
+                readlock l( _ns );
+                Client::Context ctx( _ns );
 
-            set<DiskLoc>::iterator i = _cloneLocs.begin();
-            for ( ; i!=_cloneLocs.end(); ++i ) {
-                DiskLoc dl = *i;
-                BSONObj o = dl.obj();
+                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                for ( ; i!=_cloneLocs.end(); ++i ) {
+                    if (tracker.ping()) // should I yield?
+                        break;
 
-                // use the builder size instead of accumulating 'o's size so that we take into consideration
-                // the overhead of BSONArray indices
-                if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                    break;
+                    DiskLoc dl = *i;
+                    BSONObj o = dl.obj();
+
+                    // use the builder size instead of accumulating 'o's size so that we take into consideration
+                    // the overhead of BSONArray indices
+                    if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        keepGoing = false; // break out of outer while loop
+                        break;
+                    }
+
+                    a.append( o );
                 }
-                a.append( o );
+
+                _cloneLocs.erase( _cloneLocs.begin() , i );
             }
 
             result.appendArray( "objects" , a.arr() );
-            _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
 
@@ -1141,6 +1157,8 @@ namespace mongo {
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+            
+            slaveCount = ( getSlaveCount() / 2 ) + 1;
 
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ );
 
@@ -1236,11 +1254,32 @@ namespace mongo {
                         break;
 
                     apply( res , &lastOpApplied );
+                    
+                    const int maxIterations = 3600*50;
+                    int i;
+                    for ( i=0;i<maxIterations; i++) {
+                        if ( state == ABORT ) {
+                            timing.note( "aborted" );
+                            return;
+                        }
+                        
+                        if ( opReplicatedEnough( lastOpApplied ) )
+                            break;
+                        
+                        if ( i > 100 ) {
+                            warning() << "secondaries having hard time keeping up with migrate" << endl;
+                        }
 
-                    if ( state == ABORT ) {
-                        timing.note( "aborted" );
-                        return;
+                        sleepmillis( 20 );
                     }
+
+                    if ( i == maxIterations ) {
+                        errmsg = "secondary can't keep up with migrate";
+                        error() << errmsg << endl;
+                        conn.done();
+                        state = FAIL;
+                        return;
+                    } 
                 }
 
                 timing.done(4);
@@ -1364,14 +1403,17 @@ namespace mongo {
             return didAnything;
         }
 
-        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+        bool opReplicatedEnough( const ReplTime& lastOpApplied ) {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            const int slaveCount = getSlaveCount() / 2 + 1;
-            if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
-                log( LL_WARNING ) << "migrate commit attempt timed out contacting " << slaveCount
-                                  << " slaves for '" << ns << "' " << min << " -> " << max << endl;
+            return mongo::opReplicatedEnough( lastOpApplied , slaveCount );
+        }
+
+        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+            if ( ! opReplicatedEnough( lastOpApplied ) ) {
+                warning() << "migrate commit attempt timed out contacting " << slaveCount
+                          << " slaves for '" << ns << "' " << min << " -> " << max << endl;
                 return false;
             }
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
@@ -1438,6 +1480,8 @@ namespace mongo {
         long long clonedBytes;
         long long numCatchup;
         long long numSteady;
+        
+        int slaveCount;
 
         enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
         string errmsg;

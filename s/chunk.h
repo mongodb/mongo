@@ -108,18 +108,18 @@ namespace mongo {
          * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
          *              if set to false, will only split if the chunk has reached the currently desired maximum size
          * @param res the object containing details about the split execution
-         * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
+         * @return if found a key and split successfully
          */
-        ChunkPtr singleSplit( bool force , BSONObj& res );
+        bool singleSplit( bool force , BSONObj& res , ChunkPtr* low=NULL,  ChunkPtr* high=NULL);
 
         /**
          * Splits this chunk at the given key (or keys)
          *
          * @param splitPoints the vector of keys that should be used to divide this chunk
          * @param res the object containing details about the split execution
-         * @return shared pointer to the first new Chunk or null pointer if failed
+         * @return if split was successful
          */
-        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res );
+        bool multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res , bool resetIfSplit );
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -308,13 +308,13 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         void createFirstChunk( const Shard& shard );
-        ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
+        ChunkPtr findChunk( const BSONObj& obj );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique() const { return _unique; }
 
-        void maybeChunkCollection();
+        bool maybeChunkCollection();
 
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
         void getAllShards( set<Shard>& all );

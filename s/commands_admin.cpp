@@ -526,9 +526,9 @@ namespace mongo {
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 BSONObj res;
-                ChunkPtr p;
+                bool worked;
                 if ( middle.isEmpty() ) {
-                    p = chunk->singleSplit( true /* force a split even if not enough data */ , res );
+                    worked = chunk->singleSplit( true /* force a split even if not enough data */ , res );
 
                 }
                 else {
@@ -540,10 +540,10 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    p = chunk->multiSplit( splitPoints , res );
+                    worked = chunk->multiSplit( splitPoints , res , true );
                 }
 
-                if ( p.get() == NULL ) {
+                if ( !worked ) {
                     errmsg = "split failed";
                     result.append( "cause" , res );
                     return false;
