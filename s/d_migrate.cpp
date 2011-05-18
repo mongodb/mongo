@@ -505,9 +505,10 @@ namespace mongo {
                 allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
             }
             BSONArrayBuilder a (allocSize);
-
-            bool keepGoing = true;
-            while (keepGoing && !_cloneLocs.empty()){
+            
+            while ( 1 ) {
+                bool filledBuffer = false;
+                
                 readlock l( _ns );
                 Client::Context ctx( _ns );
 
@@ -522,7 +523,7 @@ namespace mongo {
                     // use the builder size instead of accumulating 'o's size so that we take into consideration
                     // the overhead of BSONArray indices
                     if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                        keepGoing = false; // break out of outer while loop
+                        filledBuffer = true; // break out of outer while loop
                         break;
                     }
 
@@ -530,6 +531,9 @@ namespace mongo {
                 }
 
                 _cloneLocs.erase( _cloneLocs.begin() , i );
+
+                if ( _cloneLocs.empty() || filledBuffer )
+                    break;
             }
 
             result.appendArray( "objects" , a.arr() );
@@ -565,8 +569,8 @@ namespace mongo {
         BSONObj _max;
 
         // disk locs yet to be transferred from here to the other side
-        // no locking needed because build by 1 thread in a read lock
-        // depleted by 1 thread in a read lock
+        // no locking needed because built initially by 1 thread in a read lock
+        // emptied by 1 thread in a read lock
         // updates applied by 1 thread in a write lock
         set<DiskLoc> _cloneLocs;
 
