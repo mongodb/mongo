@@ -273,9 +273,12 @@ namespace mongo {
         void done() {
             readlock lk( _ns );
 
-            _deleted.clear();
-            _reload.clear();
-            _cloneLocs.clear();
+            {
+                scoped_spinlock lk( _trackerLocks );
+                _deleted.clear();
+                _reload.clear();
+                _cloneLocs.clear();
+            }
             _memoryUsed = 0;
 
             scoped_lock l(_m);
@@ -447,6 +450,8 @@ namespace mongo {
                 maxRecsWhenFull = numeric_limits<long long>::max();
             }
 
+            scoped_spinlock lk( _trackerLocks );
+
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
@@ -498,6 +503,7 @@ namespace mongo {
                 Client::Context ctx( _ns );
                 NamespaceDetails *d = nsdetails( _ns.c_str() );
                 assert( d );
+                scoped_spinlock lk( _trackerLocks );
                 allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
             }
             BSONArrayBuilder a (allocSize);
@@ -507,7 +513,7 @@ namespace mongo {
                 
                 readlock l( _ns );
                 Client::Context ctx( _ns );
-
+                scoped_spinlock lk( _trackerLocks );
                 set<DiskLoc>::iterator i = _cloneLocs.begin();
                 for ( ; i!=_cloneLocs.end(); ++i ) {
                     if (tracker.ping()) // should I yield?
@@ -545,6 +551,11 @@ namespace mongo {
             if ( ! db->ownsNS( _ns ) )
                 return;
 
+            
+            // not needed right now
+            // but trying to prevent a future bug
+            scoped_spinlock lk( _trackerLocks ); 
+
             _cloneLocs.erase( dl );
         }
 
@@ -563,6 +574,10 @@ namespace mongo {
         string _ns;
         BSONObj _min;
         BSONObj _max;
+
+        // we need the lock in case there is a malicious _migrateClone for example
+        // even though it shouldn't be needed under normal operation
+        SpinLock _trackerLocks;
 
         // disk locs yet to be transferred from here to the other side
         // no locking needed because built initially by 1 thread in a read lock
