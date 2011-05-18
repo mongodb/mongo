@@ -12,6 +12,7 @@ src/api/cur_stat.c
 src/api/cur_std.c
 src/api/err_file.c
 src/api/pack.c
+src/api/session_btree.c
 src/api/strerror.c
 src/api/version.c
 src/btree/bt_alloc.c

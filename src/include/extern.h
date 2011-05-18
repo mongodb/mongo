@@ -55,7 +55,6 @@ const char *__wt_confdfl_session_sync;
 const char *__wt_confdfl_session_truncate;
 const char *__wt_confdfl_session_verify;
 const char *__wt_confdfl_wiredtiger_open;
-int __wt_session_add_btree(SESSION *session);
 int __wt_curbtree_open(SESSION *session,
     const char *uri,
     const char *config,
@@ -72,6 +71,12 @@ int __wt_curstat_open(SESSION *session,
     WT_CURSOR **cursorp);
 int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 void __wt_cursor_init(WT_CURSOR *cursor, const char *config);
+int __wt_session_add_btree(SESSION *session);
+int __wt_session_get_btree(SESSION *session,
+    const char *name,
+    size_t namelen,
+    BTREE_SESSION **btree_sessionp);
+int __wt_session_remove_btree(SESSION *session, BTREE_SESSION *btree_session);
 int __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size);
 int __wt_block_free(SESSION *session, uint32_t addr, uint32_t size);
 int __wt_block_read(SESSION *session);

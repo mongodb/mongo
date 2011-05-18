@@ -177,66 +177,6 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 }
 
 /*
- * __wt_session_add_btree --
- *	Add a btree handle to the session's cache.
- */
-int
-__wt_session_add_btree(SESSION *session)
-{
-	const char *config;
-	char *format;
-	BTREE_SESSION *btree_session;
-	WT_CONFIG_ITEM cval;
-
-	WT_RET(__wt_calloc_def(session, 1, &btree_session));
-	btree_session->btree = session->btree;
-
-	/*
-	 * Make a copy of the key and value format, it's easier for everyone
-	 * if they are NUL-terminated.  They live in the BTREE_SESSION to save
-	 * allocating memory on every cursor open.
-	 */
-	config = session->btree->config;
-
-	WT_RET(__wt_config_getones(config, "key_format", &cval));
-	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
-	memcpy(format, cval.str, cval.len);
-	btree_session->key_format = format;
-
-	WT_RET(__wt_config_getones(config, "value_format", &cval));
-	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
-	memcpy(format, cval.str, cval.len);
-	btree_session->value_format = format;
-
-	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
-
-	return (0);
-}
-
-/*
- * __get_btree --
- *	Get the btree handle for the named table.
- */
-static int
-__get_btree(SESSION *session,
-    const char *name, size_t namelen, BTREE_SESSION **btree_sessionp)
-{
-	BTREE *btree;
-	BTREE_SESSION *btree_session;
-
-	TAILQ_FOREACH(btree_session, &session->btrees, q) {
-		btree = btree_session->btree;
-		if (strncmp(name, btree->name, namelen) == 0 &&
-		    btree->name[namelen] == '\0') {
-			*btree_sessionp = btree_session;
-			return (0);
-		}
-	}
-
-	return (WT_NOTFOUND);
-}
-
-/*
  * __wt_cursor_open --
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
@@ -284,7 +224,7 @@ __wt_curbtree_open(SESSION *session,
 	/* TODO: handle projections. */
 	tablename = uri + 6;
 
-	ret = __get_btree(session,
+	ret = __wt_session_get_btree(session,
 	    tablename, strlen(tablename), &btree_session);
 	if (ret == WT_NOTFOUND) {
 		ret = 0;

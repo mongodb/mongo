@@ -82,6 +82,8 @@ struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
 	TAILQ_ENTRY(__btree) q;		/* Linked list of files */
 
+	uint32_t refcnt;		/* Sessions with this tree open. */
+
 	const char *config;		/* Configuration string */
 
 	const char *name;		/* File name */
