@@ -16,7 +16,6 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 {
 	BTREE *btree;
 	CONNECTION *conn;
-	uint32_t size;
 
 	conn = S2C(session);
 	btree = session->btree;
@@ -52,15 +51,14 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	 *
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
-	size = WT_DISK_REQUIRED(session, ovfl->size);
-	WT_RET(__wt_buf_setsize(session, store, size));
+	WT_RET(__wt_buf_setsize(session, store, ovfl->size));
 
 	/* Read the page. */
-	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, size));
+	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, ovfl->size));
 
-	/* Reference the start of the data. */
+	/* Reference the start of the data and set the data's length. */
 	store->data = WT_PAGE_DISK_BYTE(store->mem);
-	store->size = ovfl->size;
+	store->size = ((WT_PAGE_DISK *)store->mem)->u.datalen;
 
 	return (0);
 }

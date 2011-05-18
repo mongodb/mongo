@@ -314,21 +314,20 @@ cell_len:			__wt_errx(session,
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
 			__wt_cell_ovfl(cell, &ovfl);
-			if (WT_ADDR_TO_OFF(btree, ovfl.addr) +
-			    (off_t)WT_DISK_REQUIRED(
-			    session, ovfl.size) > file_size)
+			if (WT_ADDR_TO_OFF(btree,
+			    ovfl.addr) + ovfl.size > file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF:
 			__wt_cell_off(cell, &off);
-			if (WT_ADDR_TO_OFF(btree, off.addr) +
-			    (off_t)off.size > file_size)
+			if (WT_ADDR_TO_OFF(btree,
+			    off.addr) + off.size > file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF_RECORD:
 			__wt_cell_off_record(cell, &off_record);
-			if (WT_ADDR_TO_OFF(btree, off_record.addr) +
-			    (off_t)off_record.size > file_size)
+			if (WT_ADDR_TO_OFF(btree,
+			    off_record.addr) + off_record.size > file_size)
 				goto eof;
 			break;
 		}

@@ -30,8 +30,7 @@ typedef struct {
 static int __wt_verify_addfrag(SESSION *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(SESSION *, WT_VSTUFF *);
 static int __wt_verify_freelist(SESSION *, WT_VSTUFF *);
-static int __wt_verify_overflow(
-		SESSION *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_overflow(SESSION *, WT_OVFL *, WT_VSTUFF *);
 static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
 		SESSION *, WT_PAGE *, void *, WT_VSTUFF *);
@@ -461,7 +460,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_CELL *cell;
 	WT_OVFL ovfl;
 	WT_PAGE_DISK *dsk;
-	uint32_t entry_num, i;
+	uint32_t i;
 
 	dsk = page->dsk;
 	if (dsk == NULL) {
@@ -481,17 +480,13 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 *
 	 * Walk the disk page, verifying overflow items.
 	 */
-	entry_num = 0;
-	WT_CELL_FOREACH(dsk, cell, i) {
-		++entry_num;
+	WT_CELL_FOREACH(dsk, cell, i)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
 			__wt_cell_ovfl(cell, &ovfl);
-			WT_RET(__wt_verify_overflow(session,
-			    &ovfl, entry_num, WT_PADDR(page), vs));
+			WT_RET(__wt_verify_overflow(session, &ovfl, vs));
 		}
-	}
 	return (0);
 }
 
@@ -500,8 +495,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(SESSION *session,
-    WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
+__wt_verify_overflow(SESSION *session, WT_OVFL *ovfl, WT_VSTUFF *vs)
 {
 	WT_PAGE_DISK *dsk;
 	WT_BUF *scratch;
@@ -512,7 +506,7 @@ __wt_verify_overflow(SESSION *session,
 	ret = 0;
 
 	addr = ovfl->addr;
-	size = WT_DISK_REQUIRED(session, ovfl->size);
+	size = ovfl->size;
 
 	/* Allocate enough memory to hold the overflow pages. */
 	WT_RET(__wt_scr_alloc(session, size, &scratch));
@@ -532,18 +526,6 @@ __wt_verify_overflow(SESSION *session,
 
 	/* Add the fragments. */
 	WT_ERR(__wt_verify_addfrag(session, addr, size, vs));
-
-	/*
-	 * The only other thing to check is that the size we have in the page
-	 * matches the size on the underlying overflow page.
-	 */
-	if (ovfl->size != dsk->u.datalen) {
-		__wt_errx(session,
-		    "overflow page reference in cell %lu on page at addr %lu "
-		    "does not match the data size on the overflow page",
-		    (u_long)entry_num, (u_long)page_ref_addr);
-		ret = WT_ERROR;
-	}
 
 err:	__wt_scr_release(&scratch);
 

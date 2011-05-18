@@ -100,7 +100,7 @@ static int  __slvg_read(SESSION *, WT_STUFF *);
 static int  __slvg_trk_compare(const void *, const void *);
 static int  __slvg_trk_leaf(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_ovfl(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
-static void __slvg_trk_ovfl_ref(SESSION *, WT_TRACK *, WT_STUFF *);
+static void __slvg_trk_ovfl_ref(WT_TRACK *, WT_STUFF *);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __slvg_trk_dump_col(WT_TRACK *);
@@ -717,7 +717,7 @@ __slvg_range_col(SESSION *session, WT_STUFF *ss)
 		 * that are known not to be referenced.
 		 */
 		if (ss->pages[i]->ovfl_cnt != 0)
-			__slvg_trk_ovfl_ref(session, ss->pages[i], ss);
+			__slvg_trk_ovfl_ref(ss->pages[i], ss);
 
 		/* Check for pages that overlap our page. */
 		for (j = i + 1; j < ss->pages_next; ++j) {
@@ -972,7 +972,7 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 		else
 			if (ss->range_merge &&
 			    ss->page_type == WT_PAGE_COL_VAR)
-				__slvg_trk_ovfl_ref(session, trk, ss);
+				__slvg_trk_ovfl_ref(trk, ss);
 		++cref;
 	}
 
@@ -1177,7 +1177,7 @@ __slvg_range_row(SESSION *session, WT_STUFF *ss)
 		 * that are known not to be referenced.
 		 */
 		if (ss->pages[i]->ovfl_cnt != 0)
-			__slvg_trk_ovfl_ref(session, ss->pages[i], ss);
+			__slvg_trk_ovfl_ref(ss->pages[i], ss);
 
 		/* Check for pages that overlap our page. */
 		for (j = i + 1; j < ss->pages_next; ++j) {
@@ -1452,7 +1452,7 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 			__wt_buf_steal(session,
 			    &trk->u.row.range_start, &rref->key, &rref->size);
 			if (ss->range_merge)
-				__slvg_trk_ovfl_ref(session, trk, ss);
+				__slvg_trk_ovfl_ref(trk, ss);
 		}
 		++rref;
 	}
@@ -1668,7 +1668,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
  *	Review the overflow pages a WT_TRACK entry references.
  */
 static void
-__slvg_trk_ovfl_ref(SESSION *session, WT_TRACK *trk, WT_STUFF *ss)
+__slvg_trk_ovfl_ref(WT_TRACK *trk, WT_STUFF *ss)
 {
 	WT_TRACK **searchp;
 	uint32_t i;
@@ -1694,8 +1694,7 @@ __slvg_trk_ovfl_ref(SESSION *session, WT_TRACK *trk, WT_STUFF *ss)
 		searchp =
 		    bsearch(&trk->ovfl[i], ss->ovfl, ss->ovfl_next,
 		    sizeof(WT_TRACK *), __slvg_ovfl_compare);
-		if (searchp == NULL || (*searchp)->size !=
-		    WT_DISK_REQUIRED(session, trk->ovfl[i].size))
+		if (searchp == NULL || (*searchp)->size != trk->ovfl[i].size)
 			F_SET(trk, WT_TRACK_OVFL_MISSING);
 		else
 			F_SET(*searchp, WT_TRACK_OVFL_REFD);

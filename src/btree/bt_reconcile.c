@@ -242,8 +242,7 @@ __rec_discard_add_ovfl(SESSION *session, WT_CELL *cell)
 	WT_OVFL ovfl;
 
 	__wt_cell_ovfl(cell, &ovfl);
-	return (__rec_discard_add(
-	    session, NULL, ovfl.addr, WT_DISK_REQUIRED(session, ovfl.size)));
+	return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
 }
 
 /*
@@ -2749,7 +2748,7 @@ __rec_cell_build_ovfl(SESSION *session, WT_BUF *buf, WT_OVFL *to)
 
 	/* Fill in the return information. */
 	to->addr = addr;
-	to->size = buf->size;
+	to->size = size;
 
 	ret = __wt_disk_write(session, dsk, addr, size);
 
