@@ -174,9 +174,9 @@ typedef struct {
 } WT_RECONCILE;
 
 static uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
-static int  __rec_cell_build_key(SESSION *, WT_BUF *, WT_CELL *, WT_OVFL *);
-static int  __rec_cell_build_ovfl(SESSION *, WT_BUF *, WT_OVFL *);
-static int  __rec_cell_build_value(SESSION *, WT_BUF *, WT_CELL *, WT_OVFL *);
+static int  __rec_cell_build_key(SESSION *, WT_BUF *, WT_CELL *, WT_OFF *);
+static int  __rec_cell_build_ovfl(SESSION *, WT_BUF *, WT_OFF *);
+static int  __rec_cell_build_value(SESSION *, WT_BUF *, WT_CELL *, WT_OFF *);
 static int  __rec_col_fix(SESSION *, WT_PAGE *);
 static int  __rec_col_fix_bulk(SESSION *, WT_PAGE *);
 static int  __rec_col_int(SESSION *, WT_PAGE *);
@@ -239,9 +239,9 @@ static inline int __rec_discard_add_ovfl(SESSION *, WT_CELL *);
 static inline int
 __rec_discard_add_ovfl(SESSION *session, WT_CELL *cell)
 {
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 
-	__wt_cell_ovfl(cell, &ovfl);
+	__wt_cell_off(cell, &ovfl);
 	return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
 }
 
@@ -1640,7 +1640,7 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 	WT_BUF val_buf;
 	WT_CELL *val_cell, _val_cell;
 	WT_COL *cip;
-	WT_OVFL val_ovfl;
+	WT_OFF val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t val_cell_len, i;
@@ -1724,7 +1724,7 @@ __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 {
 	WT_BUF val_buf;
 	WT_CELL val_cell;
-	WT_OVFL val_ovfl;
+	WT_OFF val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t val_cell_len;
@@ -1939,7 +1939,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		if (r->cell_zero && __wt_cell_datalen(key_cell) > 1) {
 			WT_BUF key0;
 			WT_CELL key_cell0;
-			WT_OVFL key_ovfl0;
+			WT_OFF key_ovfl0;
 
 			WT_CLEAR(key0);
 
@@ -1984,8 +1984,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 {
 	WT_BUF key_buf;
 	WT_CELL key_cell, val_cell;
-	WT_OFF off;
-	WT_OVFL key_ovfl;
+	WT_OFF key_ovfl, off;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
@@ -2114,7 +2113,7 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 	WT_BUF val_buf;
 	WT_CELL *key_cell, *val_cell, _val_cell;
 	WT_INSERT *ins;
-	WT_OVFL val_ovfl;
+	WT_OFF val_ovfl;
 	WT_RECONCILE *r;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -2304,7 +2303,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 {
 	WT_BUF key_buf, val_buf;
 	WT_CELL key_cell, val_cell;
-	WT_OVFL key_ovfl, val_ovfl;
+	WT_OFF key_ovfl, val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t key_cell_len, key_len, val_cell_len, val_len;
@@ -2617,8 +2616,7 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
  *	string to be stored on the page.
  */
 static int
-__rec_cell_build_key(
-    SESSION *session, WT_BUF *key, WT_CELL *cell, WT_OVFL *ovfl)
+__rec_cell_build_key(SESSION *session, WT_BUF *key, WT_CELL *cell, WT_OFF *ovfl)
 {
 	BTREE *btree;
 	uint32_t orig_size;
@@ -2664,7 +2662,7 @@ __rec_cell_build_key(
  */
 static int
 __rec_cell_build_value(
-    SESSION *session, WT_BUF *val, WT_CELL *cell, WT_OVFL *ovfl)
+    SESSION *session, WT_BUF *val, WT_CELL *cell, WT_OFF *ovfl)
 {
 	BTREE *btree;
 	uint32_t orig_size;
@@ -2715,10 +2713,10 @@ __rec_cell_build_value(
 
 /*
  * __rec_cell_build_ovfl --
- *	Store bulk-loaded overflow items in the file, returning the WT_OVFL.
+ *	Store bulk-loaded overflow items in the file, returning the WT_OFF.
  */
 static int
-__rec_cell_build_ovfl(SESSION *session, WT_BUF *buf, WT_OVFL *to)
+__rec_cell_build_ovfl(SESSION *session, WT_BUF *buf, WT_OFF *to)
 {
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;

@@ -136,7 +136,6 @@ __wt_verify_dsk_cell(
 	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
 	WT_CELL *cell;
-	WT_OVFL ovfl;
 	WT_OFF off;
 	WT_OFF_RECORD off_record;
 	off_t file_size;
@@ -285,15 +284,12 @@ cell_vs_page:			__wt_errx(session,
 			break;
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			if (cell_len != sizeof(WT_OVFL))
+		case WT_CELL_OFF:
+			if (cell_len != sizeof(WT_OFF))
 				goto cell_len;
 			break;
 		case WT_CELL_DEL:
 			if (cell_len != 0)
-				goto cell_len;
-			break;
-		case WT_CELL_OFF:
-			if (cell_len != sizeof(WT_OFF))
 				goto cell_len;
 			break;
 		case WT_CELL_OFF_RECORD:
@@ -313,11 +309,6 @@ cell_len:			__wt_errx(session,
 		switch (cell_type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			__wt_cell_ovfl(cell, &ovfl);
-			if (WT_ADDR_TO_OFF(btree,
-			    ovfl.addr) + ovfl.size > file_size)
-				goto eof;
-			break;
 		case WT_CELL_OFF:
 			__wt_cell_off(cell, &off);
 			if (WT_ADDR_TO_OFF(btree,

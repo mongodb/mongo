@@ -12,7 +12,7 @@
  *	Read an overflow item from the disk.
  */
 int
-__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
+__wt_ovfl_in(SESSION *session, WT_OFF *ovfl, WT_BUF *store)
 {
 	BTREE *btree;
 	CONNECTION *conn;

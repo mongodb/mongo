@@ -30,7 +30,7 @@ typedef struct {
 static int __wt_verify_addfrag(SESSION *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(SESSION *, WT_VSTUFF *);
 static int __wt_verify_freelist(SESSION *, WT_VSTUFF *);
-static int __wt_verify_overflow(SESSION *, WT_OVFL *, WT_VSTUFF *);
+static int __wt_verify_overflow(SESSION *, WT_OFF *, WT_VSTUFF *);
 static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
 		SESSION *, WT_PAGE *, void *, WT_VSTUFF *);
@@ -458,7 +458,7 @@ static int
 __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
@@ -475,7 +475,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			__wt_cell_ovfl(cell, &ovfl);
+			__wt_cell_off(cell, &ovfl);
 			WT_RET(__wt_verify_overflow(session, &ovfl, vs));
 		}
 	return (0);
@@ -486,7 +486,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(SESSION *session, WT_OVFL *ovfl, WT_VSTUFF *vs)
+__wt_verify_overflow(SESSION *session, WT_OFF *ovfl, WT_VSTUFF *vs)
 {
 	WT_PAGE_DISK *dsk;
 	WT_BUF *scratch;

@@ -51,7 +51,6 @@ __wt_verify_build(void)
 	SIZE_CHECK(WT_COL, WT_COL_SIZE);
 	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
 	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
-	SIZE_CHECK(WT_OVFL, WT_OVFL_SIZE);
 	SIZE_CHECK(WT_PAGE, WT_PAGE_SIZE);
 	SIZE_CHECK(WT_ROW, WT_ROW_SIZE);
 
@@ -65,7 +64,6 @@ __wt_verify_build(void)
 
 	/* There are also structures that must be aligned correctly. */
 	ALIGN_CHECK(WT_OFF, sizeof(uint32_t));
-	ALIGN_CHECK(WT_OVFL, sizeof(uint32_t));
 	ALIGN_CHECK(WT_PAGE_DISK, sizeof(uint32_t));
 	ALIGN_CHECK(SESSION_BUFFER, sizeof(uint32_t));
 

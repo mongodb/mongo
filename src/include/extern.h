@@ -146,7 +146,7 @@ int __wt_btree_huffman_open(SESSION *session);
 void __wt_btree_huffman_close(SESSION *session);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
-int __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
+int __wt_ovfl_in(SESSION *session, WT_OFF *ovfl, WT_BUF *store);
 int
 __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 #ifdef HAVE_DIAGNOSTIC

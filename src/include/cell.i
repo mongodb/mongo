@@ -159,17 +159,6 @@ __wt_cell_next(const WT_CELL *cell)
 }
 
 /*
- * __wt_cell_ovfl --
- *	Copy out a WT_CELL that references a WT_OVFL structure.
- */
-static inline void
-__wt_cell_ovfl(const WT_CELL *cell, WT_OVFL *ovfl)
-{
-	/* Version for systems that support unaligned access. */
-	*ovfl = *(WT_OVFL *)__wt_cell_data(cell);
-}
-
-/*
  * __wt_cell_off --
  *	Copy out a WT_CELL that references a WT_OFF structure.
  */

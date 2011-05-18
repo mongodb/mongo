@@ -611,7 +611,6 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 {
 	WT_OFF off;
 	WT_OFF_RECORD off_record;
-	WT_OVFL ovfl;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -626,10 +625,6 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
-		__wt_cell_ovfl(cell, &ovfl);
-		fprintf(fp, ", addr %lu, size %lu",
-		    (u_long)ovfl.addr, (u_long)ovfl.size);
-		break;
 	case WT_CELL_OFF:
 		__wt_cell_off(cell, &off);
 		fprintf(fp, ", offpage: addr %lu, size %lu",

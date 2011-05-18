@@ -92,8 +92,6 @@ struct __wt_off;
     typedef struct __wt_off WT_OFF;
 struct __wt_off_record;
     typedef struct __wt_off_record WT_OFF_RECORD;
-struct __wt_ovfl;
-    typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_disk;

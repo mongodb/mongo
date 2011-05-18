@@ -850,16 +850,17 @@ struct __wt_cell {
 
 /*
  * WT_OFF --
- *	Row-store internal pages reference subtrees with no record count.
+ *	Row-store internal pages reference subtrees with no record count, and
+ * row- and column-store overflow key and data items.
  *
  * WT_OFF_RECORD --
  *      Column-store internal pages reference subtrees including total record
- *	counts for the subtree.
+ * counts for the subtree.
  *
  * !!!
  * Note the initial two fields of the WT_OFF and WT_OFF_RECORD fields are the
  * same -- this is deliberate, and we use it to pass references to places that
- * only care about the addr/size information.
+ * only care about the addr/size pair.
  */
 struct __wt_off {
 	uint32_t addr;			/* Subtree root page address */
@@ -900,20 +901,6 @@ struct __wt_off_record {
 #define	WT_OFF_FOREACH(dsk, offp, i)					\
 	for ((offp) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; ++(offp), --(i))
-
-/*
- * Btree overflow cells reference another page, and so the data is another
- * structure.
- */
-struct __wt_ovfl {
-	uint32_t addr;			/* Overflow address */
-	uint32_t size;			/* Overflow length */
-};
-/*
- * WT_OVFL_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding (which would break the world).
- */
-#define	WT_OVFL_SIZE	8
 
 /*
  * On-page "deleted" flags for fixed-length column-store data cells -- steal

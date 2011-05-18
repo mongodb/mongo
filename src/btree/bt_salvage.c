@@ -50,7 +50,7 @@ struct __wt_track {
 	 * Pages that reference overflow pages contain a list of the pages
 	 * they reference.
 	 */
-	WT_OVFL *ovfl;				/* Referenced overflow pages */
+	WT_OFF	*ovfl;				/* Referenced overflow pages */
 	uint32_t ovfl_cnt;			/* Overflow list elements */
 
 	union {
@@ -535,7 +535,7 @@ static int
 __slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	uint32_t i, ovfl_cnt;
 
 	/*
@@ -549,13 +549,13 @@ __slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	if (ovfl_cnt == 0)
 		return (0);
 
-	WT_RET(__wt_calloc(session, ovfl_cnt, sizeof(WT_OVFL), &trk->ovfl));
+	WT_RET(__wt_calloc(session, ovfl_cnt, sizeof(WT_OFF), &trk->ovfl));
 	trk->ovfl_cnt = ovfl_cnt;
 
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(dsk, cell, i)
 		if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_ovfl(cell, &ovfl);
+			__wt_cell_off(cell, &ovfl);
 			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
 			trk->ovfl[ovfl_cnt].size = ovfl.size;
 			++ovfl_cnt;
@@ -571,7 +571,7 @@ static int
 __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	uint32_t i, ovfl_cnt;
 
 	/*
@@ -589,7 +589,7 @@ __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	if (ovfl_cnt == 0)
 		return (0);
 
-	WT_RET(__wt_calloc(session, ovfl_cnt, sizeof(WT_OVFL), &trk->ovfl));
+	WT_RET(__wt_calloc(session, ovfl_cnt, sizeof(WT_OFF), &trk->ovfl));
 	trk->ovfl_cnt = ovfl_cnt;
 
 	ovfl_cnt = 0;
@@ -597,7 +597,7 @@ __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			__wt_cell_ovfl(cell, &ovfl);
+			__wt_cell_off(cell, &ovfl);
 			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
 			trk->ovfl[ovfl_cnt].size = ovfl.size;
 			++ovfl_cnt;
@@ -1124,14 +1124,14 @@ __slvg_ovfl_col_inmem_ref(WT_PAGE *page, WT_STUFF *ss)
 {
 	WT_CELL *cell;
 	WT_COL *cip;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	WT_TRACK **searchp;
 	uint32_t i;
 
 	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
 		if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_ovfl(cell, &ovfl);
+			__wt_cell_off(cell, &ovfl);
 			searchp = bsearch(
 			    &ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
@@ -1635,7 +1635,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 {
 	WT_CELL *key_cell, *value_cell;
 	WT_ROW *rip;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	WT_TRACK **searchp;
 	uint32_t i;
 
@@ -1646,7 +1646,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 			continue;
 		}
 		if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL) {
-			__wt_cell_ovfl(key_cell, &ovfl);
+			__wt_cell_off(key_cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
@@ -1654,7 +1654,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 		}
 		value_cell = WT_ROW_PTR(page, rip);
 		if (WT_CELL_TYPE(value_cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_ovfl(value_cell, &ovfl);
+			__wt_cell_off(value_cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
@@ -1708,10 +1708,10 @@ __slvg_trk_ovfl_ref(WT_TRACK *trk, WT_STUFF *ss)
 static int
 __slvg_ovfl_compare(const void *a, const void *b)
 {
-	WT_OVFL *ovfl;
+	WT_OFF *ovfl;
 	WT_TRACK *entry;
 
-	ovfl = (WT_OVFL *)a;
+	ovfl = (WT_OFF *)a;
 	entry = *(WT_TRACK **)b;
 
 	return (ovfl->addr > entry->addr ? 1 :

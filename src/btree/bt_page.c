@@ -414,7 +414,7 @@ __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 {
 	BTREE *btree;
 	WT_BUF *tmp;
-	WT_OVFL ovfl;
+	WT_OFF ovfl;
 	uint32_t size;
 	int ret;
 	void *huffman;
@@ -449,7 +449,7 @@ offpage:	/*
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-		__wt_cell_ovfl(cell, &ovfl);
+		__wt_cell_off(cell, &ovfl);
 		WT_RET(__wt_ovfl_in(session, &ovfl, tmp));
 		p = tmp->data;
 		size = tmp->size;
