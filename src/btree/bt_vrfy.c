@@ -463,15 +463,6 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	uint32_t i;
 
 	dsk = page->dsk;
-	if (dsk == NULL) {
-		/*
-		 * XXX
-		 * This should all go away -- once we're only verifying "clean"
-		 * trees or files, there will never be a case where we don't
-		 * have a backing disk page.
-		 */
-		return (0);
-	}
 
 	/*
 	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact
