@@ -616,6 +616,7 @@ namespace mongo {
             result.appendTimestamp( "global" , shardingState.getVersion(ns) );
 
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
+            result.appendBool( "inShardedMode" , info != 0 );
             if ( info )
                 result.appendTimestamp( "mine" , info->getVersion(ns) );
             else
