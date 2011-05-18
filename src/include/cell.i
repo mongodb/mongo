@@ -149,34 +149,6 @@ __wt_cell_len(const WT_CELL *cell)
 }
 
 /*
- * __wt_cell_copy --
- *	Copy out a cell to a WT_PAGE location.
- */
-static inline void
-__wt_cell_copy(const WT_CELL *cell, uint8_t *to)
-{
-	uint8_t *from;
-
-	from = (uint8_t *)cell;
-
-	*to++ = cell->__cell_chunk[0];
-	switch (WT_CELL_BYTES(cell)) {
-	case WT_CELL_4_BYTE:
-		*to++ = *from++;
-		/* FALLTHROUGH */
-	case WT_CELL_3_BYTE:
-		*to++ = *from++;
-		/* FALLTHROUGH */
-	case WT_CELL_2_BYTE:
-		*to++ = *from++;
-		/* FALLTHROUGH */
-	case WT_CELL_1_BYTE:
-		*to++ = *from++;
-		break;
-	}
-}
-
-/*
  * __wt_cell_next --
  *	Return a pointer to the next WT_CELL on the page.
  */
