@@ -80,6 +80,8 @@ AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS(fcntl pthread_yield)
 
+AC_C_BIGENDIAN
+
 AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:../src/include/wiredtiger.in

@@ -559,7 +559,17 @@ __wt_cksum(const void *chunk, size_t len)
 
 	/* Checksum in 8B chunks. */
 	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
+#ifdef WORDS_BIGENDIAN
+		/* Swap bytes to give same results as little endian algorithm. */
+		uint32_t first = *(uint32_t *)p;
+		crc ^=
+			((first << 24) & 0xFF000000) |
+			((first <<  8) & 0x00FF0000) |
+			((first >>  8) & 0x0000FF00) |
+			((first >> 24) & 0x000000FF);
+#else
 		crc ^= *(uint32_t *)p;
+#endif
 		p += sizeof(uint32_t);
 		next = *(uint32_t *)p;
 		p += sizeof(uint32_t);
@@ -568,10 +578,17 @@ __wt_cksum(const void *chunk, size_t len)
 			g_crc_slicing[6][(crc >>  8) & 0xFF] ^
 			g_crc_slicing[5][(crc >> 16) & 0xFF] ^
 			g_crc_slicing[4][(crc >> 24)] ^
+#ifdef WORDS_BIGENDIAN
+			g_crc_slicing[0][(next      ) & 0xFF] ^
+			g_crc_slicing[1][(next >>  8) & 0xFF] ^
+			g_crc_slicing[2][(next >> 16) & 0xFF] ^
+			g_crc_slicing[3][(next >> 24)];
+#else
 			g_crc_slicing[3][(next      ) & 0xFF] ^
 			g_crc_slicing[2][(next >>  8) & 0xFF] ^
 			g_crc_slicing[1][(next >> 16) & 0xFF] ^
 			g_crc_slicing[0][(next >> 24)];
+#endif
 	}
 
 	/* Checksum trailing bytes one byte at a time. */
