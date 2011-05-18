@@ -277,4 +277,8 @@ namespace mongo {
         DBClientBase* _conn;
         bool _setVersion;
     };
+
+
+    extern DBConnectionPool shardConnectionPool;
+    
 }

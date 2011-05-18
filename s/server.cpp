@@ -283,6 +283,10 @@ int _main(int argc, char* argv[]) {
 
     pool.addHook( new ShardingConnectionHook() );
     pool.setName( "mongos connectionpool" );
+
+    shardConnectionPool.addHook( new ShardingConnectionHook() );
+    shardConnectionPool.setName( "mongos shardconnection connectionpool" );
+
     
     DBClientConnection::setLazyKillCursor( false );
 

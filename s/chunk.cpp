@@ -319,6 +319,8 @@ namespace mongo {
 
         fromconn.done();
 
+        log( worked ) << "moveChunk result: " << res << endl;
+
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
         // reload is excessive here as the failure could be simply because collection metadata is taken
@@ -339,6 +341,12 @@ namespace mongo {
 
             if ( _dataWritten < splitThreshold / 5 )
                 return false;
+
+            // this is a bit ugly
+            // we need it so that mongos blocks for the writes to actually be commited
+            // this does mean mongos has more back pressure than mongod alone
+            // since it nots 100% tcp queue bound
+            ShardConnection::sync();
 
             log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 
@@ -788,8 +796,14 @@ namespace mongo {
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
             ScopedDbConnection conn( *i );
             BSONObj res;
+
+            // this is horrible
+            // we need a special command for dropping on the d side
+            // this hack works for the moment
+
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
+            conn->simpleCommand( "admin", 0, "unsetSharding" );
             conn.done();
         }
 

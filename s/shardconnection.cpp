@@ -41,6 +41,8 @@ namespace mongo {
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 
+    DBConnectionPool shardConnectionPool;
+
     /**
      * holds all the actual db connections for a client to various servers
      * 1 per thread, so doesn't have to be thread safe
@@ -86,12 +88,12 @@ namespace mongo {
             if ( s->avail ) {
                 DBClientBase* c = s->avail;
                 s->avail = 0;
-                pool.onHandedOut( c );
+                shardConnectionPool.onHandedOut( c );
                 return c;
             }
 
             s->created++;
-            return pool.get( addr );
+            return shardConnectionPool.get( addr );
         }
 
         void done( const string& addr , DBClientBase* conn ) {
@@ -134,7 +136,7 @@ namespace mongo {
                 Status* ss = i->second;
                 assert( ss );
                 if ( ! ss->avail )
-                    ss->avail = pool.get( i->first );
+                    ss->avail = shardConnectionPool.get( i->first );
                 checkShardVersionCB( *ss->avail , ns , false , 1 );
             }
         }
@@ -145,7 +147,7 @@ namespace mongo {
 
             try {
                 if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ) {
-                    pool.release( addr , conn );
+                    shardConnectionPool.release( addr , conn );
                 }
                 else {
                     error() << "unset sharding failed : " << res << endl;
