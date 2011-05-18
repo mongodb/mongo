@@ -610,9 +610,9 @@ namespace mongo {
             BSONObjIterator it( *argsObject );
             for ( int i=0; i<nargs; i++ ) {
                 BSONElement next = it.next();
-                args[i] = mongoToV8Element( next, true );
+                args[i] = mongoToV8Element( next );
             }
-            setObject( "args", *argsObject, true ); // for backwards compatibility
+            setObject( "args", *argsObject, false); // for backwards compatibility
         }
         else {
             _global->Set( V8STR_ARGS, v8::Undefined() );
@@ -626,7 +626,7 @@ namespace mongo {
         }
         Handle<v8::Object> v8recv;
         if (recv != 0)
-            v8recv = mongoToLZV8(*recv, false, true);
+            v8recv = mongoToLZV8(*recv, false);
         else
             v8recv = _emptyObj;
 
