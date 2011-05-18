@@ -4,32 +4,45 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <title>$title</title>
 <link href="$relpath$tabs.css" rel="stylesheet" type="text/css"/>
-<link href="$relpath$search/search.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="$relpath$search/search.js"></script>
-<link href="navtree.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="jquery.js"></script>
-<script type="text/javascript" src="navtree.js"></script>
-<script type="text/javascript" src="resize.js"></script>
-<script type="text/javascript">
-$(document).ready(initResizable);
-</script>
-<link href="$relpath$wiredtiger.css" rel="stylesheet" type="text/css"/>
+<link href="$relpath$wiredtiger.css" rel="stylesheet" type="text/css" />
+$treeview
+$search
+$mathjax
 </head>
-<body onload='searchBox.OnSelectItem(0);'>
-
-<div id="top">
+<body>
+<div id="top"><!-- do not remove this div! -->
+<!--BEGIN TITLEAREA-->
 <div id="titlearea">
 <table cellspacing="0" cellpadding="0">
  <tbody>
  <tr style="height: 56px;">
-  <td style="padding-left: 0.5em;">
+  <!--BEGIN PROJECT_LOGO-->
+  <td id="projectlogo">
     <div class="logo"><a href="http://wiredtiger.com/"><img src="$relpath$images/LogoFinal-header.png" alt="WiredTiger" /></a></div>
   </td>
-  <td>
-	  <h1>&nbsp;$projectnumber</h1>
+  <!--END PROJECT_LOGO-->
+  <!--BEGIN PROJECT_NAME-->
+  <td style="padding-left: 0.5em;">
+   <div id="projectname">
+   <!--BEGIN PROJECT_NUMBER-->&#160;<span id="projectnumber">$projectnumber</span><!--END PROJECT_NUMBER-->
+   </div>
+   <!--BEGIN PROJECT_BRIEF--><div id="projectbrief">$projectbrief</div><!--END PROJECT_BRIEF-->
   </td>
+  <!--END PROJECT_NAME-->
+  <!--BEGIN !PROJECT_NAME-->
+   <!--BEGIN PROJECT_BRIEF-->
+    <td style="padding-left: 0.5em;">
+    <div id="projectbrief">$projectbrief</div>
+    </td>
+   <!--END PROJECT_BRIEF-->
+  <!--END !PROJECT_NAME-->
+  <!--BEGIN DISABLE_INDEX-->
+   <!--BEGIN SEARCHENGINE-->
+   <td>$searchbox</td>
+   <!--END SEARCHENGINE-->
+  <!--END DISABLE_INDEX-->
  </tr>
  </tbody>
 </table>
 </div>
-	
+<!--END TITLEAREA-->

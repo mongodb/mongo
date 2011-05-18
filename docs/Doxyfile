@@ -1,4 +1,4 @@
-# Doxyfile 1.7.3
+# Doxyfile 1.7.4
 
 # This file describes the settings to be used by the documentation system
 # doxygen (www.doxygen.org) for a project
@@ -33,8 +33,8 @@ PROJECT_NAME           = WiredTiger
 
 PROJECT_NUMBER         = "Version 1.0"
 
-# Using the PROJECT_BRIEF tag one can provide an optional one line description
-# for a project that appears at the top of each page and should give viewer
+# Using the PROJECT_BRIEF tag one can provide an optional one line description 
+# for a project that appears at the top of each page and should give viewer 
 # a quick idea about the purpose of the project. Keep the description short.
 
 PROJECT_BRIEF          = 
@@ -44,7 +44,7 @@ PROJECT_BRIEF          =
 # exceed 55 pixels and the maximum width should not exceed 200 pixels. 
 # Doxygen will copy the logo to the output directory.
 
-PROJECT_LOGO           = 
+PROJECT_LOGO           = images/LogoFinal-header.png
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) 
 # base path where the generated documentation will be put. 
@@ -202,24 +202,22 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = \
-                         "errors=\returns zero on success and a non-zero error code on failure" \
+ALIASES                = "errors=\returns zero on success and a non-zero error code on failure" \
                          "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
-			 "hrow{1}=<tr><th>\1</th></tr>" \
-			 "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
-			 "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \
-			 "hrow{4}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th></tr>" \
-			 "hrow{5}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th><th>\5</th></tr>" \
-			 "row{1}=<tr><td>\1</td></tr>" \
-			 "row{2}=<tr><td>\1</td><td>\2</td></tr>" \
-			 "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
-			 "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
-			 "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>" \
+                         "hrow{1}=<tr><th>\1</th></tr>" \
+                         "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
+                         "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \
+                         "hrow{4}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th></tr>" \
+                         "hrow{5}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th><th>\5</th></tr>" \
+                         "row{1}=<tr><td>\1</td></tr>" \
+                         "row{2}=<tr><td>\1</td><td>\2</td></tr>" \
+                         "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
+                         "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
+                         "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>" \
                          "configstart{2}=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table>@hrow{Key,Effect [Default]}" \
                          "config{2}=\row{\1,\2}" \
                          "configend=</table>" \
-                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
-			 
+                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted."
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 
@@ -302,6 +300,13 @@ DISTRIBUTE_GROUP_DOC   = NO
 # the \nosubgrouping command.
 
 SUBGROUPING            = YES
+
+# When the INLINE_GROUPED_CLASSES tag is set to YES, classes, structs and 
+# unions are shown inside the group in which they are included (e.g. using 
+# @ingroup) instead of on a separate page (for HTML and Man pages) or 
+# section (for LaTeX and RTF).
+
+INLINE_GROUPED_CLASSES = NO
 
 # When TYPEDEF_HIDES_STRUCT is enabled, a typedef of a struct, union, or enum 
 # is documented as struct, union, or enum with the name of the typedef. So 
@@ -478,10 +483,10 @@ SORT_GROUP_NAMES       = YES
 
 SORT_BY_SCOPE_NAME     = YES
 
-# If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to
+# If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to 
 # do proper type resolution of all parameters of a function it will reject a 
-# match between the prototype and the implementation of a member function even
-# if there is only one candidate or it is obvious which candidate to choose
+# match between the prototype and the implementation of a member function even 
+# if there is only one candidate or it is obvious which candidate to choose 
 # by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen 
 # will still accept a match between prototype and implementation in such cases.
 
@@ -874,7 +879,14 @@ HTML_FILE_EXTENSION    = .html
 
 # The HTML_HEADER tag can be used to specify a personal HTML header for 
 # each generated HTML page. If it is left blank doxygen will generate a 
-# standard header.
+# standard header. Note that when using a custom header you are responsible 
+# for the proper inclusion of any scripts and style sheets that doxygen 
+# needs, which is dependent on the configuration options used. 
+# It is adviced to generate a default header using "doxygen -w html 
+# header.html footer.html stylesheet.css YourConfigFile" and then modify 
+# that header. Note that the header is subject to change so you typically 
+# have to redo this when upgrading to a newer version of doxygen or when
+# changing the value of configuration settings such as GENERATE_TREEVIEW!
 
 HTML_HEADER            = style/header.html
 
@@ -892,6 +904,15 @@ HTML_FOOTER            = style/footer.html
 # stylesheet in the HTML output directory as well, or it will be erased!
 
 HTML_STYLESHEET        = style/wiredtiger.css
+
+# The HTML_EXTRA_FILES tag can be used to specify one or more extra images or 
+# other source files which should be copied to the HTML output directory. Note 
+# that these files will be copied to the base HTML output directory. Use the 
+# $relpath$ marker in the HTML_HEADER and/or HTML_FOOTER files to load these 
+# files. In the HTML_STYLESHEET file, use the file name only. Also note that 
+# the files will be copied as-is; there are no commands or markers available.
+
+HTML_EXTRA_FILES       = 
 
 # The HTML_COLORSTYLE_HUE tag controls the color of the HTML output. 
 # Doxygen will adjust the colors in the stylesheet and background images 
@@ -1095,10 +1116,10 @@ ECLIPSE_DOC_ID         = org.doxygen.Project
 
 DISABLE_INDEX          = NO
 
-# This tag can be used to set the number of enum values (range [0,1..20]) 
-# that doxygen will group on one line in the generated HTML documentation. 
-# Note that a value of 0 will completely suppress the enum values from
-# appearing in the overview section.
+# The ENUM_VALUES_PER_LINE tag can be used to set the number of enum values 
+# (range [0,1..20]) that doxygen will group on one line in the generated HTML 
+# documentation. Note that a value of 0 will completely suppress the enum 
+# values from appearing in the overview section.
 
 ENUM_VALUES_PER_LINE   = 4
 
@@ -1157,7 +1178,7 @@ USE_MATHJAX            = NO
 # HTML output directory using the MATHJAX_RELPATH option. The destination 
 # directory should contain the MathJax.js script. For instance, if the mathjax 
 # directory is located at the same level as the HTML output directory, then 
-# MATHJAX_RELPATH should be ../mathjax. The default value points to the
+# MATHJAX_RELPATH should be ../mathjax. The default value points to the 
 # mathjax.org site, so you can quickly see the result without installing 
 # MathJax, but it is strongly recommended to install a local copy of MathJax 
 # before deployment.
@@ -1236,6 +1257,13 @@ EXTRA_PACKAGES         =
 # standard header. Notice: only use this tag if you know what you are doing!
 
 LATEX_HEADER           = 
+
+# The LATEX_FOOTER tag can be used to specify a personal LaTeX footer for 
+# the generated latex document. The footer should contain everything after 
+# the last chapter. If it is left blank doxygen will generate a 
+# standard footer. Notice: only use this tag if you know what you are doing!
+
+LATEX_FOOTER           = 
 
 # If the PDF_HYPERLINKS tag is set to YES, the LaTeX that is generated 
 # is prepared for conversion to pdf (using ps2pdf). The pdf file will 
@@ -1444,7 +1472,7 @@ MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
 
 # If the SEARCH_INCLUDES tag is set to YES (the default) the includes files 
-# in the INCLUDE_PATH (see below) will be search if a #include is found.
+# pointed to by INCLUDE_PATH will be searched when a #include is found.
 
 SEARCH_INCLUDES        = YES
 
@@ -1469,12 +1497,20 @@ INCLUDE_FILE_PATTERNS  =
 # undefined via #undef or recursively expanded use the := operator 
 # instead of the = operator.
 
-PREDEFINED             = DOXYGEN
+PREDEFINED             = DOXYGEN \
+                         wt_item=WT_ITEM \
+                         wt_cursor=WT_CURSOR \
+                         wt_session=WT_SESSION \
+                         wt_connection=WT_CONNECTION \
+                         wt_event_handler=WT_EVENT_HANDLER \
+                         wt_collator=WT_COLLATOR \
+                         wt_cursor_type=WT_CURSOR_TYPE \
+                         wt_extractor=WT_EXTRACTOR
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 # this tag can be used to specify a list of macro names that should be expanded. 
 # The macro definition that is found in the sources will be used. 
-# Use the PREDEFINED tag if you want to use a different macro definition that
+# Use the PREDEFINED tag if you want to use a different macro definition that 
 # overrules the definition found in the source code.
 
 EXPAND_AS_DEFINED      = 
@@ -1666,7 +1702,7 @@ GRAPHICAL_HIERARCHY    = YES
 DIRECTORY_GRAPH        = YES
 
 # The DOT_IMAGE_FORMAT tag can be used to set the image format of the images 
-# generated by dot. Possible values are png, svg, gif or svg. 
+# generated by dot. Possible values are svg, png, jpg, or gif. 
 # If left blank png will be used.
 
 DOT_IMAGE_FORMAT       = png

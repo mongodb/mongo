@@ -11,6 +11,12 @@ h1 {
 	font-size: 150%;
 }
 
+.title {
+	font-size: 150%;
+	font-weight: bold;
+	margin: 10px 2px;
+}
+
 h2 {
 	font-size: 120%;
 }
@@ -184,16 +190,9 @@ body {
 }
 
 div.contents {
-	/*
-	background-image: url(../images/LogoFace-watermark.png);
-	background-repeat: no-repeat;
-	background-attachment: fixed;
-	background-position: center top; 
-	*/
-
 	margin-top: 10px;
 	margin-left: 10px;
-	margin-right: 10px;
+	margin-right: 5px;
 }
 
 td.indexkey {
@@ -369,6 +368,10 @@ table.memberdecls {
         white-space: nowrap;
 }
 
+.memItemRight {
+	width: 100%;
+}
+
 .memTemplParams {
 	color: #4665A2;
         white-space: nowrap;
@@ -396,9 +399,14 @@ table.memberdecls {
 	padding: 2px;
 }
 
+.mempage {
+	width: 100%;
+}
+
 .memitem {
 	padding: 0;
 	margin-bottom: 10px;
+	margin-right: 5px;
 }
 
 .memname {
@@ -809,5 +817,25 @@ dl.bug
 	margin: 0px;
 	width: 100%;
 	border-bottom: 1px solid #5373B4;
+}
+
+.image
+{
+        text-align: center;
+}
+
+.dotgraph
+{
+        text-align: center;
+}
+
+.mscgraph
+{
+        text-align: center;
+}
+
+.caption
+{
+	font-weight: bold;
 }
 
