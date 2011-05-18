@@ -929,6 +929,13 @@ doneCheckOrder:
             _currentQps->recoverFromYield();   
         }
     }
+    
+    shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
+        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
+            return shared_ptr<Cursor>();
+        }
+        return _currentQps->firstPlan()->newCursor();
+    }
 
     bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
         NamespaceDetails *nsd = nsdetails( _ns );

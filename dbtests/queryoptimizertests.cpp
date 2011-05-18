@@ -36,6 +36,7 @@ namespace mongo {
         runQuery( m, q, response );
     }
     void __forceLinkGeoPlugin();
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
 } // namespace mongo
 
 namespace QueryOptimizerTests {
@@ -2423,6 +2424,110 @@ namespace QueryOptimizerTests {
             }
         };
         
+        namespace GetCursor {
+            
+            class Base : public QueryOptimizerCursorTests::Base {
+            public:
+                Base() {
+                    // create collection
+                    _cli.insert( ns(), BSON( "_id" << 5 ) );
+                }
+                virtual ~Base() {}
+                void run() {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), query(), order() );
+                    string type = c->toString().substr( 0, expectedType().length() );
+                    ASSERT_EQUALS( expectedType(), type );
+                    check( c );
+                }
+            protected:
+                virtual string expectedType() const = 0;
+                virtual BSONObj query() const { return BSONObj(); }
+                virtual BSONObj order() const { return BSONObj(); }
+                virtual void check( const shared_ptr<Cursor> &c ) {
+                    ASSERT( c->ok() );
+                    ASSERT( !c->matcher() );
+                    ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
+                    ASSERT( !c->advance() );
+                }
+            };
+            
+            class NoConstraints : public Base {
+                string expectedType() const { return "BasicCursor"; }
+            };
+
+            class SimpleId : public Base {
+            public:
+                SimpleId() {
+                    _cli.insert( ns(), BSON( "_id" << 0 ) );
+                    _cli.insert( ns(), BSON( "_id" << 10 ) );
+                }
+                string expectedType() const { return "BtreeCursor _id_"; }
+                BSONObj query() const { return BSON( "_id" << 5 ); }
+            };
+
+            class OptimalIndex : public Base {
+            public:
+                OptimalIndex() {
+                    _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                    _cli.insert( ns(), BSON( "a" << 5 ) );
+                    _cli.insert( ns(), BSON( "a" << 6 ) );
+                }
+                string expectedType() const { return "BtreeCursor a_1"; }
+                BSONObj query() const { return BSON( "a" << GTE << 5 ); }
+                void check( const shared_ptr<Cursor> &c ) {
+                    ASSERT( c->ok() );
+                    ASSERT( c->matcher() );
+                    ASSERT_EQUALS( 5, c->current().getIntField( "a" ) );
+                    ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                    ASSERT( c->advance() );                    
+                    ASSERT_EQUALS( 6, c->current().getIntField( "a" ) );
+                    ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                    ASSERT( !c->advance() );                    
+                }
+            };
+            
+            class Geo : public Base {
+            public:
+                Geo() {
+                    _cli.insert( ns(), BSON( "_id" << 44 << "loc" << BSON_ARRAY( 44 << 45 ) ) );
+                    _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
+                }
+                string expectedType() const { return "GeoSearchCursor"; }
+                BSONObj query() const { return fromjson( "{ loc : { $near : [50,50] } }" ); }
+                void check( const shared_ptr<Cursor> &c ) {
+                    ASSERT( c->ok() );
+                    ASSERT( c->matcher() );
+                    ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                    ASSERT_EQUALS( 44, c->current().getIntField( "_id" ) );
+                    ASSERT( !c->advance() );
+                }
+            };
+            
+            class OutOfOrder : public QueryOptimizerCursorTests::Base {
+            public:
+                void run() {
+                    _cli.insert( ns(), BSON( "_id" << 5 ) );
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "b" << 1 ) );
+                    ASSERT( !c );
+                }
+            };
+
+            class MultiIndex : public Base {
+            public:
+                MultiIndex() {
+                    _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                }
+                string expectedType() const { return "QueryOptimizerCursor"; }
+                BSONObj query() const { return BSON( "_id" << GT << 0 << "a" << GT << 0 ); }
+                void check( const shared_ptr<Cursor> &c ) {}
+            };
+            
+        } // namespace GetCursor
+        
     } // namespace QueryOptimizerCursorTests
 
     class All : public Suite {
@@ -2525,6 +2630,12 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::KillOp>();
             add<QueryOptimizerCursorTests::KillOpFirstClause>();
             add<QueryOptimizerCursorTests::Nscanned>();
+            add<QueryOptimizerCursorTests::GetCursor::NoConstraints>();
+            add<QueryOptimizerCursorTests::GetCursor::SimpleId>();
+            add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
+            add<QueryOptimizerCursorTests::GetCursor::Geo>();
+            add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
+            add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
         }
     } myall;
 

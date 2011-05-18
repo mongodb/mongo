@@ -248,6 +248,8 @@ namespace mongo {
         bool prepareToYield();
         void recoverFromYield();
         
+        QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
+        
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
         BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
@@ -380,6 +382,12 @@ namespace mongo {
         bool prepareToYield();
         void recoverFromYield();
         
+        /**
+         * @return a single simple cursor if the scanner would run a single cursor
+         * for this query, otherwise return an empty shared_ptr.
+         */
+        shared_ptr<Cursor> singleCursor() const;
+        
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */
@@ -499,34 +507,13 @@ namespace mongo {
     bool isSimpleIdQuery( const BSONObj& query );
 
     /**
-     * @return a single cursor that may work well for the given query.  The returned cursor will
-     * always have a matcher().
+     * @return a single cursor that may work well for the given query.
      * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
      * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
      * no suitable indices exist.
      */
     shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
-    /**
-     * @return a cursor interface to the query optimizer.  The implementation may
-     * utilize a single query plan or interleave results from multiple query
-     * plans before settling on a single query plan.  Note that the schema of
-     * currKey() documents, the matcher(), and the isMultiKey() nature of the
-     * cursor may change over the course of iteration.
-     *
-     * @param order - If no index exists that satisfies this sort order, an
-     * empty shared_ptr will be returned.
-     *
-     * The returned cursor may @throw inside of advance() or recoverFromYield() in
-     * certain error cases, for example if a capped overrun occurred during a yield.
-     * This indicates that the cursor was unable to perform a complete scan.
-     *
-     * This is a work in progress.  Partial list of features not yet implemented:
-     * - modification of scanned documents
-     * - covered indexes
-     */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
-    
     /**
      * Add-on functionality for queryutil classes requiring access to indexing
      * functionality not currently linked to mongos.

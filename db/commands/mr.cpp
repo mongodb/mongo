@@ -975,7 +975,7 @@ namespace mongo {
                         }
 
                         // obtain cursor on data to apply mr to, sorted
-                        shared_ptr<Cursor> temp = newQueryOptimizerCursor( config.ns.c_str(), config.filter, config.sort );
+                        shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
 
                         Timer mt;

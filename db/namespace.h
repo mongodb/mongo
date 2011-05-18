@@ -433,6 +433,26 @@ namespace mongo {
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
         static void clearForPrefix(const char *prefix);
 
+        /**
+         * @return a cursor interface to the query optimizer.  The implementation may
+         * utilize a single query plan or interleave results from multiple query
+         * plans before settling on a single query plan.  Note that the schema of
+         * currKey() documents, the matcher(), and the isMultiKey() nature of the
+         * cursor may change over the course of iteration.
+         *
+         * @param order - If no index exists that satisfies this sort order, an
+         * empty shared_ptr will be returned.
+         *
+         * The returned cursor may @throw inside of advance() or recoverFromYield() in
+         * certain error cases, for example if a capped overrun occurred during a yield.
+         * This indicates that the cursor was unable to perform a complete scan.
+         *
+         * This is a work in progress.  Partial list of features not yet implemented:
+         * - modification of scanned documents
+         * - covered indexes
+         */
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
+                                     
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
     private:

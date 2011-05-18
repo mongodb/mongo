@@ -20,6 +20,7 @@
 #include "queryoptimizer.h"
 #include "pdfile.h"
 #include "clientcursor.h"
+#include "btree.h"
 
 namespace mongo {
     
@@ -125,8 +126,8 @@ namespace mongo {
     
     class QueryOptimizerCursor : public Cursor {
     public:
-        QueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ):
-        _mps( new MultiPlanScanner( ns, query, order ) ), // mayYield == false
+        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps ) :
+        _mps( mps ),
         _originalOp( new QueryOptimizerCursorOp( _nscanned ) ),
         _currOp(),
         _nscanned() {
@@ -278,14 +279,50 @@ namespace mongo {
         long long _nscanned;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( ns, query, order ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
         } catch( const AssertionException &e ) {
             // If there is an error off the bat it generally means there are no indexes
             // satisfying 'order'.  We return an empty shared_ptr in this case.
             return shared_ptr<Cursor>();
         }
+        return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
+    }
+    
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
+        return newQueryOptimizerCursor( mps );
+    }
+    
+    shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        if ( query.isEmpty() && order.isEmpty() ) {
+            // TODO This will not use a covered index.
+            return theDataFileMgr.findAll( ns );
+        }
+        if ( isSimpleIdQuery( query ) ) {
+            Database *database = cc().database();
+            assert( database );
+            NamespaceDetails *d = database->namespaceIndex.details(ns);
+            if ( d ) {
+                int idxNo = d->findIdIndex();
+                if ( idxNo >= 0 ) {
+                    IndexDetails& i = d->idx( idxNo );
+                    BSONObj key = i.getKeyFromQuery( query );
+                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                }
+            }
+        }
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
+        shared_ptr<Cursor> single = mps->singleCursor();
+        if ( single ) {
+            if ( !query.isEmpty() && !single->matcher() ) {
+                shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
+                single->setMatcher( matcher );
+            }
+            return single;
+        }
+        return newQueryOptimizerCursor( mps );
     }
     
 } // namespace mongo;

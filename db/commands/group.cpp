@@ -86,7 +86,7 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = newQueryOptimizerCursor(ns.c_str() , query);
+            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
 
             while ( cursor->ok() ) {
                 if ( ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) ||
