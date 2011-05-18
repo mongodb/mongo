@@ -484,7 +484,7 @@ namespace mongo {
                           << " ns: " << _ns << " " << _min << " -> " << _max
                           << migrateLog;
                 result.appendBool( "chunkTooBig" , true );
-                result.appendNumber( "chunkSize" , (long long)(recCount * avgRecSize) );
+                result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
                 return false;
             }
