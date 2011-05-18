@@ -46,3 +46,14 @@ var config = master.getDB("local").system.replset.findOne();
 assert.eq(oldVersion, config.version);
 
 replTest.stopSet();
+
+replTest2 = new ReplSetTest({name : 'testSet2', nodes : 1});
+nodes = replTest2.startSet();
+
+result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2", members : [
+    {_id : 0, tags : ["member0"]}
+   ]}});
+
+assert(result.errmsg.match(/bad or missing host field/));
+
+replTest2.stopSet();

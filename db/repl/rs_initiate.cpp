@@ -249,6 +249,11 @@ namespace mongo {
                     errmsg = string("couldn't initiate : ") + e.what();
                 return false;
             }
+            catch( string& e2 ) {
+                log() << e2 << rsLog;
+                errmsg = e2;
+                return false;
+            }
 
             return true;
         }
