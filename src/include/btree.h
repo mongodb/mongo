@@ -741,10 +741,6 @@ struct __wt_insert {
  * of the in-memory structurees to always reference the page.  Instead, walk the
  * original page at the same time we walk the in-memory structures so we can
  * find the original key WT_CELL.
- *
- * XXX
- * Simplify WT_ROW_REF_AND_KEY_FOREACH -- it's not really variable length pairs,
- * it's a WT_CELL followed by an off-page reference.
  */
 #define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)		\
 	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
