@@ -1008,6 +1008,7 @@ namespace QueryOptimizerTests {
                 }
             }
             shared_ptr<Cursor> c() { return _c; }
+            long long nscanned() const { return _c->nscanned(); }
         private:
             shared_ptr<Cursor> _c;
         };
@@ -2398,6 +2399,30 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class Nscanned : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 120; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << i << "a" << i ) );
+                }
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "_id" << GTE << 0 << "a" << GTE << 0 ) );
+                ASSERT( c->ok() );
+                ASSERT_EQUALS( 2, c->nscanned() );
+                c->advance();
+                ASSERT( c->ok() );
+                ASSERT_EQUALS( 2, c->nscanned() );
+                c->advance();
+                for( int i = 3; i < 222; ++i ) {
+                    ASSERT( c->ok() );
+                    c->advance();
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
     } // namespace QueryOptimizerCursorTests
 
     class All : public Suite {
@@ -2499,6 +2524,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::RecordedOrderInvalid>();
             add<QueryOptimizerCursorTests::KillOp>();
             add<QueryOptimizerCursorTests::KillOpFirstClause>();
+            add<QueryOptimizerCursorTests::Nscanned>();
         }
     } myall;
 

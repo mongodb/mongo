@@ -25,7 +25,7 @@ namespace mongo {
     
     class QueryOptimizerCursorOp : public QueryOp {
     public:
-        QueryOptimizerCursorOp() : _matchCount(), _mustAdvance(), _nscanned() {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned ) : _matchCount(), _mustAdvance(), _nscanned(), _aggregateNscanned( aggregateNscanned ) {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
@@ -33,6 +33,7 @@ namespace mongo {
             }
             _c = qp().newCursor();
             _capped = _c->capped();
+            mayAdvance();
         }
         
         virtual long long nscanned() {
@@ -86,14 +87,13 @@ namespace mongo {
                 return;
             }
             
-            _nscanned = _c->nscanned();
             if ( matcher( _c )->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
                 ++_matchCount;
             }
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp();
+            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned );
             ret->_matchCount = _matchCount;
             return ret;
         }
@@ -109,6 +109,8 @@ namespace mongo {
                 _c->advance();
                 _mustAdvance = false;
             }
+            _aggregateNscanned += ( _c->nscanned() - _nscanned );
+            _nscanned = _c->nscanned();
         }
         int _matchCount;
         bool _mustAdvance;
@@ -118,14 +120,16 @@ namespace mongo {
         ClientCursor::CleanupPointer _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
+        long long &_aggregateNscanned;
     };
     
     class QueryOptimizerCursor : public Cursor {
     public:
         QueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ):
         _mps( new MultiPlanScanner( ns, query, order ) ), // mayYield == false
-        _originalOp( new QueryOptimizerCursorOp() ),
-        _currOp() {
+        _originalOp( new QueryOptimizerCursorOp( _nscanned ) ),
+        _currOp(),
+        _nscanned() {
             _mps->initialOp( _originalOp );
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
@@ -168,7 +172,11 @@ namespace mongo {
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
-	                _takeover.reset( new MultiCursor( _mps, qocop->cursor(), op->matcher( qocop->cursor() ), *op ) );
+                    _takeover.reset( new MultiCursor( _mps,
+                                                     qocop->cursor(),
+                                                     op->matcher( qocop->cursor() ),
+                                                     *op,
+                                                     _nscanned - qocop->cursor()->nscanned() ) );
                 }
             }
             
@@ -229,7 +237,7 @@ namespace mongo {
         
         virtual bool modifiedKeys() const { return true; }
         
-        virtual long long nscanned() { return -1; }
+        virtual long long nscanned() { return _takeover ? _takeover->nscanned() : _nscanned; }
 
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
             assertOk();
@@ -267,6 +275,7 @@ namespace mongo {
         QueryOptimizerCursorOp *_currOp;
         set<DiskLoc> _dups;
         shared_ptr<Cursor> _takeover;
+        long long _nscanned;
     };
     
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {

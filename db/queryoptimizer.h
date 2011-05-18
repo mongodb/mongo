@@ -428,8 +428,14 @@ namespace mongo {
         };
         /** takes ownership of 'op' */
         MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false );
-        /** used to handoff a query to a getMore() */
-        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op );
+        /**
+         * Used
+         * 1. To handoff a query to a getMore()
+         * 2. To handoff a QueryOptimizerCursor
+         * @param nscanned is an optional initial value, if not supplied nscanned()
+         * will always return -1
+         */
+        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op, long long nscanned = -1 );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -517,7 +523,7 @@ namespace mongo {
      *
      * This is a work in progress.  Partial list of features not yet implemented:
      * - modification of scanned documents
-     * - stats like nscanned
+     * - covered indexes
      */
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
     
