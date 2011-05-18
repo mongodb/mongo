@@ -16,7 +16,6 @@ static int __wt_api_arg_min(SESSION *, const char *, uint64_t, uint64_t);
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	BTREE *btree;
 	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	SESSION *session;
@@ -32,15 +31,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
 
-	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
-		TAILQ_REMOVE(&session->btrees, btree_session, q);
-		btree = btree_session->btree;
-		__wt_free(session, btree_session->key_format);
-		__wt_free(session, btree_session->value_format);
-		__wt_free(session, btree_session);
-		session->btree = btree;
-		WT_TRET(__wt_btree_close(session));
-	}
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
+		WT_TRET(__wt_session_remove_btree(session, btree_session));
 
 	__wt_lock(session, conn->mtx);
 	if (!F_ISSET(session, WT_SESSION_INTERNAL))
