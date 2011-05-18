@@ -182,16 +182,14 @@ struct __wt_page_disk {
 
 	/*
 	 * End the the WT_PAGE_DISK structure with 3 bytes of padding: it wastes
-	 * space, but it leaves the WT_PAGE_DISK structure aligned and having a
-	 * small amount of space to play with in the future can't hurt.
+	 * space, but it leaves the WT_PAGE_DISK structure 32-bit aligned and
+	 * having a small amount of space to play with in the future can't hurt.
 	 */
 	uint8_t unused[3];		/* 33-35: unused padding */
 };
 /*
  * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
- * The header is followed by WT_CELL structures, which require 4-byte
- * alignment.
  */
 #define	WT_PAGE_DISK_SIZE		36
 
@@ -283,9 +281,10 @@ struct __wt_row_ref {
 	 *
 	 * If a key requires processing (for example, an overflow key or Huffman
 	 * encoded key), the key field points to the on-page key, and the size
-	 * is set to 0 to indicate the key is not yet processed.
+	 * is set to WT_NEEDS_PROCESS to indicate the key is not yet processed.
 	 */
 	void	 *key;			/* Key */
+#define	WT_NEEDS_PROCESS	0
 	uint32_t  size;			/* Key length */
 
 	WT_REF	  ref;			/* Subtree page */
@@ -391,7 +390,7 @@ struct __wt_page {
 	 * (although we should be able to release memory from the MVCC list as
 	 * soon as there's no running thread/txn which might want that version
 	 * of the data).   I've used 32-bit types instead of 16-bit types as I
-	 * am not positive a 16-bit write to memory will always be atomic.
+	 * am less confident a 16-bit write to memory will be atomic.
 	 */
 #define	WT_PAGE_SET_MODIFIED(p) do {					\
 	++(p)->write_gen;						\
@@ -574,8 +573,8 @@ struct __wt_col {
 	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
 	 *
 	 * The on-page data is untyped for column-store pages -- if the page
-	 * has variable-length objects, it's a WT_CELL layout, like row-store
-	 * pages.  If the page has fixed-length objects, it's untyped bytes.
+	 * has variable-length objects, it's a WT_CELL (like row-store pages).
+	 * If the page has fixed-length objects, it's untyped bytes.
 	 */
 	uint32_t value;
 };
@@ -742,6 +741,10 @@ struct __wt_insert {
  * of the in-memory structurees to always reference the page.  Instead, walk the
  * original page at the same time we walk the in-memory structures so we can
  * find the original key WT_CELL.
+ *
+ * XXX
+ * Simplify WT_ROW_REF_AND_KEY_FOREACH -- it's not really variable length pairs,
+ * it's a WT_CELL followed by an off-page reference.
  */
 #define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)		\
 	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
@@ -749,7 +752,7 @@ struct __wt_insert {
 	    (i) > 0;							\
 	    ++(rref),							\
 	    key_cell = --(i) == 0 ?					\
-	    NULL : WT_CELL_NEXT(WT_CELL_NEXT(key_cell)))
+	    NULL : __wt_cell_next(__wt_cell_next(key_cell)))
 #define	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i)			\
 	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
 	    (rip) = (page)->u.row_leaf.d, (i) = (page)->entries;	\
@@ -760,45 +763,21 @@ struct __wt_insert {
 
 /*
  * WT_CELL --
- *	Cell type plus trailing data length (in bytes).
+ *	Variable-length cell type plus trailing data length (in bytes).
  *
- * After the page header, on pages with variable-length data, there are
- * variable-length cells (all page types except WT_PAGE_COL_{INT,FIX,RLE}),
- * comprised of a list of WT_CELLs in sorted order.  Or, specifically, 4
- * bytes followed by a variable length chunk.
- *
- * The first 8 bits of that 4 bytes holds a cell type, followed by an cell
- * length.  The cell type defines the following set of bytes and the cell
- * length specifies how long the cell is.
- *
- * We encode the length and type in a 4-byte value to minimize the on-page
- * footprint as well as maintain alignment of the bytes that follow the cell.
- * (The trade-off is this limits on-page file key or data cells to 16MB.)
- * The bottom 24-bits are the length of the subsequent data, the next 4-bits are
- * the type, and the top 4-bits are unused.   We could use the unused 4-bits to
- * provide more length, but 16MB seems sufficient for on-page cells.
+ * Pages containing variable-length data (WT_PAGE_ROW_LEAF, WT_PAGE_ROW_INT
+ * and WT_PAGE_COL_VAR page types), have variable-length cells after the
+ * page header.  Specifically, 1 byte followed by M bytes of data length,
+ * followed by N bytes of data.  The high 2 bits of the first byte specify
+ * how many bytes of data length follow, the low 3 bits of the first byte
+ * specify the cell type, and the middle 3 bits are currently unused.
  *
  * The __cell_chunk field should never be directly accessed, there are macros
- * to extract the type and length.
- *
- * WT_CELLs are aligned to a 4-byte boundary, so it's OK to directly access the
- * __cell_chunk field on the page.
+ * and in-line functions to manipulate the structure.
  */
-#define	WT_CELL_MAX_LEN	(16 * 1024 * 1024 - 1)
 struct __wt_cell {
-	uint32_t __cell_chunk;
+	uint8_t __cell_chunk[5];		/* cell: 2 to 5 bytes */
 };
-/*
- * WT_CELL_SIZE is the expected structure size -- we verify the build to make
- * sure the compiler hasn't inserted padding (which would break the world).
- */
-#define	WT_CELL_SIZE	4
-
-/*
- * WT_CELL_CLEAR --
- *	Fast clear of the cell, so we can set bits in it.
- */
-#define	WT_CELL_CLEAR(cell)	((cell)->__cell_chunk = 0)
 
 /*
  * There are 2 basic types: key and data cells, each of which has an overflow
@@ -839,60 +818,39 @@ struct __wt_cell {
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Variable-length data cells (WT_CELL_DATA/DATA_OVFL/DEL).
  *
- * There are currently 7 cell types, using 3 bits, with 5 spares.
+ * There are currently 7 cell types, using 3 bits.
+ *
+ * XXX
+ * Fix this: overflow/off/deleted cells don't need a length, we know how long
+ * they are.
  */
-#define	WT_CELL_KEY		0x00000000 /* Key */
-#define	WT_CELL_KEY_OVFL	0x01000000 /* Key: overflow */
-#define	WT_CELL_DATA		0x02000000 /* Data */
-#define	WT_CELL_DATA_OVFL	0x03000000 /* Data: overflow */
-#define	WT_CELL_DEL		0x04000000 /* Deleted */
-#define	WT_CELL_OFF		0x05000000 /* Off-page reference */
-#define	WT_CELL_OFF_RECORD	0x06000000 /* Off-page reference with records */
-
-#define	WT_CELL_TYPE(addr)						\
-	(((WT_CELL *)(addr))->__cell_chunk & 0x0f000000)
-#define	WT_CELL_LEN(addr)						\
-	(((WT_CELL *)(addr))->__cell_chunk & 0x00ffffff)
-#define	WT_CELL_SET(addr, type, size)					\
-	(((WT_CELL *)(addr))->__cell_chunk = (type) | (size))
-#define	WT_CELL_SET_LEN(addr, size)					\
-	WT_CELL_SET(addr, WT_CELL_TYPE(addr), size)
-#define	WT_CELL_SET_TYPE(addr, type)					\
-	WT_CELL_SET(addr, type, WT_CELL_LEN(addr))
-
-/* WT_CELL_BYTE is the first data byte for a cell. */
-#define	WT_CELL_BYTE(addr)						\
-	((uint8_t *)(addr) + sizeof(WT_CELL))
+#define	WT_CELL_KEY		0x00	/* Key */
+#define	WT_CELL_KEY_OVFL	0x01	/* Key: overflow */
+#define	WT_CELL_DATA		0x02	/* Data */
+#define	WT_CELL_DATA_OVFL	0x03	/* Data: overflow */
+#define	WT_CELL_DEL		0x04	/* Deleted */
+#define	WT_CELL_OFF		0x05	/* Off-page reference */
+#define	WT_CELL_OFF_RECORD	0x06	/* Off-page reference with records */
+#define	WT_CELL_TYPE(cell)						\
+	(((WT_CELL *)(cell))->__cell_chunk[0] & 0x07)
 
 /*
- * On row-store pages, the on-page data referenced by the WT_ROW data field
- * may be WT_OFF, WT_OFF_RECORD or WT_OVFL structures.  These macros do the
- * cast to the right type.
+ * WT_CELL_{1,2,3,4}_BYTE --
+ *	  The high 2 bits of the first byte specify how many bytes of data
+ * length follow.
  */
-#define	WT_CELL_BYTE_OFF(cell)						\
-	((WT_OFF *)(WT_CELL_BYTE(cell)))
-#define	WT_CELL_BYTE_OFF_RECORD(cell)					\
-	((WT_OFF_RECORD *)(WT_CELL_BYTE(cell)))
-#define	WT_CELL_BYTE_OVFL(cell)						\
-	((WT_OVFL *)(WT_CELL_BYTE(cell)))
-
-/*
- * Bytes required to store a WT_CELL followed by additional bytes of data.
- * Align the WT_CELL and the subsequent data to a 4-byte boundary so the
- * WT_CELLs on a page all start at a 4-byte boundary.
- */
-#define	WT_CELL_SPACE_REQ(size)						\
-	WT_ALIGN(sizeof(WT_CELL) + (size), sizeof(uint32_t))
-
-/* WT_CELL_NEXT is the first byte of the next cell. */
-#define	WT_CELL_NEXT(cell)						\
-	((WT_CELL *)((uint8_t *)(cell) + WT_CELL_SPACE_REQ(WT_CELL_LEN(cell))))
+#define	WT_CELL_1_BYTE		(0x00 << 6)
+#define	WT_CELL_2_BYTE		(0x01 << 6)
+#define	WT_CELL_3_BYTE		(0x02 << 6)
+#define	WT_CELL_4_BYTE		(0x03 << 6)
+#define	WT_CELL_BYTES(cell)						\
+	(((WT_CELL *)(cell))->__cell_chunk[0] & (0x03 << 6))
 
 /* WT_CELL_FOREACH is a loop that walks the cells on a page */
 #define	WT_CELL_FOREACH(dsk, cell, i)					\
 	for ((cell) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries;					\
-	    (i) > 0; (cell) = WT_CELL_NEXT(cell), --(i))
+	    (i) > 0; (cell) = __wt_cell_next(cell), --(i))
 
 /*
  * WT_OFF --

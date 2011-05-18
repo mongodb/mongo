@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 /*
  * __wt_btcur_first --
@@ -166,8 +167,8 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 			switch (WT_CELL_TYPE(cell)) {
 			case WT_CELL_DATA:
 				if (cbt->btree->huffman_value == NULL) {
-					value->data = WT_CELL_BYTE(cell);
-					value->size = WT_CELL_LEN(cell);
+					__wt_cell_data_and_len(
+					    cell, &value->data, &value->size);
 					break;
 				}
 				/* FALLTHROUGH */
@@ -242,8 +243,8 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 			switch (WT_CELL_TYPE(cell)) {
 			case WT_CELL_DATA:
 				if (cbt->btree->huffman_value == NULL) {
-					value->data = WT_CELL_BYTE(cell);
-					value->size = WT_CELL_LEN(cell);
+					__wt_cell_data_and_len(
+					    cell, &value->data, &value->size);
 					break;
 				}
 				/* FALLTHROUGH */

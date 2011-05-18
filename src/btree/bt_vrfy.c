@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 /*
  * There's a bunch of stuff we pass around during verification, group it
@@ -458,6 +459,7 @@ static int
 __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
+	WT_OVFL ovfl;
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
@@ -485,9 +487,9 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
+			__wt_cell_ovfl(cell, &ovfl);
 			WT_RET(__wt_verify_overflow(session,
-			    WT_CELL_BYTE_OVFL(cell),
-			    entry_num, WT_PADDR(page), vs));
+			    &ovfl, entry_num, WT_PADDR(page), vs));
 		}
 	}
 	return (0);

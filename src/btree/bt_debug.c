@@ -7,15 +7,16 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_debug_cell(SESSION *, WT_CELL *, FILE *fp);
 static int  __wt_debug_cell_data(SESSION *, const WT_CELL *, FILE *);
 static void __wt_debug_col_insert(WT_INSERT *, FILE *);
+static int  __wt_debug_dsk_cell(SESSION *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_fix(BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(BTREE *, WT_PAGE_DISK *, FILE *);
-static int  __wt_debug_dsk_item(SESSION *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_int(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
@@ -160,7 +161,7 @@ __wt_debug_disk(
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		ret = __wt_debug_dsk_item(session, dsk, fp);
+		ret = __wt_debug_dsk_cell(session, dsk, fp);
 		break;
 	case WT_PAGE_COL_FIX:
 		__wt_debug_dsk_col_fix(btree, dsk, fp);
@@ -584,11 +585,11 @@ __wt_debug_update(WT_UPDATE *upd, FILE *fp)
 }
 
 /*
- * __wt_debug_dsk_item --
+ * __wt_debug_dsk_cell --
  *	Dump a page of WT_CELL's.
  */
 static int
-__wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
+__wt_debug_dsk_cell(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 {
 	WT_CELL *cell;
 	uint32_t i;
@@ -602,21 +603,21 @@ __wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 }
 
 /*
- * __wt_debug_item --
+ * __wt_debug_cell --
  *	Dump a single WT_CELL.
  */
 static int
 __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 {
-	WT_OFF *off;
-	WT_OFF_RECORD *off_record;
-	WT_OVFL *ovfl;
+	WT_OFF off;
+	WT_OFF_RECORD off_record;
+	WT_OVFL ovfl;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	fprintf(fp, "\t%s: len %lu",
-	    __wt_cell_type_string(cell), (u_long)WT_CELL_LEN(cell));
+	    __wt_cell_type_string(cell), (u_long)__wt_cell_datalen(cell));
 
 	switch (WT_CELL_TYPE(cell)) {
 	case WT_CELL_DATA:
@@ -625,21 +626,21 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
-		ovfl = WT_CELL_BYTE_OVFL(cell);
+		__wt_cell_ovfl(cell, &ovfl);
 		fprintf(fp, ", addr %lu, size %lu",
-		    (u_long)ovfl->addr, (u_long)ovfl->size);
+		    (u_long)ovfl.addr, (u_long)ovfl.size);
 		break;
 	case WT_CELL_OFF:
-		off = WT_CELL_BYTE_OFF(cell);
+		__wt_cell_off(cell, &off);
 		fprintf(fp, ", offpage: addr %lu, size %lu",
-		    (u_long)off->addr, (u_long)off->size);
+		    (u_long)off.addr, (u_long)off.size);
 		break;
 	case WT_CELL_OFF_RECORD:
-		off_record = WT_CELL_BYTE_OFF_RECORD(cell);
+		__wt_cell_off_record(cell, &off_record);
 		fprintf(fp,
 		    ", offpage: addr %lu, size %lu, starting recno %llu",
-		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECNO(off_record));
+		    (u_long)off_record.addr, (u_long)off_record.size,
+		    (unsigned long long)WT_RECNO(&off_record));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -746,8 +747,7 @@ __wt_debug_cell_data(SESSION *session, const WT_CELL *cell, FILE *fp)
 	case WT_CELL_DATA:
 		if (btree->huffman_value != NULL)
 			goto process;
-onpage:		p = WT_CELL_BYTE(cell);
-		size = WT_CELL_LEN(cell);
+onpage:		__wt_cell_data_and_len(cell, &p, &size);
 		break;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_DATA_OVFL:

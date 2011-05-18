@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 typedef struct {
 	void (*p)(const uint8_t *, uint32_t, FILE *);	/* Print function */
@@ -210,8 +211,8 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				dp->p(WT_CELL_BYTE(cell),
-				    WT_CELL_LEN(cell), dp->stream);
+				dp->p(__wt_cell_data(cell),
+				    __wt_cell_datalen(cell), dp->stream);
 				break;
 			}
 			/* FALLTHROUGH */
@@ -308,8 +309,8 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				value_local.data = WT_CELL_BYTE(cell);
-				value_local.size = WT_CELL_LEN(cell);
+				__wt_cell_data_and_len(
+				    cell, &value_local.data, &value_local.size);
 				value = &value_local;
 				break;
 			}

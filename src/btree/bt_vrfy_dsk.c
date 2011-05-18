@@ -6,17 +6,18 @@
  */
 
 #include "wt_internal.h"
+#include "cell.i"
 
 static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eop(SESSION *, uint32_t, uint32_t);
+static int __wt_verify_dsk_cell(
+    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_rle(
-    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_cell(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
@@ -135,13 +136,13 @@ __wt_verify_dsk_cell(
 	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
 	WT_CELL *cell;
-	WT_OVFL *ovfl;
-	WT_OFF *off;
-	WT_OFF_RECORD *off_record;
+	WT_OVFL ovfl;
+	WT_OFF off;
+	WT_OFF_RECORD off_record;
 	off_t file_size;
-	uint8_t *end;
+	uint8_t *p, *end;
 	void *huffman;
-	uint32_t i, cell_num, cell_len, cell_type;
+	uint32_t cell_num, cell_len, cell_type, i;
 	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 
 	btree = session->btree;
@@ -164,12 +165,34 @@ __wt_verify_dsk_cell(
 	WT_CELL_FOREACH(dsk, cell, i) {
 		++cell_num;
 
-		/* Check if this item is entirely on the page. */
-		if ((uint8_t *)cell + sizeof(WT_CELL) > end)
-			goto eop;
+		/*
+		 * Check if this cell is on the page, and if we can look at
+		 * the entire cell, check if the cell's data is entirely on
+		 * the page.
+		 */
+		p = (uint8_t *)cell;
+		switch (WT_CELL_BYTES(cell)) {
+			case WT_CELL_1_BYTE:
+				p += 2;
+				break;
+			case WT_CELL_2_BYTE:
+				p += 3;
+				break;
+			case WT_CELL_3_BYTE:
+				p += 4;
+				break;
+			case WT_CELL_4_BYTE:
+			default:
+				p += 5;
+				break;
+			}
+		if (p > end || (uint8_t *)(cell) + __wt_cell_len(cell) > end) {
+			ret = __wt_err_eop(session, cell_num, addr);
+			goto err;
+		}
 
 		cell_type = WT_CELL_TYPE(cell);
-		cell_len = WT_CELL_LEN(cell);
+		cell_len = __wt_cell_datalen(cell);
 
 		/* Check the cell's type. */
 		switch (cell_type) {
@@ -286,30 +309,26 @@ cell_len:			__wt_errx(session,
 			break;
 		}
 
-		/* Check if the cell is entirely on the page. */
-		if ((uint8_t *)WT_CELL_NEXT(cell) > end)
-			goto eop;
-
-		/* Check if the referenced item is entirely in the file. */
+		/* Check if any referenced item is entirely in the file. */
 		switch (cell_type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			ovfl = WT_CELL_BYTE_OVFL(cell);
-			if (WT_ADDR_TO_OFF(btree, ovfl->addr) +
-			    (off_t)WT_DISK_REQUIRED(session, ovfl->size) >
-			    file_size)
+			__wt_cell_ovfl(cell, &ovfl);
+			if (WT_ADDR_TO_OFF(btree, ovfl.addr) +
+			    (off_t)WT_DISK_REQUIRED(
+			    session, ovfl.size) > file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF:
-			off = WT_CELL_BYTE_OFF(cell);
-			if (WT_ADDR_TO_OFF(btree, off->addr) +
-			    (off_t)off->size > file_size)
+			__wt_cell_off(cell, &off);
+			if (WT_ADDR_TO_OFF(btree, off.addr) +
+			    (off_t)off.size > file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF_RECORD:
-			off_record = WT_CELL_BYTE_OFF_RECORD(cell);
-			if (WT_ADDR_TO_OFF(btree, off_record->addr) +
-			    (off_t)off_record->size > file_size)
+			__wt_cell_off_record(cell, &off_record);
+			if (WT_ADDR_TO_OFF(btree, off_record.addr) +
+			    (off_t)off_record.size > file_size)
 				goto eof;
 			break;
 		}
@@ -326,8 +345,8 @@ cell_len:			__wt_errx(session,
 		switch (cell_type) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
-				current->item.data = WT_CELL_BYTE(cell);
-				current->item.size = WT_CELL_LEN(cell);
+				__wt_cell_data_and_len(cell,
+				    &current->item.data, &current->item.size);
 				break;
 			}
 			/* FALLTHROUGH */
@@ -358,9 +377,6 @@ cell_len:			__wt_errx(session,
 
 	if (0) {
 eof:		ret = __wt_err_eof(session, cell_num, addr);
-	}
-	if (0) {
-eop:		ret = __wt_err_eop(session, cell_num, addr);
 	}
 
 	if (0) {

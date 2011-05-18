@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 struct __wt_stuff; 		typedef struct __wt_stuff WT_STUFF;
 struct __wt_track; 		typedef struct __wt_track WT_TRACK;
@@ -534,7 +535,7 @@ static int
 __slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
-	WT_OVFL *ovfl;
+	WT_OVFL ovfl;
 	uint32_t i, ovfl_cnt;
 
 	/*
@@ -554,9 +555,9 @@ __slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(dsk, cell, i)
 		if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
-			ovfl = WT_CELL_BYTE_OVFL(cell);
-			trk->ovfl[ovfl_cnt].addr = ovfl->addr;
-			trk->ovfl[ovfl_cnt].size = ovfl->size;
+			__wt_cell_ovfl(cell, &ovfl);
+			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
+			trk->ovfl[ovfl_cnt].size = ovfl.size;
 			++ovfl_cnt;
 		}
 	return (0);
@@ -570,7 +571,7 @@ static int
 __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
-	WT_OVFL *ovfl;
+	WT_OVFL ovfl;
 	uint32_t i, ovfl_cnt;
 
 	/*
@@ -596,9 +597,9 @@ __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			ovfl = WT_CELL_BYTE_OVFL(cell);
-			trk->ovfl[ovfl_cnt].addr = ovfl->addr;
-			trk->ovfl[ovfl_cnt].size = ovfl->size;
+			__wt_cell_ovfl(cell, &ovfl);
+			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
+			trk->ovfl[ovfl_cnt].size = ovfl.size;
 			++ovfl_cnt;
 			break;
 		}
@@ -1123,19 +1124,19 @@ __slvg_ovfl_col_inmem_ref(WT_PAGE *page, WT_STUFF *ss)
 {
 	WT_CELL *cell;
 	WT_COL *cip;
-	WT_OVFL *ovfl;
+	WT_OVFL ovfl;
 	WT_TRACK **searchp;
 	uint32_t i;
 
 	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
-		if (WT_CELL_TYPE(cell) != WT_CELL_DATA_OVFL)
-			continue;
-		ovfl = WT_CELL_BYTE_OVFL(cell);
-		searchp =
-		    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
-		    sizeof(WT_TRACK *), __slvg_ovfl_compare);
-		F_SET(*searchp, WT_TRACK_OVFL_REFD);
+		if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
+			__wt_cell_ovfl(cell, &ovfl);
+			searchp = bsearch(
+			    &ovfl, ss->ovfl, ss->ovfl_next,
+			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
+			F_SET(*searchp, WT_TRACK_OVFL_REFD);
+		}
 	}
 }
 
@@ -1634,7 +1635,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 {
 	WT_CELL *key_cell, *value_cell;
 	WT_ROW *rip;
-	WT_OVFL *ovfl;
+	WT_OVFL ovfl;
 	WT_TRACK **searchp;
 	uint32_t i;
 
@@ -1645,7 +1646,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 			continue;
 		}
 		if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL) {
-			ovfl = WT_CELL_BYTE_OVFL(key_cell);
+			__wt_cell_ovfl(key_cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
@@ -1653,7 +1654,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 		}
 		value_cell = WT_ROW_PTR(page, rip);
 		if (WT_CELL_TYPE(value_cell) == WT_CELL_DATA_OVFL) {
-			ovfl = WT_CELL_BYTE_OVFL(value_cell);
+			__wt_cell_ovfl(value_cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);

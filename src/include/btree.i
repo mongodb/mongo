@@ -89,36 +89,6 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_key_set --
- *	Set a key/size pair, where the key does not require further processing.
- */
-static inline void
-__wt_key_set(void *ref, const void *key, uint32_t size)
-{
-	/*
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
-	 */
-	((WT_ROW *)ref)->key = key;
-	((WT_ROW *)ref)->size = size;
-}
-
-/*
- * __wt_key_set_process --
- *	Set a key/size pair, where the key requires further processing.
- */
-static inline void
-__wt_key_set_process(void *ref, void *key)
-{
-	/*
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
-	 */
-	((WT_ROW *)ref)->key = key;
-	((WT_ROW *)ref)->size = 0;
-}
-
-/*
  * __wt_key_process --
  *	Return if a key requires processing.
  */
@@ -129,7 +99,7 @@ __wt_key_process(void *ref)
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
-	return (((WT_ROW *)ref)->size == 0 ? 1 : 0);
+	return (((WT_ROW *)ref)->size == WT_NEEDS_PROCESS ? 1 : 0);
 }
 
 /*
@@ -140,26 +110,6 @@ static inline int
 __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 {
 	return (page->write_gen == write_gen ? 0 : WT_RESTART);
-}
-
-/*
- * __wt_key_cell_next --
- *	Move to the next key WT_CELL on the page (helper function for the
- *	WT_ROW_AND_KEY_FOREACH macro).
- */
-static inline WT_CELL *
-__wt_key_cell_next(WT_CELL *key_cell)
-{
-	/*
-	 * Row-store leaf pages may have a single data cell between each key, or
-	 * keys may be adjacent (when the data cell is empty).  Move to the next
-	 * key.
-	 */
-	key_cell = WT_CELL_NEXT(key_cell);
-	if (WT_CELL_TYPE(key_cell) != WT_CELL_KEY &&
-	    WT_CELL_TYPE(key_cell) != WT_CELL_KEY_OVFL)
-		key_cell = WT_CELL_NEXT(key_cell);
-	return (key_cell);
 }
 
 /*

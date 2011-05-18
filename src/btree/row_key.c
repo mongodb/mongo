@@ -29,7 +29,6 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
 	rip = rip_arg;
-	cell = rip->key;
 
 	/*
 	 * Multiple threads of control may be searching this page, which means
@@ -49,7 +48,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * If it's on-page, we raced and we're done -- create the local copy for
 	 * our caller, if that's what they wanted.
 	 */
-	if (__wt_ref_off_page(page, cell, WT_PSIZE(page))) {
+	if (__wt_ref_off_page(page, rip->key, WT_PSIZE(page))) {
 		if (store == NULL)
 			return (0);
 		return (__wt_buf_set(session, store, rip->key, rip->size));
@@ -59,6 +58,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * If our user passes us a temporary buffer for storage, don't install
 	 * the key in the in-memory page, our caller just needs a local copy.
 	 */
+	cell = rip->key;
 	if (store != NULL)
 		return (__wt_cell_process(session, cell, store));
 

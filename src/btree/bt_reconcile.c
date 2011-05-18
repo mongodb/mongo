@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
 struct __rec_discard;		typedef struct __rec_discard WT_DISCARD;
@@ -224,13 +225,26 @@ static void __hazard_copy(SESSION *);
 static int  __hazard_exclusive(SESSION *, WT_REF *);
 static int  __hazard_qsort_cmp(const void *, const void *);
 
+/*
+ * When discarding a page, we discard a number of things: pages merged into the
+ * page, overflow items referenced by the page, and the underlying blocks.  It
+ * is all one discard family, but there are 3 different interfaces.
+ */
 #define	__rec_discard_add_block(session, addr, size)			\
 	__rec_discard_add(session, NULL, addr, size)
 #define	__rec_discard_add_page(session, page)				\
 	__rec_discard_add(session, page, WT_PADDR(page), WT_PSIZE(page))
-#define	__rec_discard_add_ovfl(session, ovfl)				\
-	__rec_discard_add(session, NULL,				\
-	    (ovfl)->addr, WT_DISK_REQUIRED(session, (ovfl)->size))
+
+static inline int __rec_discard_add_ovfl(SESSION *, WT_CELL *);
+static inline int
+__rec_discard_add_ovfl(SESSION *session, WT_CELL *cell)
+{
+	WT_OVFL ovfl;
+
+	__wt_cell_ovfl(cell, &ovfl);
+	return (__rec_discard_add(
+	    session, NULL, ovfl.addr, WT_DISK_REQUIRED(session, ovfl.size)));
+}
 
 /*
  * __rec_init --
@@ -849,9 +863,8 @@ __rec_split_init(
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
 
-	btree = session->btree;
-
 	r = S2C(session)->cache->rec;
+	btree = session->btree;
 
 	/* Ensure the scratch buffer is large enough. */
 	WT_RET(__wt_buf_setsize(session, &r->dsk, (size_t)max));
@@ -1108,14 +1121,13 @@ __rec_split_fixup(SESSION *session)
 	uint8_t *dsk_start;
 	int ret;
 
-	ret = 0;
-
 	/*
 	 * When we overflow physical limits of the page, we walk the list of
 	 * split chunks we've created and write those pages out, then update
 	 * the caller's information.
 	 */
 	r = S2C(session)->cache->rec;
+	ret = 0;
 
 	/*
 	 * The data isn't laid out on page-boundaries or nul-byte padded; copy
@@ -1354,9 +1366,9 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 	void *cipdata;
 	int ret;
 
+	r = S2C(session)->cache->rec;
 	btree = session->btree;
 	tmp = NULL;
-	r = S2C(session)->cache->rec;
 	ret = 0;
 
 	/*
@@ -1429,8 +1441,8 @@ __rec_col_fix_bulk(SESSION *session, WT_PAGE *page)
 	WT_UPDATE *upd;
 	uint32_t len;
 
-	btree = session->btree;
 	r = S2C(session)->cache->rec;
+	btree = session->btree;
 	len = btree->fixed_len;
 
 	WT_RET(__rec_split_init(session, page,
@@ -1472,9 +1484,9 @@ __rec_col_rle(SESSION *session, WT_PAGE *page)
 	void *cipdata;
 	int ret;
 
+	r = S2C(session)->cache->rec;
 	btree = session->btree;
 	tmp = NULL;
-	r = S2C(session)->cache->rec;
 	last_data = NULL;
 	ret = 0;
 
@@ -1580,8 +1592,8 @@ __rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
 	uint32_t len;
 	uint8_t *data, *last_data;
 
-	btree = session->btree;
 	r = S2C(session)->cache->rec;
+	btree = session->btree;
 	len = btree->fixed_len;
 	last_data = NULL;
 
@@ -1626,20 +1638,17 @@ __rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
 static int
 __rec_col_var(SESSION *session, WT_PAGE *page)
 {
-	enum { DATA_DELETED, DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	WT_BUF *value, _value;
-	WT_CELL value_cell, *cell;
+	WT_BUF val_buf;
+	WT_CELL *val_cell, _val_cell;
 	WT_COL *cip;
-	WT_OVFL value_ovfl;
+	WT_OVFL val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
-	uint32_t i, len;
+	uint32_t val_cell_len, i;
 
 	r = S2C(session)->cache->rec;
 
-	WT_CLEAR(value_cell);
-	WT_CLEAR(_value);
-	value = &_value;
+	WT_CLEAR(val_buf);
 
 	WT_RET(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,
@@ -1651,65 +1660,57 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 		 * Get a reference to the value: it's either an update or the
 		 * original on-page item.
 		 */
-		cell = WT_COL_PTR(page, cip);
-		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
+		val_cell = WT_COL_PTR(page, cip);
+		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
+			val_cell_len = __wt_cell_len(val_cell);
+			val_buf.size = 0;
+		} else {
 			/*
 			 * If we update an overflow value, free the underlying
 			 * file space.
 			 */
-			if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL)
-				WT_RET(__rec_discard_add_ovfl(
-				    session, WT_CELL_BYTE_OVFL(cell)));
+			if (WT_CELL_TYPE(val_cell) == WT_CELL_DATA_OVFL)
+				WT_RET(
+				    __rec_discard_add_ovfl(session, val_cell));
 
 			/*
 			 * Check for deletion, else build the value's WT_CELL
 			 * chunk from the most recent update value.
 			 */
+			val_cell = &_val_cell;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				WT_CELL_SET(&value_cell, WT_CELL_DEL, 0);
-				len = WT_CELL_SPACE_REQ(0);
-				data_loc = DATA_DELETED;
+				__wt_cell_set(val_cell, WT_CELL_DEL, 0);
+				val_cell_len = __wt_cell_space_req(0);
+				val_buf.size = 0;
 			} else {
-				value->data = WT_UPDATE_DATA(upd);
-				value->size = upd->size;
+				val_buf.data = WT_UPDATE_DATA(upd);
+				val_buf.size = upd->size;
 				WT_RET(__rec_cell_build_value(
-				    session, value, &value_cell, &value_ovfl));
-				len = WT_CELL_SPACE_REQ(value->size);
-				data_loc = DATA_OFF_PAGE;
+				    session, &val_buf, val_cell, &val_ovfl));
+				val_cell_len =
+				    __wt_cell_space_req(val_buf.size);
 			}
-		} else {
-			value->data = cell;
-			value->size = WT_CELL_LEN(cell);
-			len = WT_CELL_SPACE_REQ(value->size);
-			data_loc = DATA_ON_PAGE;
 		}
 
 		/* Boundary: split or write the page. */
-		while (len > r->space_avail)
+		while (val_cell_len + val_buf.size > r->space_avail)
 			WT_RET(__rec_split(session));
 
-		switch (data_loc) {
-		case DATA_DELETED:
-			memcpy(r->first_free, &value_cell, sizeof(value_cell));
-			break;
-		case DATA_ON_PAGE:
-			memcpy(r->first_free, value->data, len);
-			break;
-		case DATA_OFF_PAGE:
-			memcpy(r->first_free, &value_cell, sizeof(value_cell));
+		/* Copy the cell, copy the data if any. */
+		memcpy(r->first_free, val_cell, val_cell_len);
+		if (val_buf.size != 0)
 			memcpy(r->first_free +
-			    sizeof(value_cell), value->data, value->size);
-			break;
-		}
-		__rec_incr(session, r, len);
+			    val_cell_len, val_buf.data, val_buf.size);
+
+		__rec_incr(session, r, val_cell_len + val_buf.size);
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
 	}
 
 	/* Free any allocated memory. */
-	if (value->mem != NULL)
-		__wt_buf_free(session, value);
+	if (val_buf.mem != NULL)
+		__wt_buf_free(session, &val_buf);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
@@ -1722,18 +1723,16 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 static int
 __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 {
-	WT_BUF *value, _value;
-	WT_CELL value_cell;
-	WT_OVFL value_ovfl;
+	WT_BUF val_buf;
+	WT_CELL val_cell;
+	WT_OVFL val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
-	uint32_t len;
+	uint32_t val_cell_len;
 
 	r = S2C(session)->cache->rec;
 
-	WT_CLEAR(value_cell);
-	WT_CLEAR(_value);
-	value = &_value;
+	WT_CLEAR(val_buf);
 
 	WT_RET(__rec_split_init(session, page,
 	    page->u.bulk.recno,
@@ -1741,29 +1740,28 @@ __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the update list... */
 	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
-		value->data = WT_UPDATE_DATA(upd);
-		value->size = upd->size;
+		val_buf.data = WT_UPDATE_DATA(upd);
+		val_buf.size = upd->size;
 		WT_RET(__rec_cell_build_value(
-		    session, value, &value_cell, &value_ovfl));
-		len = WT_CELL_SPACE_REQ(value->size);
+		    session, &val_buf, &val_cell, &val_ovfl));
+		val_cell_len = __wt_cell_space_req(val_buf.size);
 
 		/* Boundary: split or write the page. */
-		while (len > r->space_avail)
+		while (val_cell_len + val_buf.size > r->space_avail)
 			WT_RET(__rec_split(session));
 
-		memcpy(r->first_free, &value_cell, sizeof(value_cell));
-		memcpy(r->first_free +
-		    sizeof(value_cell), value->data, value->size);
-
-		__rec_incr(session, r, len);
+		memcpy(r->first_free, &val_cell, val_cell_len);
+		memcpy(
+		    r->first_free + val_cell_len, val_buf.data, val_buf.size);
+		__rec_incr(session, r, val_cell_len + val_buf.size);
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
 	}
 
 	/* Free any allocated memory. */
-	if (value->mem != NULL)
-		__wt_buf_free(session, value);
+	if (val_buf.mem != NULL)
+		__wt_buf_free(session, &val_buf);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
@@ -1793,8 +1791,7 @@ __rec_col_var_del(SESSION *session, WT_PAGE *page)
 	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
 		if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL)
-			WT_RET(__rec_discard_add_ovfl(
-			    session, WT_CELL_BYTE_OVFL(cell)));
+			WT_RET(__rec_discard_add_ovfl(session, cell));
 	}
 	return (0);
 }
@@ -1806,12 +1803,12 @@ __rec_col_var_del(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	WT_CELL cell, *key_cell;
+	WT_CELL *key_cell, val_cell;
 	WT_OFF off;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
-	uint32_t i, len;
+	uint32_t key_cell_len, key_len, val_cell_len, val_len, i;
 
 	r = S2C(session)->cache->rec;
 
@@ -1906,8 +1903,8 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				/* Delete overflow keys for merged pages. */
 				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-					WT_RET(__rec_discard_add_ovfl(session,
-					    WT_CELL_BYTE_OVFL(key_cell)));
+					WT_RET(__rec_discard_add_ovfl(
+					    session, key_cell));
 
 				/* Merge split subtrees */
 				if (F_ISSET(rp, WT_PAGE_SPLIT)) {
@@ -1924,49 +1921,55 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
-		len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
+		key_len = __wt_cell_len(key_cell);
+		val_cell_len = __wt_cell_space_req(sizeof(WT_OFF));
+		val_len  = val_cell_len +  sizeof(WT_OFF);
 
 		/* Boundary: split or write the page. */
-		while (len + WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
+		while (key_len + val_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/*
 		 * Copy the key into place.
 		 *
 		 * Keys are immutable, so generally come from the original disk
-		 * page; however, discard any 0th key, we don't need it.
+		 * page, but discard any 0th key, we don't need it.  (We do not
+		 * have to re-do the length calculation, any length we discard
+		 * is greater than 1.)
 		 */
-		if (r->cell_zero && WT_CELL_LEN(key_cell) > 1) {
+		if (r->cell_zero && __wt_cell_datalen(key_cell) > 1) {
 			WT_BUF key0;
+			WT_CELL key_cell0;
 			WT_OVFL key_ovfl0;
 
 			WT_CLEAR(key0);
 
 			/* Delete overflow keys for discarded 0th keys. */
 			if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-				WT_RET(__rec_discard_add_ovfl(session,
-				    WT_CELL_BYTE_OVFL(key_cell)));
+				WT_RET(
+				    __rec_discard_add_ovfl(session, key_cell));
 
 			key0.data = "*";
 			key0.size = 1;
 			WT_RET(__rec_cell_build_key(
-			    session, &key0, &cell, &key_ovfl0));
-			len = WT_CELL_SPACE_REQ(WT_CELL_LEN(&cell));
-			memcpy(r->first_free, &cell, sizeof(WT_CELL));
-			memcpy(r->first_free +
-			    sizeof(WT_CELL), key0.data, key0.size);
+			    session, &key0, &key_cell0, &key_ovfl0));
+			key_cell_len = __wt_cell_space_req(key0.size);
+			key_len = key_cell_len + key0.size;
+			memcpy(r->first_free, &key_cell0, key_cell_len);
+			memcpy(
+			    r->first_free + key_cell_len, key0.data, key0.size);
 		} else
-			memcpy(r->first_free, key_cell, len);
+			memcpy(r->first_free, key_cell, key_len);
+		__rec_incr(session, r, key_len);
 		r->cell_zero = 0;
-		__rec_incr(session, r, len);
 
 		/* Copy the off-page reference into place. */
+		__wt_cell_set(&val_cell, WT_CELL_OFF, sizeof(WT_OFF));
+		memcpy(r->first_free, &val_cell, val_cell_len);
 		off.addr = WT_ROW_REF_ADDR(rref);
 		off.size = WT_ROW_REF_SIZE(rref);
-		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
-		memcpy(r->first_free, &cell, sizeof(WT_CELL));
-		memcpy(r->first_free + sizeof(WT_CELL), &off, sizeof(WT_OFF));
-		__rec_incr(session, r, WT_CELL_SPACE_REQ(sizeof(WT_OFF)));
+		memcpy(r->first_free + val_cell_len, &off, sizeof(WT_OFF));
+		__rec_incr(session, r, val_len);
 	}
 
 	/* Write the remnant page. */
@@ -1980,17 +1983,18 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_merge(SESSION *session, WT_PAGE *page)
 {
-	WT_BUF key;
-	WT_CELL cell;
+	WT_BUF key_buf;
+	WT_CELL key_cell, val_cell;
 	WT_OFF off;
 	WT_OVFL key_ovfl;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
-	uint32_t i;
+	uint32_t key_cell_len, key_len, val_cell_len, val_len, i;
 
-	WT_CLEAR(key);
 	r = S2C(session)->cache->rec;
+
+	WT_CLEAR(key_buf);
 
 	/* For each entry in the in-memory page... */
 	WT_ROW_REF_FOREACH(page, rref, i) {
@@ -2027,42 +2031,47 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		 * was called from the top-level parent page.
 		 */
 		if (r->cell_zero) {
-			key.data = "*";
-			key.size = 1;
+			key_buf.data = "*";
+			key_buf.size = 1;
 			r->cell_zero = 0;
 			r->merge_ref = NULL;
 		} else if (r->merge_ref != NULL) {
-			key.data = r->merge_ref->key;
-			key.size = r->merge_ref->size;
+			key_buf.data = r->merge_ref->key;
+			key_buf.size = r->merge_ref->size;
 			r->merge_ref = NULL;
 		} else {
-			key.data = rref->key;
-			key.size = rref->size;
+			key_buf.data = rref->key;
+			key_buf.size = rref->size;
 		}
-		WT_RET(__rec_cell_build_key(session, &key, &cell, &key_ovfl));
+		WT_RET(__rec_cell_build_key(
+		    session, &key_buf, &key_cell, &key_ovfl));
+		key_cell_len = __wt_cell_space_req(key_buf.size);
+		key_len = key_cell_len + key_buf.size;
+		val_cell_len = __wt_cell_space_req(sizeof(WT_OFF));
+		val_len = val_cell_len + sizeof(WT_OFF);
 
 		/* Boundary: split or write the page. */
-		while (WT_CELL_SPACE_REQ(key.size) +
-		    WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
+		while (key_len + val_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/* Copy the key into place. */
-		memcpy(r->first_free, &cell, sizeof(WT_CELL));
-		memcpy(r->first_free + sizeof(WT_CELL), key.data, key.size);
-		__rec_incr(session, r, WT_CELL_SPACE_REQ(key.size));
+		memcpy(r->first_free, &key_cell, key_cell_len);
+		memcpy(
+		    r->first_free + key_cell_len, key_buf.data, key_buf.size);
+		__rec_incr(session, r, key_len);
 
 		/* Copy the off-page reference into place. */
+		__wt_cell_set(&val_cell, WT_CELL_OFF, sizeof(WT_OFF));
+		memcpy(r->first_free, &val_cell, val_cell_len);
 		off.addr = WT_ROW_REF_ADDR(rref);
 		off.size = WT_ROW_REF_SIZE(rref);
-		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
-		memcpy(r->first_free, &cell, sizeof(WT_CELL));
-		memcpy(r->first_free + sizeof(WT_CELL), &off, sizeof(WT_OFF));
-		__rec_incr(session, r, WT_CELL_SPACE_REQ(sizeof(WT_OFF)));
+		memcpy(r->first_free + val_cell_len, &off, sizeof(WT_OFF));
+		__rec_incr(session, r, val_len);
 	}
 
 	/* Free any allocated memory. */
-	if (key.mem != NULL)
-		__wt_buf_free(session, &key);
+	if (key_buf.mem != NULL)
+		__wt_buf_free(session, &key_buf);
 
 	return (0);
 }
@@ -2090,8 +2099,7 @@ __rec_row_int_del(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)
 		if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-			WT_RET(__rec_discard_add_ovfl(
-			    session, WT_CELL_BYTE_OVFL(key_cell)));
+			WT_RET(__rec_discard_add_ovfl(session, key_cell));
 
 	WT_UNUSED(rref);			/* Set but not read. */
 	return (0);
@@ -2104,19 +2112,18 @@ __rec_row_int_del(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 {
-	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
-	WT_BUF value_buf;
-	WT_CELL value_cell, *key_cell;
+	WT_BUF val_buf;
+	WT_CELL *key_cell, *val_cell, _val_cell;
 	WT_INSERT *ins;
-	WT_OVFL value_ovfl;
+	WT_OVFL val_ovfl;
 	WT_RECONCILE *r;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	uint32_t i, key_len, value_len;
-	void *ripvalue;
+	uint32_t i, key_len, val_cell_len, val_len;
 
-	WT_CLEAR(value_buf);
 	r = S2C(session)->cache->rec;
+
+	WT_CLEAR(val_buf);
 
 	WT_RET(__rec_split_init(session,
 	    page, 0ULL, session->btree->leafmax, session->btree->leafmin));
@@ -2159,21 +2166,38 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			--slvg_skip;
 			continue;
 		}
+
+		/* Take the key's WT_CELL from the original page. */
+		key_len = __wt_cell_len(key_cell);
+
 		/*
 		 * Get a reference to the value.  We get the value first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		value_len = 0;
-		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
+		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
+			/*
+			 * Copy the item off the page -- however, when the page
+			 * was read into memory, there may not have been a value
+			 * item, that is, it may have been zero length.
+			 */
+			if (WT_ROW_EMPTY_ISSET(rip))
+				val_cell_len = 0;
+			else {
+				val_cell = WT_ROW_PTR(page, rip);
+				val_cell_len = __wt_cell_len(val_cell);
+			}
+			val_len = val_cell_len;
+			val_buf.size = 0;
+		} else {
 			/*
 			 * If we update an overflow value, free the underlying
 			 * file space.
 			 */
 			if (!WT_ROW_EMPTY_ISSET(rip)) {
-				ripvalue = WT_ROW_PTR(page, rip);
-				if (WT_CELL_TYPE(ripvalue) == WT_CELL_DATA_OVFL)
-					WT_RET(__rec_discard_add_ovfl(session,
-					    WT_CELL_BYTE_OVFL(ripvalue)));
+				val_cell = WT_ROW_PTR(page, rip);
+				if (WT_CELL_TYPE(val_cell) == WT_CELL_DATA_OVFL)
+					WT_RET(__rec_discard_add_ovfl(
+					    session, val_cell));
 			}
 
 			/*
@@ -2183,8 +2207,8 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-					WT_RET(__rec_discard_add_ovfl(session,
-					    WT_CELL_BYTE_OVFL(key_cell)));
+					WT_RET(__rec_discard_add_ovfl(
+					    session, key_cell));
 				goto leaf_insert;
 			}
 
@@ -2194,39 +2218,21 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			 * update value.
 			 */
 			if (upd->size == 0)
-				data_loc = EMPTY_DATA;
+				val_cell_len = val_len = val_buf.size = 0;
 			else {
-				value_buf.data = WT_UPDATE_DATA(upd);
-				value_buf.size = upd->size;
+				val_buf.data = WT_UPDATE_DATA(upd);
+				val_buf.size = upd->size;
+				val_cell = &_val_cell;
 				WT_RET(__rec_cell_build_value(session,
-				    &value_buf, &value_cell, &value_ovfl));
-				value_len = WT_CELL_SPACE_REQ(value_buf.size);
-				data_loc = DATA_OFF_PAGE;
-			}
-		} else {
-			/*
-			 * Copy the item off the page -- however, when the page
-			 * was read into memory, there may not have been a value
-			 * item, that is, it may have been zero length.  Catch
-			 * that case.
-			 */
-			if (WT_ROW_EMPTY_ISSET(rip))
-				data_loc = EMPTY_DATA;
-			else {
-				ripvalue = WT_ROW_PTR(page, rip);
-				value_buf.data = ripvalue;
-				value_buf.size =
-				    WT_CELL_SPACE_REQ(WT_CELL_LEN(ripvalue));
-				value_len = value_buf.size;
-				data_loc = DATA_ON_PAGE;
+				    &val_buf, val_cell, &val_ovfl));
+				val_cell_len =
+				    __wt_cell_space_req(val_buf.size);
+				val_len = val_cell_len + val_buf.size;
 			}
 		}
 
-		/* Take the key's WT_CELL from the original page. */
-		key_len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
-
 		/* Boundary: split or write the page. */
-		while (key_len + value_len > r->space_avail)
+		while (key_len + val_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/* Copy the key onto the page. */
@@ -2234,19 +2240,12 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 		__rec_incr(session, r, key_len);
 
 		/* Copy the value onto the page. */
-		switch (data_loc) {
-		case DATA_ON_PAGE:
-			memcpy(r->first_free, value_buf.data, value_len);
-			__rec_incr(session, r, value_len);
-			break;
-		case DATA_OFF_PAGE:
-			memcpy(r->first_free, &value_cell, sizeof(value_cell));
-			memcpy(r->first_free +
-			    sizeof(WT_CELL), value_buf.data, value_buf.size);
-			__rec_incr(session, r, value_len);
-			break;
-		case EMPTY_DATA:
-			break;
+		if (val_cell_len != 0) {
+			memcpy(r->first_free, val_cell, val_cell_len);
+			if (val_buf.size != 0)
+				memcpy(r->first_free +
+				    val_cell_len, val_buf.data, val_buf.size);
+			__rec_incr(session, r, val_len);
 		}
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
@@ -2255,8 +2254,8 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 	}
 
 	/* Free any allocated memory. */
-	if (value_buf.mem != NULL)
-		__wt_buf_free(session, &value_buf);
+	if (val_buf.mem != NULL)
+		__wt_buf_free(session, &val_buf);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
@@ -2270,10 +2269,9 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 static int
 __rec_row_leaf_del(SESSION *session, WT_PAGE *page)
 {
-	WT_CELL *key_cell;
+	WT_CELL *key_cell, *val_cell;
 	WT_ROW *rip;
 	uint32_t i;
-	void *ripvalue;
 
 	/*
 	 * We're deleting the page, which means any overflow item we ever had
@@ -2286,13 +2284,12 @@ __rec_row_leaf_del(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i) {
 		if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-			WT_RET(__rec_discard_add_ovfl(session,
-			    WT_CELL_BYTE_OVFL(key_cell)));
+			WT_RET(__rec_discard_add_ovfl(session, key_cell));
 		if (!WT_ROW_EMPTY_ISSET(rip)) {
-			ripvalue = WT_ROW_PTR(page, rip);
-			if (WT_CELL_TYPE(ripvalue) == WT_CELL_DATA_OVFL)
-				WT_RET(__rec_discard_add_ovfl(session,
-				    WT_CELL_BYTE_OVFL(ripvalue)));
+			val_cell = WT_ROW_PTR(page, rip);
+			if (WT_CELL_TYPE(val_cell) == WT_CELL_DATA_OVFL)
+				WT_RET(
+				    __rec_discard_add_ovfl(session, val_cell));
 		}
 	}
 
@@ -2306,16 +2303,17 @@ __rec_row_leaf_del(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 {
-	WT_BUF key_buf, value_buf;
-	WT_CELL key_cell, value_cell;
-	WT_OVFL key_ovfl, value_ovfl;
+	WT_BUF key_buf, val_buf;
+	WT_CELL key_cell, val_cell;
+	WT_OVFL key_ovfl, val_ovfl;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
-	uint32_t key_len, value_len;
+	uint32_t key_cell_len, key_len, val_cell_len, val_len;
+
+	r = S2C(session)->cache->rec;
 
 	WT_CLEAR(key_buf);
-	WT_CLEAR(value_buf);
-	r = S2C(session)->cache->rec;
+	WT_CLEAR(val_buf);
 
 	for (; ins != NULL; ins = ins->next) {
 		/* Build a value to store on the page. */
@@ -2323,13 +2321,14 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
-			value_len = 0;
+			val_len = 0;
 		else {
-			value_buf.data = WT_UPDATE_DATA(upd);
-			value_buf.size = upd->size;
+			val_buf.data = WT_UPDATE_DATA(upd);
+			val_buf.size = upd->size;
 			WT_RET(__rec_cell_build_value(
-			    session, &value_buf, &value_cell, &value_ovfl));
-			value_len = WT_CELL_SPACE_REQ(value_buf.size);
+			    session, &val_buf, &val_cell, &val_ovfl));
+			val_cell_len = __wt_cell_space_req(val_buf.size);
+			val_len = val_cell_len + val_buf.size;
 		}
 
 		/* Build a key to store on the page. */
@@ -2337,32 +2336,33 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		key_buf.size = WT_INSERT_KEY_SIZE(ins);
 		WT_RET(__rec_cell_build_key(
 		    session, &key_buf, &key_cell, &key_ovfl));
-		key_len = WT_CELL_SPACE_REQ(key_buf.size);
+		key_cell_len = __wt_cell_space_req(key_buf.size);
+		key_len = key_cell_len + key_buf.size;
 
 		/* Boundary: split or write the page. */
-		while (key_len + value_len > r->space_avail)
+		while (key_len + val_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/* Copy the key cell into place. */
-		memcpy(r->first_free, &key_cell, sizeof(WT_CELL));
-		memcpy(r->first_free + sizeof(WT_CELL),
-		    key_buf.data, key_buf.size);
+		memcpy(r->first_free, &key_cell, key_cell_len);
+		memcpy(
+		    r->first_free + key_cell_len, key_buf.data, key_buf.size);
 		__rec_incr(session, r, key_len);
 
 		/* Copy the value cell into place. */
-		if (value_len == 0)
-			continue;
-		memcpy(r->first_free, &value_cell, sizeof(WT_CELL));
-		memcpy(r->first_free + sizeof(WT_CELL),
-		    value_buf.data, value_buf.size);
-		__rec_incr(session, r, value_len);
+		if (val_len != 0) {
+			memcpy(r->first_free, &val_cell, val_cell_len);
+			memcpy(r->first_free +
+			    val_cell_len, val_buf.data, val_buf.size);
+			__rec_incr(session, r, val_len);
+		}
 	}
 
 	/* Free any allocated memory. */
 	if (key_buf.mem != NULL)
 		__wt_buf_free(session, &key_buf);
-	if (value_buf.mem != NULL)
-		__wt_buf_free(session, &value_buf);
+	if (val_buf.mem != NULL)
+		__wt_buf_free(session, &val_buf);
 
 	return (0);
 }
@@ -2378,8 +2378,8 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	WT_PAGE *imp;
 	WT_RECONCILE *r;
 
-	btree = session->btree;
 	r = S2C(session)->cache->rec;
+	btree = session->btree;
 
 	/*
 	 * If the page was empty, we want to eventually discard it from the
@@ -2626,8 +2626,6 @@ __rec_cell_build_key(
 
 	btree = session->btree;
 
-	WT_CELL_CLEAR(cell);
-
 	/*
 	 * We're called with a WT_BUF that references a data/size pair.  We can
 	 * re-point that WT_BUF's data and size fields to other memory, and if
@@ -2653,10 +2651,10 @@ __rec_cell_build_key(
 
 		key->data = ovfl;
 		key->size = sizeof(*ovfl);
-		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, key->size);
+		__wt_cell_set(cell, WT_CELL_KEY_OVFL, key->size);
 		WT_STAT_INCR(btree->stats, overflow_key);
 	} else
-		WT_CELL_SET(cell, WT_CELL_KEY, key->size);
+		__wt_cell_set(cell, WT_CELL_KEY, key->size);
 	return (0);
 }
 
@@ -2667,14 +2665,12 @@ __rec_cell_build_key(
  */
 static int
 __rec_cell_build_value(
-    SESSION *session, WT_BUF *value, WT_CELL *cell, WT_OVFL *ovfl)
+    SESSION *session, WT_BUF *val, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
 	uint32_t orig_size;
 
 	btree = session->btree;
-
-	WT_CELL_CLEAR(cell);
 
 	/*
 	 * We're called with a WT_BUF that references a data/size pair.  We can
@@ -2685,39 +2681,36 @@ __rec_cell_build_value(
 	 * encoded key/data cells, we need additional memory; use the SESSION
 	 * key/value return memory: this routine is called during bulk insert
 	 * and reconciliation, we aren't returning key/data pairs.
-	 */
-	WT_CELL_SET_TYPE(cell, WT_CELL_DATA);
-
-	/*
+	 *
 	 * Handle zero-length cells quickly -- this is a common value, it's
 	 * a deleted column-store variable length cell.
 	 */
-	if (value->size == 0) {
-		WT_CELL_SET_LEN(cell, 0);
+	if (val->size == 0) {
+		__wt_cell_set(cell, WT_CELL_DATA, 0);
 		return (0);
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_value != NULL) {
-		orig_size = value->size;
-		WT_RET(__wt_huffman_encode(btree->huffman_value,
-		    value->data, orig_size, value));
-		if (value->size > orig_size)
+		orig_size = val->size;
+		WT_RET(__wt_huffman_encode(
+		    btree->huffman_value, val->data, orig_size, val));
+		if (val->size > orig_size)
 			WT_STAT_INCRV(btree->stats,
-			    huffman_value, value->size - orig_size);
+			    huffman_value, val->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
-	if (value->size > btree->leafitemsize) {
-		WT_RET(__rec_cell_build_ovfl(session, value, ovfl));
+	if (val->size > btree->leafitemsize) {
+		WT_RET(__rec_cell_build_ovfl(session, val, ovfl));
 
-		value->data = ovfl;
-		value->size = sizeof(*ovfl);
-		WT_CELL_SET_TYPE(cell, WT_CELL_DATA_OVFL);
+		val->data = ovfl;
+		val->size = sizeof(*ovfl);
+		__wt_cell_set(cell, WT_CELL_DATA_OVFL, val->size);
 		WT_STAT_INCR(btree->stats, overflow_data);
-	}
+	} else
+		__wt_cell_set(cell, WT_CELL_DATA, val->size);
 
-	WT_CELL_SET_LEN(cell, value->size);
 	return (0);
 }
 
@@ -2814,7 +2807,8 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 		 * getting bigger.
 		 */
 		__wt_buf_steal(session, &spl->key, &key, &size);
-		__wt_key_set(rref, key, size);
+		rref->key = key;
+		rref->size = size;
 		WT_ROW_REF_ADDR(rref) = spl->off.addr;
 		WT_ROW_REF_SIZE(rref) = spl->off.size;
 
@@ -3154,8 +3148,8 @@ __hazard_copy(SESSION *session)
 	WT_RECONCILE *r;
 	uint32_t elem, i, j;
 
-	conn = S2C(session);
 	r = S2C(session)->cache->rec;
+	conn = S2C(session);
 
 	/* Copy the list of hazard references, compacting it as we go. */
 	elem = conn->session_size * conn->hazard_size;

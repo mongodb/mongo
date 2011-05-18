@@ -175,6 +175,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 		case WT_CELL_DEL:
 			WT_STAT_INCR(stats, file_item_col_deleted);
 			break;
+		WT_ILLEGAL_FORMAT(session);
 		}
 	return (0);
 }

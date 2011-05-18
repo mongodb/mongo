@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 /*
  * __wt_return_data --
@@ -118,8 +119,8 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 cell_set:	switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (btree->huffman_value == NULL) {
-				value_ret = WT_CELL_BYTE(cell);
-				size_ret = WT_CELL_LEN(cell);
+				__wt_cell_data_and_len(
+				    cell, &value_ret, &size_ret);
 				break;
 			}
 			/* FALLTHROUGH */

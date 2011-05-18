@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 #include "btree.i"
+#include "cell.i"
 
 static int __wt_page_inmem_col_fix(SESSION *, WT_PAGE *);
 static int __wt_page_inmem_col_int(SESSION *, WT_PAGE *);
@@ -286,7 +287,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
 	WT_CELL *cell;
-	WT_OFF *off;
+	WT_OFF off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, nindx;
@@ -315,20 +316,22 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
-				__wt_key_set(rref,
-				    WT_CELL_BYTE(cell), WT_CELL_LEN(cell));
+				__wt_cell_data_and_len(
+				    cell, &rref->key, &rref->size);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_KEY_OVFL:
-			__wt_key_set_process(rref, cell);
+			rref->key = cell;
+			rref->size = WT_NEEDS_PROCESS;
 			break;
 		case WT_CELL_OFF:
-			off = WT_CELL_BYTE_OFF(cell);
-			WT_ROW_REF_ADDR(rref) = off->addr;
-			WT_ROW_REF_SIZE(rref) = off->size;
+			__wt_cell_off(cell, &off);
+			WT_ROW_REF_ADDR(rref) = off.addr;
+			WT_ROW_REF_SIZE(rref) = off.size;
 			++rref;
 			break;
+		WT_ILLEGAL_FORMAT(session);
 		}
 
 	page->entries = nindx;
@@ -377,11 +380,12 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 			if (rip->key != NULL)
 				++rip;
 			if (btree->huffman_key != NULL ||
-			    WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL)
-				__wt_key_set_process(rip, cell);
-			else
-				__wt_key_set(rip,
-				    WT_CELL_BYTE(cell), WT_CELL_LEN(cell));
+			    WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL) {
+				rip->key = cell;
+				rip->size = WT_NEEDS_PROCESS;
+			} else
+				__wt_cell_data_and_len(
+				    cell, &rip->key, &rip->size);
 
 			/*
 			 * Two keys in a row, or a key at the end of the page
@@ -394,6 +398,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 		case WT_CELL_DATA_OVFL:
 			rip->value = WT_PAGE_DISK_OFFSET(dsk, cell);
 			break;
+		WT_ILLEGAL_FORMAT(session);
 		}
 
 	page->entries = nindx;
@@ -409,6 +414,7 @@ __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 {
 	BTREE *btree;
 	WT_BUF *tmp;
+	WT_OVFL ovfl;
 	uint32_t size;
 	int ret;
 	void *huffman;
@@ -427,8 +433,7 @@ __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 		goto offpage;
 	case WT_CELL_DATA:
 		huffman = btree->huffman_value;
-onpage:		p = WT_CELL_BYTE(cell);
-		size = WT_CELL_LEN(cell);
+onpage:		__wt_cell_data_and_len(cell, &p, &size);
 		break;
 	case WT_CELL_DATA_OVFL:
 		huffman = btree->huffman_value;
@@ -443,7 +448,9 @@ offpage:	/*
 			tmp = retbuf;
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
-		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(cell), tmp));
+
+		__wt_cell_ovfl(cell, &ovfl);
+		WT_RET(__wt_ovfl_in(session, &ovfl, tmp));
 		p = tmp->data;
 		size = tmp->size;
 		break;
