@@ -543,14 +543,15 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
  * and write header bits.
  */
 int
-__wt_huffman_encode(SESSION *session,
-    void *huffman_arg, const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
+__wt_huffman_encode(SESSION *session, void *huffman_arg,
+    const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
 	uint32_t max_len, outlen, bitpos, bytes;
 	uint16_t symbol;
+	const uint8_t *from;
 	uint8_t len, esc, padding_info, *out;
 	int ret;
 
@@ -565,6 +566,7 @@ __wt_huffman_encode(SESSION *session,
 	uint8_t valid;
 
 	huffman = huffman_arg;
+	from = from_arg;
 	tmp = NULL;
 	ret = 0;
 
@@ -603,6 +605,8 @@ __wt_huffman_encode(SESSION *session,
 	out = tmp->mem;
 	esc = 0;
 	for (bytes = 0; bytes < from_len; bytes += huffman->numBytes) {
+		WT_ASSERT(session, WT_PTRDIFF32(from, from_arg) < from_len);
+
 		/* Getting the next symbol, either 1 or 2 bytes */
 		symbol = *from++;
 		if (huffman->numBytes == 2)
@@ -714,18 +718,20 @@ err:	if (tmp != NULL)
  * Finally, subtract off these bits from the shift register.
  */
 int
-__wt_huffman_decode(SESSION *session,
-    void *huffman_arg, const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
+__wt_huffman_decode(SESSION *session, void *huffman_arg,
+    const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
 	WT_HUFFMAN_OBJ *huffman;
 	uint32_t bits, from_bits, from_len_bits, len, mask, max, max_len;
 	uint32_t out_bits, outlen;
 	uint16_t pattern, symbol;
+	const uint8_t *from;
 	uint8_t padding_info, *to, valid;
 	int ret;
 
 	huffman = huffman_arg;
+	from = from_arg;
 	tmp = NULL;
 	ret = 0;
 
@@ -767,6 +773,8 @@ __wt_huffman_decode(SESSION *session,
 	mask = (1U << max) - 1;
 	for (outlen = 0; out_bits > 0; outlen += huffman->numBytes) {
 		while (valid < max && from_bits > 0) {
+			WT_ASSERT(session,
+			    WT_PTRDIFF32(from, from_arg) < from_len);
 			bits = (bits << 8) | *from++;
 			valid += 8;
 			from_bits -= 8;

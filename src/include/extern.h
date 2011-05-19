@@ -340,12 +340,12 @@ void __wt_huffman_close(SESSION *session, void *huffman_arg);
 int __wt_print_huffman_code(void *huffman_arg, uint16_t symbol);
 int __wt_huffman_encode(SESSION *session,
     void *huffman_arg,
-    const uint8_t *from,
+    const uint8_t *from_arg,
     uint32_t from_len,
     WT_BUF *to_buf);
 int __wt_huffman_decode(SESSION *session,
     void *huffman_arg,
-    const uint8_t *from,
+    const uint8_t *from_arg,
     uint32_t from_len,
     WT_BUF *to_buf);
 uint32_t __wt_nlpo2_round(uint32_t v);
