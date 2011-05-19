@@ -798,7 +798,7 @@ namespace mongo {
             BSONElement e = it.next();
             const char *fn = e.fieldName();
 
-            uassert( 10147 ,  "Invalid modifier specified" + string( fn ), e.type() == Object );
+            uassert( 10147 ,  "Invalid modifier specified: " + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
             DEBUGUPDATE( "\t" << j );
 
