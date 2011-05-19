@@ -170,21 +170,35 @@ __wt_verify_dsk_cell(
 		 * the page.
 		 */
 		p = (uint8_t *)cell;
-		switch (WT_CELL_BYTES(cell)) {
-			case WT_CELL_1_BYTE:
-				p += 2;
-				break;
-			case WT_CELL_2_BYTE:
-				p += 3;
-				break;
-			case WT_CELL_3_BYTE:
-				p += 4;
-				break;
-			case WT_CELL_4_BYTE:
-			default:
-				p += 5;
-				break;
-			}
+
+		/*
+		 * Delete and off-page items have known sizes, we don't store
+		 * length bytes; the data is after the single byte WT_CELL.
+		 */
+		switch (WT_CELL_TYPE(cell)) {
+		case WT_CELL_DEL:
+		case WT_CELL_OFF:
+		case WT_CELL_OFF_RECORD:
+			p += 1;
+			break;
+		default:
+			switch (WT_CELL_BYTES(cell)) {
+				case WT_CELL_1_BYTE:
+					p += 2;
+					break;
+				case WT_CELL_2_BYTE:
+					p += 3;
+					break;
+				case WT_CELL_3_BYTE:
+					p += 4;
+					break;
+				case WT_CELL_4_BYTE:
+				default:
+					p += 5;
+					break;
+				}
+			break;
+		}
 		if (p > end || (uint8_t *)(cell) + __wt_cell_len(cell) > end) {
 			ret = __wt_err_eop(session, cell_num, addr);
 			goto err;
