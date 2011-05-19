@@ -62,6 +62,10 @@ namespace mongo {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res );
+                if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
+                    conn.done();
+                    throw StaleConfigException("foo","command failed because of stale config");
+                }
                 result.appendElements( res );
                 conn.done();
                 return ok;
