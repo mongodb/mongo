@@ -1922,7 +1922,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 
 		key_len = __wt_cell_len(key_cell);
 		val_cell_len = __wt_cell_space_req(sizeof(WT_OFF));
-		val_len  = val_cell_len +  sizeof(WT_OFF);
+		val_len  = val_cell_len +  WT_SIZEOF32(WT_OFF);
 
 		/* Boundary: split or write the page. */
 		while (key_len + val_len > r->space_avail)
@@ -2046,7 +2046,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		key_cell_len = __wt_cell_space_req(key_buf.size);
 		key_len = key_cell_len + key_buf.size;
 		val_cell_len = __wt_cell_space_req(sizeof(WT_OFF));
-		val_len = val_cell_len + sizeof(WT_OFF);
+		val_len = val_cell_len + WT_SIZEOF32(WT_OFF);
 
 		/* Boundary: split or write the page. */
 		while (key_len + val_len > r->space_avail)
