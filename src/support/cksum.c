@@ -9,8 +9,10 @@
 
 static const uint32_t g_crc_slicing[8][256] = {
 #ifdef WORDS_BIGENDIAN
-	/* Big endian tables have entries that are byte reversed
-	   from little endian tables */
+	/*
+	 * Big endian tables have entries that are byte reversed from little
+	 * endian tables.
+	 */
 	{
 	0x00000000, 0x03836bf2, 0xf7703be1, 0xf4f35013,
 	0x1f979ac7, 0x1c14f135, 0xe8e7a126, 0xeb64cad4,
@@ -1066,11 +1068,11 @@ static const uint32_t g_crc_slicing[8][256] = {
  * http://www.intel.com/technology/comms/perfnet/download/CRC_generators.pdf
  *
  * Based on Peter Kanowski's posting:
- * http://www.strchr.com/crc32_popcnt
+ *	http://www.strchr.com/crc32_popcnt
  *
- * The big endian version calculates the same result at each step,
- * except that the value of crc is byte reversed from what it
- * would be at that step for little endian.
+ * The big endian version calculates the same result at each step, except the
+ * value of the crc is byte reversed from what it would be at that step for
+ * little endian.
  */
 uint32_t
 __wt_cksum(const void *chunk, size_t len)
@@ -1134,6 +1136,5 @@ __wt_cksum(const void *chunk, size_t len)
 	for (len &= 0x7; len > 0; ++p, len--)
 		crc = g_crc_slicing[0][(crc ^ *p) & 0xFF] ^ (crc >> 8);
 #endif
-
 	return (~crc);
 }
