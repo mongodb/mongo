@@ -85,6 +85,12 @@ namespace mongo {
         string errmsg;
 
         for ( unsigned i=0; i<servers.size(); i++ ) {
+
+            bool haveAlready = false;
+            for ( unsigned n = 0; n < _nodes.size() && ! haveAlready; n++ )
+                haveAlready = ( _nodes[n].addr == servers[i] );
+            if( haveAlready ) continue;
+
             auto_ptr<DBClientConnection> conn( new DBClientConnection( true , 0, 5.0 ) );
             if (!conn->connect( servers[i] , errmsg ) ) {
                 log(1) << "error connecting to seed " << servers[i] << ": " << errmsg << endl;
