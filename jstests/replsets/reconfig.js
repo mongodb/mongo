@@ -16,6 +16,7 @@ replTest.stop(3);
 replTest.stop(4);
 
 print("reconfiguring");
+master = replTest.getMaster();
 var config = master.getDB("local").system.replset.findOne();
 var oldVersion = config.version++;
 config.members[0].votes = 2;
