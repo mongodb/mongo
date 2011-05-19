@@ -815,10 +815,6 @@ struct __wt_cell {
  *	Variable-length data cells (WT_CELL_DATA/DATA_OVFL/DEL).
  *
  * There are currently 7 cell types, using 3 bits.
- *
- * XXX
- * Fix this: overflow/off/deleted cells don't need a length, we know how long
- * they are.
  */
 #define	WT_CELL_KEY		0x00	/* Key */
 #define	WT_CELL_KEY_OVFL	0x01	/* Key: overflow */

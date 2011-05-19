@@ -6,39 +6,42 @@
  */
 
 /*
- * __wt_cell_space_req --
- *	Return the WT_CELL bytes required for a length of data.
- */
-static inline uint32_t
-__wt_cell_space_req(uint32_t size)
-{
-	/*
-	 * A WT_CELL requires 1B for the type/byte-count value, plus N
-	 * bytes of byte-count.
-	 */
-	return
-	    (size < 0xff ? 2 :
-	    (size < 0xffff ? 3 :
-	    (size < 0xffffff ? 4 : 5)));
-}
-
-/*
  * __wt_cell_set --
  *	Set a WT_CELL's contents based on a data size and type.
  */
 static inline void
-__wt_cell_set(WT_CELL *cell, u_int type, uint32_t size)
+__wt_cell_set(WT_CELL *cell, u_int type, uint32_t size, uint32_t *cell_lenp)
 {
 	uint8_t *v;
 
-	if (size < 0xff)
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.
+	 */
+	switch (type) {
+	case WT_CELL_DEL:
+	case WT_CELL_OFF:
+	case WT_CELL_OFF_RECORD:
+		*cell_lenp = 1;
+		cell->__cell_chunk[0] = (u_int8_t)type;
+		return;
+	default:
+		break;
+	}
+
+	if (size < 0xff) {
 		cell->__cell_chunk[0] = WT_CELL_1_BYTE | (u_int8_t)type;
-	else if (size < 0xffff)
+		*cell_lenp = 2;
+	} else if (size < 0xffff) {
 		cell->__cell_chunk[0] = WT_CELL_2_BYTE | (u_int8_t)type;
-	else if (size < 0xffffff)
+		*cell_lenp = 3;
+	} else if (size < 0xffffff) {
 		cell->__cell_chunk[0] = WT_CELL_3_BYTE | (u_int8_t)type;
-	else
+		*cell_lenp = 4;
+	} else {
 		cell->__cell_chunk[0] = WT_CELL_4_BYTE | (u_int8_t)type;
+		*cell_lenp = 5;
+	}
 
 #ifdef WORDS_BIGENDIAN
 	__wt_cell_set has not been written for a big-endian system.
@@ -59,6 +62,20 @@ __wt_cell_set(WT_CELL *cell, u_int type, uint32_t size)
 static inline void *
 __wt_cell_data(const WT_CELL *cell)
 {
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes; the data is after the single byte WT_CELL.
+	 */
+	switch (WT_CELL_TYPE(cell)) {
+	case WT_CELL_DEL:
+	case WT_CELL_OFF:
+	case WT_CELL_OFF_RECORD:
+		return ((u_int8_t *)cell + 1);
+	default:
+		break;
+	}
+
+	/* Otherwise, it's N bytes after the WT_CELL. */
 	switch (WT_CELL_BYTES(cell)) {
 	case WT_CELL_1_BYTE:
 		return ((u_int8_t *)cell + 2);
@@ -70,6 +87,7 @@ __wt_cell_data(const WT_CELL *cell)
 	default:
 		return ((u_int8_t *)cell + 5);
 	}
+	/* NOTREACHED */
 }
 
 /*
@@ -82,10 +100,25 @@ __wt_cell_datalen(const WT_CELL *cell)
 	uint32_t _v;
 	uint8_t *p, *v;
 
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.
+	 */
+	switch (WT_CELL_TYPE(cell)) {
+	case WT_CELL_DEL:
+		return (0);
+	case WT_CELL_OFF:
+	case WT_CELL_OFF_RECORD:
+		return (sizeof(WT_OFF));
+	default:
+		break;
+	}
+
+	/* Otherwise, copy out the length bytes, and return the value. */
+	p = (uint8_t *)cell + 1;
+
 	v = (uint8_t *)&_v;
 	_v = 0;
-
-	p = (uint8_t *)cell + 1;
 
 #ifdef WORDS_BIGENDIAN
 	__wt_cell_datalen has not been written for a big-endian system.
@@ -130,6 +163,24 @@ __wt_cell_len(const WT_CELL *cell)
 {
 	uint32_t i;
 
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.
+	 */
+	switch (WT_CELL_TYPE(cell)) {
+	case WT_CELL_DEL:
+		return (1);
+	case WT_CELL_OFF:
+	case WT_CELL_OFF_RECORD:
+		return (1 + sizeof(WT_OFF));
+	default:
+		break;
+	}
+
+	/*
+	 * Otherwise, return the WT_CELL byte, the length bytes and the data
+	 * length.
+	 */
 	switch (WT_CELL_BYTES(cell)) {
 	case WT_CELL_1_BYTE:
 		i = 2;
