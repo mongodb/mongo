@@ -167,9 +167,15 @@ namespace mongo {
                         break;
                     }
                     catch ( StaleConfigException& e ) {
-                        log( i < ( maxTries / 2 ) ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+                        int logLevel = i < ( maxTries / 2 );
+                        LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
                         r.reset();
+                        
+                        unsigned long long old = manager->getSequenceNumber();
                         manager = r.getChunkManager();
+                        
+                        LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+
                         uassert(14804, "collection no longer sharded", manager);
                     }
                     sleepmillis( i * 200 );
