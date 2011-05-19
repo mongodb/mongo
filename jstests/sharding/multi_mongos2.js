@@ -20,10 +20,7 @@ assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
 s2.adminCommand( { split : "test.existing" , find : { _id : 5 } } )
 
-if (0) // This should work but doesn't due to SERVER-2828
-    res = s1.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
-else
-    res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 
 assert.eq(1 , res.ok, tojson(res));
 
@@ -46,6 +43,18 @@ var res = s1.getDB('test').existing2.stats()
 printjson( res )
 assert.eq(true, res.sharded); //SERVER-2828
 assert.eq(true, s2.getDB('test').existing2.stats().sharded);
+
+// test admin commands
+
+s1.getDB('test').existing3.insert({_id:1})
+assert.eq(1, s1.getDB('test').existing3.count({_id:1}));
+assert.eq(1, s2.getDB('test').existing3.count({_id:1}));
+
+s2.adminCommand( { shardcollection : "test.existing3" , key : { _id : 1 } } );
+s2.adminCommand( { split : "test.existing3" , find : { _id : 5 } } )
+
+res = s1.getDB( "admin" ).runCommand( { moveChunk: "test.existing3" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+assert.eq(1 , res.ok, tojson(res));
 
 
 

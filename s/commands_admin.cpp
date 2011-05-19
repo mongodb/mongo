@@ -569,8 +569,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can split";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before can split";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );
@@ -640,8 +643,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can move a chunk";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before can move a chunk";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );
