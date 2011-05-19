@@ -165,18 +165,21 @@ __wt_verify_dsk_cell(
 		++cell_num;
 
 		/*
-		 * Check if this cell is on the page, and if we can look at
-		 * the entire cell, check if the cell's data is entirely on
-		 * the page.
+		 * Check if this cell is on the page, and once we know the cell
+		 * is safe, check if the cell's data is entirely on the page.
+		 *
+		 * Delete and off-page items have known sizes, we don't store
+		 * length bytes.  Short key/data items have 6- or 7-bits of
+		 * size in the descriptor byte and no length bytes.  In both
+		 * cases, the data is after the single byte WT_CELL.
 		 */
 		p = (uint8_t *)cell;
-
-		/*
-		 * Delete and off-page items have known sizes, we don't store
-		 * length bytes; the data is after the single byte WT_CELL.
-		 */
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type_raw(cell)) {
+		case WT_CELL_DATA_OVFL:
+		case WT_CELL_DATA_SHORT:
 		case WT_CELL_DEL:
+		case WT_CELL_KEY_OVFL:
+		case WT_CELL_KEY_SHORT:
 		case WT_CELL_OFF:
 		case WT_CELL_OFF_RECORD:
 			p += 1;
@@ -204,7 +207,7 @@ __wt_verify_dsk_cell(
 			goto err;
 		}
 
-		cell_type = WT_CELL_TYPE(cell);
+		cell_type = __wt_cell_type(cell);
 		cell_len = __wt_cell_datalen(cell);
 
 		/* Check the cell's type. */

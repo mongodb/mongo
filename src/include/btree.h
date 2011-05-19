@@ -759,90 +759,11 @@ struct __wt_insert {
 
 /*
  * WT_CELL --
- *	Variable-length cell type plus trailing data length (in bytes).
- *
- * Pages containing variable-length data (WT_PAGE_ROW_LEAF, WT_PAGE_ROW_INT
- * and WT_PAGE_COL_VAR page types), have variable-length cells after the
- * page header.  Specifically, 1 byte followed by M bytes of data length,
- * followed by N bytes of data.  The high 2 bits of the first byte specify
- * how many bytes of data length follow, the low 3 bits of the first byte
- * specify the cell type, and the middle 3 bits are currently unused.
- *
- * The __cell_chunk field should never be directly accessed, there are macros
- * and in-line functions to manipulate the structure.
+ *	Variable-length cell type; see include/cell.i for more information.
  */
 struct __wt_cell {
-	uint8_t __cell_chunk[5];		/* cell: 2 to 5 bytes */
+	uint8_t __chunk[5];		/* cell: 2 to 5 bytes */
 };
-
-/*
- * There are 2 basic types: key and data cells, each of which has an overflow
- * form.  Items are followed by additional data, which varies by type: a key
- * or data cell is followed by a set of bytes; a WT_OVFL structure follows an
- * overflow form.
- *
- * There are 3 additional types: (1) a deleted type (a place-holder for deleted
- * cells where the cell cannot be removed, for example, a column-store cell
- * that must remain to preserve the record count); (2) a subtree reference for
- * keys that reference subtrees without an associated record count (a row-store
- * internal page has a key/reference pair for the tree containing all key/data
- * pairs greater than the key); (3) a subtree reference for keys that reference
- * subtrees with an associated record count (a column-store internal page has
- * a reference for the tree containing all records greater than the specified
- * record).
- *
- * Here's the usage by page type:
- *
- * WT_PAGE_ROW_INT (row-store internal pages):
- *	Variable-length keys with offpage-reference pairs (a WT_CELL_KEY or
- *	WT_CELL_KEY_OVFL cell, followed by a WT_CELL_OFF cell).
- *
- * WT_PAGE_COL_INT (Column-store internal page):
- *	Fixed-length WT_OFF_RECORD structures.
- *
- * WT_PAGE_ROW_LEAF (row-store leaf pages):
- *	Variable-length key and data pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- *	cell, followed by a WT_CELL_DATA or WT_CELL_DATA_OVFL cell).
- *
- * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length cells):
- * WT_PAGE_COL_RLE (Column-store leaf page storing fixed-length cells):
- *	Fixed-sized data cells.
- *
- * WT_PAGE_OVFL (Overflow page):
- *	A string of bytes.
- *
- * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
- *	Variable-length data cells (WT_CELL_DATA/DATA_OVFL/DEL).
- *
- * There are currently 7 cell types, using 3 bits.
- */
-#define	WT_CELL_KEY		0x00	/* Key */
-#define	WT_CELL_KEY_OVFL	0x01	/* Key: overflow */
-#define	WT_CELL_DATA		0x02	/* Data */
-#define	WT_CELL_DATA_OVFL	0x03	/* Data: overflow */
-#define	WT_CELL_DEL		0x04	/* Deleted */
-#define	WT_CELL_OFF		0x05	/* Off-page reference */
-#define	WT_CELL_OFF_RECORD	0x06	/* Off-page reference with records */
-#define	WT_CELL_TYPE(cell)						\
-	(((WT_CELL *)(cell))->__cell_chunk[0] & 0x07)
-
-/*
- * WT_CELL_{1,2,3,4}_BYTE --
- *	  The high 2 bits of the first byte specify how many bytes of data
- * length follow.
- */
-#define	WT_CELL_1_BYTE		(0x00 << 6)
-#define	WT_CELL_2_BYTE		(0x01 << 6)
-#define	WT_CELL_3_BYTE		(0x02 << 6)
-#define	WT_CELL_4_BYTE		(0x03 << 6)
-#define	WT_CELL_BYTES(cell)						\
-	(((WT_CELL *)(cell))->__cell_chunk[0] & (0x03 << 6))
-
-/* WT_CELL_FOREACH is a loop that walks the cells on a page */
-#define	WT_CELL_FOREACH(dsk, cell, i)					\
-	for ((cell) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = (dsk)->u.entries;					\
-	    (i) > 0; (cell) = __wt_cell_next(cell), --(i))
 
 /*
  * WT_OFF --

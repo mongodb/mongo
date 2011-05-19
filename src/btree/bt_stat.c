@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "cell.i"
 
 static int __wt_stat_page_col_fix(SESSION *, WT_PAGE *);
 static int __wt_stat_page_col_rle(SESSION *, WT_PAGE *);
@@ -163,7 +164,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	 * there's Huffman encoding).
 	 */
 	WT_COL_FOREACH(page, cip, i)
-		switch (WT_CELL_TYPE(WT_COL_PTR(page, cip))) {
+		switch (__wt_cell_type(WT_COL_PTR(page, cip))) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
 			upd = WT_COL_UPDATE(page, cip);

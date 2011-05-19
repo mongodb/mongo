@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "cell.i"
 
 /*
  * __wt_col_search --
@@ -153,7 +154,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
 		} else
-			if (WT_CELL_TYPE(cipdata) == WT_CELL_DEL)
+			if (__wt_cell_type(cipdata) == WT_CELL_DEL)
 				goto notfound;
 		break;
 	case WT_PAGE_COL_RLE:

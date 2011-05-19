@@ -208,7 +208,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 		/* Process the original data. */
 		cell = WT_COL_PTR(page, cip);
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
 				dp->p(__wt_cell_data(cell),
@@ -306,7 +306,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 		/* Set cell to reference the value we'll dump. */
 		cell = WT_ROW_PTR(page, rip);
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
 				__wt_cell_data_and_len(

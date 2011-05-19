@@ -313,7 +313,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	rref = page->u.row_int.t;
 	WT_CELL_FOREACH(dsk, cell, i)
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
 				__wt_cell_data_and_len(
@@ -373,14 +373,14 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 	nindx = 0;
 	rip = page->u.row_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, i)
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 			++nindx;
 			if (rip->key != NULL)
 				++rip;
 			if (btree->huffman_key != NULL ||
-			    WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL) {
+			    __wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
 				rip->key = cell;
 				rip->size = WT_NEEDS_PROCESS;
 			} else
@@ -424,7 +424,7 @@ __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 	tmp = NULL;
 	ret = 0;
 
-	switch (WT_CELL_TYPE(cell)) {
+	switch (__wt_cell_type(cell)) {
 	case WT_CELL_KEY:
 		huffman = btree->huffman_key;
 		goto onpage;

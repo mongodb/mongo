@@ -164,7 +164,7 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 			value->size = upd->size;
 		} else {
 			cell = WT_COL_PTR(cbt->page, cbt->cip);
-			switch (WT_CELL_TYPE(cell)) {
+			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
 				if (cbt->btree->huffman_value == NULL) {
 					__wt_cell_data_and_len(
@@ -240,7 +240,7 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 			value->size = 0;
 		} else {
 			cell = WT_ROW_PTR(cbt->page, cbt->rip);
-			switch (WT_CELL_TYPE(cell)) {
+			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
 				if (cbt->btree->huffman_value == NULL) {
 					__wt_cell_data_and_len(

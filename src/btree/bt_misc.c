@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "cell.i"
 
 /*
  * __wt_page_type_string --
@@ -46,23 +47,27 @@ __wt_page_type_string(u_int type)
 const char *
 __wt_cell_type_string(WT_CELL *cell)
 {
-	switch (WT_CELL_TYPE(cell)) {
+	switch (__wt_cell_type_raw(cell)) {
 	case WT_CELL_DATA:
 		return ("data");
 	case WT_CELL_DATA_OVFL:
 		return ("data-overflow");
+	case WT_CELL_DATA_SHORT:
+		return ("data-short");
 	case WT_CELL_DEL:
 		return ("deleted");
 	case WT_CELL_KEY:
 		return ("key");
 	case WT_CELL_KEY_OVFL:
 		return ("key-overflow");
+	case WT_CELL_KEY_SHORT:
+		return ("key-short");
 	case WT_CELL_OFF:
 		return ("off-page");
 	case WT_CELL_OFF_RECORD:
 		return ("off-page-records");
 	default:
-		break;
+		return ("unknown");
 	}
-	return ("unknown");
+	/* NOTREACHED */
 }

@@ -472,7 +472,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 * Walk the disk page, verifying overflow items.
 	 */
 	WT_CELL_FOREACH(dsk, cell, i)
-		switch (WT_CELL_TYPE(cell)) {
+		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
 			__wt_cell_off(cell, &ovfl);

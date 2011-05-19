@@ -618,7 +618,7 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 	fprintf(fp, "\t%s: len %lu",
 	    __wt_cell_type_string(cell), (u_long)__wt_cell_datalen(cell));
 
-	switch (WT_CELL_TYPE(cell)) {
+	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
 	case WT_CELL_DEL:
 	case WT_CELL_KEY:
@@ -734,7 +734,7 @@ __wt_debug_cell_data(SESSION *session, const WT_CELL *cell, FILE *fp)
 	tmp = NULL;
 	ret = 0;
 
-	switch (WT_CELL_TYPE(cell)) {
+	switch (__wt_cell_type(cell)) {
 	case WT_CELL_KEY:
 		if (btree->huffman_key != NULL)
 			goto process;
