@@ -72,6 +72,10 @@ namespace mongo {
         virtual void onHandedOut( DBClientBase * conn ) {
             ClientInfo::get()->addShard( conn->getServerAddress() );
         }
+
+        virtual void onDestory( DBClientBase * conn ) {
+            resetShardVersionCB( conn );
+        }
     };
 
     class ShardedMessageHandler : public MessageHandler {
