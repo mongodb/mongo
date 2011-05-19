@@ -2615,7 +2615,6 @@ __rec_cell_build_key(
 {
 	WT_RECONCILE *r;
 	BTREE *btree;
-	uint32_t orig_size;
 
 	r = S2C(session)->cache->rec;
 	btree = session->btree;
@@ -2625,19 +2624,11 @@ __rec_cell_build_key(
 	 * re-point that WT_BUF's data and size fields to other memory, and if
 	 * we allocate memory in that WT_BUF, the caller must free it.
 	 *
-	 * Optionally compress the value using the Huffman engine.  For Huffman-
-	 * encoded key/data cells, we need additional memory; use the SESSION
-	 * key/value return memory: this routine is called during bulk insert
-	 * and reconciliation, we aren't returning key/data pairs.
+	 * Optionally compress the value using the Huffman engine.
 	 */
-	if (btree->huffman_key != NULL) {
-		orig_size = key->size;
+	if (btree->huffman_key != NULL)
 		WT_RET(__wt_huffman_encode(session,
-		    btree->huffman_key, key->data, orig_size, key));
-		if (key->size > orig_size)
-			WT_STAT_INCRV(btree->stats,
-			    huffman_key, key->size - orig_size);
-	}
+		    btree->huffman_key, key->data, key->size, key));
 
 	/* Create an overflow object if the data won't fit. */
 	if (key->size > btree->leafitemsize) {
@@ -2663,7 +2654,6 @@ __rec_cell_build_val(
 {
 	WT_RECONCILE *r;
 	BTREE *btree;
-	uint32_t orig_size;
 
 	r = S2C(session)->cache->rec;
 	btree = session->btree;
@@ -2673,10 +2663,7 @@ __rec_cell_build_val(
 	 * re-point that WT_BUF's data and size fields to other memory, and if
 	 * we allocate memory in that WT_BUF, the caller must free it.
 	 *
-	 * Optionally compress the value using the Huffman engine.  For Huffman-
-	 * encoded key/data cells, we need additional memory; use the SESSION
-	 * key/value return memory: this routine is called during bulk insert
-	 * and reconciliation, we aren't returning key/data pairs.
+	 * Optionally compress the value using the Huffman engine.
 	 *
 	 * Handle zero-length cells quickly -- this is a common value, it's
 	 * a deleted column-store variable length cell.
@@ -2687,14 +2674,9 @@ __rec_cell_build_val(
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
-	if (btree->huffman_value != NULL) {
-		orig_size = val->size;
+	if (btree->huffman_value != NULL)
 		WT_RET(__wt_huffman_encode(session,
-		    btree->huffman_value, val->data, orig_size, val));
-		if (val->size > orig_size)
-			WT_STAT_INCRV(btree->stats,
-			    huffman_value, val->size - orig_size);
-	}
+		    btree->huffman_value, val->data, val->size, val));
 
 	/* Create an overflow object if the data won't fit. */
 	if (val->size > btree->leafitemsize) {

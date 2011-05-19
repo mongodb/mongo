@@ -44,8 +44,6 @@ struct __wt_btree_stats {
 	struct __wt_stats alloc;
 	struct __wt_stats extend;
 	struct __wt_stats free;
-	struct __wt_stats huffman_key;
-	struct __wt_stats huffman_value;
 	struct __wt_stats items_inserted;
 	struct __wt_stats overflow_data;
 	struct __wt_stats overflow_key;

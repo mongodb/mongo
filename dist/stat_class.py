@@ -46,8 +46,6 @@ btree_stats = {
 	'alloc' : Stat('file: block allocations'),
 	'extend' : Stat('file: block allocations require file extension'),
 	'free' : Stat('file: block frees'),
-	'huffman_key' : Stat('file: huffman key compression in bytes'),
-	'huffman_value' : Stat('file: huffman value compression in bytes'),
 	'items_inserted' : Stat('file: key/value pairs inserted'),
 	'overflow_data' : Stat('file: overflow values inserted'),
 	'overflow_key' : Stat('file: overflow key items inserted'),

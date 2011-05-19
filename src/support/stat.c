@@ -12,8 +12,6 @@ __wt_stat_alloc_btree_stats(SESSION *session, WT_BTREE_STATS **statsp)
 	stats->alloc.desc = "file: block allocations";
 	stats->extend.desc = "file: block allocations require file extension";
 	stats->free.desc = "file: block frees";
-	stats->huffman_key.desc = "file: huffman key compression in bytes";
-	stats->huffman_value.desc = "file: huffman value compression in bytes";
 	stats->items_inserted.desc = "file: key/value pairs inserted";
 	stats->overflow_data.desc = "file: overflow values inserted";
 	stats->overflow_key.desc = "file: overflow key items inserted";
@@ -34,8 +32,6 @@ __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats)
 	stats->alloc.v = 0;
 	stats->extend.v = 0;
 	stats->free.v = 0;
-	stats->huffman_key.v = 0;
-	stats->huffman_value.v = 0;
 	stats->items_inserted.v = 0;
 	stats->overflow_data.v = 0;
 	stats->overflow_key.v = 0;
@@ -53,8 +49,6 @@ __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream)
 	__wt_stat_print(&stats->alloc, stream);
 	__wt_stat_print(&stats->extend, stream);
 	__wt_stat_print(&stats->free, stream);
-	__wt_stat_print(&stats->huffman_key, stream);
-	__wt_stat_print(&stats->huffman_value, stream);
 	__wt_stat_print(&stats->items_inserted, stream);
 	__wt_stat_print(&stats->overflow_data, stream);
 	__wt_stat_print(&stats->overflow_key, stream);
