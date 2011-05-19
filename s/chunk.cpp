@@ -346,6 +346,7 @@ namespace mongo {
             // we need it so that mongos blocks for the writes to actually be commited
             // this does mean mongos has more back pressure than mongod alone
             // since it nots 100% tcp queue bound
+            // this was implicit before since we did a splitVector on the same socket
             ShardConnection::sync();
 
             log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
