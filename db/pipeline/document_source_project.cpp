@@ -74,7 +74,7 @@ namespace mongo {
 	      going to pick off elements one by one, and make fields of
 	      them below.
 	    */
-	    if (unwindName.length() > 0) {
+	    if (unwindName.length()) {
 		unwindWhich = pNoUnwindDocument->getFieldIndex(unwindName);
 		Document::FieldPair outPair(
 		    pNoUnwindDocument->getField(unwindWhich));
@@ -135,7 +135,7 @@ namespace mongo {
         return pSource;
     }
 
-    void DocumentSourceProject::includeField(
+    void DocumentSourceProject::addField(
         const string &fieldName, const shared_ptr<Expression> &pExpression,
 	bool unwindArray) {
         assert(pExpression); // CW TODO must be a non-null expression
@@ -156,8 +156,12 @@ namespace mongo {
 	pEO->addField(fieldName, pExpression);
     }
 
-    void DocumentSourceProject::excludeField(const string &fieldName) {
-	pEO->excludeField(fieldName);
+    void DocumentSourceProject::includePath(const string &fieldPath) {
+	pEO->includePath(fieldPath);
+    }
+
+    void DocumentSourceProject::excludePath(const string &fieldPath) {
+	pEO->excludePath(fieldPath);
     }
 
     shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
@@ -182,13 +186,10 @@ namespace mongo {
 	    Expression::ObjectCtx::DOCUMENT_OK);
         while(fieldIterator.more()) {
             BSONElement outFieldElement(fieldIterator.next());
-            string outFieldName(outFieldElement.fieldName());
-            string inFieldName(outFieldName);
+            string outFieldPath(outFieldElement.fieldName());
+            string inFieldName(outFieldPath);
             BSONType specType = outFieldElement.type();
             int fieldInclusion = -1;
-
-            assert(outFieldName.find('.') == outFieldName.npos);
-            // CW TODO user error: out field name can't use dot notation
 
             switch(specType) {
             case NumberDouble: {
@@ -199,7 +200,7 @@ namespace mongo {
                     assert(false); // CW TODO unimplemented constant expression
                 }
 
-                goto AddField;
+                goto IncludeExclude;
             }
 
             case NumberInt:
@@ -208,26 +209,26 @@ namespace mongo {
                 assert((fieldInclusion >= 0) && (fieldInclusion <= 1));
                 // CW TODO invalid field projection specification
 
-AddField:
+IncludeExclude:
                 if (fieldInclusion == 0)
-		    pProject->excludeField(outFieldName);
-                else {
-                    shared_ptr<Expression> pExpression(
-                        ExpressionFieldPath::create(inFieldName));
-                    pProject->includeField(outFieldName, pExpression, false);
-                }
+		    pProject->excludePath(outFieldPath);
+                else 
+                    pProject->includePath(outFieldPath);
                 break;
 
             case Bool:
                 /* just a plain boolean include/exclude specification */
                 fieldInclusion = outFieldElement.Bool() ? 1 : 0;
-                goto AddField;
+                goto IncludeExclude;
 
             case String:
                 /* include a field, with rename */
                 fieldInclusion = 1;
                 inFieldName = outFieldElement.String();
-                goto AddField;
+		pProject->addField(
+		    outFieldPath,
+		    ExpressionFieldPath::create(inFieldName), false);
+		break;
 
             case Object: {
                 bool hasUnwound = objectCtx.unwindUsed();
@@ -241,8 +242,8 @@ AddField:
                   projection, and after parsing find that we have just gotten a
                   $unwind specification.
                  */
-                pProject->includeField(
-                    outFieldName, pDocument,
+                pProject->addField(
+                    outFieldPath, pDocument,
                     !hasUnwound && objectCtx.unwindUsed());
                 break;
             }

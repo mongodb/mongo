@@ -72,6 +72,7 @@ var p6 = db.runCommand(
     }}
 ]});
 
+// slightly more complex computed expression; $ifnull
 var p7 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
@@ -81,33 +82,14 @@ var p7 = db.runCommand(
     }}
 ]});
 
-// simple filtering
-// note use of the '$' prefix to distinguish between field names and literals
-var f1 = db.runCommand(
-{ aggregate : "article", pipeline : [
-    { $filter : { $eq:["$author", "dave"] } }
-]});
 
-// try the same thing with matcher syntax
+// simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $match : { author : "dave" } }
 ]});
 
-// combining filtering with a projection
-var f2 = db.runCommand(
-{ aggregate : "article", pipeline : [
-    { $project : {
-	title : 1,
-	author : 1,
-	pageViews : 1,
-	tag : { $unwind : "tags" },
-	comments : 1
-    }},
-    { $filter : { $eq:["$tag", "nasty"] } }
-]});
-
-// try it with match syntax
+// combining matching with a projection
 var m2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
@@ -119,6 +101,7 @@ var m2 = db.runCommand(
     }},
     { $match : { tag : "nasty" } }
 ]});
+
 
 // group by tag
 var g1 = db.runCommand(

@@ -585,8 +585,22 @@ namespace mongo {
         */
         static shared_ptr<DocumentSourceProject> create();
 
+	/*
+	  Include a field path in a projection.
+
+	  @param fieldPath the path of the field to include
+	*/
+	void includePath(const string &fieldPath);
+
+	/*
+	  Exclude a field path from the projection.
+
+	  @param fieldPath the path of the field to exclude
+	 */
+	void excludePath(const string &fieldPath);
+
         /*
-          Include an output Expression in the projection.
+          Add an output Expression in the projection.
 
           BSON document fields are ordered, so the new field will be
           appended to the existing set.
@@ -599,16 +613,9 @@ namespace mongo {
               value from the array.  Note there can only be one unwound field
 	      per projection.
         */
-        void includeField(const string &fieldName,
-			  const shared_ptr<Expression> &pExpression,
-			  bool unwindArray);
-
-	/*
-	  Exclude a field from the projection.
-
-	  @param fieldName the name of the field to exclude
-	 */
-	void excludeField(const string &fieldName);
+        void addField(const string &fieldName,
+		      const shared_ptr<Expression> &pExpression,
+		      bool unwindArray);
 
 	/*
 	  Create a new projection DocumentSource from BSON.

@@ -171,14 +171,7 @@ namespace mongo {
 		if (pEO)
 		{
 		    string idString(idName);
-		    shared_ptr<Expression> pIE(pEO->getField(idString));
-		    assert(!pIE.get()); // CW TODO error: not allowed
-
-		    assert(!pEO->getExclusionCount());
-                              // CW TODO error: not allowed for the _id field
-
-		    /* override the default behavior to include _id */
-		    pEO->setAddId(false);
+		    pEO->excludePath(idName);
 		}
 
                 pGroup->setIdExpression(pId);

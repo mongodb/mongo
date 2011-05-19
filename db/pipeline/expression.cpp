@@ -21,6 +21,7 @@
 #include "db/jsobj.h"
 #include "db/pipeline/builder.h"
 #include "db/pipeline/document.h"
+#include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -138,24 +139,19 @@ namespace mongo {
                     /* it's an inclusion specification */
                     double inclusion = fieldElement.Double();
 		    if (inclusion == 0)
-			pExpressionObject->excludeField(fieldName);
-		    else if (inclusion == 1) {
-			shared_ptr<Expression> pPath(
-			    ExpressionFieldPath::create(fieldName));
-			pExpressionObject->addField(fieldName, pPath);
-		    } else
+			pExpressionObject->excludePath(fieldName);
+		    else if (inclusion == 1)
+			pExpressionObject->includePath(fieldName);
+		    else
 			assert(false);
                     // CW TODO error: only 0 or 1 allowed here
                 }
                 else if (fieldType == Bool) {
 		    bool inclusion = fieldElement.Bool();
 		    if (!inclusion)
-			pExpressionObject->excludeField(fieldName);
-		    else {
-			shared_ptr<Expression> pPath(
-			    ExpressionFieldPath::create(fieldName));
-			pExpressionObject->addField(fieldName, pPath);
-		    }
+			pExpressionObject->excludePath(fieldName);
+		    else
+			pExpressionObject->includePath(fieldName);
 		}
 		else { /* nothing else is allowed */
                     assert(false); // CW TODO error
@@ -825,8 +821,10 @@ namespace mongo {
     }
 
     ExpressionObject::ExpressionObject():
-	addId(true),
-	exclusions(),
+	computedId(false),
+	excludeId(false),
+	excludePaths(false),
+	path(),
         vFieldName(),
         vpExpression() {
     }
@@ -845,57 +843,165 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
 	/* try to figure out how big to make the result document */
 	size_t sizeHint = pDocument->getFieldCount();
-	size_t excludeCount = exclusions.size();
-	if (sizeHint > excludeCount)
-	    sizeHint -= excludeCount;
-	else
-	    sizeHint = 0;
+	const size_t pathSize = path.size();
+	if (!excludePaths)
+	    sizeHint += pathSize;
+	else {
+	    size_t excludeCount = pathSize;
+	    if (sizeHint > excludeCount)
+		sizeHint -= excludeCount;
+	    else
+		sizeHint = 0;
+	}
 	sizeHint += vFieldName.size();
+	set<string>::iterator end(path.end());
 
 	/* create the result */
         shared_ptr<Document> pResult(Document::create(sizeHint));
+	bool addedId = false;
 
 	/*
-	  If we're using exclusions, copy all the fields from the original
-	  that aren't excluded, unless it's just the _id.
+	  Take care of inclusions or exclusions.  Note that _id is special,
+	  that that it is always included, unless it is specifically excluded.
+	  we use excludeId for that in case excludePaths if false, which means
+	  to include paths.
 	*/
-	if (excludeCount) {
-	    set<string>::iterator end(exclusions.end());
-	    if ((excludeCount > 1) ||
-		(exclusions.find(idName) == end)) {
-		auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
+	if (pathSize) {
+	    auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
+	    if (excludePaths) {
 		while(pIter->more()) {
 		    pair<string, shared_ptr<const Value> > field(pIter->next());
-	            set<string>::iterator si(exclusions.find(field.first));
 
-		    /* if it's not excluded, add it to the result */
-		    if (si == end)
-			pResult->addField(field.first, field.second);
-	        }
+		    /*
+		      If the field in the document is not in the exclusion set,
+		      add it to the result document.
+
+		      Note that exclusions are only allowed on leaves, so we
+		      can assume we don't have to descend recursively here.
+		     */
+		    if (path.find(field.first) != end)
+			continue; // we found it, so don't add it
+		    if (excludeId && idName.compare(field.first))
+			continue; // excluding id, and that's it, so don't add
+
+		    pResult->addField(field.first, field.second);
+		}
+	    }
+	    else { /* !excludePaths */
+		while(pIter->more()) {
+		    pair<string, shared_ptr<const Value> > field(
+			pIter->next());
+		    /*
+		      If the field in the document is in the inclusion set,
+		      add it to the result document.  Or, if we're not
+		      excluding _id, and it is _id, include it.
+
+		      Note that this could be an inclusion along a pathway,
+		      so we look for an ExpressionObject in vpExpression; when
+		      we find one, we populate the result with the evaluation
+		      of that on the nested object, yielding relative paths.
+		      This also allows us to handle intermediate arrays; if we
+		      encounter one, we repeat this for each array element.
+		     */
+		    const bool isId = !idName.compare(field.first);
+		    if ((path.find(field.first) != end) ||
+			(!excludeId && isId)) {
+
+			if (isId)
+			    addedId = true;
+
+			/* find the Expression */
+			const size_t n = vFieldName.size();
+			size_t i;
+			Expression *pE = NULL;
+			for(i = 0; i < n; ++i) {
+			    if (field.first.compare(vFieldName[i]) == 0) {
+				pE = vpExpression[i].get();
+				break;
+			    }
+			}
+
+			/*
+			  If we didn't find an expression, it's the last path
+			  element to include.
+			*/
+			if (!pE) {
+			    pResult->addField(field.first, field.second);
+			    continue;
+			}
+
+			ExpressionObject *pChild =
+			    dynamic_cast<ExpressionObject *>(pE);
+			assert(pChild);
+
+			/*
+			  Check on the type of the result object.  If it's an
+			  object, just walk down into that recursively, and
+			  add it to the result.
+			*/
+			BSONType valueType = field.second->getType();
+			if (valueType == Object) {
+			    shared_ptr<Document> pD(
+				pChild->evaluateDocument(
+				    field.second->getDocument()));
+			    pResult->addField(field.first,
+					      Value::createDocument(pD));
+			}
+			else if (valueType == Array) {
+			    /*
+			      If it's an array, we have to do the same thing,
+			      but to each array element.  Then, add the array
+			      of results to the current document.
+			    */
+			    vector<shared_ptr<const Value> > result;
+			    shared_ptr<ValueIterator> pVI(
+				field.second->getArray());
+			    while(pVI->more()) {
+				shared_ptr<Document> pD(
+				    pChild->evaluateDocument(
+					pVI->next()->getDocument()));
+				result.push_back(Value::createDocument(pD));
+			    }
+
+			    pResult->addField(field.first,
+					      Value::createArray(result));
+			}
+		    }
+		}
 	    }
 	}
 
-        /*
-	  If we're supposed to include the _id, and we haven't so far, do so.
-	  We do this here, because this is the case where there aren't any
-	  exclusions, so the _id appears first.  Of course, we can only do this
-	  if it came through from the underlying document.
-	 */
-        if (addId) {
+	/*
+	  If we still haven't got an _id, we're supposed to have one,
+	  and there isn't a computed one, add the underlying one here.
+	*/
+	if (!addedId && !excludeId && !computedId) {
 	    shared_ptr<const Value> pId(pDocument->getField(idName));
-	    if (pId.get())
+	    if (pId.get() && (pId->getType() != Undefined))
 		pResult->addField(idName, pId);
 	}
 
-	/* add any remaining fields */
+	/* add any remaining fields we haven't already taken care of */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
+	    string fieldName(vFieldName[i]);
+
+	    /* if we've already dealt with this field, above, do nothing */
+	    if (path.find(fieldName) != end)
+		continue;
+
 	    shared_ptr<const Value> pValue(
 		vpExpression[i]->evaluate(pDocument));
 
-	    /* don't add the value if it is undefined */
-	    if (pValue->getType() != Undefined)
-		pResult->addField(vFieldName[i], pValue);
+	    /*
+	      Don't add non-existent values (note:  different from NULL);
+	      this is consistent with existing selection syntax which doesn't
+	      force the appearnance of non-existent fields.
+	    */
+	    if (pValue->getType() == Undefined)
+		continue;
+
+	    pResult->addField(fieldName, pValue);
         }
 
         return pResult;
@@ -906,57 +1012,80 @@ namespace mongo {
 	return Value::createDocument(evaluateDocument(pDocument));
     }
 
-    void ExpressionObject::addField(const string &theFieldPath,
+    void ExpressionObject::addField(const string &fieldName,
 				    const shared_ptr<Expression> &pExpression) {
-	/* parse the field path */
-	FieldPath fieldPath(theFieldPath);
+	/* must have an expression */
+	assert(pExpression.get());
 
-	/* add the expression at the end of the path */
-	addField(&fieldPath, 0, fieldPath.getPathLength(), pExpression);
+	/* parse the field path */
+	FieldPath fieldPath(fieldName);
+	assert(fieldPath.getPathLength() == 1); // CW TODO ERROR
+
+	/* make sure it isn't a name we've included or excluded */
+	set<string>::iterator ex(path.find(fieldName));
+	assert(ex == path.end()); // CW TODO ERROR
+
+	/* if we're adding a computed _id, don't include the regular one */
+	if (idName.compare(fieldName) == 0)
+	{
+	    excludeId = true;
+	    computedId = true;
+	}
+
+	/* make sure it isn't a name we've already got */
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    assert(fieldName.compare(vFieldName[i]) != 0); // CW TODO ERROR
+	}
+
+	vFieldName.push_back(fieldName);
+	vpExpression.push_back(pExpression);
     }
 
-    ExpressionObject *ExpressionObject::addField(
-	const FieldPath *pPath, size_t pathi, size_t pathn,
-	const shared_ptr<Expression> &pExpression) {
+    void ExpressionObject::includePath(
+	const FieldPath *pPath, size_t pathi, size_t pathn, bool excludeLast) {
 
 	/* get the current path field name */
-	string thisField(pPath->getFieldName(pathi));
+	string fieldName(pPath->getFieldName(pathi));
+	assert(fieldName.length()); // must be non-zero length
 
-	/* find the field, if we already know about it */
+	const size_t pathCount = path.size();
+
+	/* if this is the leaf-most object, stop */
+	if (pathi == pathn - 1) {
+	    /*
+	      If the field is _id, never put it in path, because we might not
+	      yet know if that is going to be used for inclusions or
+	      exclusions.
+	     */
+	    if (!fieldName.compare(idName)) {
+		if (excludeLast)
+		    excludeId = true;
+		return;
+	    }
+
+	    /*
+	      Make sure the exclusion configuration of this node matches
+	      the requested result.  Or, that this is the first (determining)
+	      specification.
+	    */
+	    assert((excludePaths == excludeLast) || !pathCount);
+                                                             // CW TODO ERROR
+
+	    excludePaths = excludeLast; // if (!pathCount), set this
+	    path.insert(fieldName);
+	    return;
+	}
+
+	/* this level had better be about inclusions */
+	assert(!excludePaths); // CW TODO ERROR
+
+	/* see if we already know about this field */
 	const size_t n = vFieldName.size();
 	size_t i;
 	for(i = 0; i < n; ++i) {
-	    if (thisField.compare(vFieldName[i]) == 0)
+	    if (fieldName.compare(vFieldName[i]) == 0)
 		break;
-	}
-
-	/* if this is the leaf-most object, stop and add the expression */
-	if (pathi == pPath->getPathLength() - 1) {
-	    assert(i == n); // CW TODO ERROR: already specified here */
-
-	    set<string>::iterator ex(exclusions.find(thisField));
-	    assert(ex == exclusions.end()); // CW TODO conflicting spec
-
-	    /*
-	      addField() is also used by excludeField() to insert the
-	      intermediate child objects, in which case no Expression is
-	      supplied.
-	     */
-	    if (pExpression.get()) {
-		/*
-		  If the _id has been explicitly added, we won't add it again
-		  ourselves; the user may have redefined it, or have put it
-		  in a particular position for some reason.
-		 */
-		if (thisField.compare(idName) == 0)
-		    addId = false;
-		else {
-		    vFieldName.push_back(thisField);
-		    vpExpression.push_back(pExpression);
-		}
-	    }
-
-	    return this;
 	}
 
 	/* find the right object, and continue */
@@ -964,6 +1093,7 @@ namespace mongo {
 	if (i < n) {
 	    /* the intermediate child already exists */
 	    pChild = dynamic_cast<ExpressionObject *>(vpExpression[i].get());
+	    assert(pChild);
 	}
 	else {
 	    /*
@@ -972,31 +1102,25 @@ namespace mongo {
 	    */
 	    shared_ptr<ExpressionObject> sharedChild(
 		ExpressionObject::create());
-	    vFieldName.push_back(thisField);
+	    vFieldName.push_back(fieldName);
 	    vpExpression.push_back(sharedChild);
 	    pChild = sharedChild.get();
 	}
 
-	return pChild->addField(pPath, pathi + 1, pathn, pExpression);
+	// LATER CW TODO turn this into a loop
+	pChild->includePath(pPath, pathi + 1, pathn, excludeLast);
     }
 
-    void ExpressionObject::excludeField(const string &theFieldPath) {
+    void ExpressionObject::includePath(const string &theFieldPath) {
 	/* parse the field path */
 	FieldPath fieldPath(theFieldPath);
+	includePath(&fieldPath, 0, fieldPath.getPathLength(), false);
+    }
 
-	/*
-	  Exclusion implies that all the intervening child objects will be
-	  included; if they weren't, we wouldn't need to exclude the item at
-	  the end of the path.
-	 */
-	const size_t pathLength = fieldPath.getPathLength();
-	ExpressionObject *pLeaf = addField(
-	    &fieldPath, 0, pathLength, shared_ptr<Expression>());
-
-	string fieldName(fieldPath.getFieldName(pathLength - 1));
-	if (fieldName.compare(idName) == 0)
-	    addId = false;
-	exclusions.insert(fieldName);
+    void ExpressionObject::excludePath(const string &theFieldPath) {
+	/* parse the field path */
+	FieldPath fieldPath(theFieldPath);
+	includePath(&fieldPath, 0, fieldPath.getPathLength(), true);
     }
 
     shared_ptr<Expression> ExpressionObject::getField(
@@ -1011,36 +1135,92 @@ namespace mongo {
 	return shared_ptr<Expression>();
     }
 
+    void ExpressionObject::emitPaths(
+	BSONObjBuilder *pBuilder, vector<string> *pvPath) const {
+	if (!path.size())
+	    return;
+	
+	/* we use these for loops */
+	const size_t nField = vFieldName.size();
+	const size_t nPath = pvPath->size();
+
+	/*
+	  We can iterate over the inclusion/exclusion paths in their
+	  (random) set order because they don't affect the order that
+	  fields are listed in the result.  That comes from the underlying
+	  Document they are fetched from.
+	 */
+	for(set<string>::iterator end(path.end()),
+		iter(path.begin()); iter != end; ++iter) {
+
+	    /* find the matching field description */
+	    size_t iField = 0;
+	    for(; iField < nField; ++iField) {
+		if (iter->compare(vFieldName[iField]) == 0)
+		    break;
+	    }
+
+	    if (iField == nField) {
+		/*
+		  If we didn't find a matching field description, this is the
+		  leaf, so add the path.
+		*/
+		stringstream ss;
+
+		for(size_t iPath = 0; iPath < nPath; ++iPath)
+		    ss << (*pvPath)[iPath] << ".";
+		ss << *iter;
+
+		pBuilder->append(ss.str(), !excludePaths);
+	    }
+	    else {
+		/*
+		  If we found a matching field description, then we need to
+		  descend into the next level.
+		*/
+		Expression *pE = vpExpression[iField].get();
+		ExpressionObject *pEO = dynamic_cast<ExpressionObject *>(pE);
+		assert(pEO);
+
+		/*
+		  Add the current field name to the path being built up,
+		  then go down into the next level.
+		 */
+		PathPusher(pvPath, vFieldName[iField]);
+		pEO->emitPaths(pBuilder, pvPath);
+	    }
+	}
+    }
+
     void ExpressionObject::documentToBson(
 	BSONObjBuilder *pBuilder, bool fieldPrefix,
 	const string &unwindField) const {
 
-	/* if there are any exclusions, write them out first */
-	if (exclusions.size()) {
-	    set<string>::iterator end(exclusions.end());
-	    for(set<string>::iterator end(exclusions.end()),
-		    iter(exclusions.begin()); iter != end; ++iter) {
-		pBuilder->append(*iter, false);
-	    }
-	}
+	/* emit any inclusion/exclusion paths */
+	vector<string> vPath;
+	emitPaths(pBuilder, &vPath);
 
-	/* then add any inclusions */
-	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i) {
-	    if (unwindField.compare(vFieldName[i]) == 0) {
+	/* then add any expressions */
+	const size_t nField = vFieldName.size();
+	const set<string>::iterator pathEnd(path.end());
+	for(size_t iField = 0; iField < nField; ++iField) {
+	    string fieldName(vFieldName[iField]);
+
+	    /* if we already took care of this, don't repeat it */
+	    if (path.find(fieldName) != pathEnd)
+		continue;
+
+	    if (unwindField.compare(fieldName) == 0) {
 		BSONObjBuilder unwind;
-		vpExpression[i]->addToBsonObj(
+		vpExpression[iField]->addToBsonObj(
 		    &unwind, Expression::unwindName, false);
-		pBuilder->append(vFieldName[i], unwind.done());
+		pBuilder->append(vFieldName[iField], unwind.done());
 		continue;
 	    }
 
-	    vpExpression[i]->addToBsonObj(pBuilder, vFieldName[i], fieldPrefix);
+	    vpExpression[iField]->addToBsonObj(
+		pBuilder, fieldName, fieldPrefix);
 	}
-    }
-
-    void ExpressionObject::setAddId(bool b) {
-	addId = b;
     }
 
     void ExpressionObject::addToBsonObj(
@@ -1071,7 +1251,8 @@ namespace mongo {
         return pExpression;
     }
 
-    ExpressionFieldPath::ExpressionFieldPath(const string &theFieldPath):
+    ExpressionFieldPath::ExpressionFieldPath(
+	const string &theFieldPath):
         fieldPath(theFieldPath) {
     }
 
@@ -1082,8 +1263,12 @@ namespace mongo {
 
     shared_ptr<const Value> ExpressionFieldPath::evaluate(
         const shared_ptr<Document> &pDocument) const {
-        shared_ptr<const Value> pValue;
+
+	/* figure out where to start the path traversal */
 	shared_ptr<Document> pLocal(pDocument);
+
+	/* start walking down the path */
+        shared_ptr<const Value> pValue; /* the return value */
         const size_t n = fieldPath.getPathLength();
         size_t i = 0;
         while(true) {

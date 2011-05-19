@@ -55,7 +55,7 @@ namespace mongo {
     inline void ExpressionContext::setInRouter(bool b) {
 	inRouter = b;
     }
-    
+
     inline bool ExpressionContext::getInShard() const {
 	return inShard;
     }

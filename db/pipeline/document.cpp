@@ -98,6 +98,8 @@ namespace mongo {
 
     void Document::addField(const string &fieldName,
 			    const shared_ptr<const Value> &pValue) {
+	assert(pValue->getType() != Undefined);
+
         vFieldName.push_back(fieldName);
         vpValue.push_back(pValue);
     }
@@ -105,6 +107,8 @@ namespace mongo {
     void Document::setField(size_t index,
                             const string &fieldName,
 			    const shared_ptr<const Value> &pValue) {
+	assert(pValue->getType() != Undefined);
+
         vFieldName[index] = fieldName;
         vpValue[index] = pValue;
     }

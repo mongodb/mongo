@@ -27,6 +27,7 @@ namespace mongo {
     class BSONObjBuilder;
     class Builder;
     class Document;
+    class ExpressionContext;
     class Value;
 
     class Expression :
@@ -638,14 +639,25 @@ namespace mongo {
 		      const shared_ptr<Expression> &pExpression);
 
 	/*
-	  Add a field to the set of those to be excluded.
+	  Add a field path to the set of those to be included.
+
+	  Note that including a nested field implies including everything on
+	  the path leading down to it.
+
+	  @param fieldPath the name of the field to be included
+	*/
+	void includePath(const string &fieldPath);
+
+	/*
+	  Add a field path to the set of those to be excluded.
 
 	  Note that excluding a nested field implies including everything on
-	  the path leading down to it.
+	  the path leading down to it (because you're stating you want to see
+	  all the other fields that aren't being excluded).
 
 	  @param fieldName the name of the field to be excluded
 	 */
-	void excludeField(const string &fieldPath);
+	void excludePath(const string &fieldPath);
 
 	/*
 	  Return the expression for a field.
@@ -683,29 +695,44 @@ namespace mongo {
 	    BSONObjBuilder *pBuilder, bool fieldPrefix,
 	    const string &unwindField) const;
 
-	/*
-	  Set whether or not to include _id by default.
-
-	  Does not affect explicit inclusions or exclusions of _id.
-
-	  @params addId whether or not to include _id
-	*/
-	void setAddId(bool addId);
-
     private:
         ExpressionObject();
 
-	ExpressionObject *addField(const FieldPath *pPath,
-				   size_t pathi, size_t pathn,
-				   const shared_ptr<Expression> &pExpression);
+	void includePath(
+	    const FieldPath *pPath, size_t pathi, size_t pathn,
+	    bool excludeLast);
 
 	static string idName;
-	bool addId;
-	set<string> exclusions;
+	bool computedId;
+	bool excludeId;
+	bool excludePaths;
+	set<string> path;
 
         /* these two vectors are maintained in parallel */
         vector<string> vFieldName;
         vector<shared_ptr<Expression> > vpExpression;
+
+	/*
+	  Utility function used by documentToBson().  Emits inclusion
+	  and exclusion paths by recursively walking down the nested
+	  ExpressionObject trees these have created.
+
+	  @param pBuilder the builder to write boolean valued path "fields" to
+	  @param pvPath pointer to a vector of strings describing the path on
+	    descent; the top-level call should pass an empty vector
+	 */
+	void emitPaths(BSONObjBuilder *pBuilder, vector<string> *pvPath) const;
+
+	/* utility class used by emitPaths() */
+	class PathPusher :
+	    boost::noncopyable {
+	public:
+	    PathPusher(vector<string> *pvPath, const string &s);
+	    ~PathPusher();
+
+	private:
+	    vector<string> *pvPath;
+	};
     };
 
 
@@ -772,8 +799,14 @@ namespace mongo {
 	return vFieldName.size();
     }
 
-    inline size_t ExpressionObject::getExclusionCount() const {
-	return exclusions.size();
+    inline ExpressionObject::PathPusher::PathPusher(
+	vector<string> *pTheVPath, const string &s):
+	pvPath(pTheVPath) {
+	pvPath->push_back(s);
+    }
+
+    inline ExpressionObject::PathPusher::~PathPusher() {
+	pvPath->pop_back();
     }
 
 }
