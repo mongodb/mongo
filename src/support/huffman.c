@@ -42,7 +42,6 @@ typedef struct __wt_huffman_code {
 } WT_HUFFMAN_CODE;
 
 typedef struct __wt_huffman_obj {
-	SESSION *session;		/* Enclosing session */
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
 	 * This contains the frequency table (tree) used to produce optimal
@@ -203,11 +202,11 @@ set_codes(WT_FREQTREE_NODE *node,
 		}
 
 		if (len < MAX_CODE_LENGTH) {
-			patternleft =  (pattern << 1) | 0;
+			patternleft = (pattern << 1) | 0;
 			patternright = (pattern << 1) | 1;
 			len++;
 		} else {			/* "low bit mode" */
-			patternleft =  pattern;
+			patternleft = pattern;
 			patternright = pattern + node->left->weight;
 						/* len unchanged */
 		}
@@ -301,7 +300,6 @@ __wt_huffman_open(SESSION *session,
 
 	WT_RET(__wt_calloc_def(session, 1, &huffman));
 	WT_ERR(__wt_calloc_def(session, (size_t)symcnt, &indexed_freqs));
-	huffman->session = session;
 
 	/*
 	 * The frequency array must be sorted to be able to use linear time
@@ -335,7 +333,7 @@ __wt_huffman_open(SESSION *session,
 	 */
 	if (esc.frequency == 0)
 		esc.frequency++;
-		
+
 	qsort(indexed_freqs,
 	    symcnt, sizeof(INDEXED_SYMBOL), indexed_byte_comparator);
 
@@ -438,7 +436,7 @@ __wt_huffman_open(SESSION *session,
 	uint16_t sym;
 
 	printf("leaf depth %lu..%lu, memory use: "
-	    "codes %u# * %u size  +  code2symbol %lu# * %u size\n",
+	    "codes %u# * %u size  + code2symbol %lu# * %u size\n",
 	    (u_long)huffman->min_depth, (u_long)huffman->max_depth,
 	    symcnt, sizeof(WT_HUFFMAN_CODE),
 	    (u_long)(1U << huffman->max_depth), sizeof(uint16_t));
@@ -530,7 +528,7 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
 /*
  * __wt_huffman_encode --
  *	Take a byte string, encode it into the target.
- * 
+ *
  * Translation from symbol to Huffman code is a simple array lookup.
  *
  * WT_HUFFMAN_OBJ contains an array called 'codes' with one WT_HUFFMAN_CODE per
@@ -541,15 +539,14 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
  * To encode byte-string, we iterate over the input symbols.  For each symbol,
  * look it up via table, shift bits onto a shift register (an int long enough
  * to hold the longest code word + up to 7 bits remaining from the previous),
- * then drain out full bytes.  Finally, at the end flush remaining bits 
+ * then drain out full bytes.  Finally, at the end flush remaining bits
  * and write header bits.
  */
 int
-__wt_huffman_encode(
+__wt_huffman_encode(SESSION *session,
     void *huffman_arg, const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
-	SESSION *session;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
 	uint32_t max_len, outlen, bitpos, bytes;
@@ -568,7 +565,6 @@ __wt_huffman_encode(
 	uint8_t valid;
 
 	huffman = huffman_arg;
-	session = huffman->session;
 	tmp = NULL;
 	ret = 0;
 
@@ -697,13 +693,13 @@ err:	if (tmp != NULL)
  * From the symbol, we index into the 'codes' array to get the code length.
  *
  * When decoding a message, we don't know where the boundaries are between
- * codes.  The trick is that we collect enough bits for the longest code word, 
+ * codes.  The trick is that we collect enough bits for the longest code word,
  * and construct the table such that for codes with fewer bits we flood the
  * table with all of the bit patterns in the lower order bits.  This works
  * because the Huffman code is a unique prefix, and by the flooding we are
  * treating bits beyond the unique prefix as don't care bits.
  *
- * For example, we have table of length 2^max_code_length (1<<max_code_length). 
+ * For example, we have table of length 2^max_code_length (1<<max_code_length).
  * For a code of length, max_code_length, the position code2symbol[code] =
  *	symbol.
  * For a code word of (max_length - 1), we fill code2symbol[code << 1] = symbol,
@@ -718,11 +714,10 @@ err:	if (tmp != NULL)
  * Finally, subtract off these bits from the shift register.
  */
 int
-__wt_huffman_decode(
+__wt_huffman_decode(SESSION *session,
     void *huffman_arg, const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
-	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
 	uint32_t bits, from_bits, from_len_bits, len, mask, max, max_len;
 	uint32_t out_bits, outlen;
@@ -731,7 +726,6 @@ __wt_huffman_decode(
 	int ret;
 
 	huffman = huffman_arg;
-	session = huffman->session;
 	tmp = NULL;
 	ret = 0;
 

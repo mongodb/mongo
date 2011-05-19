@@ -2632,7 +2632,7 @@ __rec_cell_build_key(
 	 */
 	if (btree->huffman_key != NULL) {
 		orig_size = key->size;
-		WT_RET(__wt_huffman_encode(
+		WT_RET(__wt_huffman_encode(session,
 		    btree->huffman_key, key->data, orig_size, key));
 		if (key->size > orig_size)
 			WT_STAT_INCRV(btree->stats,
@@ -2689,7 +2689,7 @@ __rec_cell_build_val(
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_value != NULL) {
 		orig_size = val->size;
-		WT_RET(__wt_huffman_encode(
+		WT_RET(__wt_huffman_encode(session,
 		    btree->huffman_value, val->data, orig_size, val));
 		if (val->size > orig_size)
 			WT_STAT_INCRV(btree->stats,

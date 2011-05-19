@@ -470,7 +470,7 @@ offpage:	/*
 		if (tmp != retbuf)
 			WT_ERR(__wt_buf_set(session, retbuf, p, size));
 	} else
-		WT_ERR(__wt_huffman_decode(huffman, p, size, retbuf));
+		WT_ERR(__wt_huffman_decode(session, huffman, p, size, retbuf));
 
 err:	if (tmp != NULL && tmp != retbuf)
 		__wt_scr_release(&tmp);
