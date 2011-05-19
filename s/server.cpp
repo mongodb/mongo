@@ -69,6 +69,16 @@ namespace mongo {
     class ShardingConnectionHook : public DBConnectionHook {
     public:
 
+        ShardingConnectionHook( bool shardedConnections )
+            : _shardedConnections( shardedConnections ) {
+        }
+
+        virtual void onCreate( DBClientBase * conn ) {
+            if ( _shardedConnections ) {
+                conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+            }
+        }
+
         virtual void onHandedOut( DBClientBase * conn ) {
             ClientInfo::get()->addShard( conn->getServerAddress() );
         }
@@ -76,6 +86,8 @@ namespace mongo {
         virtual void onDestory( DBClientBase * conn ) {
             resetShardVersionCB( conn );
         }
+
+        bool _shardedConnections;
     };
 
     class ShardedMessageHandler : public MessageHandler {
@@ -285,10 +297,10 @@ int _main(int argc, char* argv[]) {
     
     // set some global state
 
-    pool.addHook( new ShardingConnectionHook() );
+    pool.addHook( new ShardingConnectionHook( false ) );
     pool.setName( "mongos connectionpool" );
 
-    shardConnectionPool.addHook( new ShardingConnectionHook() );
+    shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
     shardConnectionPool.setName( "mongos shardconnection connectionpool" );
 
     

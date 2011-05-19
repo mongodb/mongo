@@ -16,6 +16,8 @@ assert.eq(1, s1.getDB('test').existing.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
 s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
+s2.adminCommand( { split : "test.existing" , find : { _id : 5 } } )
+
 //assert.eq(true, s1.getDB('test').existing.stats().sharded); //SERVER-2828
 assert.eq(true, s2.getDB('test').existing.stats().sharded);
 
@@ -27,7 +29,11 @@ else
 
 assert.eq(1 , res.ok, tojson(res));
 
-//assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
+printjson( s2.adminCommand( {"getShardVersion" : "test.existing" } ) )
+printjson( new Mongo(s1.getServer( "test" ).name).getDB( "admin" ).adminCommand( {"getShardVersion" : "test.existing" } ) )
+
+
+assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
 s1.stop();
