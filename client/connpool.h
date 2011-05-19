@@ -26,6 +26,7 @@
 namespace mongo {
 
     class Shard;
+    class DBConnectionPool;
 
     /**
      * not thread safe
@@ -46,7 +47,7 @@ namespace mongo {
 
         int numAvailable() const { return (int)_pool.size(); }
 
-        void createdOne( DBClientBase * base);
+        void createdOne( DBClientBase * base );
         long long numCreated() const { return _created; }
 
         ConnectionString::ConnectionType type() const { assert(_created); return _type; }
@@ -54,9 +55,9 @@ namespace mongo {
         /**
          * gets a connection or return NULL
          */
-        DBClientBase * get();
+        DBClientBase * get( DBConnectionPool * pool);
 
-        void done( DBClientBase * c );
+        void done( DBConnectionPool * pool , DBClientBase * c );
 
         void flush();
         
@@ -87,6 +88,7 @@ namespace mongo {
         virtual ~DBConnectionHook() {}
         virtual void onCreate( DBClientBase * conn ) {}
         virtual void onHandedOut( DBClientBase * conn ) {}
+        virtual void onDestory( DBClientBase * conn ) {}
     };
 
     /** Database connection pool.
@@ -116,20 +118,15 @@ namespace mongo {
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
+        void onDestory( DBClientBase * conn );
 
         void flush();
 
         DBClientBase *get(const string& host);
         DBClientBase *get(const ConnectionString& host);
 
-        void release(const string& host, DBClientBase *c) {
-            if ( c->isFailed() ) {
-                delete c;
-                return;
-            }
-            scoped_lock L(_mutex);
-            _pools[host].done(c);
-        }
+        void release(const string& host, DBClientBase *c);
+
         void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
 

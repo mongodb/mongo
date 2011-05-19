@@ -36,8 +36,9 @@ namespace mongo {
         }
     }
 
-    void PoolForHost::done( DBClientBase * c ) {
+    void PoolForHost::done( DBConnectionPool * pool, DBClientBase * c ) {
         if ( _pool.size() >= _maxPerHost ) {
+            pool->onDestory( c );
             delete c;
         }
         else {
@@ -45,15 +46,16 @@ namespace mongo {
         }
     }
 
-    DBClientBase * PoolForHost::get() {
+    DBClientBase * PoolForHost::get( DBConnectionPool * pool ) {
 
         time_t now = time(0);
 
         while ( ! _pool.empty() ) {
             StoredConnection sc = _pool.top();
             _pool.pop();
-            if ( sc.ok( now ) )
+            if ( sc.ok( now ) ) 
                 return sc.conn;
+            pool->onDestory( sc.conn );
             delete sc.conn;
         }
 
@@ -127,7 +129,7 @@ namespace mongo {
         assert( ! inShutdown() );
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[ident];
-        return p.get();
+        return p.get( this );
     }
 
     DBClientBase* DBConnectionPool::_finishCreate( const string& host , DBClientBase* conn ) {
@@ -174,6 +176,17 @@ namespace mongo {
         return _finishCreate( host , c );
     }
 
+    void DBConnectionPool::release(const string& host, DBClientBase *c) {
+        if ( c->isFailed() ) {
+            onDestory( c );
+            delete c;
+            return;
+        }
+        scoped_lock L(_mutex);
+        _pools[host].done(this,c);
+    }
+
+
     DBConnectionPool::~DBConnectionPool() {
         // connection closing is handled by ~PoolForHost
     }
@@ -205,6 +218,15 @@ namespace mongo {
 
         for ( list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++ ) {
             (*i)->onHandedOut( conn );
+        }
+    }
+
+    void DBConnectionPool::onDestory( DBClientBase * conn ) {
+        if ( _hooks->size() == 0 )
+            return;
+
+        for ( list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++ ) {
+            (*i)->onDestory( conn );
         }
     }
 
@@ -270,6 +292,7 @@ namespace mongo {
 
         for ( size_t i=0; i<toDelete.size(); i++ ) {
             try {
+                onDestory( toDelete[i] );
                 delete toDelete[i];
             }
             catch ( ... ) {
