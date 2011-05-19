@@ -111,6 +111,14 @@ namespace mongo {
             return i->second;
         }
 
+        // Useful for ensuring our shard data will not be modified while we use it
+        Shard findCopy( const string& ident ){
+            ShardPtr found = find( ident );
+            scoped_lock lk( _mutex );
+            massert( 13128 , (string)"can't find shard for: " + ident , found.get() );
+            return *found.get();
+        }
+
         void set( const string& name , const Shard& s , bool setName = true , bool setAddr = true ) {
             scoped_lock lk( _mutex );
             ShardPtr ss( new Shard( s ) );
@@ -257,14 +265,9 @@ namespace mongo {
     }
 
     void Shard::reset( const string& ident ) {
-        ShardPtr s = staticShardInfo.find( ident );
-        massert( 13128 , (string)"can't find shard for: " + ident , s->ok() );
-        _name = s->_name;
-        _addr = s->_addr;
-        _cs = s->_cs;
+        *this = staticShardInfo.findCopy( ident );
+        _rs.reset();
         _rsInit();
-        _maxSize = s->_maxSize;
-        _isDraining = s->_isDraining;
     }
 
     bool Shard::containsNode( const string& node ) const {
@@ -286,10 +289,10 @@ namespace mongo {
     }
 
     void Shard::printShardInfo( ostream& out ) {
-        vector<ShardPtr> all;
+        vector<Shard> all;
         staticShardInfo.getAllShards( all );
         for ( unsigned i=0; i<all.size(); i++ )
-            out << all[i]->toString() << "\n";
+            out << all[i].toString() << "\n";
         out.flush();
     }
 
@@ -321,7 +324,7 @@ namespace mongo {
     }
 
     Shard Shard::pick( const Shard& current ) {
-        vector<ShardPtr> all;
+        vector<Shard> all;
         staticShardInfo.getAllShards( all );
         if ( all.size() == 0 ) {
             staticShardInfo.reload();
@@ -331,13 +334,13 @@ namespace mongo {
         }
 
         // if current shard was provided, pick a different shard only if it is a better choice
-        ShardStatus best = all[0]->getStatus();
+        ShardStatus best = all[0].getStatus();
         if ( current != EMPTY ) {
             best = current.getStatus();
         }
 
         for ( size_t i=0; i<all.size(); i++ ) {
-            ShardStatus t = all[i]->getStatus();
+            ShardStatus t = all[i].getStatus();
             if ( t < best )
                 best = t;
         }
