@@ -228,15 +228,13 @@ namespace mongo {
 
     HostAndPort ReplicaSetMonitor::getSlave() {
 
-        {
-            scoped_lock lk( _lock );
-            for ( unsigned i=0; i<_nodes.size(); i++ ) {
-                _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-                if ( _nextSlave == _master )
-                    continue;
-                if ( _nodes[ _nextSlave ].ok )
-                    return _nodes[ _nextSlave ].addr;
-            }
+        scoped_lock lk( _lock );
+        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+            _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+            if ( _nextSlave == _master )
+                continue;
+            if ( _nodes[ _nextSlave ].ok )
+                return _nodes[ _nextSlave ].addr;
         }
 
         return _nodes[ 0 ].addr;
