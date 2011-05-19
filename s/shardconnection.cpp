@@ -110,15 +110,10 @@ namespace mongo {
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
-
-                if ( ss->avail ) {
+                if ( ss->avail )
                     ss->avail->getLastError();
-                    release( addr , ss->avail );
-                    ss->avail = 0;
-                }
-                delete ss;
+                
             }
-            _hosts.clear();
         }
 
         void checkVersions( const string& ns ) {
