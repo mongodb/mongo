@@ -317,7 +317,7 @@ namespace mongo {
             BSONObj o;
             c->isMaster(isMaster, &o);
 
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << '\n';
+            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << endl;
 
             // add other nodes
             if ( o["hosts"].type() == Array ) {
@@ -547,7 +547,7 @@ namespace mongo {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
                 catch ( DBException &e ) {
-                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << e.what() << endl;
+                    log() << "can't query replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                 }
             }
         }
