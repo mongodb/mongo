@@ -1813,6 +1813,23 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 	    page, 0ULL, session->btree->intlmax, session->btree->intlmin));
 
 	/*
+	 * Ideally, we'd never store the 0th key on row-store internal pages
+	 * because it's never used during tree search and there's no reason
+	 * to waste the space.  The problem is how we do splits: when we split,
+	 * we've potentially picked out several "split points" in the buffer
+	 * which is overflowing the maximum page size, and when the overflow
+	 * happens, we go back and physically split the buffer, at those split
+	 * points, into new pages.  It would be both difficult and expensive
+	 * to re-process the 0th key at each split point to be an empty key,
+	 * so we don't do that.  However, we are reconciling an internal page
+	 * for whatever reason, and the 0th key is known to be useless.  Set
+	 * the 0th key to something small.  (We do NOT put a zero-length key
+	 * in the tree: zero-length keys are keys requiring further processing,
+	 * not keys we are going to ignore.)
+	 */
+	r->cell_zero = 1;
+
+	/*
 	 * There are two kinds of row-store internal pages we reconcile: the
 	 * first is a page created entirely in-memory, in which case there's
 	 * no underlying disk image.  The second is a page read from disk,
@@ -1837,23 +1854,6 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		WT_RET(__rec_row_merge(session, page));
 		return (__rec_split_finish(session));
 	}
-
-	/*
-	 * Ideally, we'd never store the 0th key on row-store internal pages
-	 * because it's never used during tree search and there's no reason
-	 * to waste the space.  The problem is how we do splits: when we split,
-	 * we've potentially picked out several "split points" in the buffer
-	 * which is overflowing the maximum page size, and when the overflow
-	 * happens, we go back and physically split the buffer, at those split
-	 * points, into new pages.  It would be both difficult and expensive
-	 * to re-process the 0th key at each split point to be an empty key,
-	 * so we don't do that.  However, we are reconciling an internal page
-	 * for whatever reason, and the 0th key is known to be useless.  Set
-	 * the 0th key to something small.  (We do NOT put a zero-length key
-	 * in the tree: zero-length keys are keys requiring further processing,
-	 * not keys we are going to ignore.)
-	 */
-	r->cell_zero = 1;
 
 	/* The value cells all look the same. */
 	__wt_cell_set(&val_cell, WT_CELL_OFF, sizeof(WT_OFF), &val_cell_len);
