@@ -49,7 +49,6 @@ typedef struct __wt_huffman_obj {
 	 */
 	uint32_t numSymbols;
 	uint8_t  numBytes;		/* 1 or 2 */
-					/* Tree in static array reprentation */
 	uint16_t max_depth, min_depth;
 
 	uint16_t escape;		/* Escape symbol. */
@@ -723,8 +722,8 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 {
 	WT_BUF *tmp;
 	WT_HUFFMAN_OBJ *huffman;
-	uint32_t bits, from_bits, from_len_bits, len, mask, max, max_len;
-	uint32_t out_bits, outlen;
+	uint32_t bits, from_bytes, from_len_bits, len, mask, max, max_len;
+	uint32_t outlen;
 	uint16_t pattern, symbol;
 	const uint8_t *from;
 	uint8_t padding_info, *to, valid;
@@ -753,6 +752,9 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 	if (padding_info != 0)
 		from_len_bits -= 8 - padding_info;
 
+	/* Number of bits that have codes. */
+	from_len_bits -= WT_HUFFMAN_HEADER;
+
 	/*
 	 * Compute largest uncompressed output size, which is if all symbols are
 	 * most frequent and so have smallest Huffman codes and therefore
@@ -765,26 +767,27 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 	WT_ERR(__wt_scr_alloc(session, max_len, &tmp));
 	to = tmp->mem;
 
+	/* The first byte of input is a special case because of header bits. */
 	bits = *from++;
 	valid = 8 - WT_HUFFMAN_HEADER;
-	from_bits = from_len_bits - 8;
-	out_bits = from_len_bits - WT_HUFFMAN_HEADER;
+	from_bytes = from_len - 1;
+
 	max = huffman->max_depth;
 	mask = (1U << max) - 1;
-	for (outlen = 0; out_bits > 0; outlen += huffman->numBytes) {
-		while (valid < max && from_bits > 0) {
+	for (outlen = 0; from_len_bits > 0; outlen += huffman->numBytes) {
+		while (valid < max && from_bytes > 0) {
 			WT_ASSERT(session,
 			    WT_PTRDIFF32(from, from_arg) < from_len);
 			bits = (bits << 8) | *from++;
 			valid += 8;
-			from_bits -= 8;
+			from_bytes--;
 		}
 		pattern = valid >= max ?	/* short patterns near end */
 		    (bits >> (valid - max)) : (bits << (max - valid));
 		symbol = huffman->code2symbol[pattern & mask];
 		len = huffman->codes[symbol].length;
 		valid -= len;
-		out_bits -= len;
+		from_len_bits -= len;
 
 		if (symbol == huffman->escape) {
 #if __HUFFMAN_DETAIL
@@ -796,7 +799,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 			while (valid < len) {
 				bits = (bits << 8) | *from++;
 				valid += 8;
-				from_bits -= 8;
+				from_bytes--;
 			}
 
 			/*
@@ -805,7 +808,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 			 */
 			symbol = bits >> (valid - len);
 			valid -= len;
-			out_bits -= len;
+			from_len_bits -= len;
 		}
 
 		if (huffman->numBytes == 2)
