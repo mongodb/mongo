@@ -333,8 +333,9 @@ void __wt_hazard_clear(SESSION *session, WT_PAGE *page);
 void __wt_hazard_empty(SESSION *session, const char *name);
 void __wt_hazard_validate(SESSION *session, WT_PAGE *page);
 int __wt_huffman_open(SESSION *session,
-    uint8_t const *byte_frequency_array,
+    void *symbol_frequency_array,
     u_int symcnt,
+    u_int numbytes,
     void *retp);
 void __wt_huffman_close(SESSION *session, void *huffman_arg);
 int __wt_print_huffman_code(void *huffman_arg, uint16_t symbol);

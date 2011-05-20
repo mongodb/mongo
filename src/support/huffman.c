@@ -25,11 +25,11 @@
 typedef struct __wt_freqtree_node {
 	/*
 	 * Data structure representing a node of the huffman tree. It holds a
-	 * 32-bit weight and pointers to the left and right child nodes.  The
+	 * 64-bit weight and pointers to the left and right child nodes.  The
 	 * node either has two child nodes or none.
 	 */
 	uint16_t symbol;			/* only used in leaf nodes */
-	uint32_t weight;
+	uint64_t weight;
 	struct __wt_freqtree_node *left;	/* bit 0 */
 	struct __wt_freqtree_node *right;	/* bit 1 */
 } WT_FREQTREE_NODE;
@@ -44,14 +44,14 @@ typedef struct __wt_huffman_code {
 typedef struct __wt_huffman_obj {
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
-	 * This contains the frequency table (tree) used to produce optimal
-	 * results.  This version of the encoder supports 1- and 2-byte symbols.
+	 * This version of the encoder supports 1- and 2-byte symbols.
 	 */
-	uint32_t numSymbols;
-	uint8_t  numBytes;		/* 1 or 2 */
-	uint16_t max_depth, min_depth;
+	u_int	numBytes;		/* Bytes being encoded: 1 or 2 */
+	u_int	numSymbols;		/* Symbols: UINT16_MAX or UINT8_MAX */
 
-	uint16_t escape;		/* Escape symbol. */
+	uint16_t escape;		/* Escape symbol */
+
+	uint16_t max_depth, min_depth;	/* Tree max/min depths */
 
 	/*
 	 * use: codes[symbol] = struct with pattern and length.
@@ -98,11 +98,12 @@ typedef struct node_queue {
  * frequency array.
  */
 typedef struct __indexed_byte {
-	uint8_t frequency;
-	uint16_t symbol;
+	uint32_t symbol;
+	uint32_t frequency;
 } INDEXED_SYMBOL;
 
-static int  indexed_byte_comparator(const void *, const void *);
+static int  indexed_freq_compare(const void *, const void *);
+static int  indexed_symbol_compare(const void *, const void *);
 static void make_table(
 	SESSION *, uint16_t *, uint16_t, WT_HUFFMAN_CODE *, u_int);
 static void node_queue_close(SESSION *, NODE_QUEUE *);
@@ -117,14 +118,30 @@ static void set_codes(WT_FREQTREE_NODE *, WT_HUFFMAN_CODE *, uint16_t, uint8_t);
 	(((queue) == NULL || (queue)->first == NULL) ? 1 : 0)
 
 /*
- * Comparator function used by QuickSort to order the frequency table by
- * frequency (most frequent symbols will be at the end of the array).
+ * indexed_symbol_compare --
+ *	Qsort comparator to order the table by symbol, lowest to highest.
  */
 static int
-indexed_byte_comparator(const void *elem1, const void *elem2)
+indexed_symbol_compare(const void *a, const void *b)
 {
-	return (((INDEXED_SYMBOL *)
-	    elem1)->frequency) - (((INDEXED_SYMBOL *)elem2)->frequency);
+	return (((INDEXED_SYMBOL *)a)->symbol >
+	    ((INDEXED_SYMBOL *)b)->symbol ? 1 :
+	    (((INDEXED_SYMBOL *)a)->symbol <
+	    ((INDEXED_SYMBOL *)b)->symbol ? -1 : 0));
+}
+
+/*
+ * indexed_freq_compare --
+ *	Qsort comparator to order the table by frequency (the most frequent
+ * symbols will be at the end of the array).
+ */
+static int
+indexed_freq_compare(const void *a, const void *b)
+{
+	return (((INDEXED_SYMBOL *)a)->frequency >
+	    ((INDEXED_SYMBOL *)b)->frequency ? 1 :
+	    (((INDEXED_SYMBOL *)a)->frequency <
+	    ((INDEXED_SYMBOL *)b)->frequency ? -1 : 0));
 }
 
 /*
@@ -271,43 +288,76 @@ recursive_free_node(SESSION *session, WT_FREQTREE_NODE *node)
 /*
  * __wt_huffman_open --
  *	Take a frequency table and return a pointer to a descriptor object.
- *
- *  The frequency table must be the full range of valid values.  For 1 byte
- *  tables there are 256 values in 8 bits.  The highest rank is 255, and the
- * lowest rank is 1 (0 means the byte never appears in the input), so 1 byte
- * is needed to hold the rank and the input table must be 1 byte x 256 values.
- *
- *  For UTF-16 (symcnt == 2) the range is 0 - 65535 and the max rank is 65535.
- *  The table should be 2 bytes x 65536 values.
  */
 int
 __wt_huffman_open(SESSION *session,
-    uint8_t const *byte_frequency_array, u_int symcnt, void *retp)
+    void *symbol_frequency_array, u_int symcnt, u_int numbytes, void *retp)
 {
-	INDEXED_SYMBOL esc, *indexed_freqs;
+	INDEXED_SYMBOL *indexed_freqs;
 	NODE_QUEUE *combined_nodes, *leaves;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
-	uint32_t w1, w2;
+	uint64_t w1, w2;
 	uint16_t i;
 	int ret;
 
-	indexed_freqs = NULL;
+	indexed_freqs = symbol_frequency_array;
+
 	combined_nodes = leaves = NULL;
 	node = node2 = tempnode = NULL;
 	ret = 0;
 
 	WT_RET(__wt_calloc_def(session, 1, &huffman));
-	WT_ERR(__wt_calloc_def(session, (size_t)symcnt, &indexed_freqs));
 
 	/*
-	 * The frequency array must be sorted to be able to use linear time
+	 * The frequency table is 4B pairs of symbol and frequency.  The symbol
+	 * is either 1 or 2 bytes and the frequency ranges from 1 to UINT32_MAX
+	 * (a frequency of 0 means the value is never expected to appear in the
+	 * input).  Validate the symbols are within range.
+	 */
+	if (numbytes != 1 && numbytes != 2) {
+		__wt_errx(session,
+		    "illegal number of symbol bytes specified for a huffman "
+		    "table");
+		goto err;
+	}
+	huffman->numBytes = numbytes;
+	huffman->numSymbols = numbytes == 2 ? UINT16_MAX : UINT8_MAX;
+
+	if (symcnt == 0) {
+		__wt_errx(session,
+		    "illegal number of symbols specified for a huffman table");
+		goto err;
+	}
+
+	/*
+	 * Order the array by symbol and check for invalid symbosl and
+	 * duplicates.
+	 */
+	qsort((void *)indexed_freqs,
+	    symcnt, sizeof(INDEXED_SYMBOL), indexed_symbol_compare);
+	for (i = 0; i < symcnt; ++i) {
+		if (i > 0 &&
+		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol) {
+			__wt_errx(session,
+			    "duplicate symbol %lx specified in a huffman table",
+			    (u_long)indexed_freqs[i].symbol);
+			goto err;
+		}
+		if (indexed_freqs[i].symbol > huffman->numSymbols) {
+			__wt_errx(session,
+			    "illegal symbol %lx specified in a huffman table",
+			    (u_long)indexed_freqs[i].symbol);
+			goto err;
+		}
+	}
+
+	/*
+	 * The array must be sorted by frequency to be able to use a linear time
 	 * construction algorithm.
 	 */
-	for (i = 0; i < symcnt; i++) {
-		indexed_freqs[i].frequency = byte_frequency_array[i];
-		indexed_freqs[i].symbol = i;
-	}
+	qsort((void *)indexed_freqs,
+	    symcnt, sizeof(INDEXED_SYMBOL), indexed_freq_compare);
 
 	/*
 	 * The escape symbol dynamically seizes the lowest-frequency symbol,
@@ -316,50 +366,42 @@ __wt_huffman_open(SESSION *session,
 	 * the lowest-frequency to have minimal impact (close to no impact) on
 	 * compression ratios, but if there are lots of errors we pay the
 	 * longest codeword length in addition to the raw bits of the symbol.
+	 *
+	 * XXX
+	 * Ideally, if we're not provided a 0-frequency symbol, and we're not
+	 * provided a frequency for every legal value, we could take one of
+	 * the not-specified values as our escape symbol.
+	 *
+	 * When building the tree, we discard symbols with a 0 frequency; make
+	 * sure that doesn't happen to our escape symbol.
 	 */
-	esc = indexed_freqs[0];
-	for (i = 0+1; i < symcnt; i++)
-		if (indexed_freqs[i].frequency < esc.frequency)
-			esc = indexed_freqs[i];
-	huffman->escape = esc.symbol;
+	huffman->escape = (uint16_t)indexed_freqs[0].symbol;
 #if __HUFFMAN_DETAIL
-	printf("taking over symbol %d (freq %d) as escape\n",
-	    huffman->escape, esc.frequency);
+	printf("selecting symbol %lx (freq %d) as escape\n",
+	    (u_long)huffman->escape, indexed_freqs[0].frequency);
 #endif
-	/*
-	 * Zero frequency left out of codes, so make sure this doesn't happen
-	 * to the escape symbol.
-	 */
-	if (esc.frequency == 0)
-		esc.frequency++;
-
-	qsort(indexed_freqs,
-	    symcnt, sizeof(INDEXED_SYMBOL), indexed_byte_comparator);
+	if (indexed_freqs[0].frequency == 0)
+		++indexed_freqs[0].frequency;
 
 	/* We need two node queues to build the tree. */
 	WT_ERR(__wt_calloc_def(session, 1, &leaves));
 	WT_ERR(__wt_calloc_def(session, 1, &combined_nodes));
 
-	/* Adding the leaves to the queue */
-	for (i = 0; i < symcnt; ++i) {
-		/*
-		 * We are leaving out symbols with a frequency of 0.  This
-		 * assumes these symbols will NEVER occur in the source stream,
-		 * and the purpose is to reduce the huffman tree's size.
-		 *
-		 * NOTE: Even if this behavior is not desired, the frequencies
-		 * should have a range between 1 - 255, otherwise the algorithm
-		 * cannot produce well balanced tree; so this can be treated as
-		 * an optional feature.
-		 */
+	/*
+	 * Adding the leaves to the queue.
+	 *
+	 * Discard symbols with a frequency of 0; this assumes these symbols
+	 * never occur in the source stream, and the purpose is to reduce the
+	 * huffman tree's size.
+	 */
+	for (i = 0; i < symcnt; ++i)
 		if (indexed_freqs[i].frequency > 0) {
 			WT_ERR(__wt_calloc_def(session, 1, &tempnode));
-			tempnode->symbol = indexed_freqs[i].symbol;
+			tempnode->symbol = (uint16_t)indexed_freqs[i].symbol;
 			tempnode->weight = indexed_freqs[i].frequency;
 			WT_ERR(node_queue_enqueue(session, leaves, tempnode));
 			tempnode = NULL;
 		}
-	}
 
 	while (!node_queue_is_empty(leaves) ||
 	    !node_queue_is_empty(combined_nodes)) {
@@ -375,9 +417,9 @@ __wt_huffman_open(SESSION *session,
 		 * the first items from both:
 		 */
 		w1 = node_queue_is_empty(leaves) ?
-		    UINT32_MAX : leaves->first->node->weight;
+		    UINT64_MAX : leaves->first->node->weight;
 		w2 = node_queue_is_empty(combined_nodes) ?
-		    UINT32_MAX : combined_nodes->first->node->weight;
+		    UINT64_MAX : combined_nodes->first->node->weight;
 
 		/*
 		 * Based on the two weights we finally can dequeue the smaller
@@ -411,12 +453,11 @@ __wt_huffman_open(SESSION *session,
 
 	/*
 	 * The remaining node is in the node variable, this is the root of the
-	 * tree.   Calculate how many bytes it takes to hold symcnt bytes bits.
+	 * tree.   Calculate how many bytes it takes to hold numSymbols bytes
+	 * bits.
 	 */
-	huffman->numSymbols = symcnt;
-	huffman->numBytes = symcnt > 256 ? 2 : 1;
-
-	huffman->max_depth = 0; huffman->min_depth = MAX_CODE_LENGTH;
+	huffman->max_depth = 0;
+	huffman->min_depth = MAX_CODE_LENGTH;
 	(void)profile_tree(node, 0, &huffman->max_depth, &huffman->min_depth);
 	if (huffman->max_depth > MAX_CODE_LENGTH)
 		huffman->max_depth = MAX_CODE_LENGTH;
@@ -431,13 +472,12 @@ __wt_huffman_open(SESSION *session,
 
 #if __HUFFMAN_DETAIL
 	{
-	uint32_t weighted_length;
-	uint16_t sym;
+	uint32_t symbol, weighted_length;
 
 	printf("leaf depth %lu..%lu, memory use: "
-	    "codes %u# * %u size  + code2symbol %lu# * %u size\n",
+	    "codes %u# * %uB  + code2symbol %lu# * %uB\n",
 	    (u_long)huffman->min_depth, (u_long)huffman->max_depth,
-	    symcnt, sizeof(WT_HUFFMAN_CODE),
+	    huffman->numSymbols, sizeof(WT_HUFFMAN_CODE),
 	    (u_long)(1U << huffman->max_depth), sizeof(uint16_t));
 
 	/*
@@ -446,12 +486,14 @@ __wt_huffman_open(SESSION *session,
 	 */
 	weighted_length = 0;
 	for (i = 0; i < symcnt; i++) {
-		sym = indexed_freqs[i].symbol;
+		symbol = indexed_freqs[i].symbol;
 		weighted_length +=
-		    indexed_freqs[i].frequency * huffman->codes[sym].length;
+		    indexed_freqs[i].frequency * huffman->codes[symbol].length;
 		/*
-		 * printf("\t%d->%d. %d * %d\n", i, sym,
-		 *    indexed_freqs[i].frequency, huffman->codes[sym].length);
+		 * printf("\t%lu->%lu. %lu * %lu\n",
+		 *    (u_long)i, (u_long)symbol,
+		 *    (u_long)indexed_freqs[i].frequency,
+		 *    (u_long)huffman->codes[symbol].length);
 		 */
 	}
 	printf("weighted length of all codes (the smaller the better): %lu\n",
@@ -461,12 +503,14 @@ __wt_huffman_open(SESSION *session,
 
 	*(void **)retp = huffman;
 
-err:	if (leaves != NULL)
+	if (0) {
+err:		if (ret == 0)
+			ret = WT_ERROR;
+	}
+	if (leaves != NULL)
 		node_queue_close(session, leaves);
 	if (combined_nodes != NULL)
 		node_queue_close(session, combined_nodes);
-	if (indexed_freqs != NULL)
-		__wt_free(session, indexed_freqs);
 	if (node != NULL)
 		recursive_free_node(session, node);
 	if (node2 != NULL)
@@ -474,7 +518,7 @@ err:	if (leaves != NULL)
 	if (tempnode != NULL)
 		__wt_free(session, tempnode);
 	if (ret != 0)
-		__wt_free(session, huffman);
+		__wt_huffman_close(session, huffman);
 	return (ret);
 }
 
@@ -674,7 +718,7 @@ __wt_huffman_encode(SESSION *session, void *huffman_arg,
 	WT_ERR(__wt_buf_setsize(session, to_buf, outlen));
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
-#if __HUFFMAN_DETAIL
+#if 0
 	printf("encode: worst case %lu bytes -> actual %lu\n",
 	    (u_long)max_len, (u_long)outlen);
 #endif
@@ -820,7 +864,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 	WT_ERR(__wt_buf_setsize(session, to_buf, outlen));
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
-#if __HUFFMAN_DETAIL
+#if 0
 	printf("decode: worst case %lu bytes -> actual %lu\n",
 	    (u_long)max_len, (u_long)outlen);
 #endif
