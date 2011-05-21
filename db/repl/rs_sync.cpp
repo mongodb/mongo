@@ -419,7 +419,7 @@ namespace mongo {
                         }
 
                         syncApply(o);
-                        _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */
+                        _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
                     }
                 }
             }
@@ -463,8 +463,11 @@ namespace mongo {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
-            if( ! _self || myConfig().arbiterOnly ){
-            	if( ! _self ) log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
+            if( ! _self ) {
+            	log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
+                return;
+            }
+            if( myConfig().arbiterOnly ) {
                 return;
             }
 
@@ -503,7 +506,7 @@ namespace mongo {
         n++;
 
         Client::initThread("replica set sync");
-        cc().iAmSyncThread();
+        cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();
         cc().shutdown();

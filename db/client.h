@@ -68,11 +68,14 @@ namespace mongo {
          */
         bool shutdown();
 
+        /**  set so isSyncThread() works */
         void iAmSyncThread() {
             wassert( syncThread == 0 );
             syncThread = this;
         }
-        bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
+        /** @return true if this client is the replication secondary pull thread.  not used much, is used in create index sync code. */
+        bool isSyncThread() const { return this == syncThread; }
+
         string clientAddress(bool includePort=false) const;
         const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }
         AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
