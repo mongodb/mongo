@@ -18,6 +18,7 @@
 
 #include "tool.h"
 
+#include <climits>
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
@@ -389,26 +390,30 @@ namespace mongo {
 
     long long BSONTool::processFile( const path& root ) {
         _fileName = root.string();
+        bool use_stdin = _fileName == "-";
+        unsigned long long fileLength = ULONG_MAX;
 
-        unsigned long long fileLength = file_size( root );
+        FILE* file = stdin;
+        if ( ! use_stdin ) {
+            fileLength = file_size( root );
 
-        if ( fileLength == 0 ) {
-            out() << "file " << _fileName << " empty, skipping" << endl;
-            return 0;
-        }
+            if ( fileLength == 0 ) {
+                out() << "file " << _fileName << " empty, skipping" << endl;
+                return 0;
+            }
 
-
-        FILE* file = fopen( _fileName.c_str() , "rb" );
-        if ( ! file ) {
-            log() << "error opening file: " << _fileName << endl;
-            return 0;
-        }
+            file = fopen( _fileName.c_str() , "rb" );
+            if ( ! file ) {
+                log() << "error opening file: " << _fileName << endl;
+                return 0;
+            }
 
 #if !defined(__sunos__) && defined(POSIX_FADV_SEQUENTIAL)
-        posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
+            posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        log(1) << "\t file size: " << fileLength << endl;
+            log(1) << "\t file size: " << fileLength << endl;
+        }
 
         unsigned long long read = 0;
         unsigned long long num = 0;
@@ -418,16 +423,25 @@ namespace mongo {
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
-        ProgressMeter m( fileLength );
+        ProgressMeter m(0);
+        if ( ! use_stdin ){
+            m.reset( fileLength );
+        }
 
         while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);
+            if ( (amt != 4) && feof(file) ) {
+                break;
+            }
             assert( amt == 4 );
 
             int size = ((int*)buf)[0];
             uassert( 10264 , str::stream() << "invalid object size: " << size , size < BUF_SIZE );
 
             amt = fread(buf+4, 1, size-4, file);
+            if ( (amt != (size_t)(size-4)) && feof(file) ) {
+                break;
+            }
             assert( amt == (size_t)( size - 4 ) );
 
             BSONObj o( buf );
@@ -456,13 +470,18 @@ namespace mongo {
             read += o.objsize();
             num++;
 
-            m.hit( o.objsize() );
+            if ( ! use_stdin ) {
+                m.hit( o.objsize() );
+            }
         }
 
-        fclose( file );
+        if ( ! use_stdin ) {
+            fclose( file );
 
-        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        out() << "\t "  << m.hits() << " objects found" << endl;
+            uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
+        }
+
+        out() << "\t "  << num << " objects found" << endl;
         if ( _matcher.get() )
             out() << "\t "  << processed << " objects processed" << endl;
         return processed;

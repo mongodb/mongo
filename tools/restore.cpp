@@ -47,14 +47,14 @@ public:
         ("oplogReplay" , "replay oplog for point-in-time restore")
         ;
         add_hidden_options()
-        ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
+        ("dir", po::value<string>()->default_value("dump"), "directory or filename to restore from or \"-\" for stdin")
         ("indexesLast" , "wait to add indexes (now default)") // left in for backwards compatibility
         ;
         addPositionArg("dir", 1);
     }
 
     virtual void printExtraHelp(ostream& out) {
-        out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
+        out << "usage: " << _name << " [options] [directory or filename to restore from or \"-\" for stdin]" << endl;
     }
 
     virtual int doRun() {
@@ -67,6 +67,20 @@ public:
         }
 
         _drop = hasParam( "drop" );
+
+        // process stdin -- require db and collection
+        if ( root == "-" ) {
+            if ( _db == "" || _coll == "" ) {
+                cout << "database and collection params are required when restoring from stdin" << endl;
+                return -1;
+            }
+            _curns = _db + "." + _coll;
+            out() << "\t going into namespace [" << _curns << "]" << endl;
+            _curdb = NamespaceString(_curns).db;
+            processFile( root );
+
+            return EXIT_CLEAN;
+        }
 
         bool doOplog = hasParam( "oplogReplay" );
         if (doOplog) {
