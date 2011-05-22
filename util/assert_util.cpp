@@ -101,6 +101,7 @@ namespace mongo {
 
     void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
+        LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg);
         throw UserException(msgid, msg);
     }
