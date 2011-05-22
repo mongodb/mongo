@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "client/dbclient.h"
 #include "db/json.h"
+#include "util/log.h"
 
 #include "tool.h"
 
@@ -42,6 +43,13 @@ public:
         ("jsonArray", "output to a json array rather than one object per line")
         ;
         _usesstdout = false;
+    }
+
+    void preSetup() {
+        if ( !hasParam( "out" ) ) {
+            // log to stderr so we don't corrupt the output data stream
+            Logstream::setLogFile(stderr);
+        }
     }
 
     int run() {
