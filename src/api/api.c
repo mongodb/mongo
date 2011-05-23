@@ -108,10 +108,10 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	WT_RET(__wt_config_gets(__cfg, "key_format", &cval));
 	if (strncmp(cval.str, "r", cval.len) == 0)
 		key_format = "r";
-	else if (strncmp(cval.str, "S", cval.len) == 0)
-		key_format = "S";
-	else if (strncmp(cval.str, "u", cval.len) == 0)
-		key_format = "u";
+	else if (cval.str[cval.len - 1] == 'S')
+		value_format = "S";
+	else if (cval.str[cval.len - 1] == 'u')
+		value_format = "u";
 	else {
 		__wt_errx(session, "Unknown key_format '%.*s'",
 		    (int)cval.len, cval.str);
@@ -119,11 +119,9 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	WT_RET(__wt_config_gets(__cfg, "value_format", &cval));
-	if (strncmp(cval.str, "S", cval.len) == 0)
+	if (cval.str[cval.len - 1] == 'S')
 		value_format = "S";
-	else if (strncmp(cval.str, "u", cval.len) == 0)
-		value_format = "u";
-	else if (cval.len > 1 && cval.str[cval.len - 1] == 'u')
+	else if (cval.str[cval.len - 1] == 'u')
 		value_format = "u";
 	else {
 		__wt_errx(session, "Unknown value_format '%.*s'",
@@ -143,7 +141,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 
 	/* Allocate a BTREE handle, and open the underlying file. */
 	WT_RET(__wt_btree_open(session, name, 0));
-	WT_RET(__wt_session_add_btree(session));
+	WT_RET(__wt_session_add_btree(session, NULL));
 
 	API_END();
 	return (0);

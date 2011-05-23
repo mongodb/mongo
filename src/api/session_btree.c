@@ -12,7 +12,7 @@
  *	Add a btree handle to the session's cache.
  */
 int
-__wt_session_add_btree(SESSION *session)
+__wt_session_add_btree(SESSION *session, BTREE_SESSION **btree_sessionp)
 {
 	const char *config;
 	char *format;
@@ -46,6 +46,9 @@ __wt_session_add_btree(SESSION *session)
 	__wt_lock(session, conn->mtx);
 	++session->btree->refcnt;
 	__wt_unlock(session, conn->mtx);
+
+	if (btree_sessionp != NULL)
+		*btree_sessionp = btree_session;
 
 	return (0);
 }

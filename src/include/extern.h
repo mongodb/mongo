@@ -72,7 +72,7 @@ int __wt_curstat_open(SESSION *session,
     WT_CURSOR **cursorp);
 int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 void __wt_cursor_init(WT_CURSOR *cursor, const char *config);
-int __wt_session_add_btree(SESSION *session);
+int __wt_session_add_btree(SESSION *session, BTREE_SESSION **btree_sessionp);
 int __wt_session_get_btree(SESSION *session,
     const char *name,
     size_t namelen,

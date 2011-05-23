@@ -231,7 +231,7 @@ __wt_curbtree_open(SESSION *session,
 
 		WT_RET(__wt_btree_open(session, tablename, 0));
 
-		WT_RET(__wt_session_add_btree(session));
+		WT_RET(__wt_session_add_btree(session, &btree_session));
 	} else {
 		WT_ERR(ret);
 		session->btree = btree_session->btree;
