@@ -241,6 +241,9 @@ struct __connection {
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: file ID counter */
 
+	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh)
+	    dlhqh;			/* Locked: library list */
+
 	uint32_t volatile api_gen;	/* API generation number */
 
 	/*

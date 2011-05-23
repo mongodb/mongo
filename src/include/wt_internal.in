@@ -22,6 +22,7 @@ extern "C" {
 #include <sys/uio.h>
 
 #include <ctype.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -72,6 +73,8 @@ struct __wt_col_ref;
     typedef struct __wt_col_ref WT_COL_REF;
 struct __wt_conn_stats;
     typedef struct __wt_conn_stats WT_CONN_STATS;
+struct __wt_dlh;
+    typedef struct __wt_dlh WT_DLH;
 struct __wt_evict_list;
     typedef struct __wt_evict_list WT_EVICT_LIST;
 struct __wt_evict_req;
@@ -129,6 +132,7 @@ struct __wt_walk_entry;
 #include "cache.h"
 #include "config.h"
 #include "debug.h"
+#include "dlh.h"
 #include "fh.h"
 #include "log.h"
 #include "misc.h"

@@ -13,6 +13,7 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -22,6 +23,7 @@ void cursor_ops(WT_CURSOR *cursor);
 void session_ops(WT_SESSION *session);
 void add_cursor_type(WT_CONNECTION *conn);
 void add_collator(WT_CONNECTION *conn);
+void add_compressor(WT_CONNECTION *conn);
 void add_extractor(WT_CONNECTION *conn);
 void connection_ops(WT_CONNECTION *conn);
 
@@ -135,25 +137,23 @@ add_cursor_type(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_CURSOR_TYPE my_ctype;
-	my_ctype.cursor_size = my_cursor_size;
-	my_ctype.init_cursor = my_init_cursor;
+	static WT_CURSOR_TYPE my_ctype = { my_cursor_size, my_init_cursor };
 	ret = conn->add_cursor_type(conn, NULL, &my_ctype, NULL);
 }
 
 /* Implementation of WT_COLLATOR for WT_CONNECTION::add_collator. */
 static int
-my_compare(WT_SESSION *session, WT_COLLATOR *collator,
+my_compare(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *value1, const WT_ITEM *value2, int *cmp, uint32_t *minprefix)
 {
 	const char *p1, *p2;
 
 	/* Unused parameters */
-	(void)session;
 	(void)collator;
+	(void)session;
 
-	p1 = value1->data;
-	p2 = value2->data;
+	p1 = (const char *)value1->data;
+	p2 = (const char *)value2->data;
 	while (*p1 != '\0' && *p1 == *p2)
 		p1++, p2++;
 
@@ -168,20 +168,64 @@ add_collator(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_COLLATOR my_collator;
-	my_collator.compare = my_compare;
+	static WT_COLLATOR my_collator = { my_compare };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
+}
+
+/* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
+static int
+my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    const WT_ITEM *source, WT_ITEM *dest)
+{
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+
+	if (dest->size < source->size) {
+		dest->size = source->size;
+		return (ENOMEM);
+	}
+	memcpy((void *)dest->data, source->data, source->size);
+	dest->size = source->size;
+	return (0);
+}
+
+static int
+my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    const WT_ITEM *source, WT_ITEM *dest)
+{
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+
+	if (dest->size < source->size) {
+		dest->size = source->size;
+		return (ENOMEM);
+	}
+	memcpy((void *)dest->data, source->data, source->size);
+	dest->size = source->size;
+	return (0);
+}
+/* End implementation of WT_COMPRESSOR. */
+
+void
+add_compressor(WT_CONNECTION *conn)
+{
+	int ret;
+	
+	static WT_COMPRESSOR my_compressor = { my_compress, my_decompress };
+	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 }
 
 /* Implementation of WT_EXTRACTOR for WT_CONNECTION::add_extractor. */
 static int
-my_extract(WT_SESSION *session, WT_EXTRACTOR *extractor,
+my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
     WT_ITEM *result)
 {
 	/* Unused parameters */
-	(void)session;
 	(void)extractor;
+	(void)session;
 	(void)key;
 
 	*result = *value;

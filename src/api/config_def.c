@@ -7,6 +7,10 @@ __wt_confdfl_connection_add_collator =
     "";
 
 const char *
+__wt_confdfl_connection_add_compressor =
+    "";
+
+const char *
 __wt_confdfl_connection_add_cursor_type =
     "";
 
@@ -94,5 +98,5 @@ __wt_confdfl_session_verify =
 const char *
 __wt_confdfl_wiredtiger_open =
     "cache_size=20MB,create=false,data_update_max=32KB,data_update_min=8KB,"
-    "exclusive=false,error_prefix=,hazard_max=15,logging=false,session_max=50"
-    ",multiprocess=false,verbose=";
+    "exclusive=false,extensions=[],error_prefix=,hazard_max=15,logging=false,"
+    "session_max=50,multiprocess=false,verbose=";

@@ -56,13 +56,14 @@ err:	(void)__wt_connection_close(conn);
 
 /*
  * __wt_connection_close --
- *	Close an Env handle.
+ *	Close a connection handle.
  */
 int
 __wt_connection_close(CONNECTION *conn)
 {
 	BTREE *btree;
 	SESSION *session;
+	WT_DLH *dlh;
 	WT_FH *fh;
 	int ret, secondary_err;
 
@@ -80,9 +81,9 @@ __wt_connection_close(CONNECTION *conn)
 
 	/* Complain if files weren't closed. */
 	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL && fh != conn->log_fh) {
-		__wt_errx(&conn->default_session,
+		__wt_errx(session,
 		    "Env handle has open file handles: %s", fh->name);
-		WT_TRET(__wt_close(&conn->default_session, fh));
+		WT_TRET(__wt_close(session, fh));
 		secondary_err = WT_ERROR;
 	}
 
@@ -107,6 +108,10 @@ __wt_connection_close(CONNECTION *conn)
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
+
+	/* Close extensions. */
+	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL)
+		WT_TRET(__wt_dlclose(session, dlh));
 
 	if (conn->log_fh != NULL) {
 		WT_TRET(__wt_close(session, conn->log_fh));

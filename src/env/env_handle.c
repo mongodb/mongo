@@ -22,6 +22,7 @@ __wt_connection_config(CONNECTION *conn)
 	WT_RET(__wt_mtx_alloc(session, "CONNECTION", 0, &conn->mtx));
 
 	TAILQ_INIT(&conn->dbqh);		/* BTREE list */
+	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
 
 	/* Statistics. */

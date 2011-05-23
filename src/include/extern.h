@@ -34,6 +34,7 @@ int __wt_config_collapse(SESSION *session,
     const char **cfg,
     const char **config_ret);
 const char *__wt_confdfl_connection_add_collator;
+const char *__wt_confdfl_connection_add_compressor;
 const char *__wt_confdfl_connection_add_cursor_type;
 const char *__wt_confdfl_connection_add_extractor;
 const char *__wt_confdfl_connection_close;
@@ -258,6 +259,9 @@ int __wt_realloc(SESSION *session,
     void *retp);
 int __wt_strdup(SESSION *session, const char *str, void *retp);
 void __wt_free_int(SESSION *session, void *p_arg);
+int __wt_dlopen(SESSION *session, const char *path, WT_DLH **dlhp);
+int __wt_dlsym(SESSION *session, WT_DLH *dlh, const char *name, void **sym_ret);
+int __wt_dlclose(SESSION *session, WT_DLH *dlh);
 int __wt_exist(const char *path);
 int __wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep);
 int __wt_fsync(SESSION *session, WT_FH *fh);

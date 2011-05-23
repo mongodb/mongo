@@ -189,10 +189,9 @@ __session_drop(
 	WT_RET(__wt_config_gets(__cfg, "force", &cval));
 	force = (cval.val != 0);
 
-	/* TODO: Combine the table name with the conn home to make a filename. */
+	/* TODO: Combine the table name with home to make a filename. */
 
 	ret = remove(name);
-
 	API_END();
 
 	return (force ? 0 : ret);
@@ -390,18 +389,43 @@ __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
  *	WT_CONNECTION->load_extension method.
  */
 static int
-__conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *config)
+__conn_load_extension(WT_CONNECTION *wt_conn,
+    const char *path, const char *config)
 {
 	CONNECTION *conn;
 	SESSION *session;
+	const char *entry_name;
+	char namebuf[100];
+	int (*entry)(WT_CONNECTION *, const char *);
+	void *p;
+	WT_CONFIG_ITEM cval;
+	WT_DLH *dlh;
 
 	WT_UNUSED(path);
 
 	conn = (CONNECTION *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config);
+
+	entry_name = "wiredtiger_extension_init";
+	WT_RET(__wt_config_gets(__cfg, "entry", &cval));
+	if (cval.len > 0) {
+		if (snprintf(namebuf, sizeof(namebuf), "%.*s",
+		    (int)cval.len, cval.str) >= (int)sizeof (namebuf)) {
+			__wt_errx(session,
+			    "extension entry name too long: %.*s",
+			    (int)cval.len, cval.str);
+			return (EINVAL);
+		} else
+			entry_name = namebuf;
+	}
+
+	WT_RET(__wt_dlopen(session, path, &dlh));
+	WT_RET(__wt_dlsym(session, dlh, entry_name, &p));
+	entry = p;
+	entry(wt_conn, config);
 	API_END();
 
-	return (ENOTSUP);
+	return (0);
 }
 
 /*
@@ -438,6 +462,27 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 
 	WT_UNUSED(name);
 	WT_UNUSED(collator);
+
+	conn = (CONNECTION *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_collator, config);
+	API_END();
+
+	return (ENOTSUP);
+}
+
+/*
+ * __conn_add_compressor --
+ *	WT_CONNECTION->add_compressor method.
+ */
+static int
+__conn_add_compressor(WT_CONNECTION *wt_conn,
+    const char *name, WT_COMPRESSOR *compressor, const char *config)
+{
+	CONNECTION *conn;
+	SESSION *session;
+
+	WT_UNUSED(name);
+	WT_UNUSED(compressor);
 
 	conn = (CONNECTION *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config);
@@ -600,6 +645,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_load_extension,
 		__conn_add_cursor_type,
 		__conn_add_collator,
+		__conn_add_compressor,
 		__conn_add_extractor,
 		__conn_close,
 		__conn_get_home,
@@ -619,9 +665,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	};
 	CONNECTION *conn;
 	SESSION *session;
-	WT_CONFIG vconfig;
-	WT_CONFIG_ITEM cval, vkey, vval;
+	WT_CONFIG subconfig;
+	WT_CONFIG_ITEM cval, skey, sval;
 	const char *__cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
+	char expath[256], exconfig[100];
 	int opened, ret;
 
 	opened = 0;
@@ -676,11 +723,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 #ifdef HAVE_VERBOSE
 	WT_ERR(__wt_config_gets(__cfg, "verbose", &cval));
 	for (vt = verbtypes; vt->vname != NULL; vt++) {
-		WT_ERR(__wt_config_initn(&vconfig, cval.str, cval.len));
-		vkey.str = vt->vname;
-		vkey.len = strlen(vt->vname);
-		ret = __wt_config_getraw(&vconfig, &vkey, &vval);
-		if (ret == 0 && vval.val)
+		WT_ERR(__wt_config_initn(&subconfig, cval.str, cval.len));
+		skey.str = vt->vname;
+		skey.len = strlen(vt->vname);
+		ret = __wt_config_getraw(&subconfig, &skey, &sval);
+		if (ret == 0 && sval.val)
 			FLD_SET(conn->verbose, vt->vflag);
 		else if (ret != WT_NOTFOUND)
 			goto err;
@@ -693,6 +740,33 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(__cfg, "logging", &cval));
 	if (cval.val != 0)
 		WT_ERR(__wt_open(session, "__wt.log", 0666, 1, &conn->log_fh));
+
+	/* Load any extensions referenced in the config. */
+	WT_ERR(__wt_config_gets(__cfg, "extensions", &cval));
+	WT_ERR(__wt_config_initn(&subconfig, cval.str, cval.len));
+	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
+		if (snprintf(expath, sizeof(expath), "%.*s",
+		    (int)skey.len, skey.str) >= (int)sizeof (expath)) {
+			__wt_err(session, ret = EINVAL,
+			    "extension filename too long: %.*s",
+			    (int)skey.len, skey.str);
+			goto err;
+		}
+		if (sval.len > 0 &&
+		    snprintf(exconfig, sizeof(exconfig), "entry=%.*s\n",
+		    (int)sval.len, sval.str) > (int)sizeof (exconfig)) {
+			__wt_err(session, ret = EINVAL,
+			    "extension name too long: %.*s",
+			    (int)skey.len, skey.str);
+			goto err;
+		}
+		WT_ERR(conn->iface.load_extension(&conn->iface, expath,
+		    (sval.len > 0) ? exconfig : NULL));
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	else if (ret != 0)
+		goto err;
 
 	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
 	*wt_connp = &conn->iface;

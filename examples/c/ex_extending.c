@@ -18,11 +18,11 @@ const char *home = "WT_TEST";
 
 /* Case insensitive comparator. */
 static int
-__compare_nocase(WT_SESSION *session, WT_COLLATOR *collator, 
+__compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *v1, const WT_ITEM *v2, int *cmp, uint32_t *minprefix)
 {
-	const char *s1 = v1->data;
-	const char *s2 = v2->data;
+	const char *s1 = (const char *)v1->data;
+	const char *s2 = (const char *)v2->data;
 
 	session = NULL; /* unused */
 	collator = NULL; /* unused */
@@ -44,12 +44,12 @@ typedef struct {
 } PREFIX_COLLATOR;
 
 static int
-__compare_prefixes(WT_SESSION *session, WT_COLLATOR *collator, 
+__compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *v1, const WT_ITEM *v2, int *cmp, uint32_t *minprefix)
 {
 	PREFIX_COLLATOR *pcoll = (PREFIX_COLLATOR *)collator;
-	const char *s1 = v1->data;
-	const char *s2 = v2->data;
+	const char *s1 = (const char *)v1->data;
+	const char *s2 = (const char *)v2->data;
 
 	session = NULL; /* unused */
 

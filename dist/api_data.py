@@ -157,6 +157,7 @@ methods = {
 
 'connection.add_cursor_type' : Method([]),
 'connection.add_collator' : Method([]),
+'connection.add_compressor' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.close' : Method([]),
 
@@ -181,6 +182,9 @@ methods = {
 		minimum update buffer size for a session'''),
 	Config('exclusive', 'false', r'''
 		fail if the database already exists'''),
+	Config('extensions', '[]', r'''
+		list of extensions to load.  Optional values override the name of the
+		default entry function \c "wiredtiger_init"'''),
 	Config('error_prefix', '', r'''
 		Prefix string for error messages'''),
 	Config('hazard_max', '15', r'''

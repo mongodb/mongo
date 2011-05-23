@@ -1504,6 +1504,7 @@ PREDEFINED             = DOXYGEN \
                          wt_connection=WT_CONNECTION \
                          wt_event_handler=WT_EVENT_HANDLER \
                          wt_collator=WT_COLLATOR \
+                         wt_compressor=WT_COMPRESSOR \
                          wt_cursor_type=WT_CURSOR_TYPE \
                          wt_extractor=WT_EXTRACTOR
 

@@ -76,6 +76,7 @@ typedef uint64_t wiredtiger_recno_t;
  *******************************************/
 struct wt_buf;		    typedef struct wt_buf WT_BUF;
 struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
+struct wt_compressor;	    typedef struct wt_compressor WT_COMPRESSOR;
 struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
 struct wt_cursor;	    typedef struct wt_cursor WT_CURSOR;
 struct wt_cursor_type;	    typedef struct wt_cursor_type WT_CURSOR_TYPE;
@@ -811,6 +812,30 @@ struct wt_connection {
 	int __F(add_collator)(WT_CONNECTION *connection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
+	/*! Add a compression function
+	 *
+	 * @dontinclude ex_all.c
+	 *
+	 * First the application has to implement the WT_COMPRESSOR interface
+	 * as follows:
+	 * @skip Implementation of WT_COMPRESSOR
+	 * @until End implementation
+	 *
+	 * Then the implementation is registered with WiredTiger as follows:
+	 * @skip WT_COMPRESSOR
+	 * @until add_compressor
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the compression function to be used in calls
+	 *	to WT_SESSION::create
+	 * @param collator the application-supplied collation handler
+	 * @configstart{connection.add_collator, see dist/api_data.py}
+	 * @configend
+	 * @errors
+	 */
+	int __F(add_compressor)(WT_CONNECTION *connection,
+	    const char *name, WT_COMPRESSOR *compressor, const char *config);
+
 	/*! Add a custom extractor for index keys or column groups.
 	 *
 	 * @dontinclude ex_all.c
@@ -905,6 +930,8 @@ struct wt_connection {
  * @config{data_update_max, maximum update buffer size for a session}
  * @config{data_update_min, minimum update buffer size for a session}
  * @config{exclusive, fail if the database already exists}
+ * @config{extensions, list of extensions to load.  Optional values override the
+ * name of the default entry function \c "wiredtiger_init"}
  * @config{error_prefix, Prefix string for error messages}
  * @config{hazard_max, number of hazard references per session}
  * @config{logging, enable logging}
@@ -1107,9 +1134,56 @@ struct wt_collator {
 	 * 	required to distinguish between the two items.
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
-	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
+	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
 	    const WT_ITEM *key1, const WT_ITEM *key2,
 	    int *cmp, uint32_t *minprefix);
+};
+
+/*!
+ * The interface implemented by applications to provide custom compression.
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_compressor.
+ */
+struct wt_compressor {
+	/*! Callback to compress a chunk of data.
+	 *
+	 * On entry, the \c dest field will point to allocated memory, with
+	 * the size of the memory in \c dest->size.  After successful
+	 * completion, the callback should return \c 0 and set \c dest->size
+	 * to the number of bytes required for the compressed representation.
+	 *
+	 * If the \c dest buffer is not big enough to hold the compressed data,
+	 * the callback should set \c dest->size to the required size and
+	 * return \c ENOMEM.
+	 *
+	 * @param[in] source the data to compress
+	 * @param[in] dest \c data field points to allocated memory;
+	 *	\c size set to maximum permitted size of compressed data
+	 * @param[out] dest \c size the actual size of the compressed data
+	 * @returns zero for success, non-zero to indicate an error.
+	 */
+	int (*compress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    const WT_ITEM *source, WT_ITEM *dest);
+
+	/*! Callback to decompress a chunk of data.
+	 *
+	 * On entry, the \c dest field will point to allocated memory, with
+	 * the size of the memory in \c dest->size.  After successful
+	 * completion, the callback should return \c 0 and set \c dest->size
+	 * to the number of bytes required for the decompressed representation.
+	 *
+	 * If the \c dest buffer is not big enough to hold the decompressed
+	 * data, the callback should set \c dest->size to the required size and
+	 * return \c ENOMEM.
+	 *
+	 * @param[in] source the compressed data
+	 * @param[in] dest \c data field points to allocated memory;
+	 *	\c size set to maximum permitted size of compressed data
+	 * @param[out] dest \c size the actual size of the decompressed data
+	 * @returns zero for success, non-zero to indicate an error.
+	 */
+	int (*decompress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    const WT_ITEM *source, WT_ITEM *dest);
 };
 
 /*!
@@ -1148,7 +1222,7 @@ struct wt_extractor {
 	 *
 	 * @errors
 	 */
-	int (*extract)(WT_SESSION *session, WT_EXTRACTOR *extractor,
+	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	    const WT_ITEM *key, const WT_ITEM *value,
 	    WT_ITEM *result);
 };
