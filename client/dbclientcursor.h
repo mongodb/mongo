@@ -52,7 +52,7 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but
             then perhaps stop.
         */
-        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + nReturned - pos; }
+        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + b.nReturned - b.pos; }
         bool moreInCurrentBatch() { return objsLeftInBatch() > 0; }
 
         /** next
@@ -132,11 +132,7 @@ namespace mongo {
             fieldsToReturn(_fieldsToReturn),
             opts(queryOptions),
             batchSize(bs==1?2:bs),
-            m(new Message()),
             cursorId(),
-            nReturned(),
-            pos(),
-            data(),
             _ownCursor( true ) {
         }
 
@@ -146,11 +142,6 @@ namespace mongo {
             nToReturn( _nToReturn ),
             haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
             opts( options ),
-            m(new Message()),
-            cursorId( _cursorId ),
-            nReturned(),
-            pos(),
-            data(),
             _ownCursor( true ) {
         }
 
@@ -173,12 +164,23 @@ namespace mongo {
         void initLazy();
         bool initLazyFinish();
 
+        class Batch : boost::noncopyable { 
+            friend class DBClientCursor;
+            auto_ptr<Message> m;
+            int nReturned;
+            int pos;
+            const char *data;
+        public:
+            Batch() : m( new Message() ), nReturned(), pos(), data() { }
+        };
+
     private:
         friend class DBClientBase;
         friend class DBClientConnection;
 
         int nextBatchSize();
         
+        Batch b;
         DBClientBase* _client;
         string ns;
         BSONObj query;
@@ -188,18 +190,16 @@ namespace mongo {
         const BSONObj *fieldsToReturn;
         int opts;
         int batchSize;
-        auto_ptr<Message> m;
         stack< BSONObj > _putBack;
         int resultFlags;
         long long cursorId;
-        int nReturned;
-        int pos;
-        const char *data;
+        bool _ownCursor; // see decouple()
+        string _scopedHost;
+        DBClientBase* _lazy; // only for lazy init
+
         void dataReceived();
         void requestMore();
         void exhaustReceiveMore(); // for exhaust
-        bool _ownCursor; // see decouple()
-        string _scopedHost;
 
         // Don't call from a virtual function
         void _assertIfNull() const { uassert(13348, "connection died", this); }
@@ -210,9 +210,6 @@ namespace mongo {
 
         // init pieces
         void _assembleInit( Message& toSend );
-
-        DBClientBase* _lazy; // only for lazy init
-        
     };
 
     /** iterate over objects in current batch only - will not cause a network call
