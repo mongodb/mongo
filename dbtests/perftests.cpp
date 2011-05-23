@@ -128,7 +128,7 @@ namespace PerfTests {
     public:
         void say(unsigned long long n, int ms, string s) {
             unsigned long long rps = n*1000/ms;
-            cout << "stats " << setw(33) << left << s << ' ' << setw(8) << rps << ' ' << right << setw(6) << ms << "ms ";
+            cout << "stats " << setw(33) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(6) << ms << "ms ";
             if( showDurStats() )
                 cout << dur::stats.curr->_asCSV();
             cout << endl;
@@ -267,7 +267,13 @@ namespace PerfTests {
 
     unsigned dontOptimizeOutHopefully;
 
-    class BSONIter : public B { 
+    class NonDurTest : public B { 
+    public:
+        virtual int howLongMillis() { return 3000; } 
+        virtual bool showDurStats() { return false; }
+    };
+
+    class BSONIter : public NonDurTest { 
     public:
         int n;
         bo b, sub;
@@ -277,7 +283,6 @@ namespace PerfTests {
             bo sub = bob().appendTimeT("t", time(0)).appendBool("abool", true).appendBinData("somebin", 3, BinDataGeneral, "abc").appendNull("anullone").obj();
             b = BSON( "_id" << OID() << "x" << 3 << "yaaaaaa" << 3.00009 << "zz" << 1 << "q" << false << "obj" << sub << "zzzzzzz" << "a string a string" );
         }
-        virtual bool showDurStats() { return false; }
         void timed() { 
             for( bo::iterator i = b.begin(); i.more(); )
                 if( i.next().fieldName() )
@@ -285,6 +290,42 @@ namespace PerfTests {
             for( bo::iterator i = sub.begin(); i.more(); )
                 if( i.next().fieldName() )
                     n++;
+        }
+    };
+
+    class BSONGetFields1 : public NonDurTest { 
+    public:
+        int n;
+        bo b, sub;
+        string name() { return "BSONGetFields1By1"; }
+        BSONGetFields1() { 
+            n = 0;
+            bo sub = bob().appendTimeT("t", time(0)).appendBool("abool", true).appendBinData("somebin", 3, BinDataGeneral, "abc").appendNull("anullone").obj();
+            b = BSON( "_id" << OID() << "x" << 3 << "yaaaaaa" << 3.00009 << "zz" << 1 << "q" << false << "obj" << sub << "zzzzzzz" << "a string a string" );
+        }
+        void timed() {
+            if( b["x"].eoo() )
+                n++;
+            if( b["q"].eoo() )
+                n++;
+            if( b["zzz"].eoo() )
+                n++;
+        }
+    };
+
+    class BSONGetFields2 : public BSONGetFields1 { 
+    public:
+        string name() { return "BSONGetFields"; }
+        void timed() {
+            static const char *names[] = { "x", "q", "zzz" };
+            BSONElement elements[3];
+            b.getFields(3, names, elements);
+            if( elements[0].eoo() )
+                n++;
+            if( elements[1].eoo() )
+                n++;
+            if( elements[2].eoo() )
+                n++;
         }
     };
 
@@ -608,6 +649,8 @@ namespace PerfTests {
             add< Bldr >();
             add< StkBldr >();
             add< BSONIter >();
+            add< BSONGetFields1 >();
+            add< BSONGetFields2 >();
             add< ChecksumTest >();
             add< TaskQueueTest >();
             add< InsertDup >();
