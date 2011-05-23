@@ -142,6 +142,7 @@ namespace mongo {
             nToReturn( _nToReturn ),
             haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
             opts( options ),
+            cursorId(_cursorId),
             _ownCursor( true ) {
         }
 
