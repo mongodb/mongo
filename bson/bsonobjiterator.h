@@ -40,29 +40,29 @@ namespace mongo {
                 return;
             }
             _pos = jso.objdata() + 4;
-            _theend = jso.objdata() + sz;
+            _theend = jso.objdata() + sz - 1;
         }
 
         BSONObjIterator( const char * start , const char * end ) {
             _pos = start + 4;
-            _theend = end;
+            _theend = end - 1;
         }
 
         /** @return true if more elements exist to be enumerated. */
-        bool more() { return _pos < _theend && _pos[0]; }
+        bool more() { return _pos < _theend; }
 
         /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is always at the end. */
-        bool moreWithEOO() { return _pos < _theend; }
+        bool moreWithEOO() { return _pos <= _theend; }
 
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd ) {
-            assert( _pos < _theend );
-            BSONElement e( _pos, checkEnd ? (int)(_theend - _pos) : -1 );
-            _pos += e.size( checkEnd ? (int)(_theend - _pos) : -1 );
+            assert( _pos <= _theend );
+            BSONElement e( _pos, checkEnd ? (int)(_theend + 1 - _pos) : -1 );
+            _pos += e.size( checkEnd ? (int)(_theend + 1 - _pos) : -1 );
             return e;
         }
         BSONElement next() {
-            assert( _pos < _theend );
+            assert( _pos <= _theend );
             BSONElement e(_pos);
             _pos += e.size();
             return e;
@@ -71,7 +71,7 @@ namespace mongo {
         void operator++(int) { next(); }
 
         BSONElement operator*() {
-            assert( _pos < _theend );
+            assert( _pos <= _theend );
             return BSONElement(_pos);
         }
 
