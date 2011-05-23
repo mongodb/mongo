@@ -191,11 +191,11 @@ namespace mongo {
         /** throws userassertion "no master found" */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        virtual void insert( const string &ns , BSONObj obj );
+        virtual void insert( const string &ns , BSONObj obj , int flags=0);
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
         virtual void remove( const string &ns , Query obj , bool justOne = 0 );
 

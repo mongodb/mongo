@@ -67,9 +67,9 @@ namespace mongo {
 
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn, int options );
 
-        virtual void insert( const string &ns, BSONObj obj );
+        virtual void insert( const string &ns, BSONObj obj, int flags=0);
 
-        virtual void insert( const string &ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v, int flags=0);
 
         virtual void remove( const string &ns , Query query, bool justOne );
 

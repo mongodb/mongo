@@ -572,6 +572,7 @@ namespace mongo {
 
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
+        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
         const char *ns = d.getns();
         op.debug().ns = ns;
 
@@ -587,23 +588,32 @@ namespace mongo {
         if( d.moreJSObjs() ) { 
             int n = 0;
             while ( d.moreJSObjs() ) {
-                BSONObj js = d.nextJsObj();
-                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+                try {
+                    BSONObj js = d.nextJsObj();
 
-                {
-                    // check no $ modifiers
-                    BSONObjIterator i( js );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                    uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+
+                    {
+                        // check no $ modifiers
+                        BSONObjIterator i( js );
+                        while ( i.more() ) {
+                            BSONElement e = i.next();
+                            uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                        }
                     }
+
+                    theDataFileMgr.insertWithObjMod(ns, js, false);
+                    logOp("i", ns, js);
+                    ++n;
+
+                    getDur().commitIfNeeded();
+                } catch (const UserException&){
+                    if (!keepGoing || !d.moreJSObjs()){
+                        globalOpCounters.incInsertInWriteLock(n);
+                        throw;
+                    }
+                    // otherwise ignore and keep going
                 }
-
-                theDataFileMgr.insertWithObjMod(ns, js, false);
-                logOp("i", ns, js);
-                ++n;
-
-                getDur().commitIfNeeded();
             }
             globalOpCounters.incInsertInWriteLock(n);
         }

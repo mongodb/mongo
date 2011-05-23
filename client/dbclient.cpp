@@ -683,12 +683,11 @@ namespace mongo {
         return n;
     }
 
-    void DBClientBase::insert( const string & ns , BSONObj obj ) {
+    void DBClientBase::insert( const string & ns , BSONObj obj , int flags) {
         Message toSend;
 
         BufBuilder b;
-        int opts = 0;
-        b.appendNum( opts );
+        b.appendNum( flags );
         b.appendStr( ns );
         obj.appendSelfToBufBuilder( b );
 
@@ -697,12 +696,11 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::insert( const string & ns , const vector< BSONObj > &v ) {
+    void DBClientBase::insert( const string & ns , const vector< BSONObj > &v , int flags) {
         Message toSend;
 
         BufBuilder b;
-        int opts = 0;
-        b.appendNum( opts );
+        b.appendNum( flags );
         b.appendStr( ns );
         for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
             i->appendSelfToBufBuilder( b );

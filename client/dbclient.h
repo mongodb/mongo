@@ -103,6 +103,12 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
+
+    enum InsertOptions {
+        /** With muli-insert keep processing inserts if one fails */
+        InsertOption_KeepGoing = 1 << 0
+    };
+
     class DBClientBase;
 
     /**
@@ -354,9 +360,9 @@ namespace mongo {
         /** don't use this - called automatically by DBClientCursor for you */
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
 
-        virtual void insert( const string &ns, BSONObj obj ) = 0;
+        virtual void insert( const string &ns, BSONObj obj , int flags=0) = 0;
 
-        virtual void insert( const string &ns, const vector< BSONObj >& v ) = 0;
+        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0) = 0;
 
         virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
 
@@ -757,12 +763,12 @@ namespace mongo {
         /**
            insert an object into the database
          */
-        virtual void insert( const string &ns , BSONObj obj );
+        virtual void insert( const string &ns , BSONObj obj , int flags=0);
 
         /**
            insert a vector of objects into the database
          */
-        virtual void insert( const string &ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
         /**
            remove matching objects from the database

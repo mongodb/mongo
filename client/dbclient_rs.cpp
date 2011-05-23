@@ -519,12 +519,12 @@ namespace mongo {
 
     // ------------- simple functions -----------------
 
-    void DBClientReplicaSet::insert( const string &ns , BSONObj obj ) {
-        checkMaster()->insert(ns, obj);
+    void DBClientReplicaSet::insert( const string &ns , BSONObj obj , int flags) {
+        checkMaster()->insert(ns, obj, flags);
     }
 
-    void DBClientReplicaSet::insert( const string &ns, const vector< BSONObj >& v ) {
-        checkMaster()->insert(ns, v);
+    void DBClientReplicaSet::insert( const string &ns, const vector< BSONObj >& v , int flags) {
+        checkMaster()->insert(ns, v, flags);
     }
 
     void DBClientReplicaSet::remove( const string &ns , Query obj , bool justOne ) {
