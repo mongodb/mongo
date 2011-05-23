@@ -152,8 +152,8 @@ struct __session_buffer {
 	uint32_t space_avail;			/* Buffer's available memory */
 	uint8_t *first_free;			/* Buffer's first free byte */
 
-	uint16_t in;				/* Buffer chunks in use */
-	uint16_t out;				/* Buffer chunks not in use */
+	uint32_t in;				/* Buffer chunks in use */
+	uint32_t out;				/* Buffer chunks not in use */
 };
 
 /*******************************************

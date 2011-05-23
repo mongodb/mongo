@@ -113,6 +113,7 @@ no_allocation:
 	sb->first_free += align_size;
 	sb->space_avail -= align_size;
 	++sb->in;
+	WT_ASSERT(session, sb->in != 0);
 
 	return (0);
 }
@@ -137,6 +138,8 @@ __wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
 void
 __wt_sb_decrement(SESSION *session, SESSION_BUFFER *sb)
 {
+	WT_ASSERT(session, sb->out < sb->in);
+
 	/*
 	 * This function is used in for two reasons.
 	 *
