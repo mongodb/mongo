@@ -855,21 +855,6 @@ namespace mongo {
         return BSONElement();
     }
 
-    int BSONObj::getIntField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.isNumber() ? (int) e.number() : INT_MIN;
-    }
-
-    bool BSONObj::getBoolField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.type() == Bool ? e.boolean() : false;
-    }
-
-    const char * BSONObj::getStringField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.type() == String ? e.valuestr() : "";
-    }
-
     /* grab names of all the fields in this object */
     int BSONObj::getFieldNames(set<string>& fields) const {
         int n = 0;
