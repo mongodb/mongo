@@ -926,6 +926,24 @@ namespace mongo {
         return true;
     }
 
+    BSONElement getErrField(const BSONObj& o) {
+        BSONElement first = o.firstElement();
+        if( first.fieldName() == "$err" )
+            return first;
+
+        // temp - will be DEV only later
+        /*DEV*/ 
+        if( 1 ) {
+            BSONElement e = o["$err"];
+            if( !e.eoo() ) { 
+                wassert(false);
+            }
+            return e;
+        }
+
+        return BSONElement();
+    }
+
     void DBClientConnection::checkResponse( const char *data, int nReturned ) {
         /* check for errors.  the only one we really care about at
          * this stage is "not master" 
@@ -934,7 +952,7 @@ namespace mongo {
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = o["$err"];
+            BSONElement e = getErrField(o);
             if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
                 clientSet->isntMaster();
             }
