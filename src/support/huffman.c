@@ -331,7 +331,7 @@ __wt_huffman_open(SESSION *session,
 	}
 
 	/*
-	 * Order the array by symbol and check for invalid symbosl and
+	 * Order the array by symbol and check for invalid symbols and
 	 * duplicates.
 	 */
 	qsort((void *)indexed_freqs,
