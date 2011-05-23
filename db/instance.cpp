@@ -586,7 +586,7 @@ namespace mongo {
         Client::Context ctx(ns);
         if( d.moreJSObjs() ) { 
             int n = 0;
-            while ( 1 ) {
+            while ( d.moreJSObjs() ) {
                 BSONObj js = d.nextJsObj();
                 uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
@@ -602,9 +602,6 @@ namespace mongo {
                 theDataFileMgr.insertWithObjMod(ns, js, false);
                 logOp("i", ns, js);
                 ++n;
-
-                if( !d.moreJSObjs() )
-                    break;
 
                 getDur().commitIfNeeded();
             }
