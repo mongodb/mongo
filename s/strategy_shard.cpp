@@ -213,7 +213,7 @@ namespace mongo {
             if (upsert) {
                 uassert(8012, "can't upsert something without shard key",
                         (manager->hasShardKey(toupdate) ||
-                         (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))));
+                         (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
                 BSONObj key = manager->getShardKey().extractKey(query);
                 BSONForEach(e, key) {
@@ -225,7 +225,7 @@ namespace mongo {
             if ( ! manager->hasShardKey( query ) ) {
                 if ( multi ) {
                 }
-                else if ( strcmp( query.firstElement().fieldName() , "_id" ) || query.nFields() != 1 ) {
+                else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
                     throw UserException( 8013 , "can't do non-multi update with query that doesn't have the shard key" );
                 }
                 else {
@@ -236,7 +236,7 @@ namespace mongo {
 
 
             if ( ! save ) {
-                if ( toupdate.firstElement().fieldName()[0] == '$' ) {
+                if ( toupdate.firstElementFieldName()[0] == '$' ) {
                     BSONObjIterator ops(toupdate);
                     while(ops.more()) {
                         BSONElement op(ops.next());

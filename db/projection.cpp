@@ -61,7 +61,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    uassert(13097, string("Unsupported projection option: ") + obj.firstElement().fieldName(), false);
+                    uassert(13097, string("Unsupported projection option: ") + obj.firstElementFieldName(), false);
                 }
 
             }

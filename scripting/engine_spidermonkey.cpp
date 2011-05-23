@@ -531,7 +531,7 @@ namespace mongo {
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ) {
             static string ref = "$ref";
-            if ( ref == obj->firstElement().fieldName() ) {
+            if ( ref == obj->firstElementFieldName() ) {
                 JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
                 CHECKNEWOBJECT(o,_context,"toJSObject1");
                 assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );

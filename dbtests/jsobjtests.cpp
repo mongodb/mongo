@@ -1248,7 +1248,7 @@ namespace JsobjTests {
             assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
             assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
 
-            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElement().fieldName() );
+            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
         }
     };
 

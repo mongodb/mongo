@@ -141,7 +141,7 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "checkShardingIndex" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
-            if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElement().fieldName() ) ) {
+            if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElementFieldName() ) ) {
                 result.appendBool( "idskip" , true );
                 return true;
             }

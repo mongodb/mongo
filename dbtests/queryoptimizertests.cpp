@@ -712,7 +712,7 @@ namespace QueryOptimizerTests {
                 TestOp() {}
                 virtual void _init() {}
                 virtual void next() {
-                    if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
+                    if ( qp().indexKey().firstElementFieldName() == string( "$natural" ) )
                         massert( 10410 ,  "throw", false );
                     setComplete();
                 }
@@ -942,11 +942,11 @@ namespace QueryOptimizerTests {
             boost::shared_ptr< Cursor > c = bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
             ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
             c = bestGuessCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ) );
-            ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElement().fieldName() );
+            ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
             boost::shared_ptr< MultiCursor > m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) ) );
             ASSERT_EQUALS( string( "a" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
             m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
-            ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+            ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElementFieldName() );
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true );
             {

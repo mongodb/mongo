@@ -756,7 +756,7 @@ namespace mongo {
                 if ( e.fieldName()[0] == '$' ) // for $atomic and anything else we add
                     continue;
 
-                if ( e.type() == Object && e.embeddedObject().firstElement().fieldName()[0] == '$' ) {
+                if ( e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$' ) {
                     // this means this is a $gt type filter, so don't make part of the new object
                     continue;
                 }
@@ -1040,7 +1040,7 @@ namespace mongo {
         /* end note */
 
         auto_ptr<ModSet> mods;
-        bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
+        bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
             if( d && d->indexBuildInProgress ) {
@@ -1251,7 +1251,7 @@ namespace mongo {
             debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
-            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
+            if ( updateobj.firstElementFieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 debug.fastmodinsert = true;

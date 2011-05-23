@@ -691,7 +691,7 @@ namespace mongo {
             boost::scoped_ptr<FieldRangeSetPair> frsp (org.topFrsp());
             {
                 // special case if most-significant field isn't in query
-                FieldRange range = frsp->singleKeyRange(_key.key().firstElement().fieldName());
+                FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
                 if ( !range.nontrivial() ) {
                     DEV PRINT(range.nontrivial());
                     getAllShards(shards);

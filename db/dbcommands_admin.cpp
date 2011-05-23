@@ -258,7 +258,7 @@ namespace mongo {
                                     errors << "invalid bson object detected (see logs for more info)";
 
                                 nInvalid++;
-                                if (strcmp("_id", obj.firstElement().fieldName()) == 0){
+                                if (strcmp("_id", obj.firstElementFieldName()) == 0){
                                     try {
                                         obj.firstElement().validate(); // throws on error
                                         log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;

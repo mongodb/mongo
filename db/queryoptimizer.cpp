@@ -78,7 +78,7 @@ namespace mongo {
         }
             
         if ( willScanTable() ) {
-            if ( _order.isEmpty() || !strcmp( _order.firstElement().fieldName(), "$natural" ) )
+            if ( _order.isEmpty() || !strcmp( _order.firstElementFieldName(), "$natural" ) )
                 _scanAndOrderRequired = false;
             return;                
         }
@@ -184,7 +184,7 @@ doneCheckOrder:
         }
 
         if ( ( _scanAndOrderRequired || _order.isEmpty() ) &&
-                !_frs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
+                !_frs.range( idxKey.firstElementFieldName() ).nontrivial() ) {
             _unhelpful = true;
         }
     }
@@ -347,7 +347,7 @@ doneCheckOrder:
         else if( hint.type() == Object ) {
             BSONObj hintobj = hint.embeddedObject();
             uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
-            if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
+            if ( !strcmp( hintobj.firstElementFieldName(), "$natural" ) ) {
                 return 0;
             }
             NamespaceDetails::IndexIterator i = d->ii();
@@ -442,7 +442,7 @@ doneCheckOrder:
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
-                if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                if ( !strcmp( bestIndex.firstElementFieldName(), "$natural" ) ) {
                     // Table scan plan
                     p.reset( new QueryPlan( d, -1, *_frsp, *_originalFrsp, _originalQuery, _order ) );
                 }
@@ -477,7 +477,7 @@ doneCheckOrder:
 
         // If table scan is optimal or natural order requested or tailable cursor requested
         if ( !_frsp->matchPossible() || ( _frsp->noNontrivialRanges() && _order.isEmpty() ) ||
-                ( !_order.isEmpty() && !strcmp( _order.firstElement().fieldName(), "$natural" ) ) ) {
+                ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
             // Table scan plan
             addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, *_originalFrsp, _originalQuery, _order ) ), checkFirst );
             return;
@@ -1163,7 +1163,7 @@ doneCheckOrder:
             return true;
 
         if ( e.type() == Object )
-            return e.Obj().firstElement().fieldName()[0] != '$';
+            return e.Obj().firstElementFieldName()[0] != '$';
 
         return false;
     }

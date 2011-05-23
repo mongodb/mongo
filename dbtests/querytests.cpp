@@ -60,7 +60,7 @@ namespace QueryTests {
         }
         static void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
-            b.append( "name", key.firstElement().fieldName() );
+            b.append( "name", key.firstElementFieldName() );
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();

@@ -159,7 +159,7 @@ namespace mongo {
     BSONObj SyncClusterConnection::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
 
         if ( ns.find( ".$cmd" ) != string::npos ) {
-            string cmdName = query.obj.firstElement().fieldName();
+            string cmdName = query.obj.firstElementFieldName();
 
             int lockType = _lockType( cmdName );
 
@@ -199,7 +199,7 @@ namespace mongo {
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
         _lastErrors.clear();
         if ( ns.find( ".$cmd" ) != string::npos ) {
-            string cmdName = query.obj.firstElement().fieldName();
+            string cmdName = query.obj.firstElementFieldName();
             int lockType = _lockType( cmdName );
             uassert( 13054 , (string)"write $cmd not supported in SyncClusterConnection::query for:" + cmdName , lockType <= 0 );
         }

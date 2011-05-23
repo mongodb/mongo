@@ -153,7 +153,7 @@ namespace mongo {
             You must assure element is a boolean before
             calling. */
         bool boolean() const {
-            return *value(); // ? true : false;
+            return *value() ? true : false;
         }
 
         bool booleanSafe() const { return isBoolean() && boolean(); }

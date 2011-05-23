@@ -773,7 +773,7 @@ namespace mongo {
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
-            equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
+            equality = ( strcmp( e.embeddedObject().firstElementFieldName(), "$not" ) != 0 );
         }
 
         if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
