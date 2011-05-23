@@ -1,0 +1,124 @@
+--- bros/Makefile	2009-01-26 13:44:10.000000000 +1100
++++ bros/Makefile	2011-05-20 13:27:56.187896470 +1000
+@@ -11,8 +11,8 @@
+ SHELL = /bin/sh
+ 
+ # Targets
+-MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest bdbtest \
+-  maptest sqltest cmpsqltctest
++MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest \
++  bdbtest wttest maptest sqltest cmpsqltctest
+ 
+ 
+ 
+@@ -64,7 +64,7 @@
+ qdbmtest : qdbmtest.c
+ 	gcc -I.. -I/usr/local/include -D_GNU_SOURCE=1 \
+ 	  -Wall -ansi -pedantic -O3 -o $@ qdbmtest.c \
+-	  -static -L.. -L/usr/local/lib -lqdbm -lz -lc
++	  -static -L.. -L/usr/local/lib -lqdbm -liconv -lz -lc
+ 
+ 
+ ndbmtest : ndbmtest.c
+@@ -98,9 +98,16 @@
+ 
+ 
+ bdbtest : bdbtest.c
+-	gcc -I/usr/local/bdb/include -D_GNU_SOURCE=1 \
++	gcc -I/usr/local/include/db51 -D_GNU_SOURCE=1 \
+ 	  -Wall -O3 -o $@ bdbtest.c \
+-	  -static -L/usr/local/bdb/lib -ldb -lpthread -lc
++	  -static -L/usr/local/lib/db51 -ldb -lpthread -lc
++
++
++wttest : wttest.c
++	gcc -I/home/mjc/wt/src/wiredtiger/build_posix -D_GNU_SOURCE=1 \
++	  -Wall -O3 -o $@ wttest.c \
++	  -static -L/home/mjc/wt/src/wiredtiger/build_posix -lwiredtiger \
++	  -lpthread -lc
+ 
+ 
+ maptest : maptest.cc
+--- bros/reporter	2008-07-27 22:30:39.000000000 +1000
++++ bros/reporter	2011-05-20 14:20:55.351219462 +1000
+@@ -11,9 +11,9 @@
+ 
+ use constant {
+     RECNUM => 1000000,
+-    TESTCOUNT => 20,
++    TESTCOUNT => 7,
+     REMOVETOP => 2,
+-    REMOVEBOTTOM => 8,
++    REMOVEBOTTOM => 2,
+ };
+ 
+ my @commands = (
+@@ -47,6 +47,14 @@
+                 './bdbtest btread -rnd casket.bdbb_r ' . RECNUM,
+                 './tctest flwrite casket.tcf ' . RECNUM,
+                 './tctest flread casket.tcf ' . RECNUM,
++                './wttest write table:casket.wt ' . RECNUM,
++                './wttest read table:casket.wt ' . RECNUM,
++                './wttest write -rnd table:casket.wt_r ' . RECNUM,
++                './wttest read -rnd table:casket.wt_r ' . RECNUM,
++                './wttest vlcswrite table:casket.vlwt ' . RECNUM,
++                './wttest vlcsread table:casket.vlwt ' . RECNUM,
++                './wttest flcswrite table:casket.flwt ' . RECNUM,
++                './wttest flcsread table:casket.flwt ' . RECNUM,
+                 );
+ 
+ my @names = (
+@@ -65,6 +73,10 @@
+              'casket.bdbb',
+              'casket.bdbb_r',
+              'casket.tcf',
++             'casket.wt',
++             'casket.wt_r',
++             'casket.vlwt',
++             'casket.flwt',
+              );
+ 
+ foreach my $name (@names){
+@@ -120,22 +132,30 @@
+ }
+ printf("\n");
+ 
+-printf("%s,%.5f,%.5f,%d\n", "TC", $table[0][1], $table[1][1], $sizes[0]);
+-printf("%s,%.5f,%.5f,%d\n", "QDBM", $table[2][1], $table[3][1], $sizes[1]);
+-printf("%s,%.5f,%.5f,%d\n", "NDBM", $table[4][1], $table[5][1], $sizes[2]);
+-printf("%s,%.5f,%.5f,%d\n", "SDBM", $table[6][1], $table[7][1], $sizes[3]);
+-printf("%s,%.5f,%.5f,%d\n", "GDBM", $table[8][1], $table[9][1], $sizes[4]);
+-printf("%s,%.5f,%.5f,%d\n", "TDB", $table[10][1], $table[11][1], $sizes[5]);
+-printf("%s,%.5f,%.5f,%d\n", "CDB", $table[12][1], $table[13][1], $sizes[6]);
+-printf("%s,%.5f,%.5f,%d\n", "BDB", $table[14][1], $table[15][1], $sizes[7]);
++printf("%s,%.5f,%.5f,%d\n", "TC-HASH", $table[0][1], $table[1][1], $sizes[0]);
++printf("%s,%.5f,%.5f,%d\n", "QDBM-HASH", $table[2][1], $table[3][1], $sizes[1]);
++#printf("%s,%.5f,%.5f,%d\n", "NDBM", $table[4][1], $table[5][1], $sizes[2]);
++#printf("%s,%.5f,%.5f,%d\n", "SDBM", $table[6][1], $table[7][1], $sizes[3]);
++#printf("%s,%.5f,%.5f,%d\n", "GDBM", $table[8][1], $table[9][1], $sizes[4]);
++#printf("%s,%.5f,%.5f,%d\n", "TDB", $table[10][1], $table[11][1], $sizes[5]);
++#printf("%s,%.5f,%.5f,%d\n", "CDB", $table[12][1], $table[13][1], $sizes[6]);
++printf("%s,%.5f,%.5f,%d\n", "BDB-HASH", $table[14][1], $table[15][1], $sizes[7]);
++
++# Ordered trees, in-order writes
+ printf("%s,%.5f,%.5f,%d\n", "TC-BT-ASC", $table[16][1], $table[17][1], $sizes[8]);
+-printf("%s,%.5f,%.5f,%d\n", "TC-BT-RND", $table[18][1], $table[19][1], $sizes[9]);
+ printf("%s,%.5f,%.5f,%d\n", "QDBM-BT-ASC", $table[20][1], $table[21][1], $sizes[10]);
+-printf("%s,%.5f,%.5f,%d\n", "QDBM-BT-RND", $table[22][1], $table[23][1], $sizes[11]);
+ printf("%s,%.5f,%.5f,%d\n", "BDB-BT-ASC", $table[24][1], $table[25][1], $sizes[12]);
+-printf("%s,%.5f,%.5f,%d\n", "BDB-BT-RND", $table[26][1], $table[27][1], $sizes[13]);
+-printf("%s,%.5f,%.5f,%d\n", "TC-FIXED", $table[28][1], $table[29][1], $sizes[14]);
++printf("%s,%.5f,%.5f,%d\n", "WT-BT-ASC", $table[30][1], $table[31][1], $sizes[15]);
+ 
++# Ordered trees, random writes
++printf("%s,%.5f,%.5f,%d\n", "TC-BT-RND", $table[18][1], $table[19][1], $sizes[9]);
++printf("%s,%.5f,%.5f,%d\n", "QDBM-BT-RND", $table[22][1], $table[23][1], $sizes[11]);
++printf("%s,%.5f,%.5f,%d\n", "BDB-BT-RND", $table[26][1], $table[27][1], $sizes[13]);
++printf("%s,%.5f,%.5f,%d\n", "WT-BT-RND", $table[32][1], $table[33][1], $sizes[16]);
+ 
++# Fixed-size / column stores
++printf("%s,%.5f,%.5f,%d\n", "TC-FIXED", $table[28][1], $table[29][1], $sizes[14]);
++printf("%s,%.5f,%.5f,%d\n", "WT-VAR", $table[34][1], $table[35][1], $sizes[17]);
++printf("%s,%.5f,%.5f,%d\n", "WT-FIX", $table[36][1], $table[37][1], $sizes[18]);
+ 
+ # END OF FILE
