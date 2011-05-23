@@ -619,6 +619,10 @@ namespace mongo {
                     }
 
                 }
+                else if( fudge == 0 ){
+                	if( p._y == p1._y && p._x == p1._x ) return true;
+                	else if( p._y == p2._y && p._x == p2._x ) return true;
+                }
 
                 // Normal intersection test.
                 // TODO: Invert these for clearer logic?
