@@ -30,6 +30,8 @@
 
 namespace mongo {
 
+    BSONElement getErrField(const BSONObj& o);
+
     void ensureHaveIdIndex(const char *ns);
 
     bool replAuthenticate(DBClientBase *);
@@ -331,7 +333,7 @@ namespace mongo {
             
             if ( c->more() ) {
                 BSONObj first = c->next();
-                if ( first.hasField("$err") ) {
+                if( !getErrField(first).eoo() ) {
                     if ( errCode ) {
                         *errCode = first.getIntField("code");
                     }

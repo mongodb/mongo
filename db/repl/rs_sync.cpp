@@ -20,28 +20,28 @@
 #include "rs.h"
 #include "../repl.h"
 #include "connections.h"
+
 namespace mongo {
 
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
+    void NOINLINE_DECL blank(const BSONObj& o) {
+        if( *o.getStringField("op") != 'n' ) {
+            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
+        }
+    }
+
     /* apply the log op that is in param o */
     void ReplSetImpl::syncApply(const BSONObj &o) {
-        char db[MaxDatabaseNameLen];
         const char *ns = o.getStringField("ns");
-        nsToDatabase(ns, db);
-
         if ( *ns == '.' || *ns == 0 ) {
-            if( *o.getStringField("op") == 'n' )
-                return;
-            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
+            blank(o);
             return;
         }
 
         Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
-
-        /* todo : if this asserts, do we want to ignore or not? */
         applyOperation_inlock(o);
     }
 
@@ -79,7 +79,7 @@ namespace mongo {
                 OpTime t = op["ts"]._opTime();
                 r.putBack(op);
 
-                if( op.firstElement().fieldName() == string("$err") ) {
+                if( op.firstElementFieldName() == string("$err") ) {
                     log() << "replSet initial sync error querying " << rsoplog << " on " << hn << " : " << op.toString() << rsLog;
                     return false;
                 }

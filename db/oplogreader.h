@@ -110,13 +110,9 @@ namespace mongo {
 
         BSONObj nextSafe() { return cursor->nextSafe(); }
 
-        BSONObj next() {
-            return cursor->next();
-        }
+        BSONObj next() { return cursor->next(); }
 
-        void putBack(BSONObj op) {
-            cursor->putBack(op);
-        }
+        void putBack(BSONObj op) { cursor->putBack(op); }
 
     private:
         bool commonConnect(const string& hostName);

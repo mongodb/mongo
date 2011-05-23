@@ -599,16 +599,23 @@ namespace mongo {
     }
 
     void applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
-        OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
-
+        assertInWriteLock();
         LOG(6) << "applying op: " << op << endl;
 
-        assertInWriteLock();
+        OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
 
-        BSONObj o = op.getObjectField("o");
-        const char *ns = op.getStringField("ns");
+        const char *names[] = { "o", "ns", "op", "b" };
+        BSONElement fields[4];
+        op.getFields(4, names, fields);
+
+        BSONObj o;
+        if( fields[0].isABSONObj() )
+            o = fields[0].embeddedObject();
+            
+        const char *ns = fields[1].valuestrsafe();
+
         // operation type -- see logOp() comments for types
-        const char *opType = op.getStringField("op");
+        const char *opType = fields[2].valuestrsafe();
 
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
@@ -648,17 +655,14 @@ namespace mongo {
             opCounters->gotUpdate();
             RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
             OpDebug debug;
-            updateObjects(ns, o, op.getObjectField("o2"), /*upsert*/ op.getBoolField("b"), /*multi*/ false, /*logop*/ false , debug );
+            updateObjects(ns, o, op.getObjectField("o2"), /*upsert*/ fields[3].booleanSafe(), /*multi*/ false, /*logop*/ false , debug );
         }
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(ns, o, op.getBoolField("b"));
+                deleteObjects(ns, o, /*justOne*/ fields[3].booleanSafe());
             else
                 assert( opType[1] == 'b' ); // "db" advertisement
-        }
-        else if ( *opType == 'n' ) {
-            // no op
         }
         else if ( *opType == 'c' ) {
             opCounters->gotCommand();
@@ -666,10 +670,11 @@ namespace mongo {
             BSONObjBuilder ob;
             _runCommands(ns, o, bb, ob, true, 0);
         }
+        else if ( *opType == 'n' ) {
+            // no op
+        }
         else {
-            stringstream ss;
-            ss << "unknown opType [" << opType << "]";
-            throw MsgAssertionException( 13141 , ss.str() );
+            throw MsgAssertionException( 13141 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
 
     }
