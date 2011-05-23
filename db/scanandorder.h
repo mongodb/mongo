@@ -31,16 +31,16 @@ namespace mongo {
 
     class KeyType : boost::noncopyable {
     public:
-        BSONObj pattern; // e.g., { ts : -1 }
+        BSONObj _pattern; // e.g., { ts : -1 }
     public:
-        KeyType(BSONObj _keyPattern) {
-            pattern = _keyPattern;
-            assert( !pattern.isEmpty() );
+        KeyType(BSONObj keyPattern) {
+            _pattern = keyPattern;
+            assert( !_pattern.isEmpty() );
         }
 
         // returns the key value for o
         BSONObj getKeyFromObject(BSONObj o) {
-            return o.extractFields(pattern,true);
+            return o.extractFields(_pattern,true);
         }
     };
 
@@ -86,7 +86,7 @@ namespace mongo {
         void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
             /* todo : we don't correct _approxSize here. */
             const BSONObj& worstBestKey = i->first;
-            int c = worstBestKey.woCompare(k, _order.pattern);
+            int c = worstBestKey.woCompare(k, _order._pattern);
             if ( c > 0 ) {
                 // k is better, 'upgrade'
                 _best.erase(i);
