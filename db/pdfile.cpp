@@ -249,7 +249,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );
+                database->suitableFile( ns, (int) size, false, false )->createExtent( ns, (int) size, newCapped );
             }
         }
         else if ( int( e.number() ) > 0 ) {
@@ -261,7 +261,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );
+                database->suitableFile( ns, (int) size, false, false )->createExtent( ns, (int) size, newCapped );
             }
         }
         else {
@@ -273,7 +273,7 @@ namespace mongo {
                     desiredExtentSize = Extent::minSize();
                 }
                 desiredExtentSize &= 0xffffff00;
-                Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
+                Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped, true );
                 size -= e->length;
             }
         }
@@ -367,24 +367,6 @@ namespace mongo {
     }
 
     void MongoDataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
-        {
-            /* check quotas
-               very simple temporary implementation for now
-            */
-            if ( cmdLine.quota && fileNo > cmdLine.quotaFiles && !MMF::exists(filename) ) {
-                /* todo: if we were adding / changing keys in an index did we do some
-                   work previously that needs cleaning up?  Possible.  We should
-                   check code like that and have it catch the exception and do
-                   something reasonable.
-                */
-                string s = "db disk space quota exceeded ";
-                Database *database = cc().database();
-                if ( database )
-                    s += database->name;
-                uasserted(12501,s);
-            }
-        }
-
         long size = defaultSize( filename );
         while ( size < minSize ) {
             if ( size < maxSize() / 2 )
@@ -1594,27 +1576,34 @@ namespace mongo {
         }
     }
 
-    /** @return null loc if out of space */
-    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr) {
+    NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
+        DiskLoc loc;
+        if ( d->capped == 0 ) { // size capped doesn't grow
+            log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
+            cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
+            loc = d->alloc(ns, lenWHdr, extentLoc);
+            if ( loc.isNull() ) {
+                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
+                for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
+                    log() << "try #" << z << endl;
+                    cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
+                    loc = d->alloc(ns, lenWHdr, extentLoc);
+                    if ( ! loc.isNull() )
+                        break;
+                }
+            }
+        }
+        return loc;
+    }
+
+    /** used by insert and also compact
+      * @return null loc if out of space 
+      */
+    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god) {
         DiskLoc extentLoc;
         DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
         if ( loc.isNull() ) {
-            // out of space
-            if ( d->capped == 0 ) { // size capped doesn't grow
-                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
-                cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
-                loc = d->alloc(ns, lenWHdr, extentLoc);
-                if ( loc.isNull() ) {
-                    log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
-                    for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
-                        log() << "try #" << z << endl;
-                        cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
-                        loc = d->alloc(ns, lenWHdr, extentLoc);
-                        if ( ! loc.isNull() )
-                            break;
-                    }
-                }
-            }
+            loc = outOfSpace(ns, d, lenWHdr, god, extentLoc);
         }
         return loc;
     }
@@ -1655,7 +1644,7 @@ namespace mongo {
             // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
             ies = (32+4) * 1024;
         }
-        cc().database()->allocExtent(ns, ies, false);
+        cc().database()->allocExtent(ns, ies, false, false);
         NamespaceDetails *d = nsdetails(ns);
         if ( !god )
             ensureIdIndexForNewNs(ns);
@@ -1717,7 +1706,7 @@ namespace mongo {
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
-        massert( 10093 , "cannot insert into reserved $ collection", god || isANormalNSName( ns ) );
+        massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
         {
             const char *sys = strstr(ns, "system.");
@@ -1787,7 +1776,7 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
+        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
         if ( loc.isNull() ) {
             log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
             assert(d->capped);

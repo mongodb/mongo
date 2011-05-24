@@ -365,7 +365,7 @@ namespace mongo {
                         continue;
                     }
                 }
-                if( ! isANormalNSName( from_name ) ) {
+                if( ! NamespaceString::normal( from_name ) ) {
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }

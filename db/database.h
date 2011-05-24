@@ -80,9 +80,9 @@ namespace mongo {
          */
         void preallocateAFile() { getFile( numFiles() , 0, true ); }
 
-        MongoDataFile* suitableFile( int sizeNeeded, bool preallocate );
+        MongoDataFile* suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota );
 
-        Extent* allocExtent( const char *ns, int size, bool capped );
+        Extent* allocExtent( const char *ns, int size, bool capped, bool enforceQuota );
 
         MongoDataFile* newestFile();
 
@@ -90,7 +90,6 @@ namespace mongo {
          * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
-
 
         void flushFiles( bool sync ) const;
 

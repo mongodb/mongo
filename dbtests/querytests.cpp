@@ -853,7 +853,7 @@ namespace QueryTests {
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
             for ( int i=0; i<200; i++ ) {
                 insertNext();
-                cout << count() << endl;
+//                cout << count() << endl;
                 ASSERT( count() < 90 );
             }
 

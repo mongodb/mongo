@@ -368,7 +368,7 @@ namespace PdfileTests {
 
             int start = d->numFiles();
             for ( int i=0; i<start; i++ )
-                d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false );
+                d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false, false );
             ASSERT_EQUALS( start , d->numFiles() );
 
             {

@@ -44,6 +44,21 @@ namespace mongo {
         NamespaceString( const string& ns ) { init(ns.c_str()); }
         string ns() const { return db + '.' + coll; }
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
+
+        /**
+         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
+         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
+         */
+        static bool normal(const char* ns) {
+            const char *p = strchr(ns, '$');
+            if( p == 0 )
+                return true;
+            return strcmp( ns, "local.oplog.$main" ) == 0;
+        }
+
+        static bool special(const char *ns) { 
+            return !normal(ns) || strstr(ns, ".system.");
+        }
     private:
         void init(const char *ns) {
             const char *p = strchr(ns, '.');

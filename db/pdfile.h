@@ -494,16 +494,6 @@ namespace mongo {
 
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
-    /**
-     * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
-     * special case for the local.oplog.$main ns -- naming it as such was a mistake.
-     */
-    inline bool isANormalNSName( const char* ns ) {
-        if ( strchr( ns , '$' ) == 0 )
-            return true;
-        return strcmp( ns, "local.oplog.$main" ) == 0;
-    }
-
     inline BSONObj::BSONObj(const Record *r) {
         init(r->data);
     }
