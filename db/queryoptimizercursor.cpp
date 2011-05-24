@@ -282,7 +282,7 @@ namespace mongo {
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps ) {
         try {
             return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
-        } catch( const AssertionException &e ) {
+        } catch( const AssertionException & ) {
             // If there is an error off the bat it generally means there are no indexes
             // satisfying 'order'.  We return an empty shared_ptr in this case.
             return shared_ptr<Cursor>();
