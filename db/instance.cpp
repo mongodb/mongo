@@ -570,22 +570,27 @@ namespace mongo {
         return ok;
     }
 
-    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, BSONObj js) { 
+    void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
+        uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        {
+            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
+            BSONObjIterator i( js );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
+            }
+        }
+        theDataFileMgr.insertWithObjModNoRet(ns, js, false); // js may be modified in the call to add an _id field.
+        logOp("i", ns, js);
+    }
+
+    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
         const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
         int n = 0;
+        BSONObj js(_js);
         while( 1 ) {
             try {
-                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
-                {
-                    // check no $ modifiers
-                    BSONObjIterator i( js );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
-                    }
-                }
-                theDataFileMgr.insertWithObjModNoRet(ns, js, false);
-                logOp("i", ns, js);
+                checkAndInsert(ns, js);
                 ++n;
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
@@ -626,17 +631,7 @@ namespace mongo {
             return;
         }
 
-        uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
-        {
-            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
-            BSONObjIterator i( js );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
-            }
-        }
-        theDataFileMgr.insertWithObjModNoRet(ns, js, false); // js may be modified in the call to add an _id field.
-        logOp("i", ns, js);
+        checkAndInsert(ns, js);
         globalOpCounters.incInsertInWriteLock(1);
     }
 
