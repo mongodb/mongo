@@ -60,6 +60,7 @@
 #include "../util/concurrency/thread_pool.cpp"
 #include "../util/concurrency/vars.cpp"
 #include "../util/concurrency/task.cpp"
+#include "../util/concurrency/spin_lock.cpp"
 
 #include "connpool.cpp"
 #include "syncclusterconnection.cpp"
