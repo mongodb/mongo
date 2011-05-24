@@ -116,10 +116,12 @@ namespace mongo {
         *b = EOO;
     }
 
+    // global is safe as we are in write lock. we put the static outside the function to avoid the implicit mutex 
+    // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
+    // on every logop call.
+    static BufBuilder logopbufbuilder(8*1024);
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
-        // ^- static is safe as we are in write lock
-        static BufBuilder bufbuilder(8*1024);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -128,7 +130,6 @@ namespace mongo {
         }
 
         const OpTime ts = OpTime::now();
-
         long long hashNew;
         if( theReplSet ) {
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
@@ -144,12 +145,10 @@ namespace mongo {
            instead we do a single copy to the destination position in the memory mapped file.
         */
 
-        bufbuilder.reset();
-        BSONObjBuilder b(bufbuilder);
-
+        logopbufbuilder.reset();
+        BSONObjBuilder b(logopbufbuilder);
         b.appendTimestamp("ts", ts.asDate());
         b.append("h", hashNew);
-
         b.append("op", opstr);
         b.append("ns", ns);
         if ( bb )
