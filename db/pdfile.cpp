@@ -1517,10 +1517,12 @@ namespace mongo {
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
         BSONObj tmp = o;
-        insertWithObjMod( ns, tmp, god );
+        insertWithObjModNoRet( ns, tmp, god );
         logOp( "i", ns, tmp );
     }
 
+    /** @param o the object to insert. can be modified to add _id and thus be an in/out param
+     */
     DiskLoc DataFileMgr::insertWithObjMod(const char *ns, BSONObj &o, bool god) {
         DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god );
         if ( !loc.isNull() )
@@ -1704,7 +1706,7 @@ namespace mongo {
 
        @param mayAddIndex almost always true, except for invocation from rename namespace command.
     */
-    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
@@ -1739,7 +1741,6 @@ namespace mongo {
             }
         }
 
-        const BSONElement *newId = &writeId;
         int addID = 0;
         if( !god ) {
             /* Check if we have an _id field. If we don't, we'll add it.
@@ -1750,12 +1751,8 @@ namespace mongo {
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
             if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
                 addID = len;
-                if ( writeId.eoo() ) {
-                    // Very likely we'll add this elt, so little harm in init'ing here.
-                    idToInsert_.oid.init();
-                    newId = &idToInsert;
-                }
-                len += newId->size();
+                idToInsert_.oid.init();
+                len += idToInsert.size();
             }
 
             BSONElementManipulator::lookForTimestamps( io );
@@ -1789,9 +1786,9 @@ namespace mongo {
             r = (Record*) getDur().writingPtr(r, lenWHdr);
             if( addID ) {
                 /* a little effort was made here to avoid a double copy when we add an ID */
-                ((int&)*r->data) = *((int*) obuf) + newId->size();
-                memcpy(r->data+4, newId->rawdata(), newId->size());
-                memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
+                ((int&)*r->data) = *((int*) obuf) + idToInsert.size();
+                memcpy(r->data+4, idToInsert.rawdata(), idToInsert.size());
+                memcpy(r->data+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
             }
             else {
                 if( obuf )

@@ -584,7 +584,7 @@ namespace mongo {
                         uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
                     }
                 }
-                theDataFileMgr.insertWithObjMod(ns, js, false);
+                theDataFileMgr.insertWithObjModNoRet(ns, js, false);
                 logOp("i", ns, js);
                 ++n;
                 getDur().commitIfNeeded();
@@ -628,14 +628,14 @@ namespace mongo {
 
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
         {
-            // check no $ modifiers
+            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
             BSONObjIterator i( js );
             while ( i.more() ) {
                 BSONElement e = i.next();
-                uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
             }
         }
-        theDataFileMgr.insertWithObjMod(ns, js, false);
+        theDataFileMgr.insertWithObjModNoRet(ns, js, false); // js may be modified in the call to add an _id field.
         logOp("i", ns, js);
         globalOpCounters.incInsertInWriteLock(1);
     }

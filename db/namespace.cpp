@@ -707,7 +707,7 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();

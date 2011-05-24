@@ -483,7 +483,7 @@ namespace mongo {
          */
         void State::_insertToInc( BSONObj& o ) {
             assert( _onDisk );
-            theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
+            theDataFileMgr.insertWithObjModNoRet( _config.incLong.c_str() , o , true );
             getDur().commitIfNeeded();
         }
 

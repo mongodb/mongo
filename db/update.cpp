@@ -1255,7 +1255,7 @@ namespace mongo {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 debug.fastmodinsert = true;
-                theDataFileMgr.insertWithObjMod(ns, newObj, god);
+                theDataFileMgr.insertWithObjModNoRet(ns, newObj, god);
                 if ( logop )
                     logOp( "i", ns, newObj );
 
@@ -1265,7 +1265,7 @@ namespace mongo {
             checkNoMods( updateobj );
             debug.upsert = true;
             BSONObj no = updateobj;
-            theDataFileMgr.insertWithObjMod(ns, no, god);
+            theDataFileMgr.insertWithObjModNoRet(ns, no, god);
             if ( logop )
                 logOp( "i", ns, no );
             return UpdateResult( 0 , 0 , 1 , no );

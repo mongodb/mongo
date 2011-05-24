@@ -871,7 +871,7 @@ namespace mongo {
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
-                theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
+                theDataFileMgr.insertWithObjModNoRet( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
             result.append( "nIndexes" , (int)all.size() );
@@ -1483,7 +1483,7 @@ namespace mongo {
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            theDataFileMgr.insertWithObjModNoRet( ns.c_str(), obj, true );
             return true;
         }
     } cmdGodInsert;
