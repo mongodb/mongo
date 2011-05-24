@@ -570,53 +570,74 @@ namespace mongo {
         return ok;
     }
 
+    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, BSONObj js) { 
+        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
+        int n = 0;
+        while( 1 ) {
+            try {
+                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+                {
+                    // check no $ modifiers
+                    BSONObjIterator i( js );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                    }
+                }
+                theDataFileMgr.insertWithObjMod(ns, js, false);
+                logOp("i", ns, js);
+                ++n;
+                getDur().commitIfNeeded();
+            } catch (const UserException&) {
+                if (!keepGoing || !d.moreJSObjs()){
+                    globalOpCounters.incInsertInWriteLock(n);
+                    throw;
+                }
+                // otherwise ignore and keep going
+            }
+            if( !d.moreJSObjs() )
+                break;
+            js = d.nextJsObj();
+        }
+    }
+
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
-        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
         const char *ns = d.getns();
         op.debug().ns = ns;
 
         writelock lk(ns);
 
         // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10058 ,  "not master", isMasterNs( ns ) );        
+        uassert( 10058 , "not master", isMasterNs(ns) );
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
         Client::Context ctx(ns);
-        if( d.moreJSObjs() ) { 
-            int n = 0;
-            while ( d.moreJSObjs() ) {
-                try {
-                    BSONObj js = d.nextJsObj();
 
-                    uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
-
-                    {
-                        // check no $ modifiers
-                        BSONObjIterator i( js );
-                        while ( i.more() ) {
-                            BSONElement e = i.next();
-                            uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
-                        }
-                    }
-
-                    theDataFileMgr.insertWithObjMod(ns, js, false);
-                    logOp("i", ns, js);
-                    ++n;
-
-                    getDur().commitIfNeeded();
-                } catch (const UserException&){
-                    if (!keepGoing || !d.moreJSObjs()){
-                        globalOpCounters.incInsertInWriteLock(n);
-                        throw;
-                    }
-                    // otherwise ignore and keep going
-                }
-            }
-            globalOpCounters.incInsertInWriteLock(n);
+        if( !d.moreJSObjs() ) { 
+            // strange.  should we complain?
+            return;
         }
+        BSONObj js = d.nextJsObj();
+        if( d.moreJSObjs() ) { 
+            insertMulti(d, ns, js);
+            return;
+        }
+
+        uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        {
+            // check no $ modifiers
+            BSONObjIterator i( js );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+            }
+        }
+        theDataFileMgr.insertWithObjMod(ns, js, false);
+        logOp("i", ns, js);
+        globalOpCounters.incInsertInWriteLock(1);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
