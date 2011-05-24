@@ -34,5 +34,5 @@ all-local: _wiredtiger.so
 	@(cd ../lang/python && swig -python -I../../build_posix wiredtiger.i)
 
 _wiredtiger.so: libwiredtiger.a ../lang/python/wiredtiger_wrap.c
-	@(python ../lang/python/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG))
+	@$(PYTHON) ../lang/python/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
 endif
