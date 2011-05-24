@@ -45,11 +45,11 @@
 #define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
 
 /*
- * __wt_pack_bigint --
- *      Packs larger variable-length integer in the specified location.
+ * __wt_pack_posint --
+ *      Packs a positive variable-length integer in the specified location.
  */
 static inline int
-__wt_pack_bigint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_pack_posint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 	int len, shift;
@@ -72,11 +72,42 @@ __wt_pack_bigint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
 }
 
 /*
- * __wt_unpack_bigint --
- *      Reads a larger, variable-length integer from the specified location.
+ * __wt_pack_negint --
+ *      Packs a negative variable-length integer in the specified location.
  */
 static inline int
-__wt_unpack_bigint(
+__wt_pack_negint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
+{
+	uint8_t *p;
+	int len, shift;
+
+	p = *pp;
+
+	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
+		if (((x >> shift) & 0xff) != 0xff)
+			break;
+
+	/*
+         * There are four bits we can use in the first byte.
+         * We store (8 - len) to maintain ordering: this is the number of
+         * 0xff bytes in the prefix.
+         */
+	*p++ |= ((8 - len) & 0xf);
+
+	for (; len != 0; shift -= 8, --len)
+		*p++ = (x >> shift);
+
+	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	*pp = p;
+	return (0);
+}
+
+/*
+ * __wt_unpack_posint --
+ *      Reads a variable-length positive integer from the specified location.
+ */
+static inline int
+__wt_unpack_posint(
     SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
@@ -89,6 +120,32 @@ __wt_unpack_bigint(
 	len = (*p++ & 0xf);
 
 	for (x = 0; len != 0; --len, ++p)
+		x = (x << 8) | *p;
+
+	*retp = x;
+	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	*pp = p;
+	return (0);
+}
+
+/*
+ * __wt_unpack_negint --
+ *      Reads a variable-length negative integer from the specified location.
+ */
+static inline int
+__wt_unpack_negint(
+    SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
+{
+	uint64_t x;
+	uint8_t *p;
+	uint8_t len;
+
+	p = *pp;
+
+	/* There are four length bits in the first byte. */
+	len = 8 - (*p++ & 0xf);
+
+	for (x = UINT64_MAX; len != 0; --len, ++p)
 		x = (x << 8) | *p;
 
 	*retp = x;
@@ -114,8 +171,9 @@ __wt_vpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
 		*p++ = POS_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
 	} else {
+		x -= POS_2BYTE_MAX + 1;
 		*p = POS_MULTI_MARKER;
-		return (__wt_pack_bigint(session, pp, maxlen, x));
+		return (__wt_pack_posint(session, pp, maxlen, x));
 	}
 
 	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
@@ -135,7 +193,7 @@ __wt_vpack_int(SESSION *session, uint8_t **pp, size_t maxlen, int64_t x)
 	p = *pp;
 	if (x < NEG_2BYTE_MIN) {
 		*p = NEG_MULTI_MARKER;
-		return (__wt_pack_bigint(session, pp, maxlen, x - INT64_MIN));
+		return (__wt_pack_negint(session, pp, maxlen, (uint64_t)x));
 	} else if (x < NEG_1BYTE_MIN) {
 		x -= NEG_2BYTE_MIN;
 		*p++ = NEG_2BYTE_MARKER | GET_BITS(x, 13, 8);
@@ -176,7 +234,9 @@ __wt_vunpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *xp)
 		p += 2;
 		break;
 	case POS_MULTI_MARKER:
-		return (__wt_unpack_bigint(session, pp, maxlen, xp));
+		WT_RET(__wt_unpack_posint(session, pp, maxlen, xp));
+		*xp += POS_2BYTE_MAX + 1;
+                return (0);
 	default:
 		WT_ASSERT(session, *p != *p);
 		return (EINVAL);
@@ -198,8 +258,7 @@ __wt_vunpack_int(SESSION *session, uint8_t **pp, size_t maxlen, int64_t *xp)
 	p = *pp;
 	switch (*p & 0xf0) {
 	case NEG_MULTI_MARKER:
-		WT_RET(__wt_unpack_bigint(session, pp, maxlen, (uint64_t *)xp));
-		*xp += INT64_MIN;
+		WT_RET(__wt_unpack_negint(session, pp, maxlen, (uint64_t *)xp));
 		return (0);
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
