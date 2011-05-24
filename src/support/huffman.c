@@ -36,7 +36,7 @@ typedef struct __wt_freqtree_node {
 
 typedef struct __wt_huffman_code {
 	uint16_t pattern;		/* requirement: length of field's type
-					 * in bits >= max_code_length.
+					 * in bits >= MAX_CODE_LENGTH.
 					 */
 	uint8_t length;
 } WT_HUFFMAN_CODE;
@@ -196,7 +196,7 @@ set_codes(WT_FREQTREE_NODE *node,
 		code->pattern = pattern;
 		code->length = len;
 		/*
-		 * printf("%d: code %x, len %d\n", node->symbol, code, len);
+		 * printf("%x: code %x, len %d\n", node->symbol, pattern, len);
 		 */
 	} else {
 		/*
@@ -242,8 +242,13 @@ static void
 make_table(SESSION *session, uint16_t *code2symbol,
     uint16_t max_depth, WT_HUFFMAN_CODE *codes, u_int symcnt)
 {
-	uint16_t c, c1, c2, i, j;
+	uint32_t j, c1, c2;	/* Exceeds uint16_t bounds at loop boundary. */
+	uint16_t c, i;
 	uint8_t len, shift;
+
+	/* Zero out, for assertion below. */
+	for (j = 0, c2 = (1U << max_depth); j < c2; j++)
+		code2symbol[j] = 0;
 
 	/*
 	 * Here's the magic: flood all bit patterns for lower-order bits to
@@ -698,7 +703,7 @@ __wt_huffman_encode(SESSION *session, void *huffman_arg,
 			esc = 0;
 		}
 	}
-	if (valid > 0)
+	if (valid > 0)			/* Flush shift register. */
 		*out = (uint8_t)(bits << (8 - valid));
 
 	/*
@@ -791,7 +796,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 	 * The first 3 bits are the number of used bits in the last byte, unless
 	 * they're 0, in which case there are 8 bits used in the last byte.
 	 */
-	padding_info = (*from & 0xE0) >> 5;
+	padding_info = (*from & 0xE0) >> (8 - WT_HUFFMAN_HEADER);
 	from_len_bits = from_len * 8;
 	if (padding_info != 0)
 		from_len_bits -= 8 - padding_info;
@@ -836,7 +841,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 		if (symbol == huffman->escape) {
 #if __HUFFMAN_DETAIL
 			/*
-			 * printf("decoding escape\n");
+			 * printf("decoding escape %x\n", huffman->escape);
 			 */
 #endif
 			len = huffman->numBytes * 8;
