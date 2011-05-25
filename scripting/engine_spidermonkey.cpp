@@ -1075,7 +1075,7 @@ namespace mongo {
             JS_SetCStringsAreUTF8();
 #endif
 
-            _runtime = JS_NewRuntime(8L * 1024L * 1024L);
+            _runtime = JS_NewRuntime(64L * 1024L * 1024L);
             uassert( 10221 ,  "JS_NewRuntime failed" , _runtime );
 
             if ( ! utf8Ok() ) {

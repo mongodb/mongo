@@ -928,7 +928,7 @@ namespace mongo {
 
     BSONElement getErrField(const BSONObj& o) {
         BSONElement first = o.firstElement();
-        if( first.fieldName() == "$err" )
+        if( strcmp(first.fieldName(), "$err") == 0 )
             return first;
 
         // temp - will be DEV only later
