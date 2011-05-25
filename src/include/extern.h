@@ -90,6 +90,15 @@ int __wt_bulk_end(CURSOR_BULK *cbulk);
 int __wt_cache_create(CONNECTION *conn);
 void __wt_cache_stats_update(CONNECTION *conn);
 void __wt_cache_destroy(CONNECTION *conn);
+void __wt_cell_set(WT_CELL *cell,
+    u_int type,
+    u_int prefix,
+    uint32_t size,
+    uint32_t *cell_lenp);
+void *__wt_cell_data(WT_CELL *cell);
+uint32_t __wt_cell_datalen(WT_CELL *cell);
+uint32_t __wt_cell_len(WT_CELL *cell);
+int __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf);
 int __wt_bt_lex_compare( BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
@@ -159,7 +168,6 @@ int __wt_page_inmem(SESSION *session,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
-int __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf);
 void __wt_workq_read_server(CONNECTION *conn, int force);
 int __wt_cache_read_serial_func(SESSION *session);
 void *__wt_cache_read_server(void *arg);

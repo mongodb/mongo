@@ -139,14 +139,16 @@ __wt_verify_dsk_cell(
 	WT_OFF off;
 	WT_OFF_RECORD off_record;
 	off_t file_size;
-	uint8_t *p, *end;
 	void *huffman;
-	uint32_t cell_num, cell_len, cell_type, i;
-	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
+	uint32_t cell_num, cell_len, cell_type, i, prefix;
+	uint8_t *p, *end;
+	int pfx_chk, ret;
+	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;
 	huffman = btree->huffman_key;
+	pfx_chk = 1;
 	ret = 0;
 
 	WT_CLEAR(_a);
@@ -341,14 +343,16 @@ cell_len:			__wt_errx(session,
 		}
 
 		/*
-		 * The only remaining task is to check key ordering: row-store
-		 * internal and leaf page keys must be ordered, variable-length
-		 * column store pages have no such requirement.
+		 * The only remaining task is to check key ordering and prefix
+		 * compression: row-store internal and leaf page keys must be
+		 * ordered, variable-length column store pages have no ordering
+		 * requirement, and prefix compression bytes, also unique to
+		 * row-store internal and leaf pages.
 		 */
 		if (dsk->type == WT_PAGE_COL_VAR)
 			continue;
 
-		/* Build the keys and compare them, skipping values. */
+		/* Build the key. */
 		switch (cell_type) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
@@ -364,6 +368,50 @@ cell_len:			__wt_errx(session,
 			break;
 		default:
 			continue;
+		}
+
+		if (cell_type == WT_CELL_KEY) {
+			prefix = __wt_cell_prefix(cell);
+			/*
+			 * Confirm the first non-overflow key on a page has a
+			 * zero prefix compression count.
+			 */
+			if (pfx_chk) {
+				pfx_chk = 0;
+				if (prefix != 0) {
+					__wt_errx(session,
+					    "the %lu key on page at addr %lu "
+					    "is the first non-overflow key on "
+					    "the page and has a non-zero "
+					    "prefix compression value",
+					    (u_long)cell_num, (u_long)addr);
+					goto err;
+				}
+			}
+
+			/*
+			 * Confirm the last and current keys match up to the
+			 * current key's prefix compression count.
+			 */
+			if (prefix > last->item.size) {
+				__wt_errx(session,
+				    "the %lu key on page at addr %lu has a "
+				    "prefix compression count of %lu larger "
+				    "than the length of the previous key, %lu",
+				    (u_long)cell_num, (u_long)addr,
+				    (u_long)prefix, (u_long)last->item.size);
+				goto err;
+			}
+			if (prefix != 0 && memcmp(
+			    last->item.data, current->item.data, prefix) != 0) {
+				__wt_errx(session,
+				    "the %lu key on page at addr %lu is not "
+				    "identical to the previous key up to its "
+				    "prefix compression count of %lu",
+				    (u_long)cell_num,
+				    (u_long)addr, (u_long)prefix);
+				goto err;
+			}
 		}
 
 		/* Compare the current key against the last key. */

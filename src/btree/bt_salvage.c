@@ -1518,8 +1518,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
 			if (__wt_key_process(rip)) {
-				WT_ERR(
-				    __wt_cell_process(session, rip->key, key));
+				WT_ERR(__wt_cell_process(
+				    session, (WT_CELL *)rip->key, key));
 				item = key;
 			} else
 				item = rip;
@@ -1532,8 +1532,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
 			if (__wt_key_process(rip)) {
-				WT_ERR(
-				    __wt_cell_process(session, rip->key, key));
+				WT_ERR(__wt_cell_process(
+				    session, (WT_CELL *)rip->key, key));
 				item = key;
 			} else
 				item = rip;
@@ -1611,7 +1611,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 		 */
 		rip = page->u.row_leaf.d + skip_start;
 		if (__wt_key_process(rip))
-			WT_ERR(__wt_cell_process(session, rip->key, key));
+			WT_ERR(__wt_cell_process(
+			    session, (WT_CELL *)rip->key, key));
 		else
 			WT_ERR(__wt_buf_set(session, key, rip->key, rip->size));
 		__wt_buf_steal(session, key, &rref->key, &rref->size);

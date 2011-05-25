@@ -11,7 +11,7 @@
 
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_debug_cell(SESSION *, WT_CELL *, FILE *fp);
-static int  __wt_debug_cell_data(SESSION *, const WT_CELL *, FILE *);
+static int  __wt_debug_cell_data(SESSION *, WT_CELL *, FILE *);
 static void __wt_debug_col_insert(WT_INSERT *, FILE *);
 static int  __wt_debug_dsk_cell(SESSION *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_fix(BTREE *, WT_PAGE_DISK *, FILE *);
@@ -621,7 +621,9 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
 	case WT_CELL_DEL:
+		break;
 	case WT_CELL_KEY:
+		fprintf(fp, ", pfx: %lu", (u_long)__wt_cell_prefix(cell));
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
@@ -719,7 +721,7 @@ __wt_debug_dsk_col_rle(BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a single cell's data in debugging mode.
  */
 static int
-__wt_debug_cell_data(SESSION *session, const WT_CELL *cell, FILE *fp)
+__wt_debug_cell_data(SESSION *session, WT_CELL *cell, FILE *fp)
 {
 	BTREE *btree;
 	WT_BUF *tmp;

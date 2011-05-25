@@ -16,7 +16,7 @@ int
 __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 {
 	WT_BUF scratch;
-	const WT_CELL *cell;
+	WT_CELL *cell;
 	WT_ROW *rip;
 	uint32_t size;
 	int ret;
@@ -58,7 +58,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * If our user passes us a temporary buffer for storage, don't install
 	 * the key in the in-memory page, our caller just needs a local copy.
 	 */
-	cell = rip->key;
+	cell = (WT_CELL *)rip->key;
 	if (store != NULL)
 		return (__wt_cell_process(session, cell, store));
 

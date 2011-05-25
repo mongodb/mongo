@@ -42,11 +42,12 @@
  *	Variable-length data cells (a WT_CELL_DATA or WT_CELL_DATA_OVFL cell,
  *	and for deleted cells, a WT_CELL_DEL.
  *
- * A cell consists of 1 descriptor byte, optionally followed by 1-4 bytes which
- * specify a data length, optionally followed by bytes of data.
+ * A cell consists of 1 descriptor byte, optionally followed by: 1 byte which
+ * specifies key prefix compression, 1-4 bytes which specify a data length,
+ * and bytes of data.
  *
- * A cell is never more than 5 bytes in length, and the WT_CELL structure is
- * just an array of 5 unsigned bytes.  (The WT_CELL structure's __chunk field
+ * A cell is never more than 6 bytes in length, and the WT_CELL structure is
+ * just an array of 6 unsigned bytes.  (The WT_CELL structure's __chunk field
  * should not be directly read or written, use the macros and in-line functions
  * to manipulate it.)
  */
@@ -99,83 +100,14 @@
 	    (i) > 0; (cell) = __wt_cell_next(cell), --(i))
 
 /*
- * __wt_cell_set --
- *	Set a WT_CELL's contents based on a data size and type.
+ * __wt_cell_set_fixed --
+ *	Set a WT_CELL's contents based on a fixed-size type.
  */
 static inline void
-__wt_cell_set(WT_CELL *cell, u_int type, uint32_t size, uint32_t *cell_lenp)
+__wt_cell_set_fixed(WT_CELL *cell, u_int type, uint32_t *cell_lenp)
 {
-	uint8_t byte;
-
-	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
-	 */
-	switch (type) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
-		cell->__chunk[0] = (u_int8_t)type;
-		*cell_lenp = 1;
-		return;
-	case WT_CELL_DATA:
-		if (size < 0x7f) {
-			/*
-			 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7
-			 * bits are the size.
-			 */
-			byte = size;
-			cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
-			*cell_lenp = 1;
-			return;
-		}
-		break;
-	case WT_CELL_KEY:
-		if (size < 0x3f) {
-			/*
-			 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag;
-			 * the other 6 bits are the size.
-			 */
-			byte = size;
-			cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
-			*cell_lenp = 1;
-			return;
-		}
-		break;
-	default:
-		break;
-	}
-
-	/*
-	 * Key and data items that fit on the page, but are too big to for
-	 * the length to fit into the descriptor byte.
-	 */
-	if (size < 0xff) {
-		cell->__chunk[0] = WT_CELL_1_BYTE | (u_int8_t)type;
-		*cell_lenp = 2;
-	} else if (size < 0xffff) {
-		cell->__chunk[0] = WT_CELL_2_BYTE | (u_int8_t)type;
-		*cell_lenp = 3;
-	} else if (size < 0xffffff) {
-		cell->__chunk[0] = WT_CELL_3_BYTE | (u_int8_t)type;
-		*cell_lenp = 4;
-	} else {
-		cell->__chunk[0] = WT_CELL_4_BYTE | (u_int8_t)type;
-		*cell_lenp = 5;
-	}
-
-#ifdef WORDS_BIGENDIAN
-	__wt_cell_set has not been written for a big-endian system.
-#else
-	/* Little endian copy of the size into the WT_CELL. */
-	cell->__chunk[1] = ((uint8_t *)&size)[0];
-	cell->__chunk[2] = ((uint8_t *)&size)[1];
-	cell->__chunk[3] = ((uint8_t *)&size)[2];
-	cell->__chunk[4] = ((uint8_t *)&size)[3];
-#endif
+	cell->__chunk[0] = (u_int8_t)type;
+	*cell_lenp = 1;				/* Cell byte */
 }
 
 /*
@@ -183,7 +115,7 @@ __wt_cell_set(WT_CELL *cell, u_int type, uint32_t size, uint32_t *cell_lenp)
  *	Return the cell's type.
  */
 static inline u_int
-__wt_cell_type_raw(const WT_CELL *cell)
+__wt_cell_type_raw(WT_CELL *cell)
 {
 	if (cell->__chunk[0] & WT_CELL_DATA_SHORT)
 		return (WT_CELL_DATA_SHORT);
@@ -198,7 +130,7 @@ __wt_cell_type_raw(const WT_CELL *cell)
  * types.
  */
 static inline u_int
-__wt_cell_type(const WT_CELL *cell)
+__wt_cell_type(WT_CELL *cell)
 {
 	if (cell->__chunk[0] & WT_CELL_DATA_SHORT)
 		return (WT_CELL_DATA);
@@ -208,101 +140,13 @@ __wt_cell_type(const WT_CELL *cell)
 }
 
 /*
- * __wt_cell_data --
- *	Return a reference to the first byte of data for a cell.
+ * __wt_cell_prefix --
+ *	Return a cell's prefix-compression value.
  */
-static inline void *
-__wt_cell_data(const WT_CELL *cell)
+static inline u_int
+__wt_cell_prefix(WT_CELL *cell)
 {
-	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
-	 */
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DATA_SHORT:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_KEY_SHORT:
-	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
-		return ((u_int8_t *)cell + 1);
-	default:
-		/* Otherwise, it's N bytes after the WT_CELL. */
-		switch (WT_CELL_BYTES(cell)) {
-		case WT_CELL_1_BYTE:
-			return ((u_int8_t *)cell + 2);
-		case WT_CELL_2_BYTE:
-			return ((u_int8_t *)cell + 3);
-		case WT_CELL_3_BYTE:
-			return ((u_int8_t *)cell + 4);
-		case WT_CELL_4_BYTE:
-		default:
-			return ((u_int8_t *)cell + 5);
-		}
-		break;
-	}
-	/* NOTREACHED */
-}
-
-/*
- * __wt_cell_datalen --
- *	Return the number of data bytes referenced by a WT_CELL.
- */
-static inline u_int32_t
-__wt_cell_datalen(const WT_CELL *cell)
-{
-	uint32_t _v;
-	const uint8_t *p;
-	uint8_t *v;
-
-	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
-	 */
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
-		return (sizeof(WT_OFF));
-	case WT_CELL_DATA_SHORT:
-		return (cell->__chunk[0] >> 1);
-	case WT_CELL_DEL:
-		return (0);
-	case WT_CELL_KEY_SHORT:
-		return (cell->__chunk[0] >> 2);
-	default:
-		break;
-	}
-
-	/* Otherwise, copy out the length bytes, and return the value. */
-	_v = 0;
-	v = (uint8_t *)&_v;
-	p = &cell->__chunk[1];
-
-#ifdef WORDS_BIGENDIAN
-	__wt_cell_datalen has not been written for a big-endian system.
-#else
-	/* Little endian copy of the size from the WT_CELL. */
-	switch (WT_CELL_BYTES(cell)) {
-	case WT_CELL_4_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_3_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_2_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_1_BYTE:
-		*v = *p;
-		break;
-	}
-#endif
-	return (_v);
+	return (cell->__chunk[1]);
 }
 
 /*
@@ -310,54 +154,32 @@ __wt_cell_datalen(const WT_CELL *cell)
  *	Fill in both the first byte of data for a cell as well as the length.
  */
 static inline void
-__wt_cell_data_and_len(const WT_CELL *cell, void *p, uint32_t *sizep)
+__wt_cell_data_and_len(WT_CELL *cell, void *p, uint32_t *sizep)
 {
 	*(void **)p = __wt_cell_data(cell);
 	*sizep = __wt_cell_datalen(cell);
 }
 
 /*
- * __wt_cell_len --
- *	Return the total bytes taken up by a WT_CELL on page, including the
- * trailing data.
+ * __wt_cell_off --
+ *	Copy out a WT_CELL that references a WT_OFF structure.
  */
-static inline uint32_t
-__wt_cell_len(const WT_CELL *cell)
+static inline void
+__wt_cell_off(WT_CELL *cell, WT_OFF *off)
 {
-	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
-	 */
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_SHORT:
-	case WT_CELL_KEY_SHORT:
-		return (1 + __wt_cell_datalen(cell));
-	case WT_CELL_DEL:
-		return (1);
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
-		return (1 + sizeof(WT_OFF));
-	default:
-		/*
-		 * Otherwise, return the WT_CELL byte, the length bytes and
-		 * the data length.
-		 */
-		switch (WT_CELL_BYTES(cell)) {
-		case WT_CELL_1_BYTE:
-			return (2 + __wt_cell_datalen(cell));
-		case WT_CELL_2_BYTE:
-			return (3 + __wt_cell_datalen(cell));
-		case WT_CELL_3_BYTE:
-			return (4 + __wt_cell_datalen(cell));
-		case WT_CELL_4_BYTE:
-		default:
-			return (5 + __wt_cell_datalen(cell));
-		}
-	}
-	/* NOTREACHED */
+	/* Version for systems that support unaligned access. */
+	*off = *(WT_OFF *)__wt_cell_data(cell);
+}
+
+/*
+ * __wt_cell_off_record --
+ *	Copy out a WT_CELL that references a WT_OFF_RECORD structure.
+ */
+static inline void
+__wt_cell_off_record(WT_CELL *cell, WT_OFF_RECORD *off_record)
+{
+	/* Version for systems that support unaligned access. */
+	*off_record = *(WT_OFF_RECORD *)__wt_cell_data(cell);
 }
 
 /*
@@ -365,7 +187,7 @@ __wt_cell_len(const WT_CELL *cell)
  *	Return a pointer to the next WT_CELL on the page.
  */
 static inline void *
-__wt_cell_next(const WT_CELL *cell)
+__wt_cell_next(WT_CELL *cell)
 {
 	return ((u_int8_t *)cell + __wt_cell_len(cell));
 }
@@ -387,26 +209,4 @@ __wt_key_cell_next(WT_CELL *key_cell)
 	    __wt_cell_type(key_cell) != WT_CELL_KEY_OVFL)
 		key_cell = __wt_cell_next(key_cell);
 	return (key_cell);
-}
-
-/*
- * __wt_cell_off --
- *	Copy out a WT_CELL that references a WT_OFF structure.
- */
-static inline void
-__wt_cell_off(const WT_CELL *cell, WT_OFF *off)
-{
-	/* Version for systems that support unaligned access. */
-	*off = *(WT_OFF *)__wt_cell_data(cell);
-}
-
-/*
- * __wt_cell_off_record --
- *	Copy out a WT_CELL that references a WT_OFF_RECORD structure.
- */
-static inline void
-__wt_cell_off_record(const WT_CELL *cell, WT_OFF_RECORD *off_record)
-{
-	/* Version for systems that support unaligned access. */
-	*off_record = *(WT_OFF_RECORD *)__wt_cell_data(cell);
 }
