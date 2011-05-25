@@ -610,7 +610,6 @@ static int
 __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 {
 	WT_OFF off;
-	WT_OFF_RECORD off_record;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -631,13 +630,6 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 		__wt_cell_off(cell, &off);
 		fprintf(fp, ", offpage: addr %lu, size %lu",
 		    (u_long)off.addr, (u_long)off.size);
-		break;
-	case WT_CELL_OFF_RECORD:
-		__wt_cell_off_record(cell, &off_record);
-		fprintf(fp,
-		    ", offpage: addr %lu, size %lu, starting recno %llu",
-		    (u_long)off_record.addr, (u_long)off_record.size,
-		    (unsigned long long)WT_RECNO(&off_record));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -760,10 +752,6 @@ process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";
 		size = sizeof("offpage") - 1;
-		break;
-	case WT_CELL_OFF_RECORD:
-		p = (uint8_t *)"offpage_record";
-		size = sizeof("offpage_record") - 1;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}

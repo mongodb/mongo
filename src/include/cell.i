@@ -71,7 +71,7 @@
 
 /*
  * Bits 3-5 are for other cell types -- there are 7 cell types and 8 possible
- * values, the bit combination (7 << 2) remains unused.
+ * values, the bit combinations (6 << 2) and (7 << 2) remain unused.
  */
 #define	WT_CELL_DATA		(0 << 2)	/* Data */
 #define	WT_CELL_DATA_OVFL	(1 << 2)	/* Data: overflow */
@@ -79,7 +79,6 @@
 #define	WT_CELL_KEY		(3 << 2)	/* Key */
 #define	WT_CELL_KEY_OVFL	(4 << 2)	/* Key: overflow */
 #define	WT_CELL_OFF		(5 << 2)	/* Off-page ref */
-#define	WT_CELL_OFF_RECORD	(6 << 2)	/* Off-page ref with records */
 
 /*
  * WT_CELL_{1,2,3,4}_BYTE --
@@ -137,6 +136,19 @@ __wt_cell_type(WT_CELL *cell)
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
 	return (cell->__chunk[0] & (7 << 2));
+}
+
+/*
+ * __wt_cell_type_is_ovfl --
+ *	Return if a cell references an overflow item.
+ */
+static inline int
+__wt_cell_type_is_ovfl(WT_CELL *cell)
+{
+	u_int type;
+
+	type = __wt_cell_type(cell);
+	return (type == WT_CELL_DATA_OVFL || type == WT_CELL_KEY_OVFL ? 1 : 0);
 }
 
 /*

@@ -29,7 +29,6 @@ __wt_cell_set(WT_CELL *cell,
 	case WT_CELL_DEL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
 		cell->__chunk[0] = (uint8_t)type;
 		*cell_lenp = 1;			/* Cell byte */
 		return;
@@ -120,7 +119,6 @@ __wt_cell_data(WT_CELL *cell)
 	case WT_CELL_DEL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
 		return ((uint8_t *)cell + 1);	/* Cell byte */
 	case WT_CELL_KEY_SHORT:
 		return ((uint8_t *)cell + 2);	/* Cell + prefix byte */
@@ -164,7 +162,6 @@ __wt_cell_datalen(WT_CELL *cell)
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
 		return (sizeof(WT_OFF));
 	case WT_CELL_DATA_SHORT:
 		return (cell->__chunk[0] >> 1);
@@ -229,7 +226,6 @@ __wt_cell_len(WT_CELL *cell)
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
-	case WT_CELL_OFF_RECORD:
 		return (1 + sizeof(WT_OFF));	/* Cell + WT_OFF */
 	case WT_CELL_DEL:
 		return (1);			/* Cell */
@@ -266,13 +262,18 @@ __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
 {
 	BTREE *btree;
 	WT_OFF ovfl;
-	uint32_t size;
+	uint32_t size, type;
 	const void *p;
 	void *huffman;
 
 	btree = session->btree;
+	type = __wt_cell_type(cell);
 
-	switch (__wt_cell_type(cell)) {
+	/*
+	 * Overflow items require processing: read, then optionally Huffman
+	 * decode.
+	 */
+	switch (type) {
 	case WT_CELL_KEY_OVFL:
 		huffman = btree->huffman_key;
 		goto offpage;
@@ -280,21 +281,37 @@ __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
 		huffman = btree->huffman_value;
 offpage:	__wt_cell_off(cell, &ovfl);
 		WT_RET(__wt_ovfl_in(session, &ovfl, retbuf));
+		if (huffman != NULL)
+			WT_RET(__wt_huffman_decode(session,
+			    huffman, retbuf->data, retbuf->size, retbuf));
+		return (0);
+	default:
 		break;
+	}
+
+	/*
+	 * Keys require processing: optionally Huffman decode, then handle
+	 * prefix compression.
+	 */
+	switch (type) {
 	case WT_CELL_KEY:
 		huffman = btree->huffman_key;
-		goto onpage;
+		break;
 	case WT_CELL_DATA:
 		huffman = btree->huffman_value;
-onpage:		__wt_cell_data_and_len(cell, &p, &size);
-		WT_RET(__wt_buf_set(session, retbuf, p, size));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
 
+	/* Get the on-page information, and optionally Huffman decode it. */
+	__wt_cell_data_and_len(cell, &p, &size);
+	WT_RET(__wt_buf_set(session, retbuf, p, size));
 	if (huffman != NULL)
 		WT_RET(__wt_huffman_decode(session,
 		    huffman, retbuf->data, retbuf->size, retbuf));
+
+	if (__wt_cell_prefix(cell) == 0)
+		return (0);
 
 	return (0);
 }

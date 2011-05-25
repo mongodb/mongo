@@ -192,7 +192,6 @@ typedef struct {
 	int	key_prefix_compress;	/* If can prefix-compress next key */
 } WT_RECONCILE;
 
-static inline int  __rec_cell_is_ovfl(WT_CELL *);
 static inline void __rec_copy_incr(SESSION *, WT_RECONCILE *, WT_KV *);
 static inline int  __rec_discard_add_ovfl(SESSION *, WT_CELL *);
 static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t);
@@ -248,19 +247,6 @@ static void __rec_subtree_row_clear(SESSION *, WT_PAGE *);
 static int  __rec_wrapup(SESSION *, WT_PAGE *);
 
 /*
- * __rec_cell_is_ovfl --
- *	Return if a cell references an oveflow item.
- */
-static inline int
-__rec_cell_is_ovfl(WT_CELL *cell)
-{
-	uint32_t type;
-
-	type = __wt_cell_type(cell);
-	return (type == WT_CELL_DATA_OVFL || type == WT_CELL_KEY_OVFL ? 1 : 0);
-}
-
-/*
  * When discarding a page, we discard a number of things: pages merged into the
  * page, overflow items referenced by the page, and the underlying blocks.  It
  * is all one discard family, but there are 3 different interfaces.
@@ -274,7 +260,7 @@ __rec_discard_add_ovfl(SESSION *session, WT_CELL *cell)
 {
 	WT_OFF ovfl;
 
-	if (__rec_cell_is_ovfl(cell)) {
+	if (__wt_cell_type_is_ovfl(cell)) {
 		__wt_cell_off(cell, &ovfl);
 		return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
 	}
@@ -1997,11 +1983,11 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 			WT_RET(__wt_key_build(session, page, rref, &key->buf));
 			WT_RET(__rec_cell_build_key(
 			    session, key->buf.data, key->buf.size));
-			ovfl_key = __rec_cell_is_ovfl(&key->cell);
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		} else {
 			WT_RET(__rec_cell_build_key(
 			    session, rref->key, rref->size));
-			ovfl_key = __rec_cell_is_ovfl(&key->cell);
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
 
 		/*
@@ -2056,6 +2042,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	uint32_t i;
+	int ovfl_key;
 
 	r = S2C(session)->cache->rec;
 	key = &r->k;
@@ -2099,6 +2086,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		else
 			WT_RET(__rec_cell_build_key(
 			    session, rref->key, rref->size));
+		ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
@@ -2110,7 +2098,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 			WT_RET(__rec_split(session));
 
 			r->key_prefix_compress = 0;
-			if (!__rec_cell_is_ovfl(&key->cell))
+			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(session, NULL, 0));
 		}
 
@@ -2133,7 +2121,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		 * If we wrote a non-overflow key onto the page, update the
 		 * last-key value and turn on prefix compression.
 		 */
-		if (!__rec_cell_is_ovfl(&key->cell)) {
+		if (!ovfl_key) {
 			__rec_prefix_key_update(r);
 			r->key_prefix_compress = 1;
 		}
@@ -2267,11 +2255,11 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			WT_RET(__wt_key_build(session, page, rip, &key->buf));
 			WT_RET(__rec_cell_build_key(
 			    session, key->buf.data, key->buf.size));
-			ovfl_key = __rec_cell_is_ovfl(&key->cell);
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		} else {
 			WT_RET(
 			    __rec_cell_build_key(session, rip->key, rip->size));
-			ovfl_key = __rec_cell_is_ovfl(&key->cell);
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
 
 		/*
@@ -2321,6 +2309,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
+	int ovfl_key;
 
 	r = S2C(session)->cache->rec;
 	key = &r->k;
@@ -2338,6 +2327,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 
 		WT_RET(__rec_cell_build_key(		/* Build key cell. */
 		    session, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
+		ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
@@ -2349,7 +2339,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 			WT_RET(__rec_split(session));
 
 			r->key_prefix_compress = 0;
-			if (!__rec_cell_is_ovfl(&key->cell))
+			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(session, NULL, 0));
 		}
 
@@ -2362,7 +2352,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		 * If we wrote a non-overflow key onto the page, update the
 		 * last-key value and turn on prefix compression.
 		 */
-		if (!__rec_cell_is_ovfl(&key->cell)) {
+		if (!ovfl_key) {
 			__rec_prefix_key_update(r);
 			r->key_prefix_compress = 1;
 		}
@@ -2627,25 +2617,50 @@ __rec_cell_build_key(SESSION *session, const void *data, uint32_t size)
 	BTREE *btree;
 	WT_KV *key;
 	WT_RECONCILE *r;
+	uint32_t pfx_len, pfx;
+	const uint8_t *a, *b;
 
 	r = S2C(session)->cache->rec;
 	btree = session->btree;
 	key = &r->k;
 
-	/*
-	 * Passed the full key for which we're building an on-page version.  We
-	 * need a copy of that key for future key prefix compression, save one.
-	 * However, if we're re-building the key because we're moving to a new
-	 * page, we may be passed the full key we saved last time.
-	 */
-	if (data == NULL) {
-		data = r->full->data;
-		size = r->full->size;
-	} else
+	pfx = 0;
+	if (data == NULL)
+		/*
+		 * When data is NULL, our caller has a prefix compressed key
+		 * they can't use (probably because they just crossed a split
+		 * point).  Use the full key saved when last called, instead.
+		 */
+		WT_RET(__wt_buf_set(
+		    session, &key->buf, r->full->data, r->full->size));
+	else {
+		/*
+		 * Save a copy of the key for later reference: we use the full
+		 * key for prefix-compression comparisons, and if we are, for
+		 * any reason, unable to use the compressed key we generate.
+		 */
 		WT_RET(__wt_buf_set(session, r->full, data, size));
 
-	/* Prefix compress the key into the key buffer. */
-	WT_RET(__wt_buf_set(session, &key->buf, data, size));
+		/*
+		 * Do prefix compression on the key.  We know by definition the
+		 * previous key sorts before the current key, which means the
+		 * keys must differ and we just need to compare up to the
+		 * shorter of the two keys.   Also, we can't compress out more
+		 * than 256 bytes, limit the comparison to that.
+		 */
+		pfx_len = size;
+		if (pfx_len > r->last->size)
+			pfx_len = r->last->size;
+		if (pfx_len > UINT8_MAX)
+			pfx_len = UINT8_MAX;
+		for (a = data, b = r->last->data; pfx < pfx_len; ++pfx)
+			if (*a++ != *b++)
+				break;
+
+		/* Copy the non-prefix bytes into the key buffer. */
+		WT_RET(__wt_buf_set(
+		    session, &key->buf, (uint8_t *)data + pfx, size - pfx));
+	}
 
 	/* Optionally compress the value using the Huffman engine. */
 	if (btree->huffman_key != NULL)
@@ -2660,8 +2675,9 @@ __rec_cell_build_key(SESSION *session, const void *data, uint32_t size)
 	}
 
 	__wt_cell_set(
-	    &key->cell, WT_CELL_KEY, 0, key->buf.size, &key->cell_len);
+	    &key->cell, WT_CELL_KEY, pfx, key->buf.size, &key->cell_len);
 	key->len = key->cell_len + key->buf.size;
+
 	return (0);
 }
 

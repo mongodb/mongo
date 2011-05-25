@@ -64,10 +64,8 @@ __wt_cell_type_string(WT_CELL *cell)
 		return ("key-short");
 	case WT_CELL_OFF:
 		return ("off-page");
-	case WT_CELL_OFF_RECORD:
-		return ("off-page-records");
 	default:
-		return ("unknown");
+		return ("illegal");
 	}
 	/* NOTREACHED */
 }

@@ -8,17 +8,22 @@
 #include "wt_internal.h"
 #include "cell.i"
 
+static int __wt_err_cell_vs_page(
+	SESSION *, uint32_t, uint32_t, WT_CELL *, WT_PAGE_DISK *);
 static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eop(SESSION *, uint32_t, uint32_t);
-static int __wt_verify_dsk_cell(
-    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_cell(
+	SESSION *, WT_CELL *, uint32_t, uint32_t, uint8_t *);
+static int __wt_verify_dsk_row(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(
-    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(
-    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_rle(
-    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_var(
+	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
  * __wt_verify_dsk_page --
@@ -97,36 +102,31 @@ __wt_verify_dsk_page(
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+		return (__wt_verify_dsk_col_int(session, dsk, addr, size));
+	case WT_PAGE_COL_FIX:
+		return (__wt_verify_dsk_col_fix(session, dsk, addr, size));
+	case WT_PAGE_COL_RLE:
+		return (__wt_verify_dsk_col_rle(session, dsk, addr, size));
 	case WT_PAGE_COL_VAR:
+		return (__wt_verify_dsk_col_var(session, dsk, addr, size));
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_dsk_cell(session, dsk, addr, size));
-		break;
-	case WT_PAGE_COL_INT:
-		WT_RET(__wt_verify_dsk_col_int(session, dsk, addr, size));
-		break;
-	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_verify_dsk_col_fix(session, dsk, addr, size));
-		break;
-	case WT_PAGE_COL_RLE:
-		WT_RET(__wt_verify_dsk_col_rle(session, dsk, addr, size));
-		break;
+		return (__wt_verify_dsk_row(session, dsk, addr, size));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
-		WT_RET(__wt_verify_dsk_chunk(session, dsk, addr, size));
-		break;
+		return (__wt_verify_dsk_chunk(session, dsk, addr, size));
 	WT_ILLEGAL_FORMAT(session);
 	}
-
-	return (0);
+	/* NOTREACHED */
 }
 
 /*
- * __wt_verify_dsk_cell --
- *	Walk a disk page of WT_CELLs, and verify them.
+ * __wt_verify_dsk_row --
+ *	Walk a WT_PAGE_ROW_INT or WT_PAGE_ROW_LEAF disk page and verify it.
  */
 static int
-__wt_verify_dsk_cell(
+__wt_verify_dsk_row(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
@@ -137,11 +137,10 @@ __wt_verify_dsk_cell(
 	BTREE *btree;
 	WT_CELL *cell;
 	WT_OFF off;
-	WT_OFF_RECORD off_record;
 	off_t file_size;
 	void *huffman;
-	uint32_t cell_num, cell_len, cell_type, i, prefix;
-	uint8_t *p, *end;
+	uint32_t cell_num, cell_type, i, prefix;
+	uint8_t *end;
 	int pfx_chk, ret;
 	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
@@ -166,94 +165,23 @@ __wt_verify_dsk_cell(
 	WT_CELL_FOREACH(dsk, cell, i) {
 		++cell_num;
 
-		/*
-		 * Check if this cell is on the page, and once we know the cell
-		 * is safe, check if the cell's data is entirely on the page.
-		 *
-		 * Delete and off-page items have known sizes, we don't store
-		 * length bytes.  Short key/data items have 6- or 7-bits of
-		 * size in the descriptor byte and no length bytes.  In both
-		 * cases, the data is after the single byte WT_CELL.
-		 */
-		p = (uint8_t *)cell;
-		switch (__wt_cell_type_raw(cell)) {
+		/* Check the cell itself. */
+		WT_RET(__wt_verify_cell(session, cell, cell_num, addr, end));
+
+		/* Check the cell type. */
+		cell_type = __wt_cell_type(cell);
+		switch (cell_type) {
+		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
 		case WT_CELL_DATA_SHORT:
-		case WT_CELL_DEL:
+		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY_SHORT:
 		case WT_CELL_OFF:
-		case WT_CELL_OFF_RECORD:
-			p += 1;
 			break;
 		default:
-			switch (WT_CELL_BYTES(cell)) {
-				case WT_CELL_1_BYTE:
-					p += 2;
-					break;
-				case WT_CELL_2_BYTE:
-					p += 3;
-					break;
-				case WT_CELL_3_BYTE:
-					p += 4;
-					break;
-				case WT_CELL_4_BYTE:
-				default:
-					p += 5;
-					break;
-				}
-			break;
-		}
-		if (p > end || (uint8_t *)(cell) + __wt_cell_len(cell) > end) {
-			ret = __wt_err_eop(session, cell_num, addr);
-			goto err;
-		}
-
-		cell_type = __wt_cell_type(cell);
-		cell_len = __wt_cell_datalen(cell);
-
-		/* Check the cell's type. */
-		switch (cell_type) {
-		case WT_CELL_KEY:
-		case WT_CELL_KEY_OVFL:
-			if (dsk->type != WT_PAGE_ROW_INT &&
-			    dsk->type != WT_PAGE_ROW_LEAF)
-				goto cell_vs_page;
-			break;
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
-			if (dsk->type != WT_PAGE_COL_VAR &&
-			    dsk->type != WT_PAGE_ROW_LEAF)
-				goto cell_vs_page;
-			break;
-		case WT_CELL_DEL:
-			/* Deleted items only appear on column-store pages. */
-			if (dsk->type != WT_PAGE_COL_VAR)
-				goto cell_vs_page;
-			break;
-		case WT_CELL_OFF:
-			if (dsk->type != WT_PAGE_ROW_INT &&
-			    dsk->type != WT_PAGE_ROW_LEAF)
-				goto cell_vs_page;
-			break;
-		case WT_CELL_OFF_RECORD:
-			if (dsk->type != WT_PAGE_ROW_LEAF) {
-cell_vs_page:			__wt_errx(session,
-				    "illegal cell and page type combination "
-				    "(cell %lu on page at addr %lu is a %s "
-				    "cell on a %s page)",
-				    (u_long)cell_num, (u_long)addr,
-				    __wt_cell_type_string(cell),
-				    __wt_page_type_string(dsk->type));
-				goto err;
-			}
-			break;
-		default:
-			__wt_errx(session,
-			    "cell %lu on page at addr %lu has an illegal type "
-			    "of %lu",
-			    (u_long)cell_num, (u_long)addr, (u_long)cell_type);
-			goto err;
+			return (__wt_err_cell_vs_page(
+			    session, cell_num, addr, cell, dsk));
 		}
 
 		/*
@@ -261,6 +189,7 @@ cell_vs_page:			__wt_errx(session,
 		 * other page types don't have ordering relationships between
 		 * their WT_CELL entries, and validating the correct types above
 		 * is sufficient.
+		 WRONG -- row internal can't have 2 offs in a row
 		 *
 		 * For row-store leaf pages, check for:
 		 *	two values in a row,
@@ -274,7 +203,6 @@ cell_vs_page:			__wt_errx(session,
 				break;
 			case WT_CELL_DATA:
 			case WT_CELL_DATA_OVFL:
-			case WT_CELL_DEL:
 				switch (last_item_type) {
 				case IS_FIRST:
 					__wt_errx(session,
@@ -295,64 +223,23 @@ cell_vs_page:			__wt_errx(session,
 				break;
 			}
 
-		/* Check the cell's length. */
-		switch (cell_type) {
-		case WT_CELL_KEY:
-		case WT_CELL_DATA:
-			/* The length is variable, we can't check it. */
-			break;
-		case WT_CELL_KEY_OVFL:
-		case WT_CELL_DATA_OVFL:
-		case WT_CELL_OFF:
-			if (cell_len != sizeof(WT_OFF))
-				goto cell_len;
-			break;
-		case WT_CELL_DEL:
-			if (cell_len != 0)
-				goto cell_len;
-			break;
-		case WT_CELL_OFF_RECORD:
-			if (cell_len != sizeof(WT_OFF_RECORD)) {
-cell_len:			__wt_errx(session,
-				    "cell %lu on page at addr %lu has an "
-				    "incorrect length",
-				    (u_long)cell_num, (u_long)addr);
-				goto err;
-			}
-			break;
-		default:
-			break;
-		}
-
 		/* Check if any referenced item is entirely in the file. */
 		switch (cell_type) {
-		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
+		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
 			__wt_cell_off(cell, &off);
 			if (WT_ADDR_TO_OFF(btree,
 			    off.addr) + off.size > file_size)
 				goto eof;
 			break;
-		case WT_CELL_OFF_RECORD:
-			__wt_cell_off_record(cell, &off_record);
-			if (WT_ADDR_TO_OFF(btree,
-			    off_record.addr) + off_record.size > file_size)
-				goto eof;
-			break;
 		}
 
 		/*
-		 * The only remaining task is to check key ordering and prefix
-		 * compression: row-store internal and leaf page keys must be
-		 * ordered, variable-length column store pages have no ordering
-		 * requirement, and prefix compression bytes, also unique to
-		 * row-store internal and leaf pages.
+		 * Check key order and prefix compression.
+		 *
+		 * Build the key.
 		 */
-		if (dsk->type == WT_PAGE_COL_VAR)
-			continue;
-
-		/* Build the key. */
 		switch (cell_type) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
@@ -590,6 +477,56 @@ delfmt:	return (__wt_err_delfmt(session, entry_num, addr));
 }
 
 /*
+ * __wt_verify_dsk_col_var --
+ *	Walk a WT_PAGE_COL_VAR disk page and verify it.
+ */
+static int
+__wt_verify_dsk_col_var(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+{
+	BTREE *btree;
+	WT_CELL *cell;
+	WT_OFF off;
+	off_t file_size;
+	uint32_t cell_num, cell_type, i;
+	uint8_t *end;
+
+	btree = session->btree;
+	file_size = btree->fh->file_size;
+	end = (uint8_t *)dsk + size;
+
+	cell_num = 0;
+	WT_CELL_FOREACH(dsk, cell, i) {
+		++cell_num;
+
+		/* Check the cell itself. */
+		WT_RET(__wt_verify_cell(session, cell, cell_num, addr, end));
+
+		/* Check the cell type. */
+		cell_type = __wt_cell_type_raw(cell);
+		switch (cell_type) {
+		case WT_CELL_DATA:
+		case WT_CELL_DATA_OVFL:
+		case WT_CELL_DATA_SHORT:
+		case WT_CELL_DEL:
+			break;
+		default:
+			return (__wt_err_cell_vs_page(
+			    session, cell_num, addr, cell, dsk));
+		}
+
+		/* Check if any referenced item is entirely in the file. */
+		if (cell_type == WT_CELL_DATA_OVFL) {
+			__wt_cell_off(cell, &off);
+			if (WT_ADDR_TO_OFF(btree,
+			    off.addr) + off.size > file_size)
+				return (__wt_err_eof(session, cell_num, addr));
+		}
+	}
+	return (0);
+}
+
+/*
  * __wt_verify_dsk_chunk --
  *	Verify the WT_PAGE_FREELIST and WT_PAGE_OVFL disk pages.
  */
@@ -624,6 +561,83 @@ __wt_verify_dsk_chunk(
 		}
 
 	return (0);
+}
+
+/*
+ * __wt_verify_cell --
+ *	Check to see if a cell is safe.
+ */
+static int
+__wt_verify_cell(SESSION *session,
+    WT_CELL *cell, uint32_t cell_num, uint32_t addr, uint8_t *end)
+{
+	uint8_t *p;
+
+	/*
+	 * Check if this cell is on the page, and once we know the cell
+	 * is safe, check if the cell's data is entirely on the page.
+	 *
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.  Short key/data items have 6- or 7-bits of size in the
+	 * descriptor byte and no length bytes.  In both cases, the data is
+	 * after the single byte WT_CELL.
+	 */
+	p = (uint8_t *)cell;
+	
+	switch (__wt_cell_type_raw(cell)) {
+	case WT_CELL_DATA_OVFL:
+	case WT_CELL_DATA_SHORT:
+	case WT_CELL_DEL:
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_KEY_SHORT:
+	case WT_CELL_OFF:
+		p += 1;
+		break;
+	case WT_CELL_DATA:
+	case WT_CELL_KEY:
+		switch (WT_CELL_BYTES(cell)) {
+			case WT_CELL_1_BYTE:
+				p += 2;
+				break;
+			case WT_CELL_2_BYTE:
+				p += 3;
+				break;
+			case WT_CELL_3_BYTE:
+				p += 4;
+				break;
+			case WT_CELL_4_BYTE:
+			default:
+				p += 5;
+				break;
+			}
+		break;
+	default:
+		/*
+		 * Don't worry about illegal types -- our caller will check,
+		 * based on its page type.
+		 */
+		break;
+	}
+	if (p > end || (uint8_t *)(cell) + __wt_cell_len(cell) > end)
+		return (__wt_err_eop(session, cell_num, addr));
+	return (0);
+}
+
+/*
+ * __wt_err_cell_vs_page --
+ *	Generic illegal cell type for a particular page type error.
+ */
+static int
+__wt_err_cell_vs_page(SESSION *session,
+    uint32_t entry_num, uint32_t addr, WT_CELL *cell, WT_PAGE_DISK *dsk)
+{
+	__wt_errx(session,
+	    "illegal cell and page type combination cell %lu on page at addr "
+	    "%lu is a %s cell on a %s page",
+	    (u_long)entry_num, (u_long)addr,
+	    __wt_cell_type_string(cell),
+	    __wt_page_type_string(dsk->type));
+	return (WT_ERROR);
 }
 
 /*
