@@ -231,7 +231,7 @@ __wt_huffman_read(SESSION *session, WT_CONFIG_ITEM *ip,
 {
 	struct __wt_huffman_table *table, *tp;
 	FILE *fp;
-	u_quad symbol, frequency;
+	uint64_t symbol, frequency;
 	u_int entries, lineno, max;
 	int ret;
 	char *file;
@@ -310,7 +310,7 @@ nofile:		ret = errno == 0 ? WT_ERROR : errno;
 			    "line %lu of Huffman table file %.*s is corrupted: "
 			    "frequency larger than maximum value of %llu",
 			    (u_long)lineno,
-			    (int)ip->len, ip->str, (u_quad)UINT32_MAX);
+			    (int)ip->len, ip->str, (uint64_t)UINT32_MAX);
 			goto err;
 		}
 		tp->symbol = (uint32_t)symbol;
