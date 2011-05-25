@@ -108,7 +108,7 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 		break;
 	case WT_PAGE_COL_VAR:
 		cell = WT_COL_PTR(page, cip);
-		goto cell_set;
+		goto page_cell;
 	case WT_PAGE_ROW_LEAF:
 		if (WT_ROW_EMPTY_ISSET(rip)) {
 			value_ret = "";
@@ -116,7 +116,7 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 			break;
 		}
 		cell = WT_ROW_PTR(page, rip);
-cell_set:	switch (__wt_cell_type(cell)) {
+page_cell:	switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (btree->huffman_value == NULL) {
 				__wt_cell_data_and_len(
