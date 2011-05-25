@@ -88,10 +88,10 @@ __wt_pack_negint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
 			break;
 
 	/*
-         * There are four bits we can use in the first byte.
-         * We store (8 - len) to maintain ordering: this is the number of
-         * 0xff bytes in the prefix.
-         */
+	 * There are four bits we can use in the first byte.
+	 * We store (8 - len) to maintain ordering: this is the number of
+	 * 0xff bytes in the prefix.
+	 */
 	*p++ |= ((8 - len) & 0xf);
 
 	for (; len != 0; shift -= 8, --len)
@@ -236,7 +236,7 @@ __wt_vunpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *xp)
 	case POS_MULTI_MARKER:
 		WT_RET(__wt_unpack_posint(session, pp, maxlen, xp));
 		*xp += POS_2BYTE_MAX + 1;
-                return (0);
+		return (0);
 	default:
 		WT_ASSERT(session, *p != *p);
 		return (EINVAL);
