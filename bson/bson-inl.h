@@ -18,6 +18,7 @@
 #pragma once
 
 #include <map>
+#include <limits.h>
 #include "util/atomic_int.h"
 #include "util/misc.h"
 #include "../util/hex.h"
