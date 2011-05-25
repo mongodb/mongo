@@ -43,9 +43,9 @@ namespace JsobjTests {
         BSONObj x = k.toBson();
         int res = o.woCompare(x, BSONObj(), /*considerfieldname*/false);
         if( res ) {
-            cout << o.toString() << endl;
+            //cout << o.toString() << endl;
             k.toBson();
-            cout << x.toString() << endl;
+            //cout << x.toString() << endl;
             o.woCompare(x, BSONObj(), /*considerfieldname*/false);
             ASSERT( res == 0 );
         }
@@ -1648,7 +1648,7 @@ namespace JsobjTests {
                         l += strlen( j.next().fieldName() );
                 }
                 unsigned long long tm = t.micros();
-                cout << "time: " << tm << endl;
+                //cout << "time: " << tm << endl;
             }
         }
 
@@ -1721,7 +1721,7 @@ namespace JsobjTests {
             BSONElement a = x["a"];
             BSONElement b = x["b"];
             BSONElement c = x["c"];
-            cout << "c: " << c << endl;
+            //cout << "c: " << c << endl;
             ASSERT( a.woCompare( b ) != 0 );
             ASSERT( a.woCompare( b , false ) == 0 );
 
@@ -1900,7 +1900,7 @@ namespace JsobjTests {
                 for ( int i=0; i<N; i++ )
                     x.md5();
                 int millis = t.millis();
-                cout << "md5 : " << millis << endl;
+                //cout << "md5 : " << millis << endl;
             }
 
             {
@@ -1908,7 +1908,7 @@ namespace JsobjTests {
                 for ( int i=0; i<N; i++ )
                     x.toString();
                 int millis = t.millis();
-                cout << "toString : " << millis << endl;
+                //cout << "toString : " << millis << endl;
             }
 
             {
@@ -1916,7 +1916,7 @@ namespace JsobjTests {
                 for ( int i=0; i<N; i++ )
                     checksum( x.objdata() , x.objsize() );
                 int millis = t.millis();
-                cout << "checksum : " << millis << endl;
+                //cout << "checksum : " << millis << endl;
             }
 
         }
