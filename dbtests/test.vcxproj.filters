@@ -53,9 +53,6 @@
     <Filter Include="dur">
       <UniqueIdentifier>{c296d097-0d46-46ee-9097-f2df659d9596}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\NewFilter1">
-      <UniqueIdentifier>{ff8969fe-1912-42d5-86c4-f7077a7e5a24}</UniqueIdentifier>
-    </Filter>
     <Filter Include="bson">
       <UniqueIdentifier>{e6652333-c77f-420c-af8e-72d55bc095fe}</UniqueIdentifier>
     </Filter>
