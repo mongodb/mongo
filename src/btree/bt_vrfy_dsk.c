@@ -129,7 +129,7 @@ static int
 __wt_verify_dsk_row(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
+	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	struct {
 		WT_ITEM	 item;			/* WT_ITEM to compare */
 		WT_BUF	*scratch;		/* scratch buffer */
@@ -160,7 +160,7 @@ __wt_verify_dsk_row(
 	file_size = btree->fh->file_size;
 	end = (uint8_t *)dsk + size;
 
-	last_item_type = IS_FIRST;
+	last_cell_type = FIRST;
 	cell_num = 0;
 	WT_CELL_FOREACH(dsk, cell, i) {
 		++cell_num;
@@ -173,55 +173,67 @@ __wt_verify_dsk_row(
 		switch (cell_type) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
-		case WT_CELL_DATA_SHORT:
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
-		case WT_CELL_KEY_SHORT:
-		case WT_CELL_OFF:
 			break;
+		case WT_CELL_OFF:
+			if (dsk->type == WT_PAGE_ROW_INT)
+				break;
+			/* FALLTHROUGH */
 		default:
 			return (__wt_err_cell_vs_page(
 			    session, cell_num, addr, cell, dsk));
 		}
 
 		/*
-		 * Only row-store leaf pages require cell type ordering checks,
-		 * other page types don't have ordering relationships between
-		 * their WT_CELL entries, and validating the correct types above
-		 * is sufficient.
-		 WRONG -- row internal can't have 2 offs in a row
-		 *
+		 * Check ordering relationships between the WT_CELL entries.
+		 * For row-store internal pages, check for:
+		 *	two values in a row,
+		 *	two keys in a row,
+		 *	a value as the first cell on a page.
 		 * For row-store leaf pages, check for:
 		 *	two values in a row,
 		 *	a value as the first cell on a page.
 		 */
-		if (dsk->type == WT_PAGE_ROW_LEAF)
-			switch (cell_type) {
-			case WT_CELL_KEY:
-			case WT_CELL_KEY_OVFL:
-				last_item_type = WAS_KEY;
+		switch (cell_type) {
+		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
+			switch (last_cell_type) {
+			case FIRST:
+			case WAS_VALUE:
 				break;
-			case WT_CELL_DATA:
-			case WT_CELL_DATA_OVFL:
-				switch (last_item_type) {
-				case IS_FIRST:
-					__wt_errx(session,
-					    "page at addr %lu begins with a "
-					    "value",
-					    (u_long)addr);
-					goto err;
-				case WAS_DATA:
-					__wt_errx(session,
-					    "cell %lu on page at addr %lu is "
-					    "the first of two adjacent values",
-					    (u_long)cell_num - 1, (u_long)addr);
-					goto err;
-				case WAS_KEY:
-					last_item_type = WAS_DATA;
+			case WAS_KEY:
+				if (dsk->type == WT_PAGE_ROW_LEAF)
 					break;
-				}
-				break;
+				__wt_errx(session,
+				    "cell %lu on page at addr %lu is the first "
+				    "of two adjacent keys",
+				    (u_long)cell_num - 1, (u_long)addr);
+				goto err;
 			}
+			last_cell_type = WAS_KEY;
+			break;
+		case WT_CELL_DATA:
+		case WT_CELL_DATA_OVFL:
+		case WT_CELL_OFF:
+			switch (last_cell_type) {
+			case FIRST:
+				__wt_errx(session,
+				    "page at addr %lu begins with a value",
+				    (u_long)addr);
+				goto err;
+			case WAS_KEY:
+				break;
+			case WAS_VALUE:
+				__wt_errx(session,
+				    "cell %lu on page at addr %lu is the first "
+				    "of two adjacent values",
+				    (u_long)cell_num - 1, (u_long)addr);
+				goto err;
+			}
+			last_cell_type = WAS_VALUE;
+			break;
+		}
 
 		/* Check if any referenced item is entirely in the file. */
 		switch (cell_type) {
