@@ -177,7 +177,7 @@ namespace mongo {
                             unsigned long long old = manager->getSequenceNumber();
                             manager = r.getChunkManager();
                             
-                            LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
                             if (!manager) {
                                 keepGoing = false;

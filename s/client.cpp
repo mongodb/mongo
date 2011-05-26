@@ -96,7 +96,7 @@ namespace mongo {
         BSONElement cid = gle["connectionId"];
 
         if ( cid.eoo() ) {
-            error() << "getLastError writeback can't work because of version mis-match" << endl;
+            error() << "getLastError writeback can't work because of version mismatch" << endl;
             return;
         }
 
@@ -114,7 +114,7 @@ namespace mongo {
             return res;
         
         if ( fromWriteBackListener ) {
-            LOG(1) << "not doing recusrive writeback" << endl;
+            LOG(1) << "not doing recursive writeback" << endl;
             return res;
         }
         

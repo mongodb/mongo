@@ -126,7 +126,7 @@ namespace mongo {
     }
 
     BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
-        // It is possible for a donor ('from') shard to have less chunks than a recevier one ('to')
+        // It is possible for a donor ('from') shard to have less chunks than a receiver one ('to')
         // if the donor is in draining mode.
 
         if ( to.size() == 0 )

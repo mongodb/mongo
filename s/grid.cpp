@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     bool Grid::addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg ) {
-        // name can be NULL, so privide a dummy one here to avoid testing it elsewhere
+        // name can be NULL, so provide a dummy one here to avoid testing it elsewhere
         string nameInternal;
         if ( ! name ) {
             name = &nameInternal;

@@ -476,7 +476,7 @@ namespace mongo {
             
             string ns = cmdObj["setShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
-                errmsg = "need to speciy namespace";
+                errmsg = "need to specify namespace";
                 return false;
             }
 
@@ -493,7 +493,7 @@ namespace mongo {
             
             if ( globalVersion > 0 && version > 0 ) {
                 // this means there is no reset going on an either side
-                // so its safe to make some assuptions
+                // so its safe to make some assumptions
 
                 if ( version == globalVersion ) {
                     // mongos and mongod agree!
@@ -577,7 +577,7 @@ namespace mongo {
 
                 ShardChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
-                    errmsg = str::stream() << "client version differs from config's for colleciton '" << ns << "'";
+                    errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );
                     result.appendTimestamp( "version" , version );
                     result.appendTimestamp( "globalVersion" , currVersion );
@@ -674,7 +674,7 @@ namespace mongo {
 
         if ( version == 0 && clientVersion > 0 ) {
             stringstream ss;
-            ss << "collection was dropped or this shard no longer valied version: " << version << " clientVersion: " << clientVersion;
+            ss << "collection was dropped or this shard no longer valid version: " << version << " clientVersion: " << clientVersion;
             errmsg = ss.str();
             return false;
         }
