@@ -821,6 +821,7 @@ namespace mongo {
     }
 
     ExpressionObject::ExpressionObject():
+	isRoot(true),
 	computedId(false),
 	excludeId(false),
 	excludePaths(false),
@@ -1100,11 +1101,14 @@ namespace mongo {
 	      If we get here, the intervening child isn't already there,
 	      so create it.
 	    */
-	    shared_ptr<ExpressionObject> sharedChild(
+	    shared_ptr<ExpressionObject> pSharedChild(
 		ExpressionObject::create());
+	    pSharedChild->isRoot = false;
+	    pSharedChild->excludeId = true;
+	    path.insert(fieldName);
 	    vFieldName.push_back(fieldName);
-	    vpExpression.push_back(sharedChild);
-	    pChild = sharedChild.get();
+	    vpExpression.push_back(pSharedChild);
+	    pChild = pSharedChild.get();
 	}
 
 	// LATER CW TODO turn this into a loop
@@ -1186,7 +1190,7 @@ namespace mongo {
 		  Add the current field name to the path being built up,
 		  then go down into the next level.
 		 */
-		PathPusher(pvPath, vFieldName[iField]);
+		PathPusher pathPusher(pvPath, vFieldName[iField]);
 		pEO->emitPaths(pBuilder, pvPath);
 	    }
 	}
@@ -1195,6 +1199,10 @@ namespace mongo {
     void ExpressionObject::documentToBson(
 	BSONObjBuilder *pBuilder, bool fieldPrefix,
 	const string &unwindField) const {
+
+	/* indicate if we're excluding _id */
+	if (isRoot && excludeId)
+	    pBuilder->append(idName, false);
 
 	/* emit any inclusion/exclusion paths */
 	vector<string> vPath;

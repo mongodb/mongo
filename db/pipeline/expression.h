@@ -703,6 +703,7 @@ namespace mongo {
 	    bool excludeLast);
 
 	static string idName;
+	bool isRoot; // indicates top of path tree
 	bool computedId;
 	bool excludeId;
 	bool excludePaths;

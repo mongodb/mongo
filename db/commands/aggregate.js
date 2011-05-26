@@ -82,6 +82,17 @@ var p7 = db.runCommand(
     }}
 ]});
 
+// dotted path inclusion; _id exclusion
+var p8 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	_id : 0,
+	author : 1,
+	tag : { $unwind : "tags" },
+	"comments.author" : 1
+    }}
+]});
+
 
 // simple matching
 var m1 = db.runCommand(
