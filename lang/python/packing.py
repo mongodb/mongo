@@ -1,90 +1,104 @@
-# WiredTiger packing and unpacking functions
+# WiredTiger variable-length packing and unpacking functions
 
-import struct
+from intpacking import pack_int, unpack_int
 
-def __wt2struct(fmt):
-    if not fmt:
-        return None, fmt
-    # Big endian with no alignment is the default
-    if fmt[0] in '@=<>!':
-        tfmt = fmt[0]
-        fmt = fmt[1:]
-    else:
-        tfmt = '>'
-    return tfmt, fmt.replace('r', 'Q')
+def __get_type(fmt):
+	if not fmt:
+		return None, fmt
+	# Variable-sized encoding is the default (and only supported format in v1)
+	if fmt[0] in '.@<>':
+		tfmt = fmt[0]
+		fmt = fmt[1:]
+	else:
+		tfmt = '.'
+	return tfmt, fmt
 
 def unpack(fmt, s):
-    tfmt, fmt = __wt2struct(fmt)
-    if not fmt:
-        return ()
-    result = ()
-    pfmt = tfmt
-    sizebytes = 0
-    for offset, f in enumerate(fmt):
-        if f.isdigit():
-            sizebytes += 1
-        # With a fixed size, everything is encoded as a string
-        if f in 'Su' and sizebytes > 0:
-            f = 's'
-        if f not in 'Su':
-            pfmt += f
-            sizebytes = 0
-            continue
-
-        # We've hit something that needs special handling, split any fixed-size
-        # values we've already passed
-        if len(pfmt) > 1:
-            size = struct.calcsize(pfmt)
-            result += struct.unpack_from(pfmt, s)
-            s = s[size:]
-        if f == 'S':
-            l = s.find('\0')
-            result += (s[:l],)
-            s = s[l+1:]
-        if f == 'u':
-            if offset == len(fmt) - 1:
-                result += (s,)
-            else:
-                l = struct.unpack_from(tfmt + 'l', s)[0]
-                s = s[struct.calcsize(tfmt + 'l'):]
-                result += (s[:l],)
-                s = s[l:]
-        pfmt = tfmt
-        sizebytes = 0
-
-    if len(pfmt) > 1:
-        result += struct.unpack(pfmt, s)
-    return result
+	tfmt, fmt = __get_type(fmt)
+	if not fmt:
+		return ()
+	if tfmt != '.':
+		raise ValueError('Only variable-length encoding is currently supported')
+	result = []
+	havesize = size = 0
+	for offset, f in enumerate(fmt):
+		if f.isdigit():
+			size = (size * 10) + int(f)
+			havesize = 1
+			continue
+		elif f == 'x':
+			if not havesize:
+				size = 1
+			s = s[size:]
+			# Note: no value, don't increment i
+		elif f in 'Ssu':
+			if not havesize:
+				if f == 's':
+					size = 1
+				elif f == 'S':
+					size = s.find('\0')
+				elif f == 'u':
+					if offset == len(fmt) - 1:
+						size = len(s)
+					else:
+						size, s = unpack_int(s)
+			result.append(s[:size])
+			if f == 'S' and not havesize:
+				size += 1
+			s = s[size:]
+		else:
+			# integral type
+			if not havesize:
+				size = 1
+			for j in xrange(size):
+				v, s = unpack_int(s)
+				result.append(v)
+		havesize = size = 0
+	return result
 
 def pack(fmt, *values):
-    pfmt, fmt = __wt2struct(fmt)
-    if not fmt:
-        return ''
-    i = sizebytes = 0
-    for offset, f in enumerate(fmt):
-        if f == 'S':
-            # Note: this code is being careful about embedded NUL characters
-            if sizebytes == 0:
-                l = values[i].find('\0') + 1
-                if not l:
-                    l = len(values[i]) + 1
-                pfmt += str(l)
-                sizebytes = len(str(l))
-            f = 's'
-        elif f == 'u':
-            if sizebytes == 0 and offset != len(fmt) - 1:
-                l = len(values[i])
-                pfmt += 'l' + str(l)
-                values = values[:i] + (l,) + values[i:]
-                sizebytes = len(str(l))
-            f = 's'
-        pfmt += f
-        if f.isdigit():
-            sizebytes += 1
-            continue
-        if f != 's' and sizebytes > 0:
-            i += int(pfmt[-sizebytes:])
-        else:
-            i += 1
-        sizebytes = 0
-    return struct.pack(pfmt, *values)
+	tfmt, fmt = __get_type(fmt)
+	if not fmt:
+		return ()
+	if tfmt != '.':
+		raise ValueError('Only variable-length encoding is currently supported')
+	result = ''
+	havesize = i = size = 0
+	for offset, f in enumerate(fmt):
+		if f.isdigit():
+			size = (size * 10) + int(f)
+			havesize = 1
+			continue
+		elif f == 'x':
+			if not havesize:
+				result += '\0'
+			else:
+				result += '\0' * size
+			# Note: no value, don't increment i
+		elif f in 'Ssu':
+			if f == 'S' and '\0' in values[i]:
+				l = values[i].find('\0')
+			else:
+				l = len(values[i])
+			if havesize:
+				if l > size:
+					l = size
+			elif f == 's':
+				havesize = size = 1
+			elif f == 'u' and offset != len(fmt) - 1:
+				result += pack_int(l)
+			result += values[i][:l]
+			if f == 'S' and not havesize:
+				result += '\0'
+			elif size > l:
+				result += '\0' * (size - l)
+			i += 1
+		else:
+			# integral type
+			if not havesize:
+				size = 1
+			for j in xrange(size):
+				result += pack_int(values[i])
+				i += 1
+		havesize = size = 0
+	return result

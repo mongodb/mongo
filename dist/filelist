@@ -11,7 +11,6 @@ src/api/cur_dump.c
 src/api/cur_stat.c
 src/api/cur_std.c
 src/api/err_file.c
-src/api/pack.c
 src/api/session_btree.c
 src/api/strerror.c
 src/api/version.c
@@ -71,6 +70,7 @@ src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_yield.c
+src/schema/packing.c
 src/support/cksum.c
 src/support/err.c
 src/support/hazard.c

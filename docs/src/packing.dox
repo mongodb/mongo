@@ -3,8 +3,8 @@
 - native C structs
 - portability between programming languages
 
-WiredTiger's data packing uses format strings mostly as specified in the Python
-struct module:
+WiredTiger's data packing uses format strings similar to those specified in the
+Python struct module:
   http://docs.python.org/library/struct
 
 The first character of the format string can be used to indicate the byte
@@ -15,6 +15,7 @@ table:
 @hrow{Character, Byte order, Size, Alignment}
 @row{<tt>.</tt>, big-endian, packed, none}
 @row{<tt>&gt;</tt>, big-endian, standard, none}
+@row{<tt>&lt;</tt>, little-endian, standard, none}
 @row{<tt>\@</tt>, native, native, native}
 </table>
 
@@ -26,10 +27,8 @@ Format characters:
 <table>
 @hrow{Format, C Type, Java type, Java type, Standard size}
 @row{x, pad byte, N/A, N/A, 1}
-@row{c, char, char, string of length 1, 1}
 @row{b, signed char, byte, integer, 1}
 @row{B, unsigned char, byte, integer, 1}
-@row{?, _Bool, boolean, bool, 1}
 @row{h, short, short, integer, 2}
 @row{H, unsigned short, short, integer, 2}
 @row{i, int, int, integer, 4}
@@ -38,8 +37,6 @@ Format characters:
 @row{L, unsigned long, int, integer, 4}
 @row{q, long long, long, integer, 8}
 @row{Q, unsigned long long, long, integer, 8}
-@row{f, float, float, float, 4}
-@row{d, double, double, float, 8}
 @row{r, ::wiredtiger_recno_t, long, integer, 8}
 @row{s, char[], String, string, fixed length}
 @row{S, char[], String, string, variable}

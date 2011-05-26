@@ -87,6 +87,7 @@ li
 logc
 lookup
 lsn
+lt
 malloc'd
 marshalled
 marshalling
