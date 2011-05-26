@@ -1470,7 +1470,7 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
             smlock;
             precall();
 
@@ -1512,8 +1512,8 @@ namespace mongo {
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
-            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn );
+        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
+            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn, readOnlyArgs, readOnlyRecv);
         }
 
         void gotError( string s ) {
