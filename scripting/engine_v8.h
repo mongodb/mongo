@@ -92,7 +92,7 @@ namespace mongo {
 
         virtual ScriptingFunction _createFunction( const char * code );
         Local< v8::Function > __createFunction( const char * code );
-        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false );
+        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false );
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError() { return _error; }
 
@@ -142,6 +142,7 @@ namespace mongo {
         Handle<v8::String> V8STR_DBPTR;
         Handle<v8::String> V8STR_BINDATA;
         Handle<v8::String> V8STR_WRAPPER;
+        Handle<v8::String> V8STR_RO;
 
     private:
         void _startCall();
