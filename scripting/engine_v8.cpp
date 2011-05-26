@@ -281,6 +281,7 @@ namespace mongo {
         V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
         V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
+        V8STR_RO = getV8Str( "_v8_ro" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -598,7 +599,7 @@ namespace mongo {
         _global->Set( f , v8::Undefined() );
     }
 
-    int V8Scope::invoke( ScriptingFunction func , const BSONObj* argsObject, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+    int V8Scope::invoke( ScriptingFunction func , const BSONObj* argsObject, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
         V8_SIMPLE_HEADER
         Handle<Value> funcValue = _funcs[func-1];
 
@@ -610,9 +611,9 @@ namespace mongo {
             BSONObjIterator it( *argsObject );
             for ( int i=0; i<nargs; i++ ) {
                 BSONElement next = it.next();
-                args[i] = mongoToV8Element( next );
+                args[i] = mongoToV8Element( next, readOnlyArgs );
             }
-            setObject( "args", *argsObject, false); // for backwards compatibility
+            setObject( "args", *argsObject, readOnlyArgs); // for backwards compatibility
         }
         else {
             _global->Set( V8STR_ARGS, v8::Undefined() );
@@ -626,7 +627,7 @@ namespace mongo {
         }
         Handle<v8::Object> v8recv;
         if (recv != 0)
-            v8recv = mongoToLZV8(*recv, false);
+            v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
         else
             v8recv = _emptyObj;
 
@@ -1047,6 +1048,7 @@ namespace mongo {
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
+            o->SetHiddenValue(V8STR_RO, v8::Undefined());
         } else {
             if (array) {
                 o = lzArrayTemplate->NewInstance();
@@ -1351,6 +1353,14 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
+        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ) {
+            // object was readonly, use bson as is
+            BSONObj* ro = unwrapBSONObj(o);
+            if (ro)
+                return *ro;
+            return BSONObj();
+        }
+
         BSONObjBuilder b;
 
         if ( depth == 0 ) {

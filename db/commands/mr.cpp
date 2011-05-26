@@ -69,7 +69,7 @@ namespace mongo {
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             assert( s );
-            if ( s->invoke( _func.func() , &_params, &o , 0 , true ) )
+            if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
 
