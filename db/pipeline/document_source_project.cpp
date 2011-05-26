@@ -30,6 +30,7 @@ namespace mongo {
     }
 
     DocumentSourceProject::DocumentSourceProject():
+	excludeId(false),
 	pEO(ExpressionObject::create()),
 	unwindName(),
         pNoUnwindDocument(),
@@ -66,8 +67,19 @@ namespace mongo {
         if (!pNoUnwindDocument.get()) {
             shared_ptr<Document> pInDocument(pSource->getCurrent());
 
+	    /* create the result document */
+	    const size_t sizeHint =
+		pEO->getSizeHint(pInDocument) + (excludeId ? 0 : 1);
+	    pNoUnwindDocument = Document::create(sizeHint);
+
+	    if (!excludeId) {
+		shared_ptr<const Value> pId(
+		    pInDocument->getField(Document::idName));
+		pNoUnwindDocument->addField(Document::idName, pId);
+	    }
+
 	    /* use the ExpressionObject to create the base result */
-	    pNoUnwindDocument = pEO->evaluateDocument(pInDocument);
+	    pEO->addToDocument(pNoUnwindDocument, pInDocument);
 
 	    /*
 	      If we're unwinding this field, and it's an array, then we're
@@ -125,6 +137,8 @@ namespace mongo {
 
     void DocumentSourceProject::sourceToBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
+	if (excludeId)
+	    insides.append(Document::idName, false);
 	pEO->documentToBson(&insides, false, unwindName);
 	pBuilder->append("$project", insides.done());
     }
@@ -157,10 +171,20 @@ namespace mongo {
     }
 
     void DocumentSourceProject::includePath(const string &fieldPath) {
+	if (Document::idName.compare(fieldPath) == 0) {
+	    assert(!excludeId); // included by default, don't allow switching
+	    return;
+	}
+
 	pEO->includePath(fieldPath);
     }
 
     void DocumentSourceProject::excludePath(const string &fieldPath) {
+	if (Document::idName.compare(fieldPath) == 0) {
+	    excludeId = true;
+	    return;
+	}
+
 	pEO->excludePath(fieldPath);
     }
 

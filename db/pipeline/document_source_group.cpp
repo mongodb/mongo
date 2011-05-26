@@ -28,8 +28,6 @@
 namespace mongo {
     const char DocumentSourceGroup::groupName[] = "$group";
 
-    string DocumentSourceGroup::idName("_id");
-
     DocumentSourceGroup::~DocumentSourceGroup() {
     }
 
@@ -67,7 +65,8 @@ namespace mongo {
 	BSONObjBuilder insides;
 
 	/* add the _id */
-	pIdExpression->addToBsonObj(&insides, "_id", false);
+	pIdExpression->addToBsonObj(
+	    &insides, Document::idName.c_str(), false);
 
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
@@ -149,7 +148,7 @@ namespace mongo {
             BSONElement groupField(groupIterator.next());
             const char *pFieldName = groupField.fieldName();
 
-            if (strcmp(pFieldName, "_id") == 0) {
+            if (strcmp(pFieldName, Document::idName.c_str()) == 0) {
                 assert(!idSet); // CW TODO _id specified multiple times
                 assert(groupField.type() == Object); // CW TODO error message
 
@@ -161,18 +160,6 @@ namespace mongo {
                     Expression::parseObject(&groupField,
 				 &Expression::ObjectCtx(
 					Expression::ObjectCtx::DOCUMENT_OK)));
-
-		/*
-		  The _id field is not meant to behave like a projection wrt
-		  keeping the _id by default
-		 */
-		ExpressionObject *pEO =
-		    dynamic_cast<ExpressionObject *>(pId.get());
-		if (pEO)
-		{
-		    string idString(idName);
-		    pEO->excludePath(idName);
-		}
 
                 pGroup->setIdExpression(pId);
                 idSet = true;
@@ -241,7 +228,7 @@ namespace mongo {
 
             /*
               Look for the _id value in the map; if it's not there, add a
-               new entry with a blank accumulator.
+	      new entry with a blank accumulator.
             */
             vector<shared_ptr<Accumulator> > *pGroup;
             GroupsType::iterator it(groups.find(pId));
@@ -294,7 +281,7 @@ namespace mongo {
         shared_ptr<Document> pResult(Document::create(1 + n));
 
         /* add the _id field */
-        pResult->addField(idName, rIter->first);
+        pResult->addField(Document::idName, rIter->first);
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i)
@@ -308,7 +295,8 @@ namespace mongo {
 	    DocumentSourceGroup::create(pCtx));
 
 	/* the merger will use the same grouping key */
-	pMerger->setIdExpression(ExpressionFieldPath::create("_id"));
+	pMerger->setIdExpression(ExpressionFieldPath::create(
+				     Document::idName.c_str()));
 
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {

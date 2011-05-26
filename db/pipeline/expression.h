@@ -621,6 +621,29 @@ namespace mongo {
 	shared_ptr<Document> evaluateDocument(
 	    const shared_ptr<Document> &pDocument) const;
 
+	/*
+	  evaluate(), but add the evaluated fields to a given document
+	  instead of creating a new one.
+
+	  @param pResult the Document to add the evaluated expressions to
+	  @param pDocument the input Document
+	 */
+	void addToDocument(const shared_ptr<Document> &pResult,
+			   const shared_ptr<Document> &pDocument) const;
+
+	/*
+	  Estimate the number of fields that will result from evaluating
+	  this over pDocument.  Does not include _id.  This is an estimate
+	  (really an upper bound) because we can't account for undefined
+	  fields without actually doing the evaluation.  But this is still
+	  useful as an argument to Document::create(), if you plan to use
+	  addToDocument().
+
+	  @param pDocument the input document
+	  @returns estimated number of fields that will result
+	 */
+	size_t getSizeHint(const shared_ptr<Document> &pDocument) const;
+
         /*
           Create an empty expression.  Until fields are added, this
           will evaluate to an empty document (object).
@@ -702,10 +725,6 @@ namespace mongo {
 	    const FieldPath *pPath, size_t pathi, size_t pathn,
 	    bool excludeLast);
 
-	static string idName;
-	bool isRoot; // indicates top of path tree
-	bool computedId;
-	bool excludeId;
 	bool excludePaths;
 	set<string> path;
 

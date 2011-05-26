@@ -149,6 +149,8 @@ namespace mongo {
         static int compare(const shared_ptr<Document> &rL,
                            const shared_ptr<Document> &rR);
 
+	static string idName; // shared "_id"
+
     private:
         friend class FieldIterator;
 

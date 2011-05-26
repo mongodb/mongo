@@ -810,8 +810,6 @@ namespace mongo {
 
     /* ---------------------- ExpressionObject --------------------------- */
 
-    string ExpressionObject::idName("_id");
-
     ExpressionObject::~ExpressionObject() {
     }
 
@@ -821,9 +819,6 @@ namespace mongo {
     }
 
     ExpressionObject::ExpressionObject():
-	isRoot(true),
-	computedId(false),
-	excludeId(false),
 	excludePaths(false),
 	path(),
         vFieldName(),
@@ -840,25 +835,11 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<Document> ExpressionObject::evaluateDocument(
+    void ExpressionObject::addToDocument(
+	const shared_ptr<Document> &pResult,
         const shared_ptr<Document> &pDocument) const {
-	/* try to figure out how big to make the result document */
-	size_t sizeHint = pDocument->getFieldCount();
 	const size_t pathSize = path.size();
-	if (!excludePaths)
-	    sizeHint += pathSize;
-	else {
-	    size_t excludeCount = pathSize;
-	    if (sizeHint > excludeCount)
-		sizeHint -= excludeCount;
-	    else
-		sizeHint = 0;
-	}
-	sizeHint += vFieldName.size();
 	set<string>::iterator end(path.end());
-
-	/* create the result */
-        shared_ptr<Document> pResult(Document::create(sizeHint));
 	bool addedId = false;
 
 	/*
@@ -882,8 +863,6 @@ namespace mongo {
 		     */
 		    if (path.find(field.first) != end)
 			continue; // we found it, so don't add it
-		    if (excludeId && idName.compare(field.first))
-			continue; // excluding id, and that's it, so don't add
 
 		    pResult->addField(field.first, field.second);
 		}
@@ -904,13 +883,7 @@ namespace mongo {
 		      This also allows us to handle intermediate arrays; if we
 		      encounter one, we repeat this for each array element.
 		     */
-		    const bool isId = !idName.compare(field.first);
-		    if ((path.find(field.first) != end) ||
-			(!excludeId && isId)) {
-
-			if (isId)
-			    addedId = true;
-
+		    if (path.find(field.first) != end) {
 			/* find the Expression */
 			const size_t n = vFieldName.size();
 			size_t i;
@@ -972,16 +945,6 @@ namespace mongo {
 	    }
 	}
 
-	/*
-	  If we still haven't got an _id, we're supposed to have one,
-	  and there isn't a computed one, add the underlying one here.
-	*/
-	if (!addedId && !excludeId && !computedId) {
-	    shared_ptr<const Value> pId(pDocument->getField(idName));
-	    if (pId.get() && (pId->getType() != Undefined))
-		pResult->addField(idName, pId);
-	}
-
 	/* add any remaining fields we haven't already taken care of */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
@@ -1004,7 +967,34 @@ namespace mongo {
 
 	    pResult->addField(fieldName, pValue);
         }
+    }
 
+    size_t ExpressionObject::getSizeHint(
+	const shared_ptr<Document> &pDocument) const {
+	size_t sizeHint = pDocument->getFieldCount();
+	const size_t pathSize = path.size();
+	if (!excludePaths)
+	    sizeHint += pathSize;
+	else {
+	    size_t excludeCount = pathSize;
+	    if (sizeHint > excludeCount)
+		sizeHint -= excludeCount;
+	    else
+		sizeHint = 0;
+	}
+
+	/* account for the additional computed fields */
+	sizeHint += vFieldName.size();
+
+	return sizeHint;
+    }
+
+    shared_ptr<Document> ExpressionObject::evaluateDocument(
+        const shared_ptr<Document> &pDocument) const {
+	/* create and populate the result */
+        shared_ptr<Document> pResult(
+	    Document::create(getSizeHint(pDocument)));
+	addToDocument(pResult, pDocument);
         return pResult;
     }
 
@@ -1025,13 +1015,6 @@ namespace mongo {
 	/* make sure it isn't a name we've included or excluded */
 	set<string>::iterator ex(path.find(fieldName));
 	assert(ex == path.end()); // CW TODO ERROR
-
-	/* if we're adding a computed _id, don't include the regular one */
-	if (idName.compare(fieldName) == 0)
-	{
-	    excludeId = true;
-	    computedId = true;
-	}
 
 	/* make sure it isn't a name we've already got */
 	const size_t n = vFieldName.size();
@@ -1054,17 +1037,6 @@ namespace mongo {
 
 	/* if this is the leaf-most object, stop */
 	if (pathi == pathn - 1) {
-	    /*
-	      If the field is _id, never put it in path, because we might not
-	      yet know if that is going to be used for inclusions or
-	      exclusions.
-	     */
-	    if (!fieldName.compare(idName)) {
-		if (excludeLast)
-		    excludeId = true;
-		return;
-	    }
-
 	    /*
 	      Make sure the exclusion configuration of this node matches
 	      the requested result.  Or, that this is the first (determining)
@@ -1103,8 +1075,6 @@ namespace mongo {
 	    */
 	    shared_ptr<ExpressionObject> pSharedChild(
 		ExpressionObject::create());
-	    pSharedChild->isRoot = false;
-	    pSharedChild->excludeId = true;
 	    path.insert(fieldName);
 	    vFieldName.push_back(fieldName);
 	    vpExpression.push_back(pSharedChild);
@@ -1199,10 +1169,6 @@ namespace mongo {
     void ExpressionObject::documentToBson(
 	BSONObjBuilder *pBuilder, bool fieldPrefix,
 	const string &unwindField) const {
-
-	/* indicate if we're excluding _id */
-	if (isRoot && excludeId)
-	    pBuilder->append(idName, false);
 
 	/* emit any inclusion/exclusion paths */
 	vector<string> vPath;

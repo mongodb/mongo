@@ -20,6 +20,9 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
+    string Document::idName("_id");
+
     shared_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
 	shared_ptr<Document> pDocument(new Document(pBsonObj));
         return pDocument;

@@ -485,8 +485,6 @@ namespace mongo {
         GroupsType::iterator groupsIterator;
         shared_ptr<Document> pCurrent;
 
-        static string idName; // shared _id string
-
 	intrusive_ptr<ExpressionContext> pCtx;
     };
 
@@ -640,6 +638,7 @@ namespace mongo {
         DocumentSourceProject();
 
         // configuration state
+	bool excludeId;
 	shared_ptr<ExpressionObject> pEO;
 	string unwindName; // name of the field to unwind, if any
         size_t unwindWhich; // if unwinding, current Document's index
