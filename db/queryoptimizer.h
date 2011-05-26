@@ -204,6 +204,36 @@ namespace mongo {
         shared_ptr<FieldRangeVector> _orConstraint;
     };
 
+    // temp.  this class works if T::operator< is variant unlike a regular stl priority queue.
+    // but it's very slow.  however if v.size() is always very small, it would be fine, 
+    // maybe even faster than a smart impl that does more memory allocations.
+    template<class T>
+    class our_priority_queue : boost::noncopyable { 
+        vector<T> v;
+        int t;
+    public:
+        our_priority_queue() { 
+            v.reserve(4);
+        }
+        int size() const { return v.size(); }
+        bool empty() const { return v.empty(); }
+        void push(const T & x) { 
+            v.push_back(x); 
+        }
+        void pop() {
+            dassert( t < v.size() );
+            v.erase(v.begin()+t);
+        }
+        T top() { 
+            t = 0;
+            for( int i = 1; i < v.size(); i++ ) { 
+                if( v[t] < v[i] )
+                    t = i;
+            }
+            return v[t];
+        }
+    };
+
     /**
      * A set of candidate query plans for a query.  This class can return a best buess plan or run a
      * QueryOp on all the plans.
@@ -314,7 +344,7 @@ namespace mongo {
                     return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
                 }
             };
-            priority_queue<OpHolder> _queue;
+            our_priority_queue<OpHolder> _queue;
         };
 
         const char *_ns;
