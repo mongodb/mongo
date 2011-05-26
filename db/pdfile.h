@@ -121,11 +121,11 @@ namespace mongo {
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 
         /** @param o both and in and out param -- insert can sometimes modify an object (such as add _id). */
-        DiskLoc insertWithObjMod(const char *ns, BSONObj &o, bool god = false);
+        DiskLoc insertWithObjMod(const char *ns, BSONObj & /*out*/o, bool god = false);
 
-        /** @param o both and in and out param -- insert can sometimes modify an object (such as add _id). */
+        // todo eliminate
         void insertWithObjModNoRet(const char *ns, BSONObj &o, bool god = false) {
-            insert( ns, o.objdata(), o.objsize(), god );
+            insertWithObjMod(ns, o, god);
         }
 
         /** @param obj in value only for this version. */
