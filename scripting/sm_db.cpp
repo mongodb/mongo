@@ -615,6 +615,7 @@ namespace mongo {
 
     // UUID **************************
 
+#if 0
     JSBool uuid_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
 
@@ -638,6 +639,8 @@ namespace mongo {
             for( int i = 0; i < 16; i++ ) {
                 buf[i] = fromHex(encoded.c_str() + i * 2);
             }
+
+zzz
 
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
             c.setProperty( obj, "len", c.toval( (double)16 ) );
@@ -683,6 +686,8 @@ namespace mongo {
         { "toString" , uuid_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
+
+#endif
 
     // BinData **************************
 
@@ -1047,7 +1052,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
+//        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );

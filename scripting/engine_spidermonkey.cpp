@@ -492,7 +492,6 @@ namespace mongo {
             return func;
         }
 
-
         jsval toval( double d ) {
             jsval val;
             assert( JS_NewNumberValue( _context, d , &val ) );
@@ -904,6 +903,68 @@ namespace mongo {
 
     // --- global helpers ---
 
+    JSBool hexToBinData(JSContext * cx, jsval *rval, int subtype, string s) { 
+        JSObject * o = JS_NewObject( cx , &bindata_class , 0 , 0 );
+        CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
+        int len = s.size() / 2;
+        char * data = new char[len];
+        char *p = data;
+        const char *src = s.c_str();
+        for( int i = 0; i+1 < s.size(); i += 2 ) { 
+            *p++ = fromHex(src + i);
+        }
+        assert( JS_SetPrivate( cx , o , new BinDataHolder( data , len ) ) );
+        Convertor c(cx);
+        c.setProperty( o, "len", c.toval((double)len) );
+        c.setProperty( o, "type", c.toval((double)subtype) );
+        *rval = OBJECT_TO_JSVAL( o );
+        delete data;
+        return JS_TRUE;
+    }
+
+    JSBool _HexData( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 2 ) {
+            JS_ReportError( cx , "HexData needs 2 arguments -- HexData(subtype,hexstring)" );
+            return JS_FALSE;
+        }
+        int type = (int)c.toNumber( argv[ 0 ] );
+        if ( type == 2 ) {
+            JS_ReportError( cx , "BinData subtype 2 is deprecated" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[1]);
+        return hexToBinData(cx, rval, type, s);
+    }
+
+    JSBool _UUID( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "UUID needs argument -- UUID(hexstring)" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[0]);
+        if( s.size() != 32 ) {
+            JS_ReportError( cx , "bad UUID hex string len" );
+            return JS_FALSE;
+        }
+        return hexToBinData(cx, rval, 3, s);
+    }
+
+    JSBool _MD5( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "MD5 needs argument -- MD5(hexstring)" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[0]);
+        if( s.size() != 32 ) {
+            JS_ReportError( cx , "bad MD5 hex string len" );
+            return JS_FALSE;
+        }
+        return hexToBinData(cx, rval, 5, s);
+    }
+
     JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
         stringstream ss;
         Convertor c( cx );
@@ -965,6 +1026,9 @@ namespace mongo {
         { "nativeHelper" , &native_helper , 1 , 0 , 0 } ,
         { "load" , &native_load , 1 , 0 , 0 } ,
         { "gc" , &native_gc , 1 , 0 , 0 } ,
+        { "UUID", &_UUID, 0, 0, 0 } ,
+        { "MD5", &_MD5, 0, 0, 0 } ,
+        { "HexData", &_HexData, 0, 0, 0 } ,
         { 0 , 0 , 0 , 0 , 0 }
     };
 
