@@ -88,21 +88,21 @@ namespace mongo {
 //      return Handle<Value>();
 //    }
 
-//    static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
-//        BSONObj *obj = unwrapBSONObj(info.Holder());
-//        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj->nFields()));
-//        int i = 0;
-//        Local< External > scp = External::Cast( *info.Data() );
-//        V8Scope* scope = (V8Scope*)(scp->Value());
-//        // note here that if keys are parseable number, v8 will access them using index
-//        for ( BSONObjIterator it(*obj); it.more(); ++i) {
-//            const BSONElement& f = it.next();
-////            arr->Set(i, v8::String::NewExternal(new ExternalString(f.fieldName())));
-//            Handle<v8::String> name = scope->getV8Str(f.fieldName());
-//            arr->Set(i, name);
-//        }
-//        return arr;
-//    }
+    static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
+        BSONObj *obj = unwrapBSONObj(info.Holder());
+        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj->nFields()));
+        int i = 0;
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        // note here that if keys are parseable number, v8 will access them using index
+        for ( BSONObjIterator it(*obj); it.more(); ++i) {
+            const BSONElement& f = it.next();
+//            arr->Set(i, v8::String::NewExternal(new ExternalString(f.fieldName())));
+            Handle<v8::String> name = scope->getV8Str(f.fieldName());
+            arr->Set(i, name);
+        }
+        return arr;
+    }
 
 //    v8::Handle<v8::Integer> namedQuery(Local<v8::String> property, const AccessorInfo& info) {
 //      string key = ToString(property);
@@ -249,8 +249,7 @@ namespace mongo {
 
         roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         roObjectTemplate->SetInternalFieldCount( 1 );
-        roObjectTemplate->SetNamedPropertyHandler(0);
-        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, 0, v8::External::New(this));
+        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, namedEnumerator, v8::External::New(this));
         roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0, IndexedReadOnlyDelete, 0, v8::External::New(this));
 
         // initialize lazy array template
@@ -281,7 +280,7 @@ namespace mongo {
         V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
         V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
-        V8STR_RO = getV8Str( "_v8_ro" );
+        V8STR_RO = getV8Str( "_ro" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -1048,7 +1047,7 @@ namespace mongo {
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
-            o->SetHiddenValue(V8STR_RO, v8::Undefined());
+            o->SetHiddenValue(V8STR_RO, v8::Boolean::New(true));
         } else {
             if (array) {
                 o = lzArrayTemplate->NewInstance();

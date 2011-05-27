@@ -9,10 +9,8 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
-
     if ( tojson( a ) == tojson( b ) )
         return true;
-
     return false;
 }
 
@@ -35,10 +33,8 @@ doassert = function (msg) {
 
 assert = function( b , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
-
     if ( b )
-        return;
-    
+        return;    
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
@@ -538,11 +534,11 @@ else {
     print( "warning: no BinData class" );
 }
 
-if ( typeof( UUID ) != "undefined" ){
+/*if ( typeof( UUID ) != "undefined" ){
     UUID.prototype.tojson = function () {
         return this.toString();
     }
-}
+}*/
 
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
@@ -1486,6 +1482,10 @@ help = shellHelper.help = function (x) {
         print("\tb.hex()                             the data as a hex encoded string");
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
+        print();
+        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
+        print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");

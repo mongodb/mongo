@@ -403,7 +403,10 @@ namespace mongo {
             V8Unlock u;
             o = cursor->next();
         }
-        return scope->mongoToLZV8( o );
+        bool ro = false;
+        if (args.This()->Has(scope->V8STR_RO))
+            ro = args.This()->Get(scope->V8STR_RO)->BooleanValue();
+        return scope->mongoToLZV8( o, false, ro );
     }
 
     v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args) {
@@ -430,6 +433,11 @@ namespace mongo {
         return v8::Number::New( (double) ret );
     }
 
+//    v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args) {
+//        Local<v8::Object> cursor = args.This();
+//        cursor->Set(scope->V8STR_RO, v8::Undefined());
+//        return cursor;
+//    }
 
     // --- DB ----
 
