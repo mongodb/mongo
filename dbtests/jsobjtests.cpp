@@ -1647,7 +1647,7 @@ namespace JsobjTests {
                     while ( j.more() )
                         l += strlen( j.next().fieldName() );
                 }
-                unsigned long long tm = t.micros();
+                //unsigned long long tm = t.micros();
                 //cout << "time: " << tm << endl;
             }
         }
@@ -1896,26 +1896,26 @@ namespace JsobjTests {
                               << "asdasdasdas" << "asldkasldjasldjasldjlasjdlasjdlasdasdasdasdasdasdasd" );
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.md5();
-                int millis = t.millis();
+                //int millis = t.millis();
                 //cout << "md5 : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.toString();
-                int millis = t.millis();
+                //int millis = t.millis();
                 //cout << "toString : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     checksum( x.objdata() , x.objsize() );
-                int millis = t.millis();
+                //int millis = t.millis();
                 //cout << "checksum : " << millis << endl;
             }
 
