@@ -453,8 +453,6 @@ namespace mongo {
                 maxRecsWhenFull = numeric_limits<long long>::max();
             }
 
-            scoped_spinlock lk( _trackerLocks );
-
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
@@ -462,6 +460,7 @@ namespace mongo {
             while ( cc->ok() ) {
                 DiskLoc dl = cc->currLoc();
                 if ( ! isLargeChunk ) {
+                    scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
                 }
                 cc->advance();
@@ -489,7 +488,10 @@ namespace mongo {
                 return false;
             }
 
-            log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            {
+                scoped_spinlock lk( _trackerLocks );
+                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            }
             return true;
         }
 
