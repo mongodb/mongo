@@ -226,7 +226,7 @@ namespace mongo {
         }
         T top() { 
             t = 0;
-            for( int i = 1; i < v.size(); i++ ) { 
+            for( size_t i = 1; i < v.size(); i++ ) { 
                 if( v[t] < v[i] )
                     t = i;
             }
