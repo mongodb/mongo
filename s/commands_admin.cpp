@@ -254,7 +254,7 @@ namespace mongo {
                 Shard s = Shard::make( to );
 
                 if ( config->getPrimary() == s.getConnString() ) {
-                    errmsg = "is is already the primary";
+                    errmsg = "it is already the primary";
                     return false;
                 }
 
