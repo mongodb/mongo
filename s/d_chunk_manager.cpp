@@ -29,7 +29,7 @@ namespace mongo {
     ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) {
 
         // have to get a connection to the config db
-        // special case if I'm the configdb since I'm locked and if i connect to myself
+        // special case if I'm the configdb since I'm locked and if I connect to myself
         // its a deadlock
         scoped_ptr<ScopedDbConnection> scoped;
         scoped_ptr<DBDirectClient> direct;
