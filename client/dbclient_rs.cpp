@@ -438,7 +438,7 @@ namespace mongo {
     DBClientConnection * DBClientReplicaSet::checkMaster() {
         HostAndPort h = _monitor->getMaster();
 
-        if ( h == _masterHost ) {
+        if ( h == _masterHost && _master ) {
             // a master is selected.  let's just make sure connection didn't die
             if ( ! _master->isFailed() )
                 return _master.get();
@@ -459,7 +459,7 @@ namespace mongo {
     DBClientConnection * DBClientReplicaSet::checkSlave() {
         HostAndPort h = _monitor->getSlave( _slaveHost );
 
-        if ( h == _slaveHost ) {
+        if ( h == _slaveHost && _slave ) {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
