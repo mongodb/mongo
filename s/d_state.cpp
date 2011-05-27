@@ -75,7 +75,7 @@ namespace mongo {
            << " before [" << _shardName << "] "
            << " got [" << name << "] "
            ;
-        uasserted( 13298 , ss.str() );
+        msgasserted( 13298 , ss.str() );
     }
 
     void ShardingState::gotShardHost( string host ) {
@@ -97,7 +97,7 @@ namespace mongo {
            << " before [" << _shardHost << "] "
            << " got [" << host << "] "
            ;
-        uasserted( 13299 , ss.str() );
+        msgasserted( 13299 , ss.str() );
     }
 
     void ShardingState::resetShardingState() {
