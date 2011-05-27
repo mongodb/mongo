@@ -392,7 +392,11 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
-        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
+        bool iAmPotentiallyHot() const {
+          return myConfig().potentiallyHot() && // not an arbiter
+            elect.steppedDown <= time(0) && // not stepped down/frozen
+            state() == MemberState::RS_SECONDARY; // not stale
+        }
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes

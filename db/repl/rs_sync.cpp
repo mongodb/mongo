@@ -207,35 +207,35 @@ namespace mongo {
         return golive;
     }
 
-    /**
-     * Checks if the oplog given is too far ahead to read from.
-     *
-     * @param r the oplog
-     * @param hn the hostname (for log messages)
-     *
-     * @return if we are stale compared to the oplog on hn
-     */
     bool ReplSetImpl::_isStale(OplogReader& r, const string& hn) {
         BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
         OpTime ts = remoteOldestOp["ts"]._opTime();
         DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
         else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
         DEV {
-            // debugging sync1.js...
             log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
             log() << "replSet our state: " << state().toString() << rsLog;
         }
-        if( lastOpTimeWritten < ts ) {
-            log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
-            log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-            log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
-            log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-            sethbmsg("error RS102 too stale to catch up");
-            changeState(MemberState::RS_RECOVERING);
-            sleepsecs(120);
-            return true;
+        if( lastOpTimeWritten >= ts ) {
+            return false;
         }
-        return false;
+
+        // we're stale
+        log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
+        log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
+        log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
+        log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+
+        // reset minvalid so that we can't become primary prematurely
+        {
+            writelock lk("local.replset.minvalid");
+            Helpers::putSingleton("local.replset.minvalid", remoteOldestOp);
+        }
+
+        sethbmsg("error RS102 too stale to catch up");
+        changeState(MemberState::RS_RECOVERING);
+        sleepsecs(120);
+        return true;
     }
 
     /**
