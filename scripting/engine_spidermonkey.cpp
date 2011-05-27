@@ -910,7 +910,7 @@ namespace mongo {
         char * data = new char[len];
         char *p = data;
         const char *src = s.c_str();
-        for( int i = 0; i+1 < s.size(); i += 2 ) { 
+        for( size_t i = 0; i+1 < s.size(); i += 2 ) { 
             *p++ = fromHex(src + i);
         }
         assert( JS_SetPrivate( cx , o , new BinDataHolder( data , len ) ) );
