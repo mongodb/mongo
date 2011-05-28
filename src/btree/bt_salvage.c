@@ -475,8 +475,8 @@ __slvg_trk_leaf(
 		 * items.
 		 */
 		cell = WT_PAGE_DISK_BYTE(dsk);
-		WT_ERR(__wt_cell_process(
-		    session, cell, &trk->u.row.range_start));
+		WT_ASSERT(session, __wt_cell_prefix(cell) == 0);
+		WT_ERR(__wt_cell_copy(session, cell, &trk->u.row.range_start));
 		WT_CELL_FOREACH(dsk, cell, i)
 			switch (__wt_cell_type(cell)) {
 			case WT_CELL_KEY:
@@ -484,7 +484,13 @@ __slvg_trk_leaf(
 				last_key_cell = cell;
 				break;
 			}
-		WT_ERR(__wt_cell_process(
+		/*
+		 * THIS WON'T WORK: we will have to write code that gets us a
+		 * real key for the last key, because the last key is prefix
+		 * compressed.
+		 */
+		WT_ASSERT(session, __wt_cell_prefix(last_key_cell) == 0);
+		WT_ERR(__wt_cell_copy(
 		    session, last_key_cell, &trk->u.row.range_stop));
 
 		WT_ERR(__slvg_ovfl_row_dsk_ref(session, dsk, trk));
@@ -1518,8 +1524,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
 			if (__wt_key_process(rip)) {
-				WT_ERR(__wt_cell_process(
-				    session, (WT_CELL *)rip->key, key));
+				WT_ERR(__wt_row_key(
+				    session, page, rip, key));
 				item = key;
 			} else
 				item = rip;
@@ -1532,8 +1538,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
 			if (__wt_key_process(rip)) {
-				WT_ERR(__wt_cell_process(
-				    session, (WT_CELL *)rip->key, key));
+				WT_ERR(__wt_row_key(
+				    session, page, rip, key));
 				item = key;
 			} else
 				item = rip;
@@ -1611,8 +1617,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 		 */
 		rip = page->u.row_leaf.d + skip_start;
 		if (__wt_key_process(rip))
-			WT_ERR(__wt_cell_process(
-			    session, (WT_CELL *)rip->key, key));
+			WT_ERR(__wt_row_key(session, page, rip, key));
 		else
 			WT_ERR(__wt_buf_set(session, key, rip->key, rip->size));
 		__wt_buf_steal(session, key, &rref->key, &rref->size);

@@ -8,19 +8,19 @@ typedef struct {
 #define	__wt_cache_read_serial(\
     session, _parent, _parent_ref, _dsk_verify, ret) do {\
 	__wt_cache_read_args _args;\
-	_args.parent = _parent;\
-	_args.parent_ref = _parent_ref;\
-	_args.dsk_verify = _dsk_verify;\
-	(ret) = __wt_session_serialize_func(session,\
+	_args.parent = (_parent);\
+	_args.parent_ref = (_parent_ref);\
+	_args.dsk_verify = (_dsk_verify);\
+	(ret) = __wt_session_serialize_func((session),\
 	    WT_WORKQ_READ, 0, __wt_cache_read_serial_func, &_args);\
 } while (0)
 #define	__wt_cache_read_unpack(\
     session, _parent, _parent_ref, _dsk_verify) do {\
 	__wt_cache_read_args *_args =\
 	    (__wt_cache_read_args *)(session)->wq_args;\
-	_parent = _args->parent;\
-	_parent_ref = _args->parent_ref;\
-	_dsk_verify = _args->dsk_verify;\
+	(_parent) = _args->parent;\
+	(_parent_ref) = _args->parent_ref;\
+	(_dsk_verify) = _args->dsk_verify;\
 } while (0)
 
 typedef struct {
@@ -29,15 +29,15 @@ typedef struct {
 #define	__wt_evict_file_serial(\
     session, _close_method, ret) do {\
 	__wt_evict_file_args _args;\
-	_args.close_method = _close_method;\
-	(ret) = __wt_session_serialize_func(session,\
+	_args.close_method = (_close_method);\
+	(ret) = __wt_session_serialize_func((session),\
 	    WT_WORKQ_EVICT, 0, __wt_evict_file_serial_func, &_args);\
 } while (0)
 #define	__wt_evict_file_unpack(\
     session, _close_method) do {\
 	__wt_evict_file_args *_args =\
 	    (__wt_evict_file_args *)(session)->wq_args;\
-	_close_method = _args->close_method;\
+	(_close_method) = _args->close_method;\
 } while (0)
 
 typedef struct {
@@ -50,46 +50,52 @@ typedef struct {
 #define	__wt_insert_serial(\
     session, _page, _write_gen, _new_ins, _srch_ins, _ins, ret) do {\
 	__wt_insert_args _args;\
-	_args.page = _page;\
-	_args.write_gen = _write_gen;\
-	_args.new_ins = _new_ins;\
-	_args.srch_ins = _srch_ins;\
-	_args.ins = _ins;\
-	(ret) = __wt_session_serialize_func(session,\
+	_args.page = (_page);\
+	_args.write_gen = (_write_gen);\
+	_args.new_ins = (_new_ins);\
+	_args.srch_ins = (_srch_ins);\
+	_args.ins = (_ins);\
+	(ret) = __wt_session_serialize_func((session),\
 	    WT_WORKQ_FUNC, 1, __wt_insert_serial_func, &_args);\
 } while (0)
 #define	__wt_insert_unpack(\
     session, _page, _write_gen, _new_ins, _srch_ins, _ins) do {\
 	__wt_insert_args *_args =\
 	    (__wt_insert_args *)(session)->wq_args;\
-	_page = _args->page;\
-	_write_gen = _args->write_gen;\
-	_new_ins = _args->new_ins;\
-	_srch_ins = _args->srch_ins;\
-	_ins = _args->ins;\
+	(_page) = _args->page;\
+	(_write_gen) = _args->write_gen;\
+	(_new_ins) = _args->new_ins;\
+	(_srch_ins) = _args->srch_ins;\
+	(_ins) = _args->ins;\
 } while (0)
 
 typedef struct {
-	void * key_arg;
+	void * row_arg;
 	void * key;
 	uint32_t size;
-} __wt_key_build_args;
-#define	__wt_key_build_serial(\
-    session, _key_arg, _key, _size, ret) do {\
-	__wt_key_build_args _args;\
-	_args.key_arg = _key_arg;\
-	_args.key = _key;\
-	_args.size = _size;\
-	(ret) = __wt_session_serialize_func(session,\
-	    WT_WORKQ_FUNC, 1, __wt_key_build_serial_func, &_args);\
+	bitstr_t * ovfl;
+	uint32_t slot;
+} __wt_row_key_args;
+#define	__wt_row_key_serial(\
+    session, _row_arg, _key, _size, _ovfl, _slot, ret) do {\
+	__wt_row_key_args _args;\
+	_args.row_arg = (_row_arg);\
+	_args.key = (_key);\
+	_args.size = (_size);\
+	_args.ovfl = (_ovfl);\
+	_args.slot = (_slot);\
+	(ret) = __wt_session_serialize_func((session),\
+	    WT_WORKQ_FUNC, 1, __wt_row_key_serial_func, &_args);\
 } while (0)
-#define	__wt_key_build_unpack(\
-    session, _key_arg, _key, _size) do {\
-	__wt_key_build_args *_args =\
-	    (__wt_key_build_args *)(session)->wq_args;\
-	_key_arg = _args->key_arg;\
-	_key = _args->key;\
-	_size = _args->size;\
+#define	__wt_row_key_unpack(\
+    session, _row_arg, _key, _size, _ovfl, _slot) do {\
+	__wt_row_key_args *_args =\
+	    (__wt_row_key_args *)(session)->wq_args;\
+	(_row_arg) = _args->row_arg;\
+	(_key) = _args->key;\
+	(_size) = _args->size;\
+	(_ovfl) = _args->ovfl;\
+	(_slot) = _args->slot;\
 } while (0)
 
 typedef struct {
@@ -102,21 +108,21 @@ typedef struct {
 #define	__wt_update_serial(\
     session, _page, _write_gen, _new_upd, _srch_upd, _upd, ret) do {\
 	__wt_update_args _args;\
-	_args.page = _page;\
-	_args.write_gen = _write_gen;\
-	_args.new_upd = _new_upd;\
-	_args.srch_upd = _srch_upd;\
-	_args.upd = _upd;\
-	(ret) = __wt_session_serialize_func(session,\
+	_args.page = (_page);\
+	_args.write_gen = (_write_gen);\
+	_args.new_upd = (_new_upd);\
+	_args.srch_upd = (_srch_upd);\
+	_args.upd = (_upd);\
+	(ret) = __wt_session_serialize_func((session),\
 	    WT_WORKQ_FUNC, 1, __wt_update_serial_func, &_args);\
 } while (0)
 #define	__wt_update_unpack(\
     session, _page, _write_gen, _new_upd, _srch_upd, _upd) do {\
 	__wt_update_args *_args =\
 	    (__wt_update_args *)(session)->wq_args;\
-	_page = _args->page;\
-	_write_gen = _args->write_gen;\
-	_new_upd = _args->new_upd;\
-	_srch_upd = _args->srch_upd;\
-	_upd = _args->upd;\
+	(_page) = _args->page;\
+	(_write_gen) = _args->write_gen;\
+	(_new_upd) = _args->new_upd;\
+	(_srch_upd) = _args->srch_upd;\
+	(_upd) = _args->upd;\
 } while (0)

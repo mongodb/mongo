@@ -98,7 +98,7 @@ void __wt_cell_set(WT_CELL *cell,
 void *__wt_cell_data(WT_CELL *cell);
 uint32_t __wt_cell_datalen(WT_CELL *cell);
 uint32_t __wt_cell_len(WT_CELL *cell);
-int __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf);
+int __wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb);
 int __wt_bt_lex_compare( BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
@@ -219,11 +219,8 @@ int __wt_btree_col_del(SESSION *session, uint64_t recno);
 int __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value);
 int __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags);
 int __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value);
-int __wt_key_build(SESSION *session,
-    WT_PAGE *page,
-    void *rip_arg,
-    WT_BUF *store);
-int __wt_key_build_serial_func(SESSION *session);
+int __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb);
+int __wt_row_key_serial_func(SESSION *session);
 int __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
 int __wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp);

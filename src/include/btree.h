@@ -133,7 +133,7 @@ struct __wt_page_disk {
 	 * The record number of the first record of the page is stored on disk
 	 * because, if the internal page referencing a column-store leaf page
 	 * is corrupted, it's the only way to know where the leaf page fits in
-	 * the keyspace during salvage.
+	 * the key space during salvage.
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
@@ -283,11 +283,11 @@ struct __wt_row_ref {
 	 * encoded key), the key field points to the on-page key, and the size
 	 * is set to WT_NEEDS_PROCESS to indicate the key is not yet processed.
 	 */
-	void	 *key;			/* Key */
 #define	WT_NEEDS_PROCESS	0
-	uint32_t  size;			/* Key length */
+	void	*key;			/* Key */
+	uint32_t size;			/* Key length */
 
-	WT_REF	  ref;			/* Subtree page */
+	WT_REF	 ref;			/* Subtree page */
 #define	WT_ROW_REF_ADDR(rref)	((rref)->ref.addr)
 #define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
 #define	WT_ROW_REF_SIZE(rref)	((rref)->ref.size)
@@ -303,7 +303,7 @@ struct __wt_row_ref {
 	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
 /*
  * WT_ROW_REF_SLOT --
- *	Return the array offset based on a WT_ROW_REF reference.
+ *	Return the 0-based array offset based on a WT_ROW_REF reference.
  */
 #define	WT_ROW_REF_SLOT(page, rref)					\
 	((uint32_t)(((WT_ROW_REF *)rref) - (page)->u.row_int.t))
@@ -405,10 +405,12 @@ struct __wt_page {
 		/* Row-store internal information. */
 		struct {
 			WT_ROW_REF *t;		/* Subtrees */
+			bitstr_t   *ovfl;	/* Bit marking overflow keys */
 		} row_int;
 
 		struct {
 			WT_ROW	   *d;		/* K/V pairs */
+			bitstr_t   *ovfl;	/* Bit marking overflow keys */
 			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
@@ -504,26 +506,26 @@ struct __wt_row {
 	 * first two fields of a WT_ITEM so we can pass it to a comparison
 	 * function without copying.
 	 *
-	 * If a key requires processing (for example, an overflow key or an
-	 * Huffman encoded key), the key field points to the on-page key,
-	 * but the size is set to 0 to indicate the key is not yet processed.
+	 * If a key requires processing (for example, an overflow key or Huffman
+	 * encoded key), the key field points to the on-page key, and the size
+	 * is set to WT_NEEDS_PROCESS to indicate the key is not yet processed.
 	 */
-	const void *key;		/* Key */
-	uint32_t  size;			/* Key length */
+	void	*key;			/* Key */
+	uint32_t size;			/* Key length */
 
 	/*
 	 * Row-store data references are page offsets, not pointers (we boldly
 	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
 	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
 	 *
-	 * We don't store empty data items, that is, if the data doesn't exist,
-	 * the key is stored but there's no data.   Since it's impossible to
-	 * have a data item at the beginning of the page, we use a page offset
-	 * of 0 to flag non-existent data items.
+	 * We don't store empty data items, that is, if the data is zero-length,
+	 * the key is stored but there's no data WT_CELL.  Since it's impossible
+	 * to have a data item at the beginning of the page, a page offset of 0
+	 * marks non-existent data items.
 	 */
 #define	WT_ROW_EMPTY			0
 #define	WT_ROW_EMPTY_ISSET(rip)		((rip)->value == WT_ROW_EMPTY)
-	uint32_t  value;
+	uint32_t value;			/* Value WT_CELL offset */
 };
 /*
  * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
@@ -555,7 +557,7 @@ struct __wt_row {
 
 /*
  * WT_ROW_SLOT --
- *	Return the array offset based on a WT_ROW reference.
+ *	Return the 0-based array offset based on a WT_ROW reference.
  */
 #define	WT_ROW_SLOT(page, rip)						\
 	((uint32_t)(((WT_ROW *)rip) - (page)->u.row_leaf.d))
@@ -603,7 +605,7 @@ struct __wt_col {
 
 /*
  * WT_COL_SLOT --
- *	Return the array offset based on a WT_COL reference.
+ *	Return the 0-based array offset based on a WT_COL reference.
  */
 #define	WT_COL_SLOT(page, cip)						\
 	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))

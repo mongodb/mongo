@@ -60,7 +60,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 			 */
 			if (indx != 0) {
 				if (__wt_key_process(rref))
-					WT_ERR(__wt_key_build(
+					WT_ERR(__wt_row_key(
 					    session, page, rref, NULL));
 
 				cmp = func(btree, key, (WT_ITEM *)rref);
@@ -130,7 +130,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		 * been instantiated yet.
 		 */
 		if (__wt_key_process(rip))
-			WT_ERR(__wt_key_build(session, page, rip, NULL));
+			WT_ERR(__wt_row_key(session, page, rip, NULL));
 
 		cmp = func(btree, key, (WT_ITEM *)rip);
 		if (cmp == 0)

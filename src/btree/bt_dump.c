@@ -217,7 +217,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_cell_process(session, cell, tmp));
+			WT_ERR(__wt_cell_copy(session, cell, tmp));
 			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		case WT_CELL_DEL:
@@ -282,7 +282,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * print.  Set the key.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_ERR(__wt_key_build(session, page, rip, key_tmp));
+			WT_ERR(__wt_row_key(session, page, rip, key_tmp));
 			key = (WT_ITEM *)key_tmp;
 		} else
 			key = (WT_ITEM *)rip;
@@ -309,14 +309,14 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				__wt_cell_data_and_len(
-				    cell, &value_local.data, &value_local.size);
 				value = &value_local;
+				__wt_cell_data_and_len(
+				    cell, &value->data, &value->size);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_cell_process(session, cell, value_tmp));
+			WT_ERR(__wt_cell_copy(session, cell, value_tmp));
 			value = (WT_ITEM *)value_tmp;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(session, ret);

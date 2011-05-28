@@ -21,6 +21,7 @@ static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_int(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_var(SESSION *, WT_PAGE *, FILE *);
+static void __wt_debug_page_flags(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_int(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static int  __wt_debug_page_row_leaf(SESSION *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_work(SESSION *, WT_PAGE *, FILE *, uint32_t);
@@ -291,18 +292,7 @@ __wt_debug_page_work(SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
-	if (WT_PAGE_IS_ROOT(page))
-		fprintf(fp, ", root");
-	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		fprintf(fp, ", cache-counted");
-	if (F_ISSET(page, WT_PAGE_DELETED))
-		fprintf(fp, ", deleted");
-	if (F_ISSET(page, WT_PAGE_PINNED))
-		fprintf(fp, ", pinned");
-	if (F_ISSET(page, WT_PAGE_SPLIT))
-		fprintf(fp, ", split");
-	fprintf(fp, ")\n");
+	__wt_debug_page_flags(page, fp);
 
 	/* Dump the page. */
 	switch (page->type) {
@@ -332,6 +322,34 @@ __wt_debug_page_work(SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 	}
 
 	return (0);
+}
+
+/*
+ * __wt_debug_page_flags --
+ *	Print out the page flags.
+ */
+static void
+__wt_debug_page_flags(WT_PAGE *page, FILE *fp)
+{
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
+	if (WT_PAGE_IS_ROOT(page))
+		fprintf(fp, ", root");
+	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+		fprintf(fp, ", bulk-loaded");
+	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
+		fprintf(fp, ", cache-counted");
+	if (F_ISSET(page, WT_PAGE_DELETED))
+		fprintf(fp, ", deleted");
+	if (F_ISSET(page, WT_PAGE_INITIAL_EMPTY))
+		fprintf(fp, ", initial-empty");
+	if (F_ISSET(page, WT_PAGE_PINNED))
+		fprintf(fp, ", pinned");
+	if (F_ISSET(page, WT_PAGE_SPLIT))
+		fprintf(fp, ", split");
+	fprintf(fp, ")\n");
 }
 
 /*
@@ -469,9 +487,11 @@ __wt_debug_page_row_int(
 		fp = stderr;
 
 	WT_ROW_REF_FOREACH(page, rref, i) {
-		if (__wt_key_process(rref))
-			fprintf(fp, "\tK: {requires processing}\n");
-		else
+		if (__wt_key_process(rref)) {
+			fprintf(fp, "\tK: {");
+			WT_RET(__wt_debug_cell_data(session, rref->key, fp));
+			fprintf(fp, "}\n");
+		} else
 			__wt_debug_item("\tK", rref, fp);
 		fprintf(fp, "\t");
 		__wt_debug_ref(&rref->ref, fp);
@@ -511,9 +531,11 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		if (__wt_key_process(rip))
-			fprintf(fp, "\tK: {requires processing}\n");
-		else
+		if (__wt_key_process(rip)) {
+			fprintf(fp, "\tK: {");
+			WT_RET(__wt_debug_cell_data(session, rip->key, fp));
+			fprintf(fp, "}\n");
+		} else
 			__wt_debug_item("\tK", rip, fp);
 
 		fprintf(fp, "\tV: {");
@@ -715,7 +737,6 @@ __wt_debug_dsk_col_rle(BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
 static int
 __wt_debug_cell_data(SESSION *session, WT_CELL *cell, FILE *fp)
 {
-	BTREE *btree;
 	WT_BUF *tmp;
 	uint32_t size;
 	const uint8_t *p;
@@ -724,30 +745,22 @@ __wt_debug_cell_data(SESSION *session, WT_CELL *cell, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	btree = session->btree;
 	tmp = NULL;
 	ret = 0;
 
 	switch (__wt_cell_type(cell)) {
-	case WT_CELL_KEY:
-		if (btree->huffman_key != NULL)
-			goto process;
-		goto onpage;
 	case WT_CELL_DATA:
-		if (btree->huffman_value != NULL)
-			goto process;
-onpage:		__wt_cell_data_and_len(cell, &p, &size);
-		break;
-	case WT_CELL_KEY_OVFL:
 	case WT_CELL_DATA_OVFL:
-process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-		WT_ERR(__wt_cell_process(session, cell, tmp));
+	case WT_CELL_KEY:
+	case WT_CELL_KEY_OVFL:
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+		WT_ERR(__wt_cell_copy(session, cell, tmp));
 		p = tmp->data;
 		size = tmp->size;
 		break;
 	case WT_CELL_DEL:
 		p = (uint8_t *)"deleted";
-		size = 7;
+		size = sizeof("deleted") - 1;
 		break;
 	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";

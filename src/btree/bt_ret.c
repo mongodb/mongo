@@ -65,7 +65,7 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_key_build(session,
+			WT_RET(__wt_row_key(session,
 			    page, rip, &cursor->key));
 			key->data = rip->key;
 			key->size = rip->size;
@@ -125,8 +125,8 @@ page_cell:	switch (__wt_cell_type(cell)) {
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_RET(__wt_cell_process(
-			    session, cell, &cursor->value));
+			WT_RET(
+			    __wt_cell_copy(session, cell, &cursor->value));
 			value_ret = cursor->value.data;
 			size_ret = cursor->value.size;
 			break;
@@ -139,15 +139,15 @@ page_cell:	switch (__wt_cell_type(cell)) {
 	/*
 	 * When we get here, value_ret and size_ret are set to the byte string
 	 * and the length we're going to return.   That byte string has been
-	 * decoded, we called __wt_cell_process above in all cases where the
-	 * item could be encoded.
+	 * decoded, we called __wt_cell_copy above in all cases where the item
+	 * could be encoded.
 	 */
 	if (callback == NULL) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
-		 * haven't yet copied the value_ret/size_ret pair into the
-		 * return WT_ITEM (potentially done by __wt_cell_process), do
-		 * so now.
+		 * haven't copied the value_ret/size_ret pair into the return
+		 * WT_ITEM yet (potentially done by __wt_cell_copy()), do that
+		 * now.
 		 */
 		if (value_ret != cursor->value.data)
 			WT_RET(__wt_buf_set(

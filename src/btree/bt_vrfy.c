@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 #include "cell.i"
 
 /*
@@ -335,46 +334,37 @@ __wt_verify_row_int_key_order(
     SESSION *session, WT_PAGE *page, void *rref, WT_VSTUFF *vs)
 {
 	BTREE *btree;
-	WT_BUF *scratch;
+	WT_BUF *key, *tmp;
 	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
-	scratch = 0;
+	key = NULL;
 	func = btree->btree_compare;
 	ret = 0;
 
-	/*
-	 * The maximum key must have been set, we updated it from a leaf page
-	 * first.
-	 */
+	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr != WT_ADDR_INVALID);
 
-	/* The key may require processing. */
-	if (__wt_key_process(rref)) {
-		WT_RET(__wt_scr_alloc(session, 0, &scratch));
-		WT_RET(__wt_key_build(session, page, rref, scratch));
-		rref = scratch;
-	}
+	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_RET(__wt_row_key(session, page, rref, key));
 
 	/* Compare the key against the largest key we've seen so far. */
-	if (func(btree, rref, (WT_ITEM *)vs->max_key) <= 0) {
+	if (func(btree, (WT_ITEM *)key, (WT_ITEM *)vs->max_key) <= 0) {
 		__wt_errx(session,
 		    "the internal key in entry %lu on the page at addr %lu "
-		    "sorts before a key appearing on page %lu",
+		    "sorts before the last key appearing on page %lu",
 		    (u_long)WT_ROW_REF_SLOT(page, rref),
 		    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
 		ret = WT_ERROR;
-		WT_ASSERT(session, ret == 0);
 	} else {
 		/* Update the largest key we've seen to the key just checked. */
+		tmp = vs->max_key;
+		vs->max_key = key;
+		key = tmp;
 		vs->max_addr = WT_PADDR(page);
-
-		WT_RET(__wt_buf_set(session, vs->max_key,
-		    ((WT_ROW_REF *)rref)->key, ((WT_ROW_REF *)rref)->size));
 	}
 
-	if (rref == scratch)
-		__wt_scr_release(&scratch);
+	__wt_scr_release(&key);
 
 	return (ret);
 }
@@ -388,12 +378,11 @@ static int
 __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	BTREE *btree;
-	WT_BUF *scratch;
+	WT_BUF *key;
 	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
-	void *key;
 
 	btree = session->btree;
-	scratch = NULL;
+	key = NULL;
 	func = btree->btree_compare;
 	ret = 0;
 
@@ -402,14 +391,9 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 * keys on the internal pages leading to the smallest leaf in the tree
 	 * are all empty entries).
 	 */
-	if (vs->max_addr != WT_ADDR_INVALID) {
-		/* The key may require processing. */
-		key = page->u.row_leaf.d;
-		if (__wt_key_process(key)) {
-			WT_RET(__wt_scr_alloc(session, 0, &scratch));
-			WT_RET(__wt_key_build(session, page, key, scratch));
-			key = scratch;
-		}
+	if (vs->max_addr == WT_ADDR_INVALID) {
+		WT_RET(__wt_scr_alloc(session, 0, &key));
+		WT_RET(__wt_row_key(session, page, page->u.row_leaf.d, key));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -421,33 +405,23 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 		 * we've seen was a key from a previous leaf page, and it's not
 		 * OK to compare equally in that case.
 		 */
-		if (func(btree, key, (WT_ITEM *)vs->max_key) < 0) {
+		if (func(btree, (WT_ITEM *)key, (WT_ITEM *)vs->max_key) < 0) {
 			__wt_errx(session,
 			    "the first key on the page at addr %lu sorts "
 			    "equal or less than a key appearing on page %lu",
 			    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
 			ret = WT_ERROR;
-			WT_ASSERT(session, ret == 0);
 		}
 
-		if (key == scratch)
-			__wt_scr_release(&scratch);
+		__wt_scr_release(&key);
 		if (ret != 0)
 			return (ret);
 	}
 
-	/*
-	 * Update the largest key we've seen to the last key on this page; the
-	 * key may require processing.
-	 */
+	/* Update the largest key we've seen to the last key on this page. */
 	vs->max_addr = WT_PADDR(page);
-
-	key = page->u.row_leaf.d + (page->entries - 1);
-	if (__wt_key_process(key))
-		return (__wt_key_build(session, page, key, vs->max_key));
-
-	return (__wt_buf_set(
-	    session, vs->max_key, ((WT_ROW *)key)->key, ((WT_ROW *)key)->size));
+	return (__wt_row_key(session,
+	    page, page->u.row_leaf.d + (page->entries - 1), vs->max_key));
 }
 
 /*
@@ -489,21 +463,21 @@ static int
 __wt_verify_overflow(SESSION *session, WT_OFF *ovfl, WT_VSTUFF *vs)
 {
 	WT_PAGE_DISK *dsk;
-	WT_BUF *scratch;
+	WT_BUF *tmp;
 	uint32_t addr, size;
 	int ret;
 
-	scratch = NULL;
+	tmp = NULL;
 	ret = 0;
 
 	addr = ovfl->addr;
 	size = ovfl->size;
 
 	/* Allocate enough memory to hold the overflow pages. */
-	WT_RET(__wt_scr_alloc(session, size, &scratch));
+	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the page. */
-	dsk = scratch->mem;
+	dsk = tmp->mem;
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/*
@@ -518,7 +492,7 @@ __wt_verify_overflow(SESSION *session, WT_OFF *ovfl, WT_VSTUFF *vs)
 	/* Add the fragments. */
 	WT_ERR(__wt_verify_addfrag(session, addr, size, vs));
 
-err:	__wt_scr_release(&scratch);
+err:	__wt_scr_release(&tmp);
 
 	return (ret);
 }

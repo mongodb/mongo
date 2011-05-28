@@ -129,33 +129,28 @@ static int
 __wt_verify_dsk_row(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
-	struct {
-		WT_ITEM	 item;			/* WT_ITEM to compare */
-		WT_BUF	*scratch;		/* scratch buffer */
-	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
+	WT_BUF *current, *last, *last_pfx, *last_ovfl;
 	WT_CELL *cell;
 	WT_OFF off;
+	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	off_t file_size;
-	void *huffman;
-	uint32_t cell_num, cell_type, i, prefix;
+	void *huffman, *data;
+	uint32_t cell_num, cell_type, data_size, i, prefix;
 	uint8_t *end;
-	int pfx_chk, ret;
+	int ret;
 	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;
 	huffman = btree->huffman_key;
-	pfx_chk = 1;
 	ret = 0;
 
-	WT_CLEAR(_a);
-	WT_CLEAR(_b);
-	current = &_a;
-	WT_ERR(__wt_scr_alloc(session, 0, &current->scratch));
-	last = &_b;
-	WT_ERR(__wt_scr_alloc(session, 0, &last->scratch));
+	current = last_pfx = last_ovfl = NULL;
+	WT_ERR(__wt_scr_alloc(session, 0, &current));
+	WT_ERR(__wt_scr_alloc(session, 0, &last_pfx));
+	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
+	last = last_ovfl;
 
 	file_size = btree->fh->file_size;
 	end = (uint8_t *)dsk + size;
@@ -248,74 +243,98 @@ __wt_verify_dsk_row(
 		}
 
 		/*
-		 * Check key order and prefix compression.
-		 *
-		 * Build the key.
+		 * Remaining checks are for key order and prefix compression.
+		 * If this cell isn't a key, we're done, move to the next cell.
+		 * If this cell is an overflow item, instantiate the key and
+		 * compare it with the last key.   Otherwise, we have to deal
+		 * with prefix compression.
 		 */
 		switch (cell_type) {
 		case WT_CELL_KEY:
-			if (huffman == NULL) {
-				__wt_cell_data_and_len(cell,
-				    &current->item.data, &current->item.size);
-				break;
-			}
-			/* FALLTHROUGH */
-		case WT_CELL_KEY_OVFL:
-			WT_RET(
-			    __wt_cell_process(session, cell, current->scratch));
-			current->item = *(WT_ITEM *)current->scratch;
 			break;
+		case WT_CELL_KEY_OVFL:
+			WT_RET(__wt_cell_copy(session, cell, current));
+			goto key_compare;
 		default:
+			/* Not a key -- continue with the next cell. */
 			continue;
 		}
 
-		if (cell_type == WT_CELL_KEY) {
-			prefix = __wt_cell_prefix(cell);
+		/*
+		 * Prefix compression checks.
+		 *
+		 * Confirm the first non-overflow key on a page has a zero
+		 * prefix compression count.
+		 */
+		prefix = __wt_cell_prefix(cell);
+		if (last_pfx->size == 0 && prefix != 0) {
+			__wt_errx(session,
+			    "the %lu key on page at addr %lu is the first "
+			    "non-overflow key on the page and has a non-zero "
+			    "prefix compression value",
+			    (u_long)cell_num, (u_long)addr);
+			goto err;
+		}
+
+		/* Confirm the prefix compression count is possible. */
+		if (last->size != 0 && prefix >= last->size) {
+			__wt_errx(session,
+			    "the %lu key on page at addr %lu has a prefix "
+			    "compression count of %lu, larger than the length "
+			    "of the previous key, %lu",
+			    (u_long)cell_num, (u_long)addr,
+			    (u_long)prefix, (u_long)last->size);
+			goto err;
+		}
+
+		/*
+		 * If Huffman decoding, use the heavy-weight __wt_cell_copy()
+		 * code to build the key, up to the prefix. Else, we can do
+		 * it faster internally because we don't have to shuffle memory
+		 * around as much.
+		 */
+		if (huffman == NULL) {
 			/*
-			 * Confirm the first non-overflow key on a page has a
-			 * zero prefix compression count.
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
 			 */
-			if (pfx_chk) {
-				pfx_chk = 0;
-				if (prefix != 0) {
-					__wt_errx(session,
-					    "the %lu key on page at addr %lu "
-					    "is the first non-overflow key on "
-					    "the page and has a non-zero "
-					    "prefix compression value",
-					    (u_long)cell_num, (u_long)addr);
-					goto err;
-				}
-			}
+			__wt_cell_data_and_len(cell, &data, &data_size);
+			WT_ERR(__wt_buf_setsize(
+			    session, current, prefix + data_size));
 
 			/*
-			 * Confirm the last and current keys match up to the
-			 * current key's prefix compression count.
+			 * Copy the prefix, then the data into place: don't
+			 * avoid the copy in the case of a zero-length prefix,
+			 * zero-length prefixes don't occur much in nature.
 			 */
-			if (prefix > last->item.size) {
-				__wt_errx(session,
-				    "the %lu key on page at addr %lu has a "
-				    "prefix compression count of %lu larger "
-				    "than the length of the previous key, %lu",
-				    (u_long)cell_num, (u_long)addr,
-				    (u_long)prefix, (u_long)last->item.size);
-				goto err;
-			}
-			if (prefix != 0 && memcmp(
-			    last->item.data, current->item.data, prefix) != 0) {
-				__wt_errx(session,
-				    "the %lu key on page at addr %lu is not "
-				    "identical to the previous key up to its "
-				    "prefix compression count of %lu",
-				    (u_long)cell_num,
-				    (u_long)addr, (u_long)prefix);
-				goto err;
+			if (prefix != 0)
+				memcpy((void *)
+				    current->data, last->data, prefix);
+			memcpy((uint8_t *)
+			    current->data + prefix, data, data_size);
+			current->size = prefix + data_size;
+		} else {
+			WT_RET(__wt_cell_copy(session, cell, current));
+
+			/*
+			 * If there's a prefix, make sure there's enough buffer
+			 * space, then shift the decoded data past the prefix
+			 * and copy the prefix into place.
+			 */
+			if (prefix != 0) {
+				WT_ERR(__wt_buf_setsize(
+				    session, current, prefix + current->size));
+				memmove((uint8_t *)current->data +
+				    prefix, current->data, prefix);
+				memcpy((void *)
+				    last->data, (void *)current->data, prefix);
+				current->size += prefix;
 			}
 		}
 
-		/* Compare the current key against the last key. */
-		if (cell_num > 1 &&
-		    func(btree, &last->item, &current->item) >= 0) {
+key_compare:	/* Compare the current key against the last key. */
+		if (last->size != 0 &&
+		     func(btree, (WT_ITEM *)last, (WT_ITEM *)current) >= 0) {
 			__wt_errx(session,
 			    "the %lu and %lu keys on page at addr %lu are "
 			    "incorrectly sorted",
@@ -324,9 +343,22 @@ __wt_verify_dsk_row(
 			ret = WT_ERROR;
 			goto err;
 		}
-		tmp = last;
+
+		/*
+		 * Swap the buffers: last always references the last key entry,
+		 * last_pfx and last_ovfl reference the last prefix-compressed
+		 * and last overflow key entries.  Current gets pointed to the
+		 * buffer we're not using this time around, which is where the
+		 * next key goes.
+		 */
 		last = current;
-		current = tmp;
+		if (cell_type == WT_CELL_KEY) {
+			current = last_pfx;
+			last_pfx = last;
+		} else {
+			current = last_ovfl;
+			last_ovfl = last;
+		}
 	}
 
 	if (0) {
@@ -337,10 +369,12 @@ eof:		ret = __wt_err_eof(session, cell_num, addr);
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
-	if (_a.scratch != NULL)
-		__wt_scr_release(&_a.scratch);
-	if (_b.scratch != NULL)
-		__wt_scr_release(&_b.scratch);
+	if (current != NULL)
+		__wt_scr_release(&current);
+	if (last_pfx != NULL)
+		__wt_scr_release(&last_pfx);
+	if (last_ovfl != NULL)
+		__wt_scr_release(&last_ovfl);
 	return (ret);
 }
 
@@ -595,7 +629,7 @@ __wt_verify_cell(SESSION *session,
 	 * after the single byte WT_CELL.
 	 */
 	p = (uint8_t *)cell;
-	
+
 	switch (__wt_cell_type_raw(cell)) {
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_DATA_SHORT:
@@ -626,7 +660,7 @@ __wt_verify_cell(SESSION *session,
 	default:
 		/*
 		 * Don't worry about illegal types -- our caller will check,
-		 * based on its page type.
+		 * based on the page type.
 		 */
 		break;
 	}

@@ -166,14 +166,8 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 			cell = WT_COL_PTR(cbt->page, cbt->cip);
 			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
-				if (cbt->btree->huffman_value == NULL) {
-					__wt_cell_data_and_len(
-					    cell, &value->data, &value->size);
-					break;
-				}
-				/* FALLTHROUGH */
 			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_process(session, cell, value));
+				WT_RET(__wt_cell_copy(session, cell, value));
 				break;
 			case WT_CELL_DEL:
 				found = 0;
@@ -220,7 +214,7 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 
 		/* Set the key. */
 		if (__wt_key_process(cbt->rip))
-			WT_RET(__wt_key_build(session,
+			WT_RET(__wt_row_key(session,
 			    cbt->page, cbt->rip, key));
 		else {
 			key->data = cbt->rip->key;
@@ -242,14 +236,8 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 			cell = WT_ROW_PTR(cbt->page, cbt->rip);
 			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
-				if (cbt->btree->huffman_value == NULL) {
-					__wt_cell_data_and_len(
-					    cell, &value->data, &value->size);
-					break;
-				}
-				/* FALLTHROUGH */
 			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_process(session, cell, value));
+				WT_RET(__wt_cell_copy(session, cell, value));
 				break;
 			WT_ILLEGAL_FORMAT(session);
 			}

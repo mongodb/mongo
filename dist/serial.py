@@ -31,12 +31,14 @@ serial['insert'] = Serial(
 	 'WT_INSERT **/srch_ins',
 	 'WT_INSERT */ins'])
 
-serial['key_build'] = Serial(
-	'key_build',
+serial['row_key'] = Serial(
+	'row_key',
 	'WT_WORKQ_FUNC', '1',
-	['void */key_arg',
+	['void */row_arg',
 	 'void */key',
-	 'uint32_t/size'])
+	 'uint32_t/size',
+	 'bitstr_t */ovfl',
+	 'uint32_t/slot'])
 
 serial['update'] = Serial(
 	'update',
@@ -67,8 +69,8 @@ def func_serial(f):
 		f.write('\t__wt_' + entry[0] + '_args _args;\\\n')
 		for l in entry[1].args:
 			f.write('\t_args.' + l.split('/')[1] +
-			    ' = _' + l.split('/')[1] + ';\\\n')
-		f.write('\t(ret) = __wt_session_serialize_func(session,\\\n')
+			    ' = (_' + l.split('/')[1] + ');\\\n')
+		f.write('\t(ret) = __wt_session_serialize_func((session),\\\n')
 		f.write('\t    ' + entry[1].op + ', ' + entry[1].spin +
 		    ', __wt_' + entry[1].key + '_serial_func, &_args);\\\n')
 		f.write('} while (0)\n')
@@ -81,8 +83,8 @@ def func_serial(f):
 		f.write('\t__wt_' + entry[0] + '_args *_args =\\\n	    ')
 		f.write('(__wt_' + entry[0] + '_args *)(session)->wq_args;\\\n')
 		for l in entry[1].args:
-			f.write('\t_' + l.split('/')[1] +
-			    ' = _args->' + l.split('/')[1] + ';\\\n')
+			f.write('\t(_' + l.split('/')[1] +
+			    ') = _args->' + l.split('/')[1] + ';\\\n')
 		f.write('} while (0)\n')
 
 #####################################################################

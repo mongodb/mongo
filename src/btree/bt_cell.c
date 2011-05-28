@@ -254,64 +254,49 @@ __wt_cell_len(WT_CELL *cell)
 }
 
 /*
- * __wt_cell_process --
- *	Copy an on-page key into a return buffer, processing as needed.
+ * __wt_cell_copy --
+ *	Copy an on-page cell into a return buffer, processing as needed.
  */
 int
-__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
+__wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb)
 {
 	BTREE *btree;
 	WT_OFF ovfl;
-	uint32_t size, type;
+	uint32_t size;
 	const void *p;
 	void *huffman;
 
 	btree = session->btree;
-	type = __wt_cell_type(cell);
 
-	/*
-	 * Overflow items require processing: read, then optionally Huffman
-	 * decode.
-	 */
-	switch (type) {
-	case WT_CELL_KEY_OVFL:
-		huffman = btree->huffman_key;
-		goto offpage;
+	/* Select a Huffman encoding function. */
+	switch (__wt_cell_type(cell)) {
+	case WT_CELL_DATA:
 	case WT_CELL_DATA_OVFL:
 		huffman = btree->huffman_value;
-offpage:	__wt_cell_off(cell, &ovfl);
-		WT_RET(__wt_ovfl_in(session, &ovfl, retbuf));
-		if (huffman != NULL)
-			WT_RET(__wt_huffman_decode(session,
-			    huffman, retbuf->data, retbuf->size, retbuf));
-		return (0);
-	default:
 		break;
-	}
-
-	/*
-	 * Keys require processing: optionally Huffman decode, then handle
-	 * prefix compression.
-	 */
-	switch (type) {
 	case WT_CELL_KEY:
+	case WT_CELL_KEY_OVFL:
 		huffman = btree->huffman_key;
-		break;
-	case WT_CELL_DATA:
-		huffman = btree->huffman_value;
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	/* Get the on-page information, and optionally Huffman decode it. */
-	__wt_cell_data_and_len(cell, &p, &size);
-	WT_RET(__wt_buf_set(session, retbuf, p, size));
+	/* Get the cell's data. */
+	switch (__wt_cell_type(cell)) {
+	case WT_CELL_DATA:
+	case WT_CELL_KEY:
+		__wt_cell_data_and_len(cell, &p, &size);
+		WT_RET(__wt_buf_set(session, retb, p, size));
+		break;
+	case WT_CELL_DATA_OVFL:
+	case WT_CELL_KEY_OVFL:
+		__wt_cell_off(cell, &ovfl);
+		WT_RET(__wt_ovfl_in(session, &ovfl, retb));
+		break;
+	}
+
 	if (huffman != NULL)
-		WT_RET(__wt_huffman_decode(session,
-		    huffman, retbuf->data, retbuf->size, retbuf));
-
-	if (__wt_cell_prefix(cell) == 0)
-		return (0);
-
+		WT_RET(__wt_huffman_decode(
+		    session, huffman, retb->data, retb->size, retb));
 	return (0);
 }
