@@ -1705,8 +1705,12 @@ namespace mongo {
          after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
 
        @param mayAddIndex almost always true, except for invocation from rename namespace command.
+       @param addedID if not null, set to true if adding _id element. you must assure false before calling
+              if using.
     */
-    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex) {
+
+
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex, bool *addedID) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
@@ -1741,7 +1745,7 @@ namespace mongo {
             }
         }
 
-        int addID = 0;
+        int addID = 0; // 0 if not adding _id; if adding, the length of that new element
         if( !god ) {
             /* Check if we have an _id field. If we don't, we'll add it.
                Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
@@ -1750,6 +1754,8 @@ namespace mongo {
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
             if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
+                if( addedID )
+                    *addedID = true;
                 addID = len;
                 idToInsert_.oid.init();
                 len += idToInsert.size();
@@ -1791,7 +1797,7 @@ namespace mongo {
                 memcpy(r->data+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
             }
             else {
-                if( obuf )
+                if( obuf ) // obuf can be null from internal callers
                     memcpy(r->data, obuf, len);
             }
         }
@@ -1805,7 +1811,7 @@ namespace mongo {
             s->nrecords++;
         }
 
-        // we don't bother resetting query optimizer stats for the god tables - also god is true when adidng a btree bucket
+        // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
 
@@ -1850,10 +1856,7 @@ namespace mongo {
         DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
         DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
-        if ( loc.isNull() ) {
-            assert(false);
-            return 0;
-        }
+        assert( !loc.isNull() );
 
         Record *r = loc.rec();
         assert( r->lengthWithHeaders >= lenWHdr );
