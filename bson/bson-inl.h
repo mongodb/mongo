@@ -577,8 +577,8 @@ namespace mongo {
         case Symbol:
         case mongo::String:
             s << '"';
-            if ( !full &&  valuestrsize() > 80 ) {
-                s.write(valuestr(), 70);
+            if ( !full &&  valuestrsize() > 160 ) {
+                s.write(valuestr(), 150);
                 s << "...\"";
             }
             else {
