@@ -529,19 +529,31 @@ namespace mongo {
         return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
     }
 
-    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
-        auto_ptr<DBClientCursor> c =
-            this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
+    /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
+        query() and iterate the cursor. 
+     */
+    void DBClientInterface::findN(vector<BSONObj>& out, const string& ns, Query query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) { 
+        out.reserve(nToReturn);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findOne: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
+        auto_ptr<DBClientCursor> c =
+            this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+
+        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw StaleConfigException( ns , "findOne has stale config" );
+            throw StaleConfigException( ns , "findN stale config" );
 
-        if ( !c->more() )
-            return BSONObj();
+        for( int i = 0; i < nToReturn; i++ ) {
+            if ( !c->more() )
+                break;
+            out.push_back( c->nextSafe().copy() );
+        }
+    }
 
-        return c->nextSafe().copy();
+    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
+        vector<BSONObj> v;
+        findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions);
+        return v.empty() ? BSONObj() : v[0];
     }
 
     bool DBClientConnection::connect(const HostAndPort& server, string& errmsg) {

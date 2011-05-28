@@ -305,7 +305,7 @@ namespace mongo {
         Query& where(const string &jscode) { return where(jscode, BSONObj()); }
 
         /**
-         * if this query has an orderby, hint, or some other field
+         * @return true if this query has an orderby, hint, or some other field
          */
         bool isComplex( bool * hasDollar = 0 ) const;
 
@@ -357,9 +357,6 @@ namespace mongo {
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) = 0;
 
-        /** don't use this - called automatically by DBClientCursor for you */
-        virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
-
         virtual void insert( const string &ns, BSONObj obj , int flags=0) = 0;
 
         virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0) = 0;
@@ -376,8 +373,15 @@ namespace mongo {
         */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
+        /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
+            query() and iterate the cursor. 
+        */
+        void findN(vector<BSONObj>& out, const string&ns, Query query, int nToReturn, int nToSkip = 0, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
         virtual string getServerAddress() const = 0;
 
+        /** don't use this - called automatically by DBClientCursor for you */
+        virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
     };
 
     /**

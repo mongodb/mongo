@@ -71,11 +71,11 @@ namespace mongo {
         /** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
             BSONObj o = next();
-            BSONElement e = o.firstElement();
-            if( strcmp(e.fieldName(), "$err") == 0 ) {
+            if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
+                string s = "nextSafe(): " + o.toString();
                 if( logLevel >= 5 )
-                    log() << "nextSafe() error " << o.toString() << endl;
-                uassert(13106, "nextSafe(): " + o.toString(), false);
+                    log() << s << endl;
+                uasserted(13106, s);
             }
             return o;
         }
