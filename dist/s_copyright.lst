@@ -14,7 +14,6 @@ add	examples/c/ex_stat.c
 add	examples/c/ex_thread.c
 add	examples/c/ex_tpcb.c
 add	examples/c/ex_transaction.c
-add	src/support/simple_setup.c
 add	src/utilities/util_dump.c
 add	src/utilities/util_load.c
 add	src/utilities/util_salvage.c
