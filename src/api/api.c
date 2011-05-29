@@ -791,7 +791,7 @@ __wt_api_arg_min(
 	if (v >= min)
 		return (0);
 
-	__wt_errx(session, "%s argument %llu less than minimum value of %llu",
-	    arg_name, (unsigned long long)v, (unsigned long long)min);
+	__wt_errx(session, "%s argument %" PRIu64 " less than minimum value of %" PRIu64,
+	    arg_name, v, min);
 	return (WT_ERROR);
 }

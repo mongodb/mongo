@@ -66,14 +66,11 @@ void
 __wt_stat_print(WT_STATS *s, FILE *stream)
 {
 	if (s->v >= WT_BILLION)
-		fprintf(stream, "%lluB\t%s (%llu bytes)\n",
-		    (unsigned long long)s->v / WT_BILLION,
-		    s->desc, (unsigned long long)s->v);
+		fprintf(stream, "%" PRIu64 "B\t%s (%" PRIu64 " bytes)\n",
+		    s->v / WT_BILLION, s->desc, s->v);
 	else if (s->v >= WT_MILLION)
-		fprintf(stream, "%lluM\t%s (%llu bytes)\n",
-		    (unsigned long long)s->v / WT_MILLION,
-		    s->desc, (unsigned long long)s->v);
+		fprintf(stream, "%" PRIu64 "M\t%s (%" PRIu64 " bytes)\n",
+		    s->v / WT_MILLION, s->desc, s->v);
 	else
-		fprintf(stream,
-		    "%llu\t%s\n", (unsigned long long)s->v, s->desc);
+		fprintf(stream, "%" PRIu64 "\t%s\n", s->v, s->desc);
 }

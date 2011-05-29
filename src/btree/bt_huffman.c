@@ -281,36 +281,35 @@ nofile:		ret = errno == 0 ? WT_ERROR : errno;
 		goto err;
 	}
 
-	for (tp = table, lineno = 1;
-	    (ret = fscanf(fp, "%lli %lli", &symbol, &frequency)) != EOF;
+	for (tp = table, lineno = 1; (ret =
+	    fscanf(fp, "%" SCNu64 " %" SCNu64, &symbol, &frequency)) != EOF;
 	    ++tp, ++lineno) {
 		if (lineno > entries) {
 			__wt_errx(session,
-			    "Huffman table file %.*s is corrupted, more than "
-			    "%lu entries",
-			    (int)ip->len, ip->str, (u_long)entries);
+			    "Huffman table file %.*s is corrupted, "
+			    "more than %" PRIu32 " entries",
+			    (int)ip->len, ip->str, entries);
 			goto err;
 		}
 		if (ret != 2) {
 			__wt_errx(session,
-			    "line %lu of Huffman table file %.*s is corrupted: "
+			    "line %u of Huffman table file %.*s is corrupted: "
 			    "expected two unsigned integral values",
-			    (u_long)lineno, (int)ip->len, ip->str);
+			    lineno, (int)ip->len, ip->str);
 			goto err;
 		}
 		if (symbol > max) {
 			__wt_errx(session,
-			    "line %lu of Huffman table file %.*s is corrupted: "
-			    "symbol larger than maximum value of %lu",
-			    (u_long)lineno, (int)ip->len, ip->str, (u_long)max);
+			    "line %u of Huffman table file %.*s is corrupted: "
+			    "symbol larger than maximum value of %u",
+			    lineno, (int)ip->len, ip->str, max);
 			goto err;
 		}
 		if (frequency > UINT32_MAX) {
-			__wt_errx(session,
-			    "line %lu of Huffman table file %.*s is corrupted: "
-			    "frequency larger than maximum value of %llu",
-			    (u_long)lineno,
-			    (int)ip->len, ip->str, (uint64_t)UINT32_MAX);
+			__wt_errx(session, "line %u of Huffman table"
+			    " file %.*s is corrupted: frequency larger than"
+			    " maximum value of %" PRIu32,
+			    lineno, (int)ip->len, ip->str, UINT32_MAX);
 			goto err;
 		}
 		tp->symbol = (uint32_t)symbol;

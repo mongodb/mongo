@@ -27,8 +27,9 @@ key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 	 * an insert, otherwise 00.
 	 */
 	len = insert ?
-	    sprintf(g.key_gen_buf, "%010llu.%02d", keyno, (int)MMRAND(1, 15)) :
-	    sprintf(g.key_gen_buf, "%010llu.00", keyno);
+	    sprintf(g.key_gen_buf, "%010" PRIu64 ".%02d", keyno,
+                (int)MMRAND(1, 15)) :
+	    sprintf(g.key_gen_buf, "%010" PRIu64 ".00", keyno);
 	g.key_gen_buf[len] = '/';
 
 	*(void **)keyp = g.key_gen_buf;
@@ -152,7 +153,7 @@ track(const char *s, uint64_t i)
 		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, s);
 	else
 		len = snprintf(msg, sizeof(msg),
-		    "%4d: %s %llu", g.run_cnt, s, (unsigned long long)i);
+		    "%4d: %s %" PRIu64, g.run_cnt, s, i);
 	tlen = len;
 
 	for (p = msg + len; tlen < lastlen; ++tlen)
@@ -207,7 +208,7 @@ wts_rand(void)
 		r = (uint32_t)strtoul(buf, NULL, 10);
 	} else {
 		r = (uint32_t)rand();
-		fprintf(g.rand_log, "%lu\n", (u_long)r);
+		fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	}
 	return (r);
 }

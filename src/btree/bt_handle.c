@@ -324,10 +324,10 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	if (btree->allocsize < WT_BTREE_ALLOCATION_SIZE_MIN ||
 	    btree->allocsize > WT_BTREE_ALLOCATION_SIZE_MAX) {
 		__wt_errx(session,
-		   "the allocation size must be at least %luB and no larger "
-		   "than %luMB",
-		    (u_long)WT_BTREE_ALLOCATION_SIZE_MIN,
-		    (u_long)(WT_BTREE_ALLOCATION_SIZE_MAX / WT_MEGABYTE));
+		    "the allocation size must be at least %" PRIu32 "B "
+		    "and no larger than %" PRIu32 "MB",
+		    WT_BTREE_ALLOCATION_SIZE_MIN,
+		    WT_BTREE_ALLOCATION_SIZE_MAX / WT_MEGABYTE);
 		return (WT_ERROR);
 	}
 
@@ -342,8 +342,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	    btree->leafmax % btree->allocsize != 0) {
 		__wt_errx(session,
 		    "all page sizes must be a multiple of the page allocation "
-		    "size (%luB)",
-		    (u_long)btree->allocsize);
+		    "size (%" PRIu32 "B)", btree->allocsize);
 		return (WT_ERROR);
 	}
 
@@ -360,8 +359,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	    btree->leafmin > WT_BTREE_PAGE_SIZE_MAX ||
 	    btree->leafmax > WT_BTREE_PAGE_SIZE_MAX) {
 		__wt_errx(session,
-		    "page sizes may not be larger than %luMB",
-		    (u_long)WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE);
+		    "page sizes may not be larger than %" PRIu32 "MB",
+		    WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE);
 		return (WT_ERROR);
 	}
 

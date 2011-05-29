@@ -73,7 +73,7 @@ main(int argc, char *argv[])
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
 
-	printf("%s: process %lu\n", g.progname, (u_long)getpid());
+	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		restart();			/* Clean up previous runs */
 

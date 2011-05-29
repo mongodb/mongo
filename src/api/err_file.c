@@ -71,7 +71,7 @@ __handle_progress_verbose(WT_EVENT_HANDLER *handler,
 {
 	WT_UNUSED(handler);
 
-	(void)printf("\r\t%s %-20llu", operation, (unsigned long long)progress);
+	(void)printf("\r\t%s %-20" PRIu64, operation, progress);
 	return (0);
 }
 

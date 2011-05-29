@@ -28,8 +28,8 @@ __wt_page_free(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "discard addr %lu/%lu (type %s)",
-	    (u_long)addr, (u_long)size, __wt_page_type_string(page->type)));
+	    (session, "discard addr %" PRIu32 "/%" PRIu32 " (type %s)",
+	    addr, size, __wt_page_type_string(page->type)));
 
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);

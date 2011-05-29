@@ -32,9 +32,9 @@ __wt_disk_read(
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		__wt_errx(session,
-		    "read checksum error: addr/size %lu/%lu at offset %llu",
-		    (u_long)addr, (u_long)size, (unsigned long long)offset);
+		__wt_errx(session, "read checksum error: "
+		    "addr/size %" PRIu32 "/%" PRIu32 " at offset %" PRIu64,
+		    addr, size, offset);
 		return (WT_ERROR);
 	}
 

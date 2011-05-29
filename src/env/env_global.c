@@ -50,8 +50,8 @@ void
 __wt_attach(WT_SESSION_IMPL *session)
 {
 #ifdef HAVE_ATTACH
-	__wt_err(session, 0,
-	    "process ID %lld: waiting for debugger...", (long long)getpid());
+	__wt_err(session, 0, "process ID %" PRIdMAX
+	    ": waiting for debugger...", (intmax_t)getpid());
 	while (__wt_debugger_attach == 0)
 		__wt_sleep(10, 0);
 #else

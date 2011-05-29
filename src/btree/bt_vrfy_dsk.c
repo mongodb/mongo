@@ -47,9 +47,9 @@ __wt_verify_dsk_page(
 		break;
 	case WT_PAGE_INVALID:
 	default:
-		__wt_errx(session,
-		    "page at addr %lu has an invalid type of %lu",
-		    (u_long)addr, (u_long)dsk->type);
+		__wt_errx(session, "page at addr %" PRIu32
+		    " has an invalid type of %" PRIu32,
+		    addr, dsk->type);
 		return (WT_ERROR);
 	}
 
@@ -60,9 +60,9 @@ __wt_verify_dsk_page(
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		if (dsk->recno == 0) {
-			__wt_errx(session,
-			    "%s page at addr %lu has a record number of zero",
-			    __wt_page_type_string(dsk->type), (u_long)addr);
+			__wt_errx(session, "%s page at addr %" PRIu32
+			    " has a record number of zero",
+			    __wt_page_type_string(dsk->type), addr);
 			return (WT_ERROR);
 		}
 		break;
@@ -71,9 +71,9 @@ __wt_verify_dsk_page(
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		if (dsk->recno != 0) {
-			__wt_errx(session,
-			    "%s page at addr %lu has a non-zero record number",
-			    __wt_page_type_string(dsk->type), (u_long)addr);
+			__wt_errx(session, "%s page at addr %" PRIu32
+			    " has a non-zero record number",
+			    __wt_page_type_string(dsk->type), addr);
 			return (WT_ERROR);
 		}
 		break;
@@ -88,16 +88,15 @@ __wt_verify_dsk_page(
 
 	/* The in-memory and on-disk page sizes are currently the same. */
 	if (dsk->size != size || dsk->memsize != size) {
-		__wt_errx(session,
-		    "page at addr %lu has an incorrect size", (u_long)addr);
+		__wt_errx(session, "page at addr %" PRIu32
+		    " has an incorrect size", addr);
 		return (WT_ERROR);
 	}
 
 	if (dsk->unused[0] != '\0' ||
 	    dsk->unused[1] != '\0' || dsk->unused[2] != '\0') {
-		__wt_errx(session,
-		    "page at addr %lu has non-zero unused header fields",
-		    (u_long)addr);
+		__wt_errx(session, "page at addr %" PRIu32
+		    " has non-zero unused header fields", addr);
 		return (WT_ERROR);
 	}
 
@@ -201,10 +200,10 @@ __wt_verify_dsk_row(
 			case WAS_KEY:
 				if (dsk->type == WT_PAGE_ROW_LEAF)
 					break;
-				__wt_errx(session,
-				    "cell %lu on page at addr %lu is the first "
-				    "of two adjacent keys",
-				    (u_long)cell_num - 1, (u_long)addr);
+				__wt_errx(session, "cell %" PRIu32
+				    " on page at addr %" PRIu32
+				    " is the first of two adjacent keys",
+				    cell_num - 1, addr);
 				goto err;
 			}
 			last_cell_type = WAS_KEY;
@@ -214,17 +213,16 @@ __wt_verify_dsk_row(
 		case WT_CELL_OFF:
 			switch (last_cell_type) {
 			case FIRST:
-				__wt_errx(session,
-				    "page at addr %lu begins with a value",
-				    (u_long)addr);
+				__wt_errx(session, "page at addr %" PRIu32
+				    " begins with a value", addr);
 				goto err;
 			case WAS_KEY:
 				break;
 			case WAS_VALUE:
-				__wt_errx(session,
-				    "cell %lu on page at addr %lu is the first "
-				    "of two adjacent values",
-				    (u_long)cell_num - 1, (u_long)addr);
+				__wt_errx(session, "cell %" PRIu32
+				    " on page at addr %" PRIu32
+				    " is the first of two adjacent values",
+				    cell_num - 1, addr);
 				goto err;
 			}
 			last_cell_type = WAS_VALUE;
@@ -269,22 +267,22 @@ __wt_verify_dsk_row(
 		 */
 		prefix = __wt_cell_prefix(cell);
 		if (last_pfx->size == 0 && prefix != 0) {
-			__wt_errx(session,
-			    "the %lu key on page at addr %lu is the first "
+			__wt_errx(session, "the %" PRIu32
+			    " key on page at addr %" PRIu32 " is the first "
 			    "non-overflow key on the page and has a non-zero "
 			    "prefix compression value",
-			    (u_long)cell_num, (u_long)addr);
+			    cell_num, addr);
 			goto err;
 		}
 
 		/* Confirm the prefix compression count is possible. */
 		if (last->size != 0 && prefix > last->size) {
-			__wt_errx(session,
-			    "the %lu key on page at addr %lu has a prefix "
-			    "compression count of %lu, larger than the length "
-			    "of the previous key, %lu",
-			    (u_long)cell_num, (u_long)addr,
-			    (u_long)prefix, (u_long)last->size);
+			__wt_errx(session, "key %" PRIu32
+			    " on page at addr %" PRIu32
+			    " has a prefix compression count of %" PRIu32
+			    ", larger than the length of the previous key,"
+			    " %" PRIu32,
+			    cell_num, addr, prefix, last->size);
 			goto err;
 		}
 
@@ -332,11 +330,10 @@ __wt_verify_dsk_row(
 key_compare:	/* Compare the current key against the last key. */
 		if (last->size != 0 &&
 		     func(btree, (WT_ITEM *)last, (WT_ITEM *)current) >= 0) {
-			__wt_errx(session,
-			    "the %lu and %lu keys on page at addr %lu are "
-			    "incorrectly sorted",
-			    (u_long)cell_num - 2,
-			    (u_long)cell_num, (u_long)addr);
+			__wt_errx(session, "the %" PRIu32
+			    " and %" PRIu32 " keys on page at addr %" PRIu32
+			    " are incorrectly sorted",
+			    cell_num - 2, cell_num, addr);
 			ret = WT_ERROR;
 			goto err;
 		}
@@ -479,9 +476,10 @@ __wt_verify_dsk_col_rle(
 		/* Count must be non-zero. */
 		if (WT_RLE_REPEAT_COUNT(data) == 0) {
 			__wt_errx(session,
-			    "fixed-length entry %lu on page at addr "
-			    "%lu has a repeat count of 0",
-			    (u_long)entry_num, (u_long)addr);
+			    "fixed-length entry %" PRIu32
+			    " on page at addr %" PRIu32
+			    " has a repeat count of 0",
+			    entry_num, addr);
 			return (WT_ERROR);
 		}
 
@@ -504,11 +502,10 @@ __wt_verify_dsk_col_rle(
 		    WT_RLE_REPEAT_DATA(data), btree->fixed_len) == 0 &&
 		    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
 			__wt_errx(session,
-			    "fixed-length entries %lu and %lu on page "
-			    "at addr %lu are identical and should have "
-			    "been compressed",
-			    (u_long)entry_num,
-			    (u_long)entry_num - 1, (u_long)addr);
+			    "fixed-length entries %" PRIu32
+			    " and %" PRIu32 " on page at addr %" PRIu32
+			    " are identical and should have been compressed",
+			    entry_num, entry_num - 1, addr);
 			return (WT_ERROR);
 		}
 		last_data = data;
@@ -587,8 +584,8 @@ __wt_verify_dsk_chunk(
 	 */
 	if (dsk->u.datalen == 0) {
 		__wt_errx(session,
-		    "%s page at addr %lu has no data",
-		    __wt_page_type_string(dsk->type), (u_long)addr);
+		    "%s page at addr %" PRIu32 " has no data",
+		    __wt_page_type_string(dsk->type), addr);
 		return (WT_ERROR);
 	}
 
@@ -598,8 +595,9 @@ __wt_verify_dsk_chunk(
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {
 			__wt_errx(session,
-			    "%s page at addr %lu has non-zero trailing bytes",
-			    __wt_page_type_string(dsk->type), (u_long)addr);
+			    "%s page at addr %" PRIu32
+			    " has non-zero trailing bytes",
+			    __wt_page_type_string(dsk->type), addr);
 			return (WT_ERROR);
 		}
 
@@ -675,11 +673,10 @@ __wt_err_cell_vs_page(WT_SESSION_IMPL *session,
     uint32_t entry_num, uint32_t addr, WT_CELL *cell, WT_PAGE_DISK *dsk)
 {
 	__wt_errx(session,
-	    "illegal cell and page type combination cell %lu on page at addr "
-	    "%lu is a %s cell on a %s page",
-	    (u_long)entry_num, (u_long)addr,
-	    __wt_cell_type_string(cell),
-	    __wt_page_type_string(dsk->type));
+	    "illegal cell and page type combination cell %" PRIu32
+	    " on page at addr %" PRIu32 " is a %s cell on a %s page",
+	    entry_num, addr,
+	    __wt_cell_type_string(cell), __wt_page_type_string(dsk->type));
 	return (WT_ERROR);
 }
 
@@ -690,9 +687,9 @@ __wt_err_cell_vs_page(WT_SESSION_IMPL *session,
 static int
 __wt_err_eop(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
-	__wt_errx(session,
-	    "item %lu on page at addr %lu extends past the end of the page",
-	    (u_long)entry_num, (u_long)addr);
+	__wt_errx(session, "item %" PRIu32 " on page at addr %" PRIu32
+	    " extends past the end of the page",
+	    entry_num, addr);
 	return (WT_ERROR);
 }
 
@@ -703,10 +700,9 @@ __wt_err_eop(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 static int
 __wt_err_eof(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
-	__wt_errx(session,
-	    "off-page item %lu on page at addr %lu references non-existent "
-	    "file pages",
-	    (u_long)entry_num, (u_long)addr);
+	__wt_errx(session, "off-page item %" PRIu32
+	   " on page at addr %" PRIu32 " references non-existent file pages",
+	    entry_num, addr);
 	return (WT_ERROR);
 }
 
@@ -718,9 +714,8 @@ __wt_err_eof(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 static int
 __wt_err_delfmt(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
-	__wt_errx(session,
-	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "
-	    "bytes",
-	    (u_long)entry_num, (u_long)addr);
+	__wt_errx(session, "deleted fixed-length entry %" PRIu32
+	    " on page at addr %" PRIu32 " has non-nul bytes",
+	    entry_num, addr);
 	return (WT_ERROR);
 }

@@ -153,7 +153,7 @@ config_print(int error_display)
 			if (!strcmp(cp->name, "file_type"))
 				fprintf(fp,
 				    "# file type: %s\n", config_dtype());
-			fprintf(fp, "%s=%lu\n", cp->name, (u_long)*cp->v);
+			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 		}
 
 	fprintf(fp, "############################################\n");
@@ -223,10 +223,9 @@ config_single(char *s, int perm)
 
 	*cp->v = config_translate(vp);
 	if (*cp->v < cp->min || *cp->v > cp->max) {
-		fprintf(stderr,
-		    "%s: %s: value of %lu outside min/max values of %lu-%lu\n",
-		    g.progname, s,
-		    (u_long)*cp->v, (u_long)cp->min, (u_long)cp->max);
+		fprintf(stderr, "%s: %s: value of %" PRIu32
+                    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
+		    g.progname, s, *cp->v, cp->min, cp->max);
 		exit(EXIT_FAILURE);
 	}
 }

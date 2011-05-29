@@ -34,7 +34,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	struct record_t record;
-	unsigned long long insert_count;
+	uint64_t insert_count;
 	int ch, debug, eof, ret, text_input, tret, verbose;
 	const char *tablename, *table_config, *home;
 	char cursor_config[100], datasink[100];
@@ -124,7 +124,7 @@ main(int argc, char *argv[])
 	for (eof = 0; (ret = bulk_read(&record, &eof)) == 0 && !eof;) {
                 /* Report on progress every 100 inserts. */
                 if (verbose && ++insert_count % 100 == 0) {
-                        printf("\r\t%s: %llu", tablename, insert_count);
+                        printf("\r\t%s: %" PRIu64, tablename, insert_count);
 			fflush(stdout);
 		}
 	
@@ -138,7 +138,7 @@ main(int argc, char *argv[])
 	}
 
 	if (verbose)
-		printf("\r\t%s: %llu\n", tablename, insert_count);
+		printf("\r\t%s: %" PRIu64 "\n", tablename, insert_count);
 
 	if (0) {
 err:		ret = 1;

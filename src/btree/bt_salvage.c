@@ -2008,8 +2008,8 @@ __wt_trk_dump(const char *l, void *ss_arg)
 	fprintf(stderr, "overflow page track list: ");
 	for (i = 0; i < ss->ovfl_next; ++i) {
 		trk = ss->ovfl[i];
-		fprintf(stderr, "%lu/%lu ",
-		    (u_long)trk->addr, (u_long)trk->size);
+		fprintf(stderr,
+		    "%" PRIu32 "/%" PRIu32 " ", trk->addr, trk->size);
 	}
 	fprintf(stderr, "\n");
 }
@@ -2021,11 +2021,10 @@ __wt_trk_dump(const char *l, void *ss_arg)
 static void
 __slvg_trk_dump_col(WT_TRACK *trk)
 {
-	fprintf(stderr, "%6lu/%-6lu (%llu)\t%llu-%llu\n",
-	    (u_long)trk->addr, (u_long)trk->size,
-	    (unsigned long long)trk->lsn,
-	    (unsigned long long)trk->u.col.range_start,
-	    (unsigned long long)trk->u.col.range_stop);
+	fprintf(stderr, "%6" PRIu32 "/%-6" PRIu32 " (%" PRIu64 ")"
+	    "\t%" PRIu64 "-%" PRIu64 "\n",
+	    trk->addr, trk->size, trk->lsn,
+	    trk->u.col.range_start, trk->u.col.range_stop);
 }
 
 /*
@@ -2035,12 +2034,10 @@ __slvg_trk_dump_col(WT_TRACK *trk)
 static void
 __slvg_trk_dump_row(WT_TRACK *trk)
 {
-	fprintf(stderr, "%6lu/%-6lu (%llu)\n\t%.*s\n\t%.*s\n",
-	    (u_long)trk->addr, (u_long)trk->size,
-	    (unsigned long long)trk->lsn,
-	    trk->u.row.range_start.size,
-	    (char *)trk->u.row.range_start.data,
-	    trk->u.row.range_stop.size,
-	    (char *)trk->u.row.range_stop.data);
+	fprintf(stderr, "%6" PRIu32 "/%-6" PRIu32 " (%" PRIu64 ")\n"
+	    "\t%.*s\n\t%.*s\n",
+	    trk->addr, trk->size, trk->lsn,
+	    trk->u.row.range_start.size, (char *)trk->u.row.range_start.data,
+	    trk->u.row.range_stop.size, (char *)trk->u.row.range_stop.data);
 }
 #endif

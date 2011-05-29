@@ -193,10 +193,9 @@ static int
 __col_wrong_fixed_size(
     WT_SESSION_IMPL *session, uint32_t len, uint32_t config_len)
 {
-	__wt_errx(session,
-	    "%s: length of %lu does not match fixed-length file configuration "
-	    "of %lu",
-	    session->name, (u_long)len, (u_long)config_len);
+	__wt_errx(session, "length of %" PRIu32
+	    " does not match fixed-length file configuration of %" PRIu32,
+	    len, config_len);
 	return (WT_ERROR);
 }
 

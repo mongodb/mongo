@@ -123,12 +123,12 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 
 	WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 	    "waking eviction server: force %sset, read lockout %sset, "
-	    "bytes inuse %s max (%lluMB %s %lluMB), ",
+	    "bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (unsigned long long)(bytes_inuse / WT_MEGABYTE),
+	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (unsigned long long)(bytes_max / WT_MEGABYTE)));
+	    bytes_max / WT_MEGABYTE));
 
 	cache->evict_sleeping = 0;
 	__wt_unlock(session, cache->mtx_evict);
@@ -215,10 +215,10 @@ __wt_cache_evict_server(void *arg)
 	if (ret == 0) {
 		if (__wt_cache_bytes_inuse(cache) != 0) {
 			__wt_errx(session,
-			    "cache server: exiting with %llu pages, %llu bytes "
-			    "in use",
-			    (unsigned long long)__wt_cache_pages_inuse(cache),
-			    (unsigned long long)__wt_cache_bytes_inuse(cache));
+			    "cache server: exiting with %" PRIu64 " pages, "
+			    "%" PRIu64 " bytes in use",
+			    __wt_cache_pages_inuse(cache),
+			    __wt_cache_bytes_inuse(cache));
 			WT_ASSERT(session, 0);
 		}
 	} else

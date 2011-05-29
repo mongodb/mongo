@@ -207,12 +207,10 @@ __wt_verify_tree(
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_leaf.recno;
 recno_chk:	if (parent_recno != recno) {
-			__wt_errx(session,
-			    "page at addr %lu has a starting record of %llu "
-			    "where the expected starting record was %llu",
-			    (u_long)WT_PADDR(page),
-			    (unsigned long long)recno,
-			    (unsigned long long)parent_recno);
+			__wt_errx(session, "page at addr %" PRIu32
+			    " has a starting record of %" PRIu64
+			    " where the expected starting record was %" PRIu64,
+			    WT_PADDR(page), recno, parent_recno);
 			return (WT_ERROR);
 		}
 		break;
@@ -265,13 +263,12 @@ recno_chk:	if (parent_recno != recno) {
 			 * reviewed to this point.
 			 */
 			if (cref->recno != vs->record_total + 1) {
-				__wt_errx(session,
-				    "page at addr %lu has a starting record of "
-				    "%llu where the expected starting record "
-				    "was %llu",
-				    (u_long)WT_PADDR(page),
-				    (unsigned long long)cref->recno,
-				    (unsigned long long)vs->record_total + 1);
+				__wt_errx(session, "page at addr %" PRIu32
+				    " has a starting record of %" PRIu64
+				    " where the expected starting record was "
+				    "%" PRIu64,
+				    WT_PADDR(page),
+				    cref->recno, vs->record_total + 1);
 				return (WT_ERROR);
 			}
 
@@ -345,10 +342,10 @@ __wt_verify_row_int_key_order(
 	/* Compare the key against the largest key we've seen so far. */
 	if (func(btree, &item, (WT_ITEM *)vs->max_key) <= 0) {
 		__wt_errx(session,
-		    "the internal key in entry %lu on the page at addr %lu "
-		    "sorts before the last key appearing on page %lu",
-		    (u_long)WT_ROW_REF_SLOT(page, rref),
-		    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
+		    "the internal key in entry %" PRIu32
+		    " on the page at addr %" PRIu32
+		    " sorts before the last key appearing on page %" PRIu32,
+		    WT_ROW_REF_SLOT(page, rref), WT_PADDR(page), vs->max_addr);
 		ret = WT_ERROR;
 	} else {
 		/* Update the largest key we've seen to the key just checked. */
@@ -399,9 +396,10 @@ __wt_verify_row_leaf_key_order(
 		 */
 		if (func(btree, (WT_ITEM *)key, (WT_ITEM *)vs->max_key) < 0) {
 			__wt_errx(session,
-			    "the first key on the page at addr %lu sorts "
-			    "equal or less than a key appearing on page %lu",
-			    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
+			    "the first key on the page at addr %" PRIu32
+			    " sorts equal or less than a key"
+			    " appearing on page %" PRIu32,
+			    WT_PADDR(page), vs->max_addr);
 			ret = WT_ERROR;
 		}
 
@@ -531,8 +529,8 @@ __wt_verify_addfrag(
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
 			__wt_errx(session,
-			    "file fragment at addr %lu already verified",
-			    (u_long)addr);
+			    "file fragment at addr %" PRIu32
+			    " already verified", addr);
 			return (WT_ERROR);
 		}
 	if (frags > 0)

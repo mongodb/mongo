@@ -29,8 +29,8 @@ __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 	 * rare.
 	 */
 	WT_VERBOSE(conn, WT_VERB_READ, (session,
-	    "overflow read addr/size %lu/%lu",
-	    (u_long)ovfl->addr, (u_long)ovfl->size));
+	    "overflow read addr/size %" PRIu32 "/%" PRIu32,
+	    ovfl->addr, ovfl->size));
 	WT_STAT_INCR(btree->stats, overflow_read);
 	WT_STAT_INCR(conn->cache->stats, cache_overflow_read);
 

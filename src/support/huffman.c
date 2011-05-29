@@ -347,14 +347,16 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 		if (i > 0 &&
 		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol) {
 			__wt_errx(session,
-			    "duplicate symbol %lx specified in a huffman table",
-			    (u_long)indexed_freqs[i].symbol);
+			    "duplicate symbol %" PRIx16
+			    " specified in a huffman table",
+			    indexed_freqs[i].symbol);
 			goto err;
 		}
 		if (indexed_freqs[i].symbol > huffman->numSymbols) {
 			__wt_errx(session,
-			    "illegal symbol %lx specified in a huffman table",
-			    (u_long)indexed_freqs[i].symbol);
+			    "illegal symbol %" PRIx16
+			    " specified in a huffman table",
+			    indexed_freqs[i].symbol);
 			goto err;
 		}
 	}
@@ -382,10 +384,10 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	 * When building the tree, we discard symbols with a 0 frequency; make
 	 * sure that doesn't happen to our escape symbol.
 	 */
-	huffman->escape = (uint16_t)indexed_freqs[0].symbol;
+	huffman->escape = indexed_freqs[0].symbol;
 #if __HUFFMAN_DETAIL
-	printf("selecting symbol %lx (freq %d) as escape\n",
-	    (u_long)huffman->escape, indexed_freqs[0].frequency);
+	printf("selecting symbol %" PRIx16 " (freq %d) as escape\n",
+	    huffman->escape, indexed_freqs[0].frequency);
 #endif
 	if (indexed_freqs[0].frequency == 0)
 		++indexed_freqs[0].frequency;
@@ -481,11 +483,11 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	{
 	uint32_t symbol, weighted_length;
 
-	printf("leaf depth %lu..%lu, memory use: "
-	    "codes %u# * %uB  + code2symbol %lu# * %uB\n",
-	    (u_long)huffman->min_depth, (u_long)huffman->max_depth,
-	    huffman->numSymbols, sizeof(WT_HUFFMAN_CODE),
-	    (u_long)(1U << huffman->max_depth), sizeof(uint16_t));
+	printf("leaf depth %" PRIu16 "..%" PRIu16 ", memory use: "
+	    "codes %u# * %uB  + code2symbol %" PRIu32 "# * %uB\n",
+	    huffman->min_depth, huffman->max_depth,
+	    huffman->numSymbols, (u_int)sizeof(WT_HUFFMAN_CODE),
+	    (uint32_t)(1U << huffman->max_depth), (u_int)sizeof(uint16_t));
 
 	/*
 	 * measure quality of computed Huffman codes, for different max bit
@@ -497,14 +499,14 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 		weighted_length +=
 		    indexed_freqs[i].frequency * huffman->codes[symbol].length;
 		/*
-		 * printf("\t%lu->%lu. %lu * %lu\n",
-		 *    (u_long)i, (u_long)symbol,
-		 *    (u_long)indexed_freqs[i].frequency,
-		 *    (u_long)huffman->codes[symbol].length);
+		 * printf("\t%" PRIu16 "->%" PRIu32 ". %" PRIu32
+		 *    " * %" PRIu8 "\n",
+		 *    i, symbol, indexed_freqs[i].frequency,
+		 *    huffman->codes[symbol].length);
 		 */
 	}
-	printf("weighted length of all codes (the smaller the better): %lu\n",
-	    (u_long)weighted_length);
+	printf("weighted length of all codes (the smaller the better): "
+	    "%" PRIu32 "\n", weighted_length);
 	}
 #endif
 
@@ -726,8 +728,8 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
 #if 0
-	printf("encode: worst case %lu bytes -> actual %lu\n",
-	    (u_long)max_len, (u_long)outlen);
+	printf("encode: worst case %" PRIu32 " bytes -> actual %" PRIu32 "\n",
+	    max_len, outlen);
 #endif
 
 err:	if (tmp != NULL)
@@ -872,8 +874,8 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
 #if 0
-	printf("decode: worst case %lu bytes -> actual %lu\n",
-	    (u_long)max_len, (u_long)outlen);
+	printf("decode: worst case %" PRIu32 " bytes -> actual %" PRIu32 "\n",
+	    max_len, outlen);
 #endif
 
 err:	if (tmp != NULL)

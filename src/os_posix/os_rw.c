@@ -18,16 +18,16 @@ __wt_read(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(fh->stats, read_io);
 	WT_STAT_INCR(S2C(session)->stats, total_read_io);
 
-	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
-	    (session, "fileops: %s: read %lu bytes at offset %lu",
-	    fh->name, (u_long)bytes, (u_long)offset));
+	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS, (session,
+	    "fileops: %s: read %" PRIu32 " bytes at offset %" PRIuMAX,
+	    fh->name, bytes, (uintmax_t)offset));
 
 	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_err(session, errno,
-	    "%s read error: attempt to read %lu bytes at offset %lu",
-	    fh->name, (u_long)bytes, (u_long)offset);
+	__wt_err(session, errno, "%s read error: attempt to read %" PRIu32
+	    " bytes at offset %" PRIuMAX,
+	    fh->name, bytes, (uintmax_t)offset);
 	return (WT_ERROR);
 }
 
@@ -42,15 +42,15 @@ __wt_write(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(fh->stats, write_io);
 	WT_STAT_INCR(S2C(session)->stats, total_write_io);
 
-	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
-	    (session, "fileops: %s: write %lu bytes at offset %lu",
-	    fh->name, (u_long)bytes, (u_long)offset));
+	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS, (session,
+	    "fileops: %s: write %" PRIu32 " bytes at offset %" PRIuMAX,
+	    fh->name, bytes, (uintmax_t)offset));
 
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_err(session, errno,
-	    "%s write error: attempt to write %lu bytes at offset %lu",
-	    fh->name, (u_long)bytes, (u_long)offset);
+	__wt_err(session, errno, "%s write error: attempt to write %" PRIu32
+	    " bytes at offset %" PRIuMAX,
+	    fh->name, bytes, (uintmax_t)offset);
 	return (WT_ERROR);
 }

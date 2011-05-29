@@ -192,13 +192,12 @@ combine:/*
 	    fe->addr + (fe->size / btree->allocsize) > new->addr) ||
 	    ((fe = TAILQ_NEXT(new, qa)) != NULL &&
 	    new->addr + (new->size / btree->allocsize) > fe->addr)) {
-		__wt_errx(session,
-		    "block free at addr range %lu-%lu overlaps already free "
-		    "block at addr range %lu-%lu",
-		    (u_long)new->addr,
-		    (u_long)new->addr + (new->size / btree->allocsize),
-		    (u_long)fe->addr,
-		    (u_long)fe->addr + (fe->size / btree->allocsize));
+		__wt_errx(session, "block free at addr range "
+		    "%" PRIu32 "-%" PRIu32
+		    " overlaps already free block at addr range "
+		    "%" PRIu32 "-%" PRIu32,
+		    new->addr, new->addr + (new->size / btree->allocsize),
+		    fe->addr, fe->addr + (fe->size / btree->allocsize));
 		TAILQ_REMOVE(&btree->freeqa, new, qa);
 		return (WT_ERROR);
 	}
@@ -418,13 +417,13 @@ __wt_block_dump(WT_SESSION_IMPL *session)
 
 	fprintf(stderr, "Freelist by addr:");
 	TAILQ_FOREACH(fe, &btree->freeqa, qa)
-		fprintf(stderr,
-		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
+		fprintf(stderr, " {%" PRIu32 "/%" PRIu32 "}",
+		    fe->addr, fe->size);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Freelist by size:");
 	TAILQ_FOREACH(fe, &btree->freeqs, qs)
-		fprintf(stderr,
-		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
+		fprintf(stderr, " {%" PRIu32 "/%" PRIu32 "}",
+		    fe->addr, fe->size);
 	fprintf(stderr, "\n");
 }
 #endif

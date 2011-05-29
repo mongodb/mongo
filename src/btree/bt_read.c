@@ -65,10 +65,9 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 			cache->read_lockout = 0;
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(conn, WT_VERB_READ,
-		    (&conn->default_session,
-		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
-		    (unsigned long long)bytes_inuse,
-		    (unsigned long long)bytes_max));
+		    (&conn->default_session, "workQ locks out reads: "
+		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
+		    bytes_inuse, bytes_max));
 		cache->read_lockout = 1;
 	}
 
@@ -267,7 +266,7 @@ __cache_read(
 
 	/* Read the page. */
 	WT_VERBOSE(S2C(session), WT_VERB_READ, (session,
-	    "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
+	    "cache read addr/size %" PRIu32 "/%" PRIu32, addr, size));
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/* Verify the disk image on demand. */

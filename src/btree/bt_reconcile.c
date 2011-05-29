@@ -468,9 +468,9 @@ __wt_page_reconcile(
 	ret = 0;
 
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "reconcile %s page addr %lu (type %s)",
+	    (session, "reconcile %s page addr %" PRIu32 " (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
-	    (u_long)WT_PADDR(page), __wt_page_type_string(page->type)));
+	    WT_PADDR(page), __wt_page_type_string(page->type)));
 
 	/*
 	 * Handle pages marked for deletion or split.
@@ -2393,8 +2393,8 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (r->split_next == 0) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-		    "reconcile: delete page %lu (%luB)",
-		    (u_long)WT_PADDR(page), (u_long)WT_PSIZE(page)));
+		    "reconcile: delete page %" PRIu32 " (%" PRIu32 "B)",
+		    WT_PADDR(page), WT_PSIZE(page)));
 		WT_STAT_INCR(btree->stats, page_delete);
 
 		/*
@@ -2458,9 +2458,10 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (r->split_next == 1) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-		    "reconcile: move %lu to %lu, (%luB to %luB)",
-		    (u_long)WT_PADDR(page), (u_long)r->split[0].off.addr,
-		    (u_long)WT_PSIZE(page), (u_long)r->split[0].off.size));
+		    "reconcile: move %" PRIu32 " to %" PRIu32
+		    ", (%" PRIu32 "B to %" PRIu32 "B)",
+		    WT_PADDR(page), r->split[0].off.addr,
+		    WT_PSIZE(page), r->split[0].off.size));
 
 		/* Queue the original page to be discarded, we're done. */
 		WT_RET(__rec_discard_add_page(session, page));
@@ -2497,8 +2498,8 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * pages -- create a new internal page.
 	 */
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "reconcile: %lu (%luB) splitting",
-	    (u_long)WT_PADDR(page), (u_long)WT_PSIZE(page)));
+	    (session, "reconcile: %" PRIu32 " (%" PRIu32 "B) splitting",
+	    WT_PADDR(page), WT_PSIZE(page)));
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -2888,8 +2889,8 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 		}
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-		    "split: %lu (%luB)",
-		    (u_long)spl->off.addr, (u_long)spl->off.size));
+		    "split: %" PRIu32 " (%" PRIu32 "B)",
+		    spl->off.addr, spl->off.size));
 	}
 
 	/*
@@ -2979,9 +2980,9 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 		}
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-		    "split: %lu (%luB), starting record %llu",
-		    (u_long)off->addr, (u_long)off->size,
-		    (unsigned long long)WT_RECNO(&spl->off)));
+		    "split: %" PRIu32 " (%" PRIu32 "B), "
+		    "starting record %" PRIu64,
+		    off->addr, off->size, WT_RECNO(&spl->off)));
 	}
 
 	/*

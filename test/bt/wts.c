@@ -73,8 +73,8 @@ wts_startup(void)
 	char config[200], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%luMB,verbose=[%s]",
-	    g.progname, (u_long)g.c_cache,
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
+	    g.progname, g.c_cache,
 	    ""
 	    // "evict,"
 	    // "fileops,"
@@ -424,16 +424,16 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			session->msg_printf(session, "%-10s %lu {%.*s}",
-			    "bulk K",
-			    (u_long)g.key_cnt, (int)key.size, (char *)key.data);
+			session->msg_printf(session,
+                            "%-10s %" PRIu32 " {%.*s}", "bulk K",
+                            g.key_cnt, (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		session->msg_printf(session, "%-10s %lu {%.*s}",
-		    "bulk V",
-		    (u_long)g.key_cnt, (int)value.size, (char *)value.data);
+		session->msg_printf(session,
+                    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+                    g.key_cnt, (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, value.data, value.size);
@@ -556,8 +556,7 @@ wts_read(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%llu", "read",
-		    (unsigned long long)keyno);
+		session->msg_printf(session, "%-10s%" PRIu64, "read", keyno);
 
 	/* Retrieve the BDB value. */
 	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
@@ -578,9 +577,8 @@ wts_read(uint64_t keyno)
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->get_value(cursor, &value);
 	if (ret != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_read: read row %llu: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
+		fprintf(stderr, "%s: wts_read: read row %" PRIu64 ": %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -590,9 +588,7 @@ wts_read(uint64_t keyno)
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
-		fprintf(stderr,
-		    "wts_read: read row %llu:\n",
-		    (unsigned long long)keyno);
+		fprintf(stderr, "wts_read: read row %" PRIu64 ":\n", keyno);
 		__wt_debug_pair(
 		    "bdb", bdb_value.data, bdb_value.size, stderr);
 		__wt_debug_pair("wt", value.data, value.size, stderr);
@@ -631,9 +627,9 @@ wts_row_put(uint64_t keyno, int insert)
 	cursor->set_key(cursor, &key);
 	cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_row_put: put row %llu by key: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
+		fprintf(stderr,
+                    "%s: wts_row_put: put row %" PRIu64 " by key: %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -658,9 +654,8 @@ wts_col_put(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%llu {%.*s}",
-		    "put", (unsigned long long)keyno,
-		    (int)value.size, (char *)value.data);
+		session->msg_printf(session, "%-10s%" PRIu64 " {%.*s}",
+		    "put", keyno, (int)value.size, (char *)value.data);
 
 	key_gen(&key.data, &key.size, keyno, 0);
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
@@ -669,9 +664,9 @@ wts_col_put(uint64_t keyno)
 	cursor->set_key(cursor, (wiredtiger_recno_t)keyno);
 	cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_col_put: put col %llu by key: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
+		fprintf(stderr,
+                    "%s: wts_col_put: put col %" PRIu64 " by key: %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -696,17 +691,16 @@ wts_row_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%llu",
-		    "delete", (unsigned long long)keyno);
+		session->msg_printf(session, "%-10s%" PRIu64, "delete", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
 	cursor->set_key(cursor, &key);
 	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_row_del: remove %llu by key: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
+		fprintf(stderr,
+                    "%s: wts_row_del: remove %" PRIu64 " by key: %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 	NTF_CHK(wts_notfound_chk("wts_row_del", ret, notfound, keyno));
@@ -729,17 +723,16 @@ wts_col_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%llu",
-		    "delete", (unsigned long long)keyno);
+		session->msg_printf(session, "%-10s%" PRIu64, "delete", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
 	cursor->set_key(cursor, keyno);
 	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_col_del: remove %llu by key: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
+		fprintf(stderr,
+                    "%s: wts_col_del: remove %" PRIu64 " by key: %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -759,15 +752,15 @@ wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 		if (wt_ret == WT_NOTFOUND)
 			return (2);
 
-		fprintf(stderr, "%s: %s: row %llu: "
-		    "deleted in Berkeley DB, found in WiredTiger\n",
-		    g.progname, f, (unsigned long long)keyno);
+		fprintf(stderr, "%s: %s: row %" PRIu64
+                    ": deleted in Berkeley DB, found in WiredTiger\n",
+		    g.progname, f, keyno);
 		return (1);
 	}
 	if (wt_ret == WT_NOTFOUND) {
-		fprintf(stderr, "%s: %s: row %llu: "
-		    "found in Berkeley DB, deleted in WiredTiger\n",
-		    g.progname, f, (unsigned long long)keyno);
+		fprintf(stderr, "%s: %s: row %" PRIu64
+		    ": found in Berkeley DB, deleted in WiredTiger\n",
+		    g.progname, f, keyno);
 		return (1);
 	}
 	return (0);

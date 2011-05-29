@@ -138,26 +138,24 @@ __wt_debug_disk(
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		fprintf(fp,
-		    "%s page: starting recno %llu, entries %lu, lsn %lu/%lu\n",
+		fprintf(fp, "%s page: starting recno %" PRIu64
+		    ", entries %" PRIu32 ", lsn %" PRIu32 "/%" PRIu32 "\n",
 		    __wt_page_type_string(dsk->type),
-		    (unsigned long long)dsk->recno, (u_long)dsk->u.entries,
-		    (u_long)WT_LSN_FILE(dsk->lsn),
-		    (u_long)WT_LSN_OFFSET(dsk->lsn));
+		    dsk->recno, dsk->u.entries,
+		    WT_LSN_FILE(dsk->lsn), WT_LSN_OFFSET(dsk->lsn));
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		fprintf(fp,
-		    "%s page: entries %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk->type), (u_long)dsk->u.entries,
-		    (u_long)WT_LSN_FILE(dsk->lsn),
-		    (u_long)WT_LSN_OFFSET(dsk->lsn));
+		fprintf(fp, "%s page: entries %" PRIu32
+		    ", lsn %" PRIu32 "/%" PRIu32 "\n",
+		    __wt_page_type_string(dsk->type), dsk->u.entries,
+		    WT_LSN_FILE(dsk->lsn), WT_LSN_OFFSET(dsk->lsn));
 		break;
 	case WT_PAGE_OVFL:
-		fprintf(fp, "%s page: data size %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk->type), (u_long)dsk->u.datalen,
-		    (u_long)WT_LSN_FILE(dsk->lsn),
-		    (u_long)WT_LSN_OFFSET(dsk->lsn));
+		fprintf(fp, "%s page: data size %" PRIu32
+		    ", lsn %" PRIu32 "/%" PRIu32 "\n",
+		    __wt_page_type_string(dsk->type), dsk->u.datalen,
+		    WT_LSN_FILE(dsk->lsn), WT_LSN_OFFSET(dsk->lsn));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -275,23 +273,20 @@ __wt_debug_page_work(
 	if (WT_PADDR(page) == WT_ADDR_INVALID)
 		fprintf(fp, "[NoAddr]");
 	else
-		fprintf(fp, "[%lu-%lu]",
-		    (u_long)WT_PADDR(page),
-		    (u_long)WT_PADDR(page) +
+		fprintf(fp, "[%" PRIu32 "-%" PRIu32 "]", WT_PADDR(page),
+		    WT_PADDR(page) +
 		    (WT_OFF_TO_ADDR(btree, WT_PSIZE(page)) - 1));
-	fprintf(fp, "/%lu %s",
-	    (u_long)WT_PSIZE(page), __wt_page_type_string(page->type));
+	fprintf(fp, "/%" PRIu32 " %s",
+	    WT_PSIZE(page), __wt_page_type_string(page->type));
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		fprintf(fp, " recno %llu",
-		    (unsigned long long)page->u.col_int.recno);
+		fprintf(fp, " recno %" PRIu64, page->u.col_int.recno);
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		fprintf(fp, " recno %llu",
-		    (unsigned long long)page->u.col_leaf.recno);
+		fprintf(fp, " recno %" PRIu64, page->u.col_leaf.recno);
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -411,8 +406,7 @@ __wt_debug_page_col_int(
 		fp = stderr;
 
 	WT_COL_REF_FOREACH(page, cref, i) {
-		fprintf(fp,
-		    "\trecno %llu, ", (unsigned long long)cref->recno);
+		fprintf(fp, "\trecno %" PRIu64 ", ", cref->recno);
 		__wt_debug_ref(&cref->ref, fp);
 	}
 
@@ -446,7 +440,7 @@ __wt_debug_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, FILE *fp)
 	WT_COL_FOREACH(page, cip, i) {
 		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp,
-		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipvalue));
+		    "\trepeat %" PRIu32 " {", WT_RLE_REPEAT_COUNT(cipvalue));
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipvalue)))
 			fprintf(fp, "deleted");
 		else
@@ -570,8 +564,7 @@ __wt_debug_col_insert(WT_INSERT *ins, FILE *fp)
 		fp = stderr;
 
 	for (; ins != NULL; ins = ins->next) {
-		fprintf(fp, "\tinsert %llu\n",
-		    (unsigned long long)WT_INSERT_RECNO(ins));
+		fprintf(fp, "\tinsert %" PRIu64 "\n", WT_INSERT_RECNO(ins));
 		__wt_debug_update(ins->upd, fp);
 	}
 }
@@ -641,22 +634,22 @@ __wt_debug_cell(WT_SESSION_IMPL *session, WT_CELL *cell, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	fprintf(fp, "\t%s: len %lu",
-	    __wt_cell_type_string(cell), (u_long)__wt_cell_datalen(cell));
+	fprintf(fp, "\t%s: len %" PRIu32,
+	    __wt_cell_type_string(cell), __wt_cell_datalen(cell));
 
 	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
 	case WT_CELL_DEL:
 		break;
 	case WT_CELL_KEY:
-		fprintf(fp, ", pfx: %lu", (u_long)__wt_cell_prefix(cell));
+		fprintf(fp, ", pfx: %u", __wt_cell_prefix(cell));
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
 		__wt_cell_off(cell, &off);
-		fprintf(fp, ", offpage: addr %lu, size %lu",
-		    (u_long)off.addr, (u_long)off.size);
+		fprintf(fp, ", offpage: addr %" PRIu32 ", size %" PRIu32,
+		    off.addr, off.size);
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -679,10 +672,9 @@ __wt_debug_dsk_col_int(WT_PAGE_DISK *dsk, FILE *fp)
 		fp = stderr;
 
 	WT_OFF_FOREACH(dsk, off_record, i)
-		fprintf(fp,
-		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
-		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECNO(off_record));
+		fprintf(fp, "\toffpage: addr %" PRIu32 ", size %" PRIu32
+		    ", starting recno %" PRIu64 "\n",
+		    off_record->addr, off_record->size, WT_RECNO(off_record));
 }
 
 /*
@@ -722,8 +714,7 @@ __wt_debug_dsk_col_rle(WT_BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
 		fp = stderr;
 
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i) {
-		fprintf(fp, "\trepeat %lu {",
-		    (u_long)WT_RLE_REPEAT_COUNT(p));
+		fprintf(fp, "\trepeat %" PRIu32 " {", WT_RLE_REPEAT_COUNT(p));
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(p)))
 			fprintf(fp, "deleted");
 		else
@@ -838,7 +829,7 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	if (ref->addr == WT_ADDR_INVALID)
 		fprintf(fp, "NoAddr");
 	else
-		fprintf(fp, "%lu/%lu", (u_long)ref->addr, (u_long)ref->size);
+		fprintf(fp, "%" PRIu32 "/%" PRIu32, ref->addr, ref->size);
 
 	fprintf(fp, ": %s", s);
 	if (ref->state == WT_REF_MEM)
