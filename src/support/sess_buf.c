@@ -141,7 +141,7 @@ __wt_sb_decrement(SESSION *session, SESSION_BUFFER *sb)
 	WT_ASSERT(session, sb->out < sb->in);
 
 	/*
-	 * This function is used in for two reasons.
+	 * This function is used for two reasons.
 	 *
 	 * #1: it's possible we allocated a WT_UPDATE structure and related K/V
 	 * memory from the SESSION buffer, but then an error occurred.  In this
