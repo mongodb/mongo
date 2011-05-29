@@ -68,19 +68,18 @@ __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t size)
 
 	WT_ASSERT(session, size <= UINT32_MAX);
 
-	if (size <= buf->mem_size)
-		return (0);
+	if (size > buf->mem_size) {
+		/*
+		 * Reallocate the buffer's memory, but maintain the previous
+		 * data reference.
+		 */
+		offset = buf->data == NULL ?
+		    0 : WT_PTRDIFF32(buf->data, buf->mem);
 
-	/*
-	 * If we reallocate the buffer's memory, maintain the previous values
-	 * for the data/size pair.
-	 */
-	offset = buf->data == NULL ? 0 : WT_PTRDIFF32(buf->data, buf->mem);
+		WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
 
-	WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
-
-	buf->data = (uint8_t *)buf->mem + offset;
-
+		buf->data = (uint8_t *)buf->mem + offset;
+	}
 	return (0);
 }
 
