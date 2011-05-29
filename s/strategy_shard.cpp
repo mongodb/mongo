@@ -154,7 +154,7 @@ namespace mongo {
                     // Many operations benefit from having the shard key early in the object
                     o = manager->getShardKey().moveToFront(o);
 
-                    const int maxTries = 10;
+                    const int maxTries = 30;
 
                     bool gotThrough = false;
                     for ( int i=0; i<maxTries; i++ ) {
@@ -184,7 +184,7 @@ namespace mongo {
                                 uasserted(14804, "collection no longer sharded");
                             }
                         }
-                        sleepmillis( i * 200 );
+                        sleepmillis( i * 20 );
                     }
                     
                     assert( inShutdown() || gotThrough ); // not caught below
