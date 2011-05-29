@@ -292,6 +292,7 @@ __wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb)
 		break;
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
+	default:
 		if ((huffman = btree->huffman_key) == NULL)
 			return (0);
 		break;
