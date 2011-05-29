@@ -76,7 +76,6 @@ src/support/err.c
 src/support/hazard.c
 src/support/huffman.c
 src/support/pow.c
-src/support/prime.c
 src/support/scratch.c
 src/support/serial.c
 src/support/sess_buf.c

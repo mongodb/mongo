@@ -361,7 +361,6 @@ int __wt_huffman_decode(SESSION *session,
 uint32_t __wt_nlpo2_round(uint32_t v);
 uint32_t __wt_nlpo2(uint32_t v);
 int __wt_ispo2(uint32_t v);
-uint32_t __wt_prime(uint32_t n);
 int __wt_buf_init(SESSION *session, WT_BUF *buf, size_t size);
 int __wt_buf_initsize(SESSION *session, WT_BUF *buf, size_t size);
 int __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t size);
