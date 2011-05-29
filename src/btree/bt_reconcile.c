@@ -2730,10 +2730,7 @@ __rec_cell_build_val(SESSION *session, void *data, uint32_t size)
 	val->buf.data = data;
 	val->buf.size = size;
 
-	/*
-	 * Handle zero-length cells quickly -- this is a common value, it's
-	 * a deleted column-store variable length cell.
-	 */
+	/* Handle zero-length cells quickly. */
 	if (size == 0) {
 		__wt_cell_set(&val->cell, WT_CELL_DATA, 0, 0, &val->cell_len);
 		val->len = val->cell_len + val->buf.size;
