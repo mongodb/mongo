@@ -18,14 +18,17 @@ int
 __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
-	WT_BUF tmp;
+	WT_BUF build, tmp;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	bitstr_t *ovfl;
 	uint32_t pfx, size, slot;
 	uint8_t type;
-	int is_ovfl, is_tmp, ret, slot_offset;
-	void *key, *data;
+	int is_ovfl, is_local, ret, slot_offset;
+	void *key;
+
+	WT_CLEAR(build);
+	WT_CLEAR(tmp);
 
 	/*
 	 * If the caller didn't pass us a buffer, create one.  We don't use
@@ -33,11 +36,10 @@ __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 	 * for semi-permanent use, and using an existing buffer might waste
 	 * memory if the one allocated from the pool was larger than needed.
 	 */
-	is_tmp = 0;
+	is_local = 0;
 	if (retb == NULL) {
-		WT_CLEAR(tmp);
-		retb = &tmp;
-		is_tmp = 1;
+		retb = &build;
+		is_local = 1;
 	}
 
 	/*
@@ -207,9 +209,10 @@ __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 		 * forward.
 		 */
 		if (direction == FORWARD) {
-			__wt_cell_data_and_len(key, &data, &size);
-			WT_ERR(__wt_buf_setsize(session, retb, size + pfx));
-			memcpy((uint8_t *)retb->data + pfx, data, size);
+			WT_ERR(__wt_cell_copy(session, key, &tmp));
+			WT_ERR(
+			    __wt_buf_setsize(session, retb, tmp.size + pfx));
+			memcpy((uint8_t *)retb->data + pfx, tmp.data, tmp.size);
 			if (slot_offset == 0)
 				break;
 		}
@@ -224,11 +227,13 @@ next:		switch (direction) {
 		}
 	}
 
+	__wt_buf_free(session, &tmp);
+
 	/*
 	 * If a return buffer was specified, the caller just wants a copy,
 	 * no further work is needed.
 	 */
-	if (!is_tmp)
+	if (!is_local)
 		return (0);
 
 	/* Steal the buffer's memory, then serialize the key into place. */
@@ -244,8 +249,8 @@ next:		switch (direction) {
 
 	return (ret);
 
-err:	if (is_tmp)
-		__wt_buf_free(session, &tmp);
+err:	__wt_buf_free(session, &build);
+	__wt_buf_free(session, &tmp);
 	return (ret);
 }
 
