@@ -96,7 +96,7 @@ namespace mongo {
         _mp(p) {
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
-#ifndef _WINDOWS
+#ifndef _WIN32
         stringstream temp;
         temp << hex << showbase << pthread_self();
         _threadId = temp.str();
