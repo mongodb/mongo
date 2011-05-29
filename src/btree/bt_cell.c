@@ -268,19 +268,6 @@ __wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb)
 
 	btree = session->btree;
 
-	/* Select a Huffman encoding function. */
-	switch (__wt_cell_type(cell)) {
-	case WT_CELL_DATA:
-	case WT_CELL_DATA_OVFL:
-		huffman = btree->huffman_value;
-		break;
-	case WT_CELL_KEY:
-	case WT_CELL_KEY_OVFL:
-		huffman = btree->huffman_key;
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
 	/* Get the cell's data. */
 	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
@@ -293,10 +280,23 @@ __wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb)
 		__wt_cell_off(cell, &ovfl);
 		WT_RET(__wt_ovfl_in(session, &ovfl, retb));
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
-	if (huffman != NULL)
-		WT_RET(__wt_huffman_decode(
-		    session, huffman, retb->data, retb->size, retb));
-	return (0);
+	/* Select a Huffman encoding function. */
+	switch (__wt_cell_type(cell)) {
+	case WT_CELL_DATA:
+	case WT_CELL_DATA_OVFL:
+		if ((huffman = btree->huffman_value) == NULL)
+			return (0);
+		break;
+	case WT_CELL_KEY:
+	case WT_CELL_KEY_OVFL:
+		if ((huffman = btree->huffman_key) == NULL)
+			return (0);
+		break;
+	}
+
+	return (__wt_huffman_decode(
+	    session, huffman, retb->data, retb->size, retb));
 }
