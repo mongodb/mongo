@@ -327,7 +327,7 @@ __wt_verify_dsk_row(
 				memmove((uint8_t *)current->data +
 				    prefix, current->data, prefix);
 				memcpy((void *)
-				    last->data, (void *)current->data, prefix);
+				    (void *)current->data, last->data, prefix);
 				current->size += prefix;
 			}
 		}
