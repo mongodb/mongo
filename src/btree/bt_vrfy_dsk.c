@@ -299,7 +299,7 @@ __wt_verify_dsk_row(
 			 * enough buffer space.
 			 */
 			__wt_cell_data_and_len(cell, &data, &data_size);
-			WT_ERR(__wt_buf_setsize(
+			WT_ERR(__wt_buf_grow(
 			    session, current, prefix + data_size));
 
 			/*
@@ -322,11 +322,11 @@ __wt_verify_dsk_row(
 			 * and copy the prefix into place.
 			 */
 			if (prefix != 0) {
-				WT_ERR(__wt_buf_setsize(
+				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
 				memmove((uint8_t *)current->data +
-				    prefix, current->data, prefix);
-				memcpy((void *)
+				    prefix, current->data, current->size);
+				memcpy(
 				    (void *)current->data, last->data, prefix);
 				current->size += prefix;
 			}
