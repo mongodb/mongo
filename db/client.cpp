@@ -98,7 +98,7 @@ namespace mongo {
         _curOp = new CurOp( this );
 #ifndef _WINDOWS
         stringstream temp;
-        temp << "0x" << hex << pthread_self();
+        temp << hex << showbase << pthread_self();
         _threadId = temp.str();
 #endif
         scoped_lock bl(clientsMutex);
