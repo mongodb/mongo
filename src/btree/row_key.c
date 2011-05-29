@@ -209,10 +209,18 @@ __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 		 * forward.
 		 */
 		if (direction == FORWARD) {
+			/*
+			 * Get a copy of the current key;
+			 * Ensure the buffer can hold the key plus the prefix;
+			 * Append the key to the prefix (already in the buffer);
+			 * Set the final size of the key.
+			 */
 			WT_ERR(__wt_cell_copy(session, key, &tmp));
 			WT_ERR(
 			    __wt_buf_setsize(session, retb, tmp.size + pfx));
 			memcpy((uint8_t *)retb->data + pfx, tmp.data, tmp.size);
+			retb->size = tmp.size + pfx;
+
 			if (slot_offset == 0)
 				break;
 		}
