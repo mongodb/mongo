@@ -96,6 +96,11 @@ namespace mongo {
         _mp(p) {
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
+#ifndef _WINDOWS
+        stringstream temp;
+        temp << "0x" << hex << pthread_self();
+        _threadId = temp.str();
+#endif
         scoped_lock bl(clientsMutex);
         clients.insert(this);
     }
@@ -387,9 +392,12 @@ namespace mongo {
         clientStr << _remote.toString();
         b.append("client", clientStr.str());
 
-        if ( _client )
+        if ( _client ) {
             b.append( "desc" , _client->desc() );
-
+            if ( _client->_threadId.size() ) 
+                b.append( "threadId" , _client->_threadId );
+        }
+        
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf(128);
