@@ -60,5 +60,12 @@ __wt_nlpo2(uint32_t v)
 int
 __wt_ispo2(uint32_t v)
 {
+	/*
+	 * Only numbers that are powers of two will satisfy the relationship
+	 * (v & (v - 1) == 0).
+	 *
+	 * However n must be positive, this returns 0 as a power of 2; to fix
+	 * that, use: (! (v & (v - 1)) && v)
+	 */
 	return ((v & (v - 1)) == 0 ? 1 : 0);
 }
