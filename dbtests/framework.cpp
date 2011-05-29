@@ -180,6 +180,8 @@ namespace mongo {
             }
         };
 
+        unsigned perfHist = 1;
+
         int Suite::run( int argc , char** argv , string default_dbpath ) {
             unsigned long long seed = time( 0 );
             string dbpathSpec;
@@ -202,6 +204,7 @@ namespace mongo {
             ("dur", "enable journaling")
             ("nodur", "disable journaling (currently the default)")
             ("seed", po::value<unsigned long long>(&seed), "random number seed")
+            ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
             ;
 
             hidden_options.add_options()
