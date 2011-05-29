@@ -720,7 +720,7 @@ __wt_huffman_encode(SESSION *session, void *huffman_arg,
 
 	/* Copy result of exact known size into caller's buffer. */
 	outlen = (bitpos + 7) / 8;
-	WT_ERR(__wt_buf_setsize(session, to_buf, outlen));
+	WT_ERR(__wt_buf_initsize(session, to_buf, outlen));
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
 #if 0
@@ -866,7 +866,7 @@ __wt_huffman_decode(SESSION *session, void *huffman_arg,
 	}
 
 	/* Return the number of bytes used. */
-	WT_ERR(__wt_buf_setsize(session, to_buf, outlen));
+	WT_ERR(__wt_buf_initsize(session, to_buf, outlen));
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
 #if 0

@@ -10,25 +10,6 @@
 static void __wt_buf_clear(WT_BUF *);
 
 /*
- * __wt_buf_setsize --
- *	Ensure that a buffer is at least as big as required and configure it
- *	to return an item, so that data == mem.
- */
-int
-__wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
-{
-	WT_ASSERT(session, sz <= UINT32_MAX);
-
-	if (sz > buf->mem_size)
-		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
-
-	buf->data = buf->mem;
-	buf->size = (uint32_t)sz;
-
-	return (0);
-}
-
-/*
  * __wt_buf_clear --
  *	Clear a buffer.
  */
@@ -45,6 +26,65 @@ __wt_buf_clear(WT_BUF *buf)
 }
 
 /*
+ * __wt_buf_init --
+ *	Initialize a buffer at a specific size.
+ */
+int
+__wt_buf_init(SESSION *session, WT_BUF *buf, size_t size)
+{
+	WT_ASSERT(session, size <= UINT32_MAX);
+
+	if (size > buf->mem_size)
+		WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
+
+	buf->data = buf->mem;
+	buf->size = 0;
+
+	return (0);
+}
+
+/*
+ * __wt_buf_initsize --
+ *	Initialize a buffer at a specific size, and set the data length.
+ */
+int
+__wt_buf_initsize(SESSION *session, WT_BUF *buf, size_t size)
+{
+	WT_RET(__wt_buf_init(session, buf, size));
+
+	buf->size = (uint32_t)size;		/* Set the data length. */
+
+	return (0);
+}
+
+/*
+ * __wt_buf_grow --
+ *	Grow a buffer that's currently in-use.
+ */
+int
+__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t size)
+{
+	uint32_t offset;
+
+	WT_ASSERT(session, size <= UINT32_MAX);
+
+	if (size <= buf->mem_size)
+		return (0);
+
+	/*
+	 * If we reallocate the buffer's memory, maintain the previous values
+	 * for the data/size pair.
+	 */
+	offset = buf->data == NULL ? 0 : WT_PTRDIFF32(buf->data, buf->mem);
+
+	WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
+
+	buf->data = (uint8_t *)buf->mem + offset;
+
+	return (0);
+}
+
+/*
  * __wt_buf_set --
  *	Set the contents of the buffer.
  */
@@ -52,15 +92,10 @@ int
 __wt_buf_set(SESSION *session, WT_BUF *buf, const void *data, uint32_t size)
 {
 	/* Ensure the buffer is large enough. */
-	WT_RET(__wt_buf_setsize(session, buf, size));
+	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	memcpy(buf->mem, data, size);
 
-	/*
-	 * !!!
-	 * We don't have to set buf->data or buf->size, the __wt_buf_setsize()
-	 * function did that for us.
-	 */
 	return (0);
 }
 
@@ -155,8 +190,9 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 		 * is large enough, we're done; otherwise, remember it.
 		 */
 		if (buf->mem_size >= size) {
+			WT_ERR(__wt_buf_init(session, buf, size));
 			F_SET(buf, WT_BUF_INUSE);
-			WT_ERR(__wt_buf_setsize(session, buf, size));
+
 			*scratchp = buf;
 			return (0);
 		}
@@ -169,9 +205,9 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 	 * Try and grow it.
 	 */
 	if (small != NULL) {
-		WT_ERR(__wt_buf_setsize(session, small, size));
-
+		WT_ERR(__wt_buf_init(session, small, size));
 		F_SET(small, WT_BUF_INUSE);
+
 		*scratchp = small;
 		return (0);
 	}

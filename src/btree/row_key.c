@@ -217,9 +217,8 @@ __wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 			 */
 			WT_ERR(__wt_cell_copy(session, key, &tmp));
 			WT_ERR(
-			    __wt_buf_setsize(session, retb, tmp.size + pfx));
+			    __wt_buf_initsize(session, retb, tmp.size + pfx));
 			memcpy((uint8_t *)retb->data + pfx, tmp.data, tmp.size);
-			retb->size = tmp.size + pfx;
 
 			if (slot_offset == 0)
 				break;

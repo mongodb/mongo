@@ -318,7 +318,7 @@ __slvg_read(SESSION *session, WT_STUFF *ss)
 			goto skip_allocsize;
 
 		/* The page size isn't insane, read the entire page. */
-		WT_ERR(__wt_buf_setsize(session, t, size));
+		WT_ERR(__wt_buf_initsize(session, t, size));
 		WT_ERR(__wt_read(session, fh, off, size, t->mem));
 		dsk = t->mem;
 

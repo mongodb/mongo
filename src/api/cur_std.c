@@ -93,7 +93,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	} else {
 		buf = &cursor->key;
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if ((ret = __wt_buf_setsize(session, buf, sz)) == 0 &&
+		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
 		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_KEY_SET);
 		else {
@@ -143,7 +143,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	} else {
 		buf = &cursor->value;
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if ((ret = __wt_buf_setsize(session, buf, sz)) == 0 &&
+		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
 		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_VALUE_SET);
 		else {

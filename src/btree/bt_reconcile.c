@@ -952,7 +952,7 @@ __rec_split_init(
 	btree = session->btree;
 
 	/* Ensure the scratch buffer is large enough. */
-	WT_RET(__wt_buf_setsize(session, &r->dsk, (size_t)max));
+	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
 
 	/*
 	 * Some fields of the disk image are fixed based on the original page,

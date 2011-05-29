@@ -31,7 +31,7 @@ __wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...)
 	WT_ERR(__log_record_size(session, recdesc, ap, &size));
 	va_end(ap);
 
-	WT_RET(__wt_buf_setsize(session, buf, size));
+	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	va_start(ap, recdesc);
 	WT_ERR(wiredtiger_struct_packv(buf->mem, size, recdesc->fmt, ap));
@@ -59,7 +59,7 @@ __wt_log_vprintf(SESSION *session, const char *fmt, va_list ap)
 	len = vsnprintf(NULL, 0, fmt, ap_copy) + 2;
 	va_end(ap_copy);
 
-	WT_RET(__wt_buf_setsize(session, buf, len));
+	WT_RET(__wt_buf_initsize(session, buf, len));
 
 	(void)vsnprintf(buf->mem, len, fmt, ap);
 

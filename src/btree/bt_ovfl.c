@@ -51,7 +51,7 @@ __wt_ovfl_in(SESSION *session, WT_OFF *ovfl, WT_BUF *store)
 	 *
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
-	WT_RET(__wt_buf_setsize(session, store, ovfl->size));
+	WT_RET(__wt_buf_initsize(session, store, ovfl->size));
 
 	/* Read the page. */
 	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, ovfl->size));
