@@ -120,13 +120,11 @@ namespace mongo {
         // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 
-        /** @param o both and in and out param -- insert can sometimes modify an object (such as add _id). */
+        /** insert will add an _id to the object if not present.  if you would like to see the final object
+            after such an addition, use this method.
+            @param o both and in and out param 
+            */
         DiskLoc insertWithObjMod(const char *ns, BSONObj & /*out*/o, bool god = false);
-
-        // todo eliminate
-        void insertWithObjModNoRet(const char *ns, BSONObj &o, bool god = false) {
-            insertWithObjMod(ns, o, god);
-        }
 
         /** @param obj in value only for this version. */
         void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);

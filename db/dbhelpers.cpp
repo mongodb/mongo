@@ -332,7 +332,7 @@ namespace mongo {
         if ( val ) {
             try {
                 BSONObj k = obj;
-                theDataFileMgr.insertWithObjModNoRet( name_.c_str(), k, false );
+                theDataFileMgr.insertWithObjMod( name_.c_str(), k, false );
             }
             catch ( DBException& ) {
                 // dup key - already in set

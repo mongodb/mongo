@@ -1517,21 +1517,18 @@ namespace mongo {
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
         BSONObj tmp = o;
-        insertWithObjModNoRet( ns, tmp, god );
+        insertWithObjMod( ns, tmp, god );
         logOp( "i", ns, tmp );
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param
      */
     DiskLoc DataFileMgr::insertWithObjMod(const char *ns, BSONObj &o, bool god) {
-        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god );
-        if ( !loc.isNull() )
+        bool addedID = false;
+        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god, true, &addedID );
+        if( addedID && !loc.isNull() )
             o = BSONObj( loc.rec() );
         return loc;
-    }
-
-    void DataFileMgr::insertNoReturnVal(const char *ns,  BSONObj o, bool god) {
-        insert( ns, o.objdata(), o.objsize(), god );
     }
 
     bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject );

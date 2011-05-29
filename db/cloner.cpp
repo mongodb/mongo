@@ -147,7 +147,7 @@ namespace mongo {
                 }
 
                 try {
-                    theDataFileMgr.insertWithObjModNoRet(to_collection, js);
+                    theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
 
@@ -216,7 +216,7 @@ namespace mongo {
             for ( list<BSONObj>::iterator i = storedForLater.begin(); i!=storedForLater.end(); i++ ) {
                 BSONObj js = *i;
                 try {
-                    theDataFileMgr.insertWithObjModNoRet(to_collection, js);
+                    theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
 
@@ -686,7 +686,7 @@ namespace mongo {
                         break;
                 }
                 BSONObj o = c->next();
-                theDataFileMgr.insertWithObjModNoRet( target.c_str(), o );
+                theDataFileMgr.insertWithObjMod( target.c_str(), o );
             }
 
             char cl[256];
@@ -717,7 +717,7 @@ namespace mongo {
                     }
                 }
                 BSONObj n = b.done();
-                theDataFileMgr.insertWithObjModNoRet( targetIndexes.c_str(), n );
+                theDataFileMgr.insertWithObjMod( targetIndexes.c_str(), n );
             }
 
             {

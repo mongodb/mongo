@@ -292,6 +292,9 @@ namespace mongo {
             srand( (unsigned) seed );
             printGitVersion();
             printSysInfo();
+            DEV log() << "_DEBUG build" << endl;
+            if( sizeof(void*)==4 )
+                log() << "32bit" << endl;
             log() << "random seed: " << seed << endl;
 
             FileAllocator::get()->start();
