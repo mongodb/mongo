@@ -592,8 +592,9 @@ wts_read(uint64_t keyno)
 		fprintf(stderr,
 		    "wts_read: read row %llu:\n",
 		    (unsigned long long)keyno);
-		__wt_debug_item("\tbdb", &bdb_value, stderr);
-		__wt_debug_item("\twt", &value, stderr);
+		__wt_debug_pair(
+		    "bdb", bdb_value.data, bdb_value.size, stderr);
+		__wt_debug_pair("wt", value.data, value.size, stderr);
 		return (1);
 	}
 	return (0);

@@ -34,9 +34,9 @@ serial['insert'] = Serial(
 serial['row_key'] = Serial(
 	'row_key',
 	'WT_WORKQ_FUNC', '1',
-	['void */row_arg',
-	 'void */key',
-	 'uint32_t/size',
+	['WT_PAGE */page',
+	 'void */row_arg',
+	 'WT_IKEY */ikey',
 	 'bitstr_t */ovfl',
 	 'uint32_t/slot'])
 

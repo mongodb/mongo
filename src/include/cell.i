@@ -209,16 +209,16 @@ __wt_cell_next(WT_CELL *cell)
  *	Return a pointer to the next key WT_CELL on the page.
  */
 static inline WT_CELL *
-__wt_key_cell_next(WT_CELL *key_cell)
+__wt_key_cell_next(WT_CELL *cell)
 {
 	/*
 	 * Row-store leaf pages may have a single data cell between each key, or
 	 * keys may be adjacent (when the data cell is empty).  Move to the next
 	 * key.
 	 */
-	key_cell = __wt_cell_next(key_cell);
-	if (__wt_cell_type(key_cell) != WT_CELL_KEY &&
-	    __wt_cell_type(key_cell) != WT_CELL_KEY_OVFL)
-		key_cell = __wt_cell_next(key_cell);
-	return (key_cell);
+	cell = __wt_cell_next(cell);
+	if (__wt_cell_type(cell) == WT_CELL_KEY ||
+	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+		return (cell);
+	return (__wt_cell_next(cell));
 }

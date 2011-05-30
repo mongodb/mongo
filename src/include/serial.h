@@ -70,30 +70,30 @@ typedef struct {
 } while (0)
 
 typedef struct {
+	WT_PAGE * page;
 	void * row_arg;
-	void * key;
-	uint32_t size;
+	WT_IKEY * ikey;
 	bitstr_t * ovfl;
 	uint32_t slot;
 } __wt_row_key_args;
 #define	__wt_row_key_serial(\
-    session, _row_arg, _key, _size, _ovfl, _slot, ret) do {\
+    session, _page, _row_arg, _ikey, _ovfl, _slot, ret) do {\
 	__wt_row_key_args _args;\
+	_args.page = (_page);\
 	_args.row_arg = (_row_arg);\
-	_args.key = (_key);\
-	_args.size = (_size);\
+	_args.ikey = (_ikey);\
 	_args.ovfl = (_ovfl);\
 	_args.slot = (_slot);\
 	(ret) = __wt_session_serialize_func((session),\
 	    WT_WORKQ_FUNC, 1, __wt_row_key_serial_func, &_args);\
 } while (0)
 #define	__wt_row_key_unpack(\
-    session, _row_arg, _key, _size, _ovfl, _slot) do {\
+    session, _page, _row_arg, _ikey, _ovfl, _slot) do {\
 	__wt_row_key_args *_args =\
 	    (__wt_row_key_args *)(session)->wq_args;\
+	(_page) = _args->page;\
 	(_row_arg) = _args->row_arg;\
-	(_key) = _args->key;\
-	(_size) = _args->size;\
+	(_ikey) = _args->ikey;\
 	(_ovfl) = _args->ovfl;\
 	(_slot) = _args->slot;\
 } while (0)

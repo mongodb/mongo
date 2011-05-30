@@ -83,6 +83,8 @@ struct __wt_free_entry;
     typedef struct __wt_free_entry WT_FREE_ENTRY;
 struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
+struct __wt_ikey;
+    typedef struct __wt_ikey WT_IKEY;
 struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_mtx;

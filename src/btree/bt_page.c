@@ -318,7 +318,6 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/* FALLTHROUGH */
 		case WT_CELL_KEY:
 			rref->key = cell;
-			rref->size = WT_NEEDS_PROCESS;
 			break;
 		case WT_CELL_OFF:
 			__wt_cell_off(cell, &off);
@@ -380,18 +379,9 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (rip->key != NULL)
 				++rip;
 			rip->key = cell;
-			rip->size = WT_NEEDS_PROCESS;
-
-			/*
-			 * Two keys in a row, or a key at the end of the page
-			 * implies a zero-length data item.  Set the slot as if
-			 * it's going to happen.
-			 */
-			rip->value = WT_ROW_EMPTY;
 			break;
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
-			rip->value = WT_PAGE_DISK_OFFSET(dsk, cell);
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}

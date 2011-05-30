@@ -185,8 +185,8 @@ __wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	 * if it points somewhere other than the original page), and free it.
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
-		if (__wt_ref_off_page(page, rref->key, size))
-			__wt_free(session, rref->key);
+		if (__wt_off_page_size(page, rref->key, size))
+			__wt_sb_free(session, ((WT_IKEY *)rref->key)->sb);
 
 	/* Free the subtree-reference array. */
 	if (page->u.row_int.t != NULL)
@@ -211,8 +211,8 @@ __wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	 * the memory.
 	 */
 	WT_ROW_FOREACH(page, rip, i)
-		if (__wt_ref_off_page(page, rip->key, size))
-			__wt_free(session, rip->key);
+		if (__wt_off_page_size(page, rip->key, size))
+			__wt_sb_free(session, ((WT_IKEY *)rip->key)->sb);
 	__wt_free(session, page->u.row_leaf.d);
 
 	/*

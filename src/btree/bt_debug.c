@@ -11,12 +11,14 @@
 
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_debug_cell(WT_SESSION_IMPL *, WT_CELL *, FILE *fp);
-static int  __wt_debug_cell_data(WT_SESSION_IMPL *, WT_CELL *, FILE *);
+static int  __wt_debug_cell_data(
+	WT_SESSION_IMPL *, const char *, WT_CELL *, FILE *);
 static void __wt_debug_col_insert(WT_INSERT *, FILE *);
 static int  __wt_debug_dsk_cell(WT_SESSION_IMPL *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_fix(WT_BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(WT_BTREE *, WT_PAGE_DISK *, FILE *);
+static void __wt_debug_ikey(WT_IKEY *, FILE *);
 static void __wt_debug_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_int(
 	WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
@@ -28,7 +30,6 @@ static int  __wt_debug_page_row_int(
 static int  __wt_debug_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_work(
 	WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
-static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_ref(WT_REF *, FILE *);
 static void __wt_debug_row_insert(WT_INSERT *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
@@ -300,6 +301,12 @@ __wt_debug_page_work(
 
 	__wt_debug_page_flags(page, fp);
 
+	/* Skip bulk-loaded pages. */
+	if (F_ISSET(page, WT_PAGE_BULK_LOAD)) {
+		fprintf(fp, "bulk-loaded page -- skipped\n");
+		return (0);
+	}
+
 	/* Dump the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -467,10 +474,8 @@ __wt_debug_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_COL_FOREACH(page, cip, i) {
-		fprintf(fp, "\tV {");
-		WT_RET(
-		    __wt_debug_cell_data(session, WT_COL_PTR(page, cip), fp));
-		fprintf(fp, "}\n");
+		WT_RET(__wt_debug_cell_data(
+		    session, "V", WT_COL_PTR(page, cip), fp));
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
 			__wt_debug_update(upd, fp);
@@ -493,12 +498,12 @@ __wt_debug_page_row_int(
 		fp = stderr;
 
 	WT_ROW_REF_FOREACH(page, rref, i) {
-		if (__wt_key_process(rref)) {
-			fprintf(fp, "\tK: {");
-			WT_RET(__wt_debug_cell_data(session, rref->key, fp));
-			fprintf(fp, "}\n");
-		} else
-			__wt_debug_item("\tK", rref, fp);
+		if (__wt_off_page(page, rref->key))
+			__wt_debug_ikey(rref->key, fp);
+		else
+			WT_RET(
+			    __wt_debug_cell_data(session, "K", rref->key, fp));
+
 		fprintf(fp, "\t");
 		__wt_debug_ref(&rref->ref, fp);
 	}
@@ -520,6 +525,7 @@ __wt_debug_page_row_int(
 static int
 __wt_debug_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, FILE *fp)
 {
+	WT_CELL *cell;
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -537,18 +543,16 @@ __wt_debug_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, FILE *fp)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		if (__wt_key_process(rip)) {
-			fprintf(fp, "\tK: {");
-			WT_RET(__wt_debug_cell_data(session, rip->key, fp));
-			fprintf(fp, "}\n");
-		} else
-			__wt_debug_item("\tK", rip, fp);
+		if (__wt_off_page(page, rip->key))
+			__wt_debug_ikey(rip->key, fp);
+		else
+			WT_RET(
+			    __wt_debug_cell_data(session, "K", rip->key, fp));
 
-		fprintf(fp, "\tV: {");
-		if (!WT_ROW_EMPTY_ISSET(rip))
-			WT_RET(__wt_debug_cell_data(
-			    session, WT_ROW_PTR(page, rip), fp));
-		fprintf(fp, "}\n");
+		if ((cell = __wt_row_value(page, rip)) == NULL)
+			fprintf(fp, "\tV {}\n");
+		else
+			WT_RET(__wt_debug_cell_data(session, "V", cell, fp));
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
 			__wt_debug_update(upd, fp);
@@ -588,7 +592,7 @@ __wt_debug_row_insert(WT_INSERT *ins, FILE *fp)
 		fp = stderr;
 
 	for (; ins != NULL; ins = ins->next) {
-		__wt_debug_pair("\tinsert",
+		__wt_debug_pair("insert",
 		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), fp);
 		__wt_debug_update(ins->upd, fp);
 	}
@@ -609,7 +613,7 @@ __wt_debug_update(WT_UPDATE *upd, FILE *fp)
 			fprintf(fp, "\tupdate: {deleted}\n");
 		else
 			__wt_debug_pair(
-			    "\tupdate", WT_UPDATE_DATA(upd), upd->size, fp);
+			    "update", WT_UPDATE_DATA(upd), upd->size, fp);
 }
 
 /*
@@ -661,11 +665,9 @@ __wt_debug_cell(WT_SESSION_IMPL *session, WT_CELL *cell, FILE *fp)
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+	fprintf(fp, "\n");
 
-	fprintf(fp, "\n\t{");
-	WT_RET(__wt_debug_cell_data(session, cell, fp));
-	fprintf(fp, "}\n");
-	return (0);
+	return (__wt_debug_cell_data(session, NULL, cell, fp));
 }
 
 /*
@@ -741,7 +743,8 @@ __wt_debug_dsk_col_rle(WT_BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a single cell's data in debugging mode.
  */
 static int
-__wt_debug_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell, FILE *fp)
+__wt_debug_cell_data(
+    WT_SESSION_IMPL *session, const char *tag, WT_CELL *cell, FILE *fp)
 {
 	WT_BUF *tmp;
 	uint32_t size;
@@ -775,7 +778,7 @@ __wt_debug_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell, FILE *fp)
 	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}
 
-	__wt_print_byte_string(p, size, fp);
+	__wt_debug_pair(tag, p, size, fp);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -783,38 +786,29 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_debug_item --
- *	Dump a single WT_ITEM in debugging mode, with an optional tag.
+ * __wt_debug_ikey --
+ *	Dump a single WT_IKEY in debugging mode, with an optional tag.
  */
-void
-__wt_debug_item(const char *tag, void *arg_item, FILE *fp)
+static void
+__wt_debug_ikey(WT_IKEY *ikey, FILE *fp)
 {
-	WT_ITEM *item;
-
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	/*
-	 * The argument isn't necessarily a WT_ITEM structure, but the first two
-	 * fields of the argument are always a void *data/uint32_t size pair.
-	 */
-	item = arg_item;
-	__wt_debug_pair(tag, item->data, item->size, fp);
+	__wt_debug_pair("K", WT_IKEY_DATA(ikey), ikey->size, fp);
 }
 
 /*
  * __wt_debug_pair --
  *	Dump a single data/size pair, with an optional tag.
  */
-static void
+void
 __wt_debug_pair(const char *tag, const void *data, uint32_t size, FILE *fp)
 {
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	if (tag != NULL)
-		fprintf(fp, "%s: ", tag);
-	fprintf(fp, "%lu {",  (u_long)size);
+	fprintf(fp, "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
 	__wt_print_byte_string(data, size, fp);
 	fprintf(fp, "}\n");
 }

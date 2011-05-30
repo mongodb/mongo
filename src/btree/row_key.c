@@ -20,14 +20,18 @@ __wt_row_key(
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BUF build, tmp;
+	WT_CELL *cell;
+	WT_IKEY *ikey;
+	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	bitstr_t *ovfl;
-	uint32_t pfx, size, slot;
+	uint32_t pfx, slot;
 	uint8_t type;
 	int is_ovfl, is_local, ret, slot_offset;
 	void *key;
 
+	dsk = page->dsk;
 	WT_CLEAR(build);
 	WT_CLEAR(tmp);
 
@@ -106,7 +110,7 @@ __wt_row_key(
 		 *
 		 * 1: the test for an on/off page reference.
 		 */
-		if (__wt_ref_off_page(page, key, WT_PSIZE(page))) {
+		if (__wt_off_page(page, key)) {
 			/*
 			 * If this is the key we originally wanted, we don't
 			 * care if we're rolling forward or backward, or if
@@ -125,9 +129,9 @@ __wt_row_key(
 			 */
 			if (slot_offset == 0 ||
 			    ovfl == NULL || !bit_test(ovfl, slot)) {
-				WT_ERR(__wt_buf_set(session, retb, key,
-				    type == WT_PAGE_ROW_INT ?
-				    rref->size : rip->size));
+				ikey = key;
+				WT_ERR(__wt_buf_set(session,
+				    retb, WT_IKEY_DATA(ikey), ikey->size));
 				if (slot_offset == 0)
 					break;
 
@@ -244,16 +248,20 @@ next:		switch (direction) {
 	if (!is_local)
 		return (0);
 
-	/* Steal the buffer's memory, then serialize the key into place. */
-	__wt_buf_steal(session, retb, &key, &size);
+	WT_ERR(__wt_row_ikey_alloc(session, retb->data, retb->size, &ikey));
+	if ((cell = __wt_row_value(page, row_arg)) == NULL)
+		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
+	else
+		ikey->value_cell_offset = WT_PAGE_DISK_OFFSET(dsk, cell);
+	__wt_buf_free(session, &tmp);
 
 	/* Serialize the swap of the key into place. */
 	__wt_row_key_serial(
-	    session, row_arg, key, size, is_ovfl ? ovfl : NULL, slot, ret);
+	    session, page, row_arg, ikey, is_ovfl ? ovfl : NULL, slot, ret);
 
 	/* Free the allocated memory if the workQ didn't use it for the key. */
-	if (((WT_ROW *)row_arg)->key != key)
-		__wt_buf_free(session, key);
+	if (((WT_ROW *)row_arg)->key != ikey)
+		__wt_sb_decrement(session, ikey->sb);
 
 	return (ret);
 
@@ -263,40 +271,105 @@ err:	__wt_buf_free(session, &build);
 }
 
 /*
+ * __wt_row_value --
+ *	Return a pointer to the value cell for a row-store leaf page key, or
+ * NULL if there isn't one.
+ */
+WT_CELL *
+__wt_row_value(WT_PAGE *page, void *row_arg)
+{
+	WT_CELL *cell;
+	WT_IKEY *ikey;
+	void *key;
+
+	/*
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
+	 * is a void *.
+	 *
+	 * Multiple threads of control may be searching this page, which means
+	 * the key may change underfoot, and here's where it gets tricky: first,
+	 * copy the key.
+	 */
+	key = ((WT_ROW *)row_arg)->key;
+
+	/*
+	 * Key copied.
+	 *
+	 * Now, key either references a WT_IKEY structure that has a value-cell
+	 * offset, or references the on-page key WT_CELL, and we can walk past
+	 * that to find the value WT_CELL.  Both can be processed regardless of
+	 * what other threads are doing.
+	 */
+	if (__wt_off_page(page, key)) {
+		ikey = key;
+		return (WT_IKEY_VALUE_EMPTY_ISSET(ikey) ?
+		    NULL : WT_ROW_PTR(page, ikey->value_cell_offset));
+	}
+
+	/*
+	 * Row-store leaf pages may have a single data cell between each key, or
+	 * keys may be adjacent (when the data cell is empty).  Move to the next
+	 * key.  The page reconciliation code guarantees there is always a key
+	 * cell after an empty data cell, so this is safe.
+	 */
+	cell = __wt_cell_next(key);
+	if (__wt_cell_type(cell) == WT_CELL_KEY ||
+	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+		return (NULL);
+	return (cell);
+}
+
+/*
+ * __wt_row_ikey_alloc --
+ *	Instantiate a key in a WT_IKEY structure.
+ */
+int
+__wt_row_ikey_alloc(
+    WT_SESSION_IMPL *session, const void *key, uint32_t size, WT_IKEY **ikeyp)
+{
+	WT_IKEY *ikey;
+	WT_SESSION_BUFFER *sb;
+
+	/*
+	 * Allocate the WT_IKEY structure and room for the value, then copy
+	 * the value into place.
+	 */
+	WT_RET(__wt_sb_alloc(session, sizeof(WT_IKEY) + size, &ikey, &sb));
+	ikey->sb = sb;
+	ikey->size = size;
+	memcpy(WT_IKEY_DATA(ikey), key, size);
+
+	*ikeyp = ikey;
+	return (0);
+}
+
+/*
  * __wt_row_key_serial_func --
  *	Server function to instantiate a key during a row-store search.
  */
 int
 __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 {
+	WT_IKEY *ikey;
+	WT_PAGE *page;
 	WT_ROW *rip;
 	bitstr_t *ovfl;
-	uint32_t size, slot;
-	void *key;
+	uint32_t slot;
 
-	__wt_row_key_unpack(session, rip, key, size, ovfl, slot);
+	__wt_row_key_unpack(session, page, rip, ikey, ovfl, slot);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler
 	 * test, if the key we're interested in still needs to be instantiated,
 	 * because it can only be in one of two states.
 	 *
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
+	 * is a void *.
 	 */
-	if (__wt_key_process(rip)) {
-		/*
-		 * Update the overflow bit (if necessary) and the key, flush
-		 * memory, then update the size.  The order is so any other
-		 * thread is guaranteed to either see a size of 0 (indicating
-		 * the key needs processing, which means we'll resolve it all
-		 * here), or see a non-zero size and valid pointer pair.
-		 */
-		if (ovfl != NULL)
+	if (!__wt_off_page(page, rip->key)) {
+		if (ovfl != NULL)		/* WRONG BUT GOING AWAY */
 			bit_set(ovfl, (int)slot);
-		rip->key = key;
-		WT_MEMORY_FLUSH;
-		rip->size = size;
+		rip->key = ikey;
 	}
 	__wt_session_serialize_wrapup(session, NULL, 0);
 	return (0);

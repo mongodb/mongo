@@ -19,6 +19,7 @@ __wt_return_data(
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_IKEY *ikey;
 	WT_ITEM local_key, local_value;
 	WT_COL *cip;
 	WT_CELL *cell;
@@ -65,21 +66,23 @@ __wt_return_data(
 	 * support).
 	 */
 	if (key_return) {
-		if (__wt_key_process(rip)) {
-			WT_RET(__wt_row_key(session,
-			    page, rip, &cursor->key));
-			key->data = rip->key;
-			key->size = rip->size;
-		} else if (callback == NULL) {
-			WT_RET(__wt_buf_set(session,
-			    &cursor->key, rip->key, rip->size));
-
-			*key = *(WT_ITEM *)&cursor->key;
+		if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			if (callback == NULL) {
+				WT_RET(__wt_buf_set(session, &cursor->key,
+				    WT_IKEY_DATA(ikey), ikey->size));
+				key->data = cursor->key.data;
+				key->size = cursor->key.size;
+			} else {
+				WT_CLEAR(local_key);
+				key = &local_key;
+				key->data = WT_IKEY_DATA(ikey);
+				key->size = ikey->size;
+			}
 		} else {
-			WT_CLEAR(local_key);
-			key = &local_key;
-			key->data = rip->key;
-			key->size = rip->size;
+			WT_RET(__wt_row_key(session, page, rip, &cursor->key));
+			key->data = cursor->key.data;
+			key->size = cursor->key.size;
 		}
 	}
 
@@ -111,12 +114,11 @@ __wt_return_data(
 		cell = WT_COL_PTR(page, cip);
 		goto page_cell;
 	case WT_PAGE_ROW_LEAF:
-		if (WT_ROW_EMPTY_ISSET(rip)) {
+		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			value_ret = "";
 			size_ret = 0;
 			break;
 		}
-		cell = WT_ROW_PTR(page, rip);
 page_cell:	switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (btree->huffman_value == NULL) {

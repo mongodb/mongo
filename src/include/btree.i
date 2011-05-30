@@ -89,20 +89,6 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_key_process --
- *	Return if a key requires processing.
- */
-static inline int
-__wt_key_process(void *ref)
-{
-	/*
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
-	 */
-	return (((WT_ROW *)ref)->size == WT_NEEDS_PROCESS ? 1 : 0);
-}
-
-/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */
@@ -113,19 +99,27 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 }
 
 /*
- * __wt_ref_off_page --
+ * __wt_off_page_size --
  *	Return if a pointer references off-page data.
  */
 static inline int
-__wt_ref_off_page(WT_PAGE *page, const void *p, uint32_t size)
+__wt_off_page_size(WT_PAGE *page, const void *p, uint32_t size)
 {
 	/*
 	 * There may be no underlying page, in which case the reference is
 	 * off-page by definition.
 	 */
-	if (page->dsk == NULL)
-		return (1);
-
-	return (p < (void *)page->dsk ||
+	return (page->dsk == NULL ||
+	    p < (void *)page->dsk ||
 	    p >= (void *)((uint8_t *)page->dsk + size) ? 1 : 0);
+}
+
+/*
+ * __wt_off_page --
+ *	Return if a pointer references off-page data.
+ */
+static inline int
+__wt_off_page(WT_PAGE *page, const void *p)
+{
+	return (__wt_off_page_size(page, p, WT_PSIZE(page)));
 }

@@ -45,8 +45,6 @@ typedef struct {
 	uint64_t recno;				/* Total record number */
 	uint32_t ipp;				/* Items per page */
 
-	WT_BUF	 key;				/* Parent key buffer */
-
 	/*
 	 * K/V pairs for row-store leaf pages, and V objects for column-store
 	 * leaf pages, are stored in singly-linked lists (the lists are never

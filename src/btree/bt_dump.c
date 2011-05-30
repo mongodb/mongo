@@ -241,7 +241,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *cell;
 	WT_INSERT *ins;
-	WT_ITEM *key, *value, value_local;
+	WT_ITEM *key, _key, *value, _value;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -256,7 +256,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key_tmp));
 	WT_ERR(__wt_scr_alloc(session, 0, &value_tmp));
-	WT_CLEAR(value_local);
+	WT_CLEAR(_value);
 
 	/*
 	 * Dump any K/V pairs inserted into the page before the first from-disk
@@ -281,11 +281,14 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * The key and value variables reference the items we will
 		 * print.  Set the key.
 		 */
-		if (__wt_key_process(rip)) {
+		if (__wt_off_page(page, rip->key)) {
+			_key.data = WT_IKEY_DATA(rip->key);
+			_key.size = ((WT_IKEY *)rip->key)->size;
+			key = &_key;
+		} else {
 			WT_ERR(__wt_row_key(session, page, rip, key_tmp));
 			key = (WT_ITEM *)key_tmp;
-		} else
-			key = (WT_ITEM *)rip;
+		}
 
 		/*
 		 * If the item was ever updated, dump the data from the
@@ -298,18 +301,17 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Check for an empty item. */
-		if (WT_ROW_EMPTY_ISSET(rip)) {
+		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			dp->p(key->data, key->size, dp->stream);
 			dp->p(NULL, 0, dp->stream);
 			goto dump_insert;
 		}
 
 		/* Set cell to reference the value we'll dump. */
-		cell = WT_ROW_PTR(page, rip);
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				value = &value_local;
+				value = &_value;
 				__wt_cell_data_and_len(
 				    cell, &value->data, &value->size);
 				break;

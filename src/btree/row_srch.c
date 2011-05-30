@@ -18,7 +18,9 @@ int
 __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_IKEY *ikey;
 	WT_INSERT *ins;
+	WT_ITEM item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
@@ -57,13 +59,18 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 			 *
 			 * If the key is compressed or an overflow, it may not
 			 * have been instantiated yet.
+			 *
+			 * CHECK FOR PREFIX 0 AND USE ON PAGE
 			 */
 			if (indx != 0) {
-				if (__wt_key_process(rref))
+				if (!__wt_off_page(page, rref->key))
 					WT_ERR(__wt_row_key(
 					    session, page, rref, NULL));
+				ikey = rref->key;
+				item.data = WT_IKEY_DATA(ikey);
+				item.size = ikey->size;
 
-				cmp = func(btree, key, (WT_ITEM *)rref);
+				cmp = func(btree, key, &item);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -129,10 +136,13 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		 * If the key is compressed or an overflow, it may not have
 		 * been instantiated yet.
 		 */
-		if (__wt_key_process(rip))
+		if (!__wt_off_page(page, rip->key))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
+		ikey = rip->key;
+		item.data = WT_IKEY_DATA(ikey);
+		item.size = ikey->size;
 
-		cmp = func(btree, key, (WT_ITEM *)rip);
+		cmp = func(btree, key, &item);
 		if (cmp == 0)
 			break;
 		if (cmp < 0)

@@ -258,7 +258,6 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
@@ -272,11 +271,10 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 		    &cbulk->rref));
 		cbulk->ref_entries += 1000;
 	}
-	WT_RET(__wt_buf_set(session, &cbulk->key,
+	WT_RET(__wt_row_ikey_alloc(session,
 	    WT_INSERT_KEY(cbulk->ins_base),
-	    WT_INSERT_KEY_SIZE(cbulk->ins_base)));
-	rref = &cbulk->rref[cbulk->ref_next];
-	__wt_buf_steal(session, &cbulk->key, &rref->key, &rref->size);
+	    WT_INSERT_KEY_SIZE(cbulk->ins_base),
+	    (WT_IKEY **)&cbulk->rref[cbulk->ref_next].key));
 
 	/*
 	 * Allocate a page.  Bulk load pages are skeleton pages: there's no

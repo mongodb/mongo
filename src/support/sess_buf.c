@@ -146,13 +146,13 @@ __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
 	/*
 	 * This function is used for two reasons.
 	 *
-	 * #1: it's possible we allocated a WT_UPDATE structure and related K/V
-	 * memory from the session buffer, but then an error occurred.  In this
-	 * case we don't try and clean up the session buffer, it's simpler to
-	 * decrement the counters and pretend the memory is no longer in use.
-	 * We're still in the allocation path, so we decrement the "in" field
-	 * instead of incrementing the "out" field, if the eviction thread were
-	 * to update the "out" field at the same time, we could race.
+	 * #1: it's possible we allocated memory from the session buffer, but
+	 * then an error occurred.  In this case we don't try and clean up the
+	 * session buffer, it's simpler to decrement the counters and pretend
+	 * the memory is no longer in use.  We're still in the allocation path
+	 * so we decrement the "in" field instead of incrementing the "out"
+	 * field, if the eviction thread were to update the "out" field at the
+	 * same time, we could race.
 	 *
 	 * #2: the "in" reference count is artificially incremented by 1 as
 	 * long as a session buffer is referenced by the session handle; we do

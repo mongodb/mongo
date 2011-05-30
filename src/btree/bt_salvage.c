@@ -1465,8 +1465,10 @@ __slvg_build_internal_row(
 			if (deleted)
 				continue;
 		} else {
-			__wt_buf_steal(session,
-			    &trk->u.row.range_start, &rref->key, &rref->size);
+			WT_ERR(__wt_row_ikey_alloc(session,
+			    trk->u.row.range_start.data,
+			    trk->u.row.range_start.size,
+			    (WT_IKEY **)&rref->key));
 			if (ss->range_merge)
 				__slvg_trk_ovfl_ref(trk, ss);
 		}
@@ -1494,11 +1496,12 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
+	WT_IKEY *ikey;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
-	uint32_t i, skip_start, skip_stop;
 	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
-	void *item;
+	uint32_t i, skip_start, skip_stop;
 
 	btree = session->btree;
 	func = btree->btree_compare;
@@ -1533,28 +1536,34 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			if (__wt_key_process(rip)) {
-				WT_ERR(__wt_row_key(
-				    session, page, rip, key));
-				item = key;
-			} else
-				item = rip;
+			if (__wt_off_page(page, rip->key)) {
+				ikey = rip->key;
+				_item.data = WT_IKEY_DATA(ikey);
+				_item.size = ikey->size;
+				item = &_item;
+			} else {
+				WT_ERR(__wt_row_key(session, page, rip, key));
+				item = (WT_ITEM *)key;
+			}
 
-			if  (func(btree, (WT_ITEM *)item,
-			    (WT_ITEM *)&trk->u.row.range_start) > 0)
+			if  (func(btree,
+			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
 				break;
 			++skip_start;
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			if (__wt_key_process(rip)) {
-				WT_ERR(__wt_row_key(
-				    session, page, rip, key));
-				item = key;
-			} else
-				item = rip;
-			if  (func(btree, (WT_ITEM *)item,
-			    (WT_ITEM *)&trk->u.row.range_stop) < 0)
+			if (__wt_off_page(page, rip->key)) {
+				ikey = rip->key;
+				_item.data = WT_IKEY_DATA(ikey);
+				_item.size = ikey->size;
+				item = &_item;
+			} else {
+				WT_ERR(__wt_row_key(session, page, rip, key));
+				item = (WT_ITEM *)key;
+			}
+			if  (func(btree,
+			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
 				break;
 			++skip_stop;
 		}
@@ -1626,11 +1635,15 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		 * a copy from the page.
 		 */
 		rip = page->u.row_leaf.d + skip_start;
-		if (__wt_key_process(rip))
+		if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			WT_ERR(__wt_row_ikey_alloc(session, WT_IKEY_DATA(ikey),
+			    ikey->size, (WT_IKEY **)&rref->key));
+		} else {
 			WT_ERR(__wt_row_key(session, page, rip, key));
-		else
-			WT_ERR(__wt_buf_set(session, key, rip->key, rip->size));
-		__wt_buf_steal(session, key, &rref->key, &rref->size);
+			WT_ERR(__wt_row_ikey_alloc(session,
+			    key->data, key->size, (WT_IKEY **)&rref->key));
+		}
 	}
 
 	/* Discard the page and our hazard reference. */
@@ -1668,8 +1681,8 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
 			F_SET(*searchp, WT_TRACK_OVFL_REFD);
 		}
-		value_cell = WT_ROW_PTR(page, rip);
-		if (__wt_cell_type(value_cell) == WT_CELL_DATA_OVFL) {
+		if ((value_cell = __wt_row_value(page, rip)) != NULL &&
+		    __wt_cell_type(value_cell) == WT_CELL_DATA_OVFL) {
 			__wt_cell_off(value_cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,

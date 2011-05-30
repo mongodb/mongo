@@ -183,8 +183,9 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 static inline int
 __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 {
-	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
+	WT_IKEY *ikey;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	int found;
 
@@ -212,14 +213,22 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 		/* We've got a record. */
 		found = 1;
 
-		/* Set the key. */
-		if (__wt_key_process(cbt->rip))
-			WT_RET(__wt_row_key(session,
-			    cbt->page, cbt->rip, key));
-		else {
-			key->data = cbt->rip->key;
-			key->size = cbt->rip->size;
-		}
+		/*
+		 * Set the key.
+		 *
+		 * XXX
+		 * If we have the last key, we can easily build the next prefix
+		 * compressed key without calling __wt_row_key() -- obviously,
+		 * that won't work for overflow or Huffman-encoded keys, so we
+		 * need to check the cell type, at the least, before taking the
+		 * fast path.
+		 */
+		if (__wt_off_page(cbt->page, cbt->rip->key)) {
+			ikey = cbt->rip->key;
+			key->data = WT_IKEY_DATA(ikey);
+			key->size = ikey->size;
+		} else
+			WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
 
 		/*
 		 * If the item was ever modified, use the data from the
@@ -229,19 +238,12 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 		if (upd != NULL) {
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
-		} else if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
+		} else if ((cell =
+		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
 			value->data = "";
 			value->size = 0;
-		} else {
-			cell = WT_ROW_PTR(cbt->page, cbt->rip);
-			switch (__wt_cell_type(cell)) {
-			case WT_CELL_DATA:
-			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_copy(session, cell, value));
-				break;
-			WT_ILLEGAL_FORMAT(session);
-			}
-		}
+		} else
+			WT_RET(__wt_cell_copy(session, cell, value));
 	}
 
 	return (0);

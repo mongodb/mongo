@@ -1842,6 +1842,7 @@ static int
 __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL *cell;
+	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
@@ -1989,14 +1990,15 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else if (__wt_key_process(rref)) {
+		} else if (__wt_off_page(page, rref->key)) {
+			ikey = rref->key;
+			WT_RET(__rec_cell_build_key(
+			    session, WT_IKEY_DATA(ikey), ikey->size));
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
+		} else {
 			WT_RET(__wt_row_key(session, page, rref, &key->buf));
 			WT_RET(__rec_cell_build_key(
 			    session, key->buf.data, key->buf.size));
-			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
-		} else {
-			WT_RET(__rec_cell_build_key(
-			    session, rref->key, rref->size));
 			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
 
@@ -2049,6 +2051,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
@@ -2092,12 +2095,12 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (r->cell_zero)
 			WT_RET(__rec_cell_build_key(session, "*", 1));
-		else if (r->merge_ref != NULL)
+		else {
+			ikey = r->merge_ref == NULL ?
+			    rref->key : r->merge_ref->key;
 			WT_RET(__rec_cell_build_key(
-			    session, r->merge_ref->key, r->merge_ref->size));
-		else
-			WT_RET(__rec_cell_build_key(
-			    session, rref->key, rref->size));
+			    session, WT_IKEY_DATA(ikey), ikey->size));
+		}
 		ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 
 		/*
@@ -2152,6 +2155,7 @@ static int
 __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 {
 	WT_CELL *cell, *val_cell;
+	WT_IKEY *ikey;
 	WT_INSERT *ins;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -2213,10 +2217,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 			 * was read into memory, there may not have been a value
 			 * item, that is, it may have been zero length.
 			 */
-			if (WT_ROW_EMPTY_ISSET(rip))
+			if ((val_cell = __wt_row_value(page, rip)) == NULL)
 				val->buf.size = 0;
 			else {
-				val_cell = WT_ROW_PTR(page, rip);
 				val->buf.data = val_cell;
 				val->buf.size = __wt_cell_len(val_cell);
 			}
@@ -2227,9 +2230,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 			 * If we updated an overflow value, free the underlying
 			 * file space.
 			 */
-			if (!WT_ROW_EMPTY_ISSET(rip))
-				WT_RET(__rec_discard_add_ovfl(
-				    session, WT_ROW_PTR(page, rip)));
+			if ((val_cell = __wt_row_value(page, rip)) != NULL)
+				WT_RET(
+				    __rec_discard_add_ovfl(session, val_cell));
 
 			/*
 			 * If this key/value pair was deleted, we're done.  If
@@ -2265,14 +2268,15 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else if (__wt_key_process(rip)) {
+		} else if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			WT_RET(__rec_cell_build_key(
+			    session, WT_IKEY_DATA(ikey), ikey->size));
+			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
+		} else {
 			WT_RET(__wt_row_key(session, page, rip, &key->buf));
 			WT_RET(__rec_cell_build_key(
 			    session, key->buf.data, key->buf.size));
-			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
-		} else {
-			WT_RET(
-			    __rec_cell_build_key(session, rip->key, rip->size));
 			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
 
@@ -2833,9 +2837,8 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	WT_SPLIT *spl;
-	uint32_t i, size;
+	uint32_t i;
 	int ret;
-	void *key;
 
 	r = S2C(session)->cache->rec;
 	ret = 0;
@@ -2862,16 +2865,8 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 	/* Enter each split page into the new, internal page. */
 	for (rref = page->u.row_int.t,
 	    spl = r->split, i = 0; i < r->split_next; ++rref, ++spl, ++i) {
-		/*
-		 * Steal the split buffer's pointer -- we could allocate and
-		 * copy here, but that means split buffers would potentially
-		 * grow without bound, this way we do the same number of
-		 * memory allocations and the split buffers don't just keep
-		 * getting bigger.
-		 */
-		__wt_buf_steal(session, &spl->key, &key, &size);
-		rref->key = key;
-		rref->size = size;
+		WT_RET(__wt_row_ikey_alloc(session,
+		    spl->key.data, spl->key.size, (WT_IKEY **)&rref->key));
 		WT_ROW_REF_ADDR(rref) = spl->off.addr;
 		WT_ROW_REF_SIZE(rref) = spl->off.size;
 

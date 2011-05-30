@@ -147,7 +147,10 @@ extern int __wt_debug_page( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile,
     FILE *fp);
-extern void __wt_debug_item(const char *tag, void *arg_item, FILE *fp);
+extern void __wt_debug_pair(const char *tag,
+    const void *data,
+    uint32_t size,
+    FILE *fp);
 extern int __wt_desc_read(WT_SESSION_IMPL *session);
 extern int __wt_desc_write(WT_SESSION_IMPL *session,
     const char *config,
@@ -258,6 +261,11 @@ extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     void *row_arg,
     WT_BUF *retb);
+extern WT_CELL *__wt_row_value(WT_PAGE *page, void *row_arg);
+extern int __wt_row_ikey_alloc( WT_SESSION_IMPL *session,
+    const void *key,
+    uint32_t size,
+    WT_IKEY **ikeyp);
 extern int __wt_row_key_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_btree_row_del(WT_SESSION_IMPL *session, WT_ITEM *key);
 extern int __wt_btree_row_put(WT_SESSION_IMPL *session,
