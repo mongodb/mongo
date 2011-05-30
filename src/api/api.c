@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_api_arg_min(SESSION *, const char *, uint64_t, uint64_t);
+static int __wt_api_arg_min(WT_SESSION_IMPL *, const char *, uint64_t, uint64_t);
 
 /*
  * __session_close --
@@ -16,14 +16,14 @@ static int __wt_api_arg_min(SESSION *, const char *, uint64_t, uint64_t);
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	BTREE_SESSION *btree_session;
-	CONNECTION *conn;
-	SESSION *session;
+	WT_BTREE_SESSION *btree_session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	int ret;
 
-	conn = (CONNECTION *)wt_session->connection;
-	session = (SESSION *)wt_session;
+	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
+	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
 	SESSION_API_CALL(session, close, config);
@@ -55,11 +55,11 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(to_dup);
 
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config);
 
 	if (strncmp(uri, "config:", 7) == 0)
@@ -82,13 +82,13 @@ __session_open_cursor(WT_SESSION *wt_session,
 static int
 __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	WT_CONFIG_ITEM cval;
 	const char *collapse, *key_format, *value_format;
 
-	session = (SESSION *)wt_session;
-	conn = (CONNECTION *)wt_session->connection;
+	session = (WT_SESSION_IMPL *)wt_session;
+	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 
 	SESSION_API_CALL(session, create, config);
 
@@ -139,7 +139,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		WT_RET(__wt_btree_create(session, name, collapse));
 	}
 
-	/* Allocate a BTREE handle, and open the underlying file. */
+	/* Allocate a WT_BTREE handle, and open the underlying file. */
 	WT_RET(__wt_btree_open(session, name, 0));
 	WT_RET(__wt_session_add_btree(session, NULL));
 
@@ -171,11 +171,11 @@ static int
 __session_drop(
     WT_SESSION *wt_session, const char *name, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CONFIG_ITEM cval;
 	int force, ret;
 
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, drop, config);
 	if (strncmp(name, "table:", 6) != 0) {
@@ -202,10 +202,10 @@ __session_drop(
 static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config);
@@ -229,7 +229,7 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 
 	WT_TRET(__wt_salvage(session, config));
 
-	/* Close the file and discard the BTREE structure. */
+	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
 	API_END();
 
@@ -274,10 +274,10 @@ __session_truncate(WT_SESSION *wt_session,
 static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
 	SESSION_API_CALL(session, verify, config);
@@ -304,7 +304,7 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 
 	WT_TRET(__wt_verify(session, NULL, config));
 
-	/* Close the file and discard the BTREE structure. */
+	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
 	API_END();
 
@@ -370,10 +370,10 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 static int
 __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	va_start(ap, fmt);
 	__wt_msgv(session, session->name, NULL, fmt, ap);
@@ -390,8 +390,8 @@ static int
 __conn_load_extension(WT_CONNECTION *wt_conn,
     const char *path, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	const char *entry_name;
 	char namebuf[100];
 	int (*entry)(WT_CONNECTION *, const char *);
@@ -401,7 +401,7 @@ __conn_load_extension(WT_CONNECTION *wt_conn,
 
 	WT_UNUSED(path);
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config);
 
 	entry_name = "wiredtiger_extension_init";
@@ -434,13 +434,13 @@ static int
 __conn_add_cursor_type(WT_CONNECTION *wt_conn,
     const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(prefix);
 	WT_UNUSED(ctype);
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_cursor_type, config);
 	API_END();
 
@@ -455,13 +455,13 @@ static int
 __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(name);
 	WT_UNUSED(collator);
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config);
 	API_END();
 
@@ -476,13 +476,13 @@ static int
 __conn_add_compressor(WT_CONNECTION *wt_conn,
     const char *name, WT_COMPRESSOR *compressor, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(name);
 	WT_UNUSED(compressor);
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config);
 	API_END();
 
@@ -497,13 +497,13 @@ static int
 __conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config);
 	API_END();
 
@@ -513,7 +513,7 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 static const char *
 __conn_get_home(WT_CONNECTION *wt_conn)
 {
-	return (((CONNECTION *)wt_conn)->home);
+	return (((WT_CONNECTION_IMPL *)wt_conn)->home);
 }
 
 /*
@@ -536,12 +536,12 @@ static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	int ret;
-	CONNECTION *conn;
-	SESSION *s, *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *s, *session;
 	WT_SESSION *wt_session;
 
 	ret = 0;
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config);
 
@@ -587,11 +587,11 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 		__session_checkpoint,
 		__session_msg_printf,
 	};
-	CONNECTION *conn;
-	SESSION *session, *session_ret;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session, *session_ret;
 	int ret;
 
-	conn = (CONNECTION *)wt_conn;
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
 	CONNECTION_API_CALL(conn, session, open_session, config);
 
@@ -615,7 +615,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	TAILQ_INSERT_HEAD(&conn->sessions_head, session_ret, q);
 	__wt_unlock(session, conn->mtx);
 
-	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
+	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_sessionp = &session_ret->iface;
 
 	if (0) {
@@ -661,8 +661,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "evict", WT_VERB_EVICT },
 		{ NULL, 0 }
 	};
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	const char *__cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
@@ -766,7 +766,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	else if (ret != 0)
 		goto err;
 
-	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
+	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
 	if (0) {
@@ -786,7 +786,7 @@ err:		if (opened)
  */
 static int
 __wt_api_arg_min(
-    SESSION *session, const char *arg_name, uint64_t v, uint64_t min)
+    WT_SESSION_IMPL *session, const char *arg_name, uint64_t v, uint64_t min)
 {
 	if (v >= min)
 		return (0);

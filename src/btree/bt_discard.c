@@ -8,16 +8,16 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static void __wt_free_insert(SESSION *, WT_INSERT **, uint32_t);
-static void __wt_free_insert_list(SESSION *, WT_INSERT *);
-static void __wt_free_page_col_fix(SESSION *, WT_PAGE *);
-static void __wt_free_page_col_int(SESSION *, WT_PAGE *);
-static void __wt_free_page_col_rle(SESSION *, WT_PAGE *);
-static void __wt_free_page_col_var(SESSION *, WT_PAGE *);
-static void __wt_free_page_row_int(SESSION *, WT_PAGE *, uint32_t);
-static void __wt_free_page_row_leaf(SESSION *, WT_PAGE *, uint32_t);
-static void __wt_free_update(SESSION *, WT_UPDATE **, uint32_t);
-static void __wt_free_update_list(SESSION *, WT_UPDATE *);
+static void __wt_free_insert(WT_SESSION_IMPL *, WT_INSERT **, uint32_t);
+static void __wt_free_insert_list(WT_SESSION_IMPL *, WT_INSERT *);
+static void __wt_free_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static void __wt_free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
+static void __wt_free_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
+static void __wt_free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static void __wt_free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static void __wt_free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static void __wt_free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
+static void __wt_free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
 /*
  * __wt_page_free --
@@ -25,7 +25,7 @@ static void __wt_free_update_list(SESSION *, WT_UPDATE *);
  */
 void
 __wt_page_free(
-    SESSION *session, WT_PAGE *page, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "discard addr %lu/%lu (type %s)",
@@ -112,7 +112,7 @@ __wt_page_free(
  *	Discard a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_free_page_col_fix(SESSION *session, WT_PAGE *page)
+__wt_free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
@@ -129,7 +129,7 @@ __wt_free_page_col_fix(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_INT page.
  */
 static void
-__wt_free_page_col_int(SESSION *session, WT_PAGE *page)
+__wt_free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the subtree-reference array. */
 	if (page->u.col_int.t != NULL)
@@ -141,7 +141,7 @@ __wt_free_page_col_int(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_RLE page.
  */
 static void
-__wt_free_page_col_rle(SESSION *session, WT_PAGE *page)
+__wt_free_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
@@ -158,7 +158,7 @@ __wt_free_page_col_rle(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_VAR page.
  */
 static void
-__wt_free_page_col_var(SESSION *session, WT_PAGE *page)
+__wt_free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
@@ -175,7 +175,7 @@ __wt_free_page_col_var(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
-__wt_free_page_row_int(SESSION *session, WT_PAGE *page, uint32_t size)
+__wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
 	WT_ROW_REF *rref;
 	uint32_t i;
@@ -198,7 +198,7 @@ __wt_free_page_row_int(SESSION *session, WT_PAGE *page, uint32_t size)
  *	Discard a WT_PAGE_ROW_LEAF page.
  */
 static void
-__wt_free_page_row_leaf(SESSION *session, WT_PAGE *page, uint32_t size)
+__wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
 	WT_ROW *rip;
 	uint32_t i;
@@ -238,7 +238,7 @@ __wt_free_page_row_leaf(SESSION *session, WT_PAGE *page, uint32_t size)
  */
 static void
 __wt_free_insert(
-    SESSION *session, WT_INSERT **insert_head, uint32_t entries)
+    WT_SESSION_IMPL *session, WT_INSERT **insert_head, uint32_t entries)
 {
 	WT_INSERT **insp;
 
@@ -260,7 +260,7 @@ __wt_free_insert(
  * of a WT_INSERT structure and its associated chain of WT_UPDATE structures.
  */
 static void
-__wt_free_insert_list(SESSION *session, WT_INSERT *ins)
+__wt_free_insert_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
 	WT_INSERT *next;
 
@@ -278,7 +278,7 @@ __wt_free_insert_list(SESSION *session, WT_INSERT *ins)
  */
 static void
 __wt_free_update(
-    SESSION *session, WT_UPDATE **update_head, uint32_t entries)
+    WT_SESSION_IMPL *session, WT_UPDATE **update_head, uint32_t entries)
 {
 	WT_UPDATE **updp;
 
@@ -300,7 +300,7 @@ __wt_free_update(
  *	of a WT_UPDATE structure and its associated data.
  */
 static void
-__wt_free_update_list(SESSION *session, WT_UPDATE *upd)
+__wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_UPDATE *next;
 

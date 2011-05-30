@@ -13,9 +13,9 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
+__wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_INSERT *ins;

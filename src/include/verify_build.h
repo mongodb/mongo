@@ -65,7 +65,7 @@ __wt_verify_build(void)
 	/* There are also structures that must be aligned correctly. */
 	ALIGN_CHECK(WT_OFF, sizeof(uint32_t));
 	ALIGN_CHECK(WT_PAGE_DISK, sizeof(uint32_t));
-	ALIGN_CHECK(SESSION_BUFFER, sizeof(uint32_t));
+	ALIGN_CHECK(WT_SESSION_BUFFER, sizeof(uint32_t));
 
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because

@@ -14,8 +14,8 @@ extern "C" {
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_list {
-	WT_PAGE	*page;				/* Page */
-	BTREE	*btree;				/* Underlying file object */
+	WT_PAGE	 *page;				/* Page */
+	WT_BTREE *btree;			/* Underlying file object */
 };
 
 /*
@@ -23,9 +23,9 @@ struct __wt_evict_list {
  *	Encapsulation of a eviction request.
  */
 struct __wt_evict_req {
-	SESSION *session;			/* Requesting thread */
-	BTREE	*btree;				/* Btree */
-	int	 close_method;			/* Discard pages */
+	WT_SESSION_IMPL *session;			/* Requesting thread */
+	WT_BTREE *btree;				/* Btree */
+	int	  close_method;			/* Discard pages */
 
 	WT_PAGE **retry;			/* Pages to retry */
 	uint32_t  retry_next;			/* Next retry slot */
@@ -38,7 +38,7 @@ struct __wt_evict_req {
  *	Encapsulation of a read request.
  */
 struct __wt_read_req {
-	SESSION *session;			/* Requesting thread */
+	WT_SESSION_IMPL *session;			/* Requesting thread */
 	WT_PAGE *parent;			/* Parent */
 	WT_REF  *ref;				/* Reference/Address */
 	int	 dsk_verify;			/* Verify the disk image */

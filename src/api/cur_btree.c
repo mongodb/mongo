@@ -15,7 +15,7 @@ static int
 __curbtree_first(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -34,7 +34,7 @@ static int
 __curbtree_last(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
 	cbt = (CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, last, cbt->btree);
@@ -51,7 +51,7 @@ static int
 __curbtree_next(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -70,7 +70,7 @@ static int
 __curbtree_prev(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
 	cbt = (CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
@@ -87,7 +87,7 @@ static int
 __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -106,7 +106,7 @@ static int
 __curbtree_insert(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -125,7 +125,7 @@ static int
 __curbtree_update(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -144,7 +144,7 @@ static int
 __curbtree_remove(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -163,7 +163,7 @@ static int
 __curbtree_close(WT_CURSOR *cursor, const char *config)
 {
 	CURSOR_BTREE *cbt;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
@@ -181,7 +181,7 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
 int
-__wt_curbtree_open(SESSION *session,
+__wt_curbtree_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
@@ -210,8 +210,8 @@ __wt_curbtree_open(SESSION *session,
 		0			/* uint32_t flags */
 	};
 	const char *tablename;
-	BTREE_SESSION *btree_session;
-	CONNECTION *conn;
+	WT_BTREE_SESSION *btree_session;
+	WT_CONNECTION_IMPL *conn;
 	CURSOR_BTREE *cbt;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;

@@ -21,7 +21,7 @@
  *    + to walk the tree a few pages at a time, that is, periodically wake,
  *	visit some pages, then go back to sleep, which requires enough state
  *	to restart the traversal at any point,
- *    + to walk files not associated with the current SESSION's BTREE handle,
+ *    + to walk files not associated with the current session's WT_BTREE handle,
  *    + and finally, it doesn't require a hazard reference.
  *
  * My guess is we'll generalize a more complicated walk at some point, which
@@ -35,10 +35,10 @@
  *	each page.
  */
 int
-__wt_tree_walk(SESSION *session,
-    WT_PAGE *page, int (*work)(SESSION *, WT_PAGE *, void *), void *arg)
+__wt_tree_walk(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int (*work)(WT_SESSION_IMPL *, WT_PAGE *, void *), void *arg)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
 	uint32_t i;
@@ -93,9 +93,10 @@ __wt_tree_walk(SESSION *session,
  *	Start a tree walk.
  */
 int
-__wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
+__wt_walk_begin(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 
 	btree = session->btree;
 
@@ -127,7 +128,7 @@ __wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
  *	End a tree walk.
  */
 void
-__wt_walk_end(SESSION *session, WT_WALK *walk)
+__wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk)
 {
 	WT_WALK_ENTRY *e;
 
@@ -148,7 +149,7 @@ __wt_walk_end(SESSION *session, WT_WALK *walk)
  *	Return the next WT_PAGE in the tree, in a non-recursive way.
  */
 int
-__wt_walk_next(SESSION *session, WT_WALK *walk, WT_PAGE **pagep)
+__wt_walk_next(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_REF *ref;

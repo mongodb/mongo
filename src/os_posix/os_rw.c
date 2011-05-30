@@ -12,7 +12,8 @@
  *	Read a chunk.
  */
 int
-__wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+__wt_read(WT_SESSION_IMPL *session,
+    WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, read_io);
 	WT_STAT_INCR(S2C(session)->stats, total_read_io);
@@ -35,7 +36,8 @@ __wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
  *	Write a chunk.
  */
 int
-__wt_write(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+__wt_write(WT_SESSION_IMPL *session,
+    WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, write_io);
 	WT_STAT_INCR(S2C(session)->stats, total_write_io);

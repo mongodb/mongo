@@ -17,7 +17,7 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  * to make the code prettier.
  */
 struct __wt_stuff {
-	BTREE	  *btree;			/* Enclosing Btree */
+	WT_BTREE	  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
@@ -74,32 +74,38 @@ struct __wt_track {
 	uint32_t flags;
 };
 
-static int  __slvg_build_internal_col(SESSION *, uint32_t, WT_STUFF *);
-static int  __slvg_build_internal_row(SESSION *, uint32_t, WT_STUFF *);
-static int  __slvg_build_leaf_col(SESSION *,
+static int  __slvg_build_internal_col(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
+static int  __slvg_build_internal_row(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
+static int  __slvg_build_leaf_col(WT_SESSION_IMPL *,
 		WT_TRACK *, WT_PAGE *, WT_COL_REF *, WT_STUFF *);
-static int  __slvg_build_leaf_row(SESSION *,
+static int  __slvg_build_leaf_row(WT_SESSION_IMPL *,
 		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
-static int  __slvg_discard_ovfl(SESSION *, WT_STUFF *);
-static int  __slvg_free(SESSION *, WT_STUFF *);
-static int  __slvg_free_merge_block(SESSION *, WT_STUFF *);
-static int  __slvg_free_trk_col(SESSION *, WT_TRACK **, int);
-static int  __slvg_free_trk_ovfl(SESSION *, WT_TRACK **, int);
-static int  __slvg_free_trk_row(SESSION *, WT_TRACK **, int);
-static int  __slvg_key_copy(SESSION *, WT_BUF *, WT_BUF *);
-static int  __slvg_ovfl_col_dsk_ref(SESSION *, WT_PAGE_DISK *, WT_TRACK *);
+static int  __slvg_discard_ovfl(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_free(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_free_merge_block(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_free_trk_col(WT_SESSION_IMPL *, WT_TRACK **, int);
+static int  __slvg_free_trk_ovfl(WT_SESSION_IMPL *, WT_TRACK **, int);
+static int  __slvg_free_trk_row(WT_SESSION_IMPL *, WT_TRACK **, int);
+static int  __slvg_key_copy(WT_SESSION_IMPL *, WT_BUF *, WT_BUF *);
+static int  __slvg_ovfl_col_dsk_ref(
+        WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_col_inmem_ref(WT_PAGE *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
-static int  __slvg_ovfl_row_dsk_ref(SESSION *, WT_PAGE_DISK *, WT_TRACK *);
+static int  __slvg_ovfl_row_dsk_ref(
+        WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_row_inmem_ref(WT_PAGE *, uint32_t, WT_STUFF *);
-static int  __slvg_range_col(SESSION *, WT_STUFF *);
-static int  __slvg_range_overlap_col(SESSION *, uint32_t, uint32_t, WT_STUFF *);
-static int  __slvg_range_overlap_row(SESSION *, uint32_t, uint32_t, WT_STUFF *);
-static int  __slvg_range_row(SESSION *, WT_STUFF *);
-static int  __slvg_read(SESSION *, WT_STUFF *);
+static int  __slvg_range_col(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_range_overlap_col(
+        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+static int  __slvg_range_overlap_row(
+        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+static int  __slvg_range_row(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_trk_compare(const void *, const void *);
-static int  __slvg_trk_leaf(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
-static int  __slvg_trk_ovfl(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+static int  __slvg_trk_leaf(
+        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+static int  __slvg_trk_ovfl(
+        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static void __slvg_trk_ovfl_ref(WT_TRACK *, WT_STUFF *);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -112,9 +118,9 @@ static void __slvg_trk_dump_row(WT_TRACK *);
  *	Salvage a Btree.
  */
 int
-__wt_salvage(SESSION *session, const char *config)
+__wt_salvage(WT_SESSION_IMPL *session, const char *config)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	off_t len;
 	uint32_t allocsize, i, leaf_cnt;
@@ -265,9 +271,9 @@ err:	/* Wrap up reporting. */
  *	Read the file and build a table of the pages we can use.
  */
 static int
-__slvg_read(SESSION *session, WT_STUFF *ss)
+__slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *t;
 	WT_FH *fh;
 	WT_PAGE_DISK *dsk;
@@ -416,9 +422,9 @@ err:	__wt_scr_release(&t);
  */
 static int
 __slvg_trk_leaf(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CELL *cell, *last_key_cell;
 	WT_TRACK *trk;
 	uint64_t stop_recno;
@@ -513,7 +519,7 @@ err:		if (trk != NULL)
  */
 static int
 __slvg_trk_ovfl(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 
@@ -538,7 +544,8 @@ __slvg_trk_ovfl(
  *	Search a column-store page for overflow items.
  */
 static int
-__slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
+__slvg_ovfl_col_dsk_ref(
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
 	WT_OFF ovfl;
@@ -574,7 +581,8 @@ __slvg_ovfl_col_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
  *	Search a row-store page for overflow items.
  */
 static int
-__slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
+__slvg_ovfl_row_dsk_ref(
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
 	WT_OFF ovfl;
@@ -697,7 +705,7 @@ __slvg_ovfl_row_dsk_ref(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
  * re-sorting the array is small.
  */
 static int
-__slvg_range_col(SESSION *session, WT_STUFF *ss)
+__slvg_range_col(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	uint32_t i, j;
 
@@ -748,7 +756,7 @@ __slvg_range_col(SESSION *session, WT_STUFF *ss)
  */
 static int
 __slvg_range_overlap_col(
-    SESSION *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
+    WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
 	WT_TRACK *a_trk, *b_trk, *new;
 	uint32_t i, j;
@@ -913,7 +921,8 @@ delete:		WT_RET(__slvg_free_trk_col(session, &ss->pages[b_slot], 1));
  *	pages we've found.
  */
 static int
-__slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
+__slvg_build_internal_col(
+    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -998,7 +1007,7 @@ err:	if (page->u.col_int.t != NULL)
  *	Build a column-store leaf page for a merged page.
  */
 static int
-__slvg_build_leaf_col(SESSION *session,
+__slvg_build_leaf_col(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref, WT_STUFF *ss)
 {
 	WT_COL *cip, *save_col_leaf;
@@ -1152,11 +1161,11 @@ __slvg_ovfl_col_inmem_ref(WT_PAGE *page, WT_STUFF *ss)
  * same time, tag the overflow pages they reference.
  */
 static int
-__slvg_range_row(SESSION *session, WT_STUFF *ss)
+__slvg_range_row(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	uint32_t i, j;
-	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;
@@ -1209,12 +1218,12 @@ __slvg_range_row(SESSION *session, WT_STUFF *ss)
  */
 static int
 __slvg_range_overlap_row(
-    SESSION *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
+    WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
 	uint32_t i, j;
-	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1391,7 +1400,8 @@ delete:		WT_RET(__slvg_free_trk_row(session, &ss->pages[b_slot], 1));
  *	pages we've found.
  */
 static int
-__slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
+__slvg_build_internal_row(
+    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
@@ -1479,15 +1489,15 @@ err:	if (page->u.row_int.t != NULL)
  *	Build a row-store leaf page for a merged page.
  */
 static int
-__slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
+__slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
     WT_PAGE *parent, WT_ROW_REF *rref, WT_STUFF *ss, int *deletedp)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *key;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	uint32_t i, skip_start, skip_stop;
-	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
+	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 	void *item;
 
 	btree = session->btree;
@@ -1731,7 +1741,7 @@ __slvg_ovfl_compare(const void *a, const void *b)
 static int
 __slvg_trk_compare(const void *a, const void *b)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk;
 	uint64_t a_lsn, a_recno, b_lsn, b_recno;
 	int cmp;
@@ -1776,7 +1786,7 @@ __slvg_trk_compare(const void *a, const void *b)
  *	Copy a WT_TRACK start/stop key to another WT_TRACK start/stop key.
  */
 static int
-__slvg_key_copy(SESSION *session, WT_BUF *dst, WT_BUF *src)
+__slvg_key_copy(WT_SESSION_IMPL *session, WT_BUF *dst, WT_BUF *src)
 {
 	return (__wt_buf_set(session, dst, src->data, src->size));
 }
@@ -1786,7 +1796,7 @@ __slvg_key_copy(SESSION *session, WT_BUF *dst, WT_BUF *src)
  *	Discard any overflow pages that are never referenced.
  */
 static int
-__slvg_discard_ovfl(SESSION *session, WT_STUFF *ss)
+__slvg_discard_ovfl(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_TRACK *trk, **p, **t;
 	uint32_t i;
@@ -1815,7 +1825,7 @@ __slvg_discard_ovfl(SESSION *session, WT_STUFF *ss)
  *	Free any file blocks that had to be merged back into the free-list.
  */
 static int
-__slvg_free_merge_block(SESSION *session, WT_STUFF *ss)
+__slvg_free_merge_block(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 	uint32_t i;
@@ -1852,7 +1862,7 @@ __slvg_free_merge_block(SESSION *session, WT_STUFF *ss)
  *	Discard memory allocated to the page and overflow arrays.
  */
 static int
-__slvg_free(SESSION *session, WT_STUFF *ss)
+__slvg_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	uint32_t i;
 
@@ -1887,7 +1897,7 @@ __slvg_free(SESSION *session, WT_STUFF *ss)
  *	Discard a column-store WT_TRACK structure and all its resources.
  */
 static int
-__slvg_free_trk_col(SESSION *session, WT_TRACK **trkp, int blocks)
+__slvg_free_trk_col(WT_SESSION_IMPL *session, WT_TRACK **trkp, int blocks)
 {
 	WT_TRACK *trk;
 
@@ -1908,7 +1918,7 @@ __slvg_free_trk_col(SESSION *session, WT_TRACK **trkp, int blocks)
  *	Discard a row-store WT_TRACK structure and all its resources.
  */
 static int
-__slvg_free_trk_row(SESSION *session, WT_TRACK **trkp, int blocks)
+__slvg_free_trk_row(WT_SESSION_IMPL *session, WT_TRACK **trkp, int blocks)
 {
 	WT_TRACK *trk;
 
@@ -1932,7 +1942,7 @@ __slvg_free_trk_row(SESSION *session, WT_TRACK **trkp, int blocks)
  *	Discard a overflow WT_TRACK structure and all its resources.
  */
 static int
-__slvg_free_trk_ovfl(SESSION *session, WT_TRACK **trkp, int blocks)
+__slvg_free_trk_ovfl(WT_SESSION_IMPL *session, WT_TRACK **trkp, int blocks)
 {
 	WT_TRACK *trk;
 

@@ -28,13 +28,13 @@ extern "C" {
 
 /*
  * XXX
- * The server threads use their own SESSION handles because they may want to
- * block (for example, the eviction server calls reconciliation, and some of
- * the reconciliation diagnostic code reads pages), and the user's session
- * handle is already blocking on a server thread.  The problem is the server
- * thread needs to reference the correct btree handle, and that's hanging off
- * the application's thread of control.  For now, I'm just making it obvious
- * where that's getting done.
+ * The server threads use their own WT_SESSION_IMPL handles because they may
+ * want to block (for example, the eviction server calls reconciliation, and
+ * some of the reconciliation diagnostic code reads pages), and the user's
+ * session handle is already blocking on a server thread.  The problem is the
+ * server thread needs to reference the correct btree handle, and that's
+ * hanging off the application's thread of control.  For now, I'm just making
+ * it obvious where that's getting done.
  */
 #define	WT_SET_BTREE_IN_SESSION(s, b)					\
 	((s)->btree = (b))

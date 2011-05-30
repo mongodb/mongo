@@ -32,16 +32,16 @@
  *	Schedule a serialization request, and block or spin until it completes.
  */
 int
-__wt_session_serialize_func(SESSION *session,
-    wq_state_t op, int spin, int (*func)(SESSION *), void *args)
+__wt_session_serialize_func(WT_SESSION_IMPL *session,
+    wq_state_t op, int spin, int (*func)(WT_SESSION_IMPL *), void *args)
 {
 	int done;
 
 	/*
 	 * Threads serializing access to data using a function:
-	 *	set a function/argument pair in the SESSION handle,
+	 *	set a function/argument pair in the WT_SESSION_IMPL handle,
 	 *	flush memory,
-	 *	update the SESSION workq state, and
+	 *	update the WT_SESSION_IMPL workq state, and
 	 *	spins or blocks.
 	 *
 	 * The workQ thread notices the state change and calls the serialization
@@ -59,9 +59,9 @@ __wt_session_serialize_func(SESSION *session,
 	session->wq_state = op;
 
 	/*
-	 * Callers can spin on the SESSION state (implying the call is quickly
-	 * satisfied), or block until its mutex is unlocked by another thread
-	 * when the operation has completed.
+         * Callers can spin on the session state (implying the call is quickly
+         * satisfied), or block until its mutex is unlocked by another thread
+         * when the operation has completed.
 	 */
 	if (spin) {
 		/*
@@ -94,7 +94,7 @@ __wt_session_serialize_func(SESSION *session,
  *	Server function cleanup.
  */
 void
-__wt_session_serialize_wrapup(SESSION *session, WT_PAGE *page, int ret)
+__wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
 	/*
 	 * If passed a page and the return value is good, we modified the page;

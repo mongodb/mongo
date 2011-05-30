@@ -8,22 +8,22 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static inline int __wt_ins_search(SESSION *, WT_INSERT *, WT_ITEM *);
+static inline int __wt_ins_search(WT_SESSION_IMPL *, WT_INSERT *, WT_ITEM *);
 
 /*
  * __wt_row_search --
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
+__wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_INSERT *ins;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	uint32_t base, indx, limit, slot, write_gen;
-	int cmp, ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_write_gen = 0;
@@ -245,11 +245,11 @@ err:	WT_PAGE_OUT(session, page);
  *	Search the slot's insert list.
  */
 static inline int
-__wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
+__wt_ins_search(WT_SESSION_IMPL *session, WT_INSERT *ins, WT_ITEM *key)
 {
 	WT_ITEM insert_key;
-	BTREE *btree;
-	int cmp, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	WT_BTREE *btree;
+	int cmp, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;

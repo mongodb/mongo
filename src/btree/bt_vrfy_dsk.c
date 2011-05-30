@@ -9,21 +9,22 @@
 #include "cell.i"
 
 static int __wt_err_cell_vs_page(
-	SESSION *, uint32_t, uint32_t, WT_CELL *, WT_PAGE_DISK *);
-static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
-static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
-static int __wt_err_eop(SESSION *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_CELL *, WT_PAGE_DISK *);
+static int __wt_err_delfmt(WT_SESSION_IMPL *, uint32_t, uint32_t);
+static int __wt_err_eof(WT_SESSION_IMPL *, uint32_t, uint32_t);
+static int __wt_err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int __wt_verify_cell(
-	SESSION *, WT_CELL *, uint32_t, uint32_t, uint8_t *);
-static int __wt_verify_dsk_row(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_CELL *, uint32_t, uint32_t, uint8_t *);
+static int __wt_verify_dsk_row(
+        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(
-	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(
-	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_rle(
-	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_var(
-	SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
  * __wt_verify_dsk_page --
@@ -31,7 +32,7 @@ static int __wt_verify_dsk_col_var(
  */
 int
 __wt_verify_dsk_page(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	/* Check the page type. */
 	switch (dsk->type) {
@@ -127,9 +128,9 @@ __wt_verify_dsk_page(
  */
 static int
 __wt_verify_dsk_row(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *current, *last, *last_pfx, *last_ovfl;
 	WT_CELL *cell;
 	WT_OFF off;
@@ -139,7 +140,7 @@ __wt_verify_dsk_row(
 	uint32_t cell_num, cell_type, data_size, i, prefix;
 	uint8_t *end;
 	int ret;
-	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;
@@ -384,9 +385,9 @@ err:		if (ret == 0)
  */
 static int
 __wt_verify_dsk_col_int(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_OFF_RECORD *off_record;
 	uint8_t *end;
 	uint32_t i, entry_num;
@@ -417,9 +418,9 @@ __wt_verify_dsk_col_int(
  */
 static int
 __wt_verify_dsk_col_fix(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	u_int len;
 	uint32_t i, j, entry_num;
 	uint8_t *data, *end, *p;
@@ -458,9 +459,9 @@ delfmt:	return (__wt_err_delfmt(session, entry_num, addr));
  */
 static int
 __wt_verify_dsk_col_rle(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	u_int len;
 	uint32_t i, j, entry_num;
 	uint8_t *data, *end, *last_data, *p;
@@ -528,9 +529,9 @@ delfmt:	return (__wt_err_delfmt(session, entry_num, addr));
  */
 static int
 __wt_verify_dsk_col_var(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_OFF off;
 	off_t file_size;
@@ -578,7 +579,7 @@ __wt_verify_dsk_col_var(
  */
 int
 __wt_verify_dsk_chunk(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	uint32_t len;
 	uint8_t *p;
@@ -614,7 +615,7 @@ __wt_verify_dsk_chunk(
  *	Check to see if a cell is safe.
  */
 static int
-__wt_verify_cell(SESSION *session,
+__wt_verify_cell(WT_SESSION_IMPL *session,
     WT_CELL *cell, uint32_t cell_num, uint32_t addr, uint8_t *end)
 {
 	uint8_t *p;
@@ -674,7 +675,7 @@ __wt_verify_cell(SESSION *session,
  *	Generic illegal cell type for a particular page type error.
  */
 static int
-__wt_err_cell_vs_page(SESSION *session,
+__wt_err_cell_vs_page(WT_SESSION_IMPL *session,
     uint32_t entry_num, uint32_t addr, WT_CELL *cell, WT_PAGE_DISK *dsk)
 {
 	__wt_errx(session,
@@ -691,7 +692,7 @@ __wt_err_cell_vs_page(SESSION *session,
  *	Generic item extends past the end-of-page error.
  */
 static int
-__wt_err_eop(SESSION *session, uint32_t entry_num, uint32_t addr)
+__wt_err_eop(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
 	__wt_errx(session,
 	    "item %lu on page at addr %lu extends past the end of the page",
@@ -704,7 +705,7 @@ __wt_err_eop(SESSION *session, uint32_t entry_num, uint32_t addr)
  *	Generic item references non-existent file pages error.
  */
 static int
-__wt_err_eof(SESSION *session, uint32_t entry_num, uint32_t addr)
+__wt_err_eof(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
 	__wt_errx(session,
 	    "off-page item %lu on page at addr %lu references non-existent "
@@ -719,7 +720,7 @@ __wt_err_eof(SESSION *session, uint32_t entry_num, uint32_t addr)
  *	non-nul bytes.
  */
 static int
-__wt_err_delfmt(SESSION *session, uint32_t entry_num, uint32_t addr)
+__wt_err_delfmt(WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr)
 {
 	__wt_errx(session,
 	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "

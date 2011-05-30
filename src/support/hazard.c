@@ -12,13 +12,13 @@
  *	Set a hazard reference.
  */
 int
-__wt_hazard_set(SESSION *session, WT_REF *ref
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
     )
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
@@ -30,7 +30,7 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
 	 * of WT_REF_MEM, which can be set to WT_REF_LOCKED at any time by the
 	 * page eviction server.
 	 *
-	 * Add the WT_REF reference to the SESSION's hazard list and flush the
+	 * Add the WT_REF reference to the session's hazard list and flush the
 	 * write, then see if the state field is still WT_REF_MEM.  If it's
 	 * still WT_REF_MEM, we can use the page because the page eviction
 	 * server will see our hazard reference before it discards the buffer
@@ -79,7 +79,8 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
 		return (0);
 	}
 
-	__wt_errx(session, "SESSION has no more hazard reference slots");
+	__wt_errx(session,
+            "There are no more hazard reference slots in the session");
 	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
 	return (0);
 }
@@ -89,9 +90,9 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
  *	Clear a hazard reference.
  */
 void
-__wt_hazard_clear(SESSION *session, WT_PAGE *page)
+__wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
@@ -119,7 +120,7 @@ __wt_hazard_clear(SESSION *session, WT_PAGE *page)
 			 */
 			return;
 		}
-	__wt_errx(session, "SESSION hazard reference not found");
+	__wt_errx(session, "WT_SESSION_IMPL hazard reference not found");
 	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
 }
 
@@ -128,22 +129,22 @@ __wt_hazard_clear(SESSION *session, WT_PAGE *page)
  *	Verify that no hazard references are set.
  */
 void
-__wt_hazard_empty(SESSION *session, const char *name)
+__wt_hazard_empty(WT_SESSION_IMPL *session, const char *name)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
 
 	/*
-	 * Check for a set hazard reference and complain if we find one.  Clear
-	 * any we find because it's not a correctness problem (any hazard ref
-	 * we find can't be real because the SESSION is being closed when we're
-	 * called).   We do this work because it's not expensive, and we don't
-	 * want to let a hazard reference lie around, keeping a page from being
-	 * flushed.  The flush isn't necessary for correctness, but gives the
-	 * cache eviction thread immediate access to any page our reference
-	 * blocks.
+         * Check for a set hazard reference and complain if we find one.  Clear
+         * any we find because it's not a correctness problem (any hazard ref
+         * we find can't be real because the session is being closed when we're
+         * called).   We do this work because it's not expensive, and we don't
+         * want to let a hazard reference lie around, keeping a page from being
+         * flushed.  The flush isn't necessary for correctness, but gives the
+         * cache eviction thread immediate access to any page our reference
+         * blocks.
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
@@ -167,11 +168,11 @@ __wt_hazard_empty(SESSION *session, const char *name)
  *	Confirm that a page isn't on the hazard list.
  */
 void
-__wt_hazard_validate(SESSION *session, WT_PAGE *page)
+__wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	SESSION **tp;
+	WT_SESSION_IMPL **tp;
 
 	conn = S2C(session);
 

@@ -13,13 +13,13 @@
  */
 int
 __wt_bt_lex_compare(
-    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
+    WT_BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	uint32_t len;
 	const uint8_t *userp, *treep;
 
 	/*
-	 * The BTREE * argument isn't used by the default routine, but is
+	 * The WT_BTREE * argument isn't used by the default routine, but is
 	 * a standard argument for user-specified comparison functions.
 	 */
 	WT_UNUSED(btree);
@@ -51,7 +51,7 @@ __wt_bt_lex_compare(
  */
 int
 __wt_bt_int_compare(
-    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
+    WT_BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	uint64_t user_int, tree_int;
 

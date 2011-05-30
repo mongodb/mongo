@@ -12,9 +12,9 @@
  *	Open a dynamic library.
  */
 int
-__wt_dlopen(SESSION *session, const char *path, WT_DLH **dlhp)
+__wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_DLH *dlh;
 	int ret;
 
@@ -50,7 +50,8 @@ err:		__wt_free(session, dlh->name);
  *	Lookup a symbol in a dynamic library.
  */
 int
-__wt_dlsym(SESSION *session, WT_DLH *dlh, const char *name, void **sym_ret)
+__wt_dlsym(WT_SESSION_IMPL *session,
+    WT_DLH *dlh, const char *name, void **sym_ret)
 {
 	void *sym;
 
@@ -69,9 +70,9 @@ __wt_dlsym(SESSION *session, WT_DLH *dlh, const char *name, void **sym_ret)
  *	Close a dynamic library
  */
 int
-__wt_dlclose(SESSION *session, WT_DLH *dlh)
+__wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	int ret;
 
 	conn = S2C(session);

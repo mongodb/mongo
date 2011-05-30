@@ -12,10 +12,10 @@
  *	Read an overflow item from the disk.
  */
 int
-__wt_ovfl_in(SESSION *session, WT_OFF *ovfl, WT_BUF *store)
+__wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 {
-	BTREE *btree;
-	CONNECTION *conn;
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 	btree = session->btree;

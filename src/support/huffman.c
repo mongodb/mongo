@@ -105,13 +105,15 @@ typedef struct __indexed_byte {
 static int  indexed_freq_compare(const void *, const void *);
 static int  indexed_symbol_compare(const void *, const void *);
 static void make_table(
-	SESSION *, uint16_t *, uint16_t, WT_HUFFMAN_CODE *, u_int);
-static void node_queue_close(SESSION *, NODE_QUEUE *);
-static void node_queue_dequeue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE **);
-static int  node_queue_enqueue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE *);
+	WT_SESSION_IMPL *, uint16_t *, uint16_t, WT_HUFFMAN_CODE *, u_int);
+static void node_queue_close(WT_SESSION_IMPL *, NODE_QUEUE *);
+static void node_queue_dequeue(
+        WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE **);
+static int  node_queue_enqueue(
+        WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE *);
 static uint32_t profile_tree(
 	WT_FREQTREE_NODE *, uint16_t, uint16_t *, uint16_t *);
-static void recursive_free_node(SESSION *, WT_FREQTREE_NODE *);
+static void recursive_free_node(WT_SESSION_IMPL *, WT_FREQTREE_NODE *);
 static void set_codes(WT_FREQTREE_NODE *, WT_HUFFMAN_CODE *, uint16_t, uint8_t);
 
 #define	node_queue_is_empty(queue)					\
@@ -239,7 +241,7 @@ set_codes(WT_FREQTREE_NODE *node,
  * decoding from a code to a symbol are simple array lookups.
  */
 static void
-make_table(SESSION *session, uint16_t *code2symbol,
+make_table(WT_SESSION_IMPL *session, uint16_t *code2symbol,
     uint16_t max_depth, WT_HUFFMAN_CODE *codes, u_int symcnt)
 {
 	uint32_t j, c1, c2;	/* Exceeds uint16_t bounds at loop boundary. */
@@ -281,7 +283,7 @@ make_table(SESSION *session, uint16_t *code2symbol,
  *	Recursively free the huffman frequency tree's nodes.
  */
 static void
-recursive_free_node(SESSION *session, WT_FREQTREE_NODE *node)
+recursive_free_node(WT_SESSION_IMPL *session, WT_FREQTREE_NODE *node)
 {
 	if (node != NULL) {
 		recursive_free_node(session, node->left);
@@ -295,7 +297,7 @@ recursive_free_node(SESSION *session, WT_FREQTREE_NODE *node)
  *	Take a frequency table and return a pointer to a descriptor object.
  */
 int
-__wt_huffman_open(SESSION *session,
+__wt_huffman_open(WT_SESSION_IMPL *session,
     void *symbol_frequency_array, u_int symcnt, u_int numbytes, void *retp)
 {
 	INDEXED_SYMBOL *indexed_freqs;
@@ -532,7 +534,7 @@ err:		if (ret == 0)
  *	Discard a Huffman descriptor object.
  */
 void
-__wt_huffman_close(SESSION *session, void *huffman_arg)
+__wt_huffman_close(WT_SESSION_IMPL *session, void *huffman_arg)
 {
 	WT_HUFFMAN_OBJ *huffman;
 
@@ -591,7 +593,7 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
  * and write header bits.
  */
 int
-__wt_huffman_encode(SESSION *session, void *huffman_arg,
+__wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
@@ -766,7 +768,7 @@ err:	if (tmp != NULL)
  * Finally, subtract off these bits from the shift register.
  */
 int
-__wt_huffman_decode(SESSION *session, void *huffman_arg,
+__wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
 {
 	WT_BUF *tmp;
@@ -886,7 +888,7 @@ err:	if (tmp != NULL)
  * It does not delete the pointed huffman tree nodes!
  */
 static void
-node_queue_close(SESSION *session, NODE_QUEUE *queue)
+node_queue_close(WT_SESSION_IMPL *session, NODE_QUEUE *queue)
 {
 	NODE_QUEUE_ELEM *elem, *next_elem;
 
@@ -905,7 +907,8 @@ node_queue_close(SESSION *session, NODE_QUEUE *queue)
  *	Push a tree node to the end of the queue.
  */
 static int
-node_queue_enqueue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
+node_queue_enqueue(
+    WT_SESSION_IMPL *session, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
 {
 	NODE_QUEUE_ELEM *elem;
 
@@ -939,7 +942,8 @@ node_queue_enqueue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
  *	pointer to the location referred by the retp parameter.
  */
 static void
-node_queue_dequeue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
+node_queue_dequeue(
+    WT_SESSION_IMPL *session, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 {
 	NODE_QUEUE_ELEM *first_elem;
 

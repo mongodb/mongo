@@ -28,7 +28,7 @@ tfile.write('/* DO NOT EDIT: automatically built by dist/log.py. */\n')
 for t in log_data.types:
 	tfile.write('''
 static inline int
-__wt_logput_%(name)s(SESSION *session, %(param_decl)s)
+__wt_logput_%(name)s(WT_SESSION_IMPL *session, %(param_decl)s)
 {
 	return (__wt_log_put(session, &__wt_logdesc_%(name)s, %(param_list)s));
 }

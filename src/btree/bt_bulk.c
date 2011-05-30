@@ -20,10 +20,10 @@ static int __wt_bulk_row_page(CURSOR_BULK *);
 int
 __wt_bulk_init(CURSOR_BULK *cbulk)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
 
 	/*
@@ -75,10 +75,10 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 int
 __wt_bulk_insert(CURSOR_BULK *cbulk)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
 
 	/*
@@ -118,12 +118,12 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 static int
 __wt_bulk_col(CURSOR_BULK *cbulk)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
 	int ret;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 	upd = NULL;
 
@@ -153,13 +153,13 @@ err:	if (upd != NULL)
 static int
 __wt_bulk_row(CURSOR_BULK *cbulk)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
 	int ret;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 	ins = NULL;
 	upd = NULL;
@@ -194,11 +194,11 @@ err:	if (ins != NULL)
 int
 __wt_bulk_end(CURSOR_BULK *cbulk)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
 	WT_REF *root_page;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
 	/* If the page has entries, reconcile and discard it. */
 	if (cbulk->ins_cnt != 0)
@@ -256,11 +256,11 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 static int
 __wt_bulk_row_page(CURSOR_BULK *cbulk)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
 	/*
 	 * Take a copy of the first key for the parent; re-allocate the parent
@@ -310,10 +310,10 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 static int
 __wt_bulk_col_page(CURSOR_BULK *cbulk)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
 	/*
 	 * Take a copy of the first key for the parent; re-allocate the parent

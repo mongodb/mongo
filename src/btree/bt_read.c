@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static inline void
-    __cache_read_req_set(SESSION *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
+static inline void __cache_read_req_set(
+        WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
 static inline void __cache_read_req_clr(WT_READ_REQ *);
 
-static int __cache_read(SESSION *, WT_PAGE *, WT_REF *, int);
+static int __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
 
 #define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
 	for ((rr) = (cache)->read_request,				\
@@ -20,7 +20,7 @@ static int __cache_read(SESSION *, WT_PAGE *, WT_REF *, int);
 	    (rr) < (rr_end); ++(rr))
 
 static inline void
-__cache_read_req_set(SESSION *session,
+__cache_read_req_set(WT_SESSION_IMPL *session,
     WT_READ_REQ *rr, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	rr->parent = parent;
@@ -44,7 +44,7 @@ __cache_read_req_clr(WT_READ_REQ *rr)
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_workq_read_server(CONNECTION *conn, int force)
+__wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 {
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
@@ -94,7 +94,7 @@ __wt_workq_read_server(CONNECTION *conn, int force)
  *	allocation or a read.
  */
 int
-__wt_cache_read_serial_func(SESSION *session)
+__wt_cache_read_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_PAGE *parent;
@@ -124,8 +124,8 @@ __wt_cache_read_serial_func(SESSION *session)
 void *
 __wt_cache_read_server(void *arg)
 {
-	CONNECTION *conn;
-	SESSION *session, *request_session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session, *request_session;
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
 	WT_SESSION *wt_session;
@@ -151,7 +151,7 @@ __wt_cache_read_server(void *arg)
 		__wt_err(session, ret, "cache read server error");
 		return (NULL);
 	}
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 	/*
 	 * Don't close this session during WT_CONNECTION->close: we do it
 	 * before the thread completes.
@@ -170,9 +170,9 @@ __wt_cache_read_server(void *arg)
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
-		 * a valid SESSION handle).  If we find a read request, perform
-		 * it, flush the result and clear the request slot, then wake
-		 * up the requesting thread.
+                 * a valid WT_SESSION_IMPL handle).  If we find a read request,
+                 * perform it, flush the result and clear the request slot,
+                 * then wake up the requesting thread.
 		 */
 		do {
 			didwork = 0;
@@ -183,7 +183,7 @@ __wt_cache_read_server(void *arg)
 					continue;
 				didwork = 1;
 
-				/* Reference the correct BTREE handle. */
+				/* Reference the correct WT_BTREE handle. */
 				WT_SET_BTREE_IN_SESSION(
 				    session, request_session->btree);
 
@@ -213,9 +213,9 @@ __wt_cache_read_server(void *arg)
  *	The exit flag is set, wake the read server to exit.
  */
 void
-__wt_workq_read_server_exit(CONNECTION *conn)
+__wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
 
 	session = &conn->default_session;
@@ -229,7 +229,8 @@ __wt_workq_read_server_exit(CONNECTION *conn)
  *	Read a page from the file.
  */
 static int
-__cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+__cache_read(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	WT_PAGE_DISK *dsk;
 	uint32_t addr, size;

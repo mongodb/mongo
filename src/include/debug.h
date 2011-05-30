@@ -28,7 +28,7 @@ extern "C" {
  * dump them to the application's logging file/function.
  */
 typedef struct __wt_mbuf {
-	SESSION	 *session;		/* Enclosing environment */
+	WT_SESSION_IMPL	 *session;		/* Enclosing environment */
 
 	char  *first;			/* Allocated message buffer */
 	char  *next;			/* Next available byte of the buffer */

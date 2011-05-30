@@ -49,7 +49,8 @@
  *      Packs a positive variable-length integer in the specified location.
  */
 static inline int
-__wt_pack_posint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_pack_posint(
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 	int len, shift;
@@ -76,7 +77,8 @@ __wt_pack_posint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
  *      Packs a negative variable-length integer in the specified location.
  */
 static inline int
-__wt_pack_negint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_pack_negint(
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 	int len, shift;
@@ -108,7 +110,7 @@ __wt_pack_negint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
  */
 static inline int
 __wt_unpack_posint(
-    SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
 	uint8_t *p;
@@ -134,7 +136,7 @@ __wt_unpack_posint(
  */
 static inline int
 __wt_unpack_negint(
-    SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
 	uint8_t *p;
@@ -159,7 +161,8 @@ __wt_unpack_negint(
  *      Variable-sized packing for unsigned integers
  */
 static inline int
-__wt_vpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_vpack_uint(
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 
@@ -186,7 +189,7 @@ __wt_vpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t x)
  *      Variable-sized packing for signed integers
  */
 static inline int
-__wt_vpack_int(SESSION *session, uint8_t **pp, size_t maxlen, int64_t x)
+__wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 {
 	uint8_t *p;
 
@@ -215,7 +218,8 @@ __wt_vpack_int(SESSION *session, uint8_t **pp, size_t maxlen, int64_t x)
  *      Variable-sized unpacking for unsigned integers
  */
 static inline int
-__wt_vunpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *xp)
+__wt_vunpack_uint(
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t *xp)
 {
 	uint8_t *p;
 
@@ -251,7 +255,8 @@ __wt_vunpack_uint(SESSION *session, uint8_t **pp, size_t maxlen, uint64_t *xp)
  *      Variable-sized packing for signed integers
  */
 static inline int
-__wt_vunpack_int(SESSION *session, uint8_t **pp, size_t maxlen, int64_t *xp)
+__wt_vunpack_int(
+    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t *xp)
 {
 	uint8_t *p;
 

@@ -45,7 +45,7 @@ def print_func(name, list):
 	f.write('\n')
 	f.write('int\n')
 	f.write('__wt_stat_alloc_' + name +
-	    '_stats(SESSION *session, WT_' +
+	    '_stats(WT_SESSION_IMPL *session, WT_' +
 	    name.upper() + '_STATS **statsp)\n')
 	f.write('{\n')
 	f.write('\tWT_' + name.upper() + '_STATS *stats;\n\n')

@@ -570,7 +570,7 @@ __wt_config_getones(const char *cfg, const char *key, WT_CONFIG_ITEM *value)
  *	somewhere in the defaults.
  */
 int
-__wt_config_checklist(SESSION *session,
+__wt_config_checklist(WT_SESSION_IMPL *session,
     const char **defaults, const char *config)
 {
 	WT_CONFIG cparser;
@@ -616,7 +616,8 @@ __wt_config_checklist(SESSION *session,
  *	application-supplied config string appear somewhere in the defaults.
  */
 int
-__wt_config_check(SESSION *session, const char *defaults, const char *config)
+__wt_config_check(
+    WT_SESSION_IMPL *session, const char *defaults, const char *config)
 {
 	const char *defs[2];
 	defs[0] = defaults;
@@ -632,7 +633,7 @@ __wt_config_check(SESSION *session, const char *defaults, const char *config)
  *	buffer.
  */
 int
-__wt_config_collapse(SESSION *session,
+__wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg, const char **config_ret)
 {
 	char *config, *end, *p;

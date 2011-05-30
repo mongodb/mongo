@@ -14,7 +14,7 @@
 static int
 __cursor_get_key(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
 	int ret;
@@ -38,7 +38,7 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 static int
 __cursor_get_value(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
 	int ret;
@@ -62,7 +62,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 static void
 __cursor_set_key(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_BUF *buf;
 	WT_ITEM *item;
 	const char *fmt, *str;
@@ -116,7 +116,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 static void
 __cursor_set_value(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_BUF *buf;
 	WT_ITEM *item;
 	const char *fmt, *str;
@@ -180,7 +180,7 @@ __cursor_search(WT_CURSOR *cursor)
 int
 __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);

@@ -9,20 +9,20 @@
 #include "btree.i"
 
 static inline void __evict_clr(WT_EVICT_LIST *);
-static inline void __evict_req_clr(SESSION *, WT_EVICT_REQ *);
-static inline void __evict_req_set(SESSION *, WT_EVICT_REQ *, int);
+static inline void __evict_req_clr(WT_SESSION_IMPL *, WT_EVICT_REQ *);
+static inline void __evict_req_set(WT_SESSION_IMPL *, WT_EVICT_REQ *, int);
 
-static void __evict_dup_remove(SESSION *);
-static int  __evict_file(SESSION *, WT_EVICT_REQ *);
-static int  __evict_lru(SESSION *);
+static void __evict_dup_remove(WT_SESSION_IMPL *);
+static int  __evict_file(WT_SESSION_IMPL *, WT_EVICT_REQ *);
+static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
-static void __evict_page(SESSION *);
+static void __evict_page(WT_SESSION_IMPL *);
 static int  __evict_page_cmp(const void *, const void *);
-static int  __evict_request_retry(SESSION *);
-static int  __evict_request_walk(SESSION *);
-static int  __evict_walk(SESSION *);
-static int  __evict_walk_file(SESSION *, u_int);
-static int  __evict_worker(SESSION *);
+static int  __evict_request_retry(WT_SESSION_IMPL *);
+static int  __evict_request_walk(WT_SESSION_IMPL *);
+static int  __evict_walk(WT_SESSION_IMPL *);
+static int  __evict_walk_file(WT_SESSION_IMPL *, u_int);
+static int  __evict_worker(WT_SESSION_IMPL *);
 
 /*
  * Tuning constants -- I hesitate to call this tuning, but we should review some
@@ -66,7 +66,7 @@ __evict_clr(WT_EVICT_LIST *e)
  *	Set an entry in the eviction request list.
  */
 static inline void
-__evict_req_set(SESSION *session, WT_EVICT_REQ *r, int close_method)
+__evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 {
 	r->close_method = close_method;
 	WT_ASSERT(session, r->retry == NULL);
@@ -84,7 +84,7 @@ __evict_req_set(SESSION *session, WT_EVICT_REQ *r, int close_method)
  *	Set an entry in the eviction request list.
  */
 static inline void
-__evict_req_clr(SESSION *session, WT_EVICT_REQ *r)
+__evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	if (r->retry != NULL)
 		__wt_free(session, r->retry);
@@ -99,9 +99,9 @@ __evict_req_clr(SESSION *session, WT_EVICT_REQ *r)
  *	See if the eviction server thread needs to be awakened.
  */
 void
-__wt_workq_evict_server(CONNECTION *conn, int force)
+__wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
 
@@ -140,7 +140,7 @@ __wt_workq_evict_server(CONNECTION *conn, int force)
  *	or closed.
  */
 int
-__wt_evict_file_serial_func(SESSION *session)
+__wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
@@ -167,8 +167,8 @@ __wt_evict_file_serial_func(SESSION *session)
 void *
 __wt_cache_evict_server(void *arg)
 {
-	CONNECTION *conn;
-	SESSION *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	WT_SESSION *wt_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
@@ -191,7 +191,7 @@ __wt_cache_evict_server(void *arg)
 	session = &conn->default_session;
 	wt_session = NULL;
 	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
-	session = (SESSION *)wt_session;
+	session = (WT_SESSION_IMPL *)wt_session;
 	/*
 	 * Don't close this session during WT_CONNECTION->close: we do it
 	 * before the thread completes.
@@ -244,9 +244,9 @@ err:		__wt_err(session, ret, "cache eviction server error");
  *	The exit flag is set, wake the eviction server to exit.
  */
 void
-__wt_workq_evict_server_exit(CONNECTION *conn)
+__wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
 
 	session = &conn->default_session;
@@ -260,7 +260,7 @@ __wt_workq_evict_server_exit(CONNECTION *conn)
  *	Evict pages from memory.
  */
 static int
-__evict_worker(SESSION *session)
+__evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	uint64_t bytes_start, bytes_inuse, bytes_max;
@@ -329,9 +329,9 @@ __evict_worker(SESSION *session)
  *	Walk the eviction request queue.
  */
 static int
-__evict_request_walk(SESSION *session)
+__evict_request_walk(WT_SESSION_IMPL *session)
 {
-	SESSION *request_session;
+	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	int ret;
@@ -339,10 +339,10 @@ __evict_request_walk(SESSION *session)
 	cache = S2C(session)->cache;
 
 	/*
-	 * Walk the eviction request queue, looking for sync or close requests
-	 * (defined by a valid SESSION handle).  If we find a request, perform
-	 * it, flush the result and clear the request slot, then wake up the
-	 * requesting thread.
+         * Walk the eviction request queue, looking for sync or close requests
+         * (defined by a valid WT_SESSION_IMPL handle).  If we find a request,
+         * perform it, flush the result and clear the request slot, then wake
+         * up the requesting thread.
 	 */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache) {
 		if ((request_session = er->session) == NULL)
@@ -354,7 +354,7 @@ __evict_request_walk(SESSION *session)
 		 */
 		memset(cache->evict, 0, cache->evict_allocated);
 
-		/* Reference the correct BTREE handle. */
+		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
 
 		ret = __evict_file(session, er);
@@ -379,9 +379,9 @@ __evict_request_walk(SESSION *session)
  *	Flush pages for a specific file as part of a close/sync operation.
  */
 static int
-__evict_file(SESSION *session, WT_EVICT_REQ *er)
+__evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_PAGE *page;
 	uint32_t flags;
 	int ret;
@@ -443,9 +443,9 @@ err:	/* End the walk cleanly. */
  *	Retry an eviction request.
  */
 static int
-__evict_request_retry(SESSION *session)
+__evict_request_retry(WT_SESSION_IMPL *session)
 {
-	SESSION *request_session;
+	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	uint32_t i, flags;
@@ -470,7 +470,7 @@ __evict_request_retry(SESSION *session)
 		 */
 		memset(cache->evict, 0, cache->evict_allocated);
 
-		/* Reference the correct BTREE handle. */
+		/* Reference the correct WT_BTREE handle. */
 		request_session = er->session;
 		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
 
@@ -510,7 +510,7 @@ __evict_request_retry(SESSION *session)
  *	Evict pages from the cache based on their read generation.
  */
 static int
-__evict_lru(SESSION *session)
+__evict_lru(WT_SESSION_IMPL *session)
 {
 	/* Get some more pages to consider for eviction. */
 	WT_RET(__evict_walk(session));
@@ -529,10 +529,10 @@ __evict_lru(SESSION *session)
  *	Fill in the array by walking the next set of pages.
  */
 static int
-__evict_walk(SESSION *session)
+__evict_walk(WT_SESSION_IMPL *session)
 {
-	CONNECTION *conn;
-	BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	u_int elem, i;
 	int ret;
@@ -561,7 +561,7 @@ __evict_walk(SESSION *session)
 			if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 				continue;
 
-			/* Reference the correct BTREE handle. */
+			/* Reference the correct WT_BTREE handle. */
 			WT_SET_BTREE_IN_SESSION(session, btree);
 
 			WT_ERR(__evict_walk_file(session, i));
@@ -577,9 +577,9 @@ err:	__wt_unlock(session, conn->mtx);
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__evict_walk_file(SESSION *session, u_int slot)
+__evict_walk_file(WT_SESSION_IMPL *session, u_int slot)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	int i, restarted_once;
@@ -635,7 +635,7 @@ walk:		WT_RET(__wt_walk_begin(
  *	Discard duplicates from the list of pages we collected.
  */
 static void
-__evict_dup_remove(SESSION *session)
+__evict_dup_remove(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -683,7 +683,7 @@ __evict_dup_remove(SESSION *session)
  *	Reconcile and discard cache pages.
  */
 static void
-__evict_page(SESSION *session)
+__evict_page(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -700,7 +700,7 @@ __evict_page(SESSION *session)
 		if ((page = evict->page) == NULL)
 			continue;
 
-		/* Reference the correct BTREE handle. */
+		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, evict->btree);
 
 		/*

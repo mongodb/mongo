@@ -15,11 +15,11 @@ typedef struct {
 	uint64_t fcnt;					/* Progress counter */
 } WT_DSTUFF;
 
-static int  __wt_dump_page(SESSION *, WT_PAGE *, void *);
-static void __wt_dump_page_col_fix(SESSION *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_col_rle(SESSION *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_col_var(SESSION *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_row_leaf(SESSION *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
+static void __wt_dump_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_print_byte_string_hex(const uint8_t *, uint32_t, FILE *);
 static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
 
@@ -28,7 +28,7 @@ static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
+__wt_btree_dump(WT_SESSION_IMPL *session, FILE *stream, uint32_t flags)
 {
 	WT_DSTUFF dstuff;
 	int ret;
@@ -68,7 +68,7 @@ __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
  *	Depth-first recursive walk of a btree.
  */
 static int
-__wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
+__wt_dump_page(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 {
 	WT_DSTUFF *dp;
 
@@ -105,9 +105,9 @@ __wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_dump_page_col_fix(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -133,9 +133,9 @@ __wt_dump_page_col_fix(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
  *	Dump a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	FILE *fp;
 	WT_COL *cip;
 	WT_INSERT *ins;
@@ -181,9 +181,9 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
  *	Dump a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_CELL *cell;
@@ -235,9 +235,9 @@ err:	__wt_scr_release(&tmp);
  *	Dump a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *cell;
 	WT_INSERT *ins;

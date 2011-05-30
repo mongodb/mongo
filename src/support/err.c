@@ -12,7 +12,7 @@
  * 	Report an error (va_list version).
  */
 void
-__wt_errv(SESSION *session, int error,
+__wt_errv(WT_SESSION_IMPL *session, int error,
     const char *prefix1, const char *prefix2, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
@@ -50,7 +50,7 @@ __wt_errv(SESSION *session, int error,
  * 	Report an error.
  */
 void
-__wt_err(SESSION *session, int error, const char *fmt, ...)
+__wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
 {
 	va_list ap;
@@ -68,7 +68,7 @@ __wt_err(SESSION *session, int error, const char *fmt, ...)
  * 	Report an error with no error code.
  */
 void
-__wt_errx(SESSION *session, const char *fmt, ...)
+__wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;
@@ -86,7 +86,7 @@ __wt_errx(SESSION *session, const char *fmt, ...)
  *	Pass a message to a callback function.
  */
 void
-__wt_msgv(SESSION *session, const char *prefix1, const char *prefix2,
+__wt_msgv(WT_SESSION_IMPL *session, const char *prefix1, const char *prefix2,
     const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
@@ -120,7 +120,7 @@ __wt_msgv(SESSION *session, const char *prefix1, const char *prefix2,
  * 	Report a message.
  */
 void
-__wt_msg(SESSION *session, const char *fmt, ...)
+__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;
@@ -139,7 +139,8 @@ __wt_msg(SESSION *session, const char *fmt, ...)
  */
 void
 __wt_assert(
-    SESSION *session, const char *check, const char *file_name, int line_number)
+    WT_SESSION_IMPL *session, const char *check,
+    const char *file_name, int line_number)
 {
 	__wt_errx(session,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
@@ -155,7 +156,7 @@ __wt_assert(
  *	discovered.
  */
 int
-__wt_file_format(SESSION *session)
+__wt_file_format(WT_SESSION_IMPL *session)
 {
 	__wt_errx(session, "the file is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the file");
@@ -168,7 +169,7 @@ __wt_file_format(SESSION *session)
  *	Print a standard error message when an element is too large to store.
  */
 int
-__wt_file_item_too_big(SESSION *session)
+__wt_file_item_too_big(WT_SESSION_IMPL *session)
 {
 	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);

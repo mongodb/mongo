@@ -12,9 +12,9 @@
  *	Db.row_get method.
  */
 int
-__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value)
+__wt_btree_row_get(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	int ret;
 
 	btree = session->btree;

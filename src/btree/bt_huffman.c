@@ -124,7 +124,7 @@ static const struct __wt_huffman_table __wt_huffman_nytenglish[] = {
 	/*  ~  */	{ 0x7e,       1 }
 };
 
-static int __wt_huffman_read(SESSION *,
+static int __wt_huffman_read(WT_SESSION_IMPL *,
     WT_CONFIG_ITEM *, struct __wt_huffman_table **, u_int *, u_int *);
 
 /*
@@ -132,9 +132,9 @@ static int __wt_huffman_read(SESSION *,
  *	Configure Huffman encoding for the tree.
  */
 int
-__wt_btree_huffman_open(SESSION *session)
+__wt_btree_huffman_open(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	u_int entries, numbytes;
 	struct __wt_huffman_table *table;
 	WT_CONFIG_ITEM key_conf, value_conf;
@@ -226,7 +226,7 @@ __wt_btree_huffman_open(SESSION *session)
  *	Read a Huffman table from a file.
  */
 static int
-__wt_huffman_read(SESSION *session, WT_CONFIG_ITEM *ip,
+__wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
     struct __wt_huffman_table **tablep, u_int *entriesp, u_int *numbytesp)
 {
 	struct __wt_huffman_table *table, *tp;
@@ -333,9 +333,9 @@ err:	if (ret == 0)
  *	Close the Huffman tables.
  */
 void
-__wt_btree_huffman_close(SESSION *session)
+__wt_btree_huffman_close(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 
 	btree = session->btree;
 

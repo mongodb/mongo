@@ -3,7 +3,7 @@
 #include "wt_internal.h"
 
 int
-__wt_stat_alloc_btree_stats(SESSION *session, WT_BTREE_STATS **statsp)
+__wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 {
 	WT_BTREE_STATS *stats;
 
@@ -61,7 +61,7 @@ __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream)
 }
 
 int
-__wt_stat_alloc_btree_file_stats(SESSION *session, WT_BTREE_FILE_STATS **statsp)
+__wt_stat_alloc_btree_file_stats(WT_SESSION_IMPL *session, WT_BTREE_FILE_STATS **statsp)
 {
 	WT_BTREE_FILE_STATS *stats;
 
@@ -146,7 +146,7 @@ __wt_stat_print_btree_file_stats(WT_BTREE_FILE_STATS *stats, FILE *stream)
 }
 
 int
-__wt_stat_alloc_cache_stats(SESSION *session, WT_CACHE_STATS **statsp)
+__wt_stat_alloc_cache_stats(WT_SESSION_IMPL *session, WT_CACHE_STATS **statsp)
 {
 	WT_CACHE_STATS *stats;
 
@@ -198,7 +198,7 @@ __wt_stat_print_cache_stats(WT_CACHE_STATS *stats, FILE *stream)
 }
 
 int
-__wt_stat_alloc_conn_stats(SESSION *session, WT_CONN_STATS **statsp)
+__wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 {
 	WT_CONN_STATS *stats;
 
@@ -244,7 +244,7 @@ __wt_stat_print_conn_stats(WT_CONN_STATS *stats, FILE *stream)
 }
 
 int
-__wt_stat_alloc_file_stats(SESSION *session, WT_FILE_STATS **statsp)
+__wt_stat_alloc_file_stats(WT_SESSION_IMPL *session, WT_FILE_STATS **statsp)
 {
 	WT_FILE_STATS *stats;
 

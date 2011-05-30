@@ -621,7 +621,7 @@ struct __wt_col {
  * list.
  */
 struct __wt_update {
-	SESSION_BUFFER *sb;		/* session buffer holding this update */
+	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
 
 	WT_UPDATE *next;		/* forward-linked list */
 
@@ -670,7 +670,7 @@ struct __wt_update {
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
-	SESSION_BUFFER *sb;		/* session buffer holding this update */
+	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
 
 	WT_INSERT *next;		/* forward-linked list */
 

@@ -47,7 +47,7 @@ int __wt_debugger_attach;
  *	A routine to wait for the debugging to attach.
  */
 void
-__wt_attach(SESSION *session)
+__wt_attach(WT_SESSION_IMPL *session)
 {
 #ifdef HAVE_ATTACH
 	__wt_err(session, 0,

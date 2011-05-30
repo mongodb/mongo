@@ -123,7 +123,7 @@ __curconfig_close(WT_CURSOR *cursor, const char *config)
  *	WT_SESSION->open_cursor method for config cursors.
  */
 int
-__wt_curconfig_open(SESSION *session,
+__wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {

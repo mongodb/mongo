@@ -16,9 +16,9 @@
 int
 __wt_btcur_first(CURSOR_BTREE *cbt)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
-	session = (SESSION *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk, 0));
 	F_SET(&cbt->iface, WT_CURSTD_POSITIONED);
@@ -123,12 +123,12 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 static inline int
 __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
 	WT_UPDATE *upd;
 	int found;
 
-	session = (SESSION *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* New page? */
 	if (cbt->nitems == 0) {
@@ -183,12 +183,12 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 static inline int
 __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
 	WT_UPDATE *upd;
 	int found;
 
-	session = (SESSION *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* New page? */
 	if (cbt->nitems == 0) {
@@ -254,12 +254,12 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 int
 __wt_btcur_next(CURSOR_BTREE *cbt)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	int ret;
 
 	cursor = &cbt->iface;
-	session = (SESSION *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));
@@ -322,14 +322,14 @@ __wt_btcur_prev(CURSOR_BTREE *cbt)
 int
 __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
-	session = (SESSION *)cursor->session;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
 	*exact = 0;
 	switch (btree->type) {
@@ -359,13 +359,13 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 int
 __wt_btcur_insert(CURSOR_BTREE *cbt)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
-	session = (SESSION *)cursor->session;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -387,13 +387,13 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
 int
 __wt_btcur_update(CURSOR_BTREE *cbt)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
-	session = (SESSION *)cursor->session;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -415,13 +415,13 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 int
 __wt_btcur_remove(CURSOR_BTREE *cbt)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
-	session = (SESSION *)cursor->session;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -441,11 +441,11 @@ __wt_btcur_remove(CURSOR_BTREE *cbt)
 int
 __wt_btcur_close(CURSOR_BTREE *cbt, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(config);
 
-	session = (SESSION *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	__wt_walk_end(session, &cbt->walk);
 	return (0);
 }

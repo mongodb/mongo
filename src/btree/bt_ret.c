@@ -14,9 +14,10 @@
  *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
+__wt_return_data(
+    WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_ITEM local_key, local_value;
 	WT_COL *cip;
@@ -26,7 +27,7 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	WT_UPDATE *upd;
 	const void *value_ret;
 	uint32_t size_ret;
-	int (*callback)(BTREE *, WT_ITEM *, WT_ITEM *), ret;
+	int (*callback)(WT_BTREE *, WT_ITEM *, WT_ITEM *), ret;
 
 	btree = session->btree;
 	cursor = session->cursor;
@@ -56,8 +57,8 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 * allocate WT_ROW/COL memory for keys, but if we are looking at a key
 	 * only to return it, it's not that likely to be accessed again (think
 	 * of a cursor moving through the tree).  Use memory in the
-	 * application's WT_ITEM instead, it is discarded when the SESSION is
-	 * discarded.
+	 * application's WT_ITEM instead, it is discarded when the session is
+	 * closed.
 	 *
 	 * Key return implies a reference to a WT_ROW index (we don't return
 	 * record number keys yet, that will probably change when I add cursor

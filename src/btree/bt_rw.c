@@ -13,9 +13,9 @@
  */
 int
 __wt_disk_read(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FH *fh;
 	off_t offset;
 	uint32_t checksum;
@@ -47,9 +47,9 @@ __wt_disk_read(
  */
 int
 __wt_disk_write(
-    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FH *fh;
 
 	btree = session->btree;

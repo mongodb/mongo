@@ -12,7 +12,7 @@
  *	Truncate a file.
  */
 int
-__wt_ftruncate(SESSION *session, WT_FH *fh, off_t len)
+__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len)
 {
 	if (ftruncate(fh->fd, len) == 0) {
 		fh->file_size = len;

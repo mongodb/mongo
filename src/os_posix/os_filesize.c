@@ -12,7 +12,7 @@
  *	Get the size of a file in bytes.
  */
 int
-__wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep)
+__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 {
 	struct stat sb;
 

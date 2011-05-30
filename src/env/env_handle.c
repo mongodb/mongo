@@ -9,19 +9,19 @@
 
 /*
  * __wt_connection_config --
- *	Set configuration for a just-created CONNECTION handle.
+ *	Set configuration for a just-created WT_CONNECTION_IMPL handle.
  */
 int
-__wt_connection_config(CONNECTION *conn)
+__wt_connection_config(WT_CONNECTION_IMPL *conn)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 
 	session = &conn->default_session;
 
 						/* Global mutex */
-	WT_RET(__wt_mtx_alloc(session, "CONNECTION", 0, &conn->mtx));
+	WT_RET(__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
 
-	TAILQ_INIT(&conn->dbqh);		/* BTREE list */
+	TAILQ_INIT(&conn->dbqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
 
@@ -36,12 +36,12 @@ __wt_connection_config(CONNECTION *conn)
 
 /*
  * __wt_connection_destroy --
- *	Destroy the CONNECTION's underlying CONNECTION structure.
+ *	Destroy the connection's underlying WT_CONNECTION_IMPL structure.
  */
 int
-__wt_connection_destroy(CONNECTION *conn)
+__wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	session = &conn->default_session;

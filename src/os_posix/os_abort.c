@@ -12,7 +12,7 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort(SESSION *session)
+__wt_abort(WT_SESSION_IMPL *session)
 {
 	__wt_msg(session, "aborting WiredTiger library");
 

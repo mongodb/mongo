@@ -12,7 +12,7 @@
  *	Sync the tree.
  */
 int
-__wt_bt_sync(SESSION *session)
+__wt_bt_sync(WT_SESSION_IMPL *session)
 {
 	int ret;
 

@@ -7,16 +7,16 @@
 
 #include "wt_internal.h"
 
-static int __col_wrong_fixed_size(SESSION *, uint32_t, uint32_t);
-static int __col_insert_alloc(SESSION *, uint64_t, WT_INSERT **);
-static int __col_update(SESSION *, uint64_t, WT_ITEM *, int);
+static int __col_wrong_fixed_size(WT_SESSION_IMPL *, uint32_t, uint32_t);
+static int __col_insert_alloc(WT_SESSION_IMPL *, uint64_t, WT_INSERT **);
+static int __col_update(WT_SESSION_IMPL *, uint64_t, WT_ITEM *, int);
 
 /*
  * __wt_btree_col_del --
  *	Db.col_del method.
  */
 int
-__wt_btree_col_del(SESSION *session, uint64_t recno)
+__wt_btree_col_del(WT_SESSION_IMPL *session, uint64_t recno)
 {
 	int ret;
 
@@ -30,9 +30,9 @@ __wt_btree_col_del(SESSION *session, uint64_t recno)
  *	Db.put method.
  */
 int
-__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
+__wt_btree_col_put(WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	int ret;
 
 	btree = session->btree;
@@ -51,7 +51,8 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
  *	Column-store delete and update.
  */
 static int
-__col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
+__col_update(
+    WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
 	WT_INSERT **new_ins, *ins;
@@ -160,13 +161,13 @@ err:		if (ins != NULL)
 
 /*
  * __col_insert_alloc --
- *	Column-store insert: allocate a WT_INSERT structure from the SESSION's
+ *	Column-store insert: allocate a WT_INSERT structure from the session's
  *	buffer and fill it in.
  */
 static int
-__col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
+__col_insert_alloc(WT_SESSION_IMPL *session, uint64_t recno, WT_INSERT **insp)
 {
-	SESSION_BUFFER *sb;
+	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
 
 	/*
@@ -189,7 +190,8 @@ __col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
  *	into a fixed-size file.
  */
 static int
-__col_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len)
+__col_wrong_fixed_size(
+    WT_SESSION_IMPL *session, uint32_t len, uint32_t config_len)
 {
 	__wt_errx(session,
 	    "%s: length of %lu does not match fixed-length file configuration "

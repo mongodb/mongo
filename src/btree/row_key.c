@@ -15,7 +15,8 @@
  * is specified, instantiate the key into the in-memory page.
  */
 int
-__wt_row_key(SESSION *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
+__wt_row_key(
+    WT_SESSION_IMPL *session, WT_PAGE *page, void *row_arg, WT_BUF *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BUF build, tmp;
@@ -266,7 +267,7 @@ err:	__wt_buf_free(session, &build);
  *	Server function to instantiate a key during a row-store search.
  */
 int
-__wt_row_key_serial_func(SESSION *session)
+__wt_row_key_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_ROW *rip;
 	bitstr_t *ovfl;

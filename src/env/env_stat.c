@@ -9,15 +9,15 @@
 
 /*
  * __wt_connection_stat_print --
- *	Print CONNECTION handle statistics to a stream.
+ *	Print WT_CONNECTION_IMPL handle statistics to a stream.
  *
  * XXX this will become a statistics cursor.
  */
 int
-__wt_connection_stat_print(CONNECTION *conn, FILE *stream)
+__wt_connection_stat_print(WT_CONNECTION_IMPL *conn, FILE *stream)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 
 	session = &conn->default_session;
 
@@ -39,12 +39,12 @@ __wt_connection_stat_print(CONNECTION *conn, FILE *stream)
 
 /*
  * __wt_connection_stat_clear --
- *	Clear CONNECTION handle statistics.
+ *	Clear WT_CONNECTION_IMPL handle statistics.
  */
 int
-__wt_connection_stat_clear(CONNECTION *conn)
+__wt_connection_stat_clear(WT_CONNECTION_IMPL *conn)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	int ret;
 
 	ret = 0;

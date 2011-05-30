@@ -258,9 +258,9 @@ __wt_cell_len(WT_CELL *cell)
  *	Copy an on-page cell into a return buffer, processing as needed.
  */
 int
-__wt_cell_copy(SESSION *session, WT_CELL *cell, WT_BUF *retb)
+__wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_BUF *retb)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_OFF ovfl;
 	uint32_t size;
 	const void *p;

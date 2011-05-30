@@ -12,7 +12,8 @@
  *	Allocate and initialize a pthread mutex.
  */
 int
-__wt_mtx_alloc(SESSION *session, const char *name, int is_locked, WT_MTX **mtxp)
+__wt_mtx_alloc(WT_SESSION_IMPL *session,
+    const char *name, int is_locked, WT_MTX **mtxp)
 {
 	WT_MTX *mtx;
 	pthread_condattr_t condattr;
@@ -22,7 +23,7 @@ __wt_mtx_alloc(SESSION *session, const char *name, int is_locked, WT_MTX **mtxp)
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL SESSION structure reference.
+	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
 	 *
 	 * Initialize the mutex.
 	 * Mutexes are shared between processes.
@@ -68,7 +69,7 @@ err:	__wt_free(session, mtx);
  *	Lock a mutex.
  */
 void
-__wt_lock(SESSION *session, WT_MTX *mtx)
+__wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
@@ -109,7 +110,7 @@ err:	__wt_err(session, ret, "mutex lock failed");
  *	Release a mutex.
  */
 void
-__wt_unlock(SESSION *session, WT_MTX *mtx)
+__wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
@@ -133,7 +134,7 @@ err:	__wt_err(session, ret, "mutex unlock failed");
  *	Destroy a mutex.
  */
 int
-__wt_mtx_destroy(SESSION *session, WT_MTX *mtx)
+__wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 

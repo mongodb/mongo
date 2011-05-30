@@ -10,7 +10,7 @@
  *	Read pages into the cache.
  */
 static inline void
-__wt_cache_page_in(SESSION *session, WT_PAGE *page, uint32_t size)
+__wt_cache_page_in(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
 	WT_CACHE *cache;
 
@@ -26,7 +26,7 @@ __wt_cache_page_in(SESSION *session, WT_PAGE *page, uint32_t size)
  *	Discard pages from the cache.
  */
 static inline void
-__wt_cache_page_out(SESSION *session, WT_PAGE *page, uint32_t size)
+__wt_cache_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
 	WT_CACHE *cache;
 
@@ -43,7 +43,7 @@ __wt_cache_page_out(SESSION *session, WT_PAGE *page, uint32_t size)
 }
 
 static inline uint64_t
-__wt_cache_read_gen(SESSION *session)
+__wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
 	return (++S2C(session)->cache->read_gen);
 }

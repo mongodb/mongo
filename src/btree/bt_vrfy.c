@@ -26,24 +26,26 @@ typedef struct {
 	uint32_t max_addr;			/* Largest key page */
 } WT_VSTUFF;
 
-static int __wt_verify_addfrag(SESSION *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_checkfrag(SESSION *, WT_VSTUFF *);
-static int __wt_verify_freelist(SESSION *, WT_VSTUFF *);
-static int __wt_verify_overflow(SESSION *, WT_OFF *, WT_VSTUFF *);
-static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_addfrag(
+        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
+static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
+static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_OFF *, WT_VSTUFF *);
+static int __wt_verify_overflow_page(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
-		SESSION *, WT_PAGE *, void *, WT_VSTUFF *);
-static int __wt_verify_row_leaf_key_order(SESSION *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_tree(SESSION *, WT_REF *, uint64_t, WT_VSTUFF *);
+        WT_SESSION_IMPL *, WT_PAGE *, void *, WT_VSTUFF *);
+static int __wt_verify_row_leaf_key_order(
+        WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_verify --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_verify(SESSION *session, FILE *stream, const char *config)
+__wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
 	int ret;
 
@@ -128,7 +130,7 @@ err:	if (vs != NULL) {
  */
 static int
 __wt_verify_tree(
-	SESSION *session,		/* Thread of control */
+	WT_SESSION_IMPL *session,		/* Thread of control */
 	WT_REF *ref,			/* Page to verify */
 	uint64_t parent_recno,		/* First record in this subtree */
 	WT_VSTUFF *vs)			/* The verify package */
@@ -331,11 +333,11 @@ recno_chk:	if (parent_recno != recno) {
  */
 static int
 __wt_verify_row_int_key_order(
-    SESSION *session, WT_PAGE *page, void *rref, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, WT_PAGE *page, void *rref, WT_VSTUFF *vs)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *key, *tmp;
-	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	key = NULL;
@@ -375,11 +377,12 @@ __wt_verify_row_int_key_order(
  * far; update the largest key we've seen so far to the last key on the page.
  */
 static int
-__wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_row_leaf_key_order(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *key;
-	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	key = NULL;
@@ -429,7 +432,8 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
  *	Verify overflow items.
  */
 static int
-__wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_page(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
 	WT_OFF ovfl;
@@ -460,7 +464,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(SESSION *session, WT_OFF *ovfl, WT_VSTUFF *vs)
+__wt_verify_overflow(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_VSTUFF *vs)
 {
 	WT_PAGE_DISK *dsk;
 	WT_BUF *tmp;
@@ -502,9 +506,9 @@ err:	__wt_scr_release(&tmp);
  *	Add the freelist fragments to the list of verified fragments.
  */
 static int
-__wt_verify_freelist(SESSION *session, WT_VSTUFF *vs)
+__wt_verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe;
 	int ret;
 
@@ -524,9 +528,9 @@ __wt_verify_freelist(SESSION *session, WT_VSTUFF *vs)
  */
 static int
 __wt_verify_addfrag(
-    SESSION *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	uint32_t frags, i;
 
 	btree = session->btree;
@@ -549,7 +553,7 @@ __wt_verify_addfrag(
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_verify_checkfrag(SESSION *session, WT_VSTUFF *vs)
+__wt_verify_checkfrag(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
 	int ffc, ffc_start, ffc_end, frags, ret;
 

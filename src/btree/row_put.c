@@ -8,14 +8,14 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
+static int __wt_row_update(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM *, int);
 
 /*
  * __wt_btree_row_del --
  *	Db.row_del method.
  */
 int
-__wt_btree_row_del(SESSION *session, WT_ITEM *key)
+__wt_btree_row_del(WT_SESSION_IMPL *session, WT_ITEM *key)
 {
 	int ret;
 
@@ -29,7 +29,7 @@ __wt_btree_row_del(SESSION *session, WT_ITEM *key)
  *	Db.row_put method.
  */
 int
-__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value)
+__wt_btree_row_put(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value)
 {
 	int ret;
 
@@ -43,7 +43,8 @@ __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value)
  *	Row-store delete and update.
  */
 static int
-__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int is_write)
+__wt_row_update(
+    WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 {
 	WT_INSERT **new_ins, *ins;
 	WT_PAGE *page;
@@ -137,13 +138,13 @@ err:		if (ins != NULL)
 
 /*
  * __wt_row_insert_alloc --
- *	Row-store insert: allocate a WT_INSERT structure from the SESSION's
+ *	Row-store insert: allocate a WT_INSERT structure from the session's
  *	buffer and fill it in.
  */
 int
-__wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp)
+__wt_row_insert_alloc(WT_SESSION_IMPL *session, WT_ITEM *key, WT_INSERT **insp)
 {
-	SESSION_BUFFER *sb;
+	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
 	uint32_t size;
 
@@ -168,7 +169,7 @@ __wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp)
  *	Server function to add an WT_INSERT entry to the page tree.
  */
 int
-__wt_insert_serial_func(SESSION *session)
+__wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
 	WT_INSERT **new_ins, **srch_ins, *ins;
@@ -212,13 +213,13 @@ err:	__wt_session_serialize_wrapup(session, page, 0);
 
 /*
  * __wt_update_alloc --
- *	Allocate a WT_UPDATE structure and associated value from the SESSION's
+ *	Allocate a WT_UPDATE structure and associated value from the session's
  *	buffer and fill it in.
  */
 int
-__wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp)
+__wt_update_alloc(WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp)
 {
-	SESSION_BUFFER *sb;
+	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
 	uint32_t size;
 
@@ -245,7 +246,7 @@ __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp)
  *	Server function to add an WT_UPDATE entry in the page array.
  */
 int
-__wt_update_serial_func(SESSION *session)
+__wt_update_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, **srch_upd, *upd;

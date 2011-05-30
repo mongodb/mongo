@@ -9,19 +9,20 @@
 
 /*
  * __wt_sb_alloc --
- *	Allocate memory from the SESSION's buffer and fill it in.
+ *	Allocate memory from the WT_SESSION_IMPL's buffer and fill it in.
  */
 int
-__wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
+__wt_sb_alloc(
+    WT_SESSION_IMPL *session, size_t size, void *retp, WT_SESSION_BUFFER **sbp)
 {
-	SESSION_BUFFER *sb;
+	WT_SESSION_BUFFER *sb;
 	uint32_t alloc_size, align_size;
 	int single_use;
 
 	/*
-	 * Allocate memory for an insert or change; there's a buffer in the
-	 * SESSION structure for allocation of chunks of memory to hold changed
-	 * or inserted values.
+         * Allocate memory for an insert or change; there's a buffer in the
+         * WT_SESSION_IMPL structure for allocation of chunks of memory to hold
+         * changed or inserted values.
 	 *
 	 * We align allocations because we directly access WT_UPDATE structure
 	 * fields in the memory (the x86 handles unaligned accesses, but I don't
@@ -31,20 +32,21 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * than with on-disk structures.  Any other code allocating memory from
 	 * this buffer needs to align its allocations as well.
 	 *
-	 * The first thing in each chunk of memory is a SESSION_BUFFER structure
-	 * (which we check is a multiple of 4B during initialization); then one
-	 * or more WT_UPDATE structure plus value chunk pairs.
+         * The first thing in each chunk of memory is a WT_SESSION_BUFFER
+         * structure (which we check is a multiple of 4B during
+         * initialization); then one or more WT_UPDATE structure plus value
+         * chunk pairs.
 	 *
-	 * Figure out how much space we need: this code limits the maximum size
-	 * of a data item stored in the file.  In summary, for a big item we
-	 * have to store a SESSION_BUFFER structure, the WT_UPDATE structure and
-	 * the data, all in an allocated buffer.   We only pass a 32-bit value
-	 * to our allocation routine, so we can't store an item bigger than the
-	 * maximum 32-bit value minus the sizes of those two structures, where
-	 * the WT_UPDATE structure and data item are aligned to a 32-bit
-	 * boundary.  We could fix this, but it's unclear it's worth the effort:
-	 * document you can store a (4GB - 512B) item max, it's insane to store
-	 * 4GB items in the file anyway.
+         * Figure out how much space we need: this code limits the maximum size
+         * of a data item stored in the file.  In summary, for a big item we
+         * have to store a WT_SESSION_BUFFER structure, the WT_UPDATE structure
+         * and the data, all in an allocated buffer.   We only pass a 32-bit
+         * value to our allocation routine, so we can't store an item bigger
+         * than the maximum 32-bit value minus the sizes of those two
+         * structures, where the WT_UPDATE structure and data item are aligned
+         * to a 32-bit boundary.  We could fix this, but it's unclear it's
+         * worth the effort: document you can store a (4GB - 512B) item max,
+         * it's insane to store 4GB items in the file anyway.
 	 */
 	if (size > WT_BTREE_OBJECT_SIZE_MAX)
 		return (__wt_file_item_too_big(session));
@@ -71,7 +73,7 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * than 4 times the requested size and at least the default buffer size.
 	 */
 	if (align_size > session->update_alloc_size) {
-		alloc_size = WT_SIZEOF32(SESSION_BUFFER) + align_size;
+		alloc_size = WT_SIZEOF32(WT_SESSION_BUFFER) + align_size;
 		single_use = 1;
 	} else {
 		if (session->update_alloc_size < 8 * WT_MEGABYTE)
@@ -84,20 +86,21 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	WT_RET(__wt_calloc(session, 1, alloc_size, &sb));
 	WT_ASSERT(session, alloc_size == (uint32_t)alloc_size);
 	sb->len = alloc_size;
-	sb->space_avail = alloc_size - WT_SIZEOF32(SESSION_BUFFER);
-	sb->first_free = (uint8_t *)sb + sizeof(SESSION_BUFFER);
+	sb->space_avail = alloc_size - WT_SIZEOF32(WT_SESSION_BUFFER);
+	sb->first_free = (uint8_t *)sb + sizeof(WT_SESSION_BUFFER);
 
 	/*
-	 * If it's a single use allocation, ignore any current SESSION buffer;
-	 * else, release the old SESSION buffer and replace it with the new one.
+         * If it's a single use allocation, ignore any current buffer in the
+         * session; else, release the old session buffer and replace it with
+         * the new one.
 	 */
 	if (!single_use) {
 		/*
-		 * The "in" reference count is artificially incremented by 1 as
-		 * long as a SESSION buffer is referenced by the SESSION thread;
-		 * we do not want SESSION buffers freed because a page was
-		 * evicted and the count went to 0 while the buffer might still
-		 * be used for future K/V inserts or modifications.
+                 * The "in" reference count is artificially incremented by 1 as
+                 * long as a session buffer is referenced by the session
+                 * handle; we do not want session buffers freed because a page
+                 * was evicted and the count went to 0 while the buffer might
+                 * still be used for future K/V inserts or modifications.
 		 */
 		if (session->sb != NULL)
 			__wt_sb_decrement(session, session->sb);
@@ -120,10 +123,10 @@ no_allocation:
 
 /*
  * __wt_sb_free --
- *	Free a chunk of memory from a per-SESSION buffer.
+ *	Free a chunk of memory from a per-WT_SESSION_IMPL buffer.
  */
 void
-__wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
+__wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
 {
 	WT_ASSERT(session, sb->out < sb->in);
 
@@ -133,36 +136,36 @@ __wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
 
 /*
  * __wt_sb_decrement --
- *	Decrement the "insert" value of a per-SESSION buffer.
+ *	Decrement the "insert" value of a per-WT_SESSION_IMPL buffer.
  */
 void
-__wt_sb_decrement(SESSION *session, SESSION_BUFFER *sb)
+__wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
 {
 	WT_ASSERT(session, sb->out < sb->in);
 
 	/*
 	 * This function is used for two reasons.
 	 *
-	 * #1: it's possible we allocated a WT_UPDATE structure and related K/V
-	 * memory from the SESSION buffer, but then an error occurred.  In this
-	 * case we don't try and clean up the SESSION buffer, it's simpler to
-	 * decrement the counters and pretend the memory is no longer in use.
-	 * We're still in the allocation path, so we decrement the "in" field
-	 * instead of incrementing the "out" field, if the eviction thread were
-	 * to update the "out" field at the same time, we could race.
+         * #1: it's possible we allocated a WT_UPDATE structure and related K/V
+         * memory from the session buffer, but then an error occurred.  In this
+         * case we don't try and clean up the session buffer, it's simpler to
+         * decrement the counters and pretend the memory is no longer in use.
+         * We're still in the allocation path, so we decrement the "in" field
+         * instead of incrementing the "out" field, if the eviction thread were
+         * to update the "out" field at the same time, we could race.
 	 *
-	 * #2: the "in" reference count is artificially incremented by 1 as
-	 * long as a SESSION buffer is referenced by the SESSION thread; we do
-	 * not want SESSION buffers freed because a page was evicted and the
-	 * count went to 0 while the buffer might still be used for future K/V
-	 * inserts or modifications.
+         * #2: the "in" reference count is artificially incremented by 1 as
+         * long as a session buffer is referenced by the session handle; we do
+         * not want session buffers freed because a page was evicted and the
+         * count went to 0 while the buffer might still be used for future K/V
+         * inserts or modifications.
 	 */
 	--sb->in;
 
 	/*
-	 * In the above case #1, if the SESSION buffer was a one-off (allocated
-	 * for a single use), we have to free it here, it's not linked to any
-	 * WT_PAGE in the system.
+         * In the above case #1, if the session buffer was a one-off (allocated
+         * for a single use), we have to free it here, it's not linked to any
+         * WT_PAGE in the system.
 	 *
 	 * In the above case #2, our artificial increment might be the last
 	 * reference, if all of the WT_PAGE's referencing this buffer have been

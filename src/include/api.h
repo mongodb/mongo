@@ -8,7 +8,7 @@
 typedef struct {
 	WT_CURSOR iface;
 
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_WALK walk;
 	WT_PAGE *page;
 	WT_COL *cip;
@@ -78,9 +78,9 @@ typedef struct {
 	WT_CURSOR iface;
 } CURSOR_STAT;
 
-struct __btree {
-	CONNECTION *conn;		/* Enclosing connection */
-	TAILQ_ENTRY(__btree) q;		/* Linked list of files */
+struct __wt_btree {
+	WT_CONNECTION_IMPL *conn;	/* Enclosing connection */
+	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of files */
 
 	uint32_t refcnt;		/* Sessions with this tree open. */
 
@@ -117,7 +117,7 @@ struct __btree {
 
 	int btree_compare_int;		/* Integer keys */
 					/* Comparison function */
-	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	uint32_t intlitemsize;		/* Maximum item size for overflow */
 	uint32_t leafitemsize;
@@ -136,13 +136,13 @@ struct __btree {
 	uint32_t flags;
 };
 
-struct __btree_session {
-	BTREE *btree;
+struct __wt_btree_session {
+	WT_BTREE *btree;
 
 	const char *key_format;
 	const char *value_format;
 
-	TAILQ_ENTRY(__btree_session) q;
+	TAILQ_ENTRY(__wt_btree_session) q;
 };
 
 /*******************************************
@@ -165,21 +165,21 @@ struct __wt_hazard {
 #endif
 };
 
-struct __session {
+struct __wt_session_impl {
 	WT_SESSION iface;
 
 	WT_EVENT_HANDLER *event_handler;
 
-	TAILQ_ENTRY(__session) q;
+	TAILQ_ENTRY(__wt_session_impl) q;
 	TAILQ_HEAD(__cursors, wt_cursor) cursors;
 
-	TAILQ_HEAD(__btrees, __btree_session) btrees;
+	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
 	WT_MTX	 *mtx;			/* Blocking mutex */
 
 	const char *name;		/* Name */
 
-	BTREE	*btree;			/* Current file */
+	WT_BTREE *btree;		/* Current file */
 	WT_CURSOR *cursor;		/* Current cursor */
 
 	WT_BUF	**scratch;		/* Temporary memory for any function */
@@ -188,16 +188,16 @@ struct __session {
 	WT_BUF	logrec_buf;		/* Buffer for log records */
 	WT_BUF	logprint_buf;		/* Buffer for debug log records */
 
-					/* SESSION workQ request */
+					/* WT_SESSION_IMPL workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
 	int	  wq_ret;		/* Return value */
-	int     (*wq_func)(SESSION *);	/* Function */
+	int     (*wq_func)(WT_SESSION_IMPL *);	/* Function */
 	void	 *wq_args;		/* Function argument */
 	int	  wq_sleeping;		/* Thread is blocked */
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
-	SESSION_BUFFER *sb;		/* Per-thread update buffer */
+	WT_SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
 
 					/* Search return values: */
@@ -210,7 +210,7 @@ struct __session {
 	WT_UPDATE      **srch_upd;	/* WT_UPDATE insert node */
 	uint32_t	 srch_slot;	/* WT_INSERT/WT_UPDATE slot */
 
-	void (*msgcall)(const CONNECTION *, const char *);
+	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
 	FILE *msgfile;
 
@@ -220,12 +220,12 @@ struct __session {
 /*******************************************
  * Implementation of WT_CONNECTION
  *******************************************/
-struct __connection {
+struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
 	const char *home;
 
-	SESSION default_session;	/* For operations without an
+	WT_SESSION_IMPL default_session;/* For operations without an
 					   application-supplied session. */
 
 	WT_MTX *mtx;			/* Global mutex */
@@ -234,7 +234,7 @@ struct __connection {
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(wt_btree_qh, __btree) dbqh; /* Locked: database list */
+	TAILQ_HEAD(wt_btree_qh, __wt_btree) dbqh; /* Locked: database list */
 	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(
@@ -252,16 +252,16 @@ struct __connection {
 	 * needs more.   Growing the number of threads dynamically is possible,
 	 * but tricky since the workQ is walking the array without locking it.
 	 *
-	 * There's an array of SESSION pointers that reference the allocated
+	 * There's an array of WT_SESSION_IMPL pointers that reference the allocated
 	 * array; we do it that way because we want an easy way for the workQ
 	 * code to avoid walking the entire array when only a few threads are
 	 * running.
 	 */
-	SESSION	**sessions;		/* TOC reference */
+	WT_SESSION_IMPL	**sessions;		/* TOC reference */
 	uint32_t toc_cnt;		/* TOC count */
 	void	 *toc_array;		/* TOC array */
 
-	TAILQ_HEAD(__sessions, __session) sessions_head;
+	TAILQ_HEAD(__sessions, __wt_session_impl) sessions_head;
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
@@ -271,7 +271,7 @@ struct __connection {
 	 * the right change is to increase the default).  The method is there
 	 * just in case an application starts failing in the field.
 	 *
-	 * The hazard array is separate from the SESSION array because we must
+	 * The hazard array is separate from the WT_SESSION_IMPL array because we must
 	 * be able to easily copy and search it when evicting pages from the
 	 * cache.
 	 */
@@ -292,7 +292,7 @@ struct __connection {
 
 	uint32_t hazard_size;
 
-	void (*msgcall)(const CONNECTION *, const char *);
+	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
 	FILE *msgfile;
 
@@ -330,22 +330,16 @@ struct __connection {
 	API_CALL(s, connection, n, NULL, NULL, cfg);			\
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
-	(s) = (SESSION *)(cur)->session;				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;				\
 	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
 
 #define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg)			\
-	(s) = (SESSION *)(cur)->session;				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;				\
 	API_CALL(s, cursor, n, cur, bt, cfg);				\
 
 /*******************************************
- * Prototypes.
+ * Global variables.
  *******************************************/
-int	 wiredtiger_env_init(CONNECTION **, uint32_t);
-void	 wiredtiger_err_stream(FILE *);
-int	 wiredtiger_simple_setup(
-    const char *, WT_EVENT_HANDLER *, const char *, BTREE **);
-int	 wiredtiger_simple_teardown(const char *, BTREE *);
-
 extern WT_EVENT_HANDLER *__wt_event_handler_default;
 extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 

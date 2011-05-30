@@ -13,7 +13,7 @@
  *	convert it to a dumpable string.
  */
 static int
-__convert_to_dump(SESSION *session, WT_BUF *buf)
+__convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(buf);
@@ -27,7 +27,7 @@ __convert_to_dump(SESSION *session, WT_BUF *buf)
  *	convert it to a raw value.
  */
 static int
-__convert_from_dump(SESSION *session, WT_BUF *buf)
+__convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(buf);
@@ -42,7 +42,7 @@ __convert_from_dump(SESSION *session, WT_BUF *buf)
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_ITEM *key;
 	va_list ap;
 
@@ -73,7 +73,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_ITEM *value;
 	va_list ap;
 
@@ -103,7 +103,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_key(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
 
@@ -130,7 +130,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
 

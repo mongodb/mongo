@@ -12,7 +12,7 @@
  *	Flush a file handle.
  */
 int
-__wt_fsync(SESSION *session, WT_FH *fh)
+__wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 
 	WT_STAT_INCR(fh->stats, fsync);

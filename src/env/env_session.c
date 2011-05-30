@@ -9,12 +9,12 @@
 
 /*
  * __wt_connection_session --
- *	CONNECTION.session method.
+ *	WT_CONNECTION_IMPL.session method.
  */
 int
-__wt_connection_session(CONNECTION *conn, SESSION **sessionp)
+__wt_connection_session(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL **sessionp)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	uint32_t slot;
 
 	*sessionp = NULL;
@@ -57,19 +57,19 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 
 /*
  * __wt_session_close --
- *	SESSION.close method.
+ *	WT_SESSION_IMPL.close method.
  */
 int
-__wt_session_close(SESSION *session)
+__wt_session_close(WT_SESSION_IMPL *session)
 {
-	CONNECTION *conn;
-	SESSION **tp;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL **tp;
 	int ret;
 
 	conn = S2C(session);
 	ret = 0;
 
-	/* Unpin the current per-SESSION buffer. */
+	/* Unpin the current per-WT_SESSION_IMPL buffer. */
 	if (session->sb != NULL)
 		__wt_sb_decrement(session, session->sb);
 
@@ -102,17 +102,17 @@ __wt_session_close(SESSION *session)
 }
 
 #ifdef HAVE_DIAGNOSTIC
-static const char *__wt_session_print_state(SESSION *);
+static const char *__wt_session_print_state(WT_SESSION_IMPL *);
 
 /*
  * __wt_session_dump --
  *	Dump information about open sessions.
  */
 void
-__wt_session_dump(SESSION *session)
+__wt_session_dump(WT_SESSION_IMPL *session)
 {
-	CONNECTION *conn;
-	SESSION **tp;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL **tp;
 	WT_HAZARD *hp;
 	WT_MBUF mb;
 
@@ -156,10 +156,10 @@ __wt_session_dump(SESSION *session)
 
 /*
  * __wt_session_print_state --
- *	Return the SESSION state as a string.
+ *	Return the WT_SESSION_IMPL state as a string.
  */
 static const char *
-__wt_session_print_state(SESSION *session)
+__wt_session_print_state(WT_SESSION_IMPL *session)
 {
 	switch (session->wq_state) {
 	case WT_WORKQ_EVICT:

@@ -12,12 +12,13 @@
  *	Add a btree handle to the session's cache.
  */
 int
-__wt_session_add_btree(SESSION *session, BTREE_SESSION **btree_sessionp)
+__wt_session_add_btree(
+    WT_SESSION_IMPL *session, WT_BTREE_SESSION **btree_sessionp)
 {
 	const char *config;
 	char *format;
-	BTREE_SESSION *btree_session;
-	CONNECTION *conn;
+	WT_BTREE_SESSION *btree_session;
+	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
 
 	WT_RET(__wt_calloc_def(session, 1, &btree_session));
@@ -26,8 +27,8 @@ __wt_session_add_btree(SESSION *session, BTREE_SESSION **btree_sessionp)
 
 	/*
 	 * Make a copy of the key and value format, it's easier for everyone
-	 * if they are NUL-terminated.  They live in the BTREE_SESSION to save
-	 * allocating memory on every cursor open.
+         * if they are NUL-terminated.  They live in the WT_BTREE_SESSION to
+         * save allocating memory on every cursor open.
 	 */
 	config = session->btree->config;
 
@@ -58,11 +59,11 @@ __wt_session_add_btree(SESSION *session, BTREE_SESSION **btree_sessionp)
  *	Get the btree handle for the named table.
  */
 int
-__wt_session_get_btree(SESSION *session,
-    const char *name, size_t namelen, BTREE_SESSION **btree_sessionp)
+__wt_session_get_btree(WT_SESSION_IMPL *session,
+    const char *name, size_t namelen, WT_BTREE_SESSION **btree_sessionp)
 {
-	BTREE *btree;
-	BTREE_SESSION *btree_session;
+	WT_BTREE *btree;
+	WT_BTREE_SESSION *btree_session;
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
@@ -81,9 +82,10 @@ __wt_session_get_btree(SESSION *session,
  *	Remove the btree handle from the session, closing if necessary.
  */
 int
-__wt_session_remove_btree(SESSION *session, BTREE_SESSION *btree_session)
+__wt_session_remove_btree(
+    WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	int need_close;
 
 	conn = S2C(session);

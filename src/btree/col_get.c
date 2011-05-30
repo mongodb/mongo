@@ -12,9 +12,9 @@
  *	Db.col_get method.
  */
 int
-__wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value)
+__wt_btree_col_get(WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	int ret;
 
 	btree = session->btree;

@@ -7,17 +7,18 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(SESSION *);
-static int __btree_init(SESSION *, const char *);
-static int __btree_page_sizes(SESSION *);
-static int __btree_type(SESSION *);
+static int __btree_conf(WT_SESSION_IMPL *);
+static int __btree_init(WT_SESSION_IMPL *, const char *);
+static int __btree_page_sizes(WT_SESSION_IMPL *);
+static int __btree_type(WT_SESSION_IMPL *);
 
 /*
  * __wt_btree_create --
  *	Create a Btree.
  */
 int
-__wt_btree_create(SESSION *session, const char *name, const char *config)
+__wt_btree_create(
+    WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 	WT_FH *fh;
 	int ret;
@@ -48,30 +49,30 @@ __wt_btree_create(SESSION *session, const char *name, const char *config)
  *	Open a Btree.
  */
 int
-__wt_btree_open(SESSION *session, const char *name, uint32_t flags)
+__wt_btree_open(WT_SESSION_IMPL *session, const char *name, uint32_t flags)
 {
-	CONNECTION *conn;
-	BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree;
 	WT_PAGE *page;
 
 	conn = S2C(session);
 	btree = session->btree;
 
-	/* Create the BTREE structure. */
+	/* Create the WT_BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
 	btree->flags = flags;
 	btree->conn = conn;
 	session->btree = btree;
 
-	/* Initialize the BTREE structure. */
+	/* Initialize the WT_BTREE structure. */
 	WT_RET(__btree_init(session, name));
 
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, name, 0666, 1, &btree->fh));
 
 	/*
-	 * Read in the file's metadata, configure the BTREE structure based on
-	 * the configuration string, read in the free-list.
+         * Read in the file's metadata, configure the WT_BTREE structure based
+         * on the configuration string, read in the free-list.
 	 *
 	 * XXX Take extra care with this if WT_BTREE_VERIFY is set?
 	 */
@@ -130,12 +131,12 @@ __wt_btree_open(SESSION *session, const char *name, uint32_t flags)
 
 /*
  * __btree_init --
- *	Initialize the BTREE structure, after an zero-filled allocation.
+ *	Initialize the WT_BTREE structure, after an zero-filled allocation.
  */
 static int
-__btree_init(SESSION *session, const char *name)
+__btree_init(WT_SESSION_IMPL *session, const char *name)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 
 	btree = session->btree;
 
@@ -161,10 +162,10 @@ __btree_init(SESSION *session, const char *name)
  *	Close a Btree.
  */
 int
-__wt_btree_close(SESSION *session)
+__wt_btree_close(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
-	CONNECTION *conn;
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	int ret;
 
 	btree = session->btree;
@@ -213,7 +214,7 @@ __wt_btree_close(SESSION *session)
  *	Configure the btree and verify the configuration relationships.
  */
 static int
-__btree_conf(SESSION *session)
+__btree_conf(WT_SESSION_IMPL *session)
 {
 	/* File type. */
 	WT_RET(__btree_type(session));
@@ -232,11 +233,11 @@ __btree_conf(SESSION *session)
  *	Figure out the database type.
  */
 static int
-__btree_type(SESSION *session)
+__btree_type(WT_SESSION_IMPL *session)
 {
 	const char *config;
 	char *endp, t;
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 
 	btree = session->btree;
@@ -276,9 +277,9 @@ __btree_type(SESSION *session)
  *	Verify the page sizes.
  */
 static int
-__btree_page_sizes(SESSION *session)
+__btree_page_sizes(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	const char *config;
 

@@ -9,18 +9,18 @@
 
 /*
  * __wt_workq_srvr --
- *      Routine to process the SESSION work queue.
+ *      Routine to process the WT_SESSION_IMPL work queue.
  */
 void *
 __wt_workq_srvr(void *arg)
 {
-	CONNECTION *conn;
-	SESSION **tp, *session;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL **tp, *session;
 	int call_evict, call_read, request;
 
-	conn = (CONNECTION *)arg;
+	conn = (WT_CONNECTION_IMPL *)arg;
 
-	/* Walk the SESSION list and execute requests. */
+	/* Walk the WT_SESSION_IMPL list and execute requests. */
 	while (F_ISSET(conn, WT_WORKQ_RUN)) {
 		++conn->api_gen;
 		WT_STAT_INCR(conn->stats, workq_passes);

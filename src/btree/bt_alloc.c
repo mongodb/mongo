@@ -7,17 +7,17 @@
 
 #include "wt_internal.h"
 
-static void __wt_block_extend(SESSION *, uint32_t *, uint32_t);
-static int __wt_block_truncate(SESSION *);
+static void __wt_block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
+static int __wt_block_truncate(WT_SESSION_IMPL *);
 
 /*
  * __wt_block_alloc --
  *	Alloc a chunk of space from the underlying file.
  */
 int
-__wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size)
+__wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
 
 	btree = session->btree;
@@ -79,9 +79,9 @@ __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size)
  *	Extend the file to allocate space.
  */
 static void
-__wt_block_extend(SESSION *session, uint32_t *addrp, uint32_t size)
+__wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FH *fh;
 
 	btree = session->btree;
@@ -101,9 +101,9 @@ __wt_block_extend(SESSION *session, uint32_t *addrp, uint32_t size)
  *	Free a chunk of space to the underlying file.
  */
 int
-__wt_block_free(SESSION *session, uint32_t addr, uint32_t size)
+__wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
 
 	btree = session->btree;
@@ -231,10 +231,10 @@ combine:/*
  *	Read the free-list at the tail of the file.
  */
 int
-__wt_block_read(SESSION *session)
+__wt_block_read(WT_SESSION_IMPL *session)
 {
 	WT_BUF *tmp;
-	BTREE *btree;
+	WT_BTREE *btree;
 	uint32_t *p;
 	int ret;
 
@@ -268,9 +268,9 @@ err:	if (tmp != NULL)
  *	Write the free-list at the tail of the file.
  */
 int
-__wt_block_write(SESSION *session)
+__wt_block_write(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_DISK *dsk;
@@ -351,9 +351,9 @@ err:	if (tmp != NULL)
  *	Truncate the file if the last part of the file isn't in use.
  */
 static int
-__wt_block_truncate(SESSION *session)
+__wt_block_truncate(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FH *fh;
 	WT_FREE_ENTRY *fe;
 	int need_trunc;
@@ -391,9 +391,9 @@ __wt_block_truncate(SESSION *session)
  *	Discard any free-list entries.
  */
 void
-__wt_block_discard(SESSION *session)
+__wt_block_discard(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe;
 
 	btree = session->btree;
@@ -409,9 +409,9 @@ __wt_block_discard(SESSION *session)
 
 #ifdef HAVE_DIAGNOSTIC
 void
-__wt_block_dump(SESSION *session)
+__wt_block_dump(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe;
 
 	btree = session->btree;

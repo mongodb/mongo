@@ -9,12 +9,12 @@
 #include "btree.i"
 #include "cell.i"
 
-static int __wt_page_inmem_col_fix(SESSION *, WT_PAGE *);
-static int __wt_page_inmem_col_int(SESSION *, WT_PAGE *);
-static int __wt_page_inmem_col_rle(SESSION *, WT_PAGE *);
-static int __wt_page_inmem_col_var(SESSION *, WT_PAGE *);
-static int __wt_page_inmem_row_int(SESSION *, WT_PAGE *);
-static int __wt_page_inmem_row_leaf(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_page_inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_page_inmem_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_page_inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_page_inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_page_inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
  * __wt_page_in --
@@ -22,7 +22,8 @@ static int __wt_page_inmem_row_leaf(SESSION *, WT_PAGE *);
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
+__wt_page_in_func(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -76,7 +77,7 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(SESSION *session,
+__wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_DISK *dsk, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
@@ -140,9 +141,9 @@ err:	if (page != NULL)
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
@@ -175,7 +176,7 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off_record;
@@ -213,9 +214,9 @@ __wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
  *	leaf pages.
  */
 static int
-__wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
@@ -249,7 +250,7 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
  *	column-store trees.
  */
 static int
-__wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_CELL *cell;
@@ -283,7 +284,7 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_OFF off;
@@ -340,7 +341,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
+__wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;

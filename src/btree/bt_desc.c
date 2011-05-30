@@ -12,9 +12,9 @@
  *	Read and verify the file's metadata.
  */
 int
-__wt_desc_read(SESSION *session)
+__wt_desc_read(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	WT_CONFIG_ITEM cval;
 	uint8_t *p, *ep, buf[512];
@@ -93,7 +93,7 @@ eof:		__wt_errx(session,
  *	Write the file's descriptor structure.
  */
 int
-__wt_desc_write(SESSION *session, const char *config, WT_FH *fh)
+__wt_desc_write(WT_SESSION_IMPL *session, const char *config, WT_FH *fh)
 {
 	WT_BTREE_DESC *desc;
 	uint8_t buf[512];
@@ -119,9 +119,9 @@ __wt_desc_write(SESSION *session, const char *config, WT_FH *fh)
  *	Update the file's descriptor structure.
  */
 int
-__wt_desc_update(SESSION *session)
+__wt_desc_update(WT_SESSION_IMPL *session)
 {
-	BTREE *btree;
+	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	uint8_t buf[512];
 

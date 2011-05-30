@@ -12,7 +12,7 @@
  *	Initialize a WT_MBUF structure for message aggregation.
  */
 void
-__wt_mb_init(SESSION *session, WT_MBUF *mbp)
+__wt_mb_init(WT_SESSION_IMPL *session, WT_MBUF *mbp)
 {
 	mbp->session = session;
 	mbp->first = mbp->next = NULL;

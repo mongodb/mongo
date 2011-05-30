@@ -13,10 +13,10 @@
  *	Create the underlying cache.
  */
 int
-__wt_cache_create(CONNECTION *conn)
+__wt_cache_create(WT_CONNECTION_IMPL *conn)
 {
 	WT_CACHE *cache;
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	session = &conn->default_session;
@@ -47,7 +47,7 @@ err:	__wt_cache_destroy(conn);
  *	Update the cache statistics for return to the application.
  */
 void
-__wt_cache_stats_update(CONNECTION *conn)
+__wt_cache_stats_update(WT_CONNECTION_IMPL *conn)
 {
 	WT_CACHE *cache;
 
@@ -64,9 +64,9 @@ __wt_cache_stats_update(CONNECTION *conn)
  *	Discard the underlying cache.
  */
 void
-__wt_cache_destroy(CONNECTION *conn)
+__wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
 
 	session = &conn->default_session;

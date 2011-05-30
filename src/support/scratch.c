@@ -30,7 +30,7 @@ __wt_buf_clear(WT_BUF *buf)
  *	Initialize a buffer at a specific size.
  */
 int
-__wt_buf_init(SESSION *session, WT_BUF *buf, size_t size)
+__wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	WT_ASSERT(session, size <= UINT32_MAX);
 
@@ -48,7 +48,7 @@ __wt_buf_init(SESSION *session, WT_BUF *buf, size_t size)
  *	Initialize a buffer at a specific size, and set the data length.
  */
 int
-__wt_buf_initsize(SESSION *session, WT_BUF *buf, size_t size)
+__wt_buf_initsize(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
 
@@ -62,7 +62,7 @@ __wt_buf_initsize(SESSION *session, WT_BUF *buf, size_t size)
  *	Grow a buffer that's currently in-use.
  */
 int
-__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t size)
+__wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	uint32_t offset;
 
@@ -88,7 +88,8 @@ __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t size)
  *	Set the contents of the buffer.
  */
 int
-__wt_buf_set(SESSION *session, WT_BUF *buf, const void *data, uint32_t size)
+__wt_buf_set(
+    WT_SESSION_IMPL *session, WT_BUF *buf, const void *data, uint32_t size)
 {
 	/* Ensure the buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
@@ -104,7 +105,7 @@ __wt_buf_set(SESSION *session, WT_BUF *buf, const void *data, uint32_t size)
  */
 void
 __wt_buf_steal(
-    SESSION *session, WT_BUF *buf, const void *datap, uint32_t *sizep)
+    WT_SESSION_IMPL *session, WT_BUF *buf, const void *datap, uint32_t *sizep)
 {
 	/*
 	 * Sometimes we steal a buffer for a different purpose, for example,
@@ -141,7 +142,7 @@ __wt_buf_steal(
  *	Free a buffer.
  */
 void
-__wt_buf_free(SESSION *session, WT_BUF *buf)
+__wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
 	if (buf->mem != NULL)
 		__wt_free(session, buf->mem);
@@ -153,7 +154,7 @@ __wt_buf_free(SESSION *session, WT_BUF *buf)
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
+__wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 {
 	WT_BUF *buf, **p, *small, **slot;
 	uint32_t allocated;
@@ -164,11 +165,12 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 	*scratchp = NULL;
 
 	/*
-	 * There's an array of scratch buffers in each SESSION that can be used
-	 * by any function.  We use WT_BUF structures for scratch memory because
-	 * we already have to have functions that do variable-length allocation
-	 * on WT_BUFs.  Scratch buffers are allocated only by a single thread of
-	 * control, so no locking is necessary.
+         * There's an array of scratch buffers in each WT_SESSION_IMPL that can
+         * be used by any function.  We use WT_BUF structures for scratch
+         * memory because we already have to have functions that do
+         * variable-length allocation on WT_BUFs.  Scratch buffers are
+         * allocated only by a single thread of control, so no locking is
+         * necessary.
 	 *
 	 * Walk the array, looking for a buffer we can use.
 	 */
@@ -232,7 +234,7 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 	return (__wt_scr_alloc(session, size, scratchp));
 
 err:	__wt_errx(session,
-	    "SESSION unable to allocate more scratch buffers");
+	    "WT_SESSION_IMPL unable to allocate more scratch buffers");
 	return (ret);
 }
 
@@ -256,7 +258,7 @@ __wt_scr_release(WT_BUF **bufp)
  *	Free all memory associated with the scratch buffers.
  */
 void
-__wt_scr_free(SESSION *session)
+__wt_scr_free(WT_SESSION_IMPL *session)
 {
 	WT_BUF **p;
 	u_int i;

@@ -12,9 +12,9 @@
  *	Open a Env handle.
  */
 int
-__wt_connection_open(CONNECTION *conn, const char *home, mode_t mode)
+__wt_connection_open(WT_CONNECTION_IMPL *conn, const char *home, mode_t mode)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	WT_UNUSED(home);
@@ -26,11 +26,11 @@ __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode)
 	session = &conn->default_session;
 	ret = 0;
 
-	/* SESSION and hazard arrays. */
+	/* WT_SESSION_IMPL and hazard arrays. */
 	WT_RET(__wt_calloc(session,
-	    conn->session_size, sizeof(SESSION *), &conn->sessions));
+	    conn->session_size, sizeof(WT_SESSION_IMPL *), &conn->sessions));
 	WT_RET(__wt_calloc(session,
-	    conn->session_size, sizeof(SESSION), &conn->toc_array));
+	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->toc_array));
 	WT_RET(__wt_calloc(session,
 	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
 	   &conn->hazard));
@@ -59,10 +59,10 @@ err:	(void)__wt_connection_close(conn);
  *	Close a connection handle.
  */
 int
-__wt_connection_close(CONNECTION *conn)
+__wt_connection_close(WT_CONNECTION_IMPL *conn)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_DLH *dlh;
 	WT_FH *fh;
 	int ret, secondary_err;
@@ -70,7 +70,7 @@ __wt_connection_close(CONNECTION *conn)
 	session = &conn->default_session;
 	ret = secondary_err = 0;
 
-	/* Complain if BTREE handles weren't closed. */
+	/* Complain if WT_BTREE handles weren't closed. */
 	while ((btree = TAILQ_FIRST(&conn->dbqh)) != NULL) {
 		__wt_errx(session,
 		    "Connection has open btree handles: %s", btree->name);

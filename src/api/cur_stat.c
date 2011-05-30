@@ -14,7 +14,7 @@
 static int
 __curstat_first(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, first, NULL);
@@ -31,7 +31,7 @@ __curstat_first(WT_CURSOR *cursor)
 static int
 __curstat_last(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, last, NULL);
@@ -48,7 +48,7 @@ __curstat_last(WT_CURSOR *cursor)
 static int
 __curstat_next(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
@@ -65,7 +65,7 @@ __curstat_next(WT_CURSOR *cursor)
 static int
 __curstat_prev(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
@@ -82,7 +82,7 @@ __curstat_prev(WT_CURSOR *cursor)
 static int
 __curstat_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	WT_UNUSED(lastcmp);
@@ -101,7 +101,7 @@ __curstat_search_near(WT_CURSOR *cursor, int *lastcmp)
 static int
 __curstat_insert(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, insert, NULL);
@@ -118,7 +118,7 @@ __curstat_insert(WT_CURSOR *cursor)
 static int
 __curstat_update(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, update, NULL);
@@ -135,7 +135,7 @@ __curstat_update(WT_CURSOR *cursor)
 static int
 __curstat_remove(WT_CURSOR *cursor)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, insert, NULL);
@@ -152,7 +152,7 @@ __curstat_remove(WT_CURSOR *cursor)
 static int
 __curstat_close(WT_CURSOR *cursor, const char *config)
 {
-	SESSION *session;
+	WT_SESSION_IMPL *session;
 	int ret;
 
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);
@@ -168,7 +168,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
 int
-__wt_curstat_open(SESSION *session,
+__wt_curstat_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {

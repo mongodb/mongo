@@ -21,13 +21,13 @@
  *	ANSI calloc function.
  */
 int
-__wt_calloc(SESSION *session, size_t number, size_t size, void *retp)
+__wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 {
 	void *p;
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL SESSION handle.
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	WT_ASSERT(session, number != 0 && size != 0);
 
@@ -48,7 +48,7 @@ __wt_calloc(SESSION *session, size_t number, size_t size, void *retp)
  *	ANSI realloc function.
  */
 int
-__wt_realloc(SESSION *session,
+__wt_realloc(WT_SESSION_IMPL *session,
     uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
 	void *p;
@@ -56,7 +56,7 @@ __wt_realloc(SESSION *session,
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL SESSION handle.
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	WT_ASSERT(session, bytes_to_allocate != 0);
 
@@ -105,7 +105,7 @@ __wt_realloc(SESSION *session,
  *	ANSI strdup function.
  */
 int
-__wt_strdup(SESSION *session, const char *str, void *retp)
+__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 {
 	size_t len;
 	void *p;
@@ -117,7 +117,7 @@ __wt_strdup(SESSION *session, const char *str, void *retp)
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL SESSION handle.
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_STAT_INCR(S2C(session)->stats, memalloc);
@@ -135,13 +135,13 @@ __wt_strdup(SESSION *session, const char *str, void *retp)
  *	ANSI free function.
  */
 void
-__wt_free_int(SESSION *session, void *p_arg)
+__wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
 {
 	void *p;
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL SESSION handle.
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_STAT_INCR(S2C(session)->stats, memfree);

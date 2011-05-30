@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static int
-__log_record_size(SESSION *session,
+__log_record_size(WT_SESSION_IMPL *session,
     WT_LOGREC_DESC *recdesc, va_list ap, size_t *sizep)
 {
 	WT_UNUSED(session);
@@ -18,7 +18,7 @@ __log_record_size(SESSION *session,
 }
 
 int
-__wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...)
+__wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 {
 	WT_BUF *buf;
 	va_list ap;
@@ -41,9 +41,9 @@ err:	va_end(ap);
 }
 
 int
-__wt_log_vprintf(SESSION *session, const char *fmt, va_list ap)
+__wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_BUF *buf;
 	va_list ap_copy;
 	size_t len;
@@ -77,7 +77,7 @@ __wt_log_vprintf(SESSION *session, const char *fmt, va_list ap)
 }
 
 int
-__wt_log_printf(SESSION *session, const char *fmt, ...)
+__wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;

@@ -8,17 +8,17 @@
 #include "wt_internal.h"
 #include "cell.i"
 
-static int __wt_stat_page_col_fix(SESSION *, WT_PAGE *);
-static int __wt_stat_page_col_rle(SESSION *, WT_PAGE *);
-static int __wt_stat_page_col_var(SESSION *, WT_PAGE *);
-static int __wt_stat_page_row_leaf(SESSION *, WT_PAGE *, void *);
+static int __wt_stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_stat_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static int __wt_stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
 
 /*
  * __wt_page_stat --
  *	Stat any Btree page.
  */
 int
-__wt_page_stat(SESSION *session, WT_PAGE *page, void *arg)
+__wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 {
 	WT_BTREE_FILE_STATS *stats;
 
@@ -64,7 +64,7 @@ __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg)
  *	Stat a WT_PAGE_COL_FIX page.
  */
 static int
-__wt_stat_page_col_fix(SESSION *session, WT_PAGE *page)
+__wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE_FILE_STATS *stats;
 	WT_COL *cip;
@@ -93,7 +93,7 @@ __wt_stat_page_col_fix(SESSION *session, WT_PAGE *page)
  *	Stat a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
+__wt_stat_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE_FILE_STATS *stats;
 	WT_COL *cip;
@@ -147,7 +147,7 @@ __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
  *	Stat a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
+__wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE_FILE_STATS *stats;
 	WT_COL *cip;
@@ -186,7 +186,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
  *	Stat a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
+__wt_stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 {
 	WT_BTREE_FILE_STATS *stats;
 	WT_INSERT *ins;

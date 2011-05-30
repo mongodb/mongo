@@ -12,11 +12,11 @@
  *	Open a file handle.
  */
 int
-__wt_open(
-    SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
+__wt_open(WT_SESSION_IMPL *session,
+    const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
-	BTREE *btree;
-	CONNECTION *conn;
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
 	int f, fd, matched, ret;
 
@@ -102,9 +102,9 @@ err:	if (fh != NULL) {
  *	Close a file handle.
  */
 int
-__wt_close(SESSION *session, WT_FH *fh)
+__wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
-	CONNECTION *conn;
+	WT_CONNECTION_IMPL *conn;
 	int ret;
 
 	conn = S2C(session);

@@ -45,20 +45,14 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward structure declarations for internal structures: BEGIN
  */
-struct __btree;
-    typedef struct __btree BTREE;
-struct __btree_session;
-    typedef struct __btree_session BTREE_SESSION;
-struct __connection;
-    typedef struct __connection CONNECTION;
-struct __session;
-    typedef struct __session SESSION;
-struct __session_buffer;
-    typedef struct __session_buffer SESSION_BUFFER;
+struct __wt_btree;
+    typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_desc;
     typedef struct __wt_btree_desc WT_BTREE_DESC;
 struct __wt_btree_file_stats;
     typedef struct __wt_btree_file_stats WT_BTREE_FILE_STATS;
+struct __wt_btree_session;
+    typedef struct __wt_btree_session WT_BTREE_SESSION;
 struct __wt_btree_stats;
     typedef struct __wt_btree_stats WT_BTREE_STATS;
 struct __wt_cache;
@@ -73,6 +67,8 @@ struct __wt_col_ref;
     typedef struct __wt_col_ref WT_COL_REF;
 struct __wt_conn_stats;
     typedef struct __wt_conn_stats WT_CONN_STATS;
+struct __wt_connection_impl;
+    typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
 struct __wt_dlh;
     typedef struct __wt_dlh WT_DLH;
 struct __wt_evict_list;
@@ -107,6 +103,10 @@ struct __wt_row;
     typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;
     typedef struct __wt_row_ref WT_ROW_REF;
+struct __wt_session_buffer;
+    typedef struct __wt_session_buffer WT_SESSION_BUFFER;
+struct __wt_session_impl;
+    typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
 struct __wt_update;
@@ -139,15 +139,15 @@ struct __wt_walk_entry;
 #include "stat.h"
 
 /*******************************************
- * SESSION support.
+ * WT_SESSION_IMPL support.
  *******************************************/
-#define	S2C(session) ((CONNECTION *)(session)->iface.connection)
+#define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 /*
- * SESSION_BUFFER --
+ * WT_SESSION_BUFFER --
  *	A structure to accumulate file changes on a per-thread basis.
  */
-struct __session_buffer {
+struct __wt_session_buffer {
 	uint32_t len;				/* Buffer original size */
 	uint32_t space_avail;			/* Buffer's available memory */
 	uint8_t *first_free;			/* Buffer's first free byte */

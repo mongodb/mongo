@@ -10,7 +10,7 @@
  *	Send a progress message to stdout.
  */
 static inline void
-__wt_progress(SESSION *session, const char *s, uint64_t v)
+__wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 {
 	WT_EVENT_HANDLER *handler;
 

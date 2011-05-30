@@ -12,10 +12,10 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_btree_stat_print(SESSION *session, FILE *stream)
+__wt_btree_stat_print(WT_SESSION_IMPL *session, FILE *stream)
 {
-	BTREE *btree;
-	CONNECTION *conn;
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 
 	btree = session->btree;
 	conn = btree->conn;
@@ -70,7 +70,7 @@ __wt_btree_stat_print(SESSION *session, FILE *stream)
  *	Clear DB handle statistics.
  */
 int
-__wt_btree_stat_clear(BTREE *btree)
+__wt_btree_stat_clear(WT_BTREE *btree)
 {
 	__wt_stat_clear_btree_stats(btree->stats);
 	__wt_stat_clear_btree_file_stats(btree->fstats);
