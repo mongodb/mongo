@@ -258,6 +258,10 @@ namespace PerfTests {
             prep();
 
             int hlm = howLongMillis();
+            DEV { 
+                // don't run very long with _DEBUG - not very meaningful anyway on that build
+                hlm = min(hlm, 1000);
+            }
 
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
