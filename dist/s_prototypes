@@ -36,6 +36,7 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e '/#/!s/\n/ /g' \
 	    -e 's/\* /\*/g' \
 	    -e 's/  */ /g' \
+	    -e 's/^/extern /' \
 	    -e 's/$/;/p' \
 	    < ../$i
 done
