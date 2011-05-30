@@ -412,6 +412,8 @@ struct __wt_page {
  * hazard reference, the page is evicted.
  */
 struct __wt_ref {
+	WT_PAGE *page;			/* In-memory page */
+
 	/*
 	 * Page state.
 	 *
@@ -425,13 +427,6 @@ struct __wt_ref {
 
 	uint32_t addr;			/* Backing disk address */
 	uint32_t size;			/* Backing disk size */
-
-	/* !!!
-	 * The layout is deliberate.  On a 64-bit machine, when you tuck this
-	 * structure inside of a row-store internal page reference, no padding
-	 * is needed because the 32-bit values line up.
-	 */
-	WT_PAGE *page;			/* In-memory page */
 };
 
 /*
