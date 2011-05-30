@@ -27,8 +27,8 @@ __wt_session_add_btree(
 
 	/*
 	 * Make a copy of the key and value format, it's easier for everyone
-         * if they are NUL-terminated.  They live in the WT_BTREE_SESSION to
-         * save allocating memory on every cursor open.
+	 * if they are NUL-terminated.  They live in the WT_BTREE_SESSION to
+	 * save allocating memory on every cursor open.
 	 */
 	config = session->btree->config;
 

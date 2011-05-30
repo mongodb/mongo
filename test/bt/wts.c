@@ -135,7 +135,7 @@ wts_startup(void)
 		break;
 	}
 
-	WT_ASSERT((SESSION *)session, p < end);
+	WT_ASSERT((WT_SESSION_IMPL *)session, p < end);
 
 	if ((ret = session->create(session, WT_TABLENAME, config)) != 0) {
 		fprintf(stderr, "%s: create table: %s\n",

@@ -71,8 +71,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *name, uint32_t flags)
 	WT_RET(__wt_open(session, name, 0666, 1, &btree->fh));
 
 	/*
-         * Read in the file's metadata, configure the WT_BTREE structure based
-         * on the configuration string, read in the free-list.
+	 * Read in the file's metadata, configure the WT_BTREE structure based
+	 * on the configuration string, read in the free-list.
 	 *
 	 * XXX Take extra care with this if WT_BTREE_VERIFY is set?
 	 */

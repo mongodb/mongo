@@ -80,7 +80,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 	}
 
 	__wt_errx(session,
-            "There are no more hazard reference slots in the session");
+	    "There are no more hazard reference slots in the session");
 	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
 	return (0);
 }
@@ -137,14 +137,14 @@ __wt_hazard_empty(WT_SESSION_IMPL *session, const char *name)
 	conn = S2C(session);
 
 	/*
-         * Check for a set hazard reference and complain if we find one.  Clear
-         * any we find because it's not a correctness problem (any hazard ref
-         * we find can't be real because the session is being closed when we're
-         * called).   We do this work because it's not expensive, and we don't
-         * want to let a hazard reference lie around, keeping a page from being
-         * flushed.  The flush isn't necessary for correctness, but gives the
-         * cache eviction thread immediate access to any page our reference
-         * blocks.
+	 * Check for a set hazard reference and complain if we find one.  Clear
+	 * any we find because it's not a correctness problem (any hazard ref
+	 * we find can't be real because the session is being closed when we're
+	 * called).   We do this work because it's not expensive, and we don't
+	 * want to let a hazard reference lie around, keeping a page from being
+	 * flushed.  The flush isn't necessary for correctness, but gives the
+	 * cache eviction thread immediate access to any page our reference
+	 * blocks.
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)

@@ -19,15 +19,15 @@ static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(WT_BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_int(
-        WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_var(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static void __wt_debug_page_flags(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_int(
-        WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
 static int  __wt_debug_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_work(
-        WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_ref(WT_REF *, FILE *);
 static void __wt_debug_row_insert(WT_INSERT *, FILE *);

@@ -27,15 +27,15 @@ typedef struct {
 } WT_VSTUFF;
 
 static int __wt_verify_addfrag(
-        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_OFF *, WT_VSTUFF *);
 static int __wt_verify_overflow_page(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
-        WT_SESSION_IMPL *, WT_PAGE *, void *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_PAGE *, void *, WT_VSTUFF *);
 static int __wt_verify_row_leaf_key_order(
-        WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*

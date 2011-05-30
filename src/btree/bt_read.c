@@ -9,7 +9,7 @@
 #include "btree.i"
 
 static inline void __cache_read_req_set(
-        WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
+	WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
 static inline void __cache_read_req_clr(WT_READ_REQ *);
 
 static int __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
@@ -170,9 +170,9 @@ __wt_cache_read_server(void *arg)
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
-                 * a valid WT_SESSION_IMPL handle).  If we find a read request,
-                 * perform it, flush the result and clear the request slot,
-                 * then wake up the requesting thread.
+		 * a valid WT_SESSION_IMPL handle).  If we find a read request,
+		 * perform it, flush the result and clear the request slot,
+		 * then wake up the requesting thread.
 		 */
 		do {
 			didwork = 0;

@@ -226,7 +226,7 @@ static int  __rec_imref_qsort_cmp(const void *, const void *);
 static int  __rec_init(WT_SESSION_IMPL *, uint32_t);
 static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_update(WT_SESSION_IMPL *,
-                WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
+		WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static void __rec_parent_update_clean(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);

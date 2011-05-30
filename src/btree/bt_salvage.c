@@ -88,24 +88,24 @@ static int  __slvg_free_trk_ovfl(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_free_trk_row(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_key_copy(WT_SESSION_IMPL *, WT_BUF *, WT_BUF *);
 static int  __slvg_ovfl_col_dsk_ref(
-        WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_col_inmem_ref(WT_PAGE *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_row_dsk_ref(
-        WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_row_inmem_ref(WT_PAGE *, uint32_t, WT_STUFF *);
 static int  __slvg_range_col(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_range_overlap_col(
-        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_range_overlap_row(
-        WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_range_row(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_trk_compare(const void *, const void *);
 static int  __slvg_trk_leaf(
-        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_ovfl(
-        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static void __slvg_trk_ovfl_ref(WT_TRACK *, WT_STUFF *);
 
 #ifdef HAVE_DIAGNOSTIC

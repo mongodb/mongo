@@ -16,7 +16,7 @@ static int __wt_err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int __wt_verify_cell(
 	WT_SESSION_IMPL *, WT_CELL *, uint32_t, uint32_t, uint8_t *);
 static int __wt_verify_dsk_row(
-        WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(

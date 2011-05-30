@@ -59,9 +59,9 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	session->wq_state = op;
 
 	/*
-         * Callers can spin on the session state (implying the call is quickly
-         * satisfied), or block until its mutex is unlocked by another thread
-         * when the operation has completed.
+	 * Callers can spin on the session state (implying the call is quickly
+	 * satisfied), or block until its mutex is unlocked by another thread
+	 * when the operation has completed.
 	 */
 	if (spin) {
 		/*

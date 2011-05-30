@@ -165,12 +165,12 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	*scratchp = NULL;
 
 	/*
-         * There's an array of scratch buffers in each WT_SESSION_IMPL that can
-         * be used by any function.  We use WT_BUF structures for scratch
-         * memory because we already have to have functions that do
-         * variable-length allocation on WT_BUFs.  Scratch buffers are
-         * allocated only by a single thread of control, so no locking is
-         * necessary.
+	 * There's an array of scratch buffers in each WT_SESSION_IMPL that can
+	 * be used by any function.  We use WT_BUF structures for scratch
+	 * memory because we already have to have functions that do
+	 * variable-length allocation on WT_BUFs.  Scratch buffers are
+	 * allocated only by a single thread of control, so no locking is
+	 * necessary.
 	 *
 	 * Walk the array, looking for a buffer we can use.
 	 */

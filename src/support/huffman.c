@@ -108,9 +108,9 @@ static void make_table(
 	WT_SESSION_IMPL *, uint16_t *, uint16_t, WT_HUFFMAN_CODE *, u_int);
 static void node_queue_close(WT_SESSION_IMPL *, NODE_QUEUE *);
 static void node_queue_dequeue(
-        WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE **);
+	WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE **);
 static int  node_queue_enqueue(
-        WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE *);
+	WT_SESSION_IMPL *, NODE_QUEUE *, WT_FREQTREE_NODE *);
 static uint32_t profile_tree(
 	WT_FREQTREE_NODE *, uint16_t, uint16_t *, uint16_t *);
 static void recursive_free_node(WT_SESSION_IMPL *, WT_FREQTREE_NODE *);
