@@ -160,7 +160,6 @@ __wt_file_format(WT_SESSION_IMPL *session)
 {
 	__wt_errx(session, "the file is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the file");
-	WT_ASSERT(session, 0);
 	return (WT_ERROR);
 }
 
