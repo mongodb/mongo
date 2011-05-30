@@ -67,6 +67,9 @@ namespace mongo {
     v8::Handle<v8::Value> binDataToBase64( V8Scope* scope, const v8::Arguments& args );
     v8::Handle<v8::Value> binDataToHex( V8Scope* scope, const v8::Arguments& args );
 
+    v8::Handle<v8::Value> uuidInit( V8Scope* scope, const v8::Arguments& args );
+    v8::Handle<v8::Value> uuidToString( V8Scope* scope, const v8::Arguments& args );
+
     v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args );
     v8::Handle<v8::Value> numberLongToNumber(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongValueOf(V8Scope* scope, const v8::Arguments& args);

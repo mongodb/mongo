@@ -1343,9 +1343,8 @@ namespace mongo {
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_BINDATA ).IsEmpty() ) {
                 int len = obj->Get( getV8Str( "len" ) )->ToInt32()->Value();
-                v8::String::Utf8Value data( obj->Get( getV8Str( "data" ) ) );
-                const char *dataArray = *data;
-                assert( data.length() == len );
+                Local<External> c = External::Cast( *(obj->GetInternalField( 0 )) );
+                const char* dataArray = (char*)(c->Value());;
                 b.appendBinData( sname,
                                  len,
                                  mongo::BinDataType( obj->Get( getV8Str( "type" ) )->ToInt32()->Value() ),
