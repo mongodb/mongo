@@ -143,7 +143,8 @@ namespace mongo {
 
     void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
     void wasserted(const char *msg, const char *file, unsigned line);
-
+    void verifyFailed( int msgid );
+    
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.
     */
@@ -166,6 +167,8 @@ namespace mongo {
     inline string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
     inline string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline string causedBy( const string& e ){ return causedBy( e.c_str() ); }
+
+    inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
 
 #ifdef assert
 #undef assert

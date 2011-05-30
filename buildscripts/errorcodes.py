@@ -33,7 +33,8 @@ codes = []
 
 def readErrorCodes( callback ):
     ps = [ re.compile( "([umsg]asser(t|ted)) *\( *(\d+)" ) ,
-           re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" )
+           re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" ) ,
+           re.compile( "((verify)) *\( *(\d+)" )
            ]
     for x in utils.getAllSourceFiles():
         lineNum = 1
