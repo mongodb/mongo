@@ -766,18 +766,6 @@ zzz
         return *rval = c.toval( ret.c_str() );
     }
 
-    JSBool bindataLength(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int len = (int)c.getNumber( obj, "len" );
-        return *rval = c.toval((double) len);
-    }
-
-    JSBool bindataSubtype(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int t = (int)c.getNumber( obj, "type" );
-        return *rval = c.toval((double) t);
-    }
-
     void bindata_finalize( JSContext * cx , JSObject * obj ) {
         Convertor c(cx);
         void *holder = JS_GetPrivate( cx, obj );
@@ -798,8 +786,6 @@ zzz
         { "toString" , bindata_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "hex", bindataAsHex, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "base64", bindataBase64, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "length", bindataLength, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "subtype", bindataSubtype, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
 
