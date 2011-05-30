@@ -70,8 +70,10 @@ namespace mongo {
 
     v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> binData = scope->createV8Function(binDataInit);
+        binData->InstanceTemplate()->SetInternalFieldCount(1);
         v8::Local<v8::Template> proto = binData->PrototypeTemplate();
         scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
         return binData;
     }
 
@@ -649,43 +651,56 @@ namespace mongo {
 
 
     v8::Handle<v8::Value> binDataInit( V8Scope* scope, const v8::Arguments& args ) {
-        v8::Handle<v8::Object> it = args.This();
+        v8::Local<v8::Object> it = args.This();
 
-        // 3 args: len, type, data
+        Handle<Value> type;
+        Handle<Value> len;
+        int rlen;
+        char* data;
         if (args.Length() == 3) {
+            // 3 args: len, type, data
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
                 v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
-            it->Set( scope->getV8Str( "len" ) , args[0] );
-            it->Set( scope->getV8Str( "type" ) , args[1] );
-            it->Set( scope->getV8Str( "data" ), args[2] );
-            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
-
-            // 2 args: type, base64 string
+            len = args[0];
+            rlen = len->IntegerValue();
+            type = args[1];
+            v8::String::Utf8Value utf( args[ 2 ] );
+            char* tmp = *utf;
+            data = new char[rlen];
+            memcpy(data, tmp, rlen);
         }
         else if ( args.Length() == 2 ) {
+            // 2 args: type, base64 string
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
                 v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
-            v8::String::Utf8Value data( args[ 1 ] );
-            string decoded = base64::decode( *data );
-            it->Set( scope->getV8Str( "len" ) , v8::Number::New( decoded.length() ) );
-            it->Set( scope->getV8Str( "type" ) , args[ 0 ] );
-            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
-            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
-
+            type = args[0];
+            v8::String::Utf8Value utf( args[ 1 ] );
+            string decoded = base64::decode( *utf );
+            const char* tmp = decoded.data();
+            rlen = decoded.length();
+            data = new char[rlen];
+            memcpy(data, tmp, rlen);
+            len = v8::Number::New(rlen);
+//            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
         }
         else {
             return v8::ThrowException( v8::String::New( "BinData needs 3 arguments" ) );
         }
 
-        return it;
+        it->Set( scope->getV8Str( "len" ) , len );
+        it->Set( scope->getV8Str( "type" ) , type );
+        it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
+        Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
+//            it->Set( scope->getV8Str( "data" ), args[2] );
+        return res;
     }
 
     v8::Handle<v8::Value> binDataToString( V8Scope* scope, const v8::Arguments& args ) {
@@ -695,8 +710,8 @@ namespace mongo {
         }
 
         v8::Handle<v8::Object> it = args.This();
-        int len = it->Get( scope->getV8Str( "len" ) )->ToInt32()->Value();
-        int type = it->Get( scope->getV8Str( "type" ) )->ToInt32()->Value();
+        int len = it->Get( scope->V8STR_LEN )->Int32Value();
+        int type = it->Get( scope->V8STR_TYPE )->Int32Value();
         v8::String::Utf8Value data( it->Get( scope->getV8Str( "data" ) ) );
 
         stringstream ss;
@@ -705,6 +720,18 @@ namespace mongo {
         ss << "\")";
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
+    }
+
+    v8::Handle<v8::Value> binDataToBase64( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        int len = Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        cout << "Internal count " << it->InternalFieldCount() << endl;
+        char* data = (char*)(c->Value());
+        stringstream ss;
+        base64::encode( ss, (const char *)data, len );
+        string ret = ss.str();
+        return v8::String::New(ret.c_str());
     }
 
     v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args ) {

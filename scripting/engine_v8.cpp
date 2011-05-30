@@ -39,14 +39,40 @@ namespace mongo {
       return (BSONObj*)ptr;
     }
 
-    static void weakRefCallback(v8::Persistent<v8::Value> p, void* scope) {
+    static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
         // should we lock here? no idea, and no doc from v8 of course
         HandleScope handle_scope;
         if (!p.IsNearDeath())
             return;
-        BSONObj* obj = unwrapBSONObj(v8::Persistent<v8::Object>::Cast(p));
-        delete obj;
+        Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
+        BSONObj* data = (BSONObj*) field->Value();
+        delete data;
         p.Dispose();
+    }
+
+    Persistent<v8::Object> V8Scope::wrapBSONObject(Local<v8::Object> obj, BSONObj* data) {
+        obj->SetInternalField(0, v8::External::New(data));
+        Persistent<v8::Object> p = Persistent<v8::Object>::New(obj);
+        p.MakeWeak(this, weakRefBSONCallback);
+        return p;
+    }
+
+    static void weakRefArrayCallback(v8::Persistent<v8::Value> p, void* scope) {
+        // should we lock here? no idea, and no doc from v8 of course
+        HandleScope handle_scope;
+        if (!p.IsNearDeath())
+            return;
+        Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
+        char* data = (char*) field->Value();
+        delete [] data;
+        p.Dispose();
+    }
+
+    Persistent<v8::Object> V8Scope::wrapArrayObject(Local<v8::Object> obj, char* data) {
+        obj->SetInternalField(0, v8::External::New(data));
+        Persistent<v8::Object> p = Persistent<v8::Object>::New(obj);
+        p.MakeWeak(this, weakRefArrayCallback);
+        return p;
     }
 
     static Handle<v8::Value> namedGet(Local<v8::String> name, const v8::AccessorInfo &info) {
@@ -266,6 +292,8 @@ namespace mongo {
         V8STR_CONN = getV8Str( "_conn" );
         V8STR_ID = getV8Str( "_id" );
         V8STR_LENGTH = getV8Str( "length" );
+        V8STR_LEN = getV8Str( "len" );
+        V8STR_TYPE = getV8Str( "type" );
         V8STR_ISOBJECTID = getV8Str( "isObjectId" );
         V8STR_RETURN = getV8Str( "return" );
         V8STR_ARGS = getV8Str( "args" );
@@ -1077,10 +1105,7 @@ namespace mongo {
 
         BSONObj* own = new BSONObj(m.getOwned());
 //        BSONObj* own = new BSONObj(m);
-        o->SetInternalField(0, v8::External::New(own));
-
-        Persistent<v8::Object> p = Persistent<v8::Object>::New(o);
-        p.MakeWeak(this, weakRefCallback);
+        Persistent<v8::Object> p = wrapBSONObject(o, own);
         return p;
     }
 

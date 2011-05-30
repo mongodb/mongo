@@ -120,6 +120,9 @@ namespace mongo {
         v8::Function * getObjectIdCons();
         Local< v8::Value > newId( const OID &id );
 
+        Persistent<v8::Object> wrapBSONObject(Local<v8::Object> obj, BSONObj* data);
+        Persistent<v8::Object> wrapArrayObject(Local<v8::Object> obj, char* data);
+
         v8::Handle<v8::String> getV8Str(string str);
 //        inline v8::Handle<v8::String> getV8Str(string str) { return v8::String::New(str.c_str()); }
         inline v8::Handle<v8::String> getLocalV8Str(string str) { return v8::String::New(str.c_str()); }
@@ -127,6 +130,8 @@ namespace mongo {
         Handle<v8::String> V8STR_CONN;
         Handle<v8::String> V8STR_ID;
         Handle<v8::String> V8STR_LENGTH;
+        Handle<v8::String> V8STR_LEN;
+        Handle<v8::String> V8STR_TYPE;
         Handle<v8::String> V8STR_ISOBJECTID;
         Handle<v8::String> V8STR_NATIVE_FUNC;
         Handle<v8::String> V8STR_NATIVE_DATA;
