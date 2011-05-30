@@ -101,6 +101,7 @@ namespace mongo {
 
     private:
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
+        string _threadId; // "" on non support systems
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;
