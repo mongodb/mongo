@@ -31,8 +31,6 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
-
-
 # --- options ----
 
 options = {}
@@ -576,12 +574,16 @@ elif "win32" == os.sys.platform:
     # some warnings we don't like:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
+    # PSAPI_VERSION relates to process api dll Psapi.dll.
+    # HAVE_CONFIG_H for pcre
+    # SUPPORT_UTF8 and SUPPORT_UCP are for pcre.  not sure if SUPPORT_UCP is needed - that is for unicode.
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
 
-    #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
+    # this would be for pre-compiled headers, could play with it later  
+    #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
 
-    # docs say don't use /FD from command line
-    # /Gy funtion level linking
+    # docs say don't use /FD from command line (minimal rebuild)
+    # /Gy function level linking
     # /Gm is minimal rebuild, but may not work in parallel mode.
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
@@ -592,7 +594,6 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
     else:
-
         # /Od disable optimization
         # /ZI debug info w/edit & continue 
         # /TP it's a c++ file
@@ -739,7 +740,6 @@ if nix:
 if usev8:
     env.Prepend( CPPPATH=["../v8/include/"] )
     env.Prepend( LIBPATH=["../v8/"] )
-
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -1128,7 +1128,7 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" ] ) ]
 
-# testing
+# dbtests test binary
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
