@@ -74,6 +74,7 @@ namespace mongo {
         v8::Local<v8::Template> proto = binData->PrototypeTemplate();
         scope->injectV8Function("toString", binDataToString, proto);
         scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
         return binData;
     }
 
@@ -712,11 +713,12 @@ namespace mongo {
         v8::Handle<v8::Object> it = args.This();
         int len = it->Get( scope->V8STR_LEN )->Int32Value();
         int type = it->Get( scope->V8STR_TYPE )->Int32Value();
-        v8::String::Utf8Value data( it->Get( scope->getV8Str( "data" ) ) );
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        char* data = (char*)(c->Value());
 
         stringstream ss;
         ss << "BinData(" << type << ",\"";
-        base64::encode( ss, *data, len );
+        base64::encode( ss, data, len );
         ss << "\")";
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
@@ -726,10 +728,24 @@ namespace mongo {
         v8::Handle<v8::Object> it = args.This();
         int len = Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
         Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
-        cout << "Internal count " << it->InternalFieldCount() << endl;
         char* data = (char*)(c->Value());
         stringstream ss;
         base64::encode( ss, (const char *)data, len );
+        string ret = ss.str();
+        return v8::String::New(ret.c_str());
+    }
+
+    v8::Handle<v8::Value> binDataToHex( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        int len = Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        char* data = (char*)(c->Value());
+        stringstream ss;
+        ss << hex;
+        for( int i = 0; i < len; i++ ) {
+            unsigned v = (unsigned char) data[i];
+            ss << v;
+        }
         string ret = ss.str();
         return v8::String::New(ret.c_str());
     }
