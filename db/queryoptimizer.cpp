@@ -244,7 +244,7 @@ doneCheckOrder:
     void QueryPlan::registerSelf( long long nScanned ) const {
         // FIXME SERVER-2864 Otherwise no query pattern can be generated.
         if ( _frs.matchPossible() ) {
-            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+            SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
         }
     }
@@ -1202,14 +1202,14 @@ doneCheckOrder:
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
         nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
     }
     
     pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
