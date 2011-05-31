@@ -407,7 +407,7 @@ namespace mongo {
                 if ( mss->amIInPlacePossible( e.isNumber() ) ) {
                     // check more typing info here
                     if ( m.elt.type() != e.type() ) {
-                        // if i'm incrememnting with a double, then the storage has to be a double
+                        // if i'm incrementing with a double, then the storage has to be a double
                         mss->amIInPlacePossible( m.elt.type() != NumberDouble );
                     }
 
@@ -509,7 +509,7 @@ namespace mongo {
         }
 
         if ( m->op == Mod::RENAME_FROM ) {
-            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fielName:" << m->fieldName );
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fieldName:" << m->fieldName );
             BSONObjBuilder bb( b.subobjStart( "$unset" ) );
             bb.append( m->fieldName, 1 );
             bb.done();
@@ -517,7 +517,7 @@ namespace mongo {
         }
 
         if ( m->op == Mod::RENAME_TO ) {
-            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fielName:" << m->fieldName );
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fieldName:" << m->fieldName );
             BSONObjBuilder bb( b.subobjStart( "$set" ) );
             bb.appendAs( newVal, m->fieldName );
             return;
@@ -663,7 +663,7 @@ namespace mongo {
 
             switch ( cmp ) {
 
-            case LEFT_SUBFIELD: { // Mod is embeddeed under this element
+            case LEFT_SUBFIELD: { // Mod is embedded under this element
                 uassert( 10145 ,  str::stream() << "LEFT_SUBFIELD only supports Object: " << field << " not: " << e.type() , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
