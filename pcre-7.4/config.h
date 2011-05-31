@@ -162,7 +162,7 @@ them both to 0; an emulation function will be used. */
    --disable-stack-for-recursion). */
 /* #undef NO_RECURSE */
 /* mongodb: don't recurse, don't want to use much stack or blow stack */
-#define NO_RECURSE 
+#define NO_RECURSE 1
 
 /* Name of package */
 #define PACKAGE "pcre"
