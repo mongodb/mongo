@@ -12,7 +12,8 @@ res = benchRun( { ops : [ { ns : t.getFullName() ,
                             update : { $inc : { x : 1 } } } ] , 
                   parallel : 2 , 
                   seconds : 1 ,
-                  totals : true } ) 
+                  totals : true ,
+                  host : db.getMongo().host } )
 printjson( res );
 
 sumsq = 0
