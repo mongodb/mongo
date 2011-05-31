@@ -6,28 +6,28 @@ MongoDB Error Codes
 
 bson/bson-inl.h
 ----
-* 10065 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L36) 
-* 10313 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L379) Insufficient bytes to calculate element size
-* 10314 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L383) Insufficient bytes to calculate element size
-* 10315 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L388) Insufficient bytes to calculate element size
-* 10316 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L393) Insufficient bytes to calculate element size
-* 10317 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L397) Insufficient bytes to calculate element size
-* 10318 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L403) Invalid regex string
-* 10319 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L413) Invalid regex options string
-* 10320 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L487) 
-* 10321 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L324) 
-* 10322 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L329) Invalid CodeWScope size
-* 10323 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L331) Invalid CodeWScope string size
-* 10324 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L332) Invalid CodeWScope string size
-* 10325 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L335) Invalid CodeWScope size
-* 10326 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L337) Invalid CodeWScope object size
-* 10327 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L284) Object does not end with EOO
-* 10328 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L286) Invalid element size
-* 10329 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L287) Element too large
-* 10330 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L289) Element extends past end of object
-* 10331 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L294) EOO Before end of object
-* 10334 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L60) 
-* 13655 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L421) 
+* 10065 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L37) 
+* 10313 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L397) Insufficient bytes to calculate element size
+* 10314 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L401) Insufficient bytes to calculate element size
+* 10315 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L406) Insufficient bytes to calculate element size
+* 10316 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L411) Insufficient bytes to calculate element size
+* 10317 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L415) Insufficient bytes to calculate element size
+* 10318 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L421) Invalid regex string
+* 10319 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L431) Invalid regex options string
+* 10320 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L505) 
+* 10321 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L342) 
+* 10322 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L347) Invalid CodeWScope size
+* 10323 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L349) Invalid CodeWScope string size
+* 10324 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L350) Invalid CodeWScope string size
+* 10325 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L353) Invalid CodeWScope size
+* 10326 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L355) Invalid CodeWScope object size
+* 10327 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L302) Object does not end with EOO
+* 10328 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L304) Invalid element size
+* 10329 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L305) Element too large
+* 10330 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L307) Element extends past end of object
+* 10331 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L312) EOO Before end of object
+* 10334 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L61) 
+* 13655 [code](http://github.com/mongodb/mongo/blob/master/bson/bson-inl.h#L439) 
 
 
 bson/bson_db.h
@@ -37,11 +37,11 @@ bson/bson_db.h
 
 bson/bsonelement.h
 ----
-* 10063 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L355) not a dbref
-* 10064 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L360) not a dbref
-* 10333 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L384) Invalid field name
-* 13111 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L418) 
-* 13118 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L423) unexpected or missing type value in BSON object
+* 10063 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L357) not a dbref
+* 10064 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L362) not a dbref
+* 10333 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L386) Invalid field name
+* 13111 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L423) 
+* 13118 [code](http://github.com/mongodb/mongo/blob/master/bson/bsonelement.h#L428) unexpected or missing type value in BSON object
 
 
 bson/bsonobjbuilder.h
@@ -69,56 +69,56 @@ client/clientOnly.cpp
 
 client/connpool.cpp
 ----
-* 13071 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.cpp#L149) invalid hostname [" + host + "]
-* 13328 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.cpp#L135) : connect failed " + url.toString() + " : 
+* 13071 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.cpp#L171) invalid hostname [" + host + "]
+* 13328 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.cpp#L157) : connect failed " + url.toString() + " : 
 
 
 client/connpool.h
 ----
-* 11004 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L207) connection was returned to the pool already
-* 11005 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L213) connection was returned to the pool already
-* 13102 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L219) connection was returned to the pool already
+* 11004 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L213) connection was returned to the pool already
+* 11005 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L219) connection was returned to the pool already
+* 13102 [code](http://github.com/mongodb/mongo/blob/master/client/connpool.h#L225) connection was returned to the pool already
 
 
 client/dbclient.cpp
 ----
 * 10005 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L479) listdatabases failed" , runCommand( "admin" , BSON( "listDatabases
 * 10006 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L480) listDatabases.databases not array" , info["databases
-* 10007 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L778) dropIndex failed
-* 10008 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L785) dropIndexes failed
-* 10276 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L536) DBClientBase::findOne: transport error: " << getServerAddress() << " query: 
-* 10278 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L919) dbclient error communicating with server: 
-* 10337 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L871) object not valid
+* 10007 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L788) dropIndex failed
+* 10008 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L795) dropIndexes failed
+* 10276 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L541) DBClientBase::findN: transport error: " << getServerAddress() << " query: 
+* 10278 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L929) dbclient error communicating with server: 
+* 10337 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L881) object not valid
 * 11010 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L281) count fails:
-* 13386 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L649) socket error for mapping query
+* 13386 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L661) socket error for mapping query
 * 13421 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L100) trying to connect to invalid ConnectionString
 
 
 client/dbclient.h
 ----
-* 10011 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L485) no collection name
-* 9000 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L799) 
+* 10011 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L498) no collection name
+* 9000 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L812) 
 
 
 client/dbclient_rs.cpp
 ----
-* 10009 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L202) ReplicaSetMonitor no master found for set: 
-* 13610 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L150) ConfigChangeHook already specified
-* 13639 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L449) can't connect to new replica set master [" << _masterHost.toString() << "] err: 
+* 10009 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L208) ReplicaSetMonitor no master found for set: 
+* 13610 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L156) ConfigChangeHook already specified
+* 13639 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L453) can't connect to new replica set master [" << _masterHost.toString() << "] err: 
 * 13642 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient_rs.cpp#L79) need at least 1 node for a replica set
 
 
 client/dbclientcursor.cpp
 ----
 * 13127 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L148) getMore: cursor didn't exist on server, possible restart or timeout?
-* 13422 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L195) DBClientCursor next() called but more() is false
+* 13422 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L196) DBClientCursor next() called but more() is false
 
 
 client/dbclientcursor.h
 ----
-* 13106 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L78) nextSafe(): 
-* 13348 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L205) connection died
-* 13383 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L225) BatchIterator empty
+* 13106 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L78) 
+* 13348 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L202) connection died
+* 13383 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.h#L219) BatchIterator empty
 
 
 client/distlock.cpp
@@ -219,14 +219,14 @@ db/cap.cpp
 
 db/client.cpp
 ----
-* 10057 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L207) 
-* 13005 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L174) can't create db, keeps getting closed
-* 14031 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L134) Can't take a write lock while out of disk space
+* 10057 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L254) 
+* 13005 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L221) can't create db, keeps getting closed
+* 14031 [code](http://github.com/mongodb/mongo/blob/master/db/client.cpp#L181) Can't take a write lock while out of disk space
 
 
 db/client.h
 ----
-* 12600 [code](http://github.com/mongodb/mongo/blob/master/db/client.h#L224) releaseAndWriteLock: unlock_shared failed, probably recursive
+* 12600 [code](http://github.com/mongodb/mongo/blob/master/db/client.h#L228) releaseAndWriteLock: unlock_shared failed, probably recursive
 
 
 db/clientcursor.h
@@ -237,13 +237,13 @@ db/clientcursor.h
 
 db/cloner.cpp
 ----
-* 10024 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L85) bad ns field for index during dbcopy
-* 10025 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L87) bad ns field for index during dbcopy [2]
-* 10026 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L637) source namespace does not exist
-* 10027 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L647) target namespace exists", cmdObj["dropTarget
-* 10289 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L281) useReplAuth is not written to replication log
-* 10290 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L352) 
-* 13008 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L591) must call copydbgetnonce first
+* 10024 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L87) bad ns field for index during dbcopy
+* 10025 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L89) bad ns field for index during dbcopy [2]
+* 10026 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L640) source namespace does not exist
+* 10027 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L650) target namespace exists", cmdObj["dropTarget
+* 10289 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L283) useReplAuth is not written to replication log
+* 10290 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L354) 
+* 13008 [code](http://github.com/mongodb/mongo/blob/master/db/cloner.cpp#L593) must call copydbgetnonce first
 
 
 db/cmdline.cpp
@@ -253,7 +253,7 @@ db/cmdline.cpp
 
 db/commands/distinct.cpp
 ----
-* 10044 [code](http://github.com/mongodb/mongo/blob/master/db/commands/distinct.cpp#L114) distinct too big, 16mb cap
+* 10044 [code](http://github.com/mongodb/mongo/blob/master/db/commands/distinct.cpp#L115) distinct too big, 16mb cap
 
 
 db/commands/find_and_modify.cpp
@@ -282,23 +282,28 @@ db/commands/isself.cpp
 db/commands/mr.cpp
 ----
 * 10074 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L155) need values
-* 10075 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L195) reduce -> multiple not supported yet
-* 10076 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L416) rename failed: 
-* 10077 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L835) fast_emit takes 2 args
-* 10078 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L1073) something bad happened" , shardedOutputCollection == res["result
-* 13069 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L836) an emit can't be more than half max bson size
+* 10075 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L196) reduce -> multiple not supported yet
+* 10076 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L421) rename failed: 
+* 10077 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L877) fast_emit takes 2 args
+* 10078 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L1131) something bad happened" , shardedOutputCollection == res["result
+* 13069 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L878) an emit can't be more than half max bson size
 * 13070 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L176) value too large to reduce
-* 13522 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L253) unknown out specifier [" << t << "]
+* 13522 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L258) unknown out specifier [" << t << "]
 * 13598 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L55) couldn't compile code for: 
-* 13602 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L225) outType is no longer a valid option" , cmdObj["outType
-* 13604 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L373) too much data for in memory map/reduce
-* 13605 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L393) too much data for in memory map/reduce
-* 13606 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L261) 'out' has to be a string or an object
-* 13608 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L295) query has to be blank or an Object
-* 13609 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L302) sort has to be blank or an Object
-* 13630 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L326) userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: 
-* 13631 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L562) userCreateNS failed for mr incLong ns: " << _config.incLong << " err: 
+* 13602 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L230) outType is no longer a valid option" , cmdObj["outType
+* 13604 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L378) too much data for in memory map/reduce
+* 13605 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L398) too much data for in memory map/reduce
+* 13606 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L266) 'out' has to be a string or an object
+* 13608 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L300) query has to be blank or an Object
+* 13609 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L307) sort has to be blank or an Object
+* 13630 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L331) userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: 
+* 13631 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L568) userCreateNS failed for mr incLong ns: " << _config.incLong << " err: 
 * 9014 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L73) map invoke failed: 
+
+
+db/common.cpp
+----
+* 10332 [code](http://github.com/mongodb/mongo/blob/master/db/common.cpp#L38) Expected CurrentTime type
 
 
 db/compact.cpp
@@ -325,7 +330,7 @@ db/curop.h
 
 db/cursor.h
 ----
-* 13285 [code](http://github.com/mongodb/mongo/blob/master/db/cursor.h#L129) manual matcher config not allowed
+* 13285 [code](http://github.com/mongodb/mongo/blob/master/db/cursor.h#L133) manual matcher config not allowed
 
 
 db/database.cpp
@@ -336,14 +341,16 @@ db/database.cpp
 * 10031 [code](http://github.com/mongodb/mongo/blob/master/db/database.cpp#L50) bad char(s) in db name
 * 10032 [code](http://github.com/mongodb/mongo/blob/master/db/database.cpp#L51) db name too long
 * 10295 [code](http://github.com/mongodb/mongo/blob/master/db/database.cpp#L151) getFile(): bad file number value (corrupt db?): run repair
+* 12501 [code](http://github.com/mongodb/mongo/blob/master/db/database.cpp#L211) quota exceeded
+* 14810 [code](http://github.com/mongodb/mongo/blob/master/db/database.cpp#L224) couldn't allocate space (suitableFile)
 
 
 db/db.cpp
 ----
-* 10296 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L435) 
-* 10297 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L1183) Couldn't register Windows Ctrl-C handler
-* 12590 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L440) 
-* 14026 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L288) 
+* 10296 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L436) 
+* 10297 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L1185) Couldn't register Windows Ctrl-C handler
+* 12590 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L441) 
+* 14026 [code](http://github.com/mongodb/mongo/blob/master/db/db.cpp#L289) 
 
 
 db/db.h
@@ -357,16 +364,16 @@ db/db.h
 
 db/dbcommands.cpp
 ----
-* 10039 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L708) can't drop collection with reserved $ character in name
-* 10040 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1015) chunks out of order
-* 10301 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1350) source collection " + fromNs + " does not exist
-* 13049 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1481) godinsert must specify a collection
-* 13281 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1034) File deleted during filemd5 command
-* 13416 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1613) captrunc must specify a collection
-* 13417 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1621) captrunc collection not found or empty
-* 13418 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1623) captrunc invalid n
-* 13428 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1640) emptycapped must specify a collection
-* 13429 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1643) emptycapped no such collection
+* 10039 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L710) can't drop collection with reserved $ character in name
+* 10040 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1017) chunks out of order
+* 10301 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1352) source collection " + fromNs + " does not exist
+* 13049 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1483) godinsert must specify a collection
+* 13281 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1036) File deleted during filemd5 command
+* 13416 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1615) captrunc must specify a collection
+* 13417 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1623) captrunc collection not found or empty
+* 13418 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1625) captrunc invalid n
+* 13428 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1642) emptycapped must specify a collection
+* 13429 [code](http://github.com/mongodb/mongo/blob/master/db/dbcommands.cpp#L1645) emptycapped no such collection
 
 
 db/dbcommands_admin.cpp
@@ -461,26 +468,26 @@ db/geo/2d.cpp
 * 13026 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L300) geo values have to be numbers: 
 * 13027 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L323) point not in interval of [ " << _min << ", " << _max << " )
 * 13028 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L110) bits in geo index must be between 1 and 32
-* 13042 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2361) missing geo field (" + _geo + ") in : 
-* 13046 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2409) 'near' param missing/invalid", !cmdObj["near
-* 13057 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2333) $within has to take an object or array
-* 13058 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2351) unknown $with type: 
-* 13059 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2337) $center has to take an object or array
-* 13060 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1937) $center needs 2 fields (middle,max distance)
-* 13061 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1951) need a max distance >= 0 
-* 13063 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2073) $box needs 2 fields (bottomLeft,topRight)
-* 13064 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2082) need an area > 0 
-* 13065 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2342) $box has to take an object or array
+* 13042 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2369) missing geo field (" + _geo + ") in : 
+* 13046 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2417) 'near' param missing/invalid", !cmdObj["near
+* 13057 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2341) $within has to take an object or array
+* 13058 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2359) unknown $with type: 
+* 13059 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2345) $center has to take an object or array
+* 13060 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1945) $center needs 2 fields (middle,max distance)
+* 13061 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1959) need a max distance >= 0 
+* 13063 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2081) $box needs 2 fields (bottomLeft,topRight)
+* 13064 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2090) need an area > 0 
+* 13065 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2350) $box has to take an object or array
 * 13067 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L295) geo field is empty
 * 13068 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L297) geo field only has 1 element
-* 13460 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1974) invalid $center query type: 
-* 13461 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1962) Spherical MaxDistance > PI. Are you sure you are using radians?
-* 13462 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1969) Spherical distance would require wrapping, which isn't implemented yet
-* 13464 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2307) invalid $near search type: 
+* 13460 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1982) invalid $center query type: 
+* 13461 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1970) Spherical MaxDistance > PI. Are you sure you are using radians?
+* 13462 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1977) Spherical distance would require wrapping, which isn't implemented yet
+* 13464 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2315) invalid $near search type: 
 * 13654 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L224) location object expected, location array not in correct format
-* 13656 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1942) the first field of $center object must be a location object
-* 14029 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2347) $polygon has to take an object or array
-* 14030 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2189) polygon must be defined by three points or more
+* 13656 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L1950) the first field of $center object must be a location object
+* 14029 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2355) $polygon has to take an object or array
+* 14030 [code](http://github.com/mongodb/mongo/blob/master/db/geo/2d.cpp#L2197) polygon must be defined by three points or more
 
 
 db/geo/core.h
@@ -535,40 +542,39 @@ db/instance.cpp
 * 10054 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L462) not master
 * 10055 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L449) update object too large
 * 10056 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L490) not master
-* 10058 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L581) not master
-* 10059 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L591) object to insert too large
-* 10309 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L896) Unable to create/open lock file: " << name << ' ' << errnoWithDescription() << " Is a mongod instance already running?
-* 10310 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L901) Unable to acquire lock for lockfilepath: 
-* 12596 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L954) old lock file
+* 10058 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L617) not master
+* 10059 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L574) object to insert too large
+* 10309 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L919) Unable to create/open lock file: " << name << ' ' << errnoWithDescription() << " Is a mongod instance already running?
+* 10310 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L924) Unable to acquire lock for lockfilepath: 
+* 12596 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L977) old lock file
 * 13004 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L394) sent negative cursors to kill: 
 * 13073 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L529) shutting down
-* 13342 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L972) Unable to truncate lock file
-* 13455 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L813) dbexit timed out getting lock
-* 13511 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L598) object to insert can't have $ modifiers
-* 13597 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L964) can't start without --journal enabled when journal/ files are present
-* 13618 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L989) can't start without --journal enabled when journal/ files are present
-* 13625 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L968) Unable to truncate lock file
-* 13627 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L890) Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?
-* 13637 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L697) count failed in DBDirectClient: 
+* 13342 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L995) Unable to truncate lock file
+* 13455 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L836) dbexit timed out getting lock
+* 13511 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L580) document to insert can't have $ fields
+* 13597 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L987) can't start without --journal enabled when journal/ files are present
+* 13618 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L1012) can't start without --journal enabled when journal/ files are present
+* 13625 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L991) Unable to truncate lock file
+* 13627 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L913) Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?
+* 13637 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L720) count failed in DBDirectClient: 
 * 13658 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L393) bad kill cursors size: 
 * 13659 [code](http://github.com/mongodb/mongo/blob/master/db/instance.cpp#L392) sent 0 cursors to kill
 
 
 db/jsobj.cpp
 ----
-* 10060 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L669) woSortOrder needs a non-empty sortKey
-* 10061 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1272) type not supported for appendMinElementForType
+* 10060 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L678) woSortOrder needs a non-empty sortKey
+* 10061 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1259) type not supported for appendMinElementForType
 * 10311 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L125) 
-* 10312 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L275) 
-* 10332 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1227) Expected CurrentTime type
-* 12579 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L988) unhandled cases in BSONObj okForStorage
+* 10312 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L284) 
+* 12579 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L982) unhandled cases in BSONObj okForStorage
 
 
 db/json.cpp
 ----
 * 10338 [code](http://github.com/mongodb/mongo/blob/master/db/json.cpp#L230) Invalid use of reserved field name
-* 10339 [code](http://github.com/mongodb/mongo/blob/master/db/json.cpp#L362) Badly formatted bindata
-* 10340 [code](http://github.com/mongodb/mongo/blob/master/db/json.cpp#L575) Failure parsing JSON string near: 
+* 10339 [code](http://github.com/mongodb/mongo/blob/master/db/json.cpp#L370) Badly formatted bindata
+* 10340 [code](http://github.com/mongodb/mongo/blob/master/db/json.cpp#L584) Failure parsing JSON string near: 
 
 
 db/lasterror.cpp
@@ -638,7 +644,7 @@ db/namespace.cpp
 
 db/namespace.h
 ----
-* 10081 [code](http://github.com/mongodb/mongo/blob/master/db/namespace.h#L532) too many namespaces/collections
+* 10081 [code](http://github.com/mongodb/mongo/blob/master/db/namespace.h#L567) too many namespaces/collections
 
 
 db/nonce.cpp
@@ -653,56 +659,55 @@ db/oplog.cpp
 ----
 * 13044 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L500) no ts field in query
 * 13257 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L338) 
-* 13288 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L47) replSet error write op to db before replSet initialized", str::startsWith(ns, "local.
-* 13312 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L133) replSet error : logOp() but not primary?
+* 13288 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L48) replSet error write op to db before replSet initialized", str::startsWith(ns, "local.
+* 13312 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L135) replSet error : logOp() but not primary?
 * 13347 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L171) local.oplog.rs missing. did you drop it? if so restart server
-* 13389 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L66) local.oplog.rs missing. did you drop it? if so restart server
+* 13389 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L67) local.oplog.rs missing. did you drop it? if so restart server
 * 14038 [code](http://github.com/mongodb/mongo/blob/master/db/oplog.cpp#L453) invalid _findingStartMode
 
 
 db/pdfile.cpp
 ----
-* 10003 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1041) failing update: objects in a capped ns cannot grow
-* 10083 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L215) invalid size spec
-* 10084 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L409) can't map file memory - mongo requires 64 bit build for larger datasets
-* 10085 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L411) can't map file memory
-* 10086 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L823) ns not found: 
-* 10087 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L831) turn off profiling before dropping system.profile collection
-* 10089 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L987) can't remove from a capped collection
-* 10092 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1211) too may dups on index build with dropDups=true
-* 10093 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1616) cannot insert into reserved $ collection
-* 10094 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1617) invalid ns: 
-* 10095 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1620) attempt to insert in reserved database name 'system'
-* 10099 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1694) _id cannot be an array
-* 10356 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L303) invalid ns: 
-* 10357 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L450) shutdown in progress
-* 10358 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L451) bad new extent size
-* 10359 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L452) header==0 on new extent: 32 bit mmap space exceeded?
-* 10360 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L595) Extent::reset bad magic value
-* 10361 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L803) can't create .$freelist
-* 12501 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L373) 
-* 12502 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L833) can't drop system ns
-* 12503 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L871) 
-* 12582 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1559) duplicate key insert for unique index of capped collection
-* 12583 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1816) unexpected index insertion failure on capped collection
-* 12584 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1352) cursor gone during bg index
-* 12585 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1332) cursor gone during bg index; dropDups
-* 12586 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L78) cannot perform operation: a background operation is currently running for this database
-* 12587 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L83) cannot perform operation: a background operation is currently running for this collection
-* 13130 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1366) can't start bg index b/c in recursive lock (db.eval?)
-* 13143 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1760) can't create index on system.indexes" , tabletoidxns.find( ".system.indexes
-* 13440 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L343) 
-* 13441 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L337) 
-* 13596 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1036) cannot change _id of a document old:" << objOld << " new:
-* 14051 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1628) system.user entry needs 'user' field to be a string" , t["user
-* 14052 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1629) system.user entry needs 'pwd' field to be a string" , t["pwd
-* 14053 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1631) system.user entry needs 'user' field to be non-empty" , t["user
-* 14054 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1632) system.user entry needs 'pwd' field to be non-empty" , t["pwd
+* 10003 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1034) failing update: objects in a capped ns cannot grow
+* 10083 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L226) invalid size spec
+* 10084 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L402) can't map file memory - mongo requires 64 bit build for larger datasets
+* 10085 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L404) can't map file memory
+* 10086 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L816) ns not found: 
+* 10087 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L824) turn off profiling before dropping system.profile collection
+* 10089 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L980) can't remove from a capped collection
+* 10092 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1204) too may dups on index build with dropDups=true
+* 10093 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1712) cannot insert into reserved $ collection
+* 10094 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1713) invalid ns: 
+* 10095 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1611) attempt to insert in reserved database name 'system'
+* 10099 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1752) _id cannot be an array
+* 10356 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L314) invalid ns: 
+* 10357 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L443) shutdown in progress
+* 10358 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L444) bad new extent size
+* 10359 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L445) header==0 on new extent: 32 bit mmap space exceeded?
+* 10360 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L588) Extent::reset bad magic value
+* 10361 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L796) can't create .$freelist
+* 12502 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L826) can't drop system ns
+* 12503 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L864) 
+* 12582 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1551) duplicate key insert for unique index of capped collection
+* 12583 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1828) unexpected index insertion failure on capped collection
+* 12584 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1345) cursor gone during bg index
+* 12585 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1325) cursor gone during bg index; dropDups
+* 12586 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L89) cannot perform operation: a background operation is currently running for this database
+* 12587 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L94) cannot perform operation: a background operation is currently running for this collection
+* 13130 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1359) can't start bg index b/c in recursive lock (db.eval?)
+* 13143 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1654) can't create index on system.indexes" , tabletoidxns.find( ".system.indexes
+* 13440 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L354) 
+* 13441 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L348) 
+* 13596 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1029) cannot change _id of a document old:" << objOld << " new:
+* 14051 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1619) system.user entry needs 'user' field to be a string" , t["user
+* 14052 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1620) system.user entry needs 'pwd' field to be a string" , t["pwd
+* 14053 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1621) system.user entry needs 'user' field to be non-empty" , t["user
+* 14054 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.cpp#L1622) system.user entry needs 'pwd' field to be non-empty" , t["pwd
 
 
 db/pdfile.h
 ----
-* 13640 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.h#L345) DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:
+* 13640 [code](http://github.com/mongodb/mongo/blob/master/db/pdfile.h#L348) DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:
 
 
 db/projection.cpp
@@ -733,10 +738,10 @@ db/query.h
 * 10102 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L130) bad order array
 * 10103 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L131) bad order array [2]
 * 10104 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L134) too many ordering elements
-* 10105 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L216) bad skip value in query
-* 12001 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L289) E12001 can't sort with $snapshot
-* 12002 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L290) E12002 can't use hint with $snapshot
-* 13513 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L265) sort must be an object or array
+* 10105 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L213) bad skip value in query
+* 12001 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L292) E12001 can't sort with $snapshot
+* 12002 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L293) E12002 can't use hint with $snapshot
+* 13513 [code](http://github.com/mongodb/mongo/blob/master/db/query.h#L262) sort must be an object or array
 
 
 db/queryoptimizer.cpp
@@ -750,24 +755,24 @@ db/queryoptimizer.cpp
 * 10366 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L388) natural order cannot be specified with $min/$max
 * 10367 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L399) 
 * 10368 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L459) Unable to locate previously recorded index
-* 10369 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L620) no plans
+* 10369 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L643) no plans
 * 13038 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L435) can't find special index: " + _special + " for: 
 * 13040 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L97) no type for special: 
-* 13268 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L801) invalid $or spec
+* 13268 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L836) invalid $or spec
 * 13292 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.cpp#L336) hint eoo
 
 
 db/queryoptimizer.h
 ----
-* 13266 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L381) not implemented for $or query
-* 13271 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L384) can't run more ops
+* 13266 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L436) not implemented for $or query
+* 13271 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L439) can't run more ops
 * 13335 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L142) yield not supported
 * 13336 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizer.h#L144) yield not supported
 
 
 db/queryoptimizercursor.cpp
 ----
-* 14809 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L179) Invalid access for cursor that is not ok()
+* 14809 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L262) Invalid access for cursor that is not ok()
 
 
 db/queryutil.cpp
@@ -797,7 +802,7 @@ db/repl.cpp
 * 10119 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L257) only source='main' allowed for now with replication", sourceName() == "main
 * 10120 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L260) bad sources 'syncedTo' field value
 * 10123 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L992) replication error last applied optime at slave >= nextOpTime from master
-* 10124 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L1184) 
+* 10124 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L1182) 
 * 10384 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L399) --only requires use of --source
 * 10385 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L455) Unable to get database list
 * 10386 [code](http://github.com/mongodb/mongo/blob/master/db/repl.cpp#L764) non Date ts found: 
@@ -820,13 +825,13 @@ db/repl/health.h
 
 db/repl/rs.cpp
 ----
-* 13093 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L255) bad --replSet config string format is: <setname>[/<seedhost1>,<seedhost2>,...]
-* 13096 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L274) bad --replSet command line config string - dups?
-* 13101 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L276) can't use localhost in replset host list
-* 13114 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L272) bad --replSet seed hostname
-* 13290 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L328) bad replSet oplog entry?
-* 13302 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L422) replSet error self appears twice in the repl set configuration
-* 13497 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L420) replSet error self not present in the configuration
+* 13093 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L257) bad --replSet config string format is: <setname>[/<seedhost1>,<seedhost2>,...]
+* 13096 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L276) bad --replSet command line config string - dups?
+* 13101 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L278) can't use localhost in replset host list
+* 13114 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L274) bad --replSet seed hostname
+* 13290 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L330) bad replSet oplog entry?
+* 13302 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L424) replSet error self appears twice in the repl set configuration
+* 13497 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs.cpp#L422) replSet error self not present in the configuration
 
 
 db/repl/rs_config.cpp
@@ -887,9 +892,9 @@ db/repl/rs_rollback.cpp
 
 db/repl/rs_sync.cpp
 ----
-* 1000 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L292) replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?
-* 12000 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L379) rs slaveDelay differential too big check clocks and systems
-* 13508 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L84) no 'ts' in first op in oplog: 
+* 1000 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L299) replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?
+* 12000 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L385) rs slaveDelay differential too big check clocks and systems
+* 13508 [code](http://github.com/mongodb/mongo/blob/master/db/repl/rs_sync.cpp#L87) no 'ts' in first op in oplog: 
 
 
 db/replutil.h
@@ -926,7 +931,7 @@ db/update.cpp
 * 10142 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L434) Cannot apply $pull/$pullAll modifier to non-array
 * 10143 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L455) Cannot apply $pop modifier to non-array
 * 10145 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L667) LEFT_SUBFIELD only supports Object: " << field << " not: 
-* 10147 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L801) Invalid modifier specified
+* 10147 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L801) Invalid modifier specified: 
 * 10148 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L813) Mod on _id not allowed", strcmp( fieldName, "_id
 * 10149 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L814) Invalid mod field name, may not end in a period
 * 10150 [code](http://github.com/mongodb/mongo/blob/master/db/update.cpp#L815) Field name duplication not allowed with modifiers
@@ -975,26 +980,26 @@ db/update.h
 
 dbtests/framework.cpp
 ----
-* 10162 [code](http://github.com/mongodb/mongo/blob/master/dbtests/framework.cpp#L389) already have suite with that name
+* 10162 [code](http://github.com/mongodb/mongo/blob/master/dbtests/framework.cpp#L395) already have suite with that name
 
 
 dbtests/jsobjtests.cpp
 ----
-* 10403 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1211) 
-* 10404 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1212) 
-* 10405 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1213) 
-* 10406 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1214) 
-* 10407 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1215) 
-* 12528 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1641) should be ok for storage:
-* 12529 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1648) should NOT be ok for storage:
+* 10403 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1234) 
+* 10404 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1235) 
+* 10405 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1236) 
+* 10406 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1237) 
+* 10407 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1238) 
+* 12528 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1664) should be ok for storage:
+* 12529 [code](http://github.com/mongodb/mongo/blob/master/dbtests/jsobjtests.cpp#L1671) should NOT be ok for storage:
 
 
 dbtests/queryoptimizertests.cpp
 ----
-* 10408 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L552) throw
-* 10409 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L591) throw
-* 10410 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L710) throw
-* 10411 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L723) throw
+* 10408 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L558) throw
+* 10409 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L597) throw
+* 10410 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L716) throw
+* 10411 [code](http://github.com/mongodb/mongo/blob/master/dbtests/queryoptimizertests.cpp#L729) throw
 
 
 s/balance.cpp
@@ -1007,32 +1012,32 @@ s/chunk.cpp
 * 10163 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L124) can only handle numbers here - which i think is correct
 * 10165 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L261) can't split as shard doesn't have a manager
 * 10167 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L299) can't move shard to its current location!
-* 10169 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L408) datasize failed!" , conn->runCommand( "admin
+* 10169 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L417) datasize failed!" , conn->runCommand( "admin
 * 10170 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L64) Chunk needs a ns
 * 10171 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L67) Chunk needs a server
 * 10172 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L69) Chunk needs a min
 * 10173 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L70) Chunk needs a max
-* 10174 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L759) config servers not all up
-* 10412 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L386) 
+* 10174 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L768) config servers not all up
+* 10412 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L395) 
 * 13003 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L264) can't split a chunk with only one distinct value
-* 13141 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L646) Chunk map pointed to incorrect chunk
-* 13282 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L517) Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.
+* 13141 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L655) Chunk map pointed to incorrect chunk
+* 13282 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L526) Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.
 * 13327 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L65) Chunk ns must match server ns
-* 13331 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L757) collection's metadata is undergoing changes. Please try again.
+* 13331 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L766) collection's metadata is undergoing changes. Please try again.
 * 13332 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L262) need a split key to split chunk
 * 13333 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L263) can't split a chunk in that many parts
 * 13345 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L186) 
-* 13346 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L801) can't pre-split already splitted collection
-* 13405 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L725) min must have shard key
-* 13406 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L726) max must have shard key
-* 13501 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L671) use geoNear command rather than $near query
-* 13502 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L678) unrecognized special query type: 
+* 13346 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L816) can't pre-split already splitted collection
+* 13405 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L734) min must have shard key
+* 13406 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L735) max must have shard key
+* 13501 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L680) use geoNear command rather than $near query
+* 13502 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L687) unrecognized special query type: 
 * 13503 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L157) 
-* 13507 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L702) invalid chunk config minObj : 
-* 13592 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L609) 
-* 14022 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L754) Error locking distributed lock for chunk drop.
-* 8070 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L650) couldn't find a chunk which should be impossible: 
-* 8071 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L792) cleaning up after drop failed: 
+* 13507 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L711) invalid chunk config minObj: 
+* 13592 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L618) 
+* 14022 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L763) Error locking distributed lock for chunk drop.
+* 8070 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L659) couldn't find a chunk which should be impossible: 
+* 8071 [code](http://github.com/mongodb/mongo/blob/master/s/chunk.cpp#L806) cleaning up after drop failed: 
 
 
 s/client.cpp
@@ -1042,26 +1047,26 @@ s/client.cpp
 
 s/commands_public.cpp
 ----
-* 10418 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L260) how could chunk manager be null!
-* 10420 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L715) how could chunk manager be null!
-* 12594 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L483) how could chunk manager be null!
-* 13002 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L605) how could chunk manager be null!
-* 13091 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L780) how could chunk manager be null!
-* 13092 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L781) GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id
-* 13137 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L317) Source and destination collections must be on same shard
-* 13138 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L311) You can't rename a sharded collection
-* 13139 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L312) You can't rename to a sharded collection
-* 13140 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L310) Don't recognize source or target DB
-* 13343 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L608) query for sharded findAndModify must have shardkey
-* 13398 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L331) cant copy to sharded DB
-* 13399 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L339) need a fromdb argument
-* 13400 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L342) don't know where source DB is
-* 13401 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L343) cant copy from sharded DB
-* 13402 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L328) need a todb argument
-* 13407 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L637) how could chunk manager be null!
-* 13408 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L643) keyPattern must equal shard key
-* 13500 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L811) how could chunk manager be null!
-* 13512 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L263) drop collection attempted on non-sharded collection
+* 10418 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L264) how could chunk manager be null!
+* 10420 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L719) how could chunk manager be null!
+* 12594 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L487) how could chunk manager be null!
+* 13002 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L609) how could chunk manager be null!
+* 13091 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L784) how could chunk manager be null!
+* 13092 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L785) GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id
+* 13137 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L321) Source and destination collections must be on same shard
+* 13138 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L315) You can't rename a sharded collection
+* 13139 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L316) You can't rename to a sharded collection
+* 13140 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L314) Don't recognize source or target DB
+* 13343 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L612) query for sharded findAndModify must have shardkey
+* 13398 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L335) cant copy to sharded DB
+* 13399 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L343) need a fromdb argument
+* 13400 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L346) don't know where source DB is
+* 13401 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L347) cant copy from sharded DB
+* 13402 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L332) need a todb argument
+* 13407 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L641) how could chunk manager be null!
+* 13408 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L647) keyPattern must equal shard key
+* 13500 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L815) how could chunk manager be null!
+* 13512 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L267) drop collection attempted on non-sharded collection
 
 
 s/config.cpp
@@ -1131,7 +1136,7 @@ s/grid.cpp
 ----
 * 10185 [code](http://github.com/mongodb/mongo/blob/master/s/grid.cpp#L93) can't find a shard to put new db on
 * 10186 [code](http://github.com/mongodb/mongo/blob/master/s/grid.cpp#L107) removeDB expects db name
-* 10421 [code](http://github.com/mongodb/mongo/blob/master/s/grid.cpp#L439) getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime
+* 10421 [code](http://github.com/mongodb/mongo/blob/master/s/grid.cpp#L440) getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime
 
 
 s/request.cpp
@@ -1146,27 +1151,27 @@ s/request.cpp
 
 s/server.cpp
 ----
-* 10197 [code](http://github.com/mongodb/mongo/blob/master/s/server.cpp#L170) createDirectClient not implemented for sharding yet
+* 10197 [code](http://github.com/mongodb/mongo/blob/master/s/server.cpp#L187) createDirectClient not implemented for sharding yet
 
 
 s/shard.cpp
 ----
-* 13128 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L261) can't find shard for: 
+* 13128 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L118) can't find shard for: 
 * 13129 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L110) can't find shard for: 
-* 13136 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L303) 
+* 13136 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L306) 
 * 13632 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L39) couldn't get updated shard list from config server
-* 14807 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L246) no set name for shard: " << _name << " 
+* 14807 [code](http://github.com/mongodb/mongo/blob/master/s/shard.cpp#L254) no set name for shard: " << _name << " 
 
 
 s/shard_version.cpp
 ----
 * 10428 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L132) need_authoritative set but in authoritative mode already
-* 10429 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L150) 
+* 10429 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L155) 
 
 
 s/shardconnection.cpp
 ----
-* 13409 [code](http://github.com/mongodb/mongo/blob/master/s/shardconnection.cpp#L255) can't parse ns from: 
+* 13409 [code](http://github.com/mongodb/mongo/blob/master/s/shardconnection.cpp#L234) can't parse ns from: 
 
 
 s/shardkey.cpp
@@ -1187,23 +1192,23 @@ s/strategy.cpp
 
 s/strategy_shard.cpp
 ----
-* 10201 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L187) invalid update
-* 10203 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L287) bad delete message
-* 12376 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L243) 
-* 13123 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L230) 
-* 13465 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L202) shard key in upsert query must be an exact match
-* 13505 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L289) $atomic not supported sharded" , pattern["$atomic
-* 13506 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L186) $atomic not supported sharded" , query["$atomic
-* 14804 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L173) collection no longer sharded
-* 14805 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L313) collection no longer sharded
-* 14806 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L275) collection no longer sharded
+* 10201 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L205) invalid update
+* 10203 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L305) bad delete message
+* 12376 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L261) 
+* 13123 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L248) 
+* 13465 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L220) shard key in upsert query must be an exact match
+* 13505 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L307) $atomic not supported sharded" , pattern["$atomic
+* 13506 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L204) $atomic not supported sharded" , query["$atomic
+* 14804 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L184) collection no longer sharded
+* 14805 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L331) collection no longer sharded
+* 14806 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L293) collection no longer sharded
 * 8010 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L41) something is wrong, shouldn't see a command here
-* 8011 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L146) tried to insert object without shard key
-* 8012 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L196) can't upsert something without shard key
-* 8013 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L211) can't do non-multi update with query that doesn't have the shard key
-* 8014 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L238) 
-* 8015 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L318) can only delete with a non-shard key pattern if can delete as many as we find
-* 8016 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L346) can't do this write op on sharded collection
+* 8011 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L149) tried to insert object without shard key
+* 8012 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L214) can't upsert something without shard key
+* 8013 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L229) can't do non-multi update with query that doesn't have the shard key
+* 8014 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L256) 
+* 8015 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L336) can only delete with a non-shard key pattern if can delete as many as we find
+* 8016 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L364) can't do this write op on sharded collection
 
 
 s/strategy_single.cpp
@@ -1260,21 +1265,21 @@ scripting/engine_spidermonkey.cpp
 * 10215 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L323) not an object
 * 10216 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L332) not a function
 * 10217 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L389) can't append field.  name:" + name + " type: 
-* 10218 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L700) not done: toval
-* 10219 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L727) object passed to getPropery is null
-* 10220 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L818) don't know what to do with this op
-* 10221 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1079) JS_NewRuntime failed
-* 10222 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1087) assert not being executed
-* 10223 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1162) deleted SMScope twice?
-* 10224 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1220) already local connected
-* 10225 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1230) already setup for external db
-* 10226 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1232) connected to different db
-* 10227 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1301) unknown type
-* 10228 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1457)  exec failed: 
-* 10229 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1656) need a scope
-* 10431 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1138) JS_NewContext failed
-* 10432 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1145) JS_NewObject failed for global
-* 10433 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1147) js init failed
+* 10218 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L699) not done: toval
+* 10219 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L726) object passed to getPropery is null
+* 10220 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L817) don't know what to do with this op
+* 10221 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1143) JS_NewRuntime failed
+* 10222 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1151) assert not being executed
+* 10223 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1226) deleted SMScope twice?
+* 10224 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1284) already local connected
+* 10225 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1294) already setup for external db
+* 10226 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1296) connected to different db
+* 10227 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1365) unknown type
+* 10228 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1521)  exec failed: 
+* 10229 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1720) need a scope
+* 10431 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1202) JS_NewContext failed
+* 10432 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1209) JS_NewObject failed for global
+* 10433 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L1211) js init failed
 * 13072 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L36) JS_NewObject failed: 
 * 13076 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L153) recursive toObject
 * 13498 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_spidermonkey.cpp#L216) 
@@ -1284,16 +1289,16 @@ scripting/engine_spidermonkey.cpp
 
 scripting/engine_v8.cpp
 ----
-* 10230 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L442) can't handle external yet
-* 10231 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L487) not an object
-* 10232 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L549) not a func
-* 10233 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L659) 
-* 10234 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L686) 
-* 12509 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L450) don't know what this is: 
-* 12510 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L751) externalSetup already called, can't call externalSetup
-* 12511 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L755) localConnect called with a different name previously
-* 12512 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L777) localConnect already called, can't call externalSetup
-* 13475 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L669) 
+* 10230 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L462) can't handle external yet
+* 10231 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L507) not an object
+* 10232 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L569) not a func
+* 10233 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L679) 
+* 10234 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L706) 
+* 12509 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L470) don't know what this is: 
+* 12510 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L771) externalSetup already called, can't call externalSetup
+* 12511 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L775) localConnect called with a different name previously
+* 12512 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L797) localConnect already called, can't call externalSetup
+* 13475 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L689) 
 
 
 scripting/sm_db.cpp
@@ -1367,15 +1372,16 @@ util/alignedbuilder.cpp
 
 util/assert_util.h
 ----
-* 10437 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L215) unknown boost failed
-* 13294 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L213) 
-* 14043 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L224) 
-* 14044 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L226) unknown boost failed 
+* 10437 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L233) unknown boost failed
+* 123 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L74) blah
+* 13294 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L231) 
+* 14043 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L242) 
+* 14044 [code](http://github.com/mongodb/mongo/blob/master/util/assert_util.h#L244) unknown boost failed 
 
 
 util/background.cpp
 ----
-* 13643 [code](http://github.com/mongodb/mongo/blob/master/util/background.cpp#L49) backgroundjob already started: 
+* 13643 [code](http://github.com/mongodb/mongo/blob/master/util/background.cpp#L52) backgroundjob already started: 
 
 
 util/base64.cpp
