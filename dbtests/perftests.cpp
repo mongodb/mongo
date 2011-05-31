@@ -405,6 +405,29 @@ namespace PerfTests {
         }
     };
 
+    unsigned long long aaa;
+
+    class Timer : public B { 
+    public:
+        string name() { return "Timer"; }
+        virtual int howLongMillis() { return 1000; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            mongo::Timer t;
+            aaa += t.millis();
+        }
+    };
+
+    class CTM : public B { 
+    public:
+        string name() { return "curTimeMillis"; }
+        virtual int howLongMillis() { return 1000; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            aaa += curTimeMillis();
+        }
+    };
+
     class Bldr : public B { 
     public:
         int n;
@@ -705,6 +728,8 @@ namespace PerfTests {
             add< Dummy >();
             add< TLS >();
             add< Malloc >();
+            add< Timer >();
+            add< CTM >();
             add< KeyTest >();
             add< Bldr >();
             add< StkBldr >();
