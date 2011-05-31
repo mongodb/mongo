@@ -311,6 +311,24 @@ var p7 = db.runCommand(
     }}
 ]});
 
+var p7result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce6"),
+        "theSum" : 10
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "theSum" : 21
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "theSum" : 20
+    }
+];
+
+assert(arrayEq(p7.result, p7result), 'p7 failed');
+
+
 // dotted path inclusion; _id exclusion
 var p8 = db.runCommand(
 { aggregate : "article", pipeline : [
@@ -322,12 +340,120 @@ var p8 = db.runCommand(
     }}
 ]});
 
+var p8result = [
+    {
+        "author" : "bob",
+        "comments" : [
+            {
+                "author" : "joe"
+            },
+            {
+                "author" : "sam"
+            }
+        ],
+        "tag" : "fun"
+    },
+    {
+        "author" : "bob",
+        "comments" : [
+            {
+                "author" : "joe"
+            },
+            {
+                "author" : "sam"
+            }
+        ],
+        "tag" : "good"
+    },
+    {
+        "author" : "dave",
+        "comments" : [
+            {
+                "author" : "barbarella"
+            },
+            {
+                "author" : "leia"
+            }
+        ],
+        "tag" : "fun"
+    },
+    {
+        "author" : "dave",
+        "comments" : [
+            {
+                "author" : "barbarella"
+            },
+            {
+                "author" : "leia"
+            }
+        ],
+        "tag" : "nasty"
+    },
+    {
+        "author" : "jane",
+        "comments" : [
+            {
+                "author" : "r2"
+            },
+            {
+                "author" : "leia"
+            }
+        ],
+        "tag" : "nasty"
+    },
+    {
+        "author" : "jane",
+        "comments" : [
+            {
+                "author" : "r2"
+            },
+            {
+                "author" : "leia"
+            }
+        ],
+        "tag" : "filthy"
+    }
+];
+
+assert(arrayEq(p8.result, p8result), 'p8 failed');
+
 
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $match : { author : "dave" } }
 ]});
+
+var m1result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "title" : "this is your title",
+        "author" : "dave",
+        "posted" : ISODate("2011-05-31T20:02:32.256Z"),
+        "pageViews" : 7,
+        "tags" : [
+            "fun",
+            "nasty"
+        ],
+        "comments" : [
+            {
+                "author" : "barbarella",
+                "text" : "this is hot"
+            },
+            {
+                "author" : "leia",
+                "text" : "i prefer the brass bikini",
+                "votes" : 10
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    }
+];
+
+assert(arrayEq(m1.result, m1result), 'm1 failed');
+
 
 // combining matching with a projection
 var m2 = db.runCommand(
@@ -341,6 +467,46 @@ var m2 = db.runCommand(
     }},
     { $match : { tag : "nasty" } }
 ]});
+
+var m2result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "title" : "this is your title",
+        "author" : "dave",
+        "pageViews" : 7,
+        "comments" : [
+            {
+                "author" : "barbarella",
+                "text" : "this is hot"
+            },
+            {
+                "author" : "leia",
+                "text" : "i prefer the brass bikini",
+                "votes" : 10
+            }
+        ],
+        "tag" : "nasty"
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "title" : "this is some other title",
+        "author" : "jane",
+        "pageViews" : 6,
+        "comments" : [
+            {
+                "author" : "r2",
+                "text" : "beep boop"
+            },
+            {
+                "author" : "leia",
+                "text" : "this is too smutty"
+            }
+        ],
+        "tag" : "nasty"
+    }
+];
+
+assert(arrayEq(m2.result, m2result), 'm2 failed');
 
 
 // group by tag
@@ -357,6 +523,40 @@ var g1 = db.runCommand(
 	viewsByTag : { $sum : "$pageViews" }
     }}
 ]});
+
+var g1result = [
+    {
+        "_id" : {
+            "tag" : "filthy"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 6
+    },
+    {
+        "_id" : {
+            "tag" : "fun"
+        },
+        "docsByTag" : 2,
+        "viewsByTag" : 12
+    },
+    {
+        "_id" : {
+            "tag" : "good"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 5
+    },
+    {
+        "_id" : {
+            "tag" : "nasty"
+        },
+        "docsByTag" : 2,
+        "viewsByTag" : 13
+    }
+];
+
+assert(arrayEq(g1.result, g1result), 'g1 failed');
+
 
 // $max, and averaging in a final projection
 var g2 = db.runCommand(
@@ -382,6 +582,40 @@ var g2 = db.runCommand(
     }}
 ]});
 
+var g2result = [
+    {
+        "docsByTag" : 1,
+        "viewsByTag" : 6,
+        "mostViewsByTag" : 6,
+        "tag" : "filthy",
+        "avgByTag" : 6
+    },
+    {
+        "docsByTag" : 2,
+        "viewsByTag" : 12,
+        "mostViewsByTag" : 7,
+        "tag" : "fun",
+        "avgByTag" : 6
+    },
+    {
+        "docsByTag" : 1,
+        "viewsByTag" : 5,
+        "mostViewsByTag" : 5,
+        "tag" : "good",
+        "avgByTag" : 5
+    },
+    {
+        "docsByTag" : 2,
+        "viewsByTag" : 13,
+        "mostViewsByTag" : 7,
+        "tag" : "nasty",
+        "avgByTag" : 6.5
+    }
+];
+
+assert(arrayEq(g2.result, g2result), 'g2 failed');
+
+
 // $push as an accumulator; can pivot data
 var g3 = db.runCommand(
 { aggregate : "article", pipeline : [
@@ -394,6 +628,46 @@ var g3 = db.runCommand(
 	authors : { $push : "$author" }
     }}
 ]});
+
+var g3result = [
+    {
+        "_id" : {
+            "tag" : "filthy"
+        },
+        "authors" : [
+            "jane"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "fun"
+        },
+        "authors" : [
+            "bob",
+            "dave"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "good"
+        },
+        "authors" : [
+            "bob"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "nasty"
+        },
+        "authors" : [
+            "dave",
+            "jane"
+        ]
+    }
+];
+
+assert(arrayEq(g3.result, g3result), 'g3 failed');
+
 
 // $avg, and averaging in a final projection
 var g4 = db.runCommand(
@@ -410,3 +684,40 @@ var g4 = db.runCommand(
 	avgByTag : { $avg : "$pageViews" },
     }}
 ]});
+
+var g4result = [
+    {
+        "_id" : {
+            "tag" : "filthy"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 6,
+        "avgByTag" : 6
+    },
+    {
+        "_id" : {
+            "tag" : "fun"
+        },
+        "docsByTag" : 2,
+        "viewsByTag" : 12,
+        "avgByTag" : 6
+    },
+    {
+        "_id" : {
+            "tag" : "good"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 5,
+        "avgByTag" : 5
+    },
+    {
+        "_id" : {
+            "tag" : "nasty"
+        },
+        "docsByTag" : 2,
+        "viewsByTag" : 13,
+        "avgByTag" : 6.5
+    }
+];
+
+assert(arrayEq(g4.result, g4result), 'g4 failed');
