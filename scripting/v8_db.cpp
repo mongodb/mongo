@@ -82,7 +82,29 @@ namespace mongo {
         v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(uuidInit);
         templ->InstanceTemplate()->SetInternalFieldCount(1);
         v8::Local<v8::Template> proto = templ->PrototypeTemplate();
-        scope->injectV8Function("toString", uuidToString, proto);
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return templ;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getMD5FunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(md5Init);
+        templ->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return templ;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getHexDataFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(hexDataInit);
+        templ->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
         return templ;
     }
 
@@ -140,6 +162,8 @@ namespace mongo {
 
         global->Set( scope->getV8Str("BinData") , getBinDataFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("UUID") , getUUIDFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("MD5") , getMD5FunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("HexData") , getHexDataFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("NumberLong") , getNumberLongFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("Timestamp") , getTimestampFunctionTemplate(scope)->GetFunction() );
 
@@ -751,39 +775,61 @@ namespace mongo {
         return v8::String::New(ss.str().c_str());
     }
 
-    v8::Handle<v8::Value> uuidInit( V8Scope* scope, const v8::Arguments& args ) {
-        v8::Local<v8::Object> it = args.This();
-
-        if (args.Length() != 1) {
-            return v8::ThrowException( v8::String::New( "UUIS needs 1 argument" ) );
-        }
-        v8::String::Utf8Value utf( args[ 0 ] );
-        string encoded = *utf;
-        if( encoded.size() != 32 ) {
-            return v8::ThrowException( v8::String::New( "UUIS string must have 32 characters" ) );
-        }
-
-        char* data = new char[16];
-        const char* src = encoded.c_str();
+    static v8::Handle<v8::Value> hexToBinData( V8Scope* scope, v8::Local<v8::Object> it, int type, string hexstr ) {
+        int len = hexstr.length() / 2;
+        char* data = new char[len];
+        const char* src = hexstr.c_str();
         for( int i = 0; i < 16; i++ ) {
             data[i] = fromHex(src + i * 2);
         }
 
-        it->Set( scope->getV8Str( "len" ) , v8::Number::New(16) );
-        it->Set( scope->getV8Str( "type" ) , v8::Number::New(3) );
+        it->Set( scope->V8STR_LEN , v8::Number::New(len) );
+        it->Set( scope->V8STR_TYPE , v8::Number::New(type) );
         it->SetHiddenValue( scope->V8STR_BINDATA, v8::Number::New( 1 ) );
         Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
         return res;
     }
 
-    v8::Handle<v8::Value> uuidToString( V8Scope* scope, const v8::Arguments& args ) {
-        v8::Handle<v8::Object> it = args.This();
-        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
-        char* data = (char*)(c->Value());
+    v8::Handle<v8::Value> uuidInit( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 1) {
+            return v8::ThrowException( v8::String::New( "UUIS needs 1 argument" ) );
+        }
+        v8::String::Utf8Value utf( args[ 0 ] );
+        if( utf.length() != 32 ) {
+            return v8::ThrowException( v8::String::New( "UUIS string must have 32 characters" ) );
+        }
 
-        stringstream ss;
-        ss << "UUID(\"" << toHex(data, 16) << "\")";
-        return v8::String::New( ss.str().c_str() );
+        return hexToBinData(scope, args.This(), bdtUUID, *utf);
+    }
+
+//    v8::Handle<v8::Value> uuidToString( V8Scope* scope, const v8::Arguments& args ) {
+//        v8::Handle<v8::Object> it = args.This();
+//        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+//        char* data = (char*)(c->Value());
+//
+//        stringstream ss;
+//        ss << "UUID(\"" << toHex(data, 16) << "\")";
+//        return v8::String::New( ss.str().c_str() );
+//    }
+
+    v8::Handle<v8::Value> md5Init( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 1) {
+            return v8::ThrowException( v8::String::New( "MD5 needs 1 argument" ) );
+        }
+        v8::String::Utf8Value utf( args[ 0 ] );
+        if( utf.length() != 32 ) {
+            return v8::ThrowException( v8::String::New( "MD5 string must have 32 characters" ) );
+        }
+
+        return hexToBinData(scope, args.This(), MD5Type, *utf);
+    }
+
+    v8::Handle<v8::Value> hexDataInit( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 2) {
+            return v8::ThrowException( v8::String::New( "HexData needs 2 arguments" ) );
+        }
+        v8::String::Utf8Value utf( args[ 1 ] );
+        return hexToBinData(scope, args.This(), args[0]->IntegerValue(), *utf);
     }
 
     v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args ) {

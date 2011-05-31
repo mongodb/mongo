@@ -7,6 +7,7 @@ m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "
 
 db1 = m.getDB( baseName )
 db2 = m.getDB( baseName + '_other' )
+admin = m.getDB( 'admin' )
 
 // auth not yet checked since we are on localhost
 db1.addUser( "foo", "bar" );
@@ -17,21 +18,21 @@ db1.a.save({});
 assert.eq(db1.a.count(), 1);
 
 //this makes auth required on localhost
-m.getDB('admin').addUser('not', 'used');
+admin.addUser('not', 'used');
 
 // can't run same db w/o auth
-assert.commandFailed( db1.adminCommand({renameCollection:db1.a.getFullName(), to: db1.b.getFullName()}) );
+assert.commandFailed( admin.runCommand({renameCollection:db1.a.getFullName(), to: db1.b.getFullName()}) );
 
 // can run same db with auth
 db1.auth('foo', 'bar')
-assert.commandWorked( db1.adminCommand({renameCollection:db1.a.getFullName(), to: db1.b.getFullName()}) );
+assert.commandWorked( admin.runCommand({renameCollection:db1.a.getFullName(), to: db1.b.getFullName()}) );
 
 // can't run diff db w/o auth
-assert.commandFailed( db1.adminCommand({renameCollection:db1.b.getFullName(), to: db2.a.getFullName()}) );
+assert.commandFailed( admin.runCommand({renameCollection:db1.b.getFullName(), to: db2.a.getFullName()}) );
 
 // can run diff db with auth
 db2.auth('bar', 'foo');
-assert.commandWorked(  db1.adminCommand({renameCollection:db1.b.getFullName(), to: db2.a.getFullName()}) );
+assert.commandWorked( admin.runCommand({renameCollection:db1.b.getFullName(), to: db2.a.getFullName()}) );
 
 // test post conditions
 assert.eq(db1.a.count(), 0);
