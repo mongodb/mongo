@@ -25,13 +25,14 @@ __wt_row_key(
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
-	bitstr_t *ovfl;
-	uint32_t pfx, slot;
+	uint32_t pfx;
 	uint8_t type;
-	int is_ovfl, is_local, ret, slot_offset;
+	int is_local, is_ovfl, ret, slot_offset;
 	void *key;
 
 	dsk = page->dsk;
+	type = page->type;
+
 	WT_CLEAR(build);
 	WT_CLEAR(tmp);
 
@@ -48,32 +49,14 @@ __wt_row_key(
 	}
 
 	/*
-	 * Set up references to the different page structures.
-	 *
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
-	 */
-	type = page->type;
-	switch (page->type) {
-	case WT_PAGE_ROW_INT:
-		slot = WT_ROW_REF_SLOT(page, row_arg);
-		ovfl = page->u.row_int.ovfl;
-		break;
-	case WT_PAGE_ROW_LEAF:
-		slot = WT_ROW_SLOT(page, row_arg);
-		ovfl = page->u.row_leaf.ovfl;
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
-	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures.  It's simpler to just
 	 * step both pointers back through the structure, and use the page type
 	 * when we actually indirect through one of them so we don't use the
 	 * one that's pointing into random memory.
 	 */
+	is_ovfl = 0;
 	direction = BACKWARD;
-	for (is_ovfl = slot_offset = 0, rref = row_arg, rip = row_arg;;) {
+	for (slot_offset = 0, rref = row_arg, rip = row_arg;;) {
 		/*
 		 * Multiple threads of control may be searching this page, which
 		 * means the key may change underfoot, and here's where it gets
@@ -127,9 +110,9 @@ __wt_row_key(
 			 * To summarize, in both cases, take a copy of the key
 			 * and roll forward.
 			 */
+			ikey = key;
 			if (slot_offset == 0 ||
-			    ovfl == NULL || !bit_test(ovfl, slot)) {
-				ikey = key;
+			    !F_ISSET(ikey, WT_IKEY_OVERFLOW)) {
 				WT_ERR(__wt_buf_set(session,
 				    retb, WT_IKEY_DATA(ikey), ikey->size));
 				if (slot_offset == 0)
@@ -242,24 +225,29 @@ next:		switch (direction) {
 	__wt_buf_free(session, &tmp);
 
 	/*
-	 * If a return buffer was specified, the caller just wants a copy,
+	 * If a return buffer was specified, the caller just wants a copy and
 	 * no further work is needed.
 	 */
 	if (!is_local)
 		return (0);
 
+	/*
+	 * Allocate and initialize a WT_IKEY structure, we're instantiating
+	 * this key.
+	 */
 	WT_ERR(__wt_row_ikey_alloc(session, retb->data, retb->size, &ikey));
 	if ((cell = __wt_row_value(page, row_arg)) == NULL)
 		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
 	else
 		ikey->value_cell_offset = WT_PAGE_DISK_OFFSET(dsk, cell);
+	if (is_ovfl)
+		F_SET(ikey, WT_IKEY_OVERFLOW);
 	__wt_buf_free(session, &tmp);
 
 	/* Serialize the swap of the key into place. */
-	__wt_row_key_serial(
-	    session, page, row_arg, ikey, is_ovfl ? ovfl : NULL, slot, ret);
+	__wt_row_key_serial(session, page, row_arg, ikey, ret);
 
-	/* Free the allocated memory if the workQ didn't use it for the key. */
+	/* Free the WT_IKEY structure if the workQ didn't use it for the key. */
 	if (((WT_ROW *)row_arg)->key != ikey)
 		__wt_sb_decrement(session, ikey->sb);
 
@@ -353,10 +341,8 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_ROW *rip;
-	bitstr_t *ovfl;
-	uint32_t slot;
 
-	__wt_row_key_unpack(session, page, rip, ikey, ovfl, slot);
+	__wt_row_key_unpack(session, page, rip, ikey);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler
@@ -366,11 +352,9 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
 	 * is a void *.
 	 */
-	if (!__wt_off_page(page, rip->key)) {
-		if (ovfl != NULL)		/* WRONG BUT GOING AWAY */
-			bit_set(ovfl, (int)slot);
+	if (!__wt_off_page(page, rip->key))
 		rip->key = ikey;
-	}
+
 	__wt_session_serialize_wrapup(session, NULL, 0);
 	return (0);
 }

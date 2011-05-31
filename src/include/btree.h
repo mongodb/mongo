@@ -284,12 +284,10 @@ struct __wt_page {
 		/* Row-store internal information. */
 		struct {
 			WT_ROW_REF *t;		/* Subtrees */
-			bitstr_t   *ovfl;	/* Bit marking overflow keys */
 		} row_int;
 
 		struct {
-			WT_ROW	   *d;		/* K/V pairs */
-			bitstr_t   *ovfl;	/* Bit marking overflow keys */
+			WT_ROW	   *d;		/* K/V object pairs */
 			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
@@ -459,6 +457,14 @@ struct __wt_ikey {
 #define	WT_IKEY_VALUE_EMPTY		0
 #define	WT_IKEY_VALUE_EMPTY_ISSET(ikey)	((ikey)->value_cell_offset == 0)
 	uint32_t  value_cell_offset;
+
+	/*
+	 * We need to know if instantiated keys were instantiated from overflow
+	 * records because overflow records aren't prefix compressed, and so do
+	 * not give us a record from which we can roll forward.
+	 */
+#define	WT_IKEY_OVERFLOW		0x01
+	uint8_t  flags;
 
 	/* The key bytes immediately follows the WT_IKEY structure. */
 #define	WT_IKEY_DATA(ikey)						\

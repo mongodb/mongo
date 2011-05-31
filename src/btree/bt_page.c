@@ -291,7 +291,6 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, nindx;
-	int need_ovfl;
 
 	dsk = page->dsk;
 
@@ -309,13 +308,10 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
 	 * are WT_CELL_OFF items.
 	 */
-	need_ovfl = 0;
 	rref = page->u.row_int.t;
 	WT_CELL_FOREACH(dsk, cell, i)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
-			need_ovfl = 1;
-			/* FALLTHROUGH */
 		case WT_CELL_KEY:
 			rref->key = cell;
 			break;
@@ -327,9 +323,6 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
-
-	if (need_ovfl)
-		WT_RET(bit_alloc(session, nindx, &page->u.row_int.ovfl));
 
 	page->entries = nindx;
 	return (0);
@@ -346,7 +339,6 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
-	int need_ovfl;
 
 	dsk = page->dsk;
 
@@ -367,13 +359,10 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * (WT_CELL_DATA) or overflow (WT_CELL_DATA_OVFL) item.
 	 */
 	nindx = 0;
-	need_ovfl = 0;
 	rip = page->u.row_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, i)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
-			need_ovfl = 1;
-			/* FALLTHROUGH */
 		case WT_CELL_KEY:
 			++nindx;
 			if (rip->key != NULL)
@@ -385,10 +374,6 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
-
-	/* Allocate the bit array for overflow keys. */
-	if (need_ovfl)
-		WT_RET(bit_alloc(session, nindx, &page->u.row_leaf.ovfl));
 
 	page->entries = nindx;
 	return (0);
