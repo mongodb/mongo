@@ -40,6 +40,8 @@ namespace mongo {
         pair<string,unsigned> max("",0);
         vector<string> drainingShards;
 
+        bool maxOpsQueued = false;
+
         for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
 
             // Find whether this shard's capacity or availability are exhausted
@@ -75,6 +77,7 @@ namespace mongo {
             // Draining shards take a lower priority than overloaded shards.
             if ( size > max.second ) {
                 max = make_pair( shard , size );
+                maxOpsQueued = opsQueued;
             }
             if ( draining && (size > 0)) {
                 drainingShards.push_back( shard );
@@ -85,6 +88,11 @@ namespace mongo {
         // draining, ... -- there's not much that the policy can do.
         if ( min.second == numeric_limits<unsigned>::max() ) {
             log() << "no available shards to take chunks" << endl;
+            return NULL;
+        }
+
+        if ( maxOpsQueued ) {
+            log() << "biggest shard has unprocessed writebacks, waiting for completion of migrate" << endl;
             return NULL;
         }
 
