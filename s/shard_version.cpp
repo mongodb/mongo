@@ -97,7 +97,9 @@ namespace mongo {
         const bool isSharded = conf->isSharded( ns );
         if ( isSharded ) {
             manager = conf->getChunkManager( ns , authoritative );
-            officialSequenceNumber = manager->getSequenceNumber();
+            // It's possible the chunk manager was reset since we checked whether sharded was true,
+            // so must check this here.
+            if( manager ) officialSequenceNumber = manager->getSequenceNumber();
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
@@ -109,7 +111,7 @@ namespace mongo {
 
 
         ShardChunkVersion version = 0;
-        if ( isSharded ) {
+        if ( isSharded && manager ) {
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
