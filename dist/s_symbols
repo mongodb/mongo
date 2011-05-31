@@ -1,0 +1,34 @@
+#! /bin/sh
+
+# Check for illegal external symbols.
+#
+t=__a.c
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# We require GNU nm which may not be installed.  Be silent on this error
+# there's no need to annoy people.
+type nm > /dev/null 2>&1 &&
+    nm --version | grep 'GNU nm' > /dev/null 2>&1 || {
+	echo 'skipped: GNU nm not found'
+	return 0
+}
+
+# This check would normally be done after the library is built, but this way
+# we don't forget about a symbol during development.   Check the previously
+# built library, if it exists.
+f=../build_posix/libwiredtiger.a
+test -f $f || {
+	echo "skipped: libwiredtiger.a not found"
+	return 0
+}
+
+(cat s_symbols.list &&
+nm --extern-only --defined-only --print-file-name $f |
+sed 's/.* //' |
+egrep -v '^__wt') |
+sort |
+uniq -u > $t
+
+test -s $t && cat $t
+
+exit 0
