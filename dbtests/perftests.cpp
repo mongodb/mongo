@@ -146,7 +146,10 @@ namespace PerfTests {
             const char *fn = "../../settings.py";
             static bool ok = true;
             if( ok ) {
-                if( !exists(fn) ) { 
+                DEV { 
+                    // no writing to perf db if dev
+                }
+                else if( !exists(fn) ) { 
                     cout << "no ../../settings.py file found. will not write perf stats to db" << endl;
                 }
                 else {
@@ -260,7 +263,7 @@ namespace PerfTests {
             int hlm = howLongMillis();
             DEV { 
                 // don't run very long with _DEBUG - not very meaningful anyway on that build
-                hlm = min(hlm, 1000);
+                hlm = min(hlm, 500);
             }
 
             dur::stats._intervalMicros = 0; // no auto rotate
@@ -287,7 +290,9 @@ namespace PerfTests {
             say(n, ms, name());
 
             int etm = expectationTimeMillis();
-            if( etm > 0 ) { 
+            DEV { 
+            }
+            else if( etm > 0 ) { 
                 if( ms > etm*2 ) { 
                     cout << "test  " << name() << " seems slow expected ~" << etm << "ms" << endl;
                 }
