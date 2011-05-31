@@ -158,6 +158,8 @@ client/parallel.cpp
 * 13431 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L395) have to have sort key in projection and removing it
 * 13633 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L109) error querying server: 
 * 14047 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L470) error querying server: 
+* 14812 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L583) Error running command on server: 
+* 14813 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L584) Command returned nothing
 
 
 client/syncclusterconnection.cpp
@@ -258,10 +260,10 @@ db/commands/distinct.cpp
 
 db/commands/find_and_modify.cpp
 ----
-* 12515 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L87) can't remove and update", cmdObj["update
-* 12516 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L119) must specify remove or update
-* 13329 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L64) upsert mode requires update field
-* 13330 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L65) upsert mode requires query field
+* 12515 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L94) can't remove and update", cmdObj["update
+* 12516 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L126) must specify remove or update
+* 13329 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L71) upsert mode requires update field
+* 13330 [code](http://github.com/mongodb/mongo/blob/master/db/commands/find_and_modify.cpp#L72) upsert mode requires query field
 
 
 db/commands/group.cpp
@@ -1165,8 +1167,8 @@ s/shard.cpp
 
 s/shard_version.cpp
 ----
-* 10428 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L132) need_authoritative set but in authoritative mode already
-* 10429 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L155) 
+* 10428 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L134) need_authoritative set but in authoritative mode already
+* 10429 [code](http://github.com/mongodb/mongo/blob/master/s/shard_version.cpp#L157) 
 
 
 s/shardconnection.cpp
@@ -1234,6 +1236,11 @@ s/writeback_listener.cpp
 * 14041 [code](http://github.com/mongodb/mongo/blob/master/s/writeback_listener.cpp#L100) got writeback waitfor for older id 
 
 
+scripting/bench.cpp
+----
+* 14811 [code](http://github.com/mongodb/mongo/blob/master/scripting/bench.cpp#L92) invalid bench dynamic piece: 
+
+
 scripting/engine.cpp
 ----
 * 10206 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine.cpp#L83) 
@@ -1289,16 +1296,16 @@ scripting/engine_spidermonkey.cpp
 
 scripting/engine_v8.cpp
 ----
-* 10230 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L462) can't handle external yet
-* 10231 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L507) not an object
-* 10232 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L569) not a func
-* 10233 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L679) 
-* 10234 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L706) 
-* 12509 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L470) don't know what this is: 
-* 12510 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L771) externalSetup already called, can't call externalSetup
-* 12511 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L775) localConnect called with a different name previously
-* 12512 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L797) localConnect already called, can't call externalSetup
-* 13475 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L689) 
+* 10230 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L490) can't handle external yet
+* 10231 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L535) not an object
+* 10232 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L597) not a func
+* 10233 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L707) 
+* 10234 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L734) 
+* 12509 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L498) don't know what this is: 
+* 12510 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L799) externalSetup already called, can't call externalSetup
+* 12511 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L803) localConnect called with a different name previously
+* 12512 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L825) localConnect already called, can't call externalSetup
+* 13475 [code](http://github.com/mongodb/mongo/blob/master/scripting/engine_v8.cpp#L717) 
 
 
 scripting/sm_db.cpp
