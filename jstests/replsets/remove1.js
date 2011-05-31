@@ -16,7 +16,7 @@ var host = getHostName();
 
 
 print("Start set with three nodes");
-var replTest = new ReplSetTest( {name: name, nodes: 3} );
+var replTest = new ReplSetTest( {name: name, nodes: 2} );
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
@@ -32,7 +32,6 @@ print("Remove slaves");
 var config = replTest.getReplSetConfig();
 
 config.members.pop();
-config.members.pop();
 config.version = 2;
 assert.soon(function() {
         try {
@@ -44,31 +43,20 @@ assert.soon(function() {
 
         reconnect(master);
         reconnect(replTest.nodes[1]);
-        reconnect(replTest.nodes[2]);
         var c = master.getDB("local").system.replset.findOne();
         return c.version == 2;
     });
 
 print("make sure 1 & 2 are dead before continuing");
 assert.soon(function() {
-        var node1 = false;
-        var node2 = false;
         try {
             replTest.nodes[1].getDB("foo").stats();
         }
         catch (e) {
             print(e);
-            node1 = true;
+            return true;
         }
-        try {
-            replTest.nodes[2].getDB("foo").stats();
-        }
-        catch (e) {
-            print(e);
-            node2 = true;
-        }
-        print("node1: "+node1+" node2: "+node2);
-        return node1 && node2;
+        return false;
     });
 
 
@@ -76,17 +64,12 @@ print("clear slave ports");
 // these are already down, but this clears their ports from memory so that they
 // can be restarted later
 replTest.stop(1);
-replTest.stop(2);
 
 print("Bring slave1 back up");
 replTest.restart(1, {"fastsync":null});
 
-print("Bring slave2 back up");
-replTest.restart(2, {"fastsync":null});
-
-print("Add them back as slaves");
+print("Add it back as a slave");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
-config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
 config.version = 3;
 printjson(config);
 wait(function() {
@@ -112,12 +95,12 @@ wait(function() {
     occasionally(function() {
         printjson(status);
       });
-    
-    if (!status.members || status.members.length != 3) {
+
+    if (!status.members || status.members.length != 2) {
       return false;
     }
 
-    for (var i = 0; i<3; i++) {
+    for (var i = 0; i<2; i++) {
       if (status.members[i].state != 1 && status.members[i].state != 2) {
         return false;
       }
