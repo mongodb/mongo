@@ -286,8 +286,8 @@ namespace mongo {
             string _db;
             BSONObj _cmd;
             DBClientBase * _conn;
+            scoped_ptr<ScopedDbConnection> _connHolder; // used if not provided a connection
 
-            scoped_ptr<boost::thread> _thr;
             scoped_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
@@ -297,7 +297,6 @@ namespace mongo {
             friend class Future;
         };
 
-        static void commandThread(shared_ptr<CommandResult> res);
         
         /**
          * @param server server name

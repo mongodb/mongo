@@ -550,58 +550,54 @@ namespace mongo {
     // ---- Future -----
     // -----------------
 
-    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
-        _server = server;
-        _db = db;
-        _cmd = cmd;
-        _conn = conn;
-        _done = false;
+    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn )
+        :_server(server) ,_db(db) ,_cmd(cmd) ,_conn(conn) ,_done(false)
+    {
+        try {
+            if ( ! _conn ){
+                _connHolder.reset( new ScopedDbConnection( _server ) );
+                _conn = _connHolder->get();
+            }
+            
+            _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1/*limit*/, 0, NULL, 0, 0));
+            _cursor->initLazy();
+        }
+        catch ( std::exception& e ) {
+            error() << "Future::spawnComand (part 1) exception: " << e.what() << endl;
+            _ok = false;
+            _done = true;
+        }
     }
 
     bool Future::CommandResult::join() {
-        _thr->join();
-        assert( _done );
-        return _ok;
-    }
-
-    void Future::commandThread(shared_ptr<CommandResult> res) {
-        setThreadName( "future" );
+        if (_done)
+            return _ok;
 
         try {
-            DBClientBase * conn = res->_conn;
-            
-            scoped_ptr<ScopedDbConnection> myconn;
-            if ( ! conn ){
-                myconn.reset( new ScopedDbConnection( res->_server ) );
-                conn = myconn->get();
-            }
-            
-            res->_cursor.reset( new DBClientCursor(conn, res->_db + ".$cmd", res->_cmd, -1/*limit*/, 0, NULL, 0, 0));
-            res->_cursor->initLazy();
-            //TODO: return here and resume later
+            bool finished = _cursor->initLazyFinish();
 
-            bool finished = res->_cursor->initLazyFinish();
-            uassert(14812,  str::stream() << "Error running command on server: " << res->_server, finished);
-            massert(14813, "Command returned nothing", res->_cursor->more());
+            // Shouldn't need to communicate with server any more
+            if ( _connHolder )
+                _connHolder->done();
 
-            res->_res = res->_cursor->nextSafe();
-            res->_ok = res->_res["ok"].trueValue();
+            uassert(14812,  str::stream() << "Error running command on server: " << _server, finished);
+            massert(14813, "Command returned nothing", _cursor->more());
 
-            if ( myconn )
-                myconn->done();
+            _res = _cursor->nextSafe();
+            _ok = _res["ok"].trueValue();
 
         }
         catch ( std::exception& e ) {
-            error() << "Future::commandThread exception: " << e.what() << endl;
-            res->_ok = false;
+            error() << "Future::spawnComand (part 2) exception: " << e.what() << endl;
+            _ok = false;
         }
-        res->_done = true;
+
+        _done = true;
+        return _ok;
     }
 
     shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
         shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , conn  ));
-        res->_thr.reset( new boost::thread( boost::bind(Future::commandThread, res) ) );
-
         return res;
     }
 
