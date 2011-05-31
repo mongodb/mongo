@@ -466,6 +466,24 @@ namespace mongo {
     private:
         ExpressionFieldPath(const string &fieldPath);
 
+	/*
+	  Internal implementation of evaluate(), used recursively.
+
+	  The internal implementation doesn't just use a loop because of
+	  the possibility that we need to skip over an array.  If the path
+	  is "a.b.c", and a is an array, then we fan out from there, and
+	  traverse "b.c" for each element of a:[...].  This requires that
+	  a be an array of objects in order to navigate more deeply.
+
+	  @param index current path field index to extract
+	  @param pathLength maximum number of fields on field path
+	  @param pDocument current document traversed to (not the top-level one)
+	  @returns the field found; could be an array
+	 */
+	shared_ptr<const Value> ExpressionFieldPath::evaluatePath(
+	    size_t index, const size_t pathLength,
+	    shared_ptr<Document> pDocument) const;
+
 	FieldPath fieldPath;
     };
 

@@ -1235,42 +1235,65 @@ namespace mongo {
 	return shared_from_this();
     }
 
+    shared_ptr<const Value> ExpressionFieldPath::evaluatePath(
+	size_t index, const size_t pathLength,
+	shared_ptr<Document> pDocument) const {
+        shared_ptr<const Value> pValue; /* the return value */
+
+	pValue = pDocument->getValue(fieldPath.getFieldName(index));
+
+	/* if the field doesn't exist, quit with an undefined value */
+	if (!pValue.get())
+	    return Value::getUndefined();
+
+	/* if we've hit the end of the path, stop */
+	++index;
+	if (index >= pathLength)
+	    return pValue;
+
+	/*
+	  We're diving deeper.  If the value was null, return null.
+	*/
+	BSONType type = pValue->getType();
+	if ((type == Undefined) || (type == jstNULL))
+	    return Value::getUndefined();
+
+	if (type == Object) {
+	    /* extract from the next level down */
+	    return evaluatePath(index, pathLength, pValue->getDocument());
+	}
+
+	if (type == Array) {
+	    /*
+	      We're going to repeat this for each member of the array,
+	      building up a new array as we go.
+	    */
+	    vector<shared_ptr<const Value> > result;
+	    shared_ptr<ValueIterator> pIter(pValue->getArray());
+	    while(pIter->more()) {
+		shared_ptr<const Value> pItem(pIter->next());
+		BSONType iType = pItem->getType();
+		if ((iType == Undefined) || (iType == jstNULL)) {
+		    result.push_back(pItem);
+		    continue;
+		}
+
+		assert(iType == Object); // CW TODO error, can't navigate this
+		shared_ptr<const Value> itemResult(
+		    evaluatePath(index, pathLength, pItem->getDocument()));
+		result.push_back(itemResult);
+	    }
+
+	    return Value::createArray(result);
+	}
+
+	assert(false); // CW TODO user error:  must be a document
+	return shared_ptr<const Value>();
+    }
+
     shared_ptr<const Value> ExpressionFieldPath::evaluate(
         const shared_ptr<Document> &pDocument) const {
-
-	/* figure out where to start the path traversal */
-	shared_ptr<Document> pLocal(pDocument);
-
-	/* start walking down the path */
-        shared_ptr<const Value> pValue; /* the return value */
-        const size_t n = fieldPath.getPathLength();
-        size_t i = 0;
-        while(true) {
-            pValue = pLocal->getValue(fieldPath.getFieldName(i));
-
-            /* if the field doesn't exist, quit with an undefined value */
-            if (!pValue.get())
-                return Value::getUndefined();
-
-            /* if we've hit the end of the path, stop */
-            ++i;
-            if (i >= n)
-                break;
-
-            /*
-              We're diving deeper.  If the value was null, return null.
-            */
-            BSONType type = pValue->getType();
-	    if ((type == Undefined) || (type == jstNULL))
-		return Value::getUndefined();
-            if (type != Object)
-                assert(false); // CW TODO user error:  must be a document
-
-            /* Extract from the next level down */
-            pLocal = pValue->getDocument();
-        }
-
-        return pValue;
+	return evaluatePath(0, fieldPath.getPathLength(), pDocument);
     }
 
     void ExpressionFieldPath::addToBsonObj(

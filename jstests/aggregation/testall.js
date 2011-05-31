@@ -418,6 +418,43 @@ var p8result = [
 assert(arrayEq(p8.result, p8result), 'p8 failed');
 
 
+// collapse a dotted path with an intervening array
+var p9 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	_id : 0,
+	author : 1,
+	commentsAuthor : "comments.author"
+    }}
+]});
+
+var p9result = [
+    {
+        "author" : "bob",
+        "commentsAuthor" : [
+            "joe",
+            "sam"
+        ]
+    },
+    {
+        "author" : "dave",
+        "commentsAuthor" : [
+            "barbarella",
+            "leia"
+        ]
+    },
+    {
+        "author" : "jane",
+        "commentsAuthor" : [
+            "r2",
+            "leia"
+        ]
+    }
+];
+
+assert(arrayEq(p9.result, p9result), 'p9 failed');
+
+
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
