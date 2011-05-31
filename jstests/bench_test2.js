@@ -38,5 +38,5 @@ print( "Std: " + std )
 print( "Min: " + min )
 print( "Max: " + max )
 
-assert( std < 100 );
+assert( std < avg/2 );
 
