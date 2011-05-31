@@ -288,6 +288,7 @@ namespace mongo {
             DBClientBase * _conn;
 
             scoped_ptr<boost::thread> _thr;
+            scoped_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
             bool _ok;

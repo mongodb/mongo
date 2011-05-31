@@ -576,7 +576,16 @@ namespace mongo {
                 conn = myconn->get();
             }
             
-            res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
+            res->_cursor.reset( new DBClientCursor(conn, res->_db + ".$cmd", res->_cmd, -1/*limit*/, 0, NULL, 0, 0));
+            res->_cursor->initLazy();
+            //TODO: return here and resume later
+
+            bool finished = res->_cursor->initLazyFinish();
+            uassert(14812,  str::stream() << "Error running command on server: " << res->_server, finished);
+            massert(14813, "Command returned nothing", res->_cursor->more());
+
+            res->_res = res->_cursor->nextSafe();
+            res->_ok = res->_res["ok"].trueValue();
 
             if ( myconn )
                 myconn->done();
