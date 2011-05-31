@@ -57,6 +57,73 @@ namespace mongo {
         bool error;
     };
 
+    static bool _hasSpecial( const BSONObj& obj ) {
+        BSONObjIterator i( obj );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.fieldName()[0] == '#' )
+                return true;
+            
+            if ( ! e.isABSONObj() )
+                continue;
+            
+            if ( _hasSpecial( e.Obj() ) )
+                return true;
+        }
+        return false;
+    }
+    
+    static void _fixField( BSONObjBuilder& b , const BSONElement& e ) {
+        assert( e.type() == Object );
+        
+        BSONObj sub = e.Obj();
+        assert( sub.nFields() == 1 );
+        
+        BSONElement f = sub.firstElement();
+        if ( str::equals( "#RAND_INT" , f.fieldName() ) ) {
+            BSONObjIterator i( f.Obj() );
+            int min = i.next().numberInt();
+            int max = i.next().numberInt();
+            
+            int x = min + ( rand() % ( max - min ) );
+            b.append( e.fieldName() , x );
+        }
+        else {
+            uasserted( 14811 , str::stream() << "invalid bench dynamic piece: " << f.fieldName() );
+        }
+        
+    } 
+    
+    static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
+        BSONObjIterator i( obj );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            
+            if ( e.type() != Object ) {
+                b.append( e );
+                continue;
+            }
+
+            BSONObj sub = e.Obj();
+            if ( sub.firstElement().fieldName()[0] != '#' ) {
+                b.append( e );
+                continue;
+            }
+            
+            _fixField( b , e );
+        }
+    }
+
+    
+    static BSONObj fixQuery( const BSONObj& obj ) {
+        if ( ! _hasSpecial( obj ) ) 
+            return obj;
+        
+        BSONObjBuilder b( obj.objsize() + 128 );
+        fixQuery( b , obj );
+        return b.obj();
+    }
+
     static void benchThread( BenchRunConfig * config ) {
         ScopedDbConnection conn( config->host );
         config->threadsReady++;
@@ -69,10 +136,10 @@ namespace mongo {
                 string op = e["op"].String();
 
                 if ( op == "findOne" ) {
-                    conn->findOne( ns , e["query"].Obj() );
+                    conn->findOne( ns , fixQuery( e["query"].Obj() ) );
                 }
                 else if ( op == "update" ) {
-                    conn->update( ns , e["query"].Obj() , e["update"].Obj() );
+                    conn->update( ns , fixQuery( e["query"].Obj() ) , e["update"].Obj() );
                 }
                 else {
                     log() << "don't understand op: " << op << endl;
@@ -145,9 +212,12 @@ namespace mongo {
 
         before = before["opcounters"].Obj();
         after = after["opcounters"].Obj();
+        
+        bool totals = args["totals"].trueValue();
 
         BSONObjBuilder buf;
-        buf.append( "note" , "values per second" );
+        if ( ! totals )
+            buf.append( "note" , "values per second" );
 
         {
             BSONObjIterator i( after );
@@ -155,7 +225,9 @@ namespace mongo {
                 BSONElement e = i.next();
                 double x = e.number();
                 x = x - before[e.fieldName()].number();
-                buf.append( e.fieldName() , x / config.seconds );
+                if ( ! totals )
+                    x = x / config.seconds;
+                buf.append( e.fieldName() , x );
             }
         }
         BSONObj zoo = buf.obj();
