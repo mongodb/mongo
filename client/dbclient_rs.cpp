@@ -544,7 +544,7 @@ namespace mongo {
             // checkSlave will try a different slave automatically after a failure
             for ( int i=0; i<3; i++ ) {
                 try {
-                    return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
+                    return checkSlaveQueryResult( checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize) );
                 }
                 catch ( DBException &e ) {
                     LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
@@ -562,7 +562,7 @@ namespace mongo {
             // checkSlave will try a different slave automatically after a failure
             for ( int i=0; i<3; i++ ) {
                 try {
-                    return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
+                    checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
                 catch ( DBException &e ) {
                 	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
@@ -585,6 +585,30 @@ namespace mongo {
         log() << "got not master for: " << _masterHost << endl;
         _monitor->notifyFailure( _masterHost );
         _master.reset(); 
+    }
+
+    auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
+        BSONObj error;
+        bool isError = result->peekError( &error );
+        if( ! isError ) return result;
+
+        // We only check for "not master or secondary" errors here
+
+        // If the error code here ever changes, we need to change this code also
+        BSONElement code = error["code"];
+        if( code.isNumber() && code.Int() == 13436 /* not master or secondary */ ){
+            isntSecondary();
+            throw DBException( str::stream() << "slave " << _slaveHost.toString() << " is no longer secondary", 14812 );
+        }
+
+        return result;
+    }
+
+    void DBClientReplicaSet::isntSecondary() {
+        log() << "slave no longer has secondary status: " << _slaveHost << endl;
+        // Failover to next slave
+        _monitor->notifySlaveFailure( _slaveHost );
+        _slave.reset();
     }
 
     DBClientBase* DBClientReplicaSet::callLazy( Message& toSend ) {

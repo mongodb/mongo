@@ -956,6 +956,10 @@ namespace mongo {
         return BSONElement();
     }
 
+    bool hasErrField( const BSONObj& o ){
+        return ! getErrField( o ).eoo();
+    }
+
     void DBClientConnection::checkResponse( const char *data, int nReturned ) {
         /* check for errors.  the only one we really care about at
          * this stage is "not master" 

@@ -959,6 +959,9 @@ namespace mongo {
 
     DBClientBase * createDirectClient();
 
+    BSONElement getErrField( const BSONObj& result );
+    bool hasErrField( const BSONObj& result );
+
 } // namespace mongo
 
 #include "dbclientcursor.h"

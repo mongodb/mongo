@@ -140,6 +140,10 @@ namespace mongo {
         QueryResult *qr = (QueryResult *) b.m->singleData();
         resultFlags = qr->resultFlags();
 
+        if ( qr->resultFlags() & ResultFlag_ErrSet ) {
+            wasError = true;
+        }
+
         if ( qr->resultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
             assert( qr->cursorId == 0 );
@@ -226,6 +230,19 @@ namespace mongo {
         }
     }
     
+    bool DBClientCursor::peekError(BSONObj* error){
+        if( ! wasError ) return false;
+
+        vector<BSONObj> v;
+        peek(v, 1);
+
+        assert( v.size() == 1 );
+        assert( hasErrField( v[0] ) );
+
+        if( error ) *error = v[0].getOwned();
+        return true;
+    }
+
     void DBClientCursor::attach( AScopedConnection * conn ) {
         assert( _scopedHost.size() == 0 );
         assert( conn );

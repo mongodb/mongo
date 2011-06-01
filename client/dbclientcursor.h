@@ -88,6 +88,11 @@ namespace mongo {
         void peek(vector<BSONObj>&, int atMost);
 
         /**
+         * peek ahead and see if an error occurred, and get the error if so.
+         */
+        bool peekError(BSONObj* error = NULL);
+
+        /**
            iterate the rest of the cursor and return the number if items
          */
         int itcount() {
@@ -129,7 +134,8 @@ namespace mongo {
             opts(queryOptions),
             batchSize(bs==1?2:bs),
             cursorId(),
-            _ownCursor( true ) {
+            _ownCursor( true ),
+            wasError( false ) {
         }
 
         DBClientCursor( DBClientBase* client, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -193,6 +199,7 @@ namespace mongo {
         bool _ownCursor; // see decouple()
         string _scopedHost;
         DBClientBase* _lazy; // only for lazy init
+        bool wasError;
 
         void dataReceived();
         void requestMore();

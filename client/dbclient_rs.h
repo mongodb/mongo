@@ -216,6 +216,10 @@ namespace mongo {
          */
         void isntMaster();
 
+        /* this is used to indicate we got a "not master or secondary" error from a secondary.
+         */
+        void isntSecondary();
+
         // ----- status ------
 
         virtual bool isFailed() const { return ! _master || _master->isFailed(); }
@@ -240,6 +244,9 @@ namespace mongo {
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
+
+        // Used to simplify slave-handling logic on errors
+        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();
