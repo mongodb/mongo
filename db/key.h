@@ -34,7 +34,7 @@ namespace mongo {
         explicit KeyBson(const char *keyData) : _o(keyData) { }
         explicit KeyBson(const BSONObj& obj) : _o(obj) { }
         int woCompare(const KeyBson& r, const Ordering &o) const { return _o.woCompare(r._o, o); }
-        bool woEqual(const KeyBson& r) const { return _o.woEqual(r._o); }
+        bool woEqual(const KeyBson& r) const { return _o.equal(r._o); }
         BSONObj toBson() const { return _o; }
         string toString() const { return _o.toString(); }
         int dataSize() const { return _o.objsize(); }

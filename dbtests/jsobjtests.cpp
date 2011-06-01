@@ -52,6 +52,12 @@ namespace JsobjTests {
         ASSERT( k.woEqual(k) );
         ASSERT( !k.isCompactFormat() || k.dataSize() < o.objsize() );
 
+        {
+            // check BSONObj::equal.  this part not a KeyV1 test.
+            int res = o.woCompare(last);
+            ASSERT( (res==0) == o.equal(last) );
+        }
+
         if( kLast ) {
             int r1 = o.woCompare(last, BSONObj(), false);
             int r2 = k.woCompare(*kLast, Ordering::make(BSONObj()));

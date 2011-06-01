@@ -296,10 +296,12 @@ namespace mongo {
          */
         int woSortOrder( const BSONObj& r , const BSONObj& sortKey , bool useDotted=false ) const;
 
+        bool equal(const BSONObj& r) const;
+
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */
-        bool woEqual(const BSONObj& r) const {
+        bool shallowEqual(const BSONObj& r) const {
             int os = objsize();
             if ( os == r.objsize() ) {
                 return (os == 0 || memcmp(objdata(),r.objdata(),os)==0);
@@ -350,9 +352,7 @@ namespace mongo {
         /** @return an md5 value for this object. */
         string md5() const;
 
-        bool operator==( const BSONObj& other ) const {
-            return woCompare( other ) == 0;
-        }
+        bool operator==( const BSONObj& other ) const { return equal( other ); }
 
         enum MatchType {
             Equality = 0,

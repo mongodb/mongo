@@ -622,6 +622,21 @@ namespace mongo {
         return -1;
     }
 
+    // deep (full) equality
+    bool BSONObj::equal(const BSONObj &rhs) const {
+        BSONObjIterator i(*this);
+        BSONObjIterator j(rhs);
+        BSONElement l,r;
+        do {
+            // so far, equal...
+            l = i.next();
+            r = j.next();
+            if ( l.eoo() )
+                return r.eoo();
+        } while( l == r );
+        return false;
+    }
+
     /* well ordered compare */
     int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
                            bool considerFieldName) const {
@@ -1094,7 +1109,7 @@ namespace mongo {
             c.appendRegex("x", "goo");
             BSONObj p = c.done();
 
-            assert( !o.woEqual( p ) );
+            assert( !o.shallowEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
         }
@@ -1199,7 +1214,7 @@ namespace mongo {
             BSONObj a = A.done();
             BSONObj b = B.done();
             BSONObj c = C.done();
-            assert( !a.woEqual( b ) ); // comments on operator==
+            assert( !a.shallowEqual( b ) ); // comments on operator==
             int cmp = a.woCompare(b);
             assert( cmp == 0 );
             cmp = a.woCompare(c);

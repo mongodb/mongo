@@ -474,7 +474,7 @@ namespace mongo {
                     _gotOne();
                 }
                 else {
-                    if ( ! _firstMatch.woEqual( _bc->currKey() ) ) {
+                    if ( ! _firstMatch.equal( _bc->currKey() ) ) {
                         setComplete();
                         return;
                     }

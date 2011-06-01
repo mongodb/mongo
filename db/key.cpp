@@ -429,7 +429,7 @@ namespace mongo {
         const unsigned char *r = right._keyData;
 
         if( (*l|*r) == IsBSON ) {
-            return toBson().woEqual(right.toBson());
+            return toBson().equal(right.toBson());
         }
 
         while( 1 ) { 
