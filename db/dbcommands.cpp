@@ -903,7 +903,7 @@ namespace mongo {
             boost::intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
-                b.append( "name", i->c_str() );
+                b.append( "name", *i );
 
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
@@ -934,7 +934,8 @@ namespace mongo {
                     continue;
 
                 BSONObjBuilder b;
-                b << "name" << name << "sizeOnDisk" << double( 1 );
+                b.append( name , name );
+                b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
                     readlock lk( name );
