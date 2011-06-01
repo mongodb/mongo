@@ -1386,17 +1386,18 @@ ReplSetTest.prototype.bridge = function() {
             printjson(this.nodes[i].getDB("local").system.namespaces.find().toArray());
             assert(false);
         }
-        
+
+        var updateMod = {"$set" : {}};
         for (var j = 0; j<config.members.length; j++) {
             if (config.members[j].host == this.host+":"+this.ports[i]) {
                 continue;
             }
 
-            config.members[j].host = this.bridges[i][j].host;
+            updateMod['$set']["members."+j+".host"] = this.bridges[i][j].host;
         }
         print("for node "+i+":");
-        printjson(config);
-        this.nodes[i].getDB("local").system.replset.update({},config);
+        printjson(updateMod);
+        this.nodes[i].getDB("local").system.replset.update({},updateMod);
     }
 
     this.stopSet(null, true);
