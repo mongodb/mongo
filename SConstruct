@@ -1074,6 +1074,13 @@ l = clientEnv[ "LIBS" ]
 removeIfInList( l , "pcre" )
 removeIfInList( l , "pcrecpp" )
 
+# profile guided
+#if windows:
+#    if release:
+#        env.Append( LINKFLAGS="/PGD:test.pgd" )
+#        env.Append( LINKFLAGS="/LTCG:PGINSTRUMENT" )
+#        env.Append( LINKFLAGS="/LTCG:PGOPTIMIZE" )
+
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
 testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
