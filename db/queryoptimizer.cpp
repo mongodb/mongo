@@ -488,6 +488,11 @@ doneCheckOrder:
         PlanSet plans;
         QueryPlanPtr optimalPlan;
         for( int i = 0; i < d->nIndexes; ++i ) {
+            if ( d->idx( i ).info.obj()["filter"].ok() ) {
+                // This is a filtered index, ignore
+                continue;
+            }
+
             if ( normalQuery ) {
                 if ( !_frsp->matchPossibleForIndex( d, i, d->idx( i ).keyPattern() ) ) {
                     // If no match is possible, only generate a trival plan that won't
