@@ -615,7 +615,6 @@ namespace JsobjTests {
                 BSONObjBuilder b;
                 b.append("a", "a\0b", 4);
                 string z("a\0b", 3);
-                const char *zz = z.c_str();
                 b.append("b", z);
                 b.appendAs(b.asTempObj()["a"], "c");
                 BSONObj o = b.obj();
