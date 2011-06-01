@@ -209,7 +209,7 @@ namespace PerfTests {
                                         BSONObj o = *i;
                                         double lastrps = o["rps"].Number();
                                         if( lastrps ) {
-                                            cout << "stats " << setw(33) << right << "old:" << ' ' << setw(9);
+                                            cout << "stats " << setw(33) << right << "new/old:" << ' ' << setw(9);
                                             cout << fixed << setprecision(2) << rps / lastrps;
                                             if( needver ) {
                                                 cout << "         " << o.getFieldDotted("info.git").toString();

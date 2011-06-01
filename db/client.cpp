@@ -55,6 +55,7 @@ namespace mongo {
             memset(buf, 42, sizeof(buf)); 
         }
         static void check(const char *tname) { 
+            static int max;
             StackChecker *sc = checker.get();
             const char *p = sc->buf;
             int i = 0;
@@ -62,7 +63,11 @@ namespace mongo {
                 if( p[i] != 42 )
                     break;
             }
-            log() << "thread " << tname << " stack usage was " << SZ-i << " bytes" << endl;
+            int z = SZ-i;
+            if( z > max ) {
+                max = z;
+                log() << "thread " << tname << " stack usage was " << z << " bytes" << endl;
+            }
             wassert( i > 16000 );
         }
     };
