@@ -383,11 +383,11 @@ namespace mongo {
                         long long sleeptime = sd - lag;
                         if( sleeptime > 0 ) {
                             uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
-                            log() << "replSet temp slavedelay sleep:" << sleeptime << rsLog;
                             if( sleeptime < 60 ) {
                                 sleepsecs((int) sleeptime);
                             }
                             else {
+                                log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
                                 // sleep(hours) would prevent reconfigs from taking effect & such!
                                 long long waitUntil = b + sleeptime;
                                 while( 1 ) {
