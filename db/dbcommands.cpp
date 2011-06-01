@@ -934,7 +934,7 @@ namespace mongo {
                     continue;
 
                 BSONObjBuilder b;
-                b.append( name , name );
+                b.append( "name" , name );
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
