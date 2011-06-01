@@ -262,6 +262,7 @@ extern int __wt_row_key( WT_SESSION_IMPL *session,
     void *row_arg,
     WT_BUF *retb);
 extern WT_CELL *__wt_row_value(WT_PAGE *page, void *row_arg);
+extern int __wt_row_ikey_all(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_ikey_alloc( WT_SESSION_IMPL *session,
     const void *key,
     uint32_t size,

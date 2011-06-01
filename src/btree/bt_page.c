@@ -325,6 +325,10 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 	page->entries = nindx;
+
+	/* Instantiate all of the keys on internal pages. */
+	WT_RET (__wt_row_ikey_all(session, page));
+
 	return (0);
 }
 

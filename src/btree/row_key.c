@@ -308,6 +308,106 @@ __wt_row_value(WT_PAGE *page, void *row_arg)
 }
 
 /*
+ * __wt_row_ikey_all --
+ *	Instantiate all of the keys for a page.
+ */
+int
+__wt_row_ikey_all(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_BUF *current, *last, *tmp;
+	WT_IKEY *ikey;
+	WT_ROW_REF *rref;
+	uint32_t data_size, i, prefix;
+	int is_ovfl, ret;
+	void *data, *huffman;
+
+	btree = session->btree;
+	current = last = NULL;
+	huffman = btree->huffman_key;
+	ret = 0;
+
+	WT_ERR(__wt_scr_alloc(session, 0, &current));
+	WT_ERR(__wt_scr_alloc(session, 0, &last));
+
+	WT_ROW_REF_FOREACH(page, rref, i) {
+		cell = rref->key;
+		prefix = __wt_cell_prefix(cell);
+		is_ovfl = __wt_cell_type_is_ovfl(cell) ? 1 : 0;
+
+		/*
+		 * Overflow keys are simple, and don't participate in prefix
+		 * compression.
+		 *
+		 * If Huffman decoding, use the heavy-weight __wt_cell_copy()
+		 * code to build the key, up to the prefix. Else, we can do
+		 * it faster internally because we don't have to shuffle memory
+		 * around as much.
+		 */
+		if (is_ovfl)
+			WT_RET(__wt_cell_copy(session, cell, current));
+		else if (huffman == NULL) {
+			/*
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
+			 */
+			__wt_cell_data_and_len(cell, &data, &data_size);
+			WT_ERR(__wt_buf_grow(
+			    session, current, prefix + data_size));
+
+			/* Copy the prefix then the data into place. */
+			if (prefix != 0)
+				memcpy((void *)
+				    current->data, last->data, prefix);
+			memcpy((uint8_t *)
+			    current->data + prefix, data, data_size);
+			current->size = prefix + data_size;
+		} else {
+			WT_RET(__wt_cell_copy(session, cell, current));
+
+			/*
+			 * If there's a prefix, make sure there's enough buffer
+			 * space, then shift the decoded data past the prefix
+			 * and copy the prefix into place.
+			 */
+			if (prefix != 0) {
+				WT_ERR(__wt_buf_grow(
+				    session, current, prefix + current->size));
+				memmove((uint8_t *)current->data +
+				    prefix, current->data, current->size);
+				memcpy(
+				    (void *)current->data, last->data, prefix);
+				current->size += prefix;
+			}
+		}
+
+		/*
+		 * Instantiate the key -- the key has no data, and overflow
+		 * doesn't matter, but might as well be consistent.
+		 */
+		WT_ERR(__wt_row_ikey_alloc(
+		    session, current->data, current->size, &ikey));
+		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
+		if (is_ovfl)
+			F_SET(ikey, WT_IKEY_OVERFLOW);
+
+		/* Swap buffers. */
+		if (!is_ovfl) {
+			tmp = last;
+			last = current;
+			current = tmp;
+		}
+	}
+
+err:	if (current != NULL)
+		__wt_scr_release(&current);
+	if (last != NULL)
+		__wt_scr_release(&last);
+	return (ret);
+}
+
+/*
  * __wt_row_ikey_alloc --
  *	Instantiate a key in a WT_IKEY structure.
  */
