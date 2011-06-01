@@ -523,7 +523,7 @@ namespace mongo {
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
                     bool recPingChange = o["state"].numberInt() == 2 && ( _lastPingCheck.get<0>() != lastPing["_id"].String() || _lastPingCheck.get<1>() != lastPing["ping"].Date() );
-                    bool recTSChange = o["state"].numberInt() == 1 && _lastPingCheck.get<3>() != o["ts"].OID();
+                    bool recTSChange = _lastPingCheck.get<3>() != o["ts"].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
