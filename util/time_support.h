@@ -171,20 +171,20 @@ namespace mongo {
 
     // DO NOT TOUCH except for testing
     inline void jsTimeVirtualSkew( long long skew ){
-	jsTime_virtual_skew = skew;
+        jsTime_virtual_skew = skew;
     }
     inline long long getJSTimeVirtualSkew(){
-	return jsTime_virtual_skew;
+        return jsTime_virtual_skew;
     }
 
     inline void jsTimeVirtualThreadSkew( long long skew ){
-	jsTime_virtual_thread_skew.reset(new long long(skew));
+        jsTime_virtual_thread_skew.reset(new long long(skew));
     }
     inline long long getJSTimeVirtualThreadSkew(){
-	if(jsTime_virtual_thread_skew.get()){
-	    return *(jsTime_virtual_thread_skew.get());
-	}
-	else return 0;
+        if(jsTime_virtual_thread_skew.get()){
+            return *(jsTime_virtual_thread_skew.get());
+        }
+        else return 0;
     }
 
 
