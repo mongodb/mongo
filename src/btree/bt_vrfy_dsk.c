@@ -15,8 +15,6 @@ static int __wt_err_eof(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int __wt_err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int __wt_verify_cell(
 	WT_SESSION_IMPL *, WT_CELL *, uint32_t, uint32_t, uint8_t *);
-static int __wt_verify_dsk_row(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(
@@ -24,6 +22,8 @@ static int __wt_verify_dsk_col_int(
 static int __wt_verify_dsk_col_rle(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_var(
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_row(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
@@ -162,7 +162,7 @@ __wt_verify_dsk_row(
 		++cell_num;
 
 		/* Check the cell itself. */
-		WT_RET(__wt_verify_cell(session, cell, cell_num, addr, end));
+		WT_ERR(__wt_verify_cell(session, cell, cell_num, addr, end));
 
 		/* Check the cell type. */
 		cell_type = __wt_cell_type(cell);
@@ -254,7 +254,7 @@ __wt_verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_RET(__wt_cell_copy(session, cell, current));
+			WT_ERR(__wt_cell_copy(session, cell, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -311,7 +311,7 @@ __wt_verify_dsk_row(
 			    current->data + prefix, data, data_size);
 			current->size = prefix + data_size;
 		} else {
-			WT_RET(__wt_cell_copy(session, cell, current));
+			WT_ERR(__wt_cell_copy(session, cell, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
