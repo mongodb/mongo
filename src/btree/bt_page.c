@@ -107,9 +107,6 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
 		WT_ERR(__wt_page_inmem_col_int(session, page));
-
-		/* Column-store internal pages do not require a disk image. */
-		__wt_free(session, page->dsk);
 		break;
 	case WT_PAGE_COL_RLE:
 		page->u.col_leaf.recno = dsk->recno;
@@ -205,6 +202,10 @@ __wt_page_inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	page->entries = dsk->u.entries;
+
+	/* Column-store internal pages do not require a disk image. */
+	__wt_free(session, page->dsk);
+
 	return (0);
 }
 
@@ -286,13 +287,25 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
+	WT_BUF *current, *last, *tmp;
 	WT_CELL *cell;
+	WT_IKEY *ikey;
 	WT_OFF off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
-	uint32_t i, nindx;
+	uint32_t data_size, i, nindx, prefix;
+	int cell_ovfl, ret;
+	void *data, *huffman;
 
+	btree = session->btree;
+	current = last = NULL;
 	dsk = page->dsk;
+	ret = 0;
+	huffman = btree->huffman_key;
+
+	WT_ERR(__wt_scr_alloc(session, 0, &current));
+	WT_ERR(__wt_scr_alloc(session, 0, &last));
 
 	/*
 	 * Internal row-store page entries map one-to-two to the number of
@@ -303,33 +316,111 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row_int.t)));
 
 	/*
-	 * Walk the page, building references: the page contains sorted key and
+	 * Set the number of elements now -- we're about to allocate memory,
+	 * and if we fail in the middle of the page, we want to discard that
+	 * memory properly.
+	 */
+	page->entries = nindx;
+
+	/*
+	 * Walk the page, instantiating keys: the page contains sorted key and
 	 * offpage-reference pairs.  Keys are row store internal pages with
 	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
 	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_CELL_FOREACH(dsk, cell, i)
+	WT_CELL_FOREACH(dsk, cell, i) {
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
-			rref->key = cell;
 			break;
 		case WT_CELL_OFF:
 			__wt_cell_off(cell, &off);
 			WT_ROW_REF_ADDR(rref) = off.addr;
 			WT_ROW_REF_SIZE(rref) = off.size;
 			++rref;
-			break;
+			continue;
 		WT_ILLEGAL_FORMAT(session);
 		}
 
-	page->entries = nindx;
+		/* Get the cell's prefix and check if it's an overflow cell. */
+		prefix = __wt_cell_prefix(cell);
+		cell_ovfl = __wt_cell_type_is_ovfl(cell) ? 1 : 0;
 
-	/* Instantiate all of the keys on internal pages. */
-	WT_RET (__wt_row_ikey_all(session, page));
+		/*
+		 * Overflow keys are simple, and don't participate in prefix
+		 * compression.
+		 *
+		 * If Huffman decoding, use the heavy-weight __wt_cell_copy()
+		 * code to build the key, up to the prefix. Else, we can do
+		 * it faster internally because we don't have to shuffle memory
+		 * around as much.
+		 */
+		if (cell_ovfl)
+			WT_RET(__wt_cell_copy(session, cell, current));
+		else if (huffman == NULL) {
+			/*
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
+			 */
+			__wt_cell_data_and_len(cell, &data, &data_size);
+			WT_ERR(__wt_buf_grow(
+			    session, current, prefix + data_size));
 
-	return (0);
+			/* Copy the prefix then the data into place. */
+			if (prefix != 0)
+				memcpy((void *)
+				    current->data, last->data, prefix);
+			memcpy((uint8_t *)
+			    current->data + prefix, data, data_size);
+			current->size = prefix + data_size;
+		} else {
+			WT_RET(__wt_cell_copy(session, cell, current));
+
+			/*
+			 * If there's a prefix, make sure there's enough buffer
+			 * space, then shift the decoded data past the prefix
+			 * and copy the prefix into place.
+			 */
+			if (prefix != 0) {
+				WT_ERR(__wt_buf_grow(
+				    session, current, prefix + current->size));
+				memmove((uint8_t *)current->data +
+				    prefix, current->data, current->size);
+				memcpy(
+				    (void *)current->data, last->data, prefix);
+				current->size += prefix;
+			}
+		}
+
+		/*
+		 * The key has no data, and overflow doesn't matter, but might
+		 * as well be consistent.
+		 */
+		WT_ERR(__wt_row_ikey_alloc(
+		    session, current->data, current->size, &ikey));
+		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
+		if (cell_ovfl)
+			F_SET(ikey, WT_IKEY_OVERFLOW);
+		rref->key = ikey;
+
+		/* Swap buffers. */
+		if (!cell_ovfl) {
+			tmp = last;
+			last = current;
+			current = tmp;
+		}
+	}
+
+#if 0
+	__wt_free(session, page->dsk);
+#endif
+
+err:	if (current != NULL)
+		__wt_scr_release(&current);
+	if (last != NULL)
+		__wt_scr_release(&last);
+	return (ret);
 }
 
 /*

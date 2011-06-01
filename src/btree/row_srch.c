@@ -56,16 +56,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 			 * sorts less than any application key.  This test is so
 			 * we don't have to update internal pages if the
 			 * application stores a new, "smallest" key in the tree.
-			 *
-			 * If the key is compressed or an overflow, it may not
-			 * have been instantiated yet.
-			 *
-			 * CHECK FOR PREFIX 0 AND USE ON PAGE
 			 */
 			if (indx != 0) {
-				if (!__wt_off_page(page, rref->key))
-					WT_ERR(__wt_row_key(
-					    session, page, rref, NULL));
 				ikey = rref->key;
 				item.data = WT_IKEY_DATA(ikey);
 				item.size = ikey->size;
@@ -132,10 +124,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		indx = base + (limit >> 1);
 		rip = page->u.row_leaf.d + indx;
 
-		/*
-		 * If the key is compressed or an overflow, it may not have
-		 * been instantiated yet.
-		 */
+		/* The key may not have been instantiated yet. */
 		if (!__wt_off_page(page, rip->key))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
 		ikey = rip->key;

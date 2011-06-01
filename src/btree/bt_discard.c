@@ -14,7 +14,7 @@ static void __wt_free_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static void __wt_free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static void __wt_free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __wt_free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __wt_free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
@@ -95,7 +95,7 @@ __wt_page_free(
 			__wt_free_page_col_var(session, page);
 			break;
 		case WT_PAGE_ROW_INT:
-			__wt_free_page_row_int(session, page, size);
+			__wt_free_page_row_int(session, page);
 			break;
 		case WT_PAGE_ROW_LEAF:
 			__wt_free_page_row_leaf(session, page, size);
@@ -175,8 +175,9 @@ __wt_free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
-__wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+__wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_IKEY *ikey;
 	WT_ROW_REF *rref;
 	uint32_t i;
 
@@ -185,8 +186,8 @@ __wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	 * if it points somewhere other than the original page), and free it.
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
-		if (__wt_off_page_size(page, rref->key, size))
-			__wt_sb_free(session, ((WT_IKEY *)rref->key)->sb);
+		if ((ikey = rref->key) != NULL)
+			__wt_sb_free(session, ikey->sb);
 
 	/* Free the subtree-reference array. */
 	if (page->u.row_int.t != NULL)
@@ -200,6 +201,7 @@ __wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 static void
 __wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
+	WT_IKEY *ikey;
 	WT_ROW *rip;
 	uint32_t i;
 
@@ -211,8 +213,9 @@ __wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	 * the memory.
 	 */
 	WT_ROW_FOREACH(page, rip, i)
-		if (__wt_off_page_size(page, rip->key, size))
-			__wt_sb_free(session, ((WT_IKEY *)rip->key)->sb);
+		if ((ikey = rip->key) != NULL &&
+		     __wt_off_page_size(page, ikey, size))
+			__wt_sb_free(session, ikey->sb);
 	__wt_free(session, page->u.row_leaf.d);
 
 	/*

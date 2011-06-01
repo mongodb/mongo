@@ -30,10 +30,10 @@ static int __wt_verify_addfrag(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
-static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_OFF *, WT_VSTUFF *);
-static int __wt_verify_overflow_page(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_CELL *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
-	WT_SESSION_IMPL *, WT_PAGE *, void *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, WT_VSTUFF *);
 static int __wt_verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
@@ -242,25 +242,15 @@ recno_chk:	if (parent_recno != recno) {
 	}
 
 	/*
-	 * Check on-page overflow page references.
-	 *
-	 * There's a potential performance problem here: we read key overflow
-	 * pages twice, once when checking the overflow page itself, and again
-	 * when checking the key ordering.   It's a pain to combine the two
-	 * tests (the page types with overflow items aren't exactly the same
-	 * as the page types with ordered keys, and the underlying functions
-	 * that instantiate (and decompress) overflow pages don't want to know
-	 * anything about verification), and I don't want to keep the overflow
-	 * keys in the cache, it's likely to be wasted space.  Until it's a
-	 * problem, I'm going to assume the second read of the overflow key is
-	 * satisfied in the operating system buffer cache, and not worry about
-	 * it.  Table verify isn't likely to be a performance path anyway.
+	 * Check overflow pages.  We check overflow cells separately from other
+	 * tests that walk the page as it's simpler, and I don't care much how
+	 * fast table verify runs.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow_page(session, page, vs));
+		WT_RET(__wt_verify_overflow(session, page, vs));
 		break;
 	}
 
@@ -333,25 +323,27 @@ recno_chk:	if (parent_recno != recno) {
  */
 static int
 __wt_verify_row_int_key_order(
-    WT_SESSION_IMPL *session, WT_PAGE *page, void *rref, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW_REF *rref, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
-	WT_BUF *key, *tmp;
+	WT_IKEY *ikey;
+	WT_ITEM item;
 	int ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
-	key = NULL;
 	func = btree->btree_compare;
 	ret = 0;
 
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr != WT_ADDR_INVALID);
 
-	WT_RET(__wt_scr_alloc(session, 0, &key));
-	WT_RET(__wt_row_key(session, page, rref, key));
+	/* Set up the key structure. */
+	ikey = rref->key;
+	item.data = WT_IKEY_DATA(ikey);
+	item.size = ikey->size;
 
 	/* Compare the key against the largest key we've seen so far. */
-	if (func(btree, (WT_ITEM *)key, (WT_ITEM *)vs->max_key) <= 0) {
+	if (func(btree, &item, (WT_ITEM *)vs->max_key) <= 0) {
 		__wt_errx(session,
 		    "the internal key in entry %lu on the page at addr %lu "
 		    "sorts before the last key appearing on page %lu",
@@ -360,13 +352,10 @@ __wt_verify_row_int_key_order(
 		ret = WT_ERROR;
 	} else {
 		/* Update the largest key we've seen to the key just checked. */
-		tmp = vs->max_key;
-		vs->max_key = key;
-		key = tmp;
+		WT_RET(
+		    __wt_buf_set(session, vs->max_key, item.data, item.size));
 		vs->max_addr = WT_PADDR(page);
 	}
-
-	__wt_scr_release(&key);
 
 	return (ret);
 }
@@ -428,33 +417,26 @@ __wt_verify_row_leaf_key_order(
 }
 
 /*
- * __wt_verify_overflow_page --
- *	Verify overflow items.
+ * __wt_verify_overflow --
+ *	Verify any overflow cells on the page.
  */
 static int
-__wt_verify_overflow_page(
+__wt_verify_overflow(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
-	WT_OFF ovfl;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
 	dsk = page->dsk;
 
-	/*
-	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact
-	 * they might have been updated, that doesn't mean anything until page
-	 * reconciliation writes them to disk.
-	 *
-	 * Walk the disk page, verifying overflow items.
-	 */
+	/* Walk the disk page, verifying pages referenced by overflow cells. */
 	WT_CELL_FOREACH(dsk, cell, i)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			__wt_cell_off(cell, &ovfl);
-			WT_RET(__wt_verify_overflow(session, &ovfl, vs));
+			WT_RET(__wt_verify_overflow_cell(session, cell, vs));
+			break;
 		}
 	return (0);
 }
@@ -464,18 +446,21 @@ __wt_verify_overflow_page(
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_VSTUFF *vs)
+__wt_verify_overflow_cell(
+    WT_SESSION_IMPL *session, WT_CELL *cell, WT_VSTUFF *vs)
 {
-	WT_PAGE_DISK *dsk;
 	WT_BUF *tmp;
+	WT_OFF ovfl;
+	WT_PAGE_DISK *dsk;
 	uint32_t addr, size;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
 
-	addr = ovfl->addr;
-	size = ovfl->size;
+	__wt_cell_off(cell, &ovfl);
+	addr = ovfl.addr;
+	size = ovfl.size;
 
 	/* Allocate enough memory to hold the overflow pages. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));

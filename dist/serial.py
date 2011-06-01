@@ -35,7 +35,7 @@ serial['row_key'] = Serial(
 	'row_key',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'void */row_arg',
+	 'WT_ROW */row_arg',
 	 'WT_IKEY */ikey'])
 
 serial['update'] = Serial(

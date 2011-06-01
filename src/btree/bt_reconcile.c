@@ -1988,15 +1988,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else if (__wt_off_page(page, rref->key)) {
+		} else {
 			ikey = rref->key;
 			WT_RET(__rec_cell_build_key(
 			    session, WT_IKEY_DATA(ikey), ikey->size));
-			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
-		} else {
-			WT_RET(__wt_row_key(session, page, rref, &key->buf));
-			WT_RET(__rec_cell_build_key(
-			    session, key->buf.data, key->buf.size));
 			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
 

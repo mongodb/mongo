@@ -259,10 +259,9 @@ extern int __wt_btree_row_get(WT_SESSION_IMPL *session,
     WT_ITEM *value);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    void *row_arg,
+    WT_ROW *rip_arg,
     WT_BUF *retb);
-extern WT_CELL *__wt_row_value(WT_PAGE *page, void *row_arg);
-extern int __wt_row_ikey_all(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern WT_CELL *__wt_row_value(WT_PAGE *page, WT_ROW *rip);
 extern int __wt_row_ikey_alloc( WT_SESSION_IMPL *session,
     const void *key,
     uint32_t size,

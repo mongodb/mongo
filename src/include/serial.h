@@ -71,7 +71,7 @@ typedef struct {
 
 typedef struct {
 	WT_PAGE * page;
-	void * row_arg;
+	WT_ROW * row_arg;
 	WT_IKEY * ikey;
 } __wt_row_key_args;
 #define	__wt_row_key_serial(\

@@ -498,12 +498,7 @@ __wt_debug_page_row_int(
 		fp = stderr;
 
 	WT_ROW_REF_FOREACH(page, rref, i) {
-		if (__wt_off_page(page, rref->key))
-			__wt_debug_ikey(rref->key, fp);
-		else
-			WT_RET(
-			    __wt_debug_cell_data(session, "K", rref->key, fp));
-
+		__wt_debug_ikey(rref->key, fp);
 		fprintf(fp, "\t");
 		__wt_debug_ref(&rref->ref, fp);
 	}
