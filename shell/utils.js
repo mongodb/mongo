@@ -529,6 +529,14 @@ if ( typeof( BinData ) != "undefined" ){
         //return "BinData type: " + this.type + " len: " + this.len;
         return this.toString();
     }
+    
+    BinData.prototype.subtype = function () {
+        return this.type;
+    }
+    
+    BinData.prototype.length = function () {
+        return this.len;
+    }    
 }
 else {
     print( "warning: no BinData class" );

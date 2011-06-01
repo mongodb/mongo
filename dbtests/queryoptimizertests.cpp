@@ -950,7 +950,7 @@ namespace QueryOptimizerTests {
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true );
             {
-                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+                SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
             }
             m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );

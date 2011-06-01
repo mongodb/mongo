@@ -488,12 +488,12 @@ namespace mongo {
         /* IndexSpec caching */
     private:
         map<const IndexDetails*,IndexSpec> _indexSpecs;
-        static mongo::mutex _isMutex;
+        static SimpleMutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ) {
             IndexSpec& spec = _indexSpecs[details];
             if ( ! spec._finishedInit ) {
-                scoped_lock lk(_isMutex);
+                SimpleMutex::scoped_lock lk(_isMutex);
                 if ( ! spec._finishedInit ) {
                     spec.reset( details );
                     assert( spec._finishedInit );
@@ -507,7 +507,7 @@ namespace mongo {
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
-        static mongo::mutex _qcMutex;
+        static SimpleMutex _qcMutex;
         /* you must be in the qcMutex when calling this (and using the returned val): */
         static NamespaceDetailsTransient& get_inlock(const char *ns) {
             return _get(ns);
