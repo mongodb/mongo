@@ -413,8 +413,18 @@ namespace mongo {
         case Code:
         case Symbol:
         case String:
-            /* todo: utf version */
-            return strcmp(l.valuestr(), r.valuestr());
+            /* todo: a utf sort order version one day... */
+            {
+                // we use memcmp as we allow zeros in UTF8 strings
+                int lsz = l.valuestrsize();
+                int rsz = r.valuestrsize();
+                int common = min(lsz, rsz);
+                int res = memcmp(l.valuestr(), r.valuestr(), common);
+                if( res ) 
+                    return res;
+                // longer string is the greater one
+                return lsz-rsz;
+            }
         case Object:
         case Array:
             return l.embeddedObject().woCompare( r.embeddedObject() );

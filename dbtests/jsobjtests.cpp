@@ -43,9 +43,9 @@ namespace JsobjTests {
         BSONObj x = k.toBson();
         int res = o.woCompare(x, BSONObj(), /*considerfieldname*/false);
         if( res ) {
-            //cout << o.toString() << endl;
+            cout << o.toString() << endl;
             k.toBson();
-            //cout << x.toString() << endl;
+            cout << x.toString() << endl;
             o.woCompare(x, BSONObj(), /*considerfieldname*/false);
             ASSERT( res == 0 );
         }
@@ -581,9 +581,42 @@ namespace JsobjTests {
         class NullString {
         public:
             void run() {
+                {
+                    BSONObjBuilder b;
+                    const char x[] = {'a', 0, 'b', 0};
+                    b.append("field", x, 4);
+                    b.append("z", true);
+                    BSONObj B = b.obj();
+                    cout << B.toString() << endl;
+
+                    BSONObjBuilder a;
+                    const char xx[] = {'a', 0, 'c', 0};
+                    a.append("field", xx, 4);
+                    a.append("z", true);
+                    BSONObj A = a.obj();
+
+                    BSONObjBuilder c;
+                    const char xxx[] = {'a', 0, 'c', 0, 0};
+                    c.append("field", xxx, 5);
+                    c.append("z", true);
+                    BSONObj C = c.obj();
+
+                    // test that nulls are ok within bson strings
+                    ASSERT( !(A == B) );
+                    ASSERT( A > B );
+
+                    ASSERT( !(B == C) );
+                    ASSERT( C > B );
+
+                    // check iteration is ok
+                    ASSERT( B["z"].Bool() && A["z"].Bool() && C["z"].Bool() );
+                }
+
                 BSONObjBuilder b;
                 b.append("a", "a\0b", 4);
-                b.append("b", string("a\0b", 3));
+                string z("a\0b", 3);
+                const char *zz = z.c_str();
+                b.append("b", z);
                 b.appendAs(b.asTempObj()["a"], "c");
                 BSONObj o = b.obj();
                 keyTest(o);
@@ -599,6 +632,7 @@ namespace JsobjTests {
 
                 ASSERT_EQUALS(o["c"].valuestrsize(), 3+1);
                 ASSERT_EQUALS(o["c"].str(), ss.str());
+
             }
 
         };
@@ -1936,6 +1970,7 @@ namespace JsobjTests {
         void setupTests() {
             add< BufBuilderBasic >();
             add< BSONElementBasic >();
+            add< BSONObjTests::NullString >();
             add< BSONObjTests::Create >();
             add< BSONObjTests::WoCompareBasic >();
             add< BSONObjTests::NumericCompareBasic >();
@@ -1952,7 +1987,6 @@ namespace JsobjTests {
             add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::ToStringArray >();
             add< BSONObjTests::ToStringNumber >();
-            add< BSONObjTests::NullString >();
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();

@@ -169,8 +169,8 @@ namespace mongo {
             appendBuf(&s, sizeof(T));
         }
 
-        void appendStr(const StringData &str , bool includeEOO = true ) {
-            const int len = str.size() + ( includeEOO ? 1 : 0 );
+        void appendStr(const StringData &str , bool includeEndingNull = true ) {
+            const int len = str.size() + ( includeEndingNull ? 1 : 0 );
             memcpy(grow(len), str.data(), len);
         }
 
