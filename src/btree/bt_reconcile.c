@@ -873,8 +873,6 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		if (F_ISSET(page, WT_PAGE_DELETED))
 			switch (page->type) {
 			case WT_PAGE_ROW_INT:
-				WT_RET(__rec_ovfl_delete(session, page));
-				break;
 			case WT_PAGE_ROW_LEAF:
 				WT_RET(__rec_ovfl_delete(session, page));
 				break;
