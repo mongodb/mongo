@@ -303,11 +303,7 @@ __wt_verify_dsk_row(
 			WT_ERR(__wt_buf_grow(
 			    session, current, prefix + data_size));
 
-			/*
-			 * Copy the prefix, then the data into place: don't
-			 * avoid the copy in the case of a zero-length prefix,
-			 * zero-length prefixes don't occur much in nature.
-			 */
+			/* Copy the prefix then the data into place. */
 			if (prefix != 0)
 				memcpy((void *)
 				    current->data, last->data, prefix);
