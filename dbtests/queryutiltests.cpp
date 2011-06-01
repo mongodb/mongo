@@ -21,6 +21,7 @@
 #include "../db/queryutil.h"
 #include "../db/querypattern.h"
 #include "../db/instance.h"
+#include "../db/pdfile.h"
 #include "dbtests.h"
 
 namespace QueryUtilTests {

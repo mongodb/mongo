@@ -25,6 +25,7 @@
 #include "../util/text.h"
 #include "../util/queue.h"
 #include "../util/paths.h"
+#include "../db/db.h"
 
 namespace BasicTests {
 

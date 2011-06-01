@@ -33,6 +33,7 @@
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
 #include "../util/file_allocator.h"
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -372,6 +373,18 @@ namespace mongo {
         _client = 0;
     }
 
+    void CurOp::enter( Client::Context * context ) {
+        ensureStarted();
+        setNS( context->ns() );
+        _dbprofile = context->_db ? context->_db->profile : 0;
+    }
+    
+    void CurOp::leave( Client::Context * context ) {
+        unsigned long long now = curTimeMicros64();
+        Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
+        _checkpoint = now;
+    }
+
 
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
@@ -420,6 +433,8 @@ namespace mongo {
 
         if( killed() ) 
             b.append("killed", true);
+        
+        b.append( "numYields" , _numYields );
 
         return b.obj();
     }
