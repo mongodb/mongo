@@ -562,7 +562,7 @@ namespace mongo {
             // checkSlave will try a different slave automatically after a failure
             for ( int i=0; i<3; i++ ) {
                 try {
-                    checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
+                    return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
                 catch ( DBException &e ) {
                 	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
