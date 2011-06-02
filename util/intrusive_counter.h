@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
+
 namespace mongo {
 
     class IntrusiveCounter :

@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include <boost/unordered_map.hpp>
 #include "client/parallel.h"
 #include "db/jsobj.h"
 #include "db/pipeline/value.h"
@@ -450,15 +451,10 @@ namespace mongo {
         void populate();
         bool populated;
 
-        struct KeyComparator {
-            bool operator()(const shared_ptr<const Value> &rL,
-                            const shared_ptr<const Value> &rR);
-        };
-
         shared_ptr<Expression> pIdExpression;
 
-        typedef map<shared_ptr<const Value>,
-	    vector<shared_ptr<Accumulator> >, KeyComparator> GroupsType;
+	typedef boost::unordered_map<shared_ptr<const Value>,
+	    vector<shared_ptr<Accumulator> >, Value::Hash> GroupsType;
         GroupsType groups;
 
         /*
@@ -652,17 +648,14 @@ namespace mongo {
     };
 }
 
+
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-    inline bool DocumentSourceGroup::KeyComparator::operator()(
-        const shared_ptr<const Value> &rL,
-        const shared_ptr<const Value> &rR) {
-        return (Value::compare(rL, rR) < 0);
-    }
 
     inline void DocumentSourceGroup::setIdExpression(
         const shared_ptr<Expression> &pExpression) {
         pIdExpression = pExpression;
     }
+
 }

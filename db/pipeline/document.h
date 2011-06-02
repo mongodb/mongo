@@ -151,6 +151,16 @@ namespace mongo {
 
 	static string idName; // shared "_id"
 
+	/*
+	  Calculate a hash value.
+
+	  Meant to be used to create composite hashes suitable for
+	  boost classes such as unordered_map<>.
+
+	  @params seed value to augment with this' hash
+	*/
+	void hash_combine(size_t &seed) const;
+
     private:
         friend class FieldIterator;
 

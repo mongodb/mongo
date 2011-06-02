@@ -138,6 +138,14 @@ namespace mongo {
 	return i;
     }
 
+    void Document::hash_combine(size_t &seed) const {
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    boost::hash_combine(seed, vFieldName[i]);
+	    vpValue[i]->hash_combine(seed);
+	}
+    }
+
     int Document::compare(const shared_ptr<Document> &rL,
                           const shared_ptr<Document> &rR) {
         const size_t lSize = rL->vFieldName.size();

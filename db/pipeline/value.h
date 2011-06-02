@@ -214,6 +214,28 @@ namespace mongo {
         */
         static BSONType getWidestNumeric(BSONType lType, BSONType rType);
 
+	/*
+	  Calculate a hash value.
+
+	  Meant to be used to create composite hashes suitable for
+	  boost classes such as unordered_map<>.
+
+	  @params seed value to augment with this' hash
+	*/
+	void hash_combine(size_t &seed) const;
+
+	/*
+	  struct Hash is defined to enable the use of Values as
+	  keys in boost::unordered_map<>.
+
+	  Values are always referenced as immutables in the form
+	  shared_ptr<const Value>, so these operate on that construction.
+	*/
+	struct Hash :
+	    unary_function<shared_ptr<const Value>, size_t> {
+	    size_t operator()(const shared_ptr<const Value> &rV) const;
+	};
+	
     private:
         Value(); // creates null value
 	Value(BSONType type); // creates an empty (unitialized value) of type
@@ -288,11 +310,20 @@ namespace mongo {
             size_t size;
             size_t nextIndex;
             const vector<shared_ptr<const Value> > *pvpValue;
-        };
+	}; /* class vi */
 
     };
-}
 
+    /*
+      Equality operator for values.
+
+      Useful for unordered_map<>, etc.
+     */
+    inline bool operator==(const shared_ptr<const Value> &v1,
+		    const shared_ptr<const Value> &v2) {
+	return (Value::compare(v1, v2) == 0);
+    }
+}
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
@@ -336,4 +367,12 @@ namespace mongo {
 	shared_ptr<const Value> pValue(&fieldOne, null_deleter());
         return pValue;
     }
+
+    inline size_t Value::Hash::operator()(
+	const shared_ptr<const Value> &rV) const {
+	size_t seed = 0xf0afbeef;
+	rV->hash_combine(seed);
+	return seed;
+    }
+
 };

@@ -17,6 +17,7 @@
 #include "pch.h"
 #include "db/pipeline/value.h"
 
+#include <boost/functional/hash.hpp>
 #include "db/jsobj.h"
 #include "db/pipeline/builder.h"
 #include "db/pipeline/document.h"
@@ -670,6 +671,88 @@ namespace mongo {
 
         /* NOTREACHED */
         return 0;
+    }
+
+    void Value::hash_combine(size_t &seed) const {
+	BSONType type = getType();
+	boost::hash_combine(seed, (int)type);
+
+        switch(type) {
+        case NumberDouble:
+	    boost::hash_combine(seed, simple.doubleValue);
+	    break;
+
+        case String:
+	    boost::hash_combine(seed, stringValue);
+	    break;
+
+        case Object:
+	    getDocument()->hash_combine(seed);
+	    break;
+
+        case Array: {
+	    shared_ptr<ValueIterator> pIter(getArray());
+	    while(pIter->more()) {
+		shared_ptr<const Value> pValue(pIter->next());
+		pValue->hash_combine(seed);
+	    };
+            break;
+        }
+
+        case BinData:
+            // pBuilder->appendBinData(fieldName, ...);
+            assert(false); // CW TODO unimplemented
+            break;
+
+        case jstOID:
+	    oidValue.hash_combine(seed);
+	    break;
+
+        case Bool:
+	    boost::hash_combine(seed, simple.boolValue);
+	    break;
+
+        case Date:
+	    boost::hash_combine(seed, (unsigned long long)dateValue);
+	    break;
+
+        case RegEx:
+	    boost::hash_combine(seed, stringValue);
+	    break;
+
+        case Symbol:
+            assert(false); // CW TODO unimplemented
+            break;
+
+        case CodeWScope:
+            assert(false); // CW TODO unimplemented
+            break;
+
+        case NumberInt:
+	    boost::hash_combine(seed, simple.intValue);
+	    break;
+
+        case Timestamp:
+	    boost::hash_combine(seed, (unsigned long long)dateValue);
+	    break;
+
+        case NumberLong:
+	    boost::hash_combine(seed, simple.longValue);
+	    break;
+
+        case Undefined:
+        case jstNULL:
+	    break;
+
+            /* these shouldn't happen in this context */
+        case MinKey:
+        case EOO:
+        case DBRef:
+        case Code:
+        case MaxKey:
+            assert(false); // CW TODO better message
+            break;
+        } // switch(type)
     }
 
     BSONType Value::getWidestNumeric(BSONType lType, BSONType rType) {
