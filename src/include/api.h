@@ -230,19 +230,17 @@ struct __wt_connection_impl {
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous threads of control by
-	 * default.   The Env.toc_max_set method tunes this if the application
-	 * needs more.   Growing the number of threads dynamically is possible,
-	 * but tricky since the workQ is walking the array without locking it.
+	 * default.  Growing the number of threads dynamically is possible, but
+	 * tricky since the workQ is walking the array without locking it.
 	 *
 	 * There's an array of WT_SESSION_IMPL pointers that reference the
 	 * allocated array; we do it that way because we want an easy way for
 	 * the workQ code to avoid walking the entire array when only a few
 	 * threads are running.
 	 */
-	WT_SESSION_IMPL	**sessions;		/* TOC reference */
-	uint32_t toc_cnt;		/* TOC count */
-	void	 *toc_array;		/* TOC array */
-
+	WT_SESSION_IMPL	**sessions;	/* TOC reference */
+	uint32_t	  toc_cnt;	/* TOC count */
+	void		 *toc_array;	/* TOC array */
 	TAILQ_HEAD(__sessions, __wt_session_impl) sessions_head;
 
 	/*
@@ -255,27 +253,22 @@ struct __wt_connection_impl {
 	 * we need to easily copy and search it when evicting pages from memory.
 	 */
 	WT_HAZARD *hazard;		/* Hazard references array */
+	uint32_t   hazard_size;
+	uint32_t   session_size;
 
 	WT_CACHE  *cache;		/* Page cache */
+	uint64_t   cache_size;
 
 	WT_CONN_STATS *stats;		/* Database statistics */
 
-	WT_FH	  *log_fh;		/* Logging file handle */
+	WT_FH	   *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
-	uint64_t cache_size;
-
 	uint32_t data_update_max;
-
 	uint32_t data_update_min;
 
-	uint32_t hazard_size;
-
-	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
-
 	FILE *msgfile;
-
-	uint32_t session_size;
+	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
 	uint32_t verbose;
 
