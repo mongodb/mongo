@@ -307,72 +307,88 @@ namespace mongo {
         }
         return true;
     }
-
-    /* _jsobj          - the query pattern
-    */
-    Matcher::Matcher(const BSONObj &_jsobj, bool subMatcher) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
-
-        BSONObjIterator i(jsobj);
-        while ( i.more() ) {
+    
+    bool Matcher::parseAnd( const BSONElement &e, bool subMatcher ) {
+        const char *ef = e.fieldName();
+        if (!( ef[ 0 ] == '$' && ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' && ef[ 4 ] == 0 )) {
+            return false;
+        }
+        
+        uassert( 14814 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+        BSONObjIterator i( e.embeddedObject() );
+        while( i.more() ) {
             BSONElement e = i.next();
+            uassert( 14811 , "$and elements must be objects" , e.type() == Object );
+            BSONObjIterator j( e.embeddedObject() );
+            while( j.more() ) {
+                parseMatchExpressionElement( j.next(), subMatcher );
+            }
+        }
+        return true;
+    }
+
+    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool subMatcher ) {
+        
+        uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
+        
+        if ( parseAnd( e, subMatcher ) ) {
+            return;   
+        }
+        
+        if ( parseOrNor( e, subMatcher ) ) {
+            return;
+        }
+        
+        if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
+            // $where: function()...
+            uassert( 10066 , "$where occurs twice?", where == 0 );
+            uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
+            massert( 13089 , "no current client needed for $where" , haveClient() );
+            where = new Where();
+            where->scope = globalScriptEngine->getPooledScope( cc().ns() );
+            where->scope->localConnect( cc().database()->name.c_str() );
             
-            uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
-
-            if ( parseOrNor( e, subMatcher ) ) {
-                continue;
+            if ( e.type() == CodeWScope ) {
+                where->setFunc( e.codeWScopeCode() );
+                where->jsScope = new BSONObj( e.codeWScopeScopeData() );
             }
-
-            if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
-                // $where: function()...
-                uassert( 10066 , "$where occurs twice?", where == 0 );
-                uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
-                massert( 13089 , "no current client needed for $where" , haveClient() );
-                where = new Where();
-                where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-                where->scope->localConnect( cc().database()->name.c_str() );
-
-                if ( e.type() == CodeWScope ) {
-                    where->setFunc( e.codeWScopeCode() );
-                    where->jsScope = new BSONObj( e.codeWScopeScopeData() );
-                }
-                else {
-                    const char *code = e.valuestr();
-                    where->setFunc(code);
-                }
-
-                where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
-
-                continue;
+            else {
+                const char *code = e.valuestr();
+                where->setFunc(code);
             }
-
-            if ( e.type() == RegEx ) {
-                addRegex( e.fieldName(), e.regex(), e.regexFlags() );
-                continue;
-            }
-
-            // greater than / less than...
-            // e.g., e == { a : { $gt : 3 } }
-            //       or
-            //            { a : { $in : [1,2,3] } }
-            if ( e.type() == Object ) {
-                // support {$regex:"a|b", $options:"imx"}
-                const char* regex = NULL;
-                const char* flags = "";
-
-                // e.g., fe == { $gt : 3 }
-                BSONObjIterator j(e.embeddedObject());
-                bool isOperator = false;
-                while ( j.more() ) {
-                    BSONElement fe = j.next();
-                    const char *fn = fe.fieldName();
-
-                    if ( fn[0] == '$' && fn[1] ) {
-                        isOperator = true;
-
-                        if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
-                            haveNeg = true;
-                            switch( fe.type() ) {
+            
+            where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
+            
+            return;
+        }
+        
+        if ( e.type() == RegEx ) {
+            addRegex( e.fieldName(), e.regex(), e.regexFlags() );
+            return;
+        }
+        
+        // greater than / less than...
+        // e.g., e == { a : { $gt : 3 } }
+        //       or
+        //            { a : { $in : [1,2,3] } }
+        if ( e.type() == Object ) {
+            // support {$regex:"a|b", $options:"imx"}
+            const char* regex = NULL;
+            const char* flags = "";
+            
+            // e.g., fe == { $gt : 3 }
+            BSONObjIterator j(e.embeddedObject());
+            bool isOperator = false;
+            while ( j.more() ) {
+                BSONElement fe = j.next();
+                const char *fn = fe.fieldName();
+                
+                if ( fn[0] == '$' && fn[1] ) {
+                    isOperator = true;
+                    
+                    if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
+                        haveNeg = true;
+                        switch( fe.type() ) {
                             case Object: {
                                 BSONObjIterator k( fe.embeddedObject() );
                                 uassert( 13030, "$not cannot be empty", k.more() );
@@ -386,37 +402,47 @@ namespace mongo {
                                 break;
                             default:
                                 uassert( 13031, "invalid use of $not", false );
-                            }
-                        }
-                        else {
-                            if ( !addOp( e, fe, false, regex, flags ) ) {
-                                isOperator = false;
-                                break;
-                            }
                         }
                     }
                     else {
-                        isOperator = false;
-                        break;
+                        if ( !addOp( e, fe, false, regex, flags ) ) {
+                            isOperator = false;
+                            break;
+                        }
                     }
                 }
-                if (regex) {
-                    addRegex(e.fieldName(), regex, flags);
+                else {
+                    isOperator = false;
+                    break;
                 }
-                if ( isOperator )
-                    continue;
             }
+            if (regex) {
+                addRegex(e.fieldName(), regex, flags);
+            }
+            if ( isOperator )
+                return;
+        }
+        
+        if ( e.type() == Array ) {
+            hasArray = true;
+        }
+        else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
+            _atomic = e.trueValue();
+            return;
+        }
+        
+        // normal, simple case e.g. { a : "foo" }
+        addBasic(e, BSONObj::Equality, false);
+    }
+    
+    /* _jsobj          - the query pattern
+    */
+    Matcher::Matcher(const BSONObj &_jsobj, bool subMatcher) :
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
-            if ( e.type() == Array ) {
-                hasArray = true;
-            }
-            else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
-                _atomic = e.trueValue();
-                continue;
-            }
-
-            // normal, simple case e.g. { a : "foo" }
-            addBasic(e, BSONObj::Equality, false);
+        BSONObjIterator i(jsobj);
+        while ( i.more() ) {
+            parseMatchExpressionElement( i.next(), subMatcher );
         }
     }
 

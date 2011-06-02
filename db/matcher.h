@@ -187,7 +187,10 @@ namespace mongo {
 
         bool parseOrNor( const BSONElement &e, bool subMatcher );
         void parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers );
+        bool parseAnd( const BSONElement &e, bool subMatcher );
 
+        void parseMatchExpressionElement( const BSONElement &e, bool subMatcher );
+        
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;

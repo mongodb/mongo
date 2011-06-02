@@ -771,6 +771,31 @@ namespace mongo {
     }
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
+        if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
+            uassert( 14812 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+            BSONObjIterator i( e.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 14813 , "$and elements must be objects" , e.type() == Object );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    processQueryField( j.next(), optimize );
+                }
+            }            
+        }
+        
+        if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+            return;
+        }        
+        
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
             equality = ( strcmp( e.embeddedObject().firstElementFieldName(), "$not" ) != 0 );
@@ -813,22 +838,7 @@ namespace mongo {
         BSONObjIterator i( _queries[ 0 ] );
 
         while( i.more() ) {
-            BSONElement e = i.next();
-            // e could be x:1 or x:{$gt:1}
-
-            if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                continue;
-            }
-
-            processQueryField( e, optimize );
+            processQueryField( i.next(), optimize );
         }
     }
     
