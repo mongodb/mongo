@@ -43,16 +43,18 @@ methods = {
 'session.create' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes'''),
-	Config('columns', '', r'''
-		list of the column names.  Comma-separated list of the form
-		<code>(column[,...])</code>.  The number of entries must match the
-		total number of values in \c key_format and \c value_format'''),
 	Config('colgroup.name', '', r'''
 		named group of columns to store together.  Comma-separated list of
 		the form <code>(column[,...])</code>.  Each column group is stored
 		separately, keyed by the primary key of the table.  Any column that
 		does not appear in a column group is stored in a default, unnamed,
 		column group for the table'''),
+	Config('columns', '', r'''
+		list of the column names.  Comma-separated list of the form
+		<code>(column[,...])</code>.  The number of entries must match the
+		total number of values in \c key_format and \c value_format'''),
+	Config('debug_split_min', 'false', r'''
+		configure minimal splits in Btree reconciliation code (debugging only)'''),
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema'''),

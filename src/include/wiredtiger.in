@@ -492,15 +492,17 @@ struct wt_session {
 	 * @param name the uri of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
-	 * @config{columns, list of the column names.  Comma-separated list of
-	 * the form <code>(column[\,...])</code>.  The number of entries must
-	 * match the total number of values in \c key_format and \c
-	 * value_format}
 	 * @config{colgroup.\<name\>, named group of columns to store together.
 	 * Comma-separated list of the form <code>(column[\,...])</code>.  Each
 	 * column group is stored separately\, keyed by the primary key of the
 	 * table.  Any column that does not appear in a column group is stored
 	 * in a default\, unnamed\, column group for the table}
+	 * @config{columns, list of the column names.  Comma-separated list of
+	 * the form <code>(column[\,...])</code>.  The number of entries must
+	 * match the total number of values in \c key_format and \c
+	 * value_format}
+	 * @config{debug_split_min, configure minimal splits in Btree
+	 * reconciliation code (debugging only)}
 	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
 	 * verifies that the table exists and has the specified schema}
 	 * @config{huffman_key, use Huffman encoding for the key.  Permitted

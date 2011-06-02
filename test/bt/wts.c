@@ -102,7 +102,8 @@ wts_startup(void)
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
 	    "intl_node_min=%d,intl_node_max=%d,"
-	    "leaf_node_min=%d,leaf_node_max=%d",
+	    "leaf_node_min=%d,leaf_node_max=%d,"
+	    "debug_split_min",
 	    (g.c_file_type == ROW) ? "u" : "r",
 	    intl_node_min = 1U << g.c_intl_node_min,
 	    intl_node_max = 1U << g.c_intl_node_max,

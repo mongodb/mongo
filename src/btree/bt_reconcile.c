@@ -30,6 +30,8 @@ typedef struct {
 	int evict;			/* The page is being discarded */
 	int locked;			/* The tree is locked down */
 
+	int debug_split_min;		/* Debugging: use minimal split sizes */
+
 	/*
 	 * As pages are reconciled, split pages are merged into their parent
 	 * and discarded; deleted pages and overflow K/V items are discarded
@@ -274,6 +276,7 @@ __rec_discard_add_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell)
 static int
 __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_RECONCILE *r;
 
@@ -293,6 +296,12 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 		/* Connect prefix compression pointers/buffers. */
 		r->full = &r->_full;
 		r->last = &r->_last;
+
+		/* Configuration. */
+		WT_RET(__wt_config_getones(
+		    session->btree->config, "debug_split_min", &cval));
+		if (cval.val != 0)
+			r->debug_split_min = 1;
 	}
 
 	r->evict = LF_ISSET(WT_REC_EVICT);
@@ -987,15 +996,14 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 */
 	r->page_size = max;
 	r->split_size = WT_ALIGN((max / 4) * 3, btree->allocsize);
-#ifdef HAVE_DIAGNOSTIC
+
 	/*
 	 * This won't get tested enough if we don't force the code to create
 	 * lots of splits.
 	 */
-	r->split_size = min;
-#else
-	WT_UNUSED(min);
-#endif
+	if (r->debug_split_min)
+		r->split_size = min;
+
 	/*
 	 * If the maximum page size is the same as the split page size, there
 	 * is no need to maintain split boundaries within a larger page.
