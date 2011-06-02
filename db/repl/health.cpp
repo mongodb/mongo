@@ -127,15 +127,17 @@ namespace mongo {
     }
 
     string MemberState::toString() const {
-        if( s == MemberState::RS_STARTUP ) return "STARTUP";
-        if( s == MemberState::RS_PRIMARY ) return "PRIMARY";
-        if( s == MemberState::RS_SECONDARY ) return "SECONDARY";
-        if( s == MemberState::RS_RECOVERING ) return "RECOVERING";
-        if( s == MemberState::RS_FATAL ) return "FATAL";
-        if( s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-        if( s == MemberState::RS_ARBITER ) return "ARBITER";
-        if( s == MemberState::RS_DOWN ) return "DOWN";
-        if( s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
+        switch ( s ) {
+        case RS_STARTUP: return "STARTUP";
+        case RS_PRIMARY: return "PRIMARY";
+        case RS_SECONDARY: return "SECONDARY";
+        case RS_RECOVERING: return "RECOVERING";
+        case RS_FATAL: return "FATAL";
+        case RS_STARTUP2: return "STARTUP2";
+        case RS_ARBITER: return "ARBITER";
+        case RS_DOWN: return "DOWN";
+        case RS_ROLLBACK: return "ROLLBACK";
+        }
         return "";
     }
 
