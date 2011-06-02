@@ -19,25 +19,6 @@ typedef struct {
 	uint32_t nrepeats;
 } CURSOR_BTREE;
 
-/*
- * WT_STACK --
- *	We maintain a stack of parent pages as we build the tree, encapsulated
- *	in this structure.
- */
-typedef struct {
-	WT_PAGE	*page;			/* page header */
-	uint8_t	*first_free;		/* page's first free byte */
-	uint32_t space_avail;		/* page's space available */
-
-	WT_BUF *tmp;			/* page-in-a-buffer */
-	void *data;			/* last on-page WT_COL/WT_ROW */
-} WT_STACK_ELEM;
-
-typedef struct {
-	WT_STACK_ELEM *elem;		/* stack */
-	u_int size;			/* stack size */
-} WT_STACK;
-
 typedef struct {
 	CURSOR_BTREE cbt;
 
@@ -137,6 +118,9 @@ struct __wt_btree {
 	uint32_t flags;
 };
 
+/*******************************************
+ * Implementation of WT_SESSION
+ *******************************************/
 struct __wt_btree_session {
 	WT_BTREE *btree;
 
@@ -146,9 +130,6 @@ struct __wt_btree_session {
 	TAILQ_ENTRY(__wt_btree_session) q;
 };
 
-/*******************************************
- * Application session information
- *******************************************/
 typedef	enum {
 	WT_WORKQ_NONE=0,		/* No request */
 	WT_WORKQ_FUNC=1,		/* Function, then return */
@@ -253,10 +234,10 @@ struct __wt_connection_impl {
 	 * needs more.   Growing the number of threads dynamically is possible,
 	 * but tricky since the workQ is walking the array without locking it.
 	 *
-	 * There's an array of WT_SESSION_IMPL pointers that reference the allocated
-	 * array; we do it that way because we want an easy way for the workQ
-	 * code to avoid walking the entire array when only a few threads are
-	 * running.
+	 * There's an array of WT_SESSION_IMPL pointers that reference the
+	 * allocated array; we do it that way because we want an easy way for
+	 * the workQ code to avoid walking the entire array when only a few
+	 * threads are running.
 	 */
 	WT_SESSION_IMPL	**sessions;		/* TOC reference */
 	uint32_t toc_cnt;		/* TOC count */
@@ -272,9 +253,9 @@ struct __wt_connection_impl {
 	 * the right change is to increase the default).  The method is there
 	 * just in case an application starts failing in the field.
 	 *
-	 * The hazard array is separate from the WT_SESSION_IMPL array because we must
-	 * be able to easily copy and search it when evicting pages from the
-	 * cache.
+	 * The hazard array is separate from the WT_SESSION_IMPL array because
+	 * we must be able to easily copy and search it when evicting pages from
+	 * the cache.
 	 */
 	WT_HAZARD *hazard;		/* Hazard references array */
 
@@ -304,15 +285,15 @@ struct __wt_connection_impl {
 	uint32_t flags;
 };
 
-#define	API_CONF_INIT(h, n, cfg)	const char *__cfg[] =	\
+#define	API_CONF_INIT(h, n, cfg)	const char *__cfg[] =		\
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
 #define	API_SESSION_INIT(s, h, n, cur, bt)				\
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
-	(s)->name = #h "." #n;					\
+	(s)->name = #h "." #n;						\
 
-#define	API_CALL_NOCONF(s, h, n, cur, bt)	do {			\
+#define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
 	API_SESSION_INIT(s, h, n, cur, bt)
 
 #define	API_CALL(s, h, n, cur, bt, cfg)	do {				\
@@ -331,11 +312,11 @@ struct __wt_connection_impl {
 	API_CALL(s, connection, n, NULL, NULL, cfg);			\
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
-	(s) = (WT_SESSION_IMPL *)(cur)->session;				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
 
 #define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg)			\
-	(s) = (WT_SESSION_IMPL *)(cur)->session;				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	API_CALL(s, cursor, n, cur, bt, cfg);				\
 
 /*******************************************
