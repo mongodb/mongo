@@ -48,11 +48,8 @@ __wt_verify_build(void)
 	 * the page header structure is exactly what we expect.
 	 */
 	SIZE_CHECK(WT_BTREE_DESC, WT_BTREE_DESC_SIZE);
-	SIZE_CHECK(WT_COL, WT_COL_SIZE);
 	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
 	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
-	SIZE_CHECK(WT_PAGE, WT_PAGE_SIZE);
-	SIZE_CHECK(WT_ROW, WT_ROW_SIZE);
 
 	/*
 	 * The page header is special: the compiler will pad it to a multiple

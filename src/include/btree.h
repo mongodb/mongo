@@ -338,28 +338,15 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_BULK_LOAD	0x001	/* Page bulk loaded */
-#define	WT_PAGE_CACHE_COUNTED	0x002	/* Page counted in cache stats */
-#define	WT_PAGE_DELETED		0x004	/* Page was empty at reconcilation */
-#define	WT_PAGE_INITIAL_EMPTY	0x008	/* Empty page created during open */
-#define	WT_PAGE_MODIFIED	0x010	/* Page is modified */
-#define	WT_PAGE_PINNED		0x020	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x040	/* Internal page created in a split */
-
+#define	WT_PAGE_BULK_LOAD	0x01	/* Page bulk loaded */
+#define	WT_PAGE_CACHE_COUNTED	0x02	/* Page counted in cache stats */
+#define	WT_PAGE_DELETED		0x04	/* Page was empty at reconcilation */
+#define	WT_PAGE_INITIAL_EMPTY	0x08	/* Empty page created during open */
+#define	WT_PAGE_MODIFIED	0x10	/* Page is modified */
+#define	WT_PAGE_PINNED		0x20	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x40	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
-/*
- * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
- * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- *
- * The compiler will pad this to be a multiple of the pointer size, so take
- * that into account.
- */
-#define	WT_PAGE_SIZE							\
-	WT_ALIGN(6 * sizeof(void *) + 2 * sizeof(uint64_t) +		\
-	    2 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
 
 /*
  * WT_PADDR, WT_PSIZE --
@@ -513,14 +500,6 @@ struct __wt_col_ref {
 struct __wt_row {
 	void	*key;			/* On-page cell or off-page WT_IKEY */
 };
-/*
- * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
- * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- */
-#define	WT_ROW_SIZE							\
-	(sizeof(void *))
 
 /*
  * WT_ROW_FOREACH --
@@ -559,13 +538,6 @@ struct __wt_col {
 	 */
 	uint32_t value;
 };
-/*
- * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
- * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- */
-#define	WT_COL_SIZE	(sizeof(uint32_t))
 
 /*
  * WT_COL_PTR --
