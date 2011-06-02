@@ -247,15 +247,12 @@ struct __wt_connection_impl {
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
-	 * control, by default.  The Env.hazard_max_set method tunes this if an
-	 * application needs more, but that shouldn't happen, there's no code
-	 * path that requires more than 15 pages at a time (and if we find one,
-	 * the right change is to increase the default).  The method is there
-	 * just in case an application starts failing in the field.
+	 * control, by default.  There's no code path that requires more than 15
+	 * pages at a time (and if we find one, the right change is to increase
+	 * the default).
 	 *
 	 * The hazard array is separate from the WT_SESSION_IMPL array because
-	 * we must be able to easily copy and search it when evicting pages from
-	 * the cache.
+	 * we need to easily copy and search it when evicting pages from memory.
 	 */
 	WT_HAZARD *hazard;		/* Hazard references array */
 
