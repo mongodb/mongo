@@ -457,6 +457,7 @@ namespace mongo {
                 case BSONObj::NE:
                 case BSONObj::NIN:
                 case BSONObj::opEXISTS: // Not part of keyMatch() determination, but we can't match on index in this case.
+                case BSONObj::opTYPE: // For $type:10 (null), a null key could be a missing field or a null value field.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;
