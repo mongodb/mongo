@@ -273,7 +273,7 @@ __wt_debug_page_work(
 
 	fprintf(fp, "%p: ", page);
 	if (WT_PADDR(page) == WT_ADDR_INVALID)
-		fprintf(fp, "[not set]");
+		fprintf(fp, "[NoAddr]");
 	else
 		fprintf(fp, "[%lu-%lu]",
 		    (u_long)WT_PADDR(page),
@@ -836,11 +836,11 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	}
 
 	if (ref->addr == WT_ADDR_INVALID)
-		fprintf(fp, "not-set");
+		fprintf(fp, "NoAddr");
 	else
-		fprintf(fp, "%lu", (u_long)ref->addr);
+		fprintf(fp, "%lu/%lu", (u_long)ref->addr, (u_long)ref->size);
 
-	fprintf(fp, "/%lu: %s", (u_long)ref->size, s);
+	fprintf(fp, ": %s", s);
 	if (ref->state == WT_REF_MEM)
 		fprintf(fp, "(%p)", ref->page);
 	fprintf(fp, "\n");
