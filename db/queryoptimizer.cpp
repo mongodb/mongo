@@ -688,9 +688,8 @@ doneCheckOrder:
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
         mayYield();
-        OpHolder holder = _queue.top();
         dassert( !_queue.empty() );
-        _queue.pop();
+        OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
         if ( op.complete() ) {

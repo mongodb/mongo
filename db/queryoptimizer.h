@@ -213,7 +213,6 @@ namespace mongo {
     template<class T>
     class our_priority_queue : boost::noncopyable { 
         vector<T> v;
-        size_t t;
     public:
         our_priority_queue() { 
             v.reserve(4);
@@ -223,17 +222,15 @@ namespace mongo {
         void push(const T & x) { 
             v.push_back(x); 
         }
-        void pop() {
-            dassert( t < v.size() );
-            v.erase(v.begin()+t);
-        }
-        T top() { 
-            t = 0;
+        T pop() { 
+            size_t t = 0;
             for( size_t i = 1; i < v.size(); i++ ) { 
                 if( v[t] < v[i] )
                     t = i;
             }
-            return v[t];
+            T ret = v[t];
+            v.erase(v.begin()+t);
+            return ret;
         }
     };
 
