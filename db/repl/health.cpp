@@ -126,21 +126,6 @@ namespace mongo {
         return "";
     }
 
-    string MemberState::toString() const {
-        switch ( s ) {
-        case RS_STARTUP: return "STARTUP";
-        case RS_PRIMARY: return "PRIMARY";
-        case RS_SECONDARY: return "SECONDARY";
-        case RS_RECOVERING: return "RECOVERING";
-        case RS_FATAL: return "FATAL";
-        case RS_STARTUP2: return "STARTUP2";
-        case RS_ARBITER: return "ARBITER";
-        case RS_DOWN: return "DOWN";
-        case RS_ROLLBACK: return "ROLLBACK";
-        }
-        return "";
-    }
-
     extern time_t started;
 
     // oplogdiags in web ui
