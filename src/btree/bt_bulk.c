@@ -272,6 +272,7 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 		cbulk->ref_entries += 1000;
 	}
 	WT_RET(__wt_row_ikey_alloc(session,
+	    0,
 	    WT_INSERT_KEY(cbulk->ins_base),
 	    WT_INSERT_KEY_SIZE(cbulk->ins_base),
 	    (WT_IKEY **)&cbulk->rref[cbulk->ref_next].key));

@@ -20,15 +20,12 @@ __wt_row_key(
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BUF build, tmp;
-	WT_CELL *cell;
 	WT_IKEY *ikey;
-	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t pfx;
-	int is_local, is_ovfl, ret, slot_offset;
+	int is_local, ret, slot_offset;
 	void *key;
 
-	dsk = page->dsk;
 	rip = rip_arg;
 
 	WT_CLEAR(build);
@@ -46,7 +43,6 @@ __wt_row_key(
 		is_local = 1;
 	}
 
-	is_ovfl = 0;
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
 		/*
@@ -103,8 +99,8 @@ __wt_row_key(
 			 * and roll forward.
 			 */
 			ikey = key;
-			if (slot_offset == 0 ||
-			    !F_ISSET(ikey, WT_IKEY_OVERFLOW)) {
+			if (slot_offset == 0 || !__wt_cell_type_is_ovfl(
+			    WT_REF_OFFSET(page, ikey->cell_offset))) {
 				WT_ERR(__wt_buf_set(session,
 				    retb, WT_IKEY_DATA(ikey), ikey->size));
 				if (slot_offset == 0)
@@ -136,7 +132,6 @@ __wt_row_key(
 			 * to know so it can update the overflow bit array.
 			 */
 			if (slot_offset == 0) {
-				is_ovfl = 1;
 				WT_ERR(__wt_cell_copy(session, key, retb));
 				break;
 			}
@@ -229,14 +224,9 @@ next:		switch (direction) {
 	 * Allocate and initialize a WT_IKEY structure, we're instantiating
 	 * this key.
 	 */
-	WT_ERR(__wt_row_ikey_alloc(session, retb->data, retb->size, &ikey));
-	if ((cell = __wt_row_value(page, rip)) == NULL)
-		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
-	else
-		ikey->value_cell_offset = WT_PAGE_DISK_OFFSET(dsk, cell);
-	if (is_ovfl)
-		F_SET(ikey, WT_IKEY_OVERFLOW);
-	__wt_buf_free(session, &tmp);
+	WT_ERR(__wt_row_ikey_alloc(session,
+	    WT_DISK_OFFSET(page->dsk, rip_arg->key),
+	    retb->data, retb->size, &ikey));
 
 	/* Serialize the swap of the key into place. */
 	__wt_row_key_serial(session, page, rip_arg, ikey, ret);
@@ -244,6 +234,8 @@ next:		switch (direction) {
 	/* Free the WT_IKEY structure if the workQ didn't use it for the key. */
 	if (rip_arg->key != ikey)
 		__wt_sb_decrement(session, ikey->sb);
+
+	__wt_buf_free(session, &tmp);
 
 	return (ret);
 
@@ -261,8 +253,6 @@ WT_CELL *
 __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
-	WT_IKEY *ikey;
-	void *key;
 
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
@@ -272,21 +262,18 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * the key may change underfoot, and here's where it gets tricky: first,
 	 * copy the key.
 	 */
-	key = rip->key;
+	cell = rip->key;
 
 	/*
 	 * Key copied.
 	 *
-	 * Now, key either references a WT_IKEY structure that has a value-cell
+	 * Now, cell either references a WT_IKEY structure that has a value-cell
 	 * offset, or references the on-page key WT_CELL, and we can walk past
 	 * that to find the value WT_CELL.  Both can be processed regardless of
 	 * what other threads are doing.
 	 */
-	if (__wt_off_page(page, key)) {
-		ikey = key;
-		return (WT_IKEY_VALUE_EMPTY_ISSET(ikey) ?
-		    NULL : WT_ROW_PTR(page, ikey->value_cell_offset));
-	}
+	if (__wt_off_page(page, cell))
+		cell = WT_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
 
 	/*
 	 * Row-store leaf pages may have a single data cell between each key, or
@@ -294,7 +281,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	cell = __wt_cell_next(key);
+	cell = __wt_cell_next(cell);
 	if (__wt_cell_type(cell) == WT_CELL_KEY ||
 	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
 		return (NULL);
@@ -306,8 +293,8 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
  *	Instantiate a key in a WT_IKEY structure.
  */
 int
-__wt_row_ikey_alloc(
-    WT_SESSION_IMPL *session, const void *key, uint32_t size, WT_IKEY **ikeyp)
+__wt_row_ikey_alloc(WT_SESSION_IMPL *session,
+    uint32_t cell_offset, const void *key, uint32_t size, WT_IKEY **ikeyp)
 {
 	WT_IKEY *ikey;
 	WT_SESSION_BUFFER *sb;
@@ -319,6 +306,7 @@ __wt_row_ikey_alloc(
 	WT_RET(__wt_sb_alloc(session, sizeof(WT_IKEY) + size, &ikey, &sb));
 	ikey->sb = sb;
 	ikey->size = size;
+	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
 	*ikeyp = ikey;

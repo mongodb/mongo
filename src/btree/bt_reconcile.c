@@ -1319,8 +1319,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 		 */
 		cell = WT_PAGE_DISK_BYTE(dsk);
 		WT_ASSERT(session,
-		    __wt_cell_type(cell) == WT_CELL_KEY_OVFL ||
-		    __wt_cell_prefix(cell) == 0);
+		    __wt_cell_prefix(cell) == 0 ||
+		    __wt_cell_type(cell) == WT_CELL_KEY_OVFL);
 		WT_RET(__wt_cell_copy(session, cell, &spl->key));
 		break;
 	case WT_PAGE_COL_FIX:
@@ -1866,10 +1866,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * points, into new pages.  It would be both difficult and expensive
 	 * to re-process the 0th key at each split point to be an empty key,
 	 * so we don't do that.  However, we are reconciling an internal page
-	 * for whatever reason, and the 0th key is known to be useless.  Set
-	 * the 0th key to something small.  (We do NOT put a zero-length key
-	 * in the tree: zero-length keys are keys requiring further processing,
-	 * not keys we are going to ignore.)
+	 * for whatever reason, and the 0th key is known to be useless.  We
+	 * truncate the key to a single byte, instead of removing it entirely,
+	 * it simplifies various things in other parts of the code: we don't
+	 * have to special case page verification, or transforming the page
+	 * from its disk image to its in-memory version.
 	 */
 	r->cell_zero = 1;
 
@@ -1883,10 +1884,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	val->len = val->cell_len + WT_SIZEOF32(WT_OFF);
 
 	/*
-	 * There are two kinds of row-store internal pages we reconcile: the
-	 * first is a page created entirely in-memory, in which case there's
-	 * no underlying disk image.  The second is a page read from disk,
-	 * in which case we can take the keys from the underlying disk image.
+	 * We reconcile three kinds of row-store internal pages: the first is a
+	 * page created entirely in-memory, in which case there's never a disk
+	 * image.  The second is a page read from disk, and these pages come in
+	 * two forms: with and without a disk image.  If the page had overflow
+	 * keys, then there's a disk image from which we get the overflow keys.
+	 * If the page had no overflow keys, we discarded the disk image after
+	 * creating the in-memory version of the page.
 	 *
 	 * Internal pages created in-memory are always merged into their parent
 	 * in order to keep the tree from growing deeper on every split.  For
@@ -1899,22 +1903,18 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *
 	 * There is a special case: if the root splits, there's no parent into
 	 * which it can be merged, so the reconciliation code turns off the
-	 * merge flag, and reconciles the page anyway.  In that case we end up
-	 * here, with no disk image.  This code is here to handle that specific
-	 * case.
+	 * merge flag, and reconciles the page anyway.
 	 */
 	if (page->dsk == NULL) {
 		WT_RET(__rec_row_merge(session, page));
 		return (__rec_split_finish(session));
 	}
 
-	/*
-	 * We have to walk both the WT_ROW structures and the original page --
-	 * see the comment at WT_ROW_REF_AND_KEY_FOREACH for details.
-	 *
-	 * For each entry in the in-memory page...
-	 */
-	WT_ROW_REF_AND_KEY_FOREACH(page, rref, cell, i) {
+	/* For each entry in the in-memory page... */
+	WT_ROW_REF_FOREACH(page, rref, i) {
+		ikey = rref->key;
+		cell = WT_REF_OFFSET(page, ikey->cell_offset);
+
 		/*
 		 * The page may be deleted or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
@@ -1969,31 +1969,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/*
 		 * Build key cell.
 		 *
-		 * Discard any 0th key, internal pages don't need 0th keys.
-		 *
 		 * If the key is an overflow item, assume prefix compression
 		 * won't make things better, and simply copy it.
+		 *
+		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (r->cell_zero) {
-			WT_RET(__rec_cell_build_key(session, "*", 1));
-			r->cell_zero = 0;
-
-			/* If the 0th key was an overflow key, discard it. */
-			WT_RET(__rec_discard_add_ovfl(session, cell));
-
-			ovfl_key = 0;
-		} else if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
+		if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_len(cell);
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
 		} else {
-			ikey = rref->key;
-			WT_RET(__rec_cell_build_key(
-			    session, WT_IKEY_DATA(ikey), ikey->size));
+			WT_RET(__rec_cell_build_key(session,
+			    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size));
 			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 		}
+		r->cell_zero = 0;
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
@@ -2076,24 +2068,17 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 		/*
-		 * Build key cell.
+		 * Build the key cell.  If this is the first key in a "to be
+		 * merged" subtree, use the merge correction key saved in the
+		 * top-level parent page when this function was called.
 		 *
-		 * Discard any 0th key, internal pages don't need 0th keys; this
-		 * test preceeds the merge test as we don't need any 0th keys,
-		 * merge or not.
-		 *
-		 * If this is the first key in a "to be merged" subtree, use the
-		 * merge correction key saved in the top-level parent page when
-		 * this function was called.
+		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (r->cell_zero)
-			WT_RET(__rec_cell_build_key(session, "*", 1));
-		else {
-			ikey = r->merge_ref == NULL ?
-			    rref->key : r->merge_ref->key;
-			WT_RET(__rec_cell_build_key(
-			    session, WT_IKEY_DATA(ikey), ikey->size));
-		}
+		ikey = r->merge_ref == NULL ? rref->key : r->merge_ref->key;
+		r->merge_ref = NULL;
+		WT_RET(__rec_cell_build_key(session,
+		    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size));
+		r->cell_zero = 0;
 		ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 
 		/*
@@ -2111,9 +2096,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
 			}
 		}
-
-		r->cell_zero = 0;
-		r->merge_ref = NULL;
 
 		/* Copy the key onto the page. */
 		__rec_copy_incr(session, r, key);
@@ -2182,13 +2164,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 	if ((ins = WT_ROW_INSERT_SMALLEST(page)) != NULL)
 		WT_RET(__rec_row_leaf_insert(session, ins));
 
-	/*
-	 * Walk the page, writing key/value pairs.
-	 *
-	 * We have to walk both the WT_ROW structures and the original page --
-	 * see the comment at WT_ROW_AND_KEY_FOREACH for details.
-	 */
-	WT_ROW_AND_KEY_FOREACH(page, rip, cell, i) {
+	/* For each entry in the page... */
+	WT_ROW_FOREACH(page, rip, i) {
 		/*
 		 * The salvage code, on some rare occasions, wants to reconcile
 		 * a page but skip some leading records on the page.  Because
@@ -2202,6 +2179,18 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 		if (slvg_skip != 0) {
 			--slvg_skip;
 			continue;
+		}
+
+		/*
+		 * Set the WT_IKEY reference (if the key was instantiated), and
+		 * the key cell reference.
+		 */
+		if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			cell = WT_REF_OFFSET(page, ikey->cell_offset);
+		} else {
+			ikey = NULL;
+			cell = rip->key;
 		}
 							/* Build value cell. */
 		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
@@ -2261,8 +2250,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else if (__wt_off_page(page, rip->key)) {
-			ikey = rip->key;
+		} else if (ikey != NULL) {
 			WT_RET(__rec_cell_build_key(
 			    session, WT_IKEY_DATA(ikey), ikey->size));
 			ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
@@ -2858,7 +2846,7 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 	/* Enter each split page into the new, internal page. */
 	for (rref = page->u.row_int.t,
 	    spl = r->split, i = 0; i < r->split_next; ++rref, ++spl, ++i) {
-		WT_RET(__wt_row_ikey_alloc(session,
+		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    spl->key.data, spl->key.size, (WT_IKEY **)&rref->key));
 		WT_ROW_REF_ADDR(rref) = spl->off.addr;
 		WT_ROW_REF_SIZE(rref) = spl->off.size;

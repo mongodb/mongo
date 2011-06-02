@@ -162,7 +162,7 @@ __wt_page_inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_FIX_FOREACH(btree, dsk, p, i)
-		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
+		(cip++)->value = WT_DISK_OFFSET(dsk, p);
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -239,7 +239,7 @@ __wt_page_inmem_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
-		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
+		(cip++)->value = WT_DISK_OFFSET(dsk, p);
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -274,7 +274,7 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, i)
-		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, cell);
+		(cip++)->value = WT_DISK_OFFSET(dsk, cell);
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -290,18 +290,17 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_BUF *current, *last, *tmp;
 	WT_CELL *cell;
-	WT_IKEY *ikey;
 	WT_OFF off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t data_size, i, nindx, prefix;
-	int cell_ovfl, ret;
+	int cell_ovfl, found_ovfl, ret;
 	void *data, *huffman;
 
 	btree = session->btree;
 	current = last = NULL;
 	dsk = page->dsk;
-	ret = 0;
+	found_ovfl = ret = 0;
 	huffman = btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
@@ -346,6 +345,13 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Get the cell's prefix and check if it's an overflow cell. */
 		prefix = __wt_cell_prefix(cell);
 		cell_ovfl = __wt_cell_type_is_ovfl(cell) ? 1 : 0;
+
+		/*
+		 * We can discard the underlying disk page if we don't have any
+		 * overflow keys.
+		 */
+		if (cell_ovfl)
+			found_ovfl = 1;
 
 		/*
 		 * Overflow keys are simple, and don't participate in prefix
@@ -393,18 +399,15 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			}
 		}
 
-		/*
-		 * The key has no data, and overflow doesn't matter, but might
-		 * as well be consistent.
-		 */
-		WT_ERR(__wt_row_ikey_alloc(
-		    session, current->data, current->size, &ikey));
-		ikey->value_cell_offset = WT_IKEY_VALUE_EMPTY;
-		if (cell_ovfl)
-			F_SET(ikey, WT_IKEY_OVERFLOW);
-		rref->key = ikey;
+		/* Allocate and initialize the instantiated key. */
+		WT_ERR(__wt_row_ikey_alloc(session,
+		    WT_DISK_OFFSET(dsk, cell),
+		    current->data, current->size, (WT_IKEY **)&rref->key));
 
-		/* Swap buffers. */
+		/*
+		 * Swap buffers if it's not an overflow key, we have a new
+		 * prefix-compressed page.
+		 */
 		if (!cell_ovfl) {
 			tmp = last;
 			last = current;
@@ -412,9 +415,8 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 	}
 
-#if 0
-	__wt_free(session, page->dsk);
-#endif
+	if (!found_ovfl)
+		__wt_free(session, page->dsk);
 
 err:	if (current != NULL)
 		__wt_scr_release(&current);

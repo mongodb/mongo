@@ -1465,7 +1465,7 @@ __slvg_build_internal_row(
 			if (deleted)
 				continue;
 		} else {
-			WT_ERR(__wt_row_ikey_alloc(session,
+			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->u.row.range_start.data,
 			    trk->u.row.range_start.size,
 			    (WT_IKEY **)&rref->key));
@@ -1637,11 +1637,12 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		rip = page->u.row_leaf.d + skip_start;
 		if (__wt_off_page(page, rip->key)) {
 			ikey = rip->key;
-			WT_ERR(__wt_row_ikey_alloc(session, WT_IKEY_DATA(ikey),
-			    ikey->size, (WT_IKEY **)&rref->key));
+			WT_ERR(__wt_row_ikey_alloc(session, 0,
+			    WT_IKEY_DATA(ikey), ikey->size,
+			    (WT_IKEY **)&rref->key));
 		} else {
 			WT_ERR(__wt_row_key(session, page, rip, key));
-			WT_ERR(__wt_row_ikey_alloc(session,
+			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    key->data, key->size, (WT_IKEY **)&rref->key));
 		}
 	}
@@ -1668,12 +1669,14 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 	WT_TRACK **searchp;
 	uint32_t i;
 
-	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i) {
+	WT_ROW_FOREACH(page, rip, i) {
 		/* Skip any leading keys on the page we're not keeping. */
 		if (skip_start != 0) {
 			--skip_start;
 			continue;
 		}
+
+		key_cell = rip->key;
 		if (__wt_cell_type(key_cell) == WT_CELL_KEY_OVFL) {
 			__wt_cell_off(key_cell, &ovfl);
 			searchp =

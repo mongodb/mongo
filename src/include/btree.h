@@ -201,13 +201,13 @@ struct __wt_page_disk {
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
 
 /*
- * WT_PAGE_DISK_OFFSET --
- *	Offset of a pointer in a page.
+ * WT_DISK_OFFSET, WT_REF_OFFSET --
+ *	Return the offset/pointer of a pointer/offset in a page disk image.
  */
-#define	WT_PAGE_DISK_OFFSET(dsk, p)					\
+#define	WT_DISK_OFFSET(dsk, p)						\
 	((uint32_t)((uint8_t *)(p) - (uint8_t *)(dsk)))
-#define	WT_PAGE_DISK_REF(dsk, o)					\
-	((void *)((uint8_t *)(dsk) + (o)))
+#define	WT_REF_OFFSET(page, o)						\
+	((void *)((uint8_t *)((page)->dsk) + (o)))
 
 /*
  * WT_PAGE --
@@ -441,32 +441,15 @@ struct __wt_ikey {
 
 	/*
 	 * If we no longer point to the key's on-page WT_CELL, we can't find
-	 * its related value.  Save the offset of the value cell in the page.
-	 * (This is wasted memory for WT_ROW_REF structures, but there aren't
-	 * that many of them, it's not worth having another structure type.)
+	 * its related value.  Save the offset of the key cell in the page.
 	 *
 	 * Row-store cell references are page offsets, not pointers (we boldly
 	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
 	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
-	 *
-	 * We don't store empty data items, that is, if the data is zero-length,
-	 * the key is stored but there's no data WT_CELL.  Since it's impossible
-	 * to have a data item at the beginning of the page, a page offset of 0
-	 * marks non-existent data items.
 	 */
-#define	WT_IKEY_VALUE_EMPTY		0
-#define	WT_IKEY_VALUE_EMPTY_ISSET(ikey)	((ikey)->value_cell_offset == 0)
-	uint32_t  value_cell_offset;
+	uint32_t  cell_offset;
 
-	/*
-	 * We need to know if instantiated keys were instantiated from overflow
-	 * records because overflow records aren't prefix compressed, and so do
-	 * not give us a record from which we can roll forward.
-	 */
-#define	WT_IKEY_OVERFLOW		0x01
-	uint8_t  flags;
-
-	/* The key bytes immediately follows the WT_IKEY structure. */
+	/* The key bytes immediately follow the WT_IKEY structure. */
 #define	WT_IKEY_DATA(ikey)						\
 	((void *)((uint8_t *)(ikey) + sizeof(WT_IKEY)))
 };
@@ -540,13 +523,6 @@ struct __wt_row {
 	(sizeof(void *))
 
 /*
- * WT_ROW_PTR --
- *	Return a pointer corresponding to the data offset.
- */
-#define	WT_ROW_PTR(page, offset)					\
-	WT_PAGE_DISK_REF((page)->dsk, offset)
-
-/*
  * WT_ROW_FOREACH --
  *	Walk the entries of an in-memory row-store leaf page.
  */
@@ -593,10 +569,10 @@ struct __wt_col {
 
 /*
  * WT_COL_PTR --
- *	Return a pointer corresponding to the data offset.
+ *     Return a pointer corresponding to the data offset.
  */
 #define	WT_COL_PTR(page, cip)						\
-	WT_PAGE_DISK_REF((page)->dsk, (cip)->value)
+	WT_REF_OFFSET(page, (cip)->value)
 
 /*
  * WT_COL_FOREACH --
@@ -722,45 +698,6 @@ struct __wt_insert {
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
-
-/*
- * WT_{ROW,ROW_REF}_AND_KEY_FOREACH --
- *	Walk the indexes of a row-store in-memory page at the same time walking
- * the underlying page's key WT_CELLs.
- *
- * This macro is necessary for when we're walking both the in-memory structures
- * as well as the original page: the problem is keys that require processing.
- * When a page is read into memory from a file, the in-memory key/size pair is
- * set to reference an on-page group of bytes in the key's WT_CELL structure.
- * For uncompressed, small, simple keys, those bytes are usually what we want to
- * access, and the in-memory WT_ROW and WT_ROW_REF structures point to them.
- *
- * Keys that require processing are harder (for example, a Huffman encoded or
- * overflow key).  When we actually use a key requiring processing, we process
- * the key and set the in-memory key/size pair to reference the allocated memory
- * that holds the key -- which means we've lost any reference to the original
- * WT_CELL structure.  If we need the original key (for example, if reconciling
- * the page, or verifying or freeing overflow references, in-memory information
- * no longer gets us there).  As these are relatively rare operations performed
- * on (hopefully!) relatively rare key types, we don't want to increase the size
- * of the in-memory structurees to always reference the page.  Instead, walk the
- * original page at the same time we walk the in-memory structures so we can
- * find the original key WT_CELL.
- */
-#define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)		\
-	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
-	    (rref) = (page)->u.row_int.t, (i) = (page)->entries;	\
-	    (i) > 0;							\
-	    ++(rref),							\
-	    key_cell = --(i) == 0 ?					\
-	    NULL : __wt_cell_next(__wt_cell_next(key_cell)))
-#define	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i)			\
-	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
-	    (rip) = (page)->u.row_leaf.d, (i) = (page)->entries;	\
-	    (i) > 0;							\
-	    ++(rip),							\
-	    key_cell = --(i) == 0 ?					\
-	    NULL : __wt_key_cell_next(key_cell))
 
 /*
  * WT_CELL --
