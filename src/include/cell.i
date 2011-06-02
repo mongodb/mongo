@@ -40,7 +40,7 @@
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Variable-length data cells (a WT_CELL_DATA or WT_CELL_DATA_OVFL cell,
- *	and for deleted cells, a WT_CELL_DEL.
+ *	and for deleted cells, a WT_CELL_DEL).
  *
  * A cell consists of 1 descriptor byte, optionally followed by: 1 byte which
  * specifies key prefix compression, 1-4 bytes which specify a data length,
