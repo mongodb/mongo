@@ -278,7 +278,7 @@ __wt_verify_dsk_row(
 		}
 
 		/* Confirm the prefix compression count is possible. */
-		if (last->size != 0 && prefix >= last->size) {
+		if (last->size != 0 && prefix > last->size) {
 			__wt_errx(session,
 			    "the %lu key on page at addr %lu has a prefix "
 			    "compression count of %lu, larger than the length "
