@@ -117,7 +117,7 @@ namespace mongo {
     }
 
 
-    void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+    void IndexSpec::getKeys( const BSONObj &obj, BSONObjSet &keys ) const {
         if ( _indexType.get() ) { //plugin (eg geo)
             _indexType->getKeys( obj , keys );
             return;
@@ -129,7 +129,7 @@ namespace mongo {
             keys.insert( _nullKey );
     }
 
-    void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+    void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSet &keys ) const {
         BSONElement arrElt;
         unsigned arrIdx = ~0;
         int numNotFound = 0;

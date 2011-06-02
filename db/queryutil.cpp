@@ -1150,6 +1150,19 @@ namespace mongo {
         return l;
     }
 
+    bool FieldRangeVector::matchesKey( const BSONObj &key ) const {
+        BSONObjIterator j( key );
+        BSONObjIterator k( _indexSpec.keyPattern );
+        for( int l = 0; l < (int)_ranges.size(); ++l ) {
+            int number = (int) k.next().number();
+            bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
+            if ( !matchesElement( j.next(), l, forward ) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
@@ -1159,25 +1172,26 @@ namespace mongo {
         BSONObjSetDefaultOrder keys;
         _indexSpec.getKeys( obj, keys );
         for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
-            BSONObjIterator j( *i );
-            BSONObjIterator k( _indexSpec.keyPattern );
-            bool match = true;
-            for( int l = 0; l < (int)_ranges.size(); ++l ) {
-                int number = (int) k.next().number();
-                bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-                if ( !matchesElement( j.next(), l, forward ) ) {
-                    match = false;
-                    break;
-                }
-            }
-            if ( match ) {
-                // The *i key matched a valid range for every element.
-                return true;
+            if ( matchesKey( *i ) ) {
+                return true;   
             }
         }
         return false;
     }
 
+    BSONObj FieldRangeVector::firstMatch( const BSONObj &obj ) const {
+        // NOTE Only works in forward direction.
+        assert( _direction >= 0 );
+        BSONObjSet keys( BSONObjCmp( _indexSpec.keyPattern ) );
+        _indexSpec.getKeys( obj, keys );
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            if ( matchesKey( *i ) ) {
+                return *i;
+            }
+        }
+        return BSONObj();
+    }
+    
     // TODO optimize more
     int FieldRangeVectorIterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );

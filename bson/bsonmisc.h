@@ -29,20 +29,19 @@ namespace mongo {
 
     class BSONObjCmp {
     public:
-        BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
+        BSONObjCmp( const BSONObj &order = BSONObj() ) : _order( order ) {}
         bool operator()( const BSONObj &l, const BSONObj &r ) const {
-            return l.woCompare( r, order ) < 0;
+            return l.woCompare( r, _order ) < 0;
         }
     private:
-        BSONObj order;
+        BSONObj _order;
     };
 
-    class BSONObjCmpDefaultOrder : public BSONObjCmp {
+    typedef set<BSONObj,BSONObjCmp> BSONObjSet;
+    class BSONObjSetDefaultOrder : public BSONObjSet {
     public:
-        BSONObjCmpDefaultOrder() : BSONObjCmp( BSONObj() ) {}
+        BSONObjSetDefaultOrder() : BSONObjSet( BSONObjCmp() ) {}
     };
-
-    typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
     enum FieldCompareResult {
         LEFT_SUBFIELD = -2,

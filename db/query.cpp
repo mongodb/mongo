@@ -687,7 +687,7 @@ namespace mongo {
 
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
-                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder() ) );
+                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder(), qp().multikeyFrs() ) );
             }
 
             if ( _pq.isExplain() ) {

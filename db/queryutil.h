@@ -313,9 +313,16 @@ namespace mongo {
          */
         bool matches( const BSONObj &obj ) const;
         
+        /**
+         * @return first key of 'obj' that would be encountered by a forward
+         * index scan using this FieldRangeVector, BSONObj() if no such key.
+         */
+        BSONObj firstMatch( const BSONObj &obj ) const;
+        
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
+        bool matchesKey( const BSONObj &key ) const;
         vector<FieldRange> _ranges;
         const IndexSpec &_indexSpec;
         int _direction;

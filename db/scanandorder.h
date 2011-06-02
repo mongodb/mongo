@@ -20,27 +20,32 @@
 
 #pragma once
 
+#include "indexkey.h"
+#include "queryutil.h"
+
 namespace mongo {
 
     /* todo:
-       _ handle compound keys with differing directions.  we don't handle this yet: neither here nor in indexes i think!!!
        _ limit amount of data
     */
 
-    /* see also IndexDetails::getKeysFromObject, which needs some merging with this. */
-
     class KeyType : boost::noncopyable {
     public:
-        BSONObj _pattern; // e.g., { ts : -1 }
+        IndexSpec _spec;
+        FieldRangeVector _keyCutter;
     public:
-        KeyType(BSONObj keyPattern) {
-            _pattern = keyPattern;
-            assert( !_pattern.isEmpty() );
+        KeyType(BSONObj pattern, const FieldRangeSet &frs):
+        _spec((assert(!pattern.isEmpty()),pattern)),
+        _keyCutter(frs, _spec, 1) {
         }
 
-        // returns the key value for o
+        /**
+         * @return first key of the object that would be encountered while
+         * scanning index with keySpec 'pattern' using constraints 'frs', or
+         * BSONObj() if no such key.
+         */
         BSONObj getKeyFromObject(BSONObj o) {
-            return o.extractFields(_pattern,true);
+            return _keyCutter.firstMatch(o);
         }
     };
 
@@ -86,7 +91,7 @@ namespace mongo {
         void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
             /* todo : we don't correct _approxSize here. */
             const BSONObj& worstBestKey = i->first;
-            int c = worstBestKey.woCompare(k, _order._pattern);
+            int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
             if ( c > 0 ) {
                 // k is better, 'upgrade'
                 _best.erase(i);
@@ -95,9 +100,9 @@ namespace mongo {
         }
 
     public:
-        ScanAndOrder(int startFrom, int limit, BSONObj order) :
+        ScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs) :
             _best( BSONObjCmp( order ) ),
-            _startFrom(startFrom), _order(order) {
+            _startFrom(startFrom), _order(order, frs) {
             _limit = limit > 0 ? limit + _startFrom : 0x7fffffff;
             _approxSize = 0;
         }
@@ -109,6 +114,9 @@ namespace mongo {
         void add(BSONObj o, DiskLoc* loc) {
             assert( o.isValid() );
             BSONObj k = _order.getKeyFromObject(o);
+            if ( k.isEmpty() ) {
+                return;   
+            }
             if ( (int) _best.size() < _limit ) {
                 _approxSize += k.objsize();
                 _approxSize += o.objsize();

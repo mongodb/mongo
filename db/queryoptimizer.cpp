@@ -55,6 +55,7 @@ namespace mongo {
         const FieldRangeSetPair &frsp, const FieldRangeSetPair &originalFrsp, const BSONObj &originalQuery, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
+        _frsMulti( frsp.frsForIndex( _d, -1 ) ),
         _originalQuery( originalQuery ),
         _order( order ),
         _index( 0 ),

@@ -76,6 +76,8 @@ namespace mongo {
         const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
         shared_ptr<FieldRangeVector> originalFrv() const { return _originalFrv; }
 
+        const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
+        
         /** just for testing */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
@@ -85,6 +87,7 @@ namespace mongo {
         NamespaceDetails * _d;
         int _idxNo;
         const FieldRangeSet &_frs;
+        const FieldRangeSet &_frsMulti;
         const BSONObj &_originalQuery;
         const BSONObj &_order;
         const IndexDetails * _index;

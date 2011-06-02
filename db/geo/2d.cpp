@@ -164,7 +164,7 @@ namespace mongo {
         }
 
         /** Finds the key objects to put in an index */
-        virtual void getKeys( const BSONObj& obj, BSONObjSetDefaultOrder& keys ) const {
+        virtual void getKeys( const BSONObj& obj, BSONObjSet& keys ) const {
             getKeys( obj, &keys, NULL );
         }
 
@@ -175,7 +175,7 @@ namespace mongo {
         }
 
         /** Finds the key objects and/or locations for a geo-indexed object */
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
+        void getKeys( const BSONObj &obj, BSONObjSet* keys, vector< BSONObj >* locs ) const {
 
             BSONElementMSet bSet;
 
