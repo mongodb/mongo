@@ -49,8 +49,8 @@ __btcur_next_fix(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 			return (WT_NOTFOUND);
 
 		*recnop = cbt->recno;
-		cell = WT_COL_PTR(cbt->page, cbt->cip);
 		if ((upd = WT_COL_UPDATE(cbt->page, cbt->cip)) == NULL) {
+			cell = WT_COL_PTR(cbt->page, cbt->cip);
 			if (!WT_FIX_DELETE_ISSET(cell)) {
 				value->data = cell;
 				value->size = cbt->btree->fixed_len;
