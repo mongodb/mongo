@@ -1179,9 +1179,9 @@ namespace mongo {
         // fields individually instead of constructing several bson objects using
         // multikey arrays.)  But getKeys() canonically defines the key set for a
         // given object and for now we are using it as is.
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         _indexSpec.getKeys( obj, keys );
-        for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
             if ( matchesKey( *i ) ) {
                 return true;   
             }

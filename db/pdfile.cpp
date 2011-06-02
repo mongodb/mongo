@@ -874,10 +874,10 @@ namespace mongo {
 
     /* unindex all keys in index for this record. */
     static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         id.getKeysFromObject(obj, keys);
         IndexInterface& ii = id.idxInterface();
-        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
             if ( otherTraceLevel >= 5 ) {
                 out() << "_unindexRecord() " << obj.toString() << endl;
@@ -1112,7 +1112,7 @@ namespace mongo {
     /* add keys to index idxNo for a new record */
     static inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->idx(idxNo);
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         idx.getKeysFromObject(obj, keys);
         if( keys.empty() ) 
             return;
@@ -1120,7 +1120,7 @@ namespace mongo {
         IndexInterface& ii = idx.idxInterface();
         Ordering ordering = Ordering::make(order);
         int n = 0;
-        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             if( ++n == 2 ) {
                 d->setIndexIsMultikey(idxNo);
             }
@@ -1541,11 +1541,11 @@ namespace mongo {
         for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
             if( d->idx(idxNo).unique() ) {
                 IndexDetails& idx = d->idx(idxNo);
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 idx.getKeysFromObject(obj, keys);
                 BSONObj order = idx.keyPattern();
                 IndexInterface& ii = idx.idxInterface();
-                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
                     // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
                     // findSingle code.
                     uassert( 12582, "duplicate key insert for unique index of capped collection",

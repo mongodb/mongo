@@ -144,13 +144,15 @@ namespace mongo {
         }
     }
 
-    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
+    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const {
         getSpec().getKeys( obj, keys );
     }
 
-    void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
-        BSONObjSetDefaultOrder::iterator i = l.begin();
-        BSONObjSetDefaultOrder::iterator j = r.begin();
+    void setDifference(BSONObjSet &l, BSONObjSet &r, vector<BSONObj*> &diff) {
+        // l and r must use the same ordering spec.
+        verify( 14819, l.key_comp().order() == r.key_comp().order() );
+        BSONObjSet::iterator i = l.begin();
+        BSONObjSet::iterator j = r.begin();
         while ( 1 ) {
             if ( i == l.end() )
                 break;

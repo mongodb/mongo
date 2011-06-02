@@ -33,15 +33,12 @@ namespace mongo {
         bool operator()( const BSONObj &l, const BSONObj &r ) const {
             return l.woCompare( r, _order ) < 0;
         }
+        BSONObj order() const { return _order; }
     private:
         BSONObj _order;
     };
 
     typedef set<BSONObj,BSONObjCmp> BSONObjSet;
-    class BSONObjSetDefaultOrder : public BSONObjSet {
-    public:
-        BSONObjSetDefaultOrder() : BSONObjSet( BSONObjCmp() ) {}
-    };
 
     enum FieldCompareResult {
         LEFT_SUBFIELD = -2,
