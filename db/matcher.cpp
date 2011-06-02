@@ -280,8 +280,8 @@ namespace mongo {
         return true;
     }
 
-    void Matcher::parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers ) {
-        uassert( 13090, "nested $or/$nor not allowed", !subMatcher );
+    void Matcher::parseOr( const BSONElement &e, bool nested, list< shared_ptr< Matcher > > &matchers ) {
+        uassert( 13090, "nested $or/$nor not allowed", !nested );
         uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
@@ -292,15 +292,15 @@ namespace mongo {
         }
     }
 
-    bool Matcher::parseOrNor( const BSONElement &e, bool subMatcher ) {
+    bool Matcher::parseOrNor( const BSONElement &e, bool nested ) {
         const char *ef = e.fieldName();
         if ( ef[ 0 ] != '$' )
             return false;
         if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
-            parseOr( e, subMatcher, _orMatchers );
+            parseOr( e, nested, _orMatchers );
         }
         else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
-            parseOr( e, subMatcher, _norMatchers );
+            parseOr( e, nested, _norMatchers );
         }
         else {
             return false;
@@ -308,7 +308,7 @@ namespace mongo {
         return true;
     }
     
-    bool Matcher::parseAnd( const BSONElement &e, bool subMatcher ) {
+    bool Matcher::parseAnd( const BSONElement &e, bool nested ) {
         const char *ef = e.fieldName();
         if (!( ef[ 0 ] == '$' && ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' && ef[ 4 ] == 0 )) {
             return false;
@@ -321,21 +321,21 @@ namespace mongo {
             uassert( 14818 , "$and elements must be objects" , e.type() == Object );
             BSONObjIterator j( e.embeddedObject() );
             while( j.more() ) {
-                parseMatchExpressionElement( j.next(), subMatcher );
+                parseMatchExpressionElement( j.next(), true );
             }
         }
         return true;
     }
 
-    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool subMatcher ) {
+    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
         
         uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
         
-        if ( parseAnd( e, subMatcher ) ) {
+        if ( parseAnd( e, nested ) ) {
             return;   
         }
         
-        if ( parseOrNor( e, subMatcher ) ) {
+        if ( parseOrNor( e, nested ) ) {
             return;
         }
         
@@ -437,12 +437,12 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    Matcher::Matcher(const BSONObj &_jsobj, bool subMatcher) :
+    Matcher::Matcher(const BSONObj &_jsobj, bool nested) :
         where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
-            parseMatchExpressionElement( i.next(), subMatcher );
+            parseMatchExpressionElement( i.next(), nested );
         }
     }
 
