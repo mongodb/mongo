@@ -24,13 +24,15 @@
 
 namespace mongo {
     
+    static const int OutOfOrderDocumentsAssertionCode = 14810;
+    
     class QueryOptimizerCursorOp : public QueryOp {
     public:
         QueryOptimizerCursorOp( long long &aggregateNscanned ) : _matchCount(), _mustAdvance(), _nscanned(), _aggregateNscanned( aggregateNscanned ) {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
-                throw MsgAssertionException( 14810, "order spec cannot be satisfied with index" );
+                throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
             }
             _c = qp().newCursor();
             _capped = _c->capped();
@@ -282,10 +284,13 @@ namespace mongo {
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps ) {
         try {
             return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
-        } catch( const AssertionException & ) {
-            // If there is an error off the bat it generally means there are no indexes
-            // satisfying 'order'.  We return an empty shared_ptr in this case.
-            return shared_ptr<Cursor>();
+        } catch( const AssertionException &e ) {
+            if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
+                // If no indexes follow the requested sort order, return an
+                // empty pointer.
+                return shared_ptr<Cursor>();
+            }
+            throw;
         }
         return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
     }

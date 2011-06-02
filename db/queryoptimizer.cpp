@@ -936,6 +936,9 @@ doneCheckOrder:
         if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
             return shared_ptr<Cursor>();
         }
+        // If there is only one plan and it does not require an in memory
+        // sort, we do not expect its cursor op to throw an exception and
+        // so do not need a QueryOptimizerCursor to handle this case.
         return _currentQps->firstPlan()->newCursor();
     }
 

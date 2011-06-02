@@ -2515,7 +2515,24 @@ namespace QueryOptimizerTests {
                     ASSERT( !c );
                 }
             };
-
+            
+            class BestSavedOutOfOrder : public QueryOptimizerCursorTests::Base {
+            public:
+                void run() {
+                    _cli.insert( ns(), BSON( "_id" << 5 << "b" << BSON_ARRAY( 1 << 2 << 3 << 4 << 5 ) ) );
+                    _cli.insert( ns(), BSON( "_id" << 1 << "b" << 6 ) );
+                    _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                    // record {_id:1} index for this query
+                    ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 << "b" << GT << 0 ).sort( "b" ) )->more() );
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 << "b" << GT << 0 ), BSON( "b" << 1 ) );
+                    // {_id:1} requires scan and order, so {b:1} must be chosen.
+                    ASSERT( c );
+                    ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
+                }
+            };
+            
             class MultiIndex : public Base {
             public:
                 MultiIndex() {
@@ -2635,6 +2652,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
             add<QueryOptimizerCursorTests::GetCursor::Geo>();
             add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
+            add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
         }
     } myall;
