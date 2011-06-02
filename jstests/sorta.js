@@ -3,7 +3,8 @@
 t = db.jstests_sorta;
 t.drop();
 
-t.save( {_id:0,a:MinKey} );
+// Enable _allow_dot to try and bypass v8 field name checking.
+t.insert( {_id:0,a:MinKey}, true );
 t.save( {_id:1,a:null} );
 t.save( {_id:2,a:[]} );
 t.save( {_id:7,a:[2]} );
@@ -11,7 +12,7 @@ t.save( {_id:3} );
 t.save( {_id:4,a:null} );
 t.save( {_id:5,a:[]} );
 t.save( {_id:6,a:1} );
-t.save( {_id:8,a:MaxKey} );
+t.insert( {_id:8,a:MaxKey}, true );
 
 function sorted( arr ) {
  	for( i = 1; i < arr.length; ++i ) {
