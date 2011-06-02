@@ -43,6 +43,13 @@ methods = {
 'session.create' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes'''),
+	Config('btree_split_min', 'false', r'''
+		configure minimal splits in Btree reconciliation code (debugging only)'''),
+	Config('btree_split_pct', '75', r'''
+		configure the Btree page split size as a percentage of the maximum Btree
+		page size, that is, when a Btree page is split, it will be split into
+		smaller pages, where each page is the specified percentage of the maximum
+		Btree page size'''),
 	Config('colgroup.name', '', r'''
 		named group of columns to store together.  Comma-separated list of
 		the form <code>(column[,...])</code>.  Each column group is stored
@@ -53,8 +60,6 @@ methods = {
 		list of the column names.  Comma-separated list of the form
 		<code>(column[,...])</code>.  The number of entries must match the
 		total number of values in \c key_format and \c value_format'''),
-	Config('debug_split_min', 'false', r'''
-		configure minimal splits in Btree reconciliation code (debugging only)'''),
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema'''),

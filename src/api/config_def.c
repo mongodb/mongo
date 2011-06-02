@@ -53,10 +53,11 @@ __wt_confdfl_session_commit_transaction =
 
 const char *
 __wt_confdfl_session_create =
-    "allocation_size=512B,colgroup.name=,columns=,debug_split_min=false,"
-    "exclusive=false,huffman_key=,huffman_value=,index.name=,"
-    "intl_node_max=2KB,intl_node_min=2KB,key_format=u,leaf_node_max=1MB,"
-    "leaf_node_min=32KB,runlength_encoding=false,value_format=u";
+    "allocation_size=512B,btree_split_min=false,btree_split_pct=75,"
+    "colgroup.name=,columns=,exclusive=false,huffman_key=,huffman_value=,"
+    "index.name=,intl_node_max=2KB,intl_node_min=2KB,key_format=u,"
+    "leaf_node_max=1MB,leaf_node_min=32KB,runlength_encoding=false,"
+    "value_format=u";
 
 const char *
 __wt_confdfl_session_drop =

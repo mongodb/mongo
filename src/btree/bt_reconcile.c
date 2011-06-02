@@ -30,7 +30,8 @@ typedef struct {
 	int evict;			/* The page is being discarded */
 	int locked;			/* The tree is locked down */
 
-	int debug_split_min;		/* Debugging: use minimal split sizes */
+	int	 btree_split_min;	/* use tiny split sizes (debugging) */
+	uint32_t btree_split_pct;	/* Split page percent */
 
 	/*
 	 * As pages are reconciled, split pages are merged into their parent
@@ -299,9 +300,12 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 
 		/* Configuration. */
 		WT_RET(__wt_config_getones(
-		    session->btree->config, "debug_split_min", &cval));
+		    session->btree->config, "btree_split_min", &cval));
 		if (cval.val != 0)
-			r->debug_split_min = 1;
+			r->btree_split_min = 1;
+		WT_RET(__wt_config_getones(
+		    session->btree->config, "btree_split_pct", &cval));
+		r->btree_split_pct = (uint32_t)cval.val;
 	}
 
 	r->evict = LF_ISSET(WT_REC_EVICT);
@@ -995,14 +999,11 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * page size.
 	 */
 	r->page_size = max;
-	r->split_size = WT_ALIGN((max / 4) * 3, btree->allocsize);
-
-	/*
-	 * This won't get tested enough if we don't force the code to create
-	 * lots of splits.
-	 */
-	if (r->debug_split_min)
+	if (r->btree_split_min)
 		r->split_size = min;
+	else
+		r->split_size = WT_ALIGN(
+		    (max * r->btree_split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
