@@ -314,11 +314,11 @@ namespace mongo {
             return false;
         }
         
-        uassert( 14814 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+        uassert( 14815 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator i( e.embeddedObject() );
         while( i.more() ) {
             BSONElement e = i.next();
-            uassert( 14811 , "$and elements must be objects" , e.type() == Object );
+            uassert( 14818 , "$and elements must be objects" , e.type() == Object );
             BSONObjIterator j( e.embeddedObject() );
             while( j.more() ) {
                 parseMatchExpressionElement( j.next(), subMatcher );

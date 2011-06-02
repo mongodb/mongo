@@ -772,11 +772,11 @@ namespace mongo {
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
         if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
-            uassert( 14812 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+            uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() ) {
                 BSONElement e = i.next();
-                uassert( 14813 , "$and elements must be objects" , e.type() == Object );
+                uassert( 14817 , "$and elements must be objects" , e.type() == Object );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
                     processQueryField( j.next(), optimize );
