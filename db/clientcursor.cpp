@@ -231,10 +231,13 @@ namespace mongo {
             c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
-                /* this might indicate a failure to call ClientCursor::updateLocation() */
+                // This might indicate a failure to call ClientCursor::updateLocation() but it can
+                // also happen during correct operation, see SERVER-2009.
                 problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
-            c->advance();
+            else {
+                c->advance();
+            }
             if ( c->eof() ) {
                 // advanced to end
                 // leave ClientCursor in place so next getMore doesn't fail
