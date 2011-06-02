@@ -43,6 +43,10 @@ methods = {
 'session.create' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes'''),
+	Config('btree_key_gap', '10', r'''
+		configure the maximum gap between instantiated keys in a Btree leaf page,
+		constraining the number of keys processed to instantiate a random Btree
+		leaf page key'''),
 	Config('btree_split_min', 'false', r'''
 		configure minimal splits in Btree reconciliation code (debugging only)'''),
 	Config('btree_split_pct', '75', r'''

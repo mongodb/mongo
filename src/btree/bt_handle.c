@@ -199,6 +199,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	__wt_btree_huffman_close(session);
 
+	__wt_buf_free(session, &btree->key_srch);
+
 	__wt_walk_end(session, &btree->evict_walk);
 
 	__wt_free(session, btree->stats);
@@ -216,6 +218,11 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 static int
 __btree_conf(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+
+	btree = session->btree;
+
 	/* File type. */
 	WT_RET(__btree_type(session));
 
@@ -224,6 +231,9 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Huffman encoding configuration. */
 	WT_RET(__wt_btree_huffman_open(session));
+
+	WT_RET(__wt_config_getones(btree->config, "btree_key_gap", &cval));
+	btree->key_gap = (uint32_t)cval.val;
 
 	return (0);
 }

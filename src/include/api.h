@@ -111,6 +111,9 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
+	uint32_t key_gap;		/* Btree instantiated key gap */
+	WT_BUF   key_srch;		/* Search key buffer */
+
 	uint32_t fixed_len;		/* Fixed-length record size */
 
 	int btree_compare_int;		/* Integer keys */

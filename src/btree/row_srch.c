@@ -20,7 +20,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
-	WT_ITEM item;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
@@ -37,8 +37,9 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	session->srch_slot = UINT32_MAX;
 
 	btree = session->btree;
-	func = btree->btree_compare;
+	item = &_item;
 	rip = NULL;
+	func = btree->btree_compare;
 
 	cmp = -1;				/* Assume we don't match. */
 
@@ -59,10 +60,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 			 */
 			if (indx != 0) {
 				ikey = rref->key;
-				item.data = WT_IKEY_DATA(ikey);
-				item.size = ikey->size;
+				item->data = WT_IKEY_DATA(ikey);
+				item->size = ikey->size;
 
-				cmp = func(btree, key, &item);
+				cmp = func(btree, key, item);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -125,13 +126,18 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		rip = page->u.row_leaf.d + indx;
 
 		/* The key may not have been instantiated yet. */
-		if (!__wt_off_page(page, rip->key))
-			WT_ERR(__wt_row_key(session, page, rip, NULL));
-		ikey = rip->key;
-		item.data = WT_IKEY_DATA(ikey);
-		item.size = ikey->size;
+		if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			_item.data = WT_IKEY_DATA(ikey);
+			_item.size = ikey->size;
+			item = &_item;
+		} else {
+			WT_ERR(
+			    __wt_row_key(session, page, rip, &btree->key_srch));
+			item = (WT_ITEM *)&btree->key_srch;
+		}
 
-		cmp = func(btree, key, &item);
+		cmp = func(btree, key, item);
 		if (cmp == 0)
 			break;
 		if (cmp < 0)

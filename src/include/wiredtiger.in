@@ -492,6 +492,9 @@ struct wt_session {
 	 * @param name the uri of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
+	 * @config{btree_key_gap, configure the maximum gap between instantiated
+	 * keys in a Btree leaf page\, constraining the number of keys processed
+	 * to instantiate a random Btree leaf page key}
 	 * @config{btree_split_min, configure minimal splits in Btree
 	 * reconciliation code (debugging only)}
 	 * @config{btree_split_pct, configure the Btree page split size as a
