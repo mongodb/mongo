@@ -520,6 +520,7 @@ namespace mongo {
             if ( best.isEmpty() ) {
                 best = me;
                 bestFrom = i;
+                if( _sortKey.isEmpty() ) break;
                 continue;
             }
 

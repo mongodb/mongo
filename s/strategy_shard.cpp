@@ -66,13 +66,7 @@ namespace mongo {
             ClusteredCursor * cursor = 0;
 
             BSONObj sort = query.getSort();
-
-            if ( sort.isEmpty() ) {
-                cursor = new SerialServerClusteredCursor( servers , q );
-            }
-            else {
-                cursor = new ParallelSortClusteredCursor( servers , q , sort );
-            }
+            cursor = new ParallelSortClusteredCursor( servers , q , sort );
 
             assert( cursor );
 
