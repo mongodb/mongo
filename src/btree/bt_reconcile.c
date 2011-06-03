@@ -1880,37 +1880,17 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	val->buf.size = WT_SIZEOF32(WT_OFF);
 	val->len = val->cell_len + WT_SIZEOF32(WT_OFF);
 
-	/*
-	 * We reconcile three kinds of row-store internal pages: the first is a
-	 * page created entirely in-memory, in which case there's never a disk
-	 * image.  The second is a page read from disk, and these pages come in
-	 * two forms: with and without a disk image.  If the page had overflow
-	 * keys, then there's a disk image from which we get the overflow keys.
-	 * If the page had no overflow keys, we discarded the disk image after
-	 * creating the in-memory version of the page.
-	 *
-	 * Internal pages created in-memory are always merged into their parent
-	 * in order to keep the tree from growing deeper on every split.  For
-	 * that reason, reconciliation of those pages consists of updating the
-	 * page state and returning, as none of the real work of reconciliation
-	 * is done until the parent page into which the created pages will be
-	 * merged is itself reconciled.  In other words, we ignore internally
-	 * created pages until that parent is reconciled, at which time we walk
-	 * the subtree rooted in that parent and consolidate the merged pages.
-	 *
-	 * There is a special case: if the root splits, there's no parent into
-	 * which it can be merged, so the reconciliation code turns off the
-	 * merge flag, and reconciles the page anyway.
-	 */
-	if (page->dsk == NULL) {
-		WT_RET(__rec_row_merge(session, page));
-		return (__rec_split_finish(session));
-	}
-
 	/* For each entry in the in-memory page... */
 	WT_ROW_REF_FOREACH(page, rref, i) {
+		/*
+		 * Keys are always instantiated for row-store internal pages,
+		 * set the WT_IKEY reference.  We may have key overflow items
+		 * on the page, in which case the disk image was retained and
+		 * the key's WT_CELL reference was set.
+		 */
 		ikey = rref->key;
-		cell = WT_REF_OFFSET(page, ikey->cell_offset);
+		cell = ikey->cell_offset == 0 ?
+		    NULL : WT_REF_OFFSET(page, ikey->cell_offset);
 
 		/*
 		 * The page may be deleted or internally created during a split.
@@ -1949,7 +1929,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			rp = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				/* Delete overflow keys for merged pages. */
-				WT_RET(__rec_discard_add_ovfl(session, cell));
+				if (cell != NULL)
+					WT_RET(__rec_discard_add_ovfl(
+					    session, cell));
 
 				/* Merge split subtrees */
 				if (F_ISSET(rp, WT_PAGE_SPLIT)) {
@@ -1971,7 +1953,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
+		if (cell != NULL) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_len(cell);
 			key->cell_len = 0;
