@@ -2675,7 +2675,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, const void *data, uint32_t size)
 		    __rec_cell_build_key(session, NULL, 0));
 	}
 
-	__wt_cell_set(
+	__wt_cell_set(session,
 	    &key->cell, WT_CELL_KEY, pfx, key->buf.size, &key->cell_len);
 	key->len = key->cell_len + key->buf.size;
 
@@ -2707,7 +2707,8 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, void *data, uint32_t size)
 
 	/* Handle zero-length cells quickly. */
 	if (size == 0) {
-		__wt_cell_set(&val->cell, WT_CELL_DATA, 0, 0, &val->cell_len);
+		__wt_cell_set(
+		    session, &val->cell, WT_CELL_DATA, 0, 0, &val->cell_len);
 		val->len = val->cell_len + val->buf.size;
 		return (0);
 	}
@@ -2724,7 +2725,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, void *data, uint32_t size)
 		return (__rec_cell_build_ovfl(session, val, WT_CELL_DATA_OVFL));
 	}
 
-	__wt_cell_set(
+	__wt_cell_set(session,
 	    &val->cell, WT_CELL_DATA, 0, val->buf.size, &val->cell_len);
 	val->len = val->cell_len + val->buf.size;
 	return (0);

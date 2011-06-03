@@ -13,8 +13,8 @@
  *	Set a WT_CELL's contents based on a type, prefix and data size.
  */
 void
-__wt_cell_set(WT_CELL *cell,
-    u_int type, u_int prefix, uint32_t size, uint32_t *cell_lenp)
+__wt_cell_set(WT_SESSION_IMPL *session,
+    WT_CELL *cell, u_int type, u_int prefix, uint32_t size, uint32_t *cell_lenp)
 {
 	uint32_t len;
 	uint8_t byte, *p;
@@ -25,13 +25,6 @@ __wt_cell_set(WT_CELL *cell,
 	 * descriptor byte and no length bytes.
 	 */
 	switch (type) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-		cell->__chunk[0] = (uint8_t)type;
-		*cell_lenp = 1;			/* Cell byte */
-		return;
 	case WT_CELL_DATA:
 		if (size < 0x7f) {
 			/*
@@ -45,7 +38,6 @@ __wt_cell_set(WT_CELL *cell,
 		}
 		break;
 	case WT_CELL_KEY:
-	default:
 		if (size < 0x3f) {
 			/*
 			 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag;
@@ -58,6 +50,7 @@ __wt_cell_set(WT_CELL *cell,
 			return;
 		}
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*

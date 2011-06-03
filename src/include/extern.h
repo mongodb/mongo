@@ -131,7 +131,8 @@ extern int __wt_bulk_end(CURSOR_BULK *cbulk);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
-extern void __wt_cell_set(WT_CELL *cell,
+extern void __wt_cell_set(WT_SESSION_IMPL *session,
+    WT_CELL *cell,
     u_int type,
     u_int prefix,
     uint32_t size,
