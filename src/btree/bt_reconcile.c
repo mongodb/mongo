@@ -299,11 +299,11 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 		r->last = &r->_last;
 
 		/* Configuration. */
-		WT_RET(__wt_config_getones(
+		WT_RET(__wt_config_getones(session,
 		    session->btree->config, "btree_split_min", &cval));
 		if (cval.val != 0)
 			r->btree_split_min = 1;
-		WT_RET(__wt_config_getones(
+		WT_RET(__wt_config_getones(session,
 		    session->btree->config, "btree_split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
 	}

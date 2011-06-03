@@ -239,13 +239,13 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 		session->btree = btree_session->btree;
 	}
 
-	WT_ERR(__wt_config_gets(__cfg, "bulk", &cval));
+	WT_ERR(__wt_config_gets(session, __cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
-	WT_ERR(__wt_config_gets(__cfg, "dump", &cval));
+	WT_ERR(__wt_config_gets(session, __cfg, "dump", &cval));
 	dump = (cval.val != 0);
-	WT_ERR(__wt_config_gets(__cfg, "printable", &cval));
+	WT_ERR(__wt_config_gets(session, __cfg, "printable", &cval));
 	printable = (cval.val != 0);
-	WT_ERR(__wt_config_gets(__cfg, "raw", &cval));
+	WT_ERR(__wt_config_gets(session, __cfg, "raw", &cval));
 	raw = (cval.val != 0);
 
 	csize = bulk ? sizeof(CURSOR_BULK) : sizeof(CURSOR_BTREE);

@@ -32,12 +32,12 @@ __wt_session_add_btree(
 	 */
 	config = session->btree->config;
 
-	WT_RET(__wt_config_getones(config, "key_format", &cval));
+	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
 	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
 	memcpy(format, cval.str, cval.len);
 	btree_session->key_format = format;
 
-	WT_RET(__wt_config_getones(config, "value_format", &cval));
+	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
 	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
 	memcpy(format, cval.str, cval.len);
 	btree_session->value_format = format;

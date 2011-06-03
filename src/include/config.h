@@ -10,6 +10,7 @@ struct __wt_config_item;	typedef struct __wt_config_item WT_CONFIG_ITEM;
 
 struct __wt_config
 {
+	WT_SESSION_IMPL *session;
 	const char *orig;
 	const char *end;
 	const char *cur;

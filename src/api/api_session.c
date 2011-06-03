@@ -127,7 +127,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also, avoiding copies / memory allocation at the moment by
 	 * pointing to constant strings for the few cases we handle.
 	 */
-	WT_RET(__wt_config_gets(__cfg, "key_format", &cval));
+	WT_RET(__wt_config_gets(session, __cfg, "key_format", &cval));
 	if (strncmp(cval.str, "r", cval.len) == 0)
 		key_format = "r";
 	else if (cval.str[cval.len - 1] == 'S')
@@ -140,7 +140,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		return (EINVAL);
 	}
 
-	WT_RET(__wt_config_gets(__cfg, "value_format", &cval));
+	WT_RET(__wt_config_gets(session, __cfg, "value_format", &cval));
 	if (cval.str[cval.len - 1] == 'S')
 		value_format = "S";
 	else if (cval.str[cval.len - 1] == 'u')
@@ -206,7 +206,7 @@ __session_drop(
 	}
 	name += strlen("table:");
 
-	WT_RET(__wt_config_gets(__cfg, "force", &cval));
+	WT_RET(__wt_config_gets(session, __cfg, "force", &cval));
 	force = (cval.val != 0);
 
 	/* TODO: Combine the table name with home to make a filename. */

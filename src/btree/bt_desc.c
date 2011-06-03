@@ -58,7 +58,8 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	    session, (char *)(buf + sizeof(WT_BTREE_DESC)), &btree->config));
 
 	/* Get the allocation size, we need it to validate the addresses. */
-	WT_RET(__wt_config_getones(btree->config, "allocation_size", &cval));
+	WT_RET(__wt_config_getones(session,
+	    btree->config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
 
 	desc = (WT_BTREE_DESC *)buf;

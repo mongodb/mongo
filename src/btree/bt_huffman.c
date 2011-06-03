@@ -144,8 +144,10 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	config = btree->config;
 
-	WT_RET(__wt_config_getones(config, "huffman_key", &key_conf));
-	WT_RET(__wt_config_getones(config, "huffman_value", &value_conf));
+	WT_RET(__wt_config_getones(session,
+	    config, "huffman_key", &key_conf));
+	WT_RET(__wt_config_getones(session,
+	    config, "huffman_value", &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
 

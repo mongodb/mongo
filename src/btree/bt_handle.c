@@ -232,7 +232,8 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Huffman encoding configuration. */
 	WT_RET(__wt_btree_huffman_open(session));
 
-	WT_RET(__wt_config_getones(btree->config, "btree_key_gap", &cval));
+	WT_RET(__wt_config_getones(session,
+	    btree->config, "btree_key_gap", &cval));
 	btree->key_gap = (uint32_t)cval.val;
 
 	return (0);
@@ -253,14 +254,14 @@ __btree_type(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	config = btree->config;
 
-	WT_RET(__wt_config_getones(config, "key_format", &cval));
+	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
 	if (cval.len > 0 && cval.str[0] == 'r')
 		btree->type = BTREE_COL_VAR;
 	else
 		btree->type = BTREE_ROW;
 
 	/* Check for fixed-length data. */
-	WT_RET(__wt_config_getones(config, "value_format", &cval));
+	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
 	if (cval.len > 1 && ((t = cval.str[cval.len - 1]) == 'u' || t == 'S')) {
 		btree->fixed_len = (uint32_t)strtol(cval.str, &endp, 10);
 		if (endp == cval.str + cval.len - 1 && btree->fixed_len != 0)
@@ -268,7 +269,8 @@ __btree_type(WT_SESSION_IMPL *session)
 	}
 
 	/* Check for run-length encoding */
-	WT_RET(__wt_config_getones(config, "runlength_encoding", &cval));
+	WT_RET(__wt_config_getones(session,
+	    config, "runlength_encoding", &cval));
 	if (cval.val != 0) {
 		if (btree->type != BTREE_COL_FIX) {
 			__wt_errx(session,
@@ -296,15 +298,15 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	config = btree->config;
 
-	WT_RET(__wt_config_getones(config, "allocation_size", &cval));
+	WT_RET(__wt_config_getones(session, config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(config, "intl_node_max", &cval));
+	WT_RET(__wt_config_getones(session, config, "intl_node_max", &cval));
 	btree->intlmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(config, "intl_node_min", &cval));
+	WT_RET(__wt_config_getones(session, config, "intl_node_min", &cval));
 	btree->intlmin = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(config, "leaf_node_max", &cval));
+	WT_RET(__wt_config_getones(session, config, "leaf_node_max", &cval));
 	btree->leafmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(config, "leaf_node_min", &cval));
+	WT_RET(__wt_config_getones(session, config, "leaf_node_min", &cval));
 	btree->leafmin = (uint32_t)cval.val;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */

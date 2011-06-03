@@ -10,24 +10,33 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);
-extern int __wt_config_initn(WT_CONFIG *conf, const char *str, size_t len);
-extern int __wt_config_init(WT_CONFIG *conf, const char *str);
+extern int __wt_config_initn( WT_SESSION_IMPL *session,
+    WT_CONFIG *conf,
+    const char *str,
+    size_t len);
+extern int __wt_config_init(WT_SESSION_IMPL *session,
+    WT_CONFIG *conf,
+    const char *str);
 extern int __wt_config_next(WT_CONFIG *conf,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
 extern int __wt_config_getraw( WT_CONFIG *cparser,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_get(const char **cfg,
+extern int __wt_config_get(WT_SESSION_IMPL *session,
+    const char **cfg,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_gets(const char **cfg,
+extern int __wt_config_gets(WT_SESSION_IMPL *session,
+    const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_getone(const char *cfg,
+extern  int __wt_config_getone(WT_SESSION_IMPL *session,
+    const char *cfg,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_getones(const char *cfg,
+extern  int __wt_config_getones(WT_SESSION_IMPL *session,
+    const char *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
 extern int __wt_config_checklist(WT_SESSION_IMPL *session,

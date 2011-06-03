@@ -12,8 +12,10 @@
  *	Initialize a config handle, used to iterate through a config string.
  */
 int
-__wt_config_initn(WT_CONFIG *conf, const char *str, size_t len)
+__wt_config_initn(
+    WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str, size_t len)
 {
+	conf->session = session;
 	conf->orig = conf->cur = str;
 	conf->end = str + len;
 	conf->depth = 0;
@@ -28,13 +30,13 @@ __wt_config_initn(WT_CONFIG *conf, const char *str, size_t len)
  *	Initialize a config handle, used to iterate through a config string.
  */
 int
-__wt_config_init(WT_CONFIG *conf, const char *str)
+__wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
 {
 	size_t len;
 
 	len = (str == NULL) ? 0 : strlen(str);
 
-	return (__wt_config_initn(conf, str, len));
+	return (__wt_config_initn(session, conf, str, len));
 }
 
 #define	PUSH(i, t) do {							\
@@ -371,6 +373,10 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BAD:
+			__wt_errx(conf->session,
+			    "Unexpected character '%c' in config string "
+			    "at position %d",
+			    *conf->cur, (int)(conf->cur - conf->orig));
 			return (EINVAL);
 
 		case A_DOWN:
@@ -387,8 +393,17 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
 		case A_VALUE:
 			if (conf->depth == conf->top) {
-				if (out == value)
+				/*
+				 * Special case: ':' is permitted in unquoted
+				 * values.
+				 */
+				if (out == value && *conf->cur != ':') {
+					__wt_errx(conf->session,
+					    "Key / value pair already complete "
+					    "at position %d",
+					    (int)(conf->cur - conf->orig));
 					return (EINVAL);
+				}
 				out = value;
 			}
 			break;
@@ -470,7 +485,11 @@ val:		__process_value(value);
 	}
 
 	/* We're either at the end of the string or we failed to parse. */
-	return ((conf->depth == 0) ? WT_NOTFOUND : EINVAL);
+	if (conf->depth == 0)
+		return (WT_NOTFOUND);
+
+	__wt_errx(conf->session, "Closing brackets missing from config string");
+	return (EINVAL);
 }
 
 /*
@@ -502,13 +521,14 @@ __wt_config_getraw(
  *	the final value for a given key.
  */
 int
-__wt_config_get(const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+__wt_config_get(WT_SESSION_IMPL *session,
+    const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
 	int found, ret;
 
 	for (found = 0; *cfg != NULL; cfg++) {
-		WT_RET(__wt_config_init(&cparser, *cfg));
+		WT_RET(__wt_config_init(session, &cparser, *cfg));
 		if ((ret = __wt_config_getraw(&cparser, key, value)) == 0)
 			found = 1;
 		else if (ret != WT_NOTFOUND)
@@ -524,7 +544,8 @@ __wt_config_get(const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  *	value for a given string key.
  */
 int
-__wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+__wt_config_gets(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM key_item;
 
@@ -532,7 +553,7 @@ __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 	key_item.str = key;
 	key_item.len = strlen(key);
 
-	return (__wt_config_get(cfg, &key_item, value));
+	return (__wt_config_get(session, cfg, &key_item, value));
 }
 
 /*
@@ -540,10 +561,11 @@ __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
  *	Get the value for a given key from a single config string.
  */
  int
-__wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+__wt_config_getone(WT_SESSION_IMPL *session,
+    const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	const char *cfgs[] = { cfg, NULL };
-	return (__wt_config_get(cfgs, key, value));
+	return (__wt_config_get(session, cfgs, key, value));
 }
 
 /*
@@ -551,10 +573,11 @@ __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  *	Get the value for a given string key from a single config string.
  */
  int
-__wt_config_getones(const char *cfg, const char *key, WT_CONFIG_ITEM *value)
+__wt_config_getones(WT_SESSION_IMPL *session,
+    const char *cfg, const char *key, WT_CONFIG_ITEM *value)
 {
 	const char *cfgs[] = { cfg, NULL };
-	return (__wt_config_gets(cfgs, key, value));
+	return (__wt_config_gets(session, cfgs, key, value));
 }
 
 /*
@@ -575,7 +598,7 @@ __wt_config_checklist(WT_SESSION_IMPL *session,
 	if (config == NULL)
 		return (0);
 
-	WT_RET(__wt_config_init(&cparser, config));
+	WT_RET(__wt_config_init(session, &cparser, config));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
 			__wt_errx(session,
@@ -587,7 +610,7 @@ __wt_config_checklist(WT_SESSION_IMPL *session,
 		 * Need to handle configuration keys that only match a prefix
 		 * such as "index_1=(),index_2=()".
 		 */
-		if ((ret = __wt_config_get(defaults, &k, &v)) != 0) {
+		if ((ret = __wt_config_get(session, defaults, &k, &v)) != 0) {
 			if (ret == WT_NOTFOUND) {
 				__wt_errx(session,
 				    "Unknown configuration key found: '%.*s'\n",
@@ -646,14 +669,14 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 	p = config;
 	end = config + len;
 
-	WT_RET(__wt_config_init(&cparser, cfg[0]));
+	WT_RET(__wt_config_init(session, &cparser, cfg[0]));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
 			__wt_errx(session,
 			    "Invalid configuration key found: '%s'\n", k.str);
 			return (EINVAL);
 		}
-		WT_ERR(__wt_config_get(cfg, &k, &v));
+		WT_ERR(__wt_config_get(session, cfg, &k, &v));
 		/* Include the quotes around string values. */
 		if (v.type == ITEM_STRING) {
 			--v.str;
