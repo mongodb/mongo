@@ -36,7 +36,7 @@ namespace mongo {
      */
 #pragma pack(4)
     class OpTime {
-        unsigned i;
+        unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
         unsigned secs;
         static OpTime last;
         static OpTime skewed();

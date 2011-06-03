@@ -362,7 +362,7 @@ namespace mongo {
 
         switch ( l.type() ) {
         case EOO:
-        case Undefined:
+        case Undefined: // EOO and Undefined are same canonicalType
         case jstNULL:
         case MaxKey:
         case MinKey:
@@ -372,6 +372,10 @@ namespace mongo {
         case Bool:
             return *l.value() - *r.value();
         case Timestamp:
+            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
+            if ( l.date() < r.date() )
+                return -1;
+            return l.date() == r.date() ? 0 : 1;
         case Date:
             if ( l.date() < r.date() )
                 return -1;

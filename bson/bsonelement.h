@@ -365,6 +365,7 @@ namespace mongo {
             return *reinterpret_cast< const mongo::OID* >( start );
         }
 
+        /** this does not use fieldName in the comparison, just the value */
         bool operator<( const BSONElement& other ) const {
             int x = (int)canonicalType() - (int)other.canonicalType();
             if ( x < 0 ) return true;
