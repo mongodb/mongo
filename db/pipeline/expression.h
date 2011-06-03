@@ -463,6 +463,15 @@ namespace mongo {
 	 */
 	string getFieldPath(bool fieldPrefix) const;
 
+	/*
+	  Write a string representation of the field path to a stream.
+
+	  @param the stream to write to
+	  @param fieldPrefix whether or not to include the document field
+	    indicator prefix
+	 */
+	void writeFieldPath(ostream &outStream, bool fieldPrefix) const;
+
     private:
         ExpressionFieldPath(const string &fieldPath);
 
@@ -831,6 +840,11 @@ namespace mongo {
 
     inline string ExpressionFieldPath::getFieldPath(bool fieldPrefix) const {
 	return fieldPath.getPath(fieldPrefix);
+    }
+
+    inline void ExpressionFieldPath::writeFieldPath(
+	ostream &outStream, bool fieldPrefix) const {
+	return fieldPath.writePath(outStream, fieldPrefix);
     }
 
     inline size_t ExpressionObject::getFieldCount() const {

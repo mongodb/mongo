@@ -59,14 +59,14 @@ namespace mongo {
 	 DocumentSourceGroup::createFromBson},
 	{DocumentSourceMatch::matchName,
 	 DocumentSourceMatch::createFromBson},
-	{DocumentSourceProject::projectName,
-	 DocumentSourceProject::createFromBson},
-/* LATER
+#ifdef LATER
 	{DocumentSourceOut::outName,
 	 DocumentSourceOut::createFromBson},
+#endif
+	{DocumentSourceProject::projectName,
+	 DocumentSourceProject::createFromBson},
 	{DocumentSourceSort::sortName,
 	 DocumentSourceSort::createFromBson},
-*/
     };
     static const size_t nStageDesc = sizeof(stageDesc) / sizeof(StageDesc);
 
@@ -229,17 +229,36 @@ namespace mongo {
 	tempList.splice(tempList.begin(), sourceList);
 
 	/*
-	  Run through the operations, putting them onto the shard pipeline
-	  until we get to a group that indicates a split point.
+	  Run through the pipeline, looking for points to split it into
+	  shard pipelines, and the rest.
 	 */
 	while(!tempList.empty()) {
 	    boost::shared_ptr<DocumentSource> &pSource = tempList.front();
+
+	    DocumentSourceSort *pSort =
+		dynamic_cast<DocumentSourceSort *>(pSource.get());
+	    if (pSort) {
+		/*
+		  There's no point in sorting until the result is combined.
+		  Therefore, sorts should be done in mongos, and not in
+		  the shard at all.  Add all the remaining operators to
+		  the shardlist.
+		*/
+		sourceList.splice(sourceList.end(), tempList);
+		break;
+	    }
+
+	    /* hang on to this in advance, because tempList.pop_ will modify */
 	    DocumentSourceGroup *pGroup =
 		dynamic_cast<DocumentSourceGroup *>(pSource.get());
 
+	    /* move the source from the tempList to the shard sourceList */
 	    pShardPipeline->sourceList.push_back(pSource);
 	    tempList.pop_front();
 
+	    /*
+	      If we found a group, that's a split point.
+	     */
 	    if (pGroup) {
 		/* start this pipeline with the group merger */
 		sourceList.push_back(pGroup->createMerger());

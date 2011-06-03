@@ -51,15 +51,18 @@ namespace mongo {
 
     string FieldPath::getPath(bool fieldPrefix) const {
 	stringstream ss;
-	if (fieldPrefix)
-	    ss << "$";
+	writePath(ss, fieldPrefix);
+	return ss.str();
+    }
 
-	ss << vFieldName[0];
+    void FieldPath::writePath(ostream &outStream, bool fieldPrefix) const {
+	if (fieldPrefix)
+	    outStream << "$";
+
+	outStream << vFieldName[0];
 
 	const size_t n = vFieldName.size();
 	for(size_t i = 1; i < n; ++i)
-	    ss << "." << vFieldName[i];
-
-	return ss.str();
+	    outStream << "." << vFieldName[i];
     }
 }

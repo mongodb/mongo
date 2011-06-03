@@ -203,3 +203,22 @@ function resultsEq(rl, rr, v) {
     assert(!rr.length);
     return true;
 }
+
+function orderedArrayEq(al, ar, v) {
+    if (al.length != ar.length) {
+	if (v)
+	    print('orderedArrayEq:  array lengths do not match ' +
+		  al + ', ' + ar);
+	return false;
+    }
+
+    /* check the elements in the array */
+    for(var i = 0; i < al.length; ++i) {
+	if (!anyEq(al[i], ar[i], v))
+	    return false;
+    }
+
+    /* if we got here, everything matched */
+    return true;
+}
+

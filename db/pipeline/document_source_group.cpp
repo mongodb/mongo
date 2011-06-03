@@ -76,7 +76,7 @@ namespace mongo {
 	    pA->addToBsonObj(&insides, vFieldName[i], true);
 	}
 
-	pBuilder->append("$group", insides.done());
+	pBuilder->append(groupName, insides.done());
     }
 
     shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create(

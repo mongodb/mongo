@@ -29,6 +29,7 @@ namespace mongo {
     class Document;
     class Expression;
     class ExpressionContext;
+    class ExpressionFieldPath;
     class ExpressionObject;
     class Matcher;
 
@@ -646,6 +647,112 @@ namespace mongo {
         shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
         shared_ptr<const Value> pUnwindValue; // current value
     };
+
+
+    class DocumentSourceSort :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceSort();
+        virtual bool eof();
+        virtual bool advance();
+        virtual shared_ptr<Document> getCurrent();
+
+        /*
+          Create a new sorting DocumentSource.
+	  
+	  @param pCtx the expression context
+	  @returns the DocumentSource
+         */
+        static shared_ptr<DocumentSourceSort> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+	/*
+	  Add sort key field.
+
+	  Adds a sort key field to the key being built up.  A concatenated
+	  key is built up by calling this repeatedly.
+
+	  @params fieldPath the field path to the key component
+	  @params ascending if true, use the key for an ascending sort,
+	    otherwise, use it for descending
+	*/
+	void addKey(const string &fieldPath, bool ascending);
+
+	/*
+	  Create a sorting DocumentSource from BSON.
+
+	  This is a convenience method that uses the above, and operates on
+	  a BSONElement that has been deteremined to be an Object with an
+	  element named $group.
+
+	  @param pBsonElement the BSONELement that defines the group
+	  @param pCtx the expression context
+	  @returns the grouping DocumentSource
+	 */
+        static shared_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+
+	static const char sortName[];
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+        DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pCtx);
+
+	/*
+	  Before returning anything, this source must fetch everything from
+	  the underlying source and group it.  populate() is used to do that
+	  on the first call to any method on this source.  The populated
+	  boolean indicates that this has been done.
+	 */
+        void populate();
+        bool populated;
+
+	/* these two parallel each other */
+	vector<shared_ptr<ExpressionFieldPath> > vSortKey;
+	vector<bool> vAscending;
+
+	class Carrier {
+	public:
+	    /*
+	      We need access to the key for compares, so we have to carry
+	      this around.
+	    */
+	    DocumentSourceSort *pSort;
+
+	    shared_ptr<Document> pDocument;
+
+	    Carrier(DocumentSourceSort *pSort,
+		    const shared_ptr<Document> &pDocument);
+
+	    static bool lessThan(const Carrier &rL, const Carrier &rR);
+	};
+
+	/*
+	  Compare two documents according to the specified sort key.
+
+	  @param rL reference to the left document
+	  @param rR reference to the right document
+	  @returns a number less than, equal to, or greater than zero,
+	    indicating pL < pR, pL == pR, or pL > pR, respectively
+	 */
+	int compare(const shared_ptr<Document> &pL,
+		    const shared_ptr<Document> &pR);
+
+	typedef list<Carrier> ListType;
+	ListType documents;
+
+        ListType::iterator listIterator;
+        shared_ptr<Document> pCurrent;
+
+	intrusive_ptr<ExpressionContext> pCtx;
+    };
+
 }
 
 
@@ -658,4 +765,9 @@ namespace mongo {
         pIdExpression = pExpression;
     }
 
+    inline DocumentSourceSort::Carrier::Carrier(
+	DocumentSourceSort *pTheSort, const shared_ptr<Document> &pTheDocument):
+	pSort(pTheSort),
+	pDocument(pTheDocument) {
+    }
 }

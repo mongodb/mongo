@@ -50,6 +50,14 @@ namespace mongo {
 	 */
 	string getPath(bool fieldPrefix) const;
 
+	/*
+	  Write the full path.
+
+	  @param outStream where to write the path to
+	  @param fieldPrefix whether or not to include the field prefix
+	*/
+	void writePath(ostream &outStream, bool fieldPrefix) const;
+
     private:
 	vector<string> vFieldName;
     };

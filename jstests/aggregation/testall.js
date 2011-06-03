@@ -455,6 +455,93 @@ var p9result = [
 assert(arrayEq(p9.result, p9result), 'p9 failed');
 
 
+// simple sort
+var p10 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $sort : {
+	title : 1
+    }}
+]});
+
+var p10result = [
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "title" : "this is my title",
+        "author" : "bob",
+        "posted" : ISODate("2011-05-03T22:21:33.251Z"),
+        "pageViews" : 5,
+        "tags" : [
+            "fun",
+            "good"
+        ],
+        "comments" : [
+            {
+                "author" : "joe",
+                "text" : "this is cool"
+            },
+            {
+                "author" : "sam",
+                "text" : "this is bad"
+            }
+        ],
+        "other" : {
+            "foo" : 5
+        }
+    },
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066f"),
+        "title" : "this is some other title",
+        "author" : "jane",
+        "posted" : ISODate("2011-05-03T22:21:33.252Z"),
+        "pageViews" : 6,
+        "tags" : [
+            "nasty",
+            "filthy"
+        ],
+        "comments" : [
+            {
+                "author" : "r2",
+                "text" : "beep boop"
+            },
+            {
+                "author" : "leia",
+                "text" : "this is too smutty"
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    },
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
+        "title" : "this is your title",
+        "author" : "dave",
+        "posted" : ISODate("2011-05-03T22:21:33.251Z"),
+        "pageViews" : 7,
+        "tags" : [
+            "fun",
+            "nasty"
+        ],
+        "comments" : [
+            {
+                "author" : "barbarella",
+                "text" : "this is hot"
+            },
+            {
+                "author" : "leia",
+                "text" : "i prefer the brass bikini",
+                "votes" : 10
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    }
+];
+
+assert(orderedArrayEq(p10.result, p10result), 'p10 failed');
+
+
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [

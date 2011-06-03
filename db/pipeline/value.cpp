@@ -550,8 +550,43 @@ namespace mongo {
     int Value::compare(const shared_ptr<const Value> &rL,
                        const shared_ptr<const Value> &rR) {
         BSONType lType = rL->getType();
-        assert(lType == rR->getType());
+	BSONType rType = rR->getType();
+
+	/*
+	  Special handling for Undefined and NULL values; these are types,
+	  so it's easier to handle them here before we go below to handle
+	  values of the same types.  This allows us to compare Undefined and
+	  NULL values with everything else.  As coded now:
+	  (*) Undefined is less than everything except itself (which is equal)
+	  (*) NULL is less than everything except Undefined and itself
+	 */
+	if (lType == Undefined) {
+	    if (rType == Undefined)
+		return 0;
+
+	    /* if rType is anything else, the left value is less */
+	    return -1;
+	}
+	
+	if (lType == jstNULL) {
+	    if (rType == Undefined)
+		return 1;
+	    if (rType == jstNULL)
+		return 0;
+
+	    return -1;
+	}
+
+	if ((rType == Undefined) || (rType == jstNULL)) {
+	    /*
+	      We know the left value isn't Undefined, because of the above.
+	      Count a NULL value as greater than an undefined one.
+	    */
+	    return 1;
+	}
+
         // CW TODO for now, only compare like values
+        assert(lType == rType);
 
         switch(lType) {
         case NumberDouble:
