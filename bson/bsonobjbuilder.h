@@ -528,6 +528,10 @@ namespace mongo {
         template < class T >
         BSONObjBuilder& append( const StringData& fieldName, const list< T >& vals );
 
+        /** Append a set of values. */
+        template < class T >
+        BSONObjBuilder& append( const StringData& fieldName, const set< T >& vals );
+
         /**
          * destructive
          * The returned BSONObj will free the buffer when it is finished.
@@ -785,15 +789,26 @@ namespace mongo {
         return *this;
     }
 
-    template < class T >
-    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const list< T >& vals ) {
+    template < class L >
+    inline BSONObjBuilder& _appendIt( BSONObjBuilder& _this, const StringData& fieldName, const L& vals ) {
         BSONObjBuilder arrBuilder;
         int n = 0;
-        for( typename list< T >::const_iterator i = vals.begin(); i != vals.end(); i++ )
-            arrBuilder.append( numStr(n++), *i );
-        appendArray( fieldName, arrBuilder.done() );
-        return *this;
+        for( typename L::const_iterator i = vals.begin(); i != vals.end(); i++ )
+            arrBuilder.append( BSONObjBuilder::numStr(n++), *i );
+        _this.appendArray( fieldName, arrBuilder.done() );
+        return _this;
     }
+
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const list< T >& vals ) {
+        return _appendIt< list< T > >( *this, fieldName, vals );
+    }
+
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const set< T >& vals ) {
+        return _appendIt< set< T > >( *this, fieldName, vals );
+    }
+
 
     // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT 6));
     inline BSONObj OR(const BSONObj& a, const BSONObj& b)
