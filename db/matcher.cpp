@@ -341,7 +341,7 @@ namespace mongo {
         
         if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
             // $where: function()...
-            uassert( 10066 , "$where occurs twice?", where == 0 );
+            uassert( 10066 , "$where may only appear once in query", where == 0 );
             uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
             massert( 13089 , "no current client needed for $where" , haveClient() );
             where = new Where();

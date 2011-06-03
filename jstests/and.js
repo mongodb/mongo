@@ -55,6 +55,17 @@ function check() {
     // Check operators
     assert.eq( 1, t.count( {$and:[{a:{$gt:0}}]} ) );
     
+    // Check where
+    assert.eq( 1, t.count( {a:'foo',$where:'this.a=="foo"'} ) );
+    assert.eq( 1, t.count( {$and:[{a:'foo'}],$where:'this.a=="foo"'} ) );
+    assert.eq( 1, t.count( {$and:[{a:'foo'}],$where:'this.a=="foo"'} ) );
+    
+    // Nested where ok
+    assert.eq( 1, t.count({$and:[{$where:'this.a=="foo"'}]}) );
+    assert.eq( 1, t.count({$and:[{a:'foo'},{$where:'this.a=="foo"'}]}) );
+    
+    // Only one where allowed
+    assert.throws( function() { t.find( {$and:[{$where:'this.a=="foo"'}],$where:'this.a=="foo"'} ).toArray(); } );
 }
 
 check();
