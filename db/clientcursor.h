@@ -34,6 +34,7 @@
 #include "matcher.h"
 #include "../client/dbclient.h"
 #include "projection.h"
+#include "s/d_chunk_manager.h"
 
 namespace mongo {
 
@@ -258,6 +259,9 @@ namespace mongo {
             return _c->matcher()->matchesCurrent( _c.get() );
         }
 
+        void setChunkManager( ShardChunkManagerPtr manager ){ _chunkManager = manager; }
+        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
+
     private:
         void setLastLoc_inlock(DiskLoc);
 
@@ -370,6 +374,8 @@ namespace mongo {
 
         bool _doingDeletes;
         ElapsedTracker _yieldSometimesTracker;
+
+        ShardChunkManagerPtr _chunkManager;
 
     public:
         shared_ptr<ParsedQuery> pq;

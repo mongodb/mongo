@@ -320,6 +320,9 @@ namespace mongo {
             if ( cc->modifiedKeys() == false && cc->isMultiKey() == false && cc->fields )
                 keyFieldsOnly.reset( cc->fields->checkKey( cc->indexKeyPattern() ) );
 
+            // This manager may be stale, but it's the state of chunking when the cursor was created.
+            ShardChunkManagerPtr manager = cc->getChunkManager();
+
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
@@ -343,15 +346,13 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
+
                 // in some cases (clone collection) there won't be a matcher
                 if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
-                /*
-                  TODO
-                else if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( c->currKey(), c->currLoc() ) ){
-                    cout << "TEMP skipping un-owned chunk: " << c->current() << endl;
+                else if ( manager && ! manager->belongsToMe( c->currLoc().obj() ) ){
+                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
                 }
-                */
                 else {
                     if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
@@ -936,6 +937,9 @@ namespace mongo {
                 cc->slaveReadTill( _slaveReadTill );
 
         }
+
+        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
+
     private:
         BufBuilder _buf;
         const ParsedQuery& _pq;
@@ -1164,6 +1168,9 @@ namespace mongo {
                 if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher( cursor ) );
                 cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
+
+            cc->setChunkManager( dqo.getChunkManager() );
+
             cursorid = cc->cursorid();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->setPos( n );

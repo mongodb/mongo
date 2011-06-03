@@ -438,6 +438,8 @@ namespace mongo {
                 // we can't cleanly release other sockets
                 // because there is data waiting on the sockets
                 // TODO: should we read from them?
+                // TODO: we should probably retry as well in this case, since a migrate commit means another
+                // migrate will take some time to complete.
                 // we can close this one because we know the state
                 conns[me]->done();
                 throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
