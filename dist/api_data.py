@@ -203,10 +203,6 @@ methods = {
 		min='1MB', max='10TB'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''', type='boolean'),
-	Config('data_update_max', '32KB', r'''
-		maximum update buffer size for a session''', min='1KB'),
-	Config('data_update_min', '8KB', r'''
-		minimum update buffer size for a session''', min='1KB'),
 	Config('exclusive', 'false', r'''
 		fail if the database already exists''', type='boolean'),
 	Config('extensions', '[]', r'''

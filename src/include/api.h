@@ -263,9 +263,6 @@ struct __wt_connection_impl {
 	WT_FH	   *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
-	uint32_t data_update_max;
-	uint32_t data_update_min;
-
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 

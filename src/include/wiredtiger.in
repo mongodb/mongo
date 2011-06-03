@@ -933,8 +933,6 @@ struct wt_connection {
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{cache_size, maximum heap memory to allocate for the cache}
  * @config{create, create the database if it does not exist}
- * @config{data_update_max, maximum update buffer size for a session}
- * @config{data_update_min, minimum update buffer size for a session}
  * @config{exclusive, fail if the database already exists}
  * @config{extensions, list of extensions to load.  Optional values override the
  * name of the default entry function \c "wiredtiger_init"}

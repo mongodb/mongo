@@ -199,14 +199,12 @@ __wt_confchk_session_verify =
 
 const char *
 __wt_confdfl_wiredtiger_open =
-    "cache_size=20MB,create=false,data_update_max=32KB,data_update_min=8KB,"
-    "exclusive=false,extensions=[],error_prefix=,hazard_max=15,logging=false,"
-    "session_max=50,multiprocess=false,verbose=";
+    "cache_size=20MB,create=false,exclusive=false,extensions=[],error_prefix="
+    ",hazard_max=15,logging=false,session_max=50,multiprocess=false,verbose=";
 
 const char *
 __wt_confchk_wiredtiger_open =
     "cache_size=(type=int,min=1MB,max=10TB),create=(type=boolean),"
-    "data_update_max=(type=int,min=1KB),data_update_min=(type=int,min=1KB),"
     "exclusive=(type=boolean),extensions=(type=list),error_prefix=(),"
     "hazard_max=(type=int,min=3),logging=(type=boolean),session_max=(type=int"
     ",min=1),multiprocess=(type=boolean),verbose=(type=list,"
