@@ -1084,8 +1084,8 @@ namespace mongo {
 
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
 
-			NamespaceDetails* d = nsdetails(ns);
-			uassert(14820, "capped collections have no _id index by default", !(d && d->capped));
+            NamespaceDetails* d = nsdetails(ns);
+            uassert(14820, "capped collections have no _id index by default", d == NULL || d->haveIdIndex() );
 
             bool nsFound = false;
             bool indexFound = false;
