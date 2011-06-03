@@ -119,6 +119,7 @@ __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
+	WT_ASSERT(session, mtx->locked);
 	mtx->locked = 0;
 	WT_ERR(pthread_cond_signal(&mtx->cond));
 
