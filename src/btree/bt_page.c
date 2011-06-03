@@ -98,7 +98,6 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	page->parent = parent;
 	page->parent_ref = parent_ref;
 	page->dsk = dsk;
-
 	page->read_gen = __wt_cache_read_gen(session);
 
 	switch (page->type) {
