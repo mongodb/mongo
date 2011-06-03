@@ -11,7 +11,9 @@ l="$l `echo ../test/bt/*.c`"
 # almost always wrong: we should use a portable PRI* macro to construct the
 # format string instead.
 (for f in $l ; do
-    sed -n -E '/WT_VERBOSE|printf|scanf|__wt_errx?/,/\);/{=;p}' $f |
+    sed -n -E '/WT_VERBOSE|printf|scanf|__wt_errx?/,/\);/{=
+p
+}' $f |
     sed -e 'N' -e 's/\n/:/' -e "s,^,$f:,"
  done) | grep '%l' > $t
 test -s $t && cat $t && exit 1
