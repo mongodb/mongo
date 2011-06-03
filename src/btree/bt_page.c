@@ -400,7 +400,12 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			}
 		}
 
-		/* Allocate and initialize the instantiated key. */
+		/*
+		 * Allocate and initialize the instantiated key.
+		 *
+		 * If the key is an overflow item, we'll retain the disk image,
+		 * and will need a reference to it during reconciliation.
+		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    cell_ovfl ? WT_DISK_OFFSET(dsk, cell) : 0,
 		    current->data, current->size, (WT_IKEY **)&rref->key));
