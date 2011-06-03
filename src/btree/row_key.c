@@ -19,7 +19,7 @@ __wt_row_key(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_BUF *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
-	WT_BUF build, tmp;
+	WT_BUF *tmp;
 	WT_IKEY *ikey;
 	WT_ROW *rip;
 	uint32_t pfx;
@@ -27,9 +27,7 @@ __wt_row_key(
 	void *key;
 
 	rip = rip_arg;
-
-	WT_CLEAR(build);
-	WT_CLEAR(tmp);
+	tmp = NULL;
 
 	/*
 	 * If the caller didn't pass us a buffer, create one.  We don't use
@@ -39,8 +37,8 @@ __wt_row_key(
 	 */
 	is_local = 0;
 	if (retb == NULL) {
-		retb = &build;
 		is_local = 1;
+		WT_ERR(__wt_scr_alloc(session, 0, &retb));
 	}
 
 	direction = BACKWARD;
@@ -190,10 +188,13 @@ __wt_row_key(
 			 * Append the key to the prefix (already in the buffer);
 			 * Set the final size of the key.
 			 */
-			WT_ERR(__wt_cell_copy(session, key, &tmp));
+			if (tmp == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+			WT_ERR(__wt_cell_copy(session, key, tmp));
 			WT_ERR(
-			    __wt_buf_initsize(session, retb, tmp.size + pfx));
-			memcpy((uint8_t *)retb->data + pfx, tmp.data, tmp.size);
+			    __wt_buf_initsize(session, retb, tmp->size + pfx));
+			memcpy((uint8_t *)
+			    retb->data + pfx, tmp->data, tmp->size);
 
 			if (slot_offset == 0)
 				break;
@@ -211,7 +212,8 @@ next:		switch (direction) {
 		}
 	}
 
-	__wt_buf_free(session, &tmp);
+	if (tmp != NULL)
+		__wt_scr_release(&tmp);
 
 	/*
 	 * If a return buffer was specified, the caller just wants a copy and
@@ -235,12 +237,14 @@ next:		switch (direction) {
 	if (rip_arg->key != ikey)
 		__wt_sb_decrement(session, ikey->sb);
 
-	__wt_buf_free(session, &tmp);
+	__wt_scr_release(&retb);
 
 	return (ret);
 
-err:	__wt_buf_free(session, &build);
-	__wt_buf_free(session, &tmp);
+err:	if (is_local && retb != NULL)
+		__wt_scr_release(&retb);
+	if (tmp != NULL)
+		__wt_scr_release(&tmp);
 	return (ret);
 }
 
