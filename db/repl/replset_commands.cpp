@@ -63,7 +63,10 @@ namespace mongo {
         }
     } cmdReplSetTest;
 
-    /** get rollback id */
+    /** get rollback id.  used to check if a rollback happened during some interval of time.
+        as consumed, the rollback id is not in any particular order, it simply changes on each rollback.
+        @see incRBID()
+    */
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
         /* todo: ideally this should only change on rollbacks NOT on mongod restarts also. fix... */
@@ -72,7 +75,9 @@ namespace mongo {
             help << "internal";
         }
         CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {
-            rbid = (int) curTimeMillis();
+            // this is ok but micros or combo with some rand() and/or 64 bits might be better -- 
+            // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
+            rbid = (int) curTimeMillis64();
         }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )

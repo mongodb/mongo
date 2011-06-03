@@ -420,11 +420,11 @@ namespace PerfTests {
 
     class CTM : public B { 
     public:
-        string name() { return "curTimeMillis"; }
-        virtual int howLongMillis() { return 1000; } 
+        string name() { return "curTimeMillis64"; }
+        virtual int howLongMillis() { return 500; } 
         virtual bool showDurStats() { return false; }
         void timed() {
-            aaa += curTimeMillis();
+            aaa += curTimeMillis64();
         }
     };
 

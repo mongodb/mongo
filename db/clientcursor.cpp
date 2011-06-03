@@ -484,7 +484,7 @@ namespace mongo {
         }
 
         long long x;
-        int ctm = (int) curTimeMillis();
+        int ctm = (int) curTimeMillis64();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
             x = x | ctm | 0x80000000; // OR to make sure not zero
@@ -580,21 +580,16 @@ namespace mongo {
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
-
-        unsigned old = curTimeMillis();
-
+        Timer t;
         const int Secs = 4;
         unsigned n = 0;
         while ( ! inShutdown() ) {
-            unsigned now = curTimeMillis();
-            ClientCursor::idleTimeReport( now - old );
-            old = now;
+            ClientCursor::idleTimeReport( t.millisReset() );
             sleepsecs(Secs);
             if( ++n % (60/4) == 0 /*once a minute*/ ) { 
                 sayMemoryStatus();
             }
         }
-
         client.shutdown();
     }
 
