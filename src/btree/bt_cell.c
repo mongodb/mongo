@@ -24,33 +24,26 @@ __wt_cell_set(WT_SESSION_IMPL *session,
 	 * bytes.  Short key/data items have 6- or 7-bits of length in the
 	 * descriptor byte and no length bytes.
 	 */
-	switch (type) {
-	case WT_CELL_DATA:
-		if (size < 0x7f) {
-			/*
-			 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7
-			 * bits are the size.
-			 */
-			byte = (uint8_t)size;
-			cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
-			*cell_lenp = 1;		/* Cell byte */
-			return;
-		}
-		break;
-	case WT_CELL_KEY:
-		if (size < 0x3f) {
-			/*
-			 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag;
-			 * the other 6 bits are the size.
-			 */
-			byte = (uint8_t)size;
-			cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
-			cell->__chunk[1] = (uint8_t)prefix;
-			*cell_lenp = 2;		/* Cell byte + prefix byte */
-			return;
-		}
-		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ASSERT(session, type == WT_CELL_DATA || type == WT_CELL_KEY);
+	if (type == WT_CELL_DATA && size < 0x7f) {
+		/*
+		 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are
+		 * the size.
+		 */
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
+		*cell_lenp = 1;		/* Cell byte */
+		return;
+	} else if (size < 0x3f) {
+		/*
+		 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag; the other
+		 * 6 bits are the size.
+		 */
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
+		cell->__chunk[1] = (uint8_t)prefix;
+		*cell_lenp = 2;		/* Cell byte + prefix byte */
+		return;
 	}
 
 	/*
