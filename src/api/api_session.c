@@ -162,6 +162,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	if (!__wt_exist(name)) {
 		WT_RET(__wt_config_collapse(session, cfg, &collapse));
 		WT_RET(__wt_btree_create(session, name, collapse));
+		__wt_free(session, collapse);
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
