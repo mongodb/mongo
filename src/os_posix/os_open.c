@@ -15,7 +15,6 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
 	int f, fd, matched, ret;
@@ -29,10 +28,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
 	__wt_lock(session, conn->mtx);
-	TAILQ_FOREACH(btree, &conn->dbqh, q) {
-		if ((fh = btree->fh) == NULL)
-			continue;
-		if (strcmp(name, btree->name) == 0) {
+	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+		if (strcmp(name, fh->name) == 0) {
 			++fh->refcnt;
 			*fhp = fh;
 			matched = 1;
