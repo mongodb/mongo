@@ -222,7 +222,6 @@ namespace mongo {
     inline unsigned long long curTimeMillis64() {
         timeval tv;
         gettimeofday(&tv, NULL);
-        unsigned t = ;
         return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
     }
     inline Date_t jsTime() {
