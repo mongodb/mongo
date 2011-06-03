@@ -287,6 +287,7 @@ namespace PerfTests {
 
             client().getLastError(); // block until all ops are finished
             int ms = t.millis();
+
             say(n, ms, name());
 
             int etm = expectationTimeMillis();
@@ -300,6 +301,8 @@ namespace PerfTests {
             else if( n < expectation() ) {
                 cout << "test  " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
             }
+
+            post();
 
             {
                 const char *test2name = timed2();
@@ -412,6 +415,7 @@ namespace PerfTests {
         string name() { return "Timer"; }
         virtual int howLongMillis() { return 1000; } 
         virtual bool showDurStats() { return false; }
+
         void timed() {
             mongo::Timer t;
             aaa += t.millis();
@@ -420,11 +424,29 @@ namespace PerfTests {
 
     class CTM : public B { 
     public:
+        CTM() : last(0), delts(0), n(0) { }
         string name() { return "curTimeMillis64"; }
         virtual int howLongMillis() { return 500; } 
         virtual bool showDurStats() { return false; }
+        unsigned long long last;
+        unsigned long long delts;
+        unsigned n;
         void timed() {
-            aaa += curTimeMillis64();
+            unsigned long long x = curTimeMillis64();
+            aaa += x;
+            if( last ) { 
+                unsigned long long delt = x-last;
+                if( delt ) {
+                    delts += delt;
+                    n++;
+                }
+            }
+            last = x;
+        }
+        void post() {
+            // we need to know if timing is highly ungranular - that could be relevant in some places
+            if( n )
+                cout << "      avg timer granularity: " << ((double)delts)/n << "ms " << endl;
         }
     };
 
@@ -574,7 +596,7 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
 
-    class Insert1 : public InsertDup {
+    class Insert1 : public B {
         const BSONObj x;
         OID oid;
         BSONObj query;
@@ -597,7 +619,7 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
 
-    class InsertBig : public InsertDup {
+    class InsertBig : public B {
         BSONObj x;
         virtual int howLongMillis() {
             if( sizeof(void*) == 4 )
@@ -630,8 +652,6 @@ namespace PerfTests {
             int x = rand();
             BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
             client().insert(ns(), y);
-        }
-        void post() {
         }
         unsigned long long expectation() { return 1000; }
     };
