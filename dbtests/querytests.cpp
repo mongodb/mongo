@@ -355,12 +355,20 @@ namespace QueryTests {
         ~TailableQueryOnId() {
             client().dropCollection( "unittests.querytests.TailableQueryOnId" );
         }
+
+		void insertA(const char* ns, int a) {
+			BSONObjBuilder b;
+			b.appendOID("_id", 0, true);
+			b.append("a", a);
+			insert(ns, b.obj());
+		}
+
         void run() {
             const char *ns = "unittests.querytests.TailableQueryOnId";
             BSONObj info;
             client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "autoIndexId" << true ), info );
-            insert( ns, BSON( "a" << 0 ) );
-            insert( ns, BSON( "a" << 1 ) );
+            insertA( ns, 0 );
+            insertA( ns, 1 );
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
             OID id;
             id.init("000000000000000000000000");
@@ -371,7 +379,7 @@ namespace QueryTests {
             c2->next();
             c2->next();
             ASSERT( !c2->more() );
-            insert( ns, BSON( "a" << 2 ) );
+            insertA( ns, 2 );
             ASSERT( c1->more() );
             ASSERT_EQUALS( 2, c1->next().getIntField( "a" ) );
             ASSERT( !c1->more() );
@@ -880,7 +888,10 @@ namespace QueryTests {
         }
 
         void insertNext() {
-            insert( ns() , BSON( "i" << _n++ ) );
+			BSONObjBuilder b;
+			b.appendOID("_id", 0, true);
+			b.append("i", _n++);
+            insert( ns() , b.obj() );
         }
 
         int _n;

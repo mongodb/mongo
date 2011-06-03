@@ -1750,7 +1750,7 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
-            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
+            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && !d->capped) {
                 if( addedID )
                     *addedID = true;
                 addID = len;

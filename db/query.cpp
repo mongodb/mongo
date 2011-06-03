@@ -1083,6 +1083,10 @@ namespace mongo {
         }
 
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+
+			NamespaceDetails* d = nsdetails(ns);
+			uassert(14815, "capped collections have no _id index by default", !(d && d->capped));
+
             bool nsFound = false;
             bool indexFound = false;
 
