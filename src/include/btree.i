@@ -121,5 +121,10 @@ __wt_off_page_size(WT_PAGE *page, const void *p, uint32_t size)
 static inline int
 __wt_off_page(WT_PAGE *page, const void *p)
 {
-	return (__wt_off_page_size(page, p, WT_PSIZE(page)));
+	/*
+	 * Try to get the size from page->dsk: during reconciliation,
+	 * parent_ref may not be set.
+	 */
+	return (__wt_off_page_size(page, p,
+	    (page->dsk != NULL) ? page->dsk->size : WT_PSIZE(page)));
 }
