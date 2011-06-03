@@ -21,52 +21,81 @@
 #include "nonce.h"
 #include "concurrency.h"
 #include "security_key.h"
+#include "../util/concurrency/spin_lock.h"
 
 namespace mongo {
 
-    /* for a particular db */
+    /* 
+     * for a particular db
+     * levels
+     *     0 : none
+     *     1 : read
+     *     2 : write
+     */
     struct Auth {
         Auth() { level = 0; }
         int level;
+        string user;
     };
 
     class AuthenticationInfo : boost::noncopyable {
-        mongo::mutex _lock;
-        map<string, Auth> m; // dbname -> auth
-        static int warned;
     public:
         bool isLocalHost;
-        AuthenticationInfo() : _lock("AuthenticationInfo") { isLocalHost = false; }
-        ~AuthenticationInfo() {
-        }
-        void logout(const string& dbname ) {
-            scoped_lock lk(_lock);
-            m.erase(dbname);
-        }
-        void authorize(const string& dbname ) {
-            scoped_lock lk(_lock);
-            m[dbname].level = 2;
-        }
-        void authorizeReadOnly(const string& dbname) {
-            scoped_lock lk(_lock);
-            m[dbname].level = 1;
-        }
-        bool isAuthorized(const string& dbname) { return _isAuthorized( dbname, 2 ); }
-        bool isAuthorizedReads(const string& dbname) { return _isAuthorized( dbname, 1 ); }
-        bool isAuthorizedForLock(const string& dbname, int lockType ) { return _isAuthorized( dbname , lockType > 0 ? 2 : 1 ); }
+        
+        AuthenticationInfo(){ isLocalHost = false; }
+        ~AuthenticationInfo() {}
 
-        void print();
+        // -- modifiers ----
+        
+        void logout(const string& dbname ) {
+            scoped_spinlock lk(_lock);
+            _dbs.erase(dbname);
+        }
+        void authorize(const string& dbname , const string& user ) {
+            scoped_spinlock lk(_lock);
+            _dbs[dbname].level = 2;
+            _dbs[dbname].user = user;
+        }
+        void authorizeReadOnly(const string& dbname , const string& user ) {
+            scoped_spinlock lk(_lock);
+            _dbs[dbname].level = 1;
+            _dbs[dbname].user = user;
+        }
+        
+        // -- accessors ---
+
+        bool isAuthorized(const string& dbname) const { 
+            return _isAuthorized( dbname, 2 ); 
+        }
+        
+        bool isAuthorizedReads(const string& dbname) const { 
+            return _isAuthorized( dbname, 1 ); 
+        }
+        
+        bool isAuthorizedForLock(const string& dbname, int lockType ) const { 
+            return _isAuthorized( dbname , lockType > 0 ? 2 : 1 ); 
+        }
+
+        string getUser( const string& dbname ) const;
+
+        void print() const;
 
     protected:
-        bool _isAuthorized(const string& dbname, int level) {
-            if( m[dbname].level >= level ) return true;
-            if( noauth ) return true;
-            if( m["admin"].level >= level ) return true;
-            if( m["local"].level >= level ) return true;
-            return _isAuthorizedSpecialChecks( dbname );
-        }
+        /** takes a lock */
+        bool _isAuthorized(const string& dbname, int level) const;
 
-        bool _isAuthorizedSpecialChecks( const string& dbname );
+        bool _isAuthorizedSingle_inlock(const string& dbname, int level) const;
+        
+        /** cannot call this locked */
+        bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
+
+    private:
+        mutable SpinLock _lock;
+
+        typedef map<string,Auth> MA;
+        MA _dbs; // dbname -> auth
+
+        static bool _warned;
     };
 
 } // namespace mongo

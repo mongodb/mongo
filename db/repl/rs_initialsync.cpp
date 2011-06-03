@@ -34,7 +34,7 @@ namespace mongo {
 
     // add try/catch with sleep
 
-    void isyncassert(const char *msg, bool expr) {
+    void isyncassert(const string& msg, bool expr) {
         if( !expr ) {
             string m = str::stream() << "initial sync " << msg;
             theReplSet->sethbmsg(m, 0);
@@ -186,16 +186,13 @@ namespace mongo {
         /* apply relevant portion of the oplog
         */
         {
-            isyncassert( "initial sync source must remain readable throughout our initial sync [2]", source->state().readable() );
+            isyncassert( str::stream() << "initial sync source must remain readable throughout our initial sync [2] state now: " << source->state().toString() , source->state().readable() );
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
-
-                {
-                    lock lk(this);
-                    lastOpTimeWritten = OpTime();
-                    lastH = 0;
-                }
+                
+                lastOpTimeWritten = OpTime();
+                lastH = 0;
                 
                 log() << "replSet cleaning up [1]" << rsLog;
                 {

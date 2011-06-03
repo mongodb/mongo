@@ -70,6 +70,8 @@ namespace mongo {
             return BSONObj();
         }
 
+        virtual bool supportGetMore() = 0;
+
         /* called after every query block is iterated -- i.e. between getMore() blocks
            so you can note where we are, if necessary.
            */
@@ -78,8 +80,13 @@ namespace mongo {
         /* called before query getmore block is iterated */
         virtual void checkLocation() { }
 
-        virtual bool supportGetMore() = 0;
         virtual bool supportYields() = 0;
+
+        /** Called before a ClientCursor yield. */
+        virtual bool prepareToYield() { noteLocation(); return supportYields(); }
+        
+        /** Called after a ClientCursor yield. */
+        virtual void recoverFromYield() { checkLocation(); }
 
         virtual string toString() { return "abstract?"; }
 
@@ -87,9 +94,6 @@ namespace mongo {
            if a multikey index traversal:
              if loc has already been sent, returns true.
              otherwise, marks loc as sent.
-           @param deep - match was against an array, so we know it is multikey.  this is legacy and kept
-                         for backwards datafile compatibility.  'deep' can be eliminated next time we
-                         force a data file conversion. 7Jul09
         */
         virtual bool getsetdup(DiskLoc loc) = 0;
 
@@ -115,7 +119,12 @@ namespace mongo {
         // matcher() should be checked each time advance() is called.
         // Implementations which generate their own matcher should return this
         // to avoid a matcher being set manually.
+        // Note that the return values differ subtly here
+
+        // Used when we want fast matcher lookup
         virtual CoveredIndexMatcher *matcher() const { return 0; }
+        // Used when we need to share this matcher with someone else
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return shared_ptr< CoveredIndexMatcher >(); }
 
         // A convenience function for setting the value of matcher() manually
         // so it may accessed later.  Implementations which must generate
@@ -170,6 +179,7 @@ namespace mongo {
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
         virtual long long nscanned() { return _nscanned; }
 

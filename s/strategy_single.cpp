@@ -81,7 +81,7 @@ namespace mongo {
                     }
                 }
 
-                string commandName = q.query.firstElement().fieldName();
+                string commandName = q.query.firstElementFieldName();
 
                 uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
             }

@@ -20,6 +20,7 @@
 
 #include "../db/commands.h"
 #include "../util/queue.h"
+#include "../util/message.h"
 
 #include "d_writeback.h"
 
@@ -39,26 +40,80 @@ namespace mongo {
     }
 
     void WriteBackManager::queueWriteBack( const string& remote , const BSONObj& o ) {
-        getWritebackQueue( remote )->push( o );
+        getWritebackQueue( remote )->queue.push( o );
     }
 
-    BlockingQueue<BSONObj>* WriteBackManager::getWritebackQueue( const string& remote ) {
+    shared_ptr<WriteBackManager::QueueInfo> WriteBackManager::getWritebackQueue( const string& remote ) {
         scoped_lock lk ( _writebackQueueLock );
-        BlockingQueue<BSONObj>*& q = _writebackQueues[remote];
+        shared_ptr<QueueInfo>& q = _writebackQueues[remote];
         if ( ! q )
-            q = new BlockingQueue<BSONObj>();
+            q.reset( new QueueInfo() );
+        q->lastCall = Listener::getElapsedTimeMillis();
         return q;
     }
 
     bool WriteBackManager::queuesEmpty() const {
         scoped_lock lk( _writebackQueueLock );
         for ( WriteBackQueuesMap::const_iterator it = _writebackQueues.begin(); it != _writebackQueues.end(); ++it ) {
-            const BlockingQueue<BSONObj>* queue = it->second;
-            if (! queue->empty() ) {
+            const shared_ptr<QueueInfo> queue = it->second;
+            if (! queue->queue.empty() ) {
                 return false;
             }
         }
         return true;
+    }
+
+    void WriteBackManager::appendStats( BSONObjBuilder& b ) const {
+        BSONObjBuilder sub;
+        long long totalQueued = 0;
+        long long now = Listener::getElapsedTimeMillis();
+        {
+            scoped_lock lk( _writebackQueueLock );
+            for ( WriteBackQueuesMap::const_iterator it = _writebackQueues.begin(); it != _writebackQueues.end(); ++it ) {
+                const shared_ptr<QueueInfo> queue = it->second;
+                
+                BSONObjBuilder t( sub.subobjStart( it->first ) );
+                t.appendNumber( "n" , queue->queue.size() );
+                t.appendNumber( "minutesSinceLastCall" , ( now - queue->lastCall ) / ( 1000 * 60 ) );
+                t.done();
+
+                totalQueued += queue->queue.size();
+            }
+        }
+        
+        b.appendBool( "hasOpsQueued" , totalQueued > 0 );
+        b.appendNumber( "totalOpsQueued" , totalQueued );
+        b.append( "queues" , sub.obj() );
+    }
+
+    bool WriteBackManager::cleanupOldQueues() {
+        long long now = Listener::getElapsedTimeMillis();
+
+        scoped_lock lk( _writebackQueueLock );
+        for ( WriteBackQueuesMap::iterator it = _writebackQueues.begin(); it != _writebackQueues.end(); ++it ) {
+            const shared_ptr<QueueInfo> queue = it->second;
+            long long sinceMinutes = ( now - queue->lastCall ) / ( 1000 * 60 );
+
+            if ( sinceMinutes < 60 ) // minutes of inactivity.  
+                continue;
+            
+            log() << "deleting queue from: " << it->first 
+                  << " of size: " << queue->queue.size() 
+                  << " after " << sinceMinutes << " inactivity" 
+                  << " (normal if any mongos has restarted)" 
+                  << endl;
+
+            _writebackQueues.erase( it );
+            return true;
+        }
+        return false;
+    }
+
+    void WriteBackManager::Cleaner::taskDoWork() { 
+        for ( int i=0; i<1000; i++ ) {
+            if ( ! writeBackManager.cleanupOldQueues() )
+                break;
+        }
     }
 
     // ---------- admin commands ----------
@@ -88,7 +143,7 @@ namespace mongo {
             // the command issuer is blocked awaiting a response
             // we want to do return at least at every 5 minutes so sockets don't timeout
             BSONObj z;
-            if ( writeBackManager.getWritebackQueue(id.str())->blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
+            if ( writeBackManager.getWritebackQueue(id.str())->queue.blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
                 log(1) << "WriteBackCommand got : " << z << endl;
                 result.append( "data" , z );
             }
@@ -114,10 +169,11 @@ namespace mongo {
         }
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            result.appendBool( "hasOpsQueued" , ! writeBackManager.queuesEmpty() );
+            writeBackManager.appendStats( result );
             return true;
         }
 
     } writeBacksQueuedCommand;
+    
 
 }  // namespace mongo

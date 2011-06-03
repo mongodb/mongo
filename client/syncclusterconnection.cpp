@@ -159,7 +159,7 @@ namespace mongo {
     BSONObj SyncClusterConnection::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
 
         if ( ns.find( ".$cmd" ) != string::npos ) {
-            string cmdName = query.obj.firstElement().fieldName();
+            string cmdName = query.obj.firstElementFieldName();
 
             int lockType = _lockType( cmdName );
 
@@ -199,7 +199,7 @@ namespace mongo {
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
         _lastErrors.clear();
         if ( ns.find( ".$cmd" ) != string::npos ) {
-            string cmdName = query.obj.firstElement().fieldName();
+            string cmdName = query.obj.firstElementFieldName();
             int lockType = _lockType( cmdName );
             uassert( 13054 , (string)"write $cmd not supported in SyncClusterConnection::query for:" + cmdName , lockType <= 0 );
         }
@@ -240,7 +240,7 @@ namespace mongo {
         return c;
     }
 
-    void SyncClusterConnection::insert( const string &ns, BSONObj obj ) {
+    void SyncClusterConnection::insert( const string &ns, BSONObj obj , int flags) {
 
         uassert( 13119 , (string)"SyncClusterConnection::insert obj has to have an _id: " + obj.jsonString() ,
                  ns.find( ".system.indexes" ) != string::npos || obj["_id"].type() );
@@ -250,13 +250,13 @@ namespace mongo {
             throw UserException( 8003 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ) {
-            _conns[i]->insert( ns , obj );
+            _conns[i]->insert( ns , obj , flags);
         }
 
         _checkLast();
     }
 
-    void SyncClusterConnection::insert( const string &ns, const vector< BSONObj >& v ) {
+    void SyncClusterConnection::insert( const string &ns, const vector< BSONObj >& v , int flags) {
         uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0);
     }
 

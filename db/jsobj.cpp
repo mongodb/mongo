@@ -98,7 +98,7 @@ namespace mongo {
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         BSONType t = type();
         if ( t == Undefined )
-            return "";
+            return "undefined";
 
         stringstream s;
         if ( includeFieldNames )
@@ -142,19 +142,28 @@ namespace mongo {
             s << "[ ";
             BSONObjIterator i( embeddedObject() );
             BSONElement e = i.next();
-            if ( !e.eoo() )
+            if ( !e.eoo() ) {
+                int count = 0;
                 while ( 1 ) {
                     if( pretty ) {
                         s << '\n';
                         for( int x = 0; x < pretty; x++ )
                             s << "  ";
                     }
-                    s << e.jsonString( format, false, pretty?pretty+1:0 );
-                    e = i.next();
+
+                    if (strtol(e.fieldName(), 0, 10) > count) {
+                        s << "undefined";
+                    }
+                    else {
+                        s << e.jsonString( format, false, pretty?pretty+1:0 );
+                        e = i.next();
+                    }
+                    count++;
                     if ( e.eoo() )
                         break;
                     s << ", ";
                 }
+            }
             s << " ]";
             break;
         }
@@ -353,7 +362,7 @@ namespace mongo {
 
         switch ( l.type() ) {
         case EOO:
-        case Undefined:
+        case Undefined: // EOO and Undefined are same canonicalType
         case jstNULL:
         case MaxKey:
         case MinKey:
@@ -363,6 +372,10 @@ namespace mongo {
         case Bool:
             return *l.value() - *r.value();
         case Timestamp:
+            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
+            if ( l.date() < r.date() )
+                return -1;
+            return l.date() == r.date() ? 0 : 1;
         case Date:
             if ( l.date() < r.date() )
                 return -1;
@@ -404,8 +417,18 @@ namespace mongo {
         case Code:
         case Symbol:
         case String:
-            /* todo: utf version */
-            return strcmp(l.valuestr(), r.valuestr());
+            /* todo: a utf sort order version one day... */
+            {
+                // we use memcmp as we allow zeros in UTF8 strings
+                int lsz = l.valuestrsize();
+                int rsz = r.valuestrsize();
+                int common = min(lsz, rsz);
+                int res = memcmp(l.valuestr(), r.valuestr(), common);
+                if( res ) 
+                    return res;
+                // longer string is the greater one
+                return lsz-rsz;
+            }
         case Object:
         case Array:
             return l.embeddedObject().woCompare( r.embeddedObject() );
@@ -611,6 +634,21 @@ namespace mongo {
             mask <<= 1;
         }
         return -1;
+    }
+
+    // deep (full) equality
+    bool BSONObj::equal(const BSONObj &rhs) const {
+        BSONObjIterator i(*this);
+        BSONObjIterator j(rhs);
+        BSONElement l,r;
+        do {
+            // so far, equal...
+            l = i.next();
+            r = j.next();
+            if ( l.eoo() )
+                return r.eoo();
+        } while( l == r );
+        return false;
     }
 
     /* well ordered compare */
@@ -844,21 +882,6 @@ namespace mongo {
             --j;
         }
         return BSONElement();
-    }
-
-    int BSONObj::getIntField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.isNumber() ? (int) e.number() : INT_MIN;
-    }
-
-    bool BSONObj::getBoolField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.type() == Bool ? e.boolean() : false;
-    }
-
-    const char * BSONObj::getStringField(const char *name) const {
-        BSONElement e = getField(name);
-        return e.type() == String ? e.valuestr() : "";
     }
 
     /* grab names of all the fields in this object */
@@ -1100,7 +1123,7 @@ namespace mongo {
             c.appendRegex("x", "goo");
             BSONObj p = c.done();
 
-            assert( !o.woEqual( p ) );
+            assert( !o.shallowEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
         }
@@ -1205,7 +1228,7 @@ namespace mongo {
             BSONObj a = A.done();
             BSONObj b = B.done();
             BSONObj c = C.done();
-            assert( !a.woEqual( b ) ); // comments on operator==
+            assert( !a.shallowEqual( b ) ); // comments on operator==
             int cmp = a.woCompare(b);
             assert( cmp == 0 );
             cmp = a.woCompare(c);
@@ -1222,13 +1245,6 @@ namespace mongo {
     Labeler::Label LTE( "$lte" );
     Labeler::Label NE( "$ne" );
     Labeler::Label SIZE( "$size" );
-
-    void BSONElementManipulator::initTimestamp() {
-        massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
-        unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
-        if ( timestamp == 0 )
-            timestamp = OpTime::now().asDate();
-    }
 
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {

@@ -25,6 +25,7 @@
 #include "../util/text.h"
 #include "../util/queue.h"
 #include "../util/paths.h"
+#include "../db/db.h"
 
 namespace BasicTests {
 
@@ -195,12 +196,16 @@ namespace BasicTests {
             int matches = 0;
             for( int p = 0; p < 3; p++ ) {
                 sleepsecs( 1 );
-                int sec = t.seconds();
+                int sec = (t.millis() + 2)/1000;
                 if( sec == 1 ) 
                     matches++;
+                else
+                    log() << "temp millis: " << t.millis() << endl;
                 ASSERT( sec >= 0 && sec <= 2 );
                 t.reset();
             }
+            if ( matches < 2 )
+                log() << "matches:" << matches << endl;
             ASSERT( matches >= 2 );
 
             sleepmicros( 1527123 );
@@ -409,9 +414,9 @@ namespace BasicTests {
             ASSERT( ! Database::validDBName( "foo/bar" ) );
             ASSERT( ! Database::validDBName( "foo.bar" ) );
 
-            ASSERT( isANormalNSName( "asdads" ) );
-            ASSERT( ! isANormalNSName( "asda$ds" ) );
-            ASSERT( isANormalNSName( "local.oplog.$main" ) );
+            ASSERT( NamespaceString::normal( "asdads" ) );
+            ASSERT( ! NamespaceString::normal( "asda$ds" ) );
+            ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
         }
     };
 

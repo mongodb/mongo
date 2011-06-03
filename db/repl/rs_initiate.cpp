@@ -180,7 +180,7 @@ namespace mongo {
 
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
                 errmsg = "server already in BADCONFIG state (check logs); not initiating";
-                result.append("info", ReplSet::startupStatusMsg);
+                result.append("info", ReplSet::startupStatusMsg.get());
                 return false;
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
@@ -239,7 +239,7 @@ namespace mongo {
                 log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
                 result.append("info", "Config now saved locally.  Should come online in about a minute.");
                 ReplSet::startupStatus = ReplSet::SOON;
-                ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
+                ReplSet::startupStatusMsg.set("Received replSetInitiate - should come online shortly.");
             }
             catch( DBException& e ) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
@@ -247,6 +247,11 @@ namespace mongo {
                     errmsg = string("couldn't parse cfg object ") + e.what();
                 else
                     errmsg = string("couldn't initiate : ") + e.what();
+                return false;
+            }
+            catch( string& e2 ) {
+                log() << e2 << rsLog;
+                errmsg = e2;
                 return false;
             }
 

@@ -32,7 +32,7 @@ var wait = function(f) {
 }
 
 var reconnect = function(a) {
-  wait(function() { 
+  wait(function() {
       try {
         a.bar.stats();
         return true;
@@ -46,9 +46,14 @@ var reconnect = function(a) {
 
 var name = "toostale"
 var replTest = new ReplSetTest( {name: name, nodes: 3});
+var host = getHostName();
 
 var nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiate({_id : name, members : [
+    {_id : 0, host : host+":"+replTest.ports[0]},
+    {_id : 1, host : host+":"+replTest.ports[1], arbiterOnly : true},
+    {_id : 2, host : host+":"+replTest.ports[2]}
+]});
 var master = replTest.getMaster();
 var mdb = master.getDB("foo");
 
@@ -60,7 +65,7 @@ mdb.foo.save({a: 1000});
 print("2: initial sync");
 replTest.awaitReplication();
 
-print("3: blind s2");
+print("3: stop s2");
 replTest.stop(2);
 print("waiting until the master knows the slave is blind");
 assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health == 0 });
@@ -82,7 +87,7 @@ while (count != prevCount) {
 }
 
 
-print("5: unblind s2");
+print("5: restart s2");
 replTest.restart(2);
 print("waiting until the master knows the slave is not blind");
 assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health != 0 });
@@ -117,5 +122,10 @@ while (status.state == 0) {
 printjson(status);
 assert.eq(status.members[2].state, 3, 'recovering');
 
+print("make sure s2 doesn't become primary");
+replTest.stop(0);
+sleep(20000);
+printjson(replTest.nodes[2].getDB("admin").runCommand({isMaster : 1}));
+printjson(replTest.nodes[2].getDB("admin").runCommand({replSetGetStatus : 1}));
 
-replTest.stopSet(15);
+//replTest.stopSet(15);

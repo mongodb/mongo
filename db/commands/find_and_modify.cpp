@@ -53,6 +53,13 @@ namespace mongo {
             BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
             const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
 
+            Projection projection;
+            if (fields) {
+                projection.init(fieldsHolder);
+                if (!projection.includeID())
+                    fields = NULL; // do projection in post-processing
+            }
+
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {
                 if (!upsert) {
@@ -129,6 +136,11 @@ namespace mongo {
                     if (cmdObj["new"].trueValue())
                         out = db.findOne(ns, QUERY("_id" << out["_id"]), fields);
                 }
+            }
+
+            if (!fieldsHolder.isEmpty() && !fields){
+                // we need to run projection but haven't yet
+                out = projection.transform(out);
             }
 
             result.append("value", out);

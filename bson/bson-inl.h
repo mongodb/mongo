@@ -18,13 +18,14 @@
 #pragma once
 
 #include <map>
+#include <limits.h>
 #include "util/atomic_int.h"
 #include "util/misc.h"
 #include "../util/hex.h"
 
 namespace mongo {
 
-    inline BSONObjIterator BSONObj::begin() {
+    inline BSONObjIterator BSONObj::begin() const {
         return BSONObjIterator(*this);
     }
 
@@ -89,16 +90,18 @@ namespace mongo {
         return b.obj();
     }
 
-    inline bool BSONObj::hasElement(const char *name) const {
-        if ( !isEmpty() ) {
-            BSONObjIterator it(*this);
-            while ( it.moreWithEOO() ) {
-                BSONElement e = it.next();
-                if ( strcmp(name, e.fieldName()) == 0 )
-                    return true;
+    inline void BSONObj::getFields(unsigned n, const char **fieldNames, BSONElement *fields) const { 
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *p = e.fieldName();
+            for( unsigned i = 0; i < n; i++ ) {
+                if( strcmp(p, fieldNames[i]) == 0 ) {
+                    fields[i] = e;
+                    break;
+                }
             }
         }
-        return false;
     }
 
     inline BSONElement BSONObj::getField(const StringData& name) const {
@@ -109,6 +112,21 @@ namespace mongo {
                 return e;
         }
         return BSONElement();
+    }
+
+    inline int BSONObj::getIntField(const char *name) const {
+        BSONElement e = getField(name);
+        return e.isNumber() ? (int) e.number() : INT_MIN;
+    }
+
+    inline bool BSONObj::getBoolField(const char *name) const {
+        BSONElement e = getField(name);
+        return e.type() == Bool ? e.boolean() : false;
+    }
+
+    inline const char * BSONObj::getStringField(const char *name) const {
+        BSONElement e = getField(name);
+        return e.type() == String ? e.valuestr() : "";
     }
 
     /* add all the fields from the object specified to this object */
@@ -559,8 +577,8 @@ namespace mongo {
         case Symbol:
         case mongo::String:
             s << '"';
-            if ( !full &&  valuestrsize() > 80 ) {
-                s.write(valuestr(), 70);
+            if ( !full &&  valuestrsize() > 160 ) {
+                s.write(valuestr(), 150);
                 s << "...\"";
             }
             else {

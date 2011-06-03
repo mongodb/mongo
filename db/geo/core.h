@@ -421,19 +421,26 @@ namespace mongo {
                 // calculated imprecisely.  We need to force the compiler to always evaluate it correctly,
                 // hence the weirdness.
                 //
-                // On a 32-bit linux machine, removing the volatile keyword or calculating the sum inline
-                // will make certain geo tests fail.
-                // TODO: Fix this with compiler options or conditional paths for 32/64 bit
-                volatile double sum = _y > p._y ? p._y + radius : _y + radius;
-                return _y > p._y ? sum >= _y : sum >= p._y;
-
-                // Original math, correct for most systems
-                //return _y > p._y ? p._y + radius >= _y : _y + radius >= p._y;
+                // On some 32-bit linux machines, removing the volatile keyword or calculating the sum inline
+                // will make certain geo tests fail.  Of course this check will force volatile for all 32-bit systems,
+                // not just affected systems.
+                if( sizeof(void*) <= 4 ){
+                    volatile double sum = _y > p._y ? p._y + radius : _y + radius;
+                    return _y > p._y ? sum >= _y : sum >= p._y;
+                }
+                else {
+                    // Original math, correct for most systems
+                    return _y > p._y ? p._y + radius >= _y : _y + radius >= p._y;
+                }
             }
             if( b == 0 ) {
-                volatile double sum = _x > p._x ? p._x + radius : _x + radius;
-                return _x > p._x ? sum >= _x : sum >= p._x;
-                // return _x > p._x ? p._x + radius >= _x : _x + radius >= p._x;
+                if( sizeof(void*) <= 4 ){
+                    volatile double sum = _x > p._x ? p._x + radius : _x + radius;
+                    return _x > p._x ? sum >= _x : sum >= p._x;
+                }
+                else {
+                    return _x > p._x ? p._x + radius >= _x : _x + radius >= p._x;
+                }
             }
 
             return sqrt( ( a * a ) + ( b * b ) ) <= radius;
@@ -453,6 +460,12 @@ namespace mongo {
 
     extern const double EARTH_RADIUS_KM;
     extern const double EARTH_RADIUS_MILES;
+
+    // Technically lat/long bounds, not really tied to earth radius.
+    inline void checkEarthBounds( Point p ) {
+        uassert( 14808, str::stream() << "point " << p.toString() << " must be in earth-like bounds of long : [-180, 180), lat : [-90, 90] ",
+                 p._x >= -180 && p._x < 180 && p._y >= -90 && p._y <= 90 );
+    }
 
     inline double deg2rad(double deg) { return deg * (M_PI/180); }
     inline double rad2deg(double rad) { return rad * (180/M_PI); }

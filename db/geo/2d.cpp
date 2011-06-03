@@ -164,7 +164,7 @@ namespace mongo {
         }
 
         /** Finds the key objects to put in an index */
-        virtual void getKeys( const BSONObj& obj, BSONObjSetDefaultOrder& keys ) const {
+        virtual void getKeys( const BSONObj& obj, BSONObjSet& keys ) const {
             getKeys( obj, &keys, NULL );
         }
 
@@ -175,7 +175,7 @@ namespace mongo {
         }
 
         /** Finds the key objects and/or locations for a geo-indexed object */
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
+        void getKeys( const BSONObj &obj, BSONObjSet* keys, vector< BSONObj >* locs ) const {
 
             BSONElementMSet bSet;
 
@@ -386,13 +386,15 @@ namespace mongo {
                 case BSONObj::opNEAR:
                 case BSONObj::opWITHIN:
                     return OPTIMAL;
-                default:;
+                default:
+                    // We can try to match if there's no other indexing defined,
+                    // this is assumed a point
+                    return HELPFUL;
                 }
             }
             case Array:
-                // Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
-                // additional criteria
-                if ( query.nFields() > 1 ) return USELESS;
+                // We can try to match if there's no other indexing defined,
+                // this is assumed a point
                 return HELPFUL;
             default:
                 return USELESS;
@@ -617,6 +619,10 @@ namespace mongo {
                     }
 
                 }
+                else if( fudge == 0 ){
+                	if( p._y == p1._y && p._x == p1._x ) return true;
+                	else if( p._y == p2._y && p._x == p2._x ) return true;
+                }
 
                 // Normal intersection test.
                 // TODO: Invert these for clearer logic?
@@ -722,6 +728,10 @@ namespace mongo {
         }
     } geo2dplugin;
 
+    void __forceLinkGeoPlugin() {
+        geo2dplugin.getName();
+    }
+    
     struct GeoUnitTest : public UnitTest {
 
         int round( double d ) {
@@ -1080,7 +1090,7 @@ namespace mongo {
         const Geo2dType * _g;
         set< pair<const char*, DiskLoc> > _seen;
         map<DiskLoc, bool> _matched;
-        auto_ptr<CoveredIndexMatcher> _matcher;
+        shared_ptr<CoveredIndexMatcher> _matcher;
 
         long long _lookedAt;
         long long _objectsLoaded;
@@ -1170,6 +1180,9 @@ namespace mongo {
 
     class GeoCursorBase : public Cursor {
     public:
+
+        static const shared_ptr< CoveredIndexMatcher > emptyMatcher;
+
         GeoCursorBase( const Geo2dType * spec )
             : _spec( spec ), _id( _spec->getDetails() ) {
 
@@ -1202,6 +1215,9 @@ namespace mongo {
         const Geo2dType * _spec;
         const IndexDetails * _id;
     };
+
+    const shared_ptr< CoveredIndexMatcher > GeoCursorBase::emptyMatcher( new CoveredIndexMatcher( BSONObj(), BSONObj(), false ) );
+
 
     // TODO: Pull out the cursor bit from the browse, have GeoBrowse as field of cursor to clean up
     // this hierarchy a bit.  Also probably useful to look at whether GeoAccumulator can be a member instead
@@ -1285,8 +1301,14 @@ namespace mongo {
         virtual BSONObj currKey() const { return _cur._key; }
 
 
-        virtual CoveredIndexMatcher *matcher() const {
-            return _matcher.get();
+        virtual CoveredIndexMatcher* matcher() const {
+            if( _matcher.get() ) return _matcher.get();
+            else return GeoCursorBase::emptyMatcher.get();
+        }
+
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
+            if( _matcher.get() ) return _matcher;
+            else return GeoCursorBase::emptyMatcher;
         }
 
         // Are we finished getting points?
@@ -1306,7 +1328,11 @@ namespace mongo {
 #endif
             if( maxToAdd < 0 ) maxToAdd = maxToCheck;
             int maxFound = _foundInExp + maxToCheck;
-            int maxAdded = _found + maxToAdd;
+            assert( maxToCheck > 0 );
+            assert( maxFound > 0 );
+            assert( _found <= 0x7fffffff ); // conversion to int
+            int maxAdded = static_cast<int>(_found) + maxToAdd;
+            assert( maxAdded >= 0 ); // overflow check
 
             bool isNeighbor = _centerPrefix.constrains();
 
@@ -1480,7 +1506,8 @@ namespace mongo {
 
                         assert( ! onlyExpand );
 
-                        fillStack( maxFound - _foundInExp, maxAdded - _found );
+                        assert( _found <= 0x7fffffff );
+                        fillStack( maxFound - _foundInExp, maxAdded - static_cast<int>(_found) );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
                         // be entirely done.  Max recurse depth is < 8 * 16.
@@ -1599,12 +1626,14 @@ namespace mongo {
         double approxDistance( const GeoHash& h ) {
 
             double approxDistance = -1;
+            Point p( _g, h );
             switch (_type) {
             case GEO_PLAIN:
-                approxDistance = _near.distance( Point( _g, h ) );
+                approxDistance = _near.distance( p );
                 break;
             case GEO_SPHERE:
-                approxDistance = spheredist_deg( _near, Point( _g, h ) );
+                checkEarthBounds( p );
+                approxDistance = spheredist_deg( _near, p );
                 break;
             default: assert( false );
             }
@@ -1636,14 +1665,17 @@ namespace mongo {
                 double exactDistance = -1;
                 bool exactWithin = false;
 
+                Point p( loc );
+
                 // Get the appropriate distance for the type
                 switch ( _type ) {
                 case GEO_PLAIN:
-                    exactDistance = _near.distance( Point( loc ) );
-                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
+                    exactDistance = _near.distance( p );
+                    exactWithin = _near.distanceWithin( p, _maxDistance );
                     break;
                 case GEO_SPHERE:
-                    exactDistance = spheredist_deg( _near, Point( loc ) );
+                    checkEarthBounds( p );
+                    exactDistance = spheredist_deg( _near, p );
                     exactWithin = ( exactDistance <= _maxDistance );
                     break;
                 default: assert( false );
@@ -1723,6 +1755,7 @@ namespace mongo {
                 _scanDistance = maxDistance + _spec->_error;
             }
             else if (type == GEO_SPHERE) {
+                checkEarthBounds( startPt );
                 // TODO: consider splitting into x and y scan distances
                 _scanDistance = computeXScanDistance( startPt._y, rad2deg( _maxDistance ) + _spec->_error );
             }
@@ -1750,7 +1783,9 @@ namespace mongo {
            // Part 1
            {
                do {
-                   fillStack( maxPointsHeuristic, _numWanted - found() , true );
+                   long long f = found();
+                   assert( f <= 0x7fffffff );
+                   fillStack( maxPointsHeuristic, _numWanted - static_cast<int>(f) , true );
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
                         found() < _numWanted &&
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
@@ -1846,6 +1881,7 @@ namespace mongo {
 
     class GeoSearchCursor : public GeoCursorBase {
     public:
+
         GeoSearchCursor( shared_ptr<GeoSearch> s )
             : GeoCursorBase( s->_spec ) ,
               _s( s ) , _cur( s->_points.begin() ) , _end( s->_points.end() ), _nscanned() {
@@ -1882,8 +1918,14 @@ namespace mongo {
 
         virtual long long nscanned() { return _nscanned; }
 
-        virtual CoveredIndexMatcher *matcher() const {
-            return _s->_matcher.get();
+        virtual CoveredIndexMatcher* matcher() const {
+            if( _s->_matcher.get() ) return _s->_matcher.get();
+            else return emptyMatcher.get();
+        }
+
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
+            if( _s->_matcher.get() ) return _s->_matcher;
+            else return emptyMatcher;
         }
 
         shared_ptr<GeoSearch> _s;
@@ -1893,7 +1935,6 @@ namespace mongo {
         void incNscanned() { if ( ok() ) { ++_nscanned; } }
         long long _nscanned;
     };
-
 
     class GeoCircleBrowse : public GeoBrowse {
     public:
@@ -1915,7 +1956,7 @@ namespace mongo {
             _startPt = Point(center);
 
             _maxDistance = i.next().numberDouble();
-            uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
+            uassert( 13061 , "need a max distance >= 0 " , _maxDistance >= 0 );
 
             if (type == "$center") {
                 // Look in box with bounds of maxDistance in either direction
@@ -1927,6 +1968,7 @@ namespace mongo {
                 // Same, but compute maxDistance using spherical transform
 
                 uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
+                checkEarthBounds( _startPt );
 
                 _type = GEO_SPHERE;
                 _yScanDistance = rad2deg( _maxDistance ) + _g->_error;
@@ -1973,10 +2015,13 @@ namespace mongo {
                 d = _g->distance( _start , h );
                 error = _g->_error;
                 break;
-            case GEO_SPHERE:
-                d = spheredist_deg( _startPt, Point( _g, h ) );
+            case GEO_SPHERE: {
+                Point p( _g, h );
+                checkEarthBounds( p );
+                d = spheredist_deg( _startPt, p );
                 error = _g->_errorSphere;
                 break;
+            }
             default: assert( false );
             }
 
@@ -1991,17 +2036,19 @@ namespace mongo {
 
                     GEODEBUG( "Inexact distance : " << d << " vs " << _maxDistance << " from " << ( *i ).toString() << " due to error " << error );
 
+                    Point p( *i );
                     // Exact distance checks.
                     switch (_type) {
                     case GEO_PLAIN: {
-                        if( _startPt.distanceWithin( Point( *i ), _maxDistance ) ) return true;
+                        if( _startPt.distanceWithin( p, _maxDistance ) ) return true;
                         break;
                     }
                     case GEO_SPHERE:
                         // Ignore all locations not hashed to the key's hash, since spherical calcs are
                         // more expensive.
                         if( _g->_hash( *i ) != h ) break;
-                        if( spheredist_deg( _startPt , Point( *i ) ) <= _maxDistance ) return true;
+                        checkEarthBounds( p );
+                        if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
                         break;
                     default: assert( false );
                     }
@@ -2241,71 +2288,81 @@ namespace mongo {
             if ( _geo != e.fieldName() )
                 continue;
 
-            if ( e.type() != Object )
-                continue;
-
-            switch ( e.embeddedObject().firstElement().getGtLtOp() ) {
-            case BSONObj::opNEAR: {
-                BSONObj n = e.embeddedObject();
-                e = n.firstElement();
-
-                const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
-                GeoDistType type;
-                if (suffix[0] == '\0') {
-                    type = GEO_PLAIN;
-                }
-                else if (strcmp(suffix, "Sphere") == 0) {
-                    type = GEO_SPHERE;
-                }
-                else {
-                    uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
-                    type = GEO_PLAIN; // prevents uninitialized warning
-                }
-
-                double maxDistance = numeric_limits<double>::max();
-                if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ) {
-                    BSONObjIterator i(e.embeddedObject());
-                    i.next();
-                    i.next();
-                    BSONElement e = i.next();
-                    if ( e.isNumber() )
-                        maxDistance = e.numberDouble();
-                }
-                {
-                    BSONElement e = n["$maxDistance"];
-                    if ( e.isNumber() )
-                        maxDistance = e.numberDouble();
-                }
-                shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
-                s->exec();
-                shared_ptr<Cursor> c;
-                c.reset( new GeoSearchCursor( s ) );
+            if ( e.type() == Array ) {
+                // If we get an array query, assume it is a location, and do a $within { $center : [[x, y], 0] } search
+                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ) ) );
                 return c;
             }
-            case BSONObj::opWITHIN: {
-                e = e.embeddedObject().firstElement();
-                uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
-                e = e.embeddedObject().firstElement();
-                string type = e.fieldName();
-                if ( startsWith(type,  "$center") ) {
-                    uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
+            else if ( e.type() == Object ) {
+
+                // TODO:  Filter out _geo : { $special... } field so it doesn't get matched accidentally,
+                // if matcher changes
+
+                switch ( e.embeddedObject().firstElement().getGtLtOp() ) {
+                case BSONObj::opNEAR: {
+                    BSONObj n = e.embeddedObject();
+                    e = n.firstElement();
+
+                    const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
+                    GeoDistType type;
+                    if (suffix[0] == '\0') {
+                        type = GEO_PLAIN;
+                    }
+                    else if (strcmp(suffix, "Sphere") == 0) {
+                        type = GEO_SPHERE;
+                    }
+                    else {
+                        uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
+                        type = GEO_PLAIN; // prevents uninitialized warning
+                    }
+
+                    double maxDistance = numeric_limits<double>::max();
+                    if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ) {
+                        BSONObjIterator i(e.embeddedObject());
+                        i.next();
+                        i.next();
+                        BSONElement e = i.next();
+                        if ( e.isNumber() )
+                            maxDistance = e.numberDouble();
+                    }
+                    {
+                        BSONElement e = n["$maxDistance"];
+                        if ( e.isNumber() )
+                            maxDistance = e.numberDouble();
+                    }
+                    shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
+                    s->exec();
+                    shared_ptr<Cursor> c;
+                    c.reset( new GeoSearchCursor( s ) );
                     return c;
                 }
-                else if ( type == "$box" ) {
-                    uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                case BSONObj::opWITHIN: {
+                    e = e.embeddedObject().firstElement();
+                    uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
+                    e = e.embeddedObject().firstElement();
+                    string type = e.fieldName();
+                    if ( startsWith(type,  "$center") ) {
+                        uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
+                        return c;
+                    }
+                    else if ( type == "$box" ) {
+                        uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        return c;
+                    }
+                    else if ( startsWith( type, "$poly" ) ) {
+                        uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        return c;
+                    }
+                    throw UserException( 13058 , (string)"unknown $with type: " + type );
+                }
+                default:
+                    // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center
+                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ) ) );
                     return c;
                 }
-                else if ( startsWith( type, "$poly" ) ) {
-                    uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
-                    return c;
-                }
-                throw UserException( 13058 , (string)"unknown $with type: " + type );
-            }
-            default:
-                break;
             }
         }
 
@@ -2373,7 +2430,6 @@ namespace mongo {
             if ( cmdObj["spherical"].trueValue() )
                 type = GEO_SPHERE;
 
-            // We're returning exact distances, so don't evaluate lazily.
             GeoSearch gs( g , n , numWanted , filter , maxDistance , type );
 
             if ( cmdObj["start"].type() == String) {

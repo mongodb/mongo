@@ -16,6 +16,7 @@ replTest.stop(3);
 replTest.stop(4);
 
 print("reconfiguring");
+master = replTest.getMaster();
 var config = master.getDB("local").system.replset.findOne();
 var oldVersion = config.version++;
 config.members[0].votes = 2;
@@ -38,6 +39,7 @@ replTest.stop(2);
 
 print("try to reconfigure with a 'majority' down");
 oldVersion = config.version++;
+master = replTest.getMaster();
 var result = master.getDB("admin").runCommand({replSetReconfig : config});
 assert.eq(13144, result.assertionCode);
 
@@ -45,3 +47,14 @@ var config = master.getDB("local").system.replset.findOne();
 assert.eq(oldVersion, config.version);
 
 replTest.stopSet();
+
+replTest2 = new ReplSetTest({name : 'testSet2', nodes : 1});
+nodes = replTest2.startSet();
+
+result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2", members : [
+    {_id : 0, tags : ["member0"]}
+   ]}});
+
+assert(result.errmsg.match(/bad or missing host field/));
+
+replTest2.stopSet();

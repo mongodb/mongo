@@ -63,7 +63,7 @@ namespace mongo {
     public:
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
         virtual void _init() {
-            if ( requireIndex_ && strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) == 0 )
+            if ( requireIndex_ && strcmp( qp().indexKey().firstElementFieldName(), "$natural" ) == 0 )
                 throw MsgAssertionException( 9011 , "Not an index cursor" );
             c_ = qp().newCursor();
             if ( !c_->ok() ) {
@@ -75,7 +75,7 @@ namespace mongo {
                 setComplete();
                 return;
             }
-            if ( matcher()->matchesCurrent( c_.get() ) ) {
+            if ( matcher( c_ )->matchesCurrent( c_.get() ) ) {
                 one_ = c_->current();
                 loc_ = c_->currLoc();
                 setStop();

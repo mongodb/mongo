@@ -41,7 +41,7 @@ namespace mongo {
             return false;
         }
 
-#if !defined(WIN32)
+#if !defined(_WIN32)
         // check permissions: must be X00, where X is >= 4
         if ((stats.st_mode & (S_IRWXG|S_IRWXO)) != 0) {
             log() << "permissions on " << filename << " are too open" << endl;

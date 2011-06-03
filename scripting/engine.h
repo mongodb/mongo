@@ -28,7 +28,7 @@ namespace mongo {
     };
 
     typedef unsigned long long ScriptingFunction;
-    typedef BSONObj (*NativeFunction) ( const BSONObj &args );
+    typedef BSONObj (*NativeFunction) ( const BSONObj &args, void* data );
 
     class Scope : boost::noncopyable {
     public:
@@ -76,6 +76,7 @@ namespace mongo {
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;
         virtual void setBoolean( const char *field , bool val ) = 0;
+        virtual void setFunction( const char *field , const char * code ) = 0;
 //        virtual void setThis( const BSONObj * obj ) = 0;
 
         virtual ScriptingFunction createFunction( const char * code );
@@ -84,9 +85,9 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false ) = 0;
-        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 ) {
-            int res = invoke( func , args , recv, timeoutMs );
+        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false ) = 0;
+        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
+            int res = invoke( func , args , recv, timeoutMs, readOnlyArgs, readOnlyRecv );
             if ( res == 0 )
                 return;
             throw UserException( 9004 , (string)"invoke failed: " + getError() );
@@ -113,7 +114,7 @@ namespace mongo {
 
         virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );
 
-        virtual void injectNative( const char *field, NativeFunction func ) = 0;
+        virtual void injectNative( const char *field, NativeFunction func, void* data = 0 ) = 0;
 
         virtual void gc() = 0;
 

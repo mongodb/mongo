@@ -28,6 +28,7 @@
 
 #include "client/dbclient.h"
 #include "db/instance.h"
+#include "db/matcher.h"
 
 using std::string;
 

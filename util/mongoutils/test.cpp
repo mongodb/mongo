@@ -19,9 +19,9 @@
  *    limitations under the License.
  */
 
+#include <assert.h>
 #include "str.h"
 #include "html.h"
-#include <assert.h>
 
 using namespace std;
 using namespace mongoutils;

@@ -83,7 +83,7 @@ namespace mongo {
            only when it's a "multikey" array.
            keys will be left empty if key not found in the object.
         */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
+        void getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const;
 
         /* get the key pattern for this object.
            e.g., { lastname:1, firstname:1 }
@@ -190,8 +190,8 @@ namespace mongo {
     };
 
     struct IndexChanges { /*on an update*/
-        BSONObjSetDefaultOrder oldkeys;
-        BSONObjSetDefaultOrder newkeys;
+        BSONObjSet oldkeys;
+        BSONObjSet newkeys;
         vector<BSONObj*> removed; // these keys were removed as part of the change
         vector<BSONObj*> added;   // these keys were added as part of the change
 

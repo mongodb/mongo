@@ -38,8 +38,6 @@ namespace mongo {
     }
 
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
-        lock lk(this);
-        
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
@@ -63,6 +61,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::assumePrimary() {
+        log(2) << "assuming primary" << endl;
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
         changeState(MemberState::RS_PRIMARY);
@@ -92,6 +91,7 @@ namespace mongo {
     const bool closeOnRelinquish = true;
 
     void ReplSetImpl::relinquish() {
+        log(2) << "attempting to relinquish" << endl;
         if( box.getState().primary() ) {
             {
                 writelock lk("admin."); // so we are synchronized with _logOp()
@@ -165,7 +165,6 @@ namespace mongo {
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
-                lock lk(this);
                 m->_hbinfo = h;
                 return;
             }
@@ -323,7 +322,6 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten() {
-        lock l(this);
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
@@ -352,13 +350,15 @@ namespace mongo {
     }
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
-    string ReplSetImpl::startupStatusMsg;
+    DiagStr ReplSetImpl::startupStatusMsg;
 
     extern BSONObj *getLastErrorDefault;
 
     void ReplSetImpl::setSelfTo(Member *m) {
         // already locked in initFromConfig
         _self = m;
+        _id = m->id();
+        _config = m->config();
         if( m ) _buildIndexes = m->config().buildIndexes;
         else _buildIndexes = true;
     }
@@ -521,7 +521,6 @@ namespace mongo {
 
         if( highest->version > myVersion && highest->version >= 0 ) {
             log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
-            writelock lk("admin.");
             highest->saveConfigLocally(BSONObj());
         }
         return true;
@@ -530,7 +529,7 @@ namespace mongo {
     void ReplSetImpl::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
-            startupStatusMsg = "loading " + rsConfigNs + " config (LOADINGCONFIG)";
+            startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
             try {
                 vector<ReplSetConfig> configs;
                 try {
@@ -570,7 +569,7 @@ namespace mongo {
 
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
+                        startupStatusMsg.set("can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         static unsigned once;
                         if( ++once == 1 )
@@ -580,7 +579,7 @@ namespace mongo {
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
+                        startupStatusMsg.set("can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (yet)" << rsLog;
                     }
 
@@ -596,7 +595,7 @@ namespace mongo {
             }
             catch(DBException& e) {
                 startupStatus = BADCONFIG;
-                startupStatusMsg = "replSet error loading set config (BADCONFIG)";
+                startupStatusMsg.set("replSet error loading set config (BADCONFIG)");
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
                 log() << "replSet error replication will not start" << rsLog;
                 sethbmsg("error loading set config");
@@ -605,14 +604,12 @@ namespace mongo {
             }
             break;
         }
-        startupStatusMsg = "? started";
+        startupStatusMsg.set("? started");
         startupStatus = STARTED;
     }
 
     void ReplSetImpl::_fatal() {
-        //lock l(this);
         box.set(MemberState::RS_FATAL, 0);
-        //sethbmsg("fatal error");
         log() << "replSet error fatal, stopping replication" << rsLog;
     }
 
@@ -620,7 +617,9 @@ namespace mongo {
         bo comment;
         if( addComment )
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
+
         newConfig.saveConfigLocally(comment);
+        
         try {
             initFromConfig(newConfig, true);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
@@ -664,9 +663,7 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
-            if( !noauth ) {
-                cc().getAuthenticationInfo()->authorize("local");
-            }
+            replLocalAuth();
             (theReplSet = new ReplSet(*replSetCmdline))->go();
         }
         catch(std::exception& e) {
@@ -676,6 +673,13 @@ namespace mongo {
         }
         cc().shutdown();
     }
+
+    void replLocalAuth() {
+        if ( noauth )
+            return;
+        cc().getAuthenticationInfo()->authorize("local","_repl");
+    }
+    
 
 }
 

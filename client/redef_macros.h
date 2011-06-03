@@ -1,4 +1,7 @@
-/** @file redef_macros.h - redefine macros from undef_macros.h */
+/** @file redef_macros.h macros the implementation uses.
+    
+    @see undef_macros.h undefines these after use to minimize name pollution.
+*/
 
 /*    Copyright 2009 10gen Inc.
  *

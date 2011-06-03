@@ -20,6 +20,7 @@
 #include "../util/message.h"
 #include "concurrency.h"
 #include "pdfile.h"
+#include "curop.h"
 #include "client.h"
 
 namespace mongo {
@@ -142,7 +143,8 @@ namespace mongo {
         int _locktype;
 
         dbtemprelease() {
-            _context = cc().getContext();
+            const Client& c = cc();
+            _context = c.getContext();
             _locktype = dbMutex.getState();
             assert( _locktype );
 
@@ -156,7 +158,10 @@ namespace mongo {
                 if ( _context ) _context->unlocked();
                 dbMutex.unlock_shared();
             }
-
+            
+            verify( 14814 , c.curop() );
+            c.curop()->yielded();
+            
         }
         ~dbtemprelease() {
             if ( _locktype > 0 )

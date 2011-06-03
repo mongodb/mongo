@@ -702,12 +702,12 @@ again:
 
     MSGID NextMsgId;
 
-    struct MsgStart {
+    /*struct MsgStart {
         MsgStart() {
             NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
             assert(MsgDataHeaderSize == 16);
         }
-    } msgstart;
+    } msgstart;*/
 
     MSGID nextMessageId() {
         MSGID msgid = NextMsgId++;

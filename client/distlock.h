@@ -82,11 +82,11 @@ namespace mongo {
          * @param legacy use legacy logic
          *
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false, bool legacy = false);
+        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
         ~DistributedLock(){};
 
         /**
-         * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
+         * Attempts to acquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
          *
          * @param why human readable description of why the lock is being taken (used to log)
@@ -95,7 +95,7 @@ namespace mongo {
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( string why , bool reenter = false, BSONObj * other = 0 );
+        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0 );
 
         /**
          * Releases a previously taken lock.
@@ -132,26 +132,28 @@ namespace mongo {
          */
         static const string locksNS;
 
-    private:
-        ConnectionString _conn;
-        string _name;
-        // TODO:  This shouldn't be a field, just constant?
-        string _ns;
-        BSONObj _id;
+        const ConnectionString _conn;
+        const string _name;
+        const BSONObj _id;
+        const string _processId;
 
         // Timeout for lock, usually LOCK_TIMEOUT
-        unsigned long long _lockTimeout;
-        // Deprecated
-        unsigned _takeoverMinutes;
-        unsigned long long _maxClockSkew;
-        unsigned long long _maxNetSkew;
-        unsigned long long _lockPing;
+        const unsigned long long _lockTimeout;
+        const unsigned long long _maxClockSkew;
+        const unsigned long long _maxNetSkew;
+        const unsigned long long _lockPing;
+
+    private:
+
+        void resetLastPing(){
+            scoped_lock lk( _mutex );
+            _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>();
+        }
+
+        mongo::mutex _mutex;
 
         // Data from last check of process with ping time
         boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
-
-        // Process id, in case we need to customize this
-        string _processId;
         // May or may not exist, depending on startup
         string _threadId;
 

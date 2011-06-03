@@ -1,4 +1,4 @@
-/** @file undef_macros.h - remove mongo-specific macros that might cause issues */
+/** @file undef_macros.h remove mongo implementation macros after using */
 
 /*    Copyright 2009 10gen Inc.
  *

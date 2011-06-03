@@ -19,6 +19,7 @@
 #include "../commands.h"
 #include "../instance.h"
 #include "../queryoptimizer.h"
+#include "../../scripting/engine.h"
 
 namespace mongo {
 
@@ -86,10 +87,11 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
+            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
 
             while ( cursor->ok() ) {
-                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
+                if ( ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) ||
+                    cursor->getsetdup( cursor->currLoc() ) ) {
                     cursor->advance();
                     continue;
                 }

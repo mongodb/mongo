@@ -3,7 +3,7 @@
 // The setup to reproduce is to create a set of points and a really big bounds so that we are required to do 
 // exact lookups on the points to get correct results.
 
-t = db.tiles
+t = db.geo_fiddly_box2
 t.drop()
 
 t.insert( { "letter" : "S", "position" : [ -3, 0 ] } )

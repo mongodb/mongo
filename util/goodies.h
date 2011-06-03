@@ -284,17 +284,15 @@ namespace mongo {
             return true;
         }
 
-        unsigned long long done() {
-            return _done;
-        }
-
-        unsigned long long hits() {
-            return _hits;
-        }
-
         void setTotalWhileRunning( unsigned long long total ) {
             _total = total;
         }
+
+        unsigned long long done() const { return _done; }
+
+        unsigned long long hits() const { return _hits; }
+
+        unsigned long long total() const { return _total; } 
 
         string toString() const {
             if ( ! _active )

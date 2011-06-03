@@ -280,8 +280,8 @@ namespace mongo {
         return true;
     }
 
-    void Matcher::parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers ) {
-        uassert( 13090, "nested $or/$nor not allowed", !subMatcher );
+    void Matcher::parseOr( const BSONElement &e, bool nested, list< shared_ptr< Matcher > > &matchers ) {
+        uassert( 13090, "nested $or/$nor not allowed", !nested );
         uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
@@ -292,87 +292,103 @@ namespace mongo {
         }
     }
 
-    bool Matcher::parseOrNor( const BSONElement &e, bool subMatcher ) {
+    bool Matcher::parseOrNor( const BSONElement &e, bool nested ) {
         const char *ef = e.fieldName();
         if ( ef[ 0 ] != '$' )
             return false;
         if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
-            parseOr( e, subMatcher, _orMatchers );
+            parseOr( e, nested, _orMatchers );
         }
         else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
-            parseOr( e, subMatcher, _norMatchers );
+            parseOr( e, nested, _norMatchers );
         }
         else {
             return false;
         }
         return true;
     }
-
-    /* _jsobj          - the query pattern
-    */
-    Matcher::Matcher(const BSONObj &_jsobj, bool subMatcher) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
-
-        BSONObjIterator i(jsobj);
-        while ( i.more() ) {
+    
+    bool Matcher::parseAnd( const BSONElement &e, bool nested ) {
+        const char *ef = e.fieldName();
+        if (!( ef[ 0 ] == '$' && ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' && ef[ 4 ] == 0 )) {
+            return false;
+        }
+        
+        uassert( 14815 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+        BSONObjIterator i( e.embeddedObject() );
+        while( i.more() ) {
             BSONElement e = i.next();
+            uassert( 14818 , "$and elements must be objects" , e.type() == Object );
+            BSONObjIterator j( e.embeddedObject() );
+            while( j.more() ) {
+                parseMatchExpressionElement( j.next(), true );
+            }
+        }
+        return true;
+    }
+
+    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
+        
+        uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
+        
+        if ( parseAnd( e, nested ) ) {
+            return;   
+        }
+        
+        if ( parseOrNor( e, nested ) ) {
+            return;
+        }
+        
+        if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
+            // $where: function()...
+            uassert( 10066 , "$where occurs twice?", where == 0 );
+            uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
+            massert( 13089 , "no current client needed for $where" , haveClient() );
+            where = new Where();
+            where->scope = globalScriptEngine->getPooledScope( cc().ns() );
+            where->scope->localConnect( cc().database()->name.c_str() );
             
-            uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
-
-            if ( parseOrNor( e, subMatcher ) ) {
-                continue;
+            if ( e.type() == CodeWScope ) {
+                where->setFunc( e.codeWScopeCode() );
+                where->jsScope = new BSONObj( e.codeWScopeScopeData() );
             }
-
-            if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
-                // $where: function()...
-                uassert( 10066 , "$where occurs twice?", where == 0 );
-                uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
-                massert( 13089 , "no current client needed for $where" , haveClient() );
-                where = new Where();
-                where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-                where->scope->localConnect( cc().database()->name.c_str() );
-
-                if ( e.type() == CodeWScope ) {
-                    where->setFunc( e.codeWScopeCode() );
-                    where->jsScope = new BSONObj( e.codeWScopeScopeData() );
-                }
-                else {
-                    const char *code = e.valuestr();
-                    where->setFunc(code);
-                }
-
-                where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
-
-                continue;
+            else {
+                const char *code = e.valuestr();
+                where->setFunc(code);
             }
-
-            if ( e.type() == RegEx ) {
-                addRegex( e.fieldName(), e.regex(), e.regexFlags() );
-                continue;
-            }
-
-            // greater than / less than...
-            // e.g., e == { a : { $gt : 3 } }
-            //       or
-            //            { a : { $in : [1,2,3] } }
-            if ( e.type() == Object ) {
-                // support {$regex:"a|b", $options:"imx"}
-                const char* regex = NULL;
-                const char* flags = "";
-
-                // e.g., fe == { $gt : 3 }
-                BSONObjIterator j(e.embeddedObject());
-                bool isOperator = false;
-                while ( j.more() ) {
-                    BSONElement fe = j.next();
-                    const char *fn = fe.fieldName();
-
-                    if ( fn[0] == '$' && fn[1] ) {
-                        isOperator = true;
-
-                        if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
-                            haveNeg = true;
-                            switch( fe.type() ) {
+            
+            where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
+            
+            return;
+        }
+        
+        if ( e.type() == RegEx ) {
+            addRegex( e.fieldName(), e.regex(), e.regexFlags() );
+            return;
+        }
+        
+        // greater than / less than...
+        // e.g., e == { a : { $gt : 3 } }
+        //       or
+        //            { a : { $in : [1,2,3] } }
+        if ( e.type() == Object ) {
+            // support {$regex:"a|b", $options:"imx"}
+            const char* regex = NULL;
+            const char* flags = "";
+            
+            // e.g., fe == { $gt : 3 }
+            BSONObjIterator j(e.embeddedObject());
+            bool isOperator = false;
+            while ( j.more() ) {
+                BSONElement fe = j.next();
+                const char *fn = fe.fieldName();
+                
+                if ( fn[0] == '$' && fn[1] ) {
+                    isOperator = true;
+                    
+                    if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
+                        haveNeg = true;
+                        switch( fe.type() ) {
                             case Object: {
                                 BSONObjIterator k( fe.embeddedObject() );
                                 uassert( 13030, "$not cannot be empty", k.more() );
@@ -386,37 +402,47 @@ namespace mongo {
                                 break;
                             default:
                                 uassert( 13031, "invalid use of $not", false );
-                            }
-                        }
-                        else {
-                            if ( !addOp( e, fe, false, regex, flags ) ) {
-                                isOperator = false;
-                                break;
-                            }
                         }
                     }
                     else {
-                        isOperator = false;
-                        break;
+                        if ( !addOp( e, fe, false, regex, flags ) ) {
+                            isOperator = false;
+                            break;
+                        }
                     }
                 }
-                if (regex) {
-                    addRegex(e.fieldName(), regex, flags);
+                else {
+                    isOperator = false;
+                    break;
                 }
-                if ( isOperator )
-                    continue;
             }
+            if (regex) {
+                addRegex(e.fieldName(), regex, flags);
+            }
+            if ( isOperator )
+                return;
+        }
+        
+        if ( e.type() == Array ) {
+            hasArray = true;
+        }
+        else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
+            _atomic = e.trueValue();
+            return;
+        }
+        
+        // normal, simple case e.g. { a : "foo" }
+        addBasic(e, BSONObj::Equality, false);
+    }
+    
+    /* _jsobj          - the query pattern
+    */
+    Matcher::Matcher(const BSONObj &_jsobj, bool nested) :
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
-            if ( e.type() == Array ) {
-                hasArray = true;
-            }
-            else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
-                _atomic = e.trueValue();
-                continue;
-            }
-
-            // normal, simple case e.g. { a : "foo" }
-            addBasic(e, BSONObj::Equality, false);
+        BSONObjIterator i(jsobj);
+        while ( i.more() ) {
+            parseMatchExpressionElement( i.next(), nested );
         }
     }
 
@@ -431,6 +457,7 @@ namespace mongo {
                 case BSONObj::NE:
                 case BSONObj::NIN:
                 case BSONObj::opEXISTS: // Not part of keyMatch() determination, but we can't match on index in this case.
+                case BSONObj::opTYPE: // For $type:10 (null), a null key could be a missing field or a null value field.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;

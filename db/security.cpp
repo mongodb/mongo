@@ -26,21 +26,54 @@
 
 namespace mongo {
 
-    int AuthenticationInfo::warned = 0;
+    bool AuthenticationInfo::_warned = false;
 
-    void AuthenticationInfo::print() {
+    void AuthenticationInfo::print() const {
         cout << "AuthenticationInfo: " << this << '\n';
-        for ( map<string,Auth>::iterator i=m.begin(); i!=m.end(); i++ ) {
+        for ( MA::const_iterator i=_dbs.begin(); i!=_dbs.end(); i++ ) {
             cout << "\t" << i->first << "\t" << i->second.level << '\n';
         }
         cout << "END" << endl;
     }
 
 
-    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) {
-        if ( cc().isGod() ) {
-            return true;
+    string AuthenticationInfo::getUser( const string& dbname ) const {
+        scoped_spinlock lk(_lock);
+
+        MA::const_iterator i = _dbs.find(dbname);
+        if ( i == _dbs.end() )
+            return "";
+
+        return i->second.user;
+    }
+
+    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
+        {
+            scoped_spinlock lk(_lock);
+            
+            if ( _isAuthorizedSingle_inlock( dbname , level ) )
+                return true;
+            
+            if ( noauth ) 
+                return true;
+            
+            if ( _isAuthorizedSingle_inlock( "admin" , level ) )
+                return true;
+            
+            if ( _isAuthorizedSingle_inlock( "local" , level ) )
+                return true;
         }
+        return _isAuthorizedSpecialChecks( dbname );
+    }
+
+    bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, int level) const {
+        MA::const_iterator i = _dbs.find(dbname);
+        return i != _dbs.end() && i->second.level >= level;
+    }
+
+    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
+        if ( cc().isGod() ) 
+            return true;
 
         if ( isLocalHost ) {
             atleastreadlock l("");
@@ -48,13 +81,15 @@ namespace mongo {
             Client::Context c("admin.system.users");
             BSONObj result;
             if( ! Helpers::getSingleton("admin.system.users", result) ) {
-                if( warned == 0 ) {
-                    warned++;
+                if( ! _warned ) {
+                    // you could get a few of these in a race, but that's ok
+                    _warned = true;
                     log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
                 }
                 return true;
             }
         }
+
         return false;
     }
 

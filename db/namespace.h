@@ -44,6 +44,21 @@ namespace mongo {
         NamespaceString( const string& ns ) { init(ns.c_str()); }
         string ns() const { return db + '.' + coll; }
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
+
+        /**
+         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
+         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
+         */
+        static bool normal(const char* ns) {
+            const char *p = strchr(ns, '$');
+            if( p == 0 )
+                return true;
+            return strcmp( ns, "local.oplog.$main" ) == 0;
+        }
+
+        static bool special(const char *ns) { 
+            return !normal(ns) || strstr(ns, ".system.");
+        }
     private:
         void init(const char *ns) {
             const char *p = strchr(ns, '.');
@@ -67,6 +82,9 @@ namespace mongo {
         bool operator==(const char *r) const { return strcmp(buf, r) == 0; }
         bool operator==(const Namespace& r) const { return strcmp(buf, r.buf) == 0; }
         int hash() const; // value returned is always > 0
+
+        size_t size() const { return strlen( buf ); }
+
         string toString() const { return (string) buf; }
         operator string() const { return (string) buf; }
 
@@ -430,6 +448,26 @@ namespace mongo {
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
         static void clearForPrefix(const char *prefix);
 
+        /**
+         * @return a cursor interface to the query optimizer.  The implementation may
+         * utilize a single query plan or interleave results from multiple query
+         * plans before settling on a single query plan.  Note that the schema of
+         * currKey() documents, the matcher(), and the isMultiKey() nature of the
+         * cursor may change over the course of iteration.
+         *
+         * @param order - If no index exists that satisfies this sort order, an
+         * empty shared_ptr will be returned.
+         *
+         * The returned cursor may @throw inside of advance() or recoverFromYield() in
+         * certain error cases, for example if a capped overrun occurred during a yield.
+         * This indicates that the cursor was unable to perform a complete scan.
+         *
+         * This is a work in progress.  Partial list of features not yet implemented:
+         * - modification of scanned documents
+         * - covered indexes
+         */
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
+                                     
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
     private:
@@ -450,12 +488,12 @@ namespace mongo {
         /* IndexSpec caching */
     private:
         map<const IndexDetails*,IndexSpec> _indexSpecs;
-        static mongo::mutex _isMutex;
+        static SimpleMutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ) {
             IndexSpec& spec = _indexSpecs[details];
             if ( ! spec._finishedInit ) {
-                scoped_lock lk(_isMutex);
+                SimpleMutex::scoped_lock lk(_isMutex);
                 if ( ! spec._finishedInit ) {
                     spec.reset( details );
                     assert( spec._finishedInit );
@@ -469,7 +507,7 @@ namespace mongo {
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
-        static mongo::mutex _qcMutex;
+        static SimpleMutex _qcMutex;
         /* you must be in the qcMutex when calling this (and using the returned val): */
         static NamespaceDetailsTransient& get_inlock(const char *ns) {
             return _get(ns);

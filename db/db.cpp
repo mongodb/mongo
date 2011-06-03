@@ -44,6 +44,7 @@
 #include "dbwebserver.h"
 #include "dur.h"
 #include "concurrency.h"
+#include "../s/d_writeback.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -480,6 +481,7 @@ namespace mongo {
 
         snapshotThread.go();
         clientCursorMonitor.go();
+        PeriodicTask::theRunner->go();
 
         if( !cmdLine._replSet.empty() ) {
             replSet = true;
@@ -1134,7 +1136,7 @@ namespace mongo {
             // given the severity of the event we write to console in addition to the --logFile
             // (rawOut writes to the logfile, if a special one were specified)
             DWORD written;
-            WriteFile(standardOut, "unhandled exception\n", 20, &written, 0);
+            WriteFile(standardOut, "unhandled windows exception\n", 20, &written, 0);
             FlushFileBuffers(standardOut);
         }
 
@@ -1143,7 +1145,7 @@ namespace mongo {
             rawOut("access violation");
         } 
         else {
-            rawOut("unhandled exception");
+            rawOut("unhandled windows exception");
             char buf[64];
             strcpy(buf, "ec=0x");
             _ui64toa(ec, buf+5, 16);

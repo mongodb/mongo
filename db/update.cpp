@@ -407,7 +407,7 @@ namespace mongo {
                 if ( mss->amIInPlacePossible( e.isNumber() ) ) {
                     // check more typing info here
                     if ( m.elt.type() != e.type() ) {
-                        // if i'm incrememnting with a double, then the storage has to be a double
+                        // if i'm incrementing with a double, then the storage has to be a double
                         mss->amIInPlacePossible( m.elt.type() != NumberDouble );
                     }
 
@@ -509,7 +509,7 @@ namespace mongo {
         }
 
         if ( m->op == Mod::RENAME_FROM ) {
-            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fielName:" << m->fieldName );
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fieldName:" << m->fieldName );
             BSONObjBuilder bb( b.subobjStart( "$unset" ) );
             bb.append( m->fieldName, 1 );
             bb.done();
@@ -517,7 +517,7 @@ namespace mongo {
         }
 
         if ( m->op == Mod::RENAME_TO ) {
-            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fielName:" << m->fieldName );
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fieldName:" << m->fieldName );
             BSONObjBuilder bb( b.subobjStart( "$set" ) );
             bb.appendAs( newVal, m->fieldName );
             return;
@@ -663,7 +663,7 @@ namespace mongo {
 
             switch ( cmp ) {
 
-            case LEFT_SUBFIELD: { // Mod is embeddeed under this element
+            case LEFT_SUBFIELD: { // Mod is embedded under this element
                 uassert( 10145 ,  str::stream() << "LEFT_SUBFIELD only supports Object: " << field << " not: " << e.type() , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
@@ -756,7 +756,7 @@ namespace mongo {
                 if ( e.fieldName()[0] == '$' ) // for $atomic and anything else we add
                     continue;
 
-                if ( e.type() == Object && e.embeddedObject().firstElement().fieldName()[0] == '$' ) {
+                if ( e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$' ) {
                     // this means this is a $gt type filter, so don't make part of the new object
                     continue;
                 }
@@ -798,7 +798,7 @@ namespace mongo {
             BSONElement e = it.next();
             const char *fn = e.fieldName();
 
-            uassert( 10147 ,  "Invalid modifier specified" + string( fn ), e.type() == Object );
+            uassert( 10147 ,  "Invalid modifier specified: " + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
             DEBUGUPDATE( "\t" << j );
 
@@ -926,7 +926,7 @@ namespace mongo {
                 return;
             }
             _nscanned = _c->nscanned();
-            if ( matcher()->matchesCurrent(_c.get(), &_details ) ) {
+            if ( matcher( _c )->matchesCurrent(_c.get(), &_details ) ) {
                 setComplete();
                 return;
             }
@@ -985,8 +985,6 @@ namespace mongo {
             if( mss->canApplyInPlace() ) {
                 mss->applyModsInPlace(true);
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
-                /*if ( profile )
-                    ss << " fastmod "; */
             }
             else {
                 BSONObj newObj = mss->createNewFromMods();
@@ -1032,10 +1030,8 @@ namespace mongo {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
-        StringBuilder& ss = debug.str;
-
-        if ( logLevel > 2 )
-            ss << " update: " << updateobj.toString();
+        
+        debug.updateobj = updateobj;
 
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
         /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
@@ -1044,7 +1040,7 @@ namespace mongo {
         /* end note */
 
         auto_ptr<ModSet> mods;
-        bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
+        bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
             if( d && d->indexBuildInProgress ) {
@@ -1061,206 +1057,204 @@ namespace mongo {
         if( !upsert && !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
-                ss << " byid ";
+                debug.idhack = true;
                 return _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
             }
         }
 
-        set<DiskLoc> seenObjects;
-
         int numModded = 0;
         long long nscanned = 0;
-        MatchDetails details;
         shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
 
-        auto_ptr<ClientCursor> cc;
+        if( c->ok() ) {
+            set<DiskLoc> seenObjects;
+            MatchDetails details;
+            auto_ptr<ClientCursor> cc;
+            do {
+                nscanned++;
 
-        while ( c->ok() ) {
-            nscanned++;
+                bool atomic = c->matcher()->docMatcher().atomic();
 
-            bool atomic = c->matcher()->docMatcher().atomic();
+                // May have already matched in UpdateOp, but do again to get details set correctly
+                if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
+                    c->advance();
 
-            // May have already matched in UpdateOp, but do again to get details set correctly
-            if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
-                c->advance();
-
-                if ( nscanned % 256 == 0 && ! atomic ) {
-                    if ( cc.get() == 0 ) {
-                        shared_ptr< Cursor > cPtr = c;
-                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                    if ( nscanned % 256 == 0 && ! atomic ) {
+                        if ( cc.get() == 0 ) {
+                            shared_ptr< Cursor > cPtr = c;
+                            cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                        }
+                        if ( ! cc->yield() ) {
+                            cc.release();
+                            // TODO should we assert or something?
+                            break;
+                        }
+                        if ( !c->ok() ) {
+                            break;
+                        }
                     }
-                    if ( ! cc->yield() ) {
-                        cc.release();
-                        // TODO should we assert or something?
-                        break;
-                    }
-                    if ( !c->ok() ) {
-                        break;
-                    }
-                }
-                continue;
-            }
-
-            Record *r = c->_current();
-            DiskLoc loc = c->currLoc();
-
-            // TODO Maybe this is unnecessary since we have seenObjects
-            if ( c->getsetdup( loc ) ) {
-                c->advance();
-                continue;
-            }
-
-            BSONObj js(r);
-
-            BSONObj pattern = patternOrig;
-
-            if ( logop ) {
-                BSONObjBuilder idPattern;
-                BSONElement id;
-                // NOTE: If the matching object lacks an id, we'll log
-                // with the original pattern.  This isn't replay-safe.
-                // It might make sense to suppress the log instead
-                // if there's no id.
-                if ( js.getObjectID( id ) ) {
-                    idPattern.append( id );
-                    pattern = idPattern.obj();
-                }
-                else {
-                    uassert( 10157 ,  "multi-update requires all modified objects to have an _id" , ! multi );
-                }
-            }
-
-            if ( profile )
-                ss << " nscanned:" << nscanned;
-
-            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-                regular ones at the moment. */
-            if ( isOperatorUpdate ) {
-
-                if ( multi ) {
-                    c->advance(); // go to next record in case this one moves
-                    if ( seenObjects.count( loc ) )
-                        continue;
+                    continue;
                 }
 
-                const BSONObj& onDisk = loc.obj();
+                Record *r = c->_current();
+                DiskLoc loc = c->currLoc();
 
-                ModSet * useMods = mods.get();
-                bool forceRewrite = false;
-
-                auto_ptr<ModSet> mymodset;
-                if ( details.elemMatchKey && mods->hasDynamicArray() ) {
-                    useMods = mods->fixDynamicArray( details.elemMatchKey );
-                    mymodset.reset( useMods );
-                    forceRewrite = true;
+                // TODO Maybe this is unnecessary since we have seenObjects
+                if ( c->getsetdup( loc ) ) {
+                    c->advance();
+                    continue;
                 }
 
-                auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
+                BSONObj js(r);
 
-                bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
-
-                if ( indexHack ) {
-                    if ( cc.get() )
-                        cc->updateLocation();
-                    else
-                        c->noteLocation();
-                }
-
-                if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ) {
-                    mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
-
-                    DEBUGUPDATE( "\t\t\t doing in place update" );
-                    if ( profile )
-                        ss << " fastmod ";
-
-                    if ( modsIsIndexed ) {
-                        seenObjects.insert( loc );
-                    }
-                }
-                else {
-                    if ( rs )
-                        rs->goingToDelete( onDisk );
-
-                    BSONObj newObj = mss->createNewFromMods();
-                    checkTooLarge(newObj);
-                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
-                    if ( newLoc != loc || modsIsIndexed ) {
-                        // object moved, need to make sure we don' get again
-                        seenObjects.insert( newLoc );
-                    }
-
-                }
+                BSONObj pattern = patternOrig;
 
                 if ( logop ) {
-                    DEV assert( mods->size() );
-
-                    if ( mss->haveArrayDepMod() ) {
-                        BSONObjBuilder patternBuilder;
-                        patternBuilder.appendElements( pattern );
-                        mss->appendSizeSpecForArrayDepMods( patternBuilder );
-                        pattern = patternBuilder.obj();
-                    }
-
-                    if ( forceRewrite || mss->needOpLogRewrite() ) {
-                        DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                        logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                    BSONObjBuilder idPattern;
+                    BSONElement id;
+                    // NOTE: If the matching object lacks an id, we'll log
+                    // with the original pattern.  This isn't replay-safe.
+                    // It might make sense to suppress the log instead
+                    // if there's no id.
+                    if ( js.getObjectID( id ) ) {
+                        idPattern.append( id );
+                        pattern = idPattern.obj();
                     }
                     else {
-                        logOp("u", ns, updateobj, &pattern );
-                    }
-                }
-                numModded++;
-                if ( ! multi )
-                    return UpdateResult( 1 , 1 , numModded );
-                if ( indexHack )
-                    c->checkLocation();
-
-                if ( nscanned % 64 == 0 && ! atomic ) {
-                    if ( cc.get() == 0 ) {
-                        shared_ptr< Cursor > cPtr = c;
-                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
-                    }
-                    if ( ! cc->yield() ) {
-                        cc.release();
-                        break;
-                    }
-                    if ( !c->ok() ) {
-                        break;
+                        uassert( 10157 ,  "multi-update requires all modified objects to have an _id" , ! multi );
                     }
                 }
 
-                if (atomic)
-                    getDur().commitIfNeeded();
+                if ( profile  && !multi ) 
+                    debug.nscanned = (int) nscanned;
 
-                continue;
-            }
+                /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+                    regular ones at the moment. */
+                if ( isOperatorUpdate ) {
 
-            uassert( 10158 ,  "multi update only works with $ operators" , ! multi );
+                    if ( multi ) {
+                        c->advance(); // go to next record in case this one moves
+                        if ( seenObjects.count( loc ) )
+                            continue;
+                    }
 
-            BSONElementManipulator::lookForTimestamps( updateobj );
-            checkNoMods( updateobj );
-            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
-            if ( logop ) {
-                DEV if( god ) log() << "REALLY??" << endl; // god doesn't get logged, this would be bad.
-                logOp("u", ns, updateobj, &pattern );
-            }
-            return UpdateResult( 1 , 0 , 1 );
-        }
+                    const BSONObj& onDisk = loc.obj();
+
+                    ModSet * useMods = mods.get();
+                    bool forceRewrite = false;
+
+                    auto_ptr<ModSet> mymodset;
+                    if ( details.elemMatchKey && mods->hasDynamicArray() ) {
+                        useMods = mods->fixDynamicArray( details.elemMatchKey );
+                        mymodset.reset( useMods );
+                        forceRewrite = true;
+                    }
+
+                    auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
+
+                    bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
+
+                    if ( indexHack ) {
+                        if ( cc.get() )
+                            cc->updateLocation();
+                        else
+                            c->noteLocation();
+                    }
+
+                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ) {
+                        mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
+
+                        DEBUGUPDATE( "\t\t\t doing in place update" );
+                        if ( profile && !multi ) 
+                            debug.fastmod = true;
+
+                        if ( modsIsIndexed ) {
+                            seenObjects.insert( loc );
+                        }
+                    }
+                    else {
+                        if ( rs )
+                            rs->goingToDelete( onDisk );
+
+                        BSONObj newObj = mss->createNewFromMods();
+                        checkTooLarge(newObj);
+                        DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                        if ( newLoc != loc || modsIsIndexed ) {
+                            // object moved, need to make sure we don' get again
+                            seenObjects.insert( newLoc );
+                        }
+
+                    }
+
+                    if ( logop ) {
+                        DEV assert( mods->size() );
+
+                        if ( mss->haveArrayDepMod() ) {
+                            BSONObjBuilder patternBuilder;
+                            patternBuilder.appendElements( pattern );
+                            mss->appendSizeSpecForArrayDepMods( patternBuilder );
+                            pattern = patternBuilder.obj();
+                        }
+
+                        if ( forceRewrite || mss->needOpLogRewrite() ) {
+                            DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
+                            logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                        }
+                        else {
+                            logOp("u", ns, updateobj, &pattern );
+                        }
+                    }
+                    numModded++;
+                    if ( ! multi )
+                        return UpdateResult( 1 , 1 , numModded );
+                    if ( indexHack )
+                        c->checkLocation();
+
+                    if ( nscanned % 64 == 0 && ! atomic ) {
+                        if ( cc.get() == 0 ) {
+                            shared_ptr< Cursor > cPtr = c;
+                            cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                        }
+                        if ( ! cc->yield() ) {
+                            cc.release();
+                            break;
+                        }
+                        if ( !c->ok() ) {
+                            break;
+                        }
+                    }
+
+                    if (atomic)
+                        getDur().commitIfNeeded();
+
+                    continue;
+                }
+
+                uassert( 10158 ,  "multi update only works with $ operators" , ! multi );
+
+                BSONElementManipulator::lookForTimestamps( updateobj );
+                checkNoMods( updateobj );
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
+                if ( logop ) {
+                    DEV wassert( !god ); // god doesn't get logged, this would be bad.
+                    logOp("u", ns, updateobj, &pattern );
+                }
+                return UpdateResult( 1 , 0 , 1 );
+            } while ( c->ok() );
+        } // endif
 
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
 
-
         if ( profile )
-            ss << " nscanned:" << nscanned;
+            debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
-            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
+            if ( updateobj.firstElementFieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
-                if ( profile )
-                    ss << " fastmodinsert ";
+                debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
                     logOp( "i", ns, newObj );
@@ -1269,8 +1263,7 @@ namespace mongo {
             }
             uassert( 10159 ,  "multi update only works with $ operators" , ! multi );
             checkNoMods( updateobj );
-            if ( profile )
-                ss << " upsert ";
+            debug.upsert = true;
             BSONObj no = updateobj;
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )

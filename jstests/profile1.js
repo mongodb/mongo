@@ -44,28 +44,41 @@ try {
     assert.gt(auto_size, capped_size, "K");
     
 
-    // 
+    db.eval("sleep(1)") // pre-load system.js
+
     db.setProfilingLevel(2);
     before = db.system.profile.count();
-    db.eval( "sleep(50)" )
+    db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
-    assert.eq( before + 4 , after , "X1" )
+    assert.eq( before + 3 , after , "X1" )
 
     db.setProfilingLevel(1,100);
     before = db.system.profile.count();
-    db.eval( "sleep(50)" )
+    db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
     assert.eq( before + 1 , after , "X2" )
 
     db.setProfilingLevel(1,20);
     before = db.system.profile.count();
-    db.eval( "sleep(50)" )
+    db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
-    assert.eq( before + 2 , after , "X2" )
-
+    assert.eq( before + 2 , after , "X3" )
+    
+    
+    db.profile.drop();
+    db.setProfilingLevel(2)
+    var q = { _id : 5 };
+    var u = { $inc : { x : 1 } };
+    db.profile1.update( q , u );
+    var r = db.system.profile.find().sort( { $natural : -1 } )[0]
+    assert.eq( q , r.query , "Y1" );
+    assert.eq( u , r.updateobj , "Y2" );
+    assert.eq( "update" , r.op , "Y3" );
+    assert.eq( "test.profile1" , r.ns , "Y4" );
+    
 
 } finally {
     // disable profiling for subsequent tests

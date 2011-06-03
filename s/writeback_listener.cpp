@@ -36,7 +36,7 @@ namespace mongo {
     set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
-    map<ConnectionId,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
+    map<WriteBackListener::ConnectionIdent,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
     mongo::mutex WriteBackListener::_seenWritebacksLock("WriteBackListener::seen");
 
     WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ) {
@@ -86,18 +86,19 @@ namespace mongo {
     }
 
     /* static */
-    BSONObj WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
+    BSONObj WriteBackListener::waitFor( const ConnectionIdent& ident, const OID& oid ) {
         Timer t;
         for ( int i=0; i<5000; i++ ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
-                WBStatus s = _seenWritebacks[connectionId];
+                WBStatus s = _seenWritebacks[ident];
                 if ( oid < s.id ) {
                     // this means we're waiting for a GLE that already passed.
                     // it should be impossible becauseonce we call GLE, no other
                     // writebacks should happen with that connection id
+
                     msgasserted( 14041 , str::stream() << "got writeback waitfor for older id " <<
-                                 " oid: " << oid << " s.id: " << s.id << " connectionId: " << connectionId );
+                                 " oid: " << oid << " s.id: " << s.id << " ident: " << ident.toString() );
                 }
                 else if ( oid == s.id ) {
                     return s.gle;
@@ -142,10 +143,13 @@ namespace mongo {
                 if ( data.getBoolField( "writeBack" ) ) {
                     string ns = data["ns"].valuestrsafe();
 
-                    ConnectionId cid = 0;
+                    ConnectionIdent cid( "" , 0 );
                     OID wid;
                     if ( data["connectionId"].isNumber() && data["id"].type() == jstOID ) {
-                        cid = data["connectionId"].numberLong();
+                        string s = "";
+                        if ( data["instanceIdent"].type() == String )
+                            s = data["instanceIdent"].String();
+                        cid = ConnectionIdent( s , data["connectionId"].numberLong() );
                         wid = data["id"].OID();
                     }
                     else {

@@ -171,36 +171,32 @@ namespace mongo {
 
     // DO NOT TOUCH except for testing
     inline void jsTimeVirtualSkew( long long skew ){
-	jsTime_virtual_skew = skew;
+        jsTime_virtual_skew = skew;
     }
     inline long long getJSTimeVirtualSkew(){
-	return jsTime_virtual_skew;
+        return jsTime_virtual_skew;
     }
 
     inline void jsTimeVirtualThreadSkew( long long skew ){
-	jsTime_virtual_thread_skew.reset(new long long(skew));
+        jsTime_virtual_thread_skew.reset(new long long(skew));
     }
     inline long long getJSTimeVirtualThreadSkew(){
-	if(jsTime_virtual_thread_skew.get()){
-	    return *(jsTime_virtual_thread_skew.get());
-	}
-	else return 0;
+        if(jsTime_virtual_thread_skew.get()){
+            return *(jsTime_virtual_thread_skew.get());
+        }
+        else return 0;
     }
 
-
-    /** curTimeMillis will overflow - use curTimeMicros64 instead if you care about that. */
-    inline unsigned curTimeMillis();
     /** Date_t is milliseconds since epoch */
     inline Date_t jsTime();
     /** measures up to 1024 seconds.  or, 512 seconds with tdiff that is */
     inline unsigned curTimeMicros();
     inline unsigned long long curTimeMicros64();
 #ifdef _WIN32 // no gettimeofday on windows
-    inline unsigned curTimeMillis() {
+    inline unsigned long long curTimeMillis64() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
-        unsigned t = xt.nsec / 1000000;
-        return (xt.sec & 0xfffff) * 1000 + t;
+        return ((unsigned long long)xt.sec) * 1000 + xt.nsec / 1000000;
     }
     inline Date_t jsTime() {
         boost::xtime xt;
@@ -213,7 +209,7 @@ namespace mongo {
         boost::xtime_get(&xt, boost::TIME_UTC);
         unsigned long long t = xt.nsec / 1000;
         return (((unsigned long long) xt.sec) * 1000000) + t;
-    }
+    }    
     inline unsigned curTimeMicros() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -223,11 +219,10 @@ namespace mongo {
     }
 #else
 #  include <sys/time.h>
-    inline unsigned curTimeMillis() {
+    inline unsigned long long curTimeMillis64() {
         timeval tv;
         gettimeofday(&tv, NULL);
-        unsigned t = tv.tv_usec / 1000;
-        return (tv.tv_sec & 0xfffff) * 1000 + t;
+        return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
     }
     inline Date_t jsTime() {
         timeval tv;
@@ -246,7 +241,6 @@ namespace mongo {
         unsigned secs = tv.tv_sec % 1024;
         return secs*1000*1000 + tv.tv_usec;
     }
-
 #endif
 
 }  // namespace mongo

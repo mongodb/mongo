@@ -41,9 +41,11 @@ namespace mongo {
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 
+    DBConnectionPool shardConnectionPool;
+
     /**
      * holds all the actual db connections for a client to various servers
-     * 1 pre thread, so don't have to worry about thread safety
+     * 1 per thread, so doesn't have to be thread safe
      */
     class ClientConnections : boost::noncopyable {
     public:
@@ -65,8 +67,10 @@ namespace mongo {
                 if ( ss->avail ) {
                     /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
-                    if ( inShutdown() )
+                    if ( inShutdown() ) {
+                        resetShardVersionCB( ss->avail );
                         delete ss->avail;
+                    }
                     else
                         release( addr , ss->avail );
                     ss->avail = 0;
@@ -86,12 +90,12 @@ namespace mongo {
             if ( s->avail ) {
                 DBClientBase* c = s->avail;
                 s->avail = 0;
-                pool.onHandedOut( c );
+                shardConnectionPool.onHandedOut( c );
                 return c;
             }
 
             s->created++;
-            return pool.get( addr );
+            return shardConnectionPool.get( addr );
         }
 
         void done( const string& addr , DBClientBase* conn ) {
@@ -108,15 +112,10 @@ namespace mongo {
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
-
-                if ( ss->avail ) {
+                if ( ss->avail )
                     ss->avail->getLastError();
-                    release( addr , ss->avail );
-                    ss->avail = 0;
-                }
-                delete ss;
+                
             }
-            _hosts.clear();
         }
 
         void checkVersions( const string& ns ) {
@@ -134,33 +133,13 @@ namespace mongo {
                 Status* ss = i->second;
                 assert( ss );
                 if ( ! ss->avail )
-                    ss->avail = pool.get( i->first );
+                    ss->avail = shardConnectionPool.get( i->first );
                 checkShardVersionCB( *ss->avail , ns , false , 1 );
             }
         }
 
         void release( const string& addr , DBClientBase * conn ) {
-            resetShardVersionCB( conn );
-            BSONObj res;
-
-            try {
-                if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ) {
-                    pool.release( addr , conn );
-                }
-                else {
-                    error() << "unset sharding failed : " << res << endl;
-                    delete conn;
-                }
-            }
-            catch ( SocketException& e ) {
-                // server down or something
-                LOG(1) << "socket exception trying to unset sharding: " << e.toString() << endl;
-                delete conn;
-            }
-            catch ( std::exception& e ) {
-                error() << "couldn't unset sharding : " << e.what() << endl;
-                delete conn;
-            }
+            shardConnectionPool.release( addr , conn );
         }
 
         void _check( const string& ns ) {

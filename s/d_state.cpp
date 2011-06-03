@@ -75,7 +75,7 @@ namespace mongo {
            << " before [" << _shardName << "] "
            << " got [" << name << "] "
            ;
-        uasserted( 13298 , ss.str() );
+        msgasserted( 13298 , ss.str() );
     }
 
     void ShardingState::gotShardHost( string host ) {
@@ -97,7 +97,7 @@ namespace mongo {
            << " before [" << _shardHost << "] "
            << " got [" << host << "] "
            ;
-        uasserted( 13299 , ss.str() );
+        msgasserted( 13299 , ss.str() );
     }
 
     void ShardingState::resetShardingState() {
@@ -542,7 +542,7 @@ namespace mongo {
             }
 
             if ( version < oldVersion ) {
-                errmsg = "you already have a newer version of collection '" + ns + "'";
+                errmsg = "this connection already had a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "newVersion" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
@@ -555,10 +555,11 @@ namespace mongo {
                     sleepmillis(2);
                     OCCASIONALLY log() << "waiting till out of critical section" << endl;
                 }
-                errmsg = "going to older version for global for collection '" + ns + "'";
+                errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
+                result.appendBool( "reloadConfig" , true );
                 return false;
             }
 
@@ -615,6 +616,7 @@ namespace mongo {
             result.appendTimestamp( "global" , shardingState.getVersion(ns) );
 
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
+            result.appendBool( "inShardedMode" , info != 0 );
             if ( info )
                 result.appendTimestamp( "mine" , info->getVersion(ns) );
             else

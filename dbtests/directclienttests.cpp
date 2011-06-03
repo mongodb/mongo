@@ -69,12 +69,35 @@ namespace DirectClientTests {
         }
     };
 
+    class InsertMany : ClientBase {
+    public:
+        virtual void run(){
+            vector<BSONObj> objs;
+            objs.push_back(BSON("_id" << 1));
+            objs.push_back(BSON("_id" << 1));
+            objs.push_back(BSON("_id" << 2));
+
+
+            client().dropCollection(ns);
+            client().insert(ns, objs);
+            ASSERT_EQUALS(client().getLastErrorDetailed()["code"].numberInt(), 11000);
+            ASSERT_EQUALS((int)client().count(ns), 1);
+
+            client().dropCollection(ns);
+            client().insert(ns, objs, InsertOption_KeepGoing);
+            ASSERT_EQUALS(client().getLastErrorDetailed()["code"].numberInt(), 11000);
+            ASSERT_EQUALS((int)client().count(ns), 2);
+        }
+
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "directclient" ) {
         }
         void setupTests() {
             add< Capped >();
+            add< InsertMany >();
         }
     } myall;
 }

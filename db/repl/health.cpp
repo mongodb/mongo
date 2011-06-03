@@ -126,19 +126,6 @@ namespace mongo {
         return "";
     }
 
-    string MemberState::toString() const {
-        if( s == MemberState::RS_STARTUP ) return "STARTUP";
-        if( s == MemberState::RS_PRIMARY ) return "PRIMARY";
-        if( s == MemberState::RS_SECONDARY ) return "SECONDARY";
-        if( s == MemberState::RS_RECOVERING ) return "RECOVERING";
-        if( s == MemberState::RS_FATAL ) return "FATAL";
-        if( s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-        if( s == MemberState::RS_ARBITER ) return "ARBITER";
-        if( s == MemberState::RS_DOWN ) return "DOWN";
-        if( s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
-        return "";
-    }
-
     extern time_t started;
 
     // oplogdiags in web ui
@@ -306,6 +293,8 @@ namespace mongo {
             myMinValid = "exception fetching minvalid";
         }
 
+        const Member *_self = this->_self;
+        assert(_self);
         {
             stringstream s;
             /* self row */
@@ -344,10 +333,7 @@ namespace mongo {
     }
 
     const Member* ReplSetImpl::findById(unsigned id) const {
-        {
-            lock lk((RSBase*)this);
-            if( _self && id == _self->id() ) return _self;
-        }
+        if( _self && id == _self->id() ) return _self;
         
         for( Member *m = head(); m; m = m->next() )
             if( m->id() == id )
@@ -374,8 +360,9 @@ namespace mongo {
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;
 
-        lock lk((RSBase*)this);
-        
+        const Member *_self = this->_self;
+        assert( _self );
+
         // add self
         {
             BSONObjBuilder bb;

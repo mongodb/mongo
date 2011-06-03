@@ -398,6 +398,10 @@ namespace mongo {
 //            _real->setThis( obj );
 //        }
 
+        void setFunction( const char *field , const char * code ) {
+            _real->setFunction(field, code);
+        }
+
         ScriptingFunction createFunction( const char * code ) {
             return _real->createFunction( code );
         }
@@ -413,7 +417,7 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
             return _real->invoke( func , args , recv, timeoutMs , ignoreReturn );
         }
 
@@ -428,8 +432,8 @@ namespace mongo {
             return _real->execFile( filename , printResult , reportError , assertOnError , timeoutMs );
         }
 
-        void injectNative( const char *field, NativeFunction func ) {
-            _real->injectNative( field , func );
+        void injectNative( const char *field, NativeFunction func, void* data ) {
+            _real->injectNative( field , func, data );
         }
 
         void gc() {

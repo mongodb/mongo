@@ -1,4 +1,4 @@
-/** @file dbclient_rs.h - connect to a Replica Set, from C++ */
+/** @file dbclient_rs.h Connect to a Replica Set, from C++ */
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -124,6 +124,7 @@ namespace mongo {
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
 
         int _find( const string& server ) const ;
+        int _find_inlock( const string& server ) const ;
         int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes
@@ -190,11 +191,11 @@ namespace mongo {
         /** throws userassertion "no master found" */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        virtual void insert( const string &ns , BSONObj obj );
+        virtual void insert( const string &ns , BSONObj obj , int flags=0);
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
         virtual void remove( const string &ns , Query obj , bool justOne = 0 );
 
@@ -214,6 +215,10 @@ namespace mongo {
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster();
+
+        /* this is used to indicate we got a "not master or secondary" error from a secondary.
+         */
+        void isntSecondary();
 
         // ----- status ------
 
@@ -239,6 +244,9 @@ namespace mongo {
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
+
+        // Used to simplify slave-handling logic on errors
+        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();

@@ -119,7 +119,7 @@ namespace mongo {
             return ss.str();
         }
 
-        void _add( const BSONObj& obj, const string& root , const BSONElement& e , BSONObjSetDefaultOrder& keys ) const {
+        void _add( const BSONObj& obj, const string& root , const BSONElement& e , BSONObjSet& keys ) const {
             BSONObjBuilder buf;
             buf.append( "" , root );
             if ( e.eoo() )
@@ -132,7 +132,7 @@ namespace mongo {
             keys.insert( key );
         }
 
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+        void getKeys( const BSONObj &obj, BSONObjSet &keys ) const {
 
             BSONElement loc = obj.getFieldDotted( _geo );
             if ( loc.eoo() )

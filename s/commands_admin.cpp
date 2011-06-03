@@ -569,8 +569,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can split";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before can split";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );
@@ -591,10 +594,10 @@ namespace mongo {
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 BSONObj res;
-                ChunkPtr p;
+                bool worked;
                 if ( middle.isEmpty() ) {
-                    p = chunk->singleSplit( true /* force a split even if not enough data */ , res );
-
+                    BSONObj ret = chunk->singleSplit( true /* force a split even if not enough data */ , res );
+                    worked = !ret.isEmpty();
                 }
                 else {
                     // sanity check if the key provided is a valid split point
@@ -605,10 +608,10 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    p = chunk->multiSplit( splitPoints , res );
+                    worked = chunk->multiSplit( splitPoints , res );
                 }
 
-                if ( p.get() == NULL ) {
+                if ( !worked ) {
                     errmsg = "split failed";
                     result.append( "cause" , res );
                     return false;
@@ -640,8 +643,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can move a chunk";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before can move a chunk";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );

@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "key.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -67,18 +68,15 @@ namespace mongo {
         Given that the KeyV1Owned constructor already grabbed a bufbuilder, we reuse it here 
         so that we don't have to do an extra malloc.
     */
-    void KeyV1Owned::traditional(BufBuilder& b, const BSONObj& obj) { 
+    void KeyV1Owned::traditional(const BSONObj& obj) { 
         b.reset();
         b.appendUChar(IsBSON);
         b.appendBuf(obj.objdata(), obj.objsize());
-        _toFree = b.buf();
-        _keyData = (const unsigned char *) _toFree;
-        b.decouple();
+        _keyData = (const unsigned char *) b.buf();
     }
 
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
-        BufBuilder b(512);
         BSONObj::iterator i(obj);
         assert( i.more() );
         unsigned char bits = 0;
@@ -121,7 +119,7 @@ namespace mongo {
                             break;
                         }
                     }
-                    traditional(b, obj);
+                    traditional(obj);
                     return;
                 }
             case Date:
@@ -131,10 +129,10 @@ namespace mongo {
             case String:
                 {
                     b.appendUChar(cstring|bits);
-                    // should we do e.valuestrsize()-1?  last char currently will always be null.
-                    unsigned x = (unsigned) e.valuestrsize();
+                    // note we do not store the terminating null, to save space.
+                    unsigned x = (unsigned) e.valuestrsize() - 1;
                     if( x > 255 ) { 
-                        traditional(b, obj);
+                        traditional(obj);
                         return;
                     }
                     b.appendUChar(x);
@@ -150,7 +148,7 @@ namespace mongo {
                     long long n = e._numberLong();
                     double d = (double) n;
                     if( d != n ) { 
-                        traditional(b, obj);
+                        traditional(obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
@@ -171,18 +169,16 @@ namespace mongo {
                 }
             default:
                 // if other types involved, store as traditional BSON
-                traditional(b, obj);
+                traditional(obj);
                 return;
             }
             if( !i.more() )
                 break;
             bits = 0;
         }
-        _toFree = b.buf();
-        _keyData = (const unsigned char *) _toFree;
+        _keyData = (const unsigned char *) b.buf();
         dassert( b.len() == dataSize() ); // check datasize method is correct
         dassert( (*_keyData & cNOTUSED) == 0 );
-        b.decouple();
     }
 
     BSONObj KeyV1::toBson() const { 
@@ -205,7 +201,13 @@ namespace mongo {
                 case cstring:
                     {
                         unsigned sz = *p++;
-                        b.append("", (const char *) p, sz);
+                        // we build the element ourself as we have to null terminate it
+                        BufBuilder &bb = b.bb();
+                        bb.appendNum((char) String);
+                        bb.appendUChar(0); // fieldname ""
+                        bb.appendNum(sz+1);
+                        bb.appendBuf(p, sz);
+                        bb.appendUChar(0); // null char at end of string
                         p += sz;
                         break;
                     }
@@ -274,13 +276,19 @@ namespace mongo {
             }
         case cstring:
             {
+                int lsz = *l;
+                int rsz = *r;
+                int common = min(lsz, rsz);
                 l++; r++; // skip the size byte
-                // todo: see https://jira.mongodb.org/browse/SERVER-1300
-                int res = strcmp((const char *) l, (const char *) r);
+                // use memcmp as we (will) allow zeros in UTF8 strings
+                int res = memcmp(l, r, common);
                 if( res ) 
                     return res;
-                unsigned sz = l[-1];
-                l += sz; r += sz;
+                // longer string is the greater one
+                int diff = lsz-rsz;
+                if( diff ) 
+                    return diff;
+                l += lsz; r += lsz;
                 break;
             }
         case coid:
@@ -367,28 +375,6 @@ namespace mongo {
         return 0;
     }
 
-    bool KeyV1::woEqual(const KeyV1& right) const {
-        const unsigned char *l = _keyData;
-        const unsigned char *r = right._keyData;
-
-        if( (*l|*r) == IsBSON ) {
-            return toBson().woEqual(right.toBson());
-        }
-
-        while( 1 ) { 
-            char lval = *l; 
-            char rval = *r;
-            if( compare(l, r) ) // updates l and r pointers
-                return false;
-            if( (lval&cHASMORE)^(rval&cHASMORE) )
-                return false;
-            if( (lval&cHASMORE) == 0 )
-                break;
-        }
-
-        return true;
-    }
-
     static unsigned sizes[] = {
         0,
         1, //cminkey=1,
@@ -408,6 +394,21 @@ namespace mongo {
         0
     };
 
+    inline unsigned sizeOfElement(const unsigned char *p) { 
+        unsigned type = *p & cCANONTYPEMASK;
+        unsigned sz = sizes[type];
+        if( sz == 0 ) {
+            if( type == cstring ) { 
+                sz = ((unsigned) p[1]) + 2;
+            }
+            else {
+                assert( type == cbindata );
+                sz = binDataCodeToLength(p[1]) + 2;
+            }
+        }
+        return sz;
+    }
+
     int KeyV1::dataSize() const { 
         const unsigned char *p = _keyData;
         if( !isCompactFormat() ) {
@@ -416,21 +417,79 @@ namespace mongo {
 
         bool more;
         do { 
-            unsigned type = *p & cCANONTYPEMASK;
-            unsigned z = sizes[type];
-            if( z == 0 ) {
-                if( type == cstring ) { 
-                    z = ((unsigned) p[1]) + 2;
-                }
-                else {
-                    assert( type == cbindata );
-                    z = binDataCodeToLength(p[1]) + 2;
-                }
-            }
+            unsigned z = sizeOfElement(p);
             more = (*p & cHASMORE) != 0;
             p += z;
         } while( more );
         return p - _keyData;
     }
+
+    bool KeyV1::woEqual(const KeyV1& right) const {
+        const unsigned char *l = _keyData;
+        const unsigned char *r = right._keyData;
+
+        if( (*l|*r) == IsBSON ) {
+            return toBson().equal(right.toBson());
+        }
+
+        while( 1 ) { 
+            char lval = *l; 
+            char rval = *r;
+            if( (lval&(cCANONTYPEMASK|cHASMORE)) != (rval&(cCANONTYPEMASK|cHASMORE)) )
+                return false;
+            l++; r++;
+            switch( lval&cCANONTYPEMASK ) { 
+            case coid:
+                if( *((unsigned*) l) != *((unsigned*) r) )
+                    return false;
+                l += 4; r += 4;
+            case cdate:
+            case cdouble:
+                if( *((unsigned long long *) l) != *((unsigned long long *) r) )
+                    return false;
+                l += 8; r += 8;
+                break;
+            case cstring:
+                {
+                    unsigned sz = ((unsigned) *l) + 1;
+                    if( memcmp(l, r, sz) ) // first byte checked is the length byte
+                        return false;
+                    l += sz; r += sz;
+                    break;
+                }
+            case cbindata:
+                {
+                    int len = binDataCodeToLength(*l) + 1;
+                    if( memcmp(l, r, len) ) 
+                        return false;
+                    l += len; r += len;
+                    break;
+                }
+            case cminkey:
+            case cnull:
+            case cfalse:
+            case ctrue:
+            case cmaxkey:
+                break;
+            default:
+                assert(false);
+            }
+            if( (lval&cHASMORE) == 0 )
+                break;
+        }
+        return true;
+    }
+
+    struct CmpUnitTest : public UnitTest {
+        void run() {
+            char a[2];
+            char b[2];
+            a[0] = -3;
+            a[1] = 0;
+            b[0] = 3;
+            b[1] = 0;
+            assert( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
+        }
+    } cunittest;
 
 }

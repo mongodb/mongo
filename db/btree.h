@@ -924,7 +924,7 @@ namespace mongo {
          * if a multikey index traversal:
          *   if loc has already been sent, returns true.
          *   otherwise, marks loc as sent.
-         * @return true if the loc has not been seen
+         * @return false if the loc has not been seen
          */
         virtual bool getsetdup(DiskLoc loc) {
             if( _multikey ) {
@@ -970,6 +970,7 @@ namespace mongo {
         void forgetEndKey() { endKey = BSONObj(); }
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
 
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
 

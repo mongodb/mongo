@@ -431,8 +431,10 @@ namespace mongo {
                 int m = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
                 t.appendNumber( "mapped" , m );
                 
-                if ( cmdLine.dur )
+                if ( cmdLine.dur ) {
                     m *= 2;
+                    t.appendNumber( "mappedWithJournal" , m );
+                }
                 
                 if( v - m > 5000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
@@ -889,7 +891,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "list databases on this server"; }
         CmdListDatabases() : Command("listDatabases" , true ) {}
         bool run(const string& dbname , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -901,12 +903,18 @@ namespace mongo {
             boost::intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
-                b.append( "name", i->c_str() );
+                b.append( "name", *i );
+
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
-                Client::Context ctx( *i );
-                b.appendBool( "empty", ctx.db()->isEmpty() );
                 totalSize += size;
+                
+                {
+                    readlock lk( *i );
+                    Client::Context ctx( *i );
+                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                }
+                
                 dbInfos.push_back( b.obj() );
 
                 seen.insert( i->c_str() );
@@ -914,7 +922,11 @@ namespace mongo {
 
             // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
             set<string> allShortNames;
-            dbHolder.getAllShortNames( allShortNames );
+            {
+                readlock lk;
+                dbHolder.getAllShortNames( allShortNames );
+            }
+            
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
                 string name = *i;
 
@@ -922,9 +934,14 @@ namespace mongo {
                     continue;
 
                 BSONObjBuilder b;
-                b << "name" << name << "sizeOnDisk" << double( 1 );
-                Client::Context ctx( name );
-                b.appendBool( "empty", ctx.db()->isEmpty() );
+                b.append( "name" , name );
+                b.append( "sizeOnDisk" , (double)1.0 );
+
+                {
+                    readlock lk( name );
+                    Client::Context ctx( name );
+                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                }
 
                 dbInfos.push_back( b.obj() );
             }

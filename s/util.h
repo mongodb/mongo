@@ -129,7 +129,7 @@ namespace mongo {
 
         virtual ~StaleConfigException() throw() {}
 
-        virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
+        virtual void appendPrefix( stringstream& ss ) const { ss << "stale sharding config exception: "; }
 
         bool justConnection() const { return _justConnection; }
 

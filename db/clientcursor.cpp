@@ -34,7 +34,7 @@
 namespace mongo {
 
     CCById ClientCursor::clientCursorsById;
-    boost::recursive_mutex ClientCursor::ccmutex;
+    boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
 
     void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ); // from s/d_logic.h
@@ -231,10 +231,13 @@ namespace mongo {
             c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
-                /* this might indicate a failure to call ClientCursor::updateLocation() */
+                // This might indicate a failure to call ClientCursor::updateLocation() but it can
+                // also happen during correct operation, see SERVER-2009.
                 problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
-            c->advance();
+            else {
+                c->advance();
+            }
             if ( c->eof() ) {
                 // advanced to end
                 // leave ClientCursor in place so next getMore doesn't fail
@@ -413,6 +416,9 @@ namespace mongo {
     bool ClientCursor::prepareToYield( YieldData &data ) {
         if ( ! _c->supportYields() )
             return false;
+        if ( ! _c->prepareToYield() ) {
+            return false;   
+        }
         // need to store in case 'this' gets deleted
         data._id = _cursorid;
 
@@ -453,7 +459,7 @@ namespace mongo {
         }
 
         cc->_doingDeletes = data._doingDeletes;
-        cc->_c->checkLocation();
+        cc->_c->recoverFromYield();
         return true;
     }
 
@@ -478,7 +484,7 @@ namespace mongo {
         }
 
         long long x;
-        int ctm = (int) curTimeMillis();
+        int ctm = (int) curTimeMillis64();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
             x = x | ctm | 0x80000000; // OR to make sure not zero
@@ -550,7 +556,7 @@ namespace mongo {
         static Mem mlast;
         try {
             ProcessInfo p;
-            if ( p.supported() ) {
+            if ( !cmdLine.quiet && p.supported() ) {
                 Mem m;
                 m.res = p.getResidentSize();
                 m.virt = p.getVirtualMemorySize();
@@ -574,21 +580,16 @@ namespace mongo {
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
-
-        unsigned old = curTimeMillis();
-
+        Timer t;
         const int Secs = 4;
         unsigned n = 0;
         while ( ! inShutdown() ) {
-            unsigned now = curTimeMillis();
-            ClientCursor::idleTimeReport( now - old );
-            old = now;
+            ClientCursor::idleTimeReport( t.millisReset() );
             sleepsecs(Secs);
             if( ++n % (60/4) == 0 /*once a minute*/ ) { 
                 sayMemoryStatus();
             }
         }
-
         client.shutdown();
     }
 

@@ -527,6 +527,8 @@ namespace mongo {
                 LSNFile lsnf;
                 lsnf.set(_lastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));
+				// do we want to fsync here? if we do it probably needs to be async so the durthread
+				// is not delayed.
             }
             catch(std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;

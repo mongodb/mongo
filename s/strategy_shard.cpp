@@ -126,56 +126,74 @@ namespace mongo {
         }
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
+            const int flags = d.reservedField();
+            bool keepGoing = flags & InsertOption_KeepGoing; // modified before assertion if should abort
 
             while ( d.moreJSObjs() ) {
-                BSONObj o = d.nextJsObj();
-                if ( ! manager->hasShardKey( o ) ) {
+                try {
+                    BSONObj o = d.nextJsObj();
+                    if ( ! manager->hasShardKey( o ) ) {
 
-                    bool bad = true;
+                        bool bad = true;
 
-                    if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
-                        BSONObjBuilder b;
-                        b.appendOID( "_id" , 0 , true );
-                        b.appendElements( o );
-                        o = b.obj();
-                        bad = ! manager->hasShardKey( o );
+                        if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
+                            BSONObjBuilder b;
+                            b.appendOID( "_id" , 0 , true );
+                            b.appendElements( o );
+                            o = b.obj();
+                            bad = ! manager->hasShardKey( o );
+                        }
+
+                        if ( bad ) {
+                            log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
+                            uasserted( 8011 , "tried to insert object without shard key" );
+                        }
+
                     }
 
-                    if ( bad ) {
-                        log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
-                        throw UserException( 8011 , "tried to insert object without shard key" );
-                    }
+                    // Many operations benefit from having the shard key early in the object
+                    o = manager->getShardKey().moveToFront(o);
 
+                    const int maxTries = 30;
+
+                    bool gotThrough = false;
+                    for ( int i=0; i<maxTries; i++ ) {
+                        try {
+                            ChunkPtr c = manager->findChunk( o );
+                            log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                            insert( c->getShard() , r.getns() , o , flags);
+
+                            r.gotInsert();
+                            if ( r.getClientInfo()->autoSplitOk() )
+                                c->splitIfShould( o.objsize() );
+                            gotThrough = true;
+                            break;
+                        }
+                        catch ( StaleConfigException& e ) {
+                            int logLevel = i < ( maxTries / 2 );
+                            LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+                            r.reset();
+                            
+                            unsigned long long old = manager->getSequenceNumber();
+                            manager = r.getChunkManager();
+                            
+                            LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+
+                            if (!manager) {
+                                keepGoing = false;
+                                uasserted(14804, "collection no longer sharded");
+                            }
+                        }
+                        sleepmillis( i * 20 );
+                    }
+                    
+                    assert( inShutdown() || gotThrough ); // not caught below
+                } catch (const UserException&){
+                    if (!keepGoing || !d.moreJSObjs()){
+                        throw;
+                    }
+                    // otherwise ignore and keep going
                 }
-
-                // Many operations benefit from having the shard key early in the object
-                o = manager->getShardKey().moveToFront(o);
-
-                const int maxTries = 10;
-
-                bool gotThrough = false;
-                for ( int i=0; i<maxTries; i++ ) {
-                    try {
-                        ChunkPtr c = manager->findChunk( o );
-                        log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                        insert( c->getShard() , r.getns() , o );
-
-                        r.gotInsert();
-                        if ( r.getClientInfo()->autoSplitOk() )
-                            c->splitIfShould( o.objsize() );
-                        gotThrough = true;
-                        break;
-                    }
-                    catch ( StaleConfigException& e ) {
-                        log( i < ( maxTries / 2 ) ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
-                        r.reset();
-                        manager = r.getChunkManager();
-                        uassert(14804, "collection no longer sharded", manager);
-                    }
-                    sleepmillis( i * 200 );
-                }
-                
-                assert( inShutdown() || gotThrough );
             }
         }
 
@@ -195,7 +213,7 @@ namespace mongo {
             if (upsert) {
                 uassert(8012, "can't upsert something without shard key",
                         (manager->hasShardKey(toupdate) ||
-                         (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))));
+                         (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
                 BSONObj key = manager->getShardKey().extractKey(query);
                 BSONForEach(e, key) {
@@ -207,7 +225,7 @@ namespace mongo {
             if ( ! manager->hasShardKey( query ) ) {
                 if ( multi ) {
                 }
-                else if ( strcmp( query.firstElement().fieldName() , "_id" ) || query.nFields() != 1 ) {
+                else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
                     throw UserException( 8013 , "can't do non-multi update with query that doesn't have the shard key" );
                 }
                 else {
@@ -218,7 +236,7 @@ namespace mongo {
 
 
             if ( ! save ) {
-                if ( toupdate.firstElement().fieldName()[0] == '$' ) {
+                if ( toupdate.firstElementFieldName()[0] == '$' ) {
                     BSONObjIterator ops(toupdate);
                     while(ops.more()) {
                         BSONElement op(ops.next());
@@ -268,7 +286,7 @@ namespace mongo {
                         if ( left <= 0 )
                             throw e;
                         left--;
-                        log() << "update failed b/c of StaleConfigException, retrying "
+                        log() << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                         r.reset( false );
                         manager = r.getChunkManager();

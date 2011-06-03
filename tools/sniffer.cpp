@@ -26,7 +26,7 @@
     killcursors
 
  */
-
+#include "../pch.h"
 #include <pcap.h>
 
 #ifdef _WIN32

@@ -55,12 +55,12 @@ namespace mongo {
         Message toSend;
         _assembleInit( toSend );
 
-        if ( !_client->call( toSend, *m, false ) ) {
+        if ( !_client->call( toSend, *b.m, false ) ) {
             // log msg temp?
             log() << "DBClientCursor::init call() failed" << endl;
             return false;
         }
-        if ( m->empty() ) {
+        if ( b.m->empty() ) {
             // log msg temp?
             log() << "DBClientCursor::init message from call() was empty" << endl;
             return false;
@@ -78,11 +78,11 @@ namespace mongo {
 
     bool DBClientCursor::initLazyFinish() {
         assert( _lazy );
-        if ( ! _lazy->recv( *m ) ) {
+        if ( ! _lazy->recv( *b.m ) ) {
             log() << "DBClientCursor::init lazy call() failed" << endl;
             return false;
         }
-        if ( m->empty() ) {
+        if ( b.m->empty() ) {
             // log msg temp?
             log() << "DBClientCursor::init message from call() was empty" << endl;
             return false;
@@ -92,10 +92,10 @@ namespace mongo {
     }
 
     void DBClientCursor::requestMore() {
-        assert( cursorId && pos == nReturned );
+        assert( cursorId && b.pos == b.nReturned );
 
         if (haveLimit) {
-            nToReturn -= nReturned;
+            nToReturn -= b.nReturned;
             assert(nToReturn > 0);
         }
         BufBuilder b;
@@ -110,7 +110,7 @@ namespace mongo {
 
         if ( _client ) {
             _client->call( toSend, *response );
-            m = response;
+            this->b.m = response;
             dataReceived();
         }
         else {
@@ -118,7 +118,7 @@ namespace mongo {
             ScopedDbConnection conn( _scopedHost );
             conn->call( toSend , *response );
             _client = conn.get();
-            m = response;
+            this->b.m = response;
             dataReceived();
             _client = 0;
             conn.done();
@@ -127,18 +127,22 @@ namespace mongo {
 
     /** with QueryOption_Exhaust, the server just blasts data at us (marked at end with cursorid==0). */
     void DBClientCursor::exhaustReceiveMore() {
-        assert( cursorId && pos == nReturned );
+        assert( cursorId && b.pos == b.nReturned );
         assert( !haveLimit );
         auto_ptr<Message> response(new Message());
         assert( _client );
         _client->recv(*response);
-        m = response;
+        b.m = response;
         dataReceived();
     }
 
     void DBClientCursor::dataReceived() {
-        QueryResult *qr = (QueryResult *) m->singleData();
+        QueryResult *qr = (QueryResult *) b.m->singleData();
         resultFlags = qr->resultFlags();
+
+        if ( qr->resultFlags() & ResultFlag_ErrSet ) {
+            wasError = true;
+        }
 
         if ( qr->resultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
@@ -154,11 +158,12 @@ namespace mongo {
             cursorId = qr->cursorId;
         }
 
-        nReturned = qr->nReturned;
-        pos = 0;
-        data = qr->data();
+        b.nReturned = qr->nReturned;
+        b.pos = 0;
+        b.data = qr->data();
 
-        _client->checkResponse( data, nReturned );
+        _client->checkResponse( b.data, b.nReturned ); // watches for "not master"
+
         /* this assert would fire the way we currently work:
             assert( nReturned || cursorId == 0 );
         */
@@ -171,17 +176,17 @@ namespace mongo {
         if ( !_putBack.empty() )
             return true;
 
-        if (haveLimit && pos >= nToReturn)
+        if (haveLimit && b.pos >= nToReturn)
             return false;
 
-        if ( pos < nReturned )
+        if ( b.pos < b.nReturned )
             return true;
 
         if ( cursorId == 0 )
             return false;
 
         requestMore();
-        return pos < nReturned;
+        return b.pos < b.nReturned;
     }
 
     BSONObj DBClientCursor::next() {
@@ -192,11 +197,11 @@ namespace mongo {
             return ret;
         }
 
-        uassert(13422, "DBClientCursor next() called but more() is false", pos < nReturned);
+        uassert(13422, "DBClientCursor next() called but more() is false", b.pos < b.nReturned);
 
-        pos++;
-        BSONObj o(data);
-        data += o.objsize();
+        b.pos++;
+        BSONObj o(b.data);
+        b.data += o.objsize();
         /* todo would be good to make data null at end of batch for safety */
         return o;
     }
@@ -214,9 +219,9 @@ namespace mongo {
         }
         */
 
-        int p = pos;
-        const char *d = data;
-        while( m && p < nReturned ) {
+        int p = b.pos;
+        const char *d = b.data;
+        while( m && p < b.nReturned ) {
             BSONObj o(d);
             d += o.objsize();
             p++;
@@ -225,6 +230,19 @@ namespace mongo {
         }
     }
     
+    bool DBClientCursor::peekError(BSONObj* error){
+        if( ! wasError ) return false;
+
+        vector<BSONObj> v;
+        peek(v, 1);
+
+        assert( v.size() == 1 );
+        assert( hasErrField( v[0] ) );
+
+        if( error ) *error = v[0].getOwned();
+        return true;
+    }
+
     void DBClientCursor::attach( AScopedConnection * conn ) {
         assert( _scopedHost.size() == 0 );
         assert( conn );

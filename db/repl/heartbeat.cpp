@@ -78,8 +78,8 @@ namespace mongo {
                 string s = string(cmdObj.getStringField("replSetHeartbeat"));
                 if( cmdLine.ourSetName() != s ) {
                     errmsg = "repl set names do not match";
-                    log() << "cmdline: " << cmdLine._replSet << endl;
-                    log() << "s: " << s << endl;
+                    log() << "replSet set names do not match, our cmdline: " << cmdLine._replSet << rsLog;
+                    log() << "replSet s: " << s << rsLog;
                     result.append("mismatch", true);
                     return false;
                 }
@@ -148,7 +148,7 @@ namespace mongo {
         string name() const { return "ReplSetHealthPollTask"; }
         void doWork() {
             if ( !theReplSet ) {
-                log(2) << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
+                log(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
             }
 
@@ -190,7 +190,7 @@ namespace mongo {
                 }
                 if( ok ) {
                     if( mem.upSince == 0 ) {
-                        log() << "replSet info " << h.toString() << " is up" << rsLog;
+                        log() << "replSet info member " << h.toString() << " is up" << rsLog;
                         mem.upSince = mem.lastHeartbeat;
                     }
                     mem.health = 1.0;
@@ -238,7 +238,7 @@ namespace mongo {
                 down(mem, e.what());
             }
             catch(...) {
-                down(mem, "something unusual went wrong");
+                down(mem, "replSet unexpected exception in ReplSetHealthPollTask");
             }
             m = mem;
 
@@ -249,7 +249,7 @@ namespace mongo {
             bool changed = mem.changed(old);
             if( changed ) {
                 if( old.hbstate != mem.hbstate )
-                    log() << "replSet member " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
+                    log() << "replSet member " << h.toString() << " is now in state " << mem.hbstate.toString() << rsLog;
             }
             if( changed || now-last>4 ) {
                 last = now;
@@ -294,18 +294,11 @@ namespace mongo {
     */
     void ReplSetImpl::startThreads() {
         task::fork(mgr);
-
-        /*Member* m = _members.head();
-        while( m ) {
-            ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
-            healthTasks.insert(task);
-            task::repeat(shared_ptr<task::Task>(task), 2000);
-            m = m->next();
-        }*/
-
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         boost::thread t(startSyncThread);
+
+        // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
 }

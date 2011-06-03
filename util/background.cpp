@@ -18,8 +18,11 @@
 #include "pch.h"
 
 #include "concurrency/mutex.h"
+#include "concurrency/spin_lock.h"
 
 #include "background.h"
+#include "time_support.h"
+#include "timer.h"
 
 #include "mongoutils/str.h"
 
@@ -117,5 +120,71 @@ namespace mongo {
         scoped_lock l( _status->m);
         return _status->state == Running;
     }
+
+    // -------------------------
+
+    PeriodicTask::PeriodicTask() {
+        if ( ! theRunner )
+            theRunner = new Runner();
+        theRunner->add( this );
+    }
+
+    PeriodicTask::~PeriodicTask() {
+        theRunner->remove( this );
+    }
+
+    void PeriodicTask::Runner::add( PeriodicTask* task ) {
+        scoped_spinlock lk( _lock );
+        _tasks.push_back( task );
+    }
+    
+    void PeriodicTask::Runner::remove( PeriodicTask* task ) {
+        scoped_spinlock lk( _lock );
+        for ( size_t i=0; i<_tasks.size(); i++ ) {
+            if ( _tasks[i] == task ) {
+                _tasks[i] = 0;
+                break;
+            }
+        }
+    }
+
+    void PeriodicTask::Runner::run() { 
+        int sleeptime = 60;
+        DEV sleeptime = 5; // to catch race conditions
+
+        while ( ! inShutdown() ) {
+
+            sleepsecs( sleeptime );
+            
+            scoped_spinlock lk( _lock );
+            
+            size_t size = _tasks.size();
+            
+            for ( size_t i=0; i<size; i++ ) {
+                PeriodicTask * t = _tasks[i];
+                if ( ! t )
+                    continue;
+
+                if ( inShutdown() )
+                    break;
+                
+                Timer timer;
+                try {
+                    t->taskDoWork();
+                }
+                catch ( std::exception& e ) {
+                    error() << "task: " << t->taskName() << " failed: " << e.what() << endl;
+                }
+                catch ( ... ) {
+                    error() << "task: " << t->taskName() << " failed with unknown error" << endl;
+                }
+                
+                int ms = timer.millis();
+                LOG( ms <= 3 ? 1 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
+            }
+        }
+    }
+
+    PeriodicTask::Runner* PeriodicTask::theRunner = 0;
 
 } // namespace mongo

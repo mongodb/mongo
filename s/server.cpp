@@ -69,9 +69,25 @@ namespace mongo {
     class ShardingConnectionHook : public DBConnectionHook {
     public:
 
+        ShardingConnectionHook( bool shardedConnections )
+            : _shardedConnections( shardedConnections ) {
+        }
+
+        virtual void onCreate( DBClientBase * conn ) {
+            if ( _shardedConnections ) {
+                conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+            }
+        }
+
         virtual void onHandedOut( DBClientBase * conn ) {
             ClientInfo::get()->addShard( conn->getServerAddress() );
         }
+
+        virtual void onDestory( DBClientBase * conn ) {
+            resetShardVersionCB( conn );
+        }
+
+        bool _shardedConnections;
     };
 
     class ShardedMessageHandler : public MessageHandler {
@@ -156,6 +172,7 @@ namespace mongo {
         installChunkShardVersioning();
         balancer.go();
         cursorCache.startTimeoutThread();
+        PeriodicTask::theRunner->go();
 
         log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
@@ -280,8 +297,12 @@ int _main(int argc, char* argv[]) {
     
     // set some global state
 
-    pool.addHook( new ShardingConnectionHook() );
+    pool.addHook( new ShardingConnectionHook( false ) );
     pool.setName( "mongos connectionpool" );
+
+    shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
+    shardConnectionPool.setName( "mongos shardconnection connectionpool" );
+
     
     DBClientConnection::setLazyKillCursor( false );
 

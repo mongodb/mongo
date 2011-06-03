@@ -35,7 +35,7 @@ namespace mongo {
     char faux;
 
     void addRecordToRecListInExtent(Record *r, DiskLoc loc);
-    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr);
+    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
     /** @return number of skipped (invalid) documents */
@@ -82,7 +82,7 @@ namespace mongo {
                     unsigned lenWHdr = sz + Record::HeaderSize;
                     totalSize += lenWHdr;
                     DiskLoc extentLoc;
-                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
+                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, false);
                     uassert(14024, "compact error out of space during compaction", !loc.isNull());
                     Record *recNew = loc.rec();
                     recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
@@ -180,7 +180,7 @@ namespace mongo {
         }
 
         // before dropping indexes, at least make sure we can allocate one extent!
-        uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1).isNull());
+        uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1, false).isNull());
 
         // note that the drop indexes call also invalidates all clientcursors for the namespace, which is important and wanted here
         log() << "compact dropping indexes" << endl;
@@ -231,7 +231,7 @@ namespace mongo {
     }
 
     bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result) {
-        massert( 14028, "bad ns", isANormalNSName(ns.c_str()) );
+        massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
         massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
         bool ok;

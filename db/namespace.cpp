@@ -572,8 +572,8 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    mongo::mutex NamespaceDetailsTransient::_qcMutex("qc");
-    mongo::mutex NamespaceDetailsTransient::_isMutex("is");
+    SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
+    SimpleMutex NamespaceDetailsTransient::_isMutex("is");
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
@@ -707,7 +707,7 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();

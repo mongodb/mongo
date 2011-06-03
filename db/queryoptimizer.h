@@ -76,6 +76,8 @@ namespace mongo {
         const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
         shared_ptr<FieldRangeVector> originalFrv() const { return _originalFrv; }
 
+        const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
+        
         /** just for testing */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
@@ -85,6 +87,7 @@ namespace mongo {
         NamespaceDetails * _d;
         int _idxNo;
         const FieldRangeSet &_frs;
+        const FieldRangeSet &_frsMulti;
         const BSONObj &_originalQuery;
         const BSONObj &_order;
         const IndexDetails * _index;
@@ -167,7 +170,14 @@ namespace mongo {
             _error = true;
             _exception = e.getInfo();
         }
-        shared_ptr<CoveredIndexMatcher> matcher() const { return _matcher; }
+
+        shared_ptr<CoveredIndexMatcher> matcher( const shared_ptr<Cursor>& c ) const {
+           return matcher( c.get() );
+        }
+        shared_ptr<CoveredIndexMatcher> matcher( Cursor* c ) const {
+            if( ! c ) return _matcher;
+            return c->matcher() ? c->matcherPtr() : _matcher;
+        }
         
     protected:
         /** Call if all results have been found. */
@@ -195,6 +205,33 @@ namespace mongo {
         shared_ptr<CoveredIndexMatcher> _matcher;
         shared_ptr<CoveredIndexMatcher> _oldMatcher;
         shared_ptr<FieldRangeVector> _orConstraint;
+    };
+
+    // temp.  this class works if T::operator< is variant unlike a regular stl priority queue.
+    // but it's very slow.  however if v.size() is always very small, it would be fine, 
+    // maybe even faster than a smart impl that does more memory allocations.
+    template<class T>
+    class our_priority_queue : boost::noncopyable { 
+        vector<T> v;
+    public:
+        our_priority_queue() { 
+            v.reserve(4);
+        }
+        int size() const { return v.size(); }
+        bool empty() const { return v.empty(); }
+        void push(const T & x) { 
+            v.push_back(x); 
+        }
+        T pop() { 
+            size_t t = 0;
+            for( size_t i = 1; i < v.size(); i++ ) { 
+                if( v[t] < v[i] )
+                    t = i;
+            }
+            T ret = v[t];
+            v.erase(v.begin()+t);
+            return ret;
+        }
     };
 
     /**
@@ -236,6 +273,13 @@ namespace mongo {
         /** Initialize or iterate a runner generated from @param originalOp. */
         shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
         
+        /** Yield the runner member. */
+        
+        bool prepareToYield();
+        void recoverFromYield();
+        
+        QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
+        
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
         BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
@@ -274,17 +318,22 @@ namespace mongo {
              * this iteration.
              */
             shared_ptr<QueryOp> next();
+            /** @return next non error op if there is one, otherwise an error op. */
+            shared_ptr<QueryOp> nextNonError();
 
+            bool prepareToYield();
+            void recoverFromYield();
+            
             /** Run until first op completes. */
             shared_ptr<QueryOp> runUntilFirstCompletes();
              
-            void mayYield( const vector<shared_ptr<QueryOp> > &ops );
+            void mayYield();
             QueryOp &_op;
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
-            static bool prepareToYield( QueryOp &op );
-            static void recoverFromYield( QueryOp &op );
+            static bool prepareToYieldOp( QueryOp &op );
+            static void recoverFromYieldOp( QueryOp &op );
         private:
             vector<shared_ptr<QueryOp> > _ops;
             struct OpHolder {
@@ -295,7 +344,7 @@ namespace mongo {
                     return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
                 }
             };
-            priority_queue<OpHolder> _queue;
+            our_priority_queue<OpHolder> _queue;
         };
 
         const char *_ns;
@@ -354,7 +403,20 @@ namespace mongo {
         }
 
         /** Initialize or iterate a runner generated from @param originalOp. */
-        shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
+        
+        void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
+        shared_ptr<QueryOp> nextOp();
+        
+        /** Yield the runner member. */
+        
+        bool prepareToYield();
+        void recoverFromYield();
+        
+        /**
+         * @return a single simple cursor if the scanner would run a single cursor
+         * for this query, otherwise return an empty shared_ptr.
+         */
+        shared_ptr<Cursor> singleCursor() const;
         
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
@@ -376,8 +438,8 @@ namespace mongo {
         void assertMayRunMore() const {
             massert( 13271, "can't run more ops", mayRunMore() );
         }
-        shared_ptr<QueryOp> nextOpBeginningClause( QueryOp &prevOp );
-        shared_ptr<QueryOp> nextOpHandleEndOfClause( QueryOp &prevOp );
+        shared_ptr<QueryOp> nextOpBeginningClause();
+        shared_ptr<QueryOp> nextOpHandleEndOfClause();
         bool uselessOr( const BSONElement &hint ) const;
         const char * _ns;
         bool _or;
@@ -390,6 +452,7 @@ namespace mongo {
         BSONObj _hint;
         bool _mayYield;
         bool _tableScanned;
+        shared_ptr<QueryOp> _baseOp;
     };
 
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
@@ -403,8 +466,14 @@ namespace mongo {
         };
         /** takes ownership of 'op' */
         MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false );
-        /** used to handoff a query to a getMore() */
-        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op );
+        /**
+         * Used
+         * 1. To handoff a query to a getMore()
+         * 2. To handoff a QueryOptimizerCursor
+         * @param nscanned is an optional initial value, if not supplied nscanned()
+         * will always return -1
+         */
+        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op, long long nscanned = -1 );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -435,7 +504,9 @@ namespace mongo {
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
 
-        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
+        virtual CoveredIndexMatcher* matcher() const { return _matcher.get(); }
+
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
         /** just for testing */
@@ -466,28 +537,13 @@ namespace mongo {
     bool isSimpleIdQuery( const BSONObj& query );
 
     /**
-     * @return a single cursor that may work well for the given query.  The returned cursor will
-     * always have a matcher().
+     * @return a single cursor that may work well for the given query.
      * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
      * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
      * no suitable indices exist.
      */
     shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
-    /**
-     * @return a cursor interface to the query optimizer.  The implementation may
-     * utilize a single query plan or interleave results from multiple query
-     * plans before settling on a single query plan.  Note that the schema of
-     * currKey() documents may change over the course of iteration.
-	 *
-     * This is a work in progress.  Partial list of features not yet implemented:
-     * - ordered/sorted document iteration
-     * - yielding
-     * - modification of scanned documents
-     * - handling of arbitrary asserts/error conditions
-     */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query );
-    
     /**
      * Add-on functionality for queryutil classes requiring access to indexing
      * functionality not currently linked to mongos.

@@ -492,7 +492,6 @@ namespace mongo {
             return func;
         }
 
-
         jsval toval( double d ) {
             jsval val;
             assert( JS_NewNumberValue( _context, d , &val ) );
@@ -531,7 +530,7 @@ namespace mongo {
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ) {
             static string ref = "$ref";
-            if ( ref == obj->firstElement().fieldName() ) {
+            if ( ref == obj->firstElementFieldName() ) {
                 JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
                 CHECKNEWOBJECT(o,_context,"toJSObject1");
                 assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
@@ -904,6 +903,68 @@ namespace mongo {
 
     // --- global helpers ---
 
+    JSBool hexToBinData(JSContext * cx, jsval *rval, int subtype, string s) { 
+        JSObject * o = JS_NewObject( cx , &bindata_class , 0 , 0 );
+        CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
+        int len = s.size() / 2;
+        char * data = new char[len];
+        char *p = data;
+        const char *src = s.c_str();
+        for( size_t i = 0; i+1 < s.size(); i += 2 ) { 
+            *p++ = fromHex(src + i);
+        }
+        assert( JS_SetPrivate( cx , o , new BinDataHolder( data , len ) ) );
+        Convertor c(cx);
+        c.setProperty( o, "len", c.toval((double)len) );
+        c.setProperty( o, "type", c.toval((double)subtype) );
+        *rval = OBJECT_TO_JSVAL( o );
+        delete data;
+        return JS_TRUE;
+    }
+
+    JSBool _HexData( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 2 ) {
+            JS_ReportError( cx , "HexData needs 2 arguments -- HexData(subtype,hexstring)" );
+            return JS_FALSE;
+        }
+        int type = (int)c.toNumber( argv[ 0 ] );
+        if ( type == 2 ) {
+            JS_ReportError( cx , "BinData subtype 2 is deprecated" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[1]);
+        return hexToBinData(cx, rval, type, s);
+    }
+
+    JSBool _UUID( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "UUID needs argument -- UUID(hexstring)" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[0]);
+        if( s.size() != 32 ) {
+            JS_ReportError( cx , "bad UUID hex string len" );
+            return JS_FALSE;
+        }
+        return hexToBinData(cx, rval, 3, s);
+    }
+
+    JSBool _MD5( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "MD5 needs argument -- MD5(hexstring)" );
+            return JS_FALSE;
+        }
+        string s = c.toString(argv[0]);
+        if( s.size() != 32 ) {
+            JS_ReportError( cx , "bad MD5 hex string len" );
+            return JS_FALSE;
+        }
+        return hexToBinData(cx, rval, 5, s);
+    }
+
     JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
         stringstream ss;
         Convertor c( cx );
@@ -921,6 +982,7 @@ namespace mongo {
         Convertor c(cx);
 
         NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
+        void* data = (void*)((long long)c.getNumber( obj , "y" ) );
         assert( func );
 
         BSONObj a;
@@ -935,7 +997,7 @@ namespace mongo {
 
         BSONObj out;
         try {
-            out = func( a );
+            out = func( a, data );
         }
         catch ( std::exception& e ) {
             JS_ReportError( cx , e.what() );
@@ -964,6 +1026,9 @@ namespace mongo {
         { "nativeHelper" , &native_helper , 1 , 0 , 0 } ,
         { "load" , &native_load , 1 , 0 , 0 } ,
         { "gc" , &native_gc , 1 , 0 , 0 } ,
+        { "UUID", &_UUID, 0, 0, 0 } ,
+        { "MD5", &_MD5, 0, 0, 0 } ,
+        { "HexData", &_HexData, 0, 0, 0 } ,
         { 0 , 0 , 0 , 0 , 0 }
     };
 
@@ -1074,7 +1139,7 @@ namespace mongo {
             JS_SetCStringsAreUTF8();
 #endif
 
-            _runtime = JS_NewRuntime(8L * 1024L * 1024L);
+            _runtime = JS_NewRuntime(64L * 1024L * 1024L);
             uassert( 10221 ,  "JS_NewRuntime failed" , _runtime );
 
             if ( ! utf8Ok() ) {
@@ -1347,6 +1412,12 @@ namespace mongo {
             }
         }
 
+        void setFunction( const char *field , const char * code ) {
+            smlock;
+            jsval v = OBJECT_TO_JSVAL(JS_GetFunctionObject(_convertor->compileFunction(code)));
+            JS_SetProperty( _context , _global , field , &v );
+        }
+
         void rename( const char * from , const char * to ) {
             smlock;
             jsval v;
@@ -1463,7 +1534,7 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
             smlock;
             precall();
 
@@ -1505,8 +1576,8 @@ namespace mongo {
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
-            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn );
+        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
+            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn, readOnlyArgs, readOnlyRecv);
         }
 
         void gotError( string s ) {
@@ -1517,13 +1588,18 @@ namespace mongo {
             return _error;
         }
 
-        void injectNative( const char *field, NativeFunction func ) {
+        void injectNative( const char *field, NativeFunction func, void* data ) {
             smlock;
             string name = field;
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
             stringstream code;
-            code << field << "_" << " = { x : " << field << "_ }; ";
+            if (data) {
+                _convertor->setProperty( _global , (name + "_data_").c_str() , _convertor->toval( (double)(long long)data ) );
+                code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
+            } else {
+                code << field << "_" << " = { x : " << field << "_ }; ";
+            }
             code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
             exec( code.str() );
         }

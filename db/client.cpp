@@ -33,6 +33,7 @@
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
 #include "../util/file_allocator.h"
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -41,10 +42,50 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
+#if defined(_DEBUG)
+    struct StackChecker;
+    ThreadLocalValue<StackChecker *> checker;
+
+    struct StackChecker { 
+        enum { SZ = 256 * 1024 };
+        char buf[SZ];
+        StackChecker() { 
+            checker.set(this);
+        }
+        void init() { 
+            memset(buf, 42, sizeof(buf)); 
+        }
+        static void check(const char *tname) { 
+            static int max;
+            StackChecker *sc = checker.get();
+            const char *p = sc->buf;
+            int i = 0;
+            for( ; i < SZ; i++ ) { 
+                if( p[i] != 42 )
+                    break;
+            }
+            int z = SZ-i;
+            if( z > max ) {
+                max = z;
+                log() << "thread " << tname << " stack usage was " << z << " bytes" << endl;
+            }
+            wassert( i > 16000 );
+        }
+    };
+#endif
+
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+#if defined(_DEBUG)
+        { 
+            if( sizeof(void*) == 8 ) {
+                StackChecker sc;
+                sc.init();
+            }
+        }
+#endif
         assert( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
@@ -61,6 +102,11 @@ namespace mongo {
         _mp(p) {
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
+#ifndef _WIN32
+        stringstream temp;
+        temp << hex << showbase << pthread_self();
+        _threadId = temp.str();
+#endif
         scoped_lock bl(clientsMutex);
         clients.insert(this);
     }
@@ -82,6 +128,13 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
+#if defined(_DEBUG)
+        { 
+            if( sizeof(void*) == 8 ) {
+                StackChecker::check( desc() );
+            }
+        }
+#endif
         _shutdown = true;
         if ( inShutdown() )
             return false;
@@ -320,6 +373,19 @@ namespace mongo {
         _client = 0;
     }
 
+    void CurOp::enter( Client::Context * context ) {
+        ensureStarted();
+        setNS( context->ns() );
+        _dbprofile = context->_db ? context->_db->profile : 0;
+    }
+    
+    void CurOp::leave( Client::Context * context ) {
+        unsigned long long now = curTimeMicros64();
+        Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
+        _checkpoint = now;
+    }
+
+
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
@@ -344,14 +410,21 @@ namespace mongo {
         clientStr << _remote.toString();
         b.append("client", clientStr.str());
 
-        if ( _client )
+        if ( _client ) {
             b.append( "desc" , _client->desc() );
-
+            if ( _client->_threadId.size() ) 
+                b.append( "threadId" , _client->_threadId );
+        }
+        
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf(128);
                 buf << _message.toString() << " " << _progressMeter.toString();
                 b.append( "msg" , buf.str() );
+                BSONObjBuilder sub( b.subobjStart( "progress" ) );
+                sub.appendNumber( "done" , (long long)_progressMeter.done() );
+                sub.appendNumber( "total" , (long long)_progressMeter.total() );
+                sub.done();
             }
             else {
                 b.append( "msg" , _message.toString() );
@@ -360,6 +433,8 @@ namespace mongo {
 
         if( killed() ) 
             b.append("killed", true);
+        
+        b.append( "numYields" , _numYields );
 
         return b.obj();
     }
@@ -518,4 +593,122 @@ namespace mongo {
 
         return writers + readers;
     }
+
+    void OpDebug::reset() {
+        extra.reset();
+
+        op = 0;
+        iscommand = false;
+        ns = "";
+        query = BSONObj();
+        updateobj = BSONObj();
+        
+        cursorid = 0;
+        ntoreturn = 0;
+        ntoskip = 0;
+        exhaust = false;
+
+        nscanned = 0;
+        idhack = false;
+        scanAndOrder = false;
+        moved = false;
+        fastmod = false;
+        fastmodinsert = false;
+        upsert = false;
+        keyUpdates = 0;
+        
+        exceptionInfo.reset();
+        
+        executionTime = 0;
+        nreturned = 0;
+        responseLength = 0;
+    }
+
+
+#define OPDEBUG_TOSTRING_HELP(x) if( x ) s << " " #x ":" << (x)
+    string OpDebug::toString() const {
+        StringBuilder s( ns.size() + 64 );
+        if ( iscommand )
+            s << "command ";
+        else
+            s << opToString( op ) << ' ';
+        s << ns.toString();
+
+        if ( ! query.isEmpty() ) {
+            if ( iscommand )
+                s << " command: ";
+            else
+                s << " query: ";
+            s << query.toString();
+        }
+        
+        if ( ! updateobj.isEmpty() ) {
+            s << " update: ";
+            updateobj.toString( s );
+        }
+        
+        OPDEBUG_TOSTRING_HELP( cursorid );
+        OPDEBUG_TOSTRING_HELP( ntoreturn );
+        OPDEBUG_TOSTRING_HELP( ntoskip );
+        OPDEBUG_TOSTRING_HELP( exhaust );
+
+        OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( idhack );
+        OPDEBUG_TOSTRING_HELP( scanAndOrder );
+        OPDEBUG_TOSTRING_HELP( moved );
+        OPDEBUG_TOSTRING_HELP( fastmod );
+        OPDEBUG_TOSTRING_HELP( fastmodinsert );
+        OPDEBUG_TOSTRING_HELP( upsert );
+        OPDEBUG_TOSTRING_HELP( keyUpdates );
+        
+        if ( extra.len() )
+            s << " " << extra.str();
+
+        if ( ! exceptionInfo.empty() ) {
+            s << " exception: " << exceptionInfo.msg;
+            if ( exceptionInfo.code )
+                s << " code:" << exceptionInfo.code;
+        }
+        
+        OPDEBUG_TOSTRING_HELP( nreturned );
+        if ( responseLength )
+            s << " reslen:" << responseLength;
+        s << " " << executionTime << "ms";
+
+        return s.str();
+    }
+
+#define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
+    void OpDebug::append( BSONObjBuilder& b ) const {
+        b.append( "op" , iscommand ? "command" : opToString( op ) );
+        b.append( "ns" , ns.toString() );
+        if ( ! query.isEmpty() )
+            b.append( iscommand ? "command" : "query" , query );
+        if ( ! updateobj.isEmpty() )
+            b.append( "updateobj" , updateobj );
+        
+        OPDEBUG_APPEND_NUMBER( cursorid );
+        OPDEBUG_APPEND_NUMBER( ntoreturn );
+        OPDEBUG_APPEND_NUMBER( ntoskip );
+        OPDEBUG_APPEND_BOOL( exhaust );
+
+        OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_BOOL( idhack );
+        OPDEBUG_APPEND_BOOL( scanAndOrder );
+        OPDEBUG_APPEND_BOOL( moved );
+        OPDEBUG_APPEND_BOOL( fastmod );
+        OPDEBUG_APPEND_BOOL( fastmodinsert );
+        OPDEBUG_APPEND_BOOL( upsert );
+        OPDEBUG_APPEND_NUMBER( keyUpdates );
+
+        if ( ! exceptionInfo.empty() ) 
+            exceptionInfo.append( b , "exception" , "exceptionCode" );
+        
+        OPDEBUG_APPEND_NUMBER( nreturned );
+        OPDEBUG_APPEND_NUMBER( responseLength );
+        b.append( "millis" , executionTime );
+        
+    }
+
 }

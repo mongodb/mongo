@@ -382,7 +382,7 @@ namespace mongo {
 
         static CCById clientCursorsById;
         static long long numberTimedOut;
-        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
+        static boost::recursive_mutex& ccmutex;   // must use this for all statics above!
         static CursorId allocCursorId_inlock();
 
     };
@@ -401,6 +401,6 @@ namespace mongo {
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
 namespace boost{
-    template<> struct scoped_ptr<mongo::ClientCursor> {};
-    template<> struct shared_ptr<mongo::ClientCursor> {};
+    template<> class scoped_ptr<mongo::ClientCursor> {};
+    template<> class shared_ptr<mongo::ClientCursor> {};
 }

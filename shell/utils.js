@@ -9,10 +9,8 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
-
     if ( tojson( a ) == tojson( b ) )
         return true;
-
     return false;
 }
 
@@ -35,10 +33,8 @@ doassert = function (msg) {
 
 assert = function( b , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
-
     if ( b )
-        return;
-    
+        return;    
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
@@ -533,16 +529,24 @@ if ( typeof( BinData ) != "undefined" ){
         //return "BinData type: " + this.type + " len: " + this.len;
         return this.toString();
     }
+    
+    BinData.prototype.subtype = function () {
+        return this.type;
+    }
+    
+    BinData.prototype.length = function () {
+        return this.len;
+    }    
 }
 else {
     print( "warning: no BinData class" );
 }
 
-if ( typeof( UUID ) != "undefined" ){
+/*if ( typeof( UUID ) != "undefined" ){
     UUID.prototype.tojson = function () {
         return this.toString();
     }
-}
+}*/
 
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
@@ -1091,7 +1095,32 @@ shellHelper.show = function (what) {
         }
         else {
             print();
-            db.system.profile.find({ millis: { $gt: 0} }).sort({ $natural: -1 }).limit(5).forEach(function (x) { print("" + x.millis + "ms " + String(x.ts).substring(0, 24)); print(x.info); print("\n"); })
+            db.system.profile.find({ millis: { $gt: 0} }).sort({ $natural: -1 }).limit(5).forEach(
+                function (x) { 
+                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " + String(x.ts).substring(0, 24)); 
+                    var l = "";
+                    for ( var z in x ){
+                        if ( z == "op" || z == "ns" || z == "millis" || z == "ts" )
+                            continue;
+                        
+                        var val = x[z];
+                        var mytype = typeof(val);
+                        
+                        if ( mytype == "string" || 
+                             mytype == "number" )
+                            l += z + ":" + val + " ";
+                        else if ( mytype == "object" ) 
+                            l += z + ":" + tojson(val ) + " ";
+                        else if ( mytype == "boolean" )
+                            l += z + " ";
+                        else
+                            l += z + ":" + val + " ";
+
+                    }
+                    print( l );
+                    print("\n"); 
+                }
+            )
         }
         return "";
     }
@@ -1461,6 +1490,10 @@ help = shellHelper.help = function (x) {
         print("\tb.hex()                             the data as a hex encoded string");
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
+        print();
+        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
+        print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");

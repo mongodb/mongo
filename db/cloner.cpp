@@ -30,6 +30,8 @@
 
 namespace mongo {
 
+    BSONElement getErrField(const BSONObj& o);
+
     void ensureHaveIdIndex(const char *ns);
 
     bool replAuthenticate(DBClientBase *);
@@ -331,7 +333,7 @@ namespace mongo {
             
             if ( c->more() ) {
                 BSONObj first = c->next();
-                if ( first.hasField("$err") ) {
+                if( !getErrField(first).eoo() ) {
                     if ( errCode ) {
                         *errCode = first.getIntField("code");
                     }
@@ -363,7 +365,7 @@ namespace mongo {
                         continue;
                     }
                 }
-                if( ! isANormalNSName( from_name ) ) {
+                if( ! NamespaceString::normal( from_name ) ) {
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }
@@ -611,6 +613,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; } // do our own auth
         virtual bool slaveOk() const {
             return false;
         }
@@ -632,7 +635,7 @@ namespace mongo {
             bool capped = false;
             long long size = 0;
             {
-                Client::Context ctx( source );
+                Client::Context ctx( source ); // auths against source
                 NamespaceDetails *nsd = nsdetails( source.c_str() );
                 uassert( 10026 ,  "source namespace does not exist", nsd );
                 capped = nsd->capped;
@@ -641,7 +644,7 @@ namespace mongo {
                         size += i.ext()->length;
             }
 
-            Client::Context ctx( target );
+            Client::Context ctx( target ); //auths against target
 
             if ( nsdetails( target.c_str() ) ) {
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );

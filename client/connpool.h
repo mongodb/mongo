@@ -21,9 +21,12 @@
 #include "dbclient.h"
 #include "redef_macros.h"
 
+#include "../util/background.h"
+
 namespace mongo {
 
     class Shard;
+    class DBConnectionPool;
 
     /**
      * not thread safe
@@ -44,7 +47,7 @@ namespace mongo {
 
         int numAvailable() const { return (int)_pool.size(); }
 
-        void createdOne( DBClientBase * base);
+        void createdOne( DBClientBase * base );
         long long numCreated() const { return _created; }
 
         ConnectionString::ConnectionType type() const { assert(_created); return _type; }
@@ -52,11 +55,13 @@ namespace mongo {
         /**
          * gets a connection or return NULL
          */
-        DBClientBase * get();
+        DBClientBase * get( DBConnectionPool * pool);
 
-        void done( DBClientBase * c );
+        void done( DBConnectionPool * pool , DBClientBase * c );
 
         void flush();
+        
+        void getStaleConnections( vector<DBClientBase*>& stale );
 
         static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
         static unsigned getMaxPerHost() { return _maxPerHost; }
@@ -83,6 +88,7 @@ namespace mongo {
         virtual ~DBConnectionHook() {}
         virtual void onCreate( DBClientBase * conn ) {}
         virtual void onHandedOut( DBClientBase * conn ) {}
+        virtual void onDestory( DBClientBase * conn ) {}
     };
 
     /** Database connection pool.
@@ -100,7 +106,7 @@ namespace mongo {
            c.conn()...
         }
     */
-    class DBConnectionPool : boost::noncopyable {
+    class DBConnectionPool : public PeriodicTask {
         
     public:
 
@@ -112,20 +118,15 @@ namespace mongo {
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
+        void onDestory( DBClientBase * conn );
 
         void flush();
 
         DBClientBase *get(const string& host);
         DBClientBase *get(const ConnectionString& host);
 
-        void release(const string& host, DBClientBase *c) {
-            if ( c->isFailed() ) {
-                delete c;
-                return;
-            }
-            scoped_lock L(_mutex);
-            _pools[host].done(c);
-        }
+        void release(const string& host, DBClientBase *c);
+
         void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
 
@@ -134,8 +135,12 @@ namespace mongo {
             bool operator()( const string& a , const string& b ) const;
         };
 
-    private:
+        virtual string taskName() const { return "DBConnectionPool-cleaner"; }
+        virtual void taskDoWork();        
 
+    private:
+        DBConnectionPool( DBConnectionPool& p );
+        
         DBClientBase* _get( const string& ident );
 
         DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
@@ -150,6 +155,7 @@ namespace mongo {
         // pointers owned by me, right now they leak on shutdown
         // _hooks itself also leaks because it creates a shutdown race condition
         list<DBConnectionHook*> * _hooks; 
+
     };
 
     extern DBConnectionPool pool;

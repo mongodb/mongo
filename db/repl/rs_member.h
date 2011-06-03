@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "../../util/concurrency/value.h"
+
 namespace mongo {
 
 
@@ -74,7 +76,7 @@ namespace mongo {
         time_t upSince;
         long long downSince;
         time_t lastHeartbeat;
-        string lastHeartbeatMsg;
+        DiagStr lastHeartbeatMsg;
         OpTime opTime;
         int skew;
         unsigned int ping; // microseconds
@@ -101,6 +103,22 @@ namespace mongo {
     inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const {
         return health != old.health ||
                hbstate != old.hbstate;
+    }
+
+    inline string MemberState::toString() const {
+        switch ( s ) {
+        case RS_STARTUP: return "STARTUP";
+        case RS_PRIMARY: return "PRIMARY";
+        case RS_SECONDARY: return "SECONDARY";
+        case RS_RECOVERING: return "RECOVERING";
+        case RS_FATAL: return "FATAL";
+        case RS_STARTUP2: return "STARTUP2";
+        case RS_ARBITER: return "ARBITER";
+        case RS_DOWN: return "DOWN";
+        case RS_ROLLBACK: return "ROLLBACK";
+        case RS_UNKNOWN: return "UNKNOWN";
+        }
+        return "";
     }
 
 }

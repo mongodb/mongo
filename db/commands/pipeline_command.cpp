@@ -90,7 +90,8 @@ namespace mongo {
 	/* create a cursor for that query */
 	string fullName(db + "." + pPipeline->getCollectionName());
 	shared_ptr<Cursor> pCursor(
-	    newQueryOptimizerCursor(fullName.c_str(), query));
+	    NamespaceDetailsTransient::getCursor(
+		fullName.c_str(), query));
 
 	/* wrap the cursor with a DocumentSource */
 	boost::shared_ptr<DocumentSource> pSource(

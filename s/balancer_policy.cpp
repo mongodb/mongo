@@ -40,6 +40,8 @@ namespace mongo {
         pair<string,unsigned> max("",0);
         vector<string> drainingShards;
 
+        bool maxOpsQueued = false;
+
         for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
 
             // Find whether this shard's capacity or availability are exhausted
@@ -51,6 +53,7 @@ namespace mongo {
             const bool draining = isDraining( shardLimits );
             const bool opsQueued = hasOpsQueued( shardLimits );
 
+            
             // Is this shard a better chunk receiver then the current one?
             // Shards that would be bad receiver candidates:
             // + maxed out shards
@@ -62,11 +65,19 @@ namespace mongo {
                     min = make_pair( shard , size );
                 }
             }
+            else if ( opsQueued ) {
+                LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
+            }
+            else if ( maxedOut ) {
+                LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
+            }
+
 
             // Check whether this shard is a better chunk donor then the current one.
             // Draining shards take a lower priority than overloaded shards.
             if ( size > max.second ) {
                 max = make_pair( shard , size );
+                maxOpsQueued = opsQueued;
             }
             if ( draining && (size > 0)) {
                 drainingShards.push_back( shard );
@@ -76,7 +87,12 @@ namespace mongo {
         // If there is no candidate chunk receiver -- they may have all been maxed out,
         // draining, ... -- there's not much that the policy can do.
         if ( min.second == numeric_limits<unsigned>::max() ) {
-            log() << "no availalable shards to take chunks" << endl;
+            log() << "no available shards to take chunks" << endl;
+            return NULL;
+        }
+
+        if ( maxOpsQueued ) {
+            log() << "biggest shard has unprocessed writebacks, waiting for completion of migrate" << endl;
             return NULL;
         }
 

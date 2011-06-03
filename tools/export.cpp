@@ -40,6 +40,7 @@ public:
         ("csv","export to csv instead of json")
         ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
         ("jsonArray", "output to a json array rather than one object per line")
+        ("slaveOk,k", po::value<bool>()->default_value(true) , "use secondaries for export if available, default true")
         ;
         _usesstdout = false;
     }
@@ -110,7 +111,9 @@ public:
         if ( q.getFilter().isEmpty() && !hasParam("dbpath"))
             q.snapshot();
 
-        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , 0 , 0 , fieldsToReturn , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
+        bool slaveOk = _params["slaveOk"].as<bool>();
+
+        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , 0 , 0 , fieldsToReturn , ( slaveOk ? QueryOption_SlaveOk : 0 ) | QueryOption_NoCursorTimeout );
 
         if ( csv ) {
             for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ) {

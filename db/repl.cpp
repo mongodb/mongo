@@ -48,6 +48,7 @@
 #include "repl_block.h"
 #include "repl/rs.h"
 #include "replutil.h"
+#include "repl/connections.h"
 
 namespace mongo {
 
@@ -149,7 +150,7 @@ namespace mongo {
             if( theReplSet == 0 ) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
-                result.append("info", ReplSet::startupStatusMsg);
+                result.append("info", ReplSet::startupStatusMsg.get());
                 result.append( "isreplicaset" , true );
                 return;
             }
@@ -1092,20 +1093,52 @@ namespace mongo {
         return true;
     }
 
-    bool OplogReader::connect(string hostName) {
+    bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = auto_ptr<DBClientConnection>(new DBClientConnection( false, 0, 0 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 0 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                    (!noauth && !replAuthenticate(_conn.get())) ||
-                    !replHandshake(_conn.get()) ) {
+                 (!noauth && !replAuthenticate(_conn.get())) ) {                
                 resetConnection();
                 log() << "repl:  " << errmsg << endl;
                 return false;
             }
         }
         return true;
+    }
+    
+    bool OplogReader::connect(string hostName) {
+        if (commonConnect(hostName)) {
+            return replHandshake(_conn.get());
+        }
+        return false;
+    }
+
+    bool OplogReader::connect(const string& from, const string& to) {
+        if (conn() != 0) {
+            return true;
+        }
+        if (commonConnect(to)) {
+            log() << "handshake between " << from << " and " << to << endl;
+            return passthroughHandshake(from);
+        }
+        return false;
+    }
+
+    bool OplogReader::passthroughHandshake(const string& f) {
+        ScopedConn from(f);
+
+        BSONObj me = from.findOne("local.me", BSONObj(), NULL, 0);
+        if (me.isEmpty() || !me.hasField("_id")) {
+            return false;
+        }
+        
+        BSONObjBuilder cmd;
+        cmd.appendAs( me["_id"] , "handshake" );
+
+        BSONObj res;
+        return conn()->runCommand( "admin" , cmd.obj() , res );
     }
 
     /* note: not yet in mutex at this point.
@@ -1303,7 +1336,7 @@ namespace mongo {
                 if ( lk.got() ) {
                     toSleep = 10;
 
-                    cc().getAuthenticationInfo()->authorize("admin");
+                    replLocalAuth();
 
                     try {
                         logKeepalive();
@@ -1327,9 +1360,7 @@ namespace mongo {
 
         {
             dblock lk;
-            cc().getAuthenticationInfo()->authorize("admin");
-
-            BSONObj obj;
+            replLocalAuth();
         }
 
         while ( 1 ) {
@@ -1387,7 +1418,7 @@ namespace mongo {
 
         {
             dblock lk;
-            cc().getAuthenticationInfo()->authorize("admin");
+            replLocalAuth();
         }
 
         if ( replSettings.slave ) {

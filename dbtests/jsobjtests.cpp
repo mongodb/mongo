@@ -18,6 +18,7 @@
  */
 
 #include "pch.h"
+#include "../bson/util/builder.h"
 #include "../db/jsobj.h"
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
@@ -51,6 +52,12 @@ namespace JsobjTests {
         ASSERT( k.woEqual(k) );
         ASSERT( !k.isCompactFormat() || k.dataSize() < o.objsize() );
 
+        {
+            // check BSONObj::equal.  this part not a KeyV1 test.
+            int res = o.woCompare(last);
+            ASSERT( (res==0) == o.equal(last) );
+        }
+
         if( kLast ) {
             int r1 = o.woCompare(last, BSONObj(), false);
             int r2 = k.woCompare(*kLast, Ordering::make(BSONObj()));
@@ -65,6 +72,15 @@ namespace JsobjTests {
                 cout << r3 << endl;
             }
             ASSERT(ok);
+            if( k.isCompactFormat() && kLast->isCompactFormat() ) { // only check if not bson as bson woEqual is broken! (or was may2011)
+                if( k.woEqual(*kLast) != (r2 == 0) ) { // check woEqual matches
+                    cout << r2 << endl;
+                    cout << k.toString() << endl;
+                    cout << kLast->toString() << endl;
+                    k.woEqual(*kLast);
+                    ASSERT(false);
+                }
+            }
         }
 
         delete kLast;
@@ -75,10 +91,18 @@ namespace JsobjTests {
     class BufBuilderBasic {
     public:
         void run() {
-            BufBuilder b( 0 );
-            b.appendStr( "foo" );
-            ASSERT_EQUALS( 4, b.len() );
-            ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            {
+                BufBuilder b( 0 );
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
+            {
+                mongo::StackBufBuilder b;
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
         }
     };
 
@@ -86,6 +110,9 @@ namespace JsobjTests {
     public:
         void run() {
             ASSERT_EQUALS( 1, BSONElement().size() );
+
+            BSONObj x;
+            ASSERT_EQUALS( 1, x.firstElement().size() );
         }
     };
 
@@ -240,6 +267,13 @@ namespace JsobjTests {
         class TimestampTest : public Base {
         public:
             void run() {
+                Client *c = currentClient.get();
+                if( c == 0 ) {
+                    Client::initThread("pretouchN");
+                    c = &cc();
+                }
+                writelock lk(""); // for initTimestamp
+        
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
                 BSONObj o = b.done();
@@ -458,6 +492,13 @@ namespace JsobjTests {
                 keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
 
                 {
+                    // check signed dates with new key format
+                    KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
+                    KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                    ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                }
+
+                {
                     BSONObjBuilder b;
                     b.appendBinData("f", 8, (BinDataType) 1, "aaaabbbb");
                     b.appendBinData("e", 3, (BinDataType) 1, "aaa");
@@ -540,9 +581,41 @@ namespace JsobjTests {
         class NullString {
         public:
             void run() {
+                {
+                    BSONObjBuilder b;
+                    const char x[] = {'a', 0, 'b', 0};
+                    b.append("field", x, 4);
+                    b.append("z", true);
+                    BSONObj B = b.obj();
+                    cout << B.toString() << endl;
+
+                    BSONObjBuilder a;
+                    const char xx[] = {'a', 0, 'c', 0};
+                    a.append("field", xx, 4);
+                    a.append("z", true);
+                    BSONObj A = a.obj();
+
+                    BSONObjBuilder c;
+                    const char xxx[] = {'a', 0, 'c', 0, 0};
+                    c.append("field", xxx, 5);
+                    c.append("z", true);
+                    BSONObj C = c.obj();
+
+                    // test that nulls are ok within bson strings
+                    ASSERT( !(A == B) );
+                    ASSERT( A > B );
+
+                    ASSERT( !(B == C) );
+                    ASSERT( C > B );
+
+                    // check iteration is ok
+                    ASSERT( B["z"].Bool() && A["z"].Bool() && C["z"].Bool() );
+                }
+
                 BSONObjBuilder b;
                 b.append("a", "a\0b", 4);
-                b.append("b", string("a\0b", 3));
+                string z("a\0b", 3);
+                b.append("b", z);
                 b.appendAs(b.asTempObj()["a"], "c");
                 BSONObj o = b.obj();
                 keyTest(o);
@@ -558,6 +631,7 @@ namespace JsobjTests {
 
                 ASSERT_EQUALS(o["c"].valuestrsize(), 3+1);
                 ASSERT_EQUALS(o["c"].str(), ss.str());
+
             }
 
         };
@@ -1213,7 +1287,7 @@ namespace JsobjTests {
             assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
             assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
 
-            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElement().fieldName() );
+            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
         }
     };
 
@@ -1612,8 +1686,8 @@ namespace JsobjTests {
                     while ( j.more() )
                         l += strlen( j.next().fieldName() );
                 }
-                unsigned long long tm = t.micros();
-                cout << "time: " << tm << endl;
+                //unsigned long long tm = t.micros();
+                //cout << "time: " << tm << endl;
             }
         }
 
@@ -1686,7 +1760,7 @@ namespace JsobjTests {
             BSONElement a = x["a"];
             BSONElement b = x["b"];
             BSONElement c = x["c"];
-            cout << "c: " << c << endl;
+            //cout << "c: " << c << endl;
             ASSERT( a.woCompare( b ) != 0 );
             ASSERT( a.woCompare( b , false ) == 0 );
 
@@ -1861,27 +1935,27 @@ namespace JsobjTests {
                               << "asdasdasdas" << "asldkasldjasldjasldjlasjdlasjdlasdasdasdasdasdasdasd" );
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.md5();
-                int millis = t.millis();
-                cout << "md5 : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "md5 : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.toString();
-                int millis = t.millis();
-                cout << "toString : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "toString : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     checksum( x.objdata() , x.objsize() );
-                int millis = t.millis();
-                cout << "checksum : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "checksum : " << millis << endl;
             }
 
         }
@@ -1895,6 +1969,7 @@ namespace JsobjTests {
         void setupTests() {
             add< BufBuilderBasic >();
             add< BSONElementBasic >();
+            add< BSONObjTests::NullString >();
             add< BSONObjTests::Create >();
             add< BSONObjTests::WoCompareBasic >();
             add< BSONObjTests::NumericCompareBasic >();
@@ -1911,7 +1986,6 @@ namespace JsobjTests {
             add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::ToStringArray >();
             add< BSONObjTests::ToStringNumber >();
-            add< BSONObjTests::NullString >();
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();

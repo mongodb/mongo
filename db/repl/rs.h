@@ -23,6 +23,7 @@
 #include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
 #include "../commands.h"
+#include "../oplogreader.h"
 #include "rs_exception.h"
 #include "rs_optime.h"
 #include "rs_member.h"
@@ -55,6 +56,7 @@ namespace mongo {
     class Member : public List1<Member>::Base {
     private:
         ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
+        Member(const Member&); 
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
@@ -265,7 +267,7 @@ namespace mongo {
             EMPTYUNREACHABLE=4, STARTED=5, SOON=6
         };
         static StartupStatus startupStatus;
-        static string startupStatusMsg;
+        static DiagStr startupStatusMsg;
         static string stateAsHtml(MemberState state);
 
         /* todo thread */
@@ -356,8 +358,8 @@ namespace mongo {
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
-        const ReplSetConfig& config() { lock lk(this); return *_cfg; }
-        string name() const { lock lk((RSBase*)this); return _name; } /* @return replica set's logical name */
+        const ReplSetConfig& config() { return *_cfg; }
+        string name() const { return _name; } /* @return replica set's logical name */
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
@@ -388,18 +390,24 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { lock lk((RSBase*)this); assert( _self ); return _self->config(); }
+        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
-        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
+        bool iAmPotentiallyHot() const {
+          return myConfig().potentiallyHot() && // not an arbiter
+            elect.steppedDown <= time(0) && // not stepped down/frozen
+            state() == MemberState::RS_SECONDARY; // not stale
+        }
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:
-        List1<Member> _members; /* all members of the set EXCEPT self. */
-
+        List1<Member> _members; // all members of the set EXCEPT _self.
+        ReplSetConfig::MemberCfg _config; // config of _self
+        unsigned _id; // _id of _self
     public:
-        unsigned selfId() const { lock lk((RSBase*)this); return _self->id(); }
+        // this is called from within a writelock in logOpRS
+        unsigned selfId() const { return _id; }
         Manager *mgr;
 
     private:
@@ -430,9 +438,37 @@ namespace mongo {
         void syncFixUp(HowToFixUp& h, OplogReader& r);
         bool _getOplogReader(OplogReader& r, string& hn);
         bool _isStale(OplogReader& r, const string& hn);
+
+        struct GhostSlave {
+        GhostSlave() : last(0), slave(0), init(false) {}
+            OplogReader reader;
+            OpTime last;
+            Member* slave;
+            bool init;
+        };
+        /**
+         * This is a cache of ghost slaves
+         */
+        map<BSONObj,GhostSlave> _ghostCache;
+        bool _getSlave(const BSONObj& rid, GhostSlave& slave);
     public:
         void syncThread();
         const OpTime lastOtherOpTime() const;
+        /**
+         * Replica sets can sync in a hierarchical fashion, which throws off w
+         * calculation on the master.  percolate() faux-syncs from an upstream
+         * node so that the primary will know what the slaves are up to.
+         *
+         * We can't just directly sync to the primary because it could be
+         * unreachable, e.g., S1--->S2--->S3--->P.  S2 should ghost sync from S3
+         * and S3 can ghost sync from the primary.
+         *
+         * Say we have an S1--->S2--->P situation and this node is S2.  rid
+         * would refer to S1.  S2 would create a ghost slave of S1 and connect
+         * it to P (_currentSyncTarget). Then it would use this connection to
+         * pretend to be S1, replicating off of P.
+         */
+        void percolate(const BSONObj& rid, const OpTime& last);
     };
 
     class ReplSet : public ReplSetImpl {
@@ -446,7 +482,6 @@ namespace mongo {
         bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() {
-            lock lk(this);
             return _self->fullName();
         }
 
@@ -466,27 +501,38 @@ namespace mongo {
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
 
-        /* we have a new config (reconfig) - apply it.
-           @param comment write a no-op comment to the oplog about it.  only makes sense if one is primary and initiating the reconf.
-        */
+        /**
+         * We have a new config (reconfig) - apply it.
+         * @param comment write a no-op comment to the oplog about it.  only
+         * makes sense if one is primary and initiating the reconf.
+         *
+         * The slaves are updated when they get a heartbeat indicating the new
+         * config.  The comment is a no-op.
+         */
         void haveNewConfig(ReplSetConfig& c, bool comment);
 
-        /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
+        /**
+         * Pointer assignment isn't necessarily atomic, so this needs to assure
+         * locking, even though we don't delete old configs.
+         */
         const ReplSetConfig& getConfig() { return config(); }
 
         bool lockedByMe() { return RSBase::lockedByMe(); }
 
         // heartbeat msg to send to others; descriptive diagnostic info
         string hbmsg() const {
-            lock lk((RSBase*)this);
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
         }
+        void percolate(const BSONObj& rid, const OpTime& last) {
+          ReplSetImpl::percolate(rid, last);
+        }
     };
 
-    /** base class for repl set commands.  checks basic things such as in rs mode before the command
-        does its real work
-        */
+    /**
+     * Base class for repl set commands.  Checks basic things such if we're in
+     * rs mode before the command does its real work.
+     */
     class ReplSetCommand : public Command {
     protected:
         ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
@@ -502,7 +548,8 @@ namespace mongo {
             }
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
-                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
+                string s;
+                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg.get();
                 if( ReplSet::startupStatus == 3 )
                     result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;
@@ -510,6 +557,12 @@ namespace mongo {
             return true;
         }
     };
+
+    /**
+     * does local authentication
+     * directly authorizes against AuthenticationInfo
+     */
+    void replLocalAuth();
 
     /** inlines ----------------- */
 

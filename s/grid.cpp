@@ -219,7 +219,8 @@ namespace mongo {
             }
             if ( ! foundAll ) {
                 ostringstream ss;
-                ss << "host " << offendingHost << " does not belong to replica set" << setName;;
+                ss << "in seed list " << servers.toString() << ", host " << offendingHost
+                   << " does not belong to replica set " << setName;
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;

@@ -26,6 +26,11 @@ for( i = 0; i < 999; ++i ) {
 assert.eq( 999, t.count() , "A1" );
 assert.eq( 999, t.find().toArray().length , "A2" );
 
+db.setProfilingLevel( 2 );
+t.count();
+db.setProfilingLevel( 0 );
+assert.lt( 0 , db.system.profile.find( { user : "eliot" } ).count() , "AP1" )
+
 assert.eq( 999, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "A3" );
 db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:999} ) } );
 assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "A4" );

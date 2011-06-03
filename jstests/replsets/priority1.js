@@ -86,7 +86,10 @@ for (i=0; i<n; i++) {
     var second = null;
     reconnect(master);
     var config = master.getDB("local").system.replset.findOne();
-
+    for (var j = 0; j < 3; j++) {
+        rs.nodes[j].getDB("admin").runCommand({setParameter : 1, logLevel : 5});
+    }
+    
     var version = config.version;
     config.version++;
 

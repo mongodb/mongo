@@ -65,9 +65,7 @@ namespace mongo {
 
     void Manager::starting() {
         Client::initThread("rs Manager");
-        if (!noauth) {
-            cc().getAuthenticationInfo()->authorize("local");
-        }
+        replLocalAuth();
     }
 
     void Manager::noteARemoteIsPrimary(const Member *m) {

@@ -1,6 +1,5 @@
 // Check sorting of array sub field SERVER-480.
 
-if ( 0 ) { // SERVER-480
 t = db.jstests_sort7;
 t.drop();
 
@@ -24,4 +23,3 @@ unindexed = t.find().sort( {"a.x":1} ).toArray();
 t.ensureIndex( { "a.x" : 1 } );
 indexed = t.find().sort( {"a.x":1} ).hint( {"a.x":1} ).toArray();
 assert.eq( unindexed, indexed );
-}

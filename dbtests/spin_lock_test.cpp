@@ -70,8 +70,6 @@ namespace {
     public:
         void run() {
 
-#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-
             SpinLock spin;
             int counter = 0;
 
@@ -92,12 +90,8 @@ namespace {
             }
 
             ASSERT_EQUALS( counter, threads*incs );
-#else
-
-            // WARNING "TODO Missing spin lock in this platform."
-            ASSERT( true );
-
-
+#if defined(__linux__)
+            ASSERT( SpinLock::isfast() );
 #endif
 
         }

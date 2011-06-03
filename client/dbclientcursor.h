@@ -52,7 +52,7 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but
             then perhaps stop.
         */
-        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + nReturned - pos; }
+        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + b.nReturned - b.pos; }
         bool moreInCurrentBatch() { return objsLeftInBatch() > 0; }
 
         /** next
@@ -71,11 +71,11 @@ namespace mongo {
         /** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
             BSONObj o = next();
-            BSONElement e = o.firstElement();
-            if( strcmp(e.fieldName(), "$err") == 0 ) {
+            if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
+                string s = "nextSafe(): " + o.toString();
                 if( logLevel >= 5 )
-                    log() << "nextSafe() error " << o.toString() << endl;
-                uassert(13106, "nextSafe(): " + o.toString(), false);
+                    log() << s << endl;
+                uasserted(13106, s);
             }
             return o;
         }
@@ -86,6 +86,11 @@ namespace mongo {
             WARNING: no support for _putBack yet!
         */
         void peek(vector<BSONObj>&, int atMost);
+
+        /**
+         * peek ahead and see if an error occurred, and get the error if so.
+         */
+        bool peekError(BSONObj* error = NULL);
 
         /**
            iterate the rest of the cursor and return the number if items
@@ -104,13 +109,9 @@ namespace mongo {
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
         */
-        bool isDead() const {
-            return  !this || cursorId == 0;
-        }
+        bool isDead() const { return  !this || cursorId == 0; }
 
-        bool tailable() const {
-            return (opts & QueryOption_CursorTailable) != 0;
-        }
+        bool tailable() const { return (opts & QueryOption_CursorTailable) != 0; }
 
         /** see ResultFlagType (constants.h) for flag values
             mostly these flags are for internal purposes -
@@ -132,12 +133,9 @@ namespace mongo {
             fieldsToReturn(_fieldsToReturn),
             opts(queryOptions),
             batchSize(bs==1?2:bs),
-            m(new Message()),
             cursorId(),
-            nReturned(),
-            pos(),
-            data(),
-            _ownCursor( true ) {
+            _ownCursor( true ),
+            wasError( false ) {
         }
 
         DBClientCursor( DBClientBase* client, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -146,11 +144,7 @@ namespace mongo {
             nToReturn( _nToReturn ),
             haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
             opts( options ),
-            m(new Message()),
-            cursorId( _cursorId ),
-            nReturned(),
-            pos(),
-            data(),
+            cursorId(_cursorId),
             _ownCursor( true ) {
         }
 
@@ -173,12 +167,23 @@ namespace mongo {
         void initLazy();
         bool initLazyFinish();
 
+        class Batch : boost::noncopyable { 
+            friend class DBClientCursor;
+            auto_ptr<Message> m;
+            int nReturned;
+            int pos;
+            const char *data;
+        public:
+            Batch() : m( new Message() ), nReturned(), pos(), data() { }
+        };
+
     private:
         friend class DBClientBase;
         friend class DBClientConnection;
 
         int nextBatchSize();
         
+        Batch b;
         DBClientBase* _client;
         string ns;
         BSONObj query;
@@ -188,18 +193,17 @@ namespace mongo {
         const BSONObj *fieldsToReturn;
         int opts;
         int batchSize;
-        auto_ptr<Message> m;
         stack< BSONObj > _putBack;
         int resultFlags;
         long long cursorId;
-        int nReturned;
-        int pos;
-        const char *data;
+        bool _ownCursor; // see decouple()
+        string _scopedHost;
+        DBClientBase* _lazy; // only for lazy init
+        bool wasError;
+
         void dataReceived();
         void requestMore();
         void exhaustReceiveMore(); // for exhaust
-        bool _ownCursor; // see decouple()
-        string _scopedHost;
 
         // Don't call from a virtual function
         void _assertIfNull() const { uassert(13348, "connection died", this); }
@@ -210,9 +214,6 @@ namespace mongo {
 
         // init pieces
         void _assembleInit( Message& toSend );
-
-        DBClientBase* _lazy; // only for lazy init
-        
     };
 
     /** iterate over objects in current batch only - will not cause a network call

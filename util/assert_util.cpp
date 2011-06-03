@@ -95,12 +95,31 @@ namespace mongo {
         throw e;
     }
 
+    void verifyFailed( int msgid ) {
+        assertionCount.condrollover( ++assertionCount.regular );
+        problem() << "Assertion failure " << msgid << endl;
+        sayDbContext();
+        raiseError(0,"assertion failure");
+        stringstream temp;
+        temp << msgid;
+        AssertionException e(temp.str(),0);
+        breakpoint();
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+        // this is so we notice in buildbot
+        log() << "\n\n***aborting after verify() failure in a debug/test build\n\n" << endl;
+        abort();
+#endif
+        throw e;
+    }
+
+
     void uassert_nothrow(const char *msg) {
         raiseError(0,msg);
     }
 
     void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
+        LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg);
         throw UserException(msgid, msg);
     }
@@ -151,6 +170,23 @@ namespace mongo {
         free(niceName);
         return s;
 #endif
+    }
+
+    NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, char ch) {
+        int l = strlen(msg);
+        assert( l < 128);
+        memcpy(buf, msg, l);
+        char *p = buf + l;
+        p[0] = ch;
+        p[1] = 0;
+    }
+
+    NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, unsigned val) {
+        int l = strlen(msg);
+        assert( l < 128);
+        memcpy(buf, msg, l);
+        char *p = buf + l;
+        sprintf(p, "%u", val);
     }
 
 }

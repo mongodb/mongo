@@ -60,7 +60,7 @@ namespace QueryTests {
         }
         static void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
-            b.append( "name", key.firstElement().fieldName() );
+            b.append( "name", key.firstElementFieldName() );
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();
@@ -853,7 +853,7 @@ namespace QueryTests {
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
             for ( int i=0; i<200; i++ ) {
                 insertNext();
-                cout << count() << endl;
+//                cout << count() << endl;
                 ASSERT( count() < 90 );
             }
 

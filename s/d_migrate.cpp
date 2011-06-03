@@ -276,9 +276,12 @@ namespace mongo {
         void done() {
             readlock lk( _ns );
 
-            _deleted.clear();
-            _reload.clear();
-            _cloneLocs.clear();
+            {
+                scoped_spinlock lk( _trackerLocks );
+                _deleted.clear();
+                _reload.clear();
+                _cloneLocs.clear();
+            }
             _memoryUsed = 0;
 
             scoped_lock l(_m);
@@ -457,6 +460,7 @@ namespace mongo {
             while ( cc->ok() ) {
                 DiskLoc dl = cc->currLoc();
                 if ( ! isLargeChunk ) {
+                    scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
                 }
                 cc->advance();
@@ -479,12 +483,15 @@ namespace mongo {
                           << " ns: " << _ns << " " << _min << " -> " << _max
                           << migrateLog;
                 result.appendBool( "chunkTooBig" , true );
-                result.appendNumber( "chunkSize" , (long long)(recCount * avgRecSize) );
+                result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
                 return false;
             }
 
-            log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            {
+                scoped_spinlock lk( _trackerLocks );
+                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            }
             return true;
         }
 
@@ -494,29 +501,50 @@ namespace mongo {
                 return false;
             }
 
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            ElapsedTracker tracker (128, 10); // same as ClientCursor::_yieldSometimesTracker
 
-            NamespaceDetails *d = nsdetails( _ns.c_str() );
-            assert( d );
+            int allocSize;
+            {
+                readlock l(_ns);
+                Client::Context ctx( _ns );
+                NamespaceDetails *d = nsdetails( _ns.c_str() );
+                assert( d );
+                scoped_spinlock lk( _trackerLocks );
+                allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
+            }
+            BSONArrayBuilder a (allocSize);
+            
+            while ( 1 ) {
+                bool filledBuffer = false;
+                
+                readlock l( _ns );
+                Client::Context ctx( _ns );
+                scoped_spinlock lk( _trackerLocks );
+                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                for ( ; i!=_cloneLocs.end(); ++i ) {
+                    if (tracker.ping()) // should I yield?
+                        break;
 
-            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
+                    DiskLoc dl = *i;
+                    BSONObj o = dl.obj();
 
-            set<DiskLoc>::iterator i = _cloneLocs.begin();
-            for ( ; i!=_cloneLocs.end(); ++i ) {
-                DiskLoc dl = *i;
-                BSONObj o = dl.obj();
+                    // use the builder size instead of accumulating 'o's size so that we take into consideration
+                    // the overhead of BSONArray indices
+                    if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        filledBuffer = true; // break out of outer while loop
+                        break;
+                    }
 
-                // use the builder size instead of accumulating 'o's size so that we take into consideration
-                // the overhead of BSONArray indices
-                if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                    break;
+                    a.append( o );
                 }
-                a.append( o );
+
+                _cloneLocs.erase( _cloneLocs.begin() , i );
+
+                if ( _cloneLocs.empty() || filledBuffer )
+                    break;
             }
 
             result.appendArray( "objects" , a.arr() );
-            _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
 
@@ -528,6 +556,11 @@ namespace mongo {
 
             if ( ! db->ownsNS( _ns ) )
                 return;
+
+            
+            // not needed right now
+            // but trying to prevent a future bug
+            scoped_spinlock lk( _trackerLocks ); 
 
             _cloneLocs.erase( dl );
         }
@@ -548,9 +581,13 @@ namespace mongo {
         BSONObj _min;
         BSONObj _max;
 
+        // we need the lock in case there is a malicious _migrateClone for example
+        // even though it shouldn't be needed under normal operation
+        SpinLock _trackerLocks;
+
         // disk locs yet to be transferred from here to the other side
-        // no locking needed because build by 1 thread in a read lock
-        // depleted by 1 thread in a read lock
+        // no locking needed because built initially by 1 thread in a read lock
+        // emptied by 1 thread in a read lock
         // updates applied by 1 thread in a write lock
         set<DiskLoc> _cloneLocs;
 
