@@ -152,7 +152,6 @@ struct __wt_session_impl {
 
 	WT_EVENT_HANDLER *event_handler;
 
-	TAILQ_ENTRY(__wt_session_impl) q;
 	TAILQ_HEAD(__cursors, wt_cursor) cursors;
 
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
@@ -229,19 +228,19 @@ struct __wt_connection_impl {
 	uint32_t volatile api_gen;	/* API generation number */
 
 	/*
-	 * WiredTiger allocates space for 50 simultaneous threads of control by
-	 * default.  Growing the number of threads dynamically is possible, but
-	 * tricky since the workQ is walking the array without locking it.
+	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
+	 * control) by default.  Growing the number of threads dynamically is
+	 * possible, but tricky since the workQ is walking the array without
+	 * locking it.
 	 *
 	 * There's an array of WT_SESSION_IMPL pointers that reference the
 	 * allocated array; we do it that way because we want an easy way for
 	 * the workQ code to avoid walking the entire array when only a few
 	 * threads are running.
 	 */
-	WT_SESSION_IMPL	**sessions;	/* TOC reference */
-	uint32_t	  toc_cnt;	/* TOC count */
-	void		 *toc_array;	/* TOC array */
-	TAILQ_HEAD(__sessions, __wt_session_impl) sessions_head;
+	WT_SESSION_IMPL	**sessions;		/* Session reference */
+	uint32_t	  session_cnt;		/* Session count */
+	void		 *session_array;	/* Session array */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of

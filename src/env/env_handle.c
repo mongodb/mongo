@@ -57,7 +57,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->sessions);
-	__wt_free(session, conn->toc_array);
+	__wt_free(session, conn->session_array);
 	__wt_free(session, conn->hazard);
 	__wt_free(session, conn->stats);
 

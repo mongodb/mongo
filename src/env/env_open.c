@@ -30,7 +30,8 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *home, mode_t mode)
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL *), &conn->sessions));
 	WT_RET(__wt_calloc(session,
-	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->toc_array));
+	    conn->session_size, sizeof(WT_SESSION_IMPL),
+	    &conn->session_array));
 	WT_RET(__wt_calloc(session,
 	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
 	   &conn->hazard));

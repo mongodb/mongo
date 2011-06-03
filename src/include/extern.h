@@ -6,6 +6,10 @@
 #define	WT_GCC_ATTRIBUTE(x)
 #endif
 
+extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
+    WT_EVENT_HANDLER *event_handler,
+    const char *config,
+    WT_SESSION_IMPL **sessionp);
 extern int __wt_config_initn(WT_CONFIG *conf, const char *str, size_t len);
 extern int __wt_config_init(WT_CONFIG *conf, const char *str);
 extern int __wt_config_next(WT_CONFIG *conf,
@@ -58,6 +62,14 @@ extern const char *__wt_confdfl_session_sync;
 extern const char *__wt_confdfl_session_truncate;
 extern const char *__wt_confdfl_session_verify;
 extern const char *__wt_confdfl_wiredtiger_open;
+extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
+    WT_BTREE_SESSION **btree_sessionp);
+extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
+    const char *name,
+    size_t namelen,
+    WT_BTREE_SESSION **btree_sessionp);
+extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
+    WT_BTREE_SESSION *btree_session);
 extern int __wt_curbtree_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *config,
@@ -74,14 +86,6 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 extern void __wt_cursor_init(WT_CURSOR *cursor, const char *config);
-extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
-    WT_BTREE_SESSION **btree_sessionp);
-extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name,
-    size_t namelen,
-    WT_BTREE_SESSION **btree_sessionp);
-extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
-    WT_BTREE_SESSION *btree_session);
 extern int __wt_block_alloc(WT_SESSION_IMPL *session,
     uint32_t *addrp,
     uint32_t size);
@@ -295,9 +299,6 @@ extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
     const char *home,
     mode_t mode);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
-extern int __wt_connection_session(WT_CONNECTION_IMPL *conn,
-    WT_SESSION_IMPL **sessionp);
-extern int __wt_session_close(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_connection_stat_print(WT_CONNECTION_IMPL *conn, FILE *stream);
 extern int __wt_connection_stat_clear(WT_CONNECTION_IMPL *conn);
