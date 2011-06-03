@@ -39,38 +39,58 @@ extern  int __wt_config_getones(WT_SESSION_IMPL *session,
     const char *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_checklist(WT_SESSION_IMPL *session,
-    const char **defaults,
-    const char *config);
-extern int __wt_config_check( WT_SESSION_IMPL *session,
-    const char *defaults,
-    const char *config);
 extern int __wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
+extern int __wt_config_check(WT_SESSION_IMPL *session,
+    const char *checks,
+    const char *config);
 extern const char *__wt_confdfl_connection_add_collator;
+extern const char *__wt_confchk_connection_add_collator;
 extern const char *__wt_confdfl_connection_add_compressor;
+extern const char *__wt_confchk_connection_add_compressor;
 extern const char *__wt_confdfl_connection_add_cursor_type;
+extern const char *__wt_confchk_connection_add_cursor_type;
 extern const char *__wt_confdfl_connection_add_extractor;
+extern const char *__wt_confchk_connection_add_extractor;
 extern const char *__wt_confdfl_connection_close;
+extern const char *__wt_confchk_connection_close;
 extern const char *__wt_confdfl_connection_load_extension;
+extern const char *__wt_confchk_connection_load_extension;
 extern const char *__wt_confdfl_connection_open_session;
+extern const char *__wt_confchk_connection_open_session;
 extern const char *__wt_confdfl_cursor_close;
+extern const char *__wt_confchk_cursor_close;
 extern const char *__wt_confdfl_session_begin_transaction;
+extern const char *__wt_confchk_session_begin_transaction;
 extern const char *__wt_confdfl_session_checkpoint;
+extern const char *__wt_confchk_session_checkpoint;
 extern const char *__wt_confdfl_session_close;
+extern const char *__wt_confchk_session_close;
 extern const char *__wt_confdfl_session_commit_transaction;
+extern const char *__wt_confchk_session_commit_transaction;
 extern const char *__wt_confdfl_session_create;
+extern const char *__wt_confchk_session_create;
 extern const char *__wt_confdfl_session_drop;
+extern const char *__wt_confchk_session_drop;
 extern const char *__wt_confdfl_session_log_printf;
+extern const char *__wt_confchk_session_log_printf;
 extern const char *__wt_confdfl_session_open_cursor;
+extern const char *__wt_confchk_session_open_cursor;
 extern const char *__wt_confdfl_session_rename;
+extern const char *__wt_confchk_session_rename;
 extern const char *__wt_confdfl_session_rollback_transaction;
+extern const char *__wt_confchk_session_rollback_transaction;
 extern const char *__wt_confdfl_session_salvage;
+extern const char *__wt_confchk_session_salvage;
 extern const char *__wt_confdfl_session_sync;
+extern const char *__wt_confchk_session_sync;
 extern const char *__wt_confdfl_session_truncate;
+extern const char *__wt_confchk_session_truncate;
 extern const char *__wt_confdfl_session_verify;
+extern const char *__wt_confchk_session_verify;
 extern const char *__wt_confdfl_wiredtiger_open;
+extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,

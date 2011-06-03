@@ -24,7 +24,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
-	SESSION_API_CALL(session, close, config);
+	SESSION_API_CALL(session, close, config, cfg);
+	(void)cfg;
 
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
@@ -82,7 +83,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_UNUSED(to_dup);
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, open_cursor, config);
+	SESSION_API_CALL(session, open_cursor, config, cfg);
+	/* Config parsing is done by each implementation. */
+	(void)cfg;
 
 	if (strncmp(uri, "config:", 7) == 0)
 		return (__wt_curconfig_open(session, uri, config, cursorp));
@@ -112,7 +115,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 
-	SESSION_API_CALL(session, create, config);
+	SESSION_API_CALL(session, create, config, cfg);
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -127,7 +130,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also, avoiding copies / memory allocation at the moment by
 	 * pointing to constant strings for the few cases we handle.
 	 */
-	WT_RET(__wt_config_gets(session, __cfg, "key_format", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
 	if (strncmp(cval.str, "r", cval.len) == 0)
 		key_format = "r";
 	else if (cval.str[cval.len - 1] == 'S')
@@ -140,7 +143,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		return (EINVAL);
 	}
 
-	WT_RET(__wt_config_gets(session, __cfg, "value_format", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
 	if (cval.str[cval.len - 1] == 'S')
 		value_format = "S";
 	else if (cval.str[cval.len - 1] == 'u')
@@ -157,7 +160,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	 * copy of the configuration information into the file.
 	 */
 	if (!__wt_exist(name)) {
-		WT_RET(__wt_config_collapse(session, __cfg, &collapse));
+		WT_RET(__wt_config_collapse(session, cfg, &collapse));
 		WT_RET(__wt_btree_create(session, name, collapse));
 	}
 
@@ -199,14 +202,14 @@ __session_drop(
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	SESSION_API_CALL(session, drop, config);
+	SESSION_API_CALL(session, drop, config, cfg);
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
 	name += strlen("table:");
 
-	WT_RET(__wt_config_gets(session, __cfg, "force", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
 	/* TODO: Combine the table name with home to make a filename. */
@@ -230,7 +233,8 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
-	SESSION_API_CALL(session, salvage, config);
+	SESSION_API_CALL(session, salvage, config, cfg);
+	(void)cfg;
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -271,7 +275,9 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	SESSION_API_CALL(session, sync, config);
+	SESSION_API_CALL(session, sync, config, cfg);
+	(void)cfg;
+
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
@@ -324,7 +330,8 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
-	SESSION_API_CALL(session, verify, config);
+	SESSION_API_CALL(session, verify, config, cfg);
+	(void)cfg;
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);

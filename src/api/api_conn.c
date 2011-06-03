@@ -7,9 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_api_arg_min(
-    WT_SESSION_IMPL *, const char *, uint64_t, uint64_t);
-
 /*
  * __conn_load_extension --
  *	WT_CONNECTION->load_extension method.
@@ -30,10 +27,10 @@ __conn_load_extension(WT_CONNECTION *wt_conn,
 	WT_UNUSED(path);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, load_extension, config);
+	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
 	entry_name = "wiredtiger_extension_init";
-	WT_RET(__wt_config_gets(session, __cfg, "entry", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "entry", &cval));
 	if (cval.len > 0) {
 		if (snprintf(namebuf, sizeof(namebuf), "%.*s",
 		    (int)cval.len, cval.str) >= (int)sizeof (namebuf)) {
@@ -69,7 +66,8 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
 	WT_UNUSED(ctype);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_cursor_type, config);
+	CONNECTION_API_CALL(conn, session, add_cursor_type, config, cfg);
+	(void)cfg;
 	API_END();
 
 	return (ENOTSUP);
@@ -90,7 +88,8 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	WT_UNUSED(collator);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_collator, config);
+	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
+	(void)cfg;
 	API_END();
 
 	return (ENOTSUP);
@@ -111,7 +110,8 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	WT_UNUSED(compressor);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_collator, config);
+	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
+	(void)cfg;
 	API_END();
 
 	return (ENOTSUP);
@@ -132,7 +132,8 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	WT_UNUSED(extractor);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_collator, config);
+	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
+	(void)cfg;
 	API_END();
 
 	return (ENOTSUP);
@@ -171,7 +172,8 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	ret = 0;
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
-	CONNECTION_API_CALL(conn, session, close, config);
+	CONNECTION_API_CALL(conn, session, close, config, cfg);
+	(void)cfg;
 
 	/* Close open sessions. */
 	for (tp = conn->sessions; (s = *tp) != NULL;) {
@@ -209,7 +211,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
-	CONNECTION_API_CALL(conn, session, open_session, config);
+	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
+	(void)cfg;
 
 	ret = 0;
 	__wt_lock(session, conn->mtx);
@@ -221,24 +224,6 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	API_END();
 
 	return (ret);
-}
-
-/*
- * __wt_api_arg_min --
- *	Print a standard error message when an API function is passed a
- *	too-small argument.
- */
-static int
-__wt_api_arg_min(
-    WT_SESSION_IMPL *session, const char *arg_name, uint64_t v, uint64_t min)
-{
-	if (v >= min)
-		return (0);
-
-	__wt_errx(session, "%s argument %" PRIu64
-	    " less than minimum value of %" PRIu64,
-	    arg_name, v, min);
-	return (WT_ERROR);
 }
 
 /*
@@ -277,7 +262,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_SESSION_IMPL *session;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
-	const char *__cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
+	const char *cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
 	char expath[256], exconfig[100];
 	int opened, ret;
 
@@ -312,25 +297,24 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_connection_config(conn));
 
-	WT_ERR(__wt_config_check(session, __cfg[0], config));
+	WT_ERR(__wt_config_check(session,
+	    __wt_confchk_wiredtiger_open, config));
 
-	WT_ERR(__wt_config_gets(session, __cfg, "cache_size", &cval));
-	WT_ERR(__wt_api_arg_min(session, "cache size", cval.val,
-	    1 * WT_MEGABYTE));
+	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
 	conn->cache_size = cval.val;
 
-	WT_ERR(__wt_config_gets(session, __cfg, "data_update_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "data_update_max", &cval));
 	conn->data_update_max = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, __cfg, "data_update_min", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "data_update_min", &cval));
 	conn->data_update_min = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, __cfg, "hazard_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_size = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, __cfg, "session_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val;
 
 	conn->verbose = 0;
 #ifdef HAVE_VERBOSE
-	WT_ERR(__wt_config_gets(session, __cfg, "verbose", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
 	for (vt = verbtypes; vt->vname != NULL; vt++) {
 		WT_ERR(__wt_config_initn(session,
 		    &subconfig, cval.str, cval.len));
@@ -347,12 +331,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_open(conn, home, 0644));
 	opened = 1;
 
-	WT_ERR(__wt_config_gets(session, __cfg, "logging", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
 		WT_ERR(__wt_open(session, "__wt.log", 0666, 1, &conn->log_fh));
 
 	/* Load any extensions referenced in the config. */
-	WT_ERR(__wt_config_gets(session, __cfg, "extensions", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_initn(session, &subconfig, cval.str, cval.len));
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
 		if (snprintf(expath, sizeof(expath), "%.*s",

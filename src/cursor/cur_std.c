@@ -183,8 +183,10 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);
 	ret = 0;
+
+	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
+	(void)cfg;
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);

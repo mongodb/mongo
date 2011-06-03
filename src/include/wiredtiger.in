@@ -460,9 +460,8 @@ struct wt_session {
 	 * @config{bulk, configure the cursor for bulk loads}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs}
-	 * @config{isolation, the isolation level for this cursor\, one of \c
-	 * "snapshot" or \c "read-committed" or \c "read-uncommitted". Ignored
-	 * for transactional cursors}
+	 * @config{isolation, the isolation level for this cursor. Ignored for
+	 * transactional cursors}
 	 * @config{overwrite, if an existing key is inserted\, overwrite the
 	 * existing value}
 	 * @config{printable, for dump cursors\, pass through printable bytes
@@ -661,12 +660,10 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
-	 * @config{isolation, the isolation level for this transaction\, one of
-	 * "serializable"\, "snapshot"\, "read-committed" or "read-uncommitted";
-	 * default "serializable"}
+	 * @config{isolation, the isolation level for this transaction; default
+	 * "serializable"}
 	 * @config{name, name of the transaction for tracing and debugging}
-	 * @config{sync, how to sync log records when the transaction commits\,
-	 * one of "full"\, "flush"\, "write" or "none"}
+	 * @config{sync, how to sync log records when the transaction commits"}
 	 * @config{priority, priority of the transaction for resolving
 	 * conflicts\, an integer between -100 and 100.  Transactions with
 	 * higher values are less likely to abort}
@@ -721,7 +718,7 @@ struct wt_session {
 	 * @config{force, write a new checkpoint even if nothing has changed
 	 * since the last one}
 	 * @config{flush_cache, flush the cache}
-	 * @config{flush_log, flush the log}
+	 * @config{flush_log, flush the log to disk}
 	 * @config{log_size, only proceed if more than the specified number of
 	 * bytes of log records have been written since the last checkpoint}
 	 * @config{timeout, only proceed if more than the specified number of
@@ -949,9 +946,8 @@ struct wt_connection {
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
  * processes)}
- * @config{verbose, enable messages for various events.  One or more of "all"\,
- * "evict"\, "fileops"\, "hazard"\, "mutex"\, "read".  Multiple options are
- * given as a list such as \c "verbose=[evict\,read]"}
+ * @config{verbose, enable messages for various events.  Options are given as a
+ * list\, such as \c "verbose=[evict\,read]"}
  * @configend
  * @param connectionp A pointer to the newly opened connection handle
  * @errors

@@ -62,6 +62,28 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 w = textwrap.TextWrapper(width=72)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
+def checkstr(c):
+	'''Generate the JSON string used by __wt_config_check to validate the
+	config string'''
+	checks = c.flags
+	ctype = checks.get('type', None)
+	cmin = str(checks.get('min', ''))
+	cmax = str(checks.get('max', ''))
+	choices = checks.get('choices', [])
+	if not ctype and ('min' in checks or 'max' in checks):
+		ctype = 'int'
+	result = []
+	if ctype:
+		result.append('type=' + ctype)
+	if cmin:
+		result.append('min=' + cmin)
+	if cmax:
+		result.append('max=' + cmax)
+	if choices:
+		result.append('choices=' + '[' +
+		    ','.join('\\"' + s + '\\"' for s in choices) + ']')
+	return ','.join(result)
+
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
 	name = name.replace('.', '_')
@@ -73,6 +95,16 @@ __wt_confdfl_%(name)s =
 	'name' : name,
 	'config' : '\n'.join('    "%s"' % line
 		for line in w.wrap(','.join('%s=%s' % (c.name, c.default)
+			for c in ctype)) or [""]),
+})
+	tfile.write('''
+const char *
+__wt_confchk_%(name)s =
+%(check)s;
+''' % {
+	'name' : name,
+	'check' : '\n'.join('    "%s"' % line
+		for line in w.wrap(','.join('%s=(%s)' % (c.name, checkstr(c))
 			for c in ctype)) or [""]),
 })
 

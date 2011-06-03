@@ -169,7 +169,8 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config);
+	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config, cfg);
+	(void)cfg;
 	ret = 0;
 	WT_TRET(__wt_btcur_close((CURSOR_BTREE *)cursor, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
@@ -219,7 +220,7 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	int bulk, dump, printable, raw, ret;
 	size_t csize;
-	API_CONF_INIT(session, open_cursor, config);
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
 	conn = S2C(session);
 
@@ -239,13 +240,13 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 		session->btree = btree_session->btree;
 	}
 
-	WT_ERR(__wt_config_gets(session, __cfg, "bulk", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, __cfg, "dump", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
 	dump = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, __cfg, "printable", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "printable", &cval));
 	printable = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, __cfg, "raw", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
 	raw = (cval.val != 0);
 
 	csize = bulk ? sizeof(CURSOR_BULK) : sizeof(CURSOR_BTREE);

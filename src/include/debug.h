@@ -17,8 +17,8 @@ extern "C" {
 #define	WT_ASSERT(session, e)						\
 	((e) ? (void)0 : __wt_assert(session, #e, __FILE__, __LINE__))
 #else
-#define	WT_ABORT(session, e)
-#define	WT_ASSERT(session, e)
+#define	WT_ABORT(session, e)	do {} while (0)
+#define	WT_ASSERT(session, e)	do {} while (0)
 #endif
 
 /*

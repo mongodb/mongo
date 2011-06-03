@@ -274,7 +274,7 @@ struct __wt_connection_impl {
 	uint32_t flags;
 };
 
-#define	API_CONF_INIT(h, n, cfg)	const char *__cfg[] =		\
+#define	API_CONF_DEFAULTS(h, n, cfg)					\
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
 #define	API_SESSION_INIT(s, h, n, cur, bt)				\
@@ -285,28 +285,28 @@ struct __wt_connection_impl {
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
 	API_SESSION_INIT(s, h, n, cur, bt)
 
-#define	API_CALL(s, h, n, cur, bt, cfg)	do {				\
-	API_CONF_INIT(h, n, cfg);					\
+#define	API_CALL(s, h, n, cur, bt, cfg, cfgvar)	do {			\
+	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
 	if (cfg != NULL)						\
-		WT_RET(__wt_config_check((s), __cfg[0], (cfg)))
+		WT_RET(__wt_config_check((s), __wt_confchk_##h##_##n, (cfg)))
 
 #define	API_END()	} while (0)
 
-#define	SESSION_API_CALL(s, n, cfg)					\
-	API_CALL(s, session, n, NULL, NULL, cfg);
+#define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
+	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 
-#define	CONNECTION_API_CALL(conn, s, n, cfg)				\
+#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
 	s = &conn->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg);			\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
 
-#define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg)			\
+#define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg, cfgvar)		\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL(s, cursor, n, cur, bt, cfg);				\
+	API_CALL(s, cursor, n, cur, bt, cfg, cfgvar);			\
 
 /*******************************************
  * Global variables.

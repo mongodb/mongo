@@ -61,9 +61,10 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
 
 	cbulk = (CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
-	CURSOR_API_CALL_CONF(cursor, session, close, btree, config);
 	ret = 0;
 
+	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
+	(void)cfg;
 	WT_TRET(__wt_bulk_end(cbulk));
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END();

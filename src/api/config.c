@@ -344,6 +344,14 @@ __process_value(WT_CONFIG_ITEM *value)
 		case 'P':
 			value->val <<= 50;
 			break;
+		default:
+			/*
+			 * We didn't get a well-formed number.  That might be
+			 * okay, the required type will be checked by
+			 * __wt_config_check.
+			 */
+			value->type = ITEM_ID;
+			break;
 		}
 	}
 }
@@ -578,67 +586,6 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 {
 	const char *cfgs[] = { cfg, NULL };
 	return (__wt_config_gets(session, cfgs, key, value));
-}
-
-/*
- * __wt_config_checklist --
- *	Given a NULL-terminated list of default configuration strings,
- *	check that all keys in an application-supplied config string appear
- *	somewhere in the defaults.
- */
-int
-__wt_config_checklist(WT_SESSION_IMPL *session,
-    const char **defaults, const char *config)
-{
-	WT_CONFIG cparser;
-	WT_CONFIG_ITEM k, v;
-	int ret;
-
-	/* It is always okay to pass NULL. */
-	if (config == NULL)
-		return (0);
-
-	WT_RET(__wt_config_init(session, &cparser, config));
-	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
-			__wt_errx(session,
-			    "Invalid configuration key found: '%s'\n", k.str);
-			return (EINVAL);
-		}
-		/*
-		 * TODO
-		 * Need to handle configuration keys that only match a prefix
-		 * such as "index_1=(),index_2=()".
-		 */
-		if ((ret = __wt_config_get(session, defaults, &k, &v)) != 0) {
-			if (ret == WT_NOTFOUND) {
-				__wt_errx(session,
-				    "Unknown configuration key found: '%.*s'\n",
-				    (int)k.len, k.str);
-				ret = EINVAL;
-			}
-			return (ret);
-		}
-	}
-
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-
-	return (ret);
-}
-
-/*
- * __wt_config_check --
- *	Given a default configuration string, check that all keys in an
- *	application-supplied config string appear somewhere in the defaults.
- */
-int
-__wt_config_check(
-    WT_SESSION_IMPL *session, const char *defaults, const char *config)
-{
-	const char *defs[] = { defaults, NULL };
-
-	return (__wt_config_checklist(session, defs, config));
 }
 
 /*

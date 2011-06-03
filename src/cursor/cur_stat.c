@@ -155,8 +155,11 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);
 	ret = 0;
+
+	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
+	(void)cfg;
+
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END();
 
@@ -200,17 +203,16 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	int dump, printable, raw, ret;
-
-	API_CONF_INIT(session, open_cursor, config);
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
 	/* Skip "stat:". */
 	uri += 5;
 
-	WT_ERR(__wt_config_gets(session, __cfg, "dump", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
 	dump = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, __cfg, "printable", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "printable", &cval));
 	printable = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, __cfg, "raw", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
 	raw = (cval.val != 0);
 
 	WT_RET(__wt_calloc_def(session, 1, &cst));
