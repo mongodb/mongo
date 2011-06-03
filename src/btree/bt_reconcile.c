@@ -157,14 +157,11 @@ typedef struct {
 		WT_BUF key;		/* Row key */
 
 		/*
-		 * If we had to create an in-memory version of the page, we'll
-		 * save it here for later connection between the newly created
-		 * split page and previously existing in-memory pages.
-		 *
-		 * For the same reason, maintain the original page's subtree
-		 * references for later fixup.
+		 * If we're creating a new, in-memory version of the reconciled
+		 * page, we'll save it here for connection between the newly
+		 * created split page and previously existing in-memory pages.
 		 */
-		WT_PAGE *imp;		/* Page's in-memory version */
+		WT_PAGE_DISK *imp_dsk;	/* New disk image */
 	} *split;			/* Saved splits */
 	uint32_t split_next;		/* Next list slot */
 	uint32_t split_entries;		/* Total list slots */
@@ -215,7 +212,7 @@ static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_rle_bulk(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE **, WT_PAGE *);
+static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_add(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, uint32_t);
@@ -223,7 +220,8 @@ static int  __rec_discard_evict(WT_SESSION_IMPL *);
 static void __rec_discard_init(WT_RECONCILE *);
 static int  __rec_imref_add(WT_SESSION_IMPL *, WT_REF *);
 static int  __rec_imref_bsearch_cmp(const void *, const void *);
-static int  __rec_imref_fixup(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_imref_fixup(
+		WT_SESSION_IMPL *, WT_SPLIT *, WT_PAGE *, WT_REF *, WT_PAGE **);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static int  __rec_init(WT_SESSION_IMPL *, uint32_t);
@@ -235,7 +233,7 @@ static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
 static int  __rec_row_merge(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE **, WT_PAGE *);
+static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split(WT_SESSION_IMPL *);
 static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
@@ -354,9 +352,8 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	if (r->split != NULL) {
 		for (spl = r->split, i = 0; i < r->split_entries; ++spl, ++i) {
 			__wt_buf_free(session, &spl->key);
-			if (spl->imp != NULL)
-				__wt_page_free(
-				    session, spl->imp, WT_ADDR_INVALID, 0);
+			if (spl->imp_dsk != NULL)
+				__wt_free(session, spl->imp_dsk);
 		}
 		__wt_free(session, r->split);
 	}
@@ -1283,15 +1280,13 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 {
 	WT_CELL *cell;
-	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
 	WT_SPLIT *spl;
 	uint32_t addr, size;
-	int ret;
 
 	r = S2C(session)->cache->rec;
-	dsk = NULL;
+	dsk = buf->mem;
 
 	/*
 	 * Set the disk block size and clear trailing bytes.
@@ -1300,7 +1295,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 	 */
 	size = __rec_allocation_size(session, buf, end);
 	WT_RET(__wt_block_alloc(session, &addr, size));
-	WT_RET(__wt_disk_write(session, buf->mem, addr, size));
+	WT_RET(__wt_disk_write(session, dsk, addr, size));
 
 	/* Save the key and addr/size pairs to update the parent. */
 	if (r->split_next == r->split_entries) {
@@ -1316,7 +1311,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 	 * For a column-store, the key is the recno, for a row-store, it's the
 	 * first key on the page, a variable-length byte string.
 	 */
-	dsk = buf->mem;
 	switch (dsk->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -1340,24 +1334,19 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 		break;
 	}
 
-	/* If we're evicting the page, there's no more work to do. */
-	if (r->evict) {
-		spl->imp = NULL;
-		return (0);
-	}
-
 	/*
-	 * If we're not evicting the page, we'll need a new in-memory version:
-	 * create an in-memory page and take any list of in-memory references.
+	 * If we're evicting the page, there's no more work to do.
+	 *
+	 * If we're not evicting the page, we'll need a new in-memory version;
+	 * save a copy of the disk image for later.
 	 */
-	WT_RET(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
-	memcpy(dsk, buf->mem, size);
-
-	if ((ret = __wt_page_inmem(session, NULL, NULL, dsk, &page)) != 0) {
-		__wt_free(session, dsk);
-		return (ret);
+	if (r->evict)
+		spl->imp_dsk = NULL;
+	else {
+		WT_RET(__wt_calloc(
+		    session, (size_t)size, sizeof(uint8_t), &spl->imp_dsk));
+		memcpy(spl->imp_dsk, dsk, size);
 	}
-	spl->imp = page;
 	return (0);
 }
 
@@ -2381,7 +2370,7 @@ static int
 __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_PAGE *imp;
+	WT_PAGE *replace;
 	WT_RECONCILE *r;
 
 	r = S2C(session)->cache->rec;
@@ -2467,74 +2456,69 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__rec_discard_add_page(session, page));
 
 		/*
-		 * Update the page's parent reference -- when we created it,
-		 * we didn't know if it would be part of a split or not, so
-		 * we didn't know what page would be its parent.
-		 *
+		 * Create a new in-memory version of this page if necessary.
 		 * If we're evicting this page, the new state is "on-disk",
 		 * else, in-memory.
-		 *
-		 * Make sure we do not free the page twice on error.
 		 */
-		if ((imp = r->split[0].imp) != NULL) {
-			r->split[0].imp = NULL;
-			imp->parent = page->parent;
-			imp->parent_ref = page->parent_ref;
-			if (r->imref_next != 0)
-				WT_RET(__rec_imref_fixup(session, imp));
+		if (r->evict)
+			WT_RET(__rec_parent_update(session, page, NULL,
+			    r->split[0].off.addr, r->split[0].off.size,
+			    WT_REF_DISK));
+		else {
+			WT_RET(__rec_imref_fixup(
+			    session, &r->split[0],
+			    page->parent, page->parent_ref, &replace));
+			WT_RET(__rec_parent_update(session, page, replace,
+			    r->split[0].off.addr, r->split[0].off.size,
+			    WT_REF_MEM));
+		}
+	} else {
+		/*
+		 * A page grew so large we had to divide it into two or more
+		 * physical pages -- create a new internal page.
+		 */
+		WT_VERBOSE(S2C(session), WT_VERB_EVICT,
+		    (session, "reconcile: %" PRIu32 " (%" PRIu32 "B) splitting",
+		    WT_PADDR(page), WT_PSIZE(page)));
+
+		switch (page->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_ROW_INT:
+			WT_STAT_INCR(btree->stats, split_intl);
+			break;
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
+		case WT_PAGE_COL_VAR:
+		case WT_PAGE_ROW_LEAF:
+			WT_STAT_INCR(btree->stats, split_leaf);
+			break;
+		WT_ILLEGAL_FORMAT(session);
 		}
 
-		WT_RET(__rec_parent_update(session, page,
-		    imp, r->split[0].off.addr, r->split[0].off.size,
-		    r->evict ? WT_REF_DISK : WT_REF_MEM));
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			WT_RET(__rec_row_split(session, page, &replace));
+			break;
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
+		case WT_PAGE_COL_VAR:
+			WT_RET(__rec_col_split(session, page, &replace));
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
 
-		/* We're done, discard everything we've queued for discard. */
-		WT_RET(__rec_discard_evict(session));
-		return (0);
+		/* Queue the original page to be discarded, we're done. */
+		WT_RET(__rec_discard_add_page(session, page));
+
+		/*
+		 * Update the parent to reference the newly created internal
+		 * page.
+		 */
+		WT_RET(__rec_parent_update(
+		    session, page, replace, WT_ADDR_INVALID, 0, WT_REF_MEM));
 	}
-
-	/*
-	 * A page grew so large we had to divide it into two or more physical
-	 * pages -- create a new internal page.
-	 */
-	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "reconcile: %" PRIu32 " (%" PRIu32 "B) splitting",
-	    WT_PADDR(page), WT_PSIZE(page)));
-
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		WT_STAT_INCR(btree->stats, split_intl);
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		WT_STAT_INCR(btree->stats, split_leaf);
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
-	switch (page->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		WT_RET(__rec_row_split(session, &imp, page));
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-		WT_RET(__rec_col_split(session, &imp, page));
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
-	/* Queue the original page to be discarded, we're done. */
-	WT_RET(__rec_discard_add_page(session, page));
-
-	/* Update the parent to reference the newly created internal page. */
-	WT_RET(__rec_parent_update(
-	    session, page, imp, WT_ADDR_INVALID, 0, WT_REF_MEM));
 
 	/* We're done, discard everything we've queued for discard. */
 	WT_RET(__rec_discard_evict(session));
@@ -2822,7 +2806,7 @@ __rec_prefix_key_update(WT_RECONCILE *r)
  *	Update a row-store parent page's reference when a page is split.
  */
 static int
-__rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
+__rec_row_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
 	WT_PAGE *imp, *page;
 	WT_RECONCILE *r;
@@ -2865,27 +2849,14 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 		 * If there's an in-memory version of the page, connect it to
 		 * this parent and fix up its in-memory references.
 		 */
-		if ((imp = spl->imp) == NULL) {
+		if (spl->imp_dsk == NULL) {
 			WT_ROW_REF_PAGE(rref) = NULL;
 			WT_ROW_REF_STATE(rref) = WT_REF_DISK;
 		} else {
-			imp->parent = page;
-			imp->parent_ref = &rref->ref;
+			WT_RET(__rec_imref_fixup(
+			    session, spl, page, &rref->ref, &imp));
 			WT_ROW_REF_PAGE(rref) = imp;
 			WT_ROW_REF_STATE(rref) = WT_REF_MEM;
-
-			/*
-			 * The created in-memory page is hooked into the new
-			 * page, don't free it on error.
-			 */
-			spl->imp = NULL;
-
-			/*
-			 * If we've found all the in-memory references we expect
-			 * to find, don't keep searching.
-			 */
-			if (r->imref_found < r->imref_next)
-				WT_RET(__rec_imref_fixup(session, imp));
 		}
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
@@ -2911,7 +2882,7 @@ err:	__wt_free(session, page);
  *	Update a column-store parent page's reference when a page is split.
  */
 static int
-__rec_col_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
+__rec_col_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off;
@@ -2956,27 +2927,14 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE **splitp, WT_PAGE *orig)
 		 * If there's an in-memory version of the page, connect it to
 		 * this parent and fix up its in-memory references.
 		 */
-		if ((imp = spl->imp) == NULL) {
+		if (spl->imp_dsk == NULL) {
 			WT_COL_REF_PAGE(cref) = NULL;
 			WT_COL_REF_STATE(cref) = WT_REF_DISK;
 		} else {
-			imp->parent = page;
-			imp->parent_ref = &cref->ref;
+			WT_RET(__rec_imref_fixup(
+			    session, spl, page, &cref->ref, &imp));
 			WT_COL_REF_PAGE(cref) = imp;
 			WT_COL_REF_STATE(cref) = WT_REF_MEM;
-
-			/*
-			 * The created in-memory page is hooked into the new
-			 * page, don't free it on error.
-			 */
-			spl->imp = NULL;
-
-			/*
-			 * If we've found all the in-memory references we expect
-			 * to find, don't keep searching.
-			 */
-			if (r->imref_found < r->imref_next)
-				WT_RET(__rec_imref_fixup(session, imp));
 		}
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
@@ -3034,15 +2992,34 @@ __rec_imref_bsearch_cmp(const void *a, const void *b)
  *	Fix up after splitting a page referencing an in-memory subtree.
  */
 static int
-__rec_imref_fixup(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_imref_fixup(WT_SESSION_IMPL *session,
+    WT_SPLIT *spl, WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE **pagep)
 {
 	WT_COL_REF *cref;
+	WT_PAGE *page;
 	WT_RECONCILE *r;
 	WT_REF **searchp, *ref;
 	WT_ROW_REF *rref;
 	uint32_t i;
 
 	r = S2C(session)->cache->rec;
+
+	/*
+	 * Create the in-memory version of the page from the disk image.  We'll
+	 * free this page on error, so clear the disk image reference to ensure
+	 * we don't free it twice.
+	 */
+	WT_RET(
+	    __wt_page_inmem(session, parent, parent_ref, spl->imp_dsk, &page));
+	spl->imp_dsk = NULL;
+	*pagep = page;
+
+	/*
+	 * If we've found all the in-memory references we expect to find, don't
+	 * keep searching.
+	 */
+	if (r->imref_found >= r->imref_next)
+		return (0);
 
 	/*
 	 * Walk the page we just created, and for any addr that appears, check
@@ -3166,9 +3143,13 @@ __rec_discard_evict(WT_SESSION_IMPL *session)
 		if (discard->page == NULL)
 			WT_RET(__wt_block_free(
 			    session, discard->addr, discard->size));
-		else
-			__wt_page_free(session,
-			    discard->page, discard->addr, discard->size);
+		else {
+			WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
+			    "discard addr %" PRIu32 "/%" PRIu32 " (%s)",
+			    discard->addr, discard->size,
+			    __wt_page_type_string(discard->page->type)));
+			__wt_page_free(session, discard->page);
+		}
 	return (0);
 }
 

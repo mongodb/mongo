@@ -1124,7 +1124,7 @@ __slvg_build_leaf_col(WT_SESSION_IMPL *session,
 	page->entries = save_entries;
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page, WT_ADDR_INVALID, 0);
+	__wt_page_free(session, page);
 	__wt_hazard_clear(session, page);
 
 	return (ret);
@@ -1648,7 +1648,7 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	}
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page, WT_ADDR_INVALID, 0);
+	__wt_page_free(session, page);
 	__wt_hazard_clear(session, page);
 
 err:	__wt_scr_release(&key);

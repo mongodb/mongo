@@ -186,10 +186,7 @@ extern int __wt_desc_write(WT_SESSION_IMPL *session,
     const char *config,
     WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
-extern void __wt_page_free( WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    uint32_t addr,
-    uint32_t size);
+extern void __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_btree_dump(WT_SESSION_IMPL *session,
     FILE *stream,
     uint32_t flags);

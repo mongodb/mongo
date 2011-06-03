@@ -10,14 +10,17 @@
  *	Read pages into the cache.
  */
 static inline void
-__wt_cache_page_in(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+__wt_cache_page_in(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
+
+	if (page->dsk == NULL)
+		return;
 
 	cache = S2C(session)->cache;
 
 	++cache->pages_in;
-	cache->bytes_in += size;
+	cache->bytes_in += page->dsk->size;
 	F_SET(page, WT_PAGE_CACHE_COUNTED);
 }
 
@@ -26,14 +29,14 @@ __wt_cache_page_in(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
  *	Discard pages from the cache.
  */
 static inline void
-__wt_cache_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+__wt_cache_page_out(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
 	++cache->pages_out;
-	cache->bytes_out += size;
+	cache->bytes_out += page->dsk->size;
 
 	WT_ASSERT(session, cache->pages_in >= cache->pages_out);
 	WT_ASSERT(session, cache->bytes_in >= cache->bytes_out);
@@ -99,22 +102,6 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 }
 
 /*
- * __wt_off_page_size --
- *	Return if a pointer references off-page data.
- */
-static inline int
-__wt_off_page_size(WT_PAGE *page, const void *p, uint32_t size)
-{
-	/*
-	 * There may be no underlying page, in which case the reference is
-	 * off-page by definition.
-	 */
-	return (page->dsk == NULL ||
-	    p < (void *)page->dsk ||
-	    p >= (void *)((uint8_t *)page->dsk + size) ? 1 : 0);
-}
-
-/*
  * __wt_off_page --
  *	Return if a pointer references off-page data.
  */
@@ -122,9 +109,15 @@ static inline int
 __wt_off_page(WT_PAGE *page, const void *p)
 {
 	/*
-	 * Try to get the size from page->dsk: during reconciliation,
-	 * parent_ref may not be set.
+	 * There may be no underlying page, in which case the reference is
+	 * off-page by definition.
+	 *
+	 * We use the page's disk size, not the page parent's reference disk
+	 * size for a reason: the page may already be disconnected from the
+	 * parent reference (when being discarded), or not yet be connected
+	 * to the parent reference (when being created).
 	 */
-	return (__wt_off_page_size(page, p,
-	    (page->dsk != NULL) ? page->dsk->size : WT_PSIZE(page)));
+	return (page->dsk == NULL ||
+	    p < (void *)page->dsk ||
+	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size) ? 1 : 0);
 }

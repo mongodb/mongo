@@ -15,7 +15,7 @@ static void __wt_free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
-static void __wt_free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static void __wt_free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static void __wt_free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __wt_free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
@@ -24,13 +24,8 @@ static void __wt_free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
  *	Free all memory associated with a page.
  */
 void
-__wt_page_free(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t addr, uint32_t size)
+__wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "discard addr %" PRIu32 "/%" PRIu32 " (type %s)",
-	    addr, size, __wt_page_type_string(page->type)));
-
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);
 #endif
@@ -45,13 +40,6 @@ __wt_page_free(
 	page->parent_ref = NULL;
 
 	/*
-	 * The address/size may not be set, and that's OK, but it means there
-	 * better not be any disk image associated with this page.
-	 */
-	WT_ASSERT(session,
-	    (addr != WT_ADDR_INVALID && size != 0) || page->dsk == NULL);
-
-	/*
 	 * The page must either be clean, or an internal split page, which
 	 * is created dirty and can never be "clean".
 	 */
@@ -64,7 +52,7 @@ __wt_page_free(
 	 * have more space.
 	 */
 	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		__wt_cache_page_out(session, page, size);
+		__wt_cache_page_out(session, page);
 
 	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
@@ -98,7 +86,7 @@ __wt_page_free(
 			__wt_free_page_row_int(session, page);
 			break;
 		case WT_PAGE_ROW_LEAF:
-			__wt_free_page_row_leaf(session, page, size);
+			__wt_free_page_row_leaf(session, page);
 			break;
 		}
 
@@ -199,7 +187,7 @@ __wt_free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_LEAF page.
  */
 static void
-__wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+__wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_IKEY *ikey;
 	WT_ROW *rip;
@@ -213,8 +201,7 @@ __wt_free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	 * the memory.
 	 */
 	WT_ROW_FOREACH(page, rip, i)
-		if ((ikey = rip->key) != NULL &&
-		     __wt_off_page_size(page, ikey, size))
+		if ((ikey = rip->key) != NULL && __wt_off_page(page, ikey))
 			__wt_sb_free(session, ikey->sb);
 	__wt_free(session, page->u.row_leaf.d);
 
