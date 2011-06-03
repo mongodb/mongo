@@ -320,7 +320,7 @@ namespace mongo {
             lower = e;
             break;
         case BSONObj::opALL: {
-            massert( 10370 ,  "$all requires array", e.type() == Array );
+            uassert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
             bool bound = false;
             while ( i.more() ) {
@@ -735,7 +735,7 @@ namespace mongo {
         int op2 = g.getGtLtOp();
         if ( op2 == BSONObj::opALL ) {
             BSONElement h = g;
-            massert( 13050 ,  "$all requires array", h.type() == Array );
+            uassert( 13050 ,  "$all requires array", h.type() == Array );
             BSONObjIterator i( h.embeddedObject() );
             if( i.more() ) {
                 BSONElement x = i.next();
@@ -1377,13 +1377,13 @@ namespace mongo {
         while( i.more() ) {
             BSONElement e = i.next();
             if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                uassert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
                     BSONElement f = j.next();
-                    massert( 13263, "$or array must contain objects", f.type() == Object );
+                    uassert( 13263, "$or array must contain objects", f.type() == Object );
                     _orSets.push_back( FieldRangeSetPair( ns, f.embeddedObject(), optimize ) );
-                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
+                    uassert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
                     _originalOrSets.push_back( _orSets.back() );
                 }
                 _orFound = true;
