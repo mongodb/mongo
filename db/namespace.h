@@ -359,6 +359,10 @@ namespace mongo {
             return -1;
         }
 
+        bool haveIdIndex() { 
+            return (flags & NamespaceDetails::Flag_HaveIdIndex) || findIdIndex() >= 0;
+        }
+
         /* return which "deleted bucket" for this size object */
         static int bucket(int n) {
             for ( int i = 0; i < Buckets; i++ )

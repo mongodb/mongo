@@ -1751,7 +1751,7 @@ namespace mongo {
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
             // we don't add _id for capped collections as they don't have an _id index
-            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && !d->capped) {
+            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && d->haveIdIndex() ) {
                 if( addedID )
                     *addedID = true;
                 addID = len;
