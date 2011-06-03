@@ -1,6 +1,8 @@
 personal_ws-1.1 en 200
 APIs
+Atomicity
 BLOBs
+DB's
 DBTs
 DbCursor
 DbEnv
@@ -64,6 +66,7 @@ fillfactor
 firstname
 fput
 gdbm
+getter
 gid
 hb
 hotbackup
@@ -141,11 +144,13 @@ realloc'd
 recno
 recnoN
 recnum
+recs
 rerequests
 ret
 ro
 rpc
 schemas
+selectable
 seqname
 serializable
 sHQ
@@ -163,14 +168,18 @@ td
 th
 thang
 timestamp
+timestamps
 todo
 tpc
 tpcb
+transactional
 transactionally
 tt
 txn
 txns
 ul
+unallocated
+untyped
 uri
 useconds
 utf
