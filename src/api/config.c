@@ -542,10 +542,7 @@ __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
  int
 __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
-	const char *cfgs[2];
-
-	cfgs[0] = cfg;
-	cfgs[1] = NULL;
+	const char *cfgs[] = { cfg, NULL };
 	return (__wt_config_get(cfgs, key, value));
 }
 
@@ -556,10 +553,7 @@ __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  int
 __wt_config_getones(const char *cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	const char *cfgs[2];
-
-	cfgs[0] = cfg;
-	cfgs[1] = NULL;
+	const char *cfgs[] = { cfg, NULL };
 	return (__wt_config_gets(cfgs, key, value));
 }
 
@@ -619,9 +613,7 @@ int
 __wt_config_check(
     WT_SESSION_IMPL *session, const char *defaults, const char *config)
 {
-	const char *defs[2];
-	defs[0] = defaults;
-	defs[1] = NULL;
+	const char *defs[] = { defaults, NULL };
 
 	return (__wt_config_checklist(session, defs, config));
 }
