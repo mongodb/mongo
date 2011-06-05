@@ -794,7 +794,6 @@ namespace mongo {
                     DEV {
                         log() << key.toString() << endl;
                         log() << keyNode(pos-1).key.toString() << endl;
-                        int res = keyNode(pos-1).key.woCompare(key, order);
                     }
                     wassert(false);
                 }
