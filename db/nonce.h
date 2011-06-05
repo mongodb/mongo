@@ -1,4 +1,4 @@
-// nonce.h
+// @file nonce.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -19,24 +19,18 @@
 
 namespace mongo {
 
-    typedef unsigned long long nonce;
+    typedef unsigned long long nonce64;
 
     struct Security {
         Security();
-
-        nonce getNonce();
-
-        /** safe during global var initialization */
-        nonce getNonceInitSafe() {
-            init();
-            return getNonce();
-        }
+        static nonce64 getNonce();
+        static nonce64 getNonceDuringInit(); // use this version during global var constructors
     private:
+        nonce64 _getNonce();
+        nonce64 __getNonce();
         ifstream *_devrandom;
-        static bool _initialized;
+        bool _initialized;
         void init(); // can call more than once
     };
-
-    extern Security security;
 
 } // namespace mongo
