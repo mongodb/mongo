@@ -161,11 +161,6 @@ namespace mongo {
     }
 #endif
 
-    // note this wraps
-    inline int tdiff(unsigned told, unsigned tnew) {
-        return WrappingInt::diff(tnew, told);
-    }
-
     extern long long jsTime_virtual_skew;
     extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
 
@@ -189,8 +184,10 @@ namespace mongo {
 
     /** Date_t is milliseconds since epoch */
     inline Date_t jsTime();
-    /** measures up to 1024 seconds.  or, 512 seconds with tdiff that is */
+
+    /** warning this will wrap */
     inline unsigned curTimeMicros();
+
     inline unsigned long long curTimeMicros64();
 #ifdef _WIN32 // no gettimeofday on windows
     inline unsigned long long curTimeMillis64() {
