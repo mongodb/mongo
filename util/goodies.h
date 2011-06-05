@@ -113,45 +113,6 @@ namespace mongo {
 #undef assert
 #define assert MONGO_assert
 
-    struct WrappingInt {
-        WrappingInt() {
-            x = 0;
-        }
-        WrappingInt(unsigned z) : x(z) { }
-        unsigned x;
-        operator unsigned() const {
-            return x;
-        }
-
-
-        static int diff(unsigned a, unsigned b) {
-            return a-b;
-        }
-        bool operator<=(WrappingInt r) {
-            // platform dependent
-            int df = (r.x - x);
-            return df >= 0;
-        }
-        bool operator>(WrappingInt r) {
-            return !(r<=*this);
-        }
-    };
-
-    /*
-
-    class DebugMutex : boost::noncopyable {
-        friend class lock;
-        mongo::mutex m;
-        int locked;
-    public:
-        DebugMutex() : locked(0); { }
-        bool isLocked() { return locked; }
-    };
-
-    */
-
-//typedef scoped_lock lock;
-
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
         if ( strlen(str) < l ) return false;
