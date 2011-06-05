@@ -790,7 +790,14 @@ namespace mongo {
             Key keyatpos = keyNode(pos).key;
             wassert( key.woCompare(keyatpos, order) <= 0 );
             if ( pos > 0 ) {
-                wassert( keyNode(pos-1).key.woCompare(key, order) <= 0 );
+                if( !( keyNode(pos-1).key.woCompare(key, order) <= 0 ) ) {
+                    DEV {
+                        log() << key.toString() << endl;
+                        log() << keyNode(pos-1).key.toString() << endl;
+                        int res = keyNode(pos-1).key.woCompare(key, order);
+                    }
+                    wassert(false);
+                }
             }
         }
 
