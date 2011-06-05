@@ -267,7 +267,7 @@ namespace mongo {
 
     inline int BSONObj::getIntField(const char *name) const {
         BSONElement e = getField(name);
-        return e.isNumber() ? (int) e.number() : INT_MIN;
+        return e.isNumber() ? (int) e.number() : std::numeric_limits< int >::min();
     }
 
     inline bool BSONObj::getBoolField(const char *name) const {
