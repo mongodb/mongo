@@ -21,6 +21,10 @@
 #include "engine.h"
 #include <v8.h>
 
+#ifndef USING_V8_SHARED
+#define V8_ISOLATE_API
+#endif
+
 using namespace v8;
 
 namespace mongo {
@@ -35,6 +39,12 @@ namespace mongo {
     // will not be preempted.  The V8Lock should be used in place of v8::Locker
     // except in certain special cases involving interrupts.
     namespace v8Locks {
+
+    	struct InterruptLock {
+    		InterruptLock();
+    		~InterruptLock();
+    	};
+
         // the implementations are quite simple - objects must be destroyed in
         // reverse of the order created, and should not be shared between threads
         struct RecursiveLock {
@@ -49,11 +59,19 @@ namespace mongo {
         };
     } // namespace v8Locks
     class V8Lock {
+    public:
+    	V8Lock() : _preemptionLock(Isolate::GetCurrent())
+    	{}
+    private:
         v8Locks::RecursiveLock _noPreemptionLock;
         v8::Locker _preemptionLock;
     };
     struct V8Unlock {
-        v8::Unlocker _preemptionUnlock;
+    public:
+    	V8Unlock() : _preemptionUnlock(Isolate::GetCurrent())
+    	{}
+    private:
+    	v8::Unlocker _preemptionUnlock;
         v8Locks::RecursiveUnlock _noPreemptionUnlock;
     };
 
@@ -152,6 +170,8 @@ namespace mongo {
     private:
         void _startCall();
 
+        static string intToString(int value);
+
         static Handle< Value > nativeCallback( V8Scope* scope, const Arguments &args );
         static v8::Handle< v8::Value > v8Callback( const v8::Arguments &args );
         static Handle< Value > load( V8Scope* scope, const Arguments &args );
@@ -159,6 +179,10 @@ namespace mongo {
         static Handle< Value > Version(V8Scope* scope, const v8::Arguments& args);
         static Handle< Value > GCV8(V8Scope* scope, const v8::Arguments& args);
 
+
+		#define MAX_INT_CACHE 10
+
+        static const string _intCache[MAX_INT_CACHE];
 
         V8ScriptEngine * _engine;
 
@@ -180,6 +204,7 @@ namespace mongo {
         Persistent<v8::ObjectTemplate> roObjectTemplate;
         Persistent<v8::ObjectTemplate> lzArrayTemplate;
         Persistent<v8::ObjectTemplate> internalFieldObjects;
+        v8::Isolate* _isolate;
     };
 
     class V8ScriptEngine : public ScriptEngine {
@@ -206,21 +231,30 @@ namespace mongo {
         friend class V8Scope;
     };
 
+#define IMMUTABLE_STRING(string_literal)                                \
+	  ExternalString::CreateFromLiteral(                      \
+      string_literal "", sizeof(string_literal) - 1)
+
     class ExternalString : public v8::String::ExternalAsciiStringResource {
     public:
-        ExternalString(std::string str) : _data(str) {
-        }
+     static v8::Handle<v8::String> CreateFromLiteral(const char *string_literal,
+                                                     size_t length);
+
+        ExternalString(const char *src, size_t len)
+          	  : _src(src),
+                _len(len) {
+          }
+
 
         ~ExternalString() {
         }
 
-        const char* data () const { return _data.c_str(); }
-        size_t length () const { return _data.length(); }
     private:
-//      string _str;
-//        const char* _data;
-        std::string _data;
-//        size_t _len;
+        const char* data () const { return _src; }
+        size_t length () const { return _len; }
+    private:
+        const char* _src;
+        size_t _len;
     };
 
     extern ScriptEngine * globalScriptEngine;

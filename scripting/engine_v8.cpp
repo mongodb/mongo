@@ -21,8 +21,11 @@
 #include "v8_utils.h"
 #include "v8_db.h"
 
-#define V8_SIMPLE_HEADER V8Lock l; HandleScope handle_scope; Context::Scope context_scope( _context );
-
+#ifdef V8_ISOLATE_API
+#define V8_SIMPLE_HEADER v8::Isolate::Scope iscope(_isolate); v8::Locker l(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
+#else
+#define V8_SIMPLE_HEADER v8Lock l(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
+#endif
 namespace mongo {
 
     // guarded by v8 mutex
@@ -226,6 +229,9 @@ namespace mongo {
     // --- engine ---
 
     V8ScriptEngine::V8ScriptEngine() {
+    	v8::V8::Initialize();
+    	v8::Locker l;
+        v8::Locker::StartPreemption( 50 );
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -239,15 +245,19 @@ namespace mongo {
 
     void V8ScriptEngine::interrupt( unsigned opSpec ) {
         v8::Locker l;
+        v8Locks::InterruptLock il;
         if ( __interruptSpecToThreadId.count( opSpec ) ) {
             V8::TerminateExecution( __interruptSpecToThreadId[ opSpec ] );
         }
     }
     void V8ScriptEngine::interruptAll() {
         v8::Locker l;
-        vector< int > toKill; // v8 mutex could potentially be yielded during the termination call
-        for( map< unsigned, int >::const_iterator i = __interruptSpecToThreadId.begin(); i != __interruptSpecToThreadId.end(); ++i ) {
-            toKill.push_back( i->second );
+		vector< int > toKill; // v8 mutex could potentially be yielded during the termination call
+        {
+			v8Locks::InterruptLock il;
+			for( map< unsigned, int >::const_iterator i = __interruptSpecToThreadId.begin(); i != __interruptSpecToThreadId.end(); ++i ) {
+				toKill.push_back( i->second );
+			}
         }
         for( vector< int >::const_iterator i = toKill.begin(); i != toKill.end(); ++i ) {
             V8::TerminateExecution( *i );
@@ -260,7 +270,12 @@ namespace mongo {
         : _engine( engine ) ,
           _connectState( NOT ) {
 
-        V8Lock l;
+
+#ifdef V8_ISOLATE_API
+        _isolate = v8::Isolate::New();
+        v8::Isolate::Scope iscope(_isolate);
+        v8::Locker l(_isolate);
+#endif
         HandleScope handleScope;
         _context = Context::New();
         Context::Scope context_scope( _context );
@@ -341,8 +356,20 @@ namespace mongo {
         lzArrayTemplate.Dispose();
         roObjectTemplate.Dispose();
         internalFieldObjects.Dispose();
+#ifdef V8_ISOLATE_API
+        _isolate->Dispose();
+#else
+
+#endif
     }
 
+    inline string V8Scope::intToString(int value) {
+    	if (value>=0 && value<MAX_INT_CACHE)
+    		return _intCache[value];
+        stringstream ss;
+        ss << value;
+        return ss.str();
+    }
     /**
      * JS Callback that will call a c++ function with BSON arguments.
      */
@@ -354,9 +381,7 @@ namespace mongo {
         Local< External > data = External::Cast( *args.Callee()->Get( scope->V8STR_NATIVE_DATA ) );
         BSONObjBuilder b;
         for( int i = 0; i < args.Length(); ++i ) {
-            stringstream ss;
-            ss << i;
-            scope->v8ToMongoElement( b, scope->V8STR_EMPTY, ss.str(), args[ i ] );
+            scope->v8ToMongoElement( b, scope->V8STR_EMPTY, intToString(i), args[ i ] );
         }
         BSONObj nativeArgs = b.obj();
         BSONObj ret;
@@ -802,9 +827,6 @@ namespace mongo {
                     return;
                 throw UserException( 12511, "localConnect called with a different name previously" );
             }
-
-            // needed for killop / interrupt support
-            v8::Locker::StartPreemption( 50 );
 
             //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
             _global->Set( getV8Str( "Mongo" ) , getMongoFunctionTemplate( this, true )->GetFunction() );
@@ -1461,6 +1483,19 @@ namespace mongo {
         }
 //      cout << "Returning str " + str << endl;
         return ptr;
+    }
+
+    const string V8Scope::_intCache[10] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+
+    v8::Handle<v8::String> ExternalString::CreateFromLiteral(
+        const char *string_literal,
+        size_t length) {
+      HandleScope scope;
+
+      Local<v8::String> ret = String::NewExternal(new ExternalString(
+          string_literal,
+          length));
+      return scope.Close(ret);
     }
 
 } // namespace mongo

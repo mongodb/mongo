@@ -204,7 +204,7 @@ namespace mongo {
 
         DBClientWithCommands * conn;
         {
-            V8Unlock ul;
+        	V8Unlock ul;
             conn = cs.connect( errmsg );
         }
         if ( ! conn )
@@ -948,19 +948,38 @@ namespace mongo {
     // to be called with v8 mutex
     void enableV8Interrupt() {
         if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+        	v8Locks::InterruptLock l;
             __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] = v8::V8::GetCurrentThreadId();
         }
     }
 
     // to be called with v8 mutex
     void disableV8Interrupt() {
+
         if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
-            __interruptSpecToThreadId.erase( globalScriptEngine->getInterruptSpec() );
+        	v8Locks::InterruptLock l;
+        	__interruptSpecToThreadId.erase( globalScriptEngine->getInterruptSpec() );
         }
     }
 
     namespace v8Locks {
-        boost::mutex& __v8Mutex = *( new boost::mutex );
+#ifdef V8_ISOLATE_API
+    	boost::mutex& __interruptMutex = *( new boost::mutex );
+#endif
+
+    	InterruptLock::InterruptLock() {
+#ifdef V8_ISOLATE_API
+    		__interruptMutex.lock();
+#endif
+    	}
+
+    	InterruptLock::~InterruptLock() {
+#ifdef V8_ISOLATE_API
+    		__interruptMutex.unlock();
+#endif
+    	}
+
+    	boost::mutex& __v8Mutex = *( new boost::mutex );
         ThreadLocalValue< bool > __locked;
 
         RecursiveLock::RecursiveLock() : _unlock() {
