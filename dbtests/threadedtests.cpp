@@ -250,17 +250,17 @@ namespace ThreadedTests {
         
         static void worker1( const RWLock * lk , AtomicUInt * x ) {
             (*x)++; // 1
-            cout << "lock b try" << endl;
+            //cout << "lock b try" << endl;
             rwlock b( *lk , true ); 
-            cout << "lock b got" << endl;
+            //cout << "lock b got" << endl;
             (*x)++; // 2
         }
 
         static void worker2( const RWLock * lk , AtomicUInt * x ) {
-            cout << "lock c try" << endl;
+            //cout << "lock c try" << endl;
             rwlock c( *lk , false );
             (*x)++;
-            cout << "lock c got" << endl;
+            //cout << "lock c got" << endl;
         }
 
         void run() { 
@@ -309,10 +309,10 @@ namespace ThreadedTests {
         
         static void worker2( RWLock * lk , AtomicUInt * x ) {
     	    assert( ! lk->lock_try(0) );
-            cout << "lock c try" << endl;
+            //cout << "lock c try" << endl;
             rwlock c( *lk , false );
             (*x)++;
-            cout << "lock c got" << endl;
+            //cout << "lock c got" << endl;
         }
 
         void run() { 
