@@ -22,9 +22,11 @@
 
 #include <map>
 #include <limits>
-//#include "../util/atomic_int.h"
-//#include "util/misc.h"
-//#include "../util/hex.h"
+
+#if defined(_WIN32)
+#undef max
+#undef min
+#endif
 
 namespace mongo {
 
@@ -68,7 +70,6 @@ namespace mongo {
         case NumberDouble: {
             double left = l.number();
             double right = r.number();
-#undef max
             bool lNan = !( left <= std::numeric_limits< double >::max() &&
                            left >= -std::numeric_limits< double >::max() );
             bool rNan = !( right <= numeric_limits< double >::max() &&
