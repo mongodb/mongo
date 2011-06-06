@@ -157,6 +157,8 @@ assert.eq( 100 , ts.find().itcount() , "E5" )
 printjson( ts.find().batchSize(5).explain() )
 
 before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+// Careful, mongos can poll the masters here too unrelated to the query, 
+// resulting in this test failing sporadically if/when there's a delay here.
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "E6" )
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 assert.eq( before.query + before.getmore , after.query + after.getmore , "E6.1" )
