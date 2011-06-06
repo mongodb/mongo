@@ -1114,7 +1114,9 @@ namespace mongo {
             return;
         }
         case Bool: appendBool( fieldName , false); return;
-        case Date: appendDate( fieldName , 0); return;
+        case Date: 
+            appendDate( fieldName , numeric_limits<long long>::min() ); 
+            return;
         case jstNULL: appendNull( fieldName ); return;
         case Symbol:
         case String: append( fieldName , "" ); return;
@@ -1163,7 +1165,7 @@ namespace mongo {
         case jstNULL:
             appendMinForType( fieldName , NumberInt );
         case Bool: appendBool( fieldName , true); break;
-        case Date: appendDate( fieldName , 0xFFFFFFFFFFFFFFFFLL ); break;
+        case Date: appendDate( fieldName , numeric_limits<long long>::max() ); break;
         case Symbol:
         case String: append( fieldName , BSONObj() ); break;
         case Code:

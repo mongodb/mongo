@@ -492,10 +492,36 @@ namespace JsobjTests {
                 keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
 
                 {
-                    // check signed dates with new key format
-                    KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
-                    KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
-                    ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                    {
+                        // check signed dates with new key format
+                        KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                    }
+                    {
+                        // backward compatibility
+                        KeyBson a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyBson b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                    }
+                    {
+                        // this is an uncompactible key:
+                        BSONObj uc1 = BSONObjBuilder().appendDate("", -50).appendCode("", "abc").obj();
+                        BSONObj uc2 = BSONObjBuilder().appendDate("", 55).appendCode("", "abc").obj();
+                        ASSERT( uc1.woCompare(uc2, Ordering::make(BSONObj())) < 0 );
+                        {
+                            KeyV1Owned a(uc1);
+                            KeyV1Owned b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                        }
+                        {
+                            KeyBson a(uc1);
+                            KeyBson b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                        }
+                    }
                 }
 
                 {

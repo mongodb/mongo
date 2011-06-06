@@ -54,9 +54,13 @@ namespace mongo {
                 return -1;
             return l.date() == r.date() ? 0 : 1;
         case Date:
-            if ( l.date() < r.date() )
-                return -1;
-            return l.date() == r.date() ? 0 : 1;
+            {
+                long long a = (long long) l.Date().millis;
+                long long b = (long long) r.Date().millis;
+                if( a < b ) 
+                    return -1;
+                return a == b ? 0 : 1;
+            }
         case NumberLong:
             if( r.type() == NumberLong ) {
                 long long L = l._numberLong();
