@@ -613,7 +613,7 @@ namespace JsobjTests {
                     b.append("field", x, 4);
                     b.append("z", true);
                     BSONObj B = b.obj();
-                    cout << B.toString() << endl;
+                    //cout << B.toString() << endl;
 
                     BSONObjBuilder a;
                     const char xx[] = {'a', 0, 'c', 0};
