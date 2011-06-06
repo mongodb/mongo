@@ -55,6 +55,7 @@ namespace mongo {
         _dropped = in["dropped"].trueValue();
         if ( in["key"].isABSONObj() )
             shard( in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
+        _dirty = false;
     }
 
 
