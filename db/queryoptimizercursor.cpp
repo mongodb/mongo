@@ -204,7 +204,7 @@ namespace mongo {
         }
         
         /** This cursor will be ignored for yielding by the client cursor implementation. */
-        virtual DiskLoc refLoc() { return DiskLoc(); }
+        virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
         virtual bool supportGetMore() { return false; }
 

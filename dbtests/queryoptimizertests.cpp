@@ -2211,6 +2211,43 @@ namespace QueryOptimizerTests {
                 }
             }
         };
+
+        /** Yield with BacicCursor takeover cursor. */
+        class YieldTakeoverBasic : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << BSON_ARRAY( i << i+1 ) ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                auto_ptr<ClientCursor> cc;
+                auto_ptr<ClientCursor::YieldData> data( new ClientCursor::YieldData() );
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "b" << NE << 0 << "a" << GTE << 0 ) );
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
+                    for( int i = 0; i < 120; ++i ) {
+                     	ASSERT( advance() );
+                    }
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 120, current().getIntField( "_id" ) );
+                    cc->prepareToYield( *data );
+                }                
+                _cli.remove( ns(), BSON( "_id" << 120 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT( ClientCursor::recoverFromYield( *data ) );
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 121, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 122, current().getIntField( "_id" ) );
+                }
+            }
+        };
         
         /** Yield with advance of inactive cursor. */
         class YieldInactiveCursorAdvance : public Base {
@@ -2637,6 +2674,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
             add<QueryOptimizerCursorTests::TryYieldGeo>();
             add<QueryOptimizerCursorTests::YieldTakeover>();
+            add<QueryOptimizerCursorTests::YieldTakeoverBasic>();
             add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
             add<QueryOptimizerCursorTests::OrderId>();
             add<QueryOptimizerCursorTests::OrderMultiIndex>();
