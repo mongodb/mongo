@@ -22,6 +22,7 @@
 #include "../db/querypattern.h"
 #include "../db/queryutil.h"
 #include "../util/unittest.h"
+#include "../util/timer.h"
 
 #include "chunk.h"
 #include "config.h"
@@ -503,7 +504,12 @@ namespace mongo {
         while (tries--) {
             ChunkMap chunkMap;
             set<Shard> shards;
+            Timer t;
             _load(chunkMap, shards);
+            {
+                int ms = t.millis();
+                log( ms < 100 ) << "time to load chunks for " << ns << ": " << ms << "ms" << endl;
+            }
 
             if (_isValid(chunkMap)) {
                 // These variables are const for thread-safety. Since the
@@ -514,10 +520,12 @@ namespace mongo {
                 const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
                 return;
             }
-
+            
             if (_chunkMap.size() < 10) {
                 _printChunks();
             }
+            
+            warning() << "ChunkManager loaded an invalid config, trying again" << endl;
 
             sleepmillis(10 * (3-tries));
         }
