@@ -208,7 +208,7 @@ namespace mongo {
         
         virtual bool supportGetMore() { return false; }
 
-        virtual bool supportYields() { return true; }
+        virtual bool supportYields() { return _takeover ? _takeover->supportsYield() : true; }
         virtual bool prepareToYield() {
             if ( _takeover ) {
                 return _takeover->prepareToYield();
