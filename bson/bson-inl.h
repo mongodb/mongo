@@ -677,7 +677,7 @@ namespace mongo {
             s << "EOO";
             break;
         case mongo::Date:
-            s << "new Date(" << date() << ')';
+            s << "new Date(" << (long long) date() << ')';
             break;
         case RegEx: {
             s << "/" << regex() << '/';

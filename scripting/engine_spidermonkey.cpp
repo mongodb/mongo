@@ -651,7 +651,7 @@ namespace mongo {
                 return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
             }
             case Date:
-                return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , (jsdouble) e.date().millis ) );
+                return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , (jsdouble) ((long long)e.date().millis) ) );
 
             case MinKey:
                 return OBJECT_TO_JSVAL( JS_NewObject( _context , &minkey_class , 0 , 0 ) );
