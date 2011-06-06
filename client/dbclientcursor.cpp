@@ -250,14 +250,20 @@ namespace mongo {
 
         if ( conn->get()->type() == ConnectionString::SET ||
              conn->get()->type() == ConnectionString::SYNC ) {
-            _scopedHost = _client->getServerAddress();
+            if( _lazy )
+                _scopedHost = _lazy->getServerAddress();
+            else if( _client )
+                _scopedHost = _client->getServerAddress();
+            else
+                massert(14821, "No client or lazy client specified, cannot store multi-host connection.", false);
         }
         else {
             _scopedHost = conn->getHost();
         }
-        
+
         conn->done();
         _client = 0;
+        _lazy = 0;
     }
 
     DBClientCursor::~DBClientCursor() {
