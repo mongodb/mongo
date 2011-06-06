@@ -201,7 +201,11 @@ namespace mongo {
                 ci = _collections[ns];
             }
             massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
+<<<<<<< Updated upstream
             assert( ci.wasDropped() || ! ci.key().isEmpty() );
+=======
+            
+>>>>>>> Stashed changes
             
             if ( ! shouldReload || earlyReload )
                 return ci.getCM();
@@ -210,6 +214,7 @@ namespace mongo {
             unique = ci.unique();
         }
         
+<<<<<<< Updated upstream
         assert( ! key.isEmpty() );
 
         // we are not locked now, and want to load a new ChunkManager
@@ -221,6 +226,11 @@ namespace mongo {
             return getChunkManager( ns , false );
         }
         
+=======
+        // we are not locked now, and want to load a new ChunkManager
+        
+        auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
+>>>>>>> Stashed changes
 
         scoped_lock lk( _lock );
         
