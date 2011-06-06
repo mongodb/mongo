@@ -542,6 +542,46 @@ var p10result = [
 assert(orderedArrayEq(p10.result, p10result), 'p10 failed');
 
 
+// unwind on nested array
+db.p11.drop();
+db.p11.save( {
+    name : 'MongoDB',
+    items : {
+	authors : ['jay', 'vivek', 'bjornar'],
+	dbg : [17, 42]
+    },
+    favorites : ['pickles', 'ice cream', 'kettle chips']
+});
+
+var p11 = db.runCommand(
+{ aggregate : "p11", pipeline : [
+    { $project : {
+	name : 1,
+	author : { $unwind : "items.authors" },
+    }}
+]});
+
+p11result = [
+    {
+        "_id" : ObjectId("4ded2e7d4a0eb8caae28044d"),
+        "name" : "MongoDB",
+        "author" : "jay"
+    },
+    {
+        "_id" : ObjectId("4ded2e7d4a0eb8caae28044d"),
+        "name" : "MongoDB",
+        "author" : "vivek"
+    },
+    {
+        "_id" : ObjectId("4ded2e7d4a0eb8caae28044d"),
+        "name" : "MongoDB",
+        "author" : "bjornar"
+    }
+];
+
+assert(arrayEq(p11.result, p11result), 'p11 failed');
+
+
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
