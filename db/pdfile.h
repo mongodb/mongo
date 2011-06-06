@@ -160,6 +160,9 @@ namespace mongo {
         int lengthWithHeaders;
         int extentOfs;
         DiskLoc nextDeleted;
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+            return DiskLoc(myLoc.a(), extentOfs);
+        }
         Extent* myExtent(const DiskLoc& myLoc) {
             return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
         }

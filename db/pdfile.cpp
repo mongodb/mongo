@@ -1417,13 +1417,9 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
-        tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
+        tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
-
-        if( background ) {
-            log(2) << "buildAnIndex: background=true\n";
-        }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         assert( d->indexBuildInProgress == 0 );
@@ -1441,7 +1437,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
+        tlog() << "build index done " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */

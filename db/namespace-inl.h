@@ -86,8 +86,8 @@ namespace mongo {
             e = e->next(this);
             if ( ! e ) {
                 if ( missingExpected )
-                    throw MsgAssertionException( 13283 , "missing extra" );
-                massert(13283, "missing Extra", e);
+                    throw MsgAssertionException( 14823 , "missing extra" );
+                massert(14824, "missing Extra", e);
             }
             i -= NIndexesExtra;
         }

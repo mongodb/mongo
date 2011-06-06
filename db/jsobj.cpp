@@ -1115,7 +1115,9 @@ namespace mongo {
         }
         case Bool: appendBool( fieldName , false); return;
         case Date: 
-            appendDate( fieldName , numeric_limits<long long>::min() ); 
+            // min varies with V0 and V1 indexes, so we go one type lower.
+            appendBool(fieldName, true);
+            //appendDate( fieldName , numeric_limits<long long>::min() ); 
             return;
         case jstNULL: appendNull( fieldName ); return;
         case Symbol:

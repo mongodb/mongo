@@ -576,7 +576,6 @@ int main(int argc, char* argv[]) {
     ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
-    ("maxConns",po::value<int>(), "max number of simultaneous connections")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
@@ -907,18 +906,6 @@ int main(int argc, char* argv[]) {
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
-        }
-        if ( params.count( "maxConns" ) ) {
-            int newSize = params["maxConns"].as<int>();
-            if ( newSize < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            else if ( newSize >= 10000000 ) {
-                out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            connTicketHolder.resize( newSize );
         }
         if (params.count("nounixsocket")) {
             noUnixSocket = true;

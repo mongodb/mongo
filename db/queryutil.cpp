@@ -408,6 +408,8 @@ namespace mongo {
                 upper = addObj( b.obj() ).firstElement();
             }
             else if ( lower.type() == MinKey && upper.type() != MaxKey && upper.isSimpleType() ) { // TODO: get rid of isSimpleType
+                if( upper.type() == Date ) 
+                    lowerInclusive = false;
                 BSONObjBuilder b;
                 b.appendMinForType( upper.fieldName() , upper.type() );
                 lower = addObj( b.obj() ).firstElement();

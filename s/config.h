@@ -81,16 +81,27 @@ namespace mongo {
                 return _cm;
             }
 
+            void resetCM( ChunkManager * cm ) {
+                assert(cm);
+                assert(_cm); // this has to be already sharded
+                _cm.reset( cm );
+            }
+
             void shard( const string& ns , const ShardKeyPattern& key , bool unique );
             void unshard();
 
             bool isDirty() const { return _dirty; }
             bool wasDropped() const { return _dropped; }
-
+            
             void save( const string& ns , DBClientBase* conn );
+            
+            bool unique() const { return _unqiue; }
+            BSONObj key() const { return _key; } 
 
 
         private:
+            BSONObj _key;
+            bool _unqiue;
             ChunkManagerPtr _cm;
             bool _dirty;
             bool _dropped;
