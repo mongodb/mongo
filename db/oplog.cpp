@@ -673,7 +673,7 @@ namespace mongo {
             // no op
         }
         else {
-            throw MsgAssertionException( 13141 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
+            throw MsgAssertionException( 14825 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
 
     }
