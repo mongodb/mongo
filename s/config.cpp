@@ -53,14 +53,19 @@ namespace mongo {
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
         _dropped = in["dropped"].trueValue();
-        if ( in["key"].isABSONObj() )
-            shard( in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
+        if ( in["key"].isABSONObj() ) {
+            _key = in["key"].Obj().getOwned();
+            _unqiue = in["unique"].trueValue();
+            shard( in["_id"].String() , _key , _unqiue );
+        }
         _dirty = false;
     }
-
+    
 
     void DBConfig::CollectionInfo::shard( const string& ns , const ShardKeyPattern& key , bool unique ) {
         _cm.reset( new ChunkManager( ns , key , unique ) );
+        _key = key.key().getOwned();
+        _unqiue = unique;
         _dirty = true;
         _dropped = false;
     }
@@ -69,6 +74,7 @@ namespace mongo {
         _cm.reset();
         _dropped = true;
         _dirty = true;
+        _key = BSONObj();
     }
 
     void DBConfig::CollectionInfo::save( const string& ns , DBClientBase* conn ) {
@@ -180,13 +186,48 @@ namespace mongo {
     }
 
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
+        BSONObj key;
+        bool unique;
+
+        {
+            scoped_lock lk( _lock );
+            
+            CollectionInfo& ci = _collections[ns];
+            
+            bool earlyReload = ! ci.isSharded() && shouldReload;
+            if ( earlyReload ) {
+                // this is to catch cases where there this is a new sharded collection
+                _reload();
+                ci = _collections[ns];
+            }
+            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
+            assert( ci.wasDropped() || ! ci.key().isEmpty() );
+            
+            if ( ! shouldReload || earlyReload )
+                return ci.getCM();
+
+            key = ci.key().copy();
+            unique = ci.unique();
+        }
+        
+        assert( ! key.isEmpty() );
+
+        // we are not locked now, and want to load a new ChunkManager
+        
+        auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
+        if ( temp->numChunks() == 0 ) {
+            // maybe we're not sharded any more
+            reload(); // this is a full reload
+            return getChunkManager( ns , false );
+        }
+        
+
         scoped_lock lk( _lock );
-
-        if ( shouldReload )
-            _reload();
-
+        
         CollectionInfo& ci = _collections[ns];
-        massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
+        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
+        
+        ci.resetCM( temp.release() );
         return ci.getCM();
     }
 
