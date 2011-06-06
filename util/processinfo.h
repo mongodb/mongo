@@ -54,7 +54,7 @@ namespace mongo {
         bool supported();
 
         bool blockCheckSupported();
-        bool blockInMemory( char * start );
+        static bool blockInMemory( char * start );
 
     private:
         pid_t _pid;
