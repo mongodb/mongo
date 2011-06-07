@@ -499,16 +499,21 @@ namespace JsonTests {
             }
         };
 
-        class FancyNumber {
-        public:
-            virtual ~FancyNumber() {}
-            void run() {
-                ASSERT_EQUALS( int( 1000000 * bson().firstElement().number() ),
-                               int( 1000000 * fromjson( json() ).firstElement().number() ) );
-            }
+        class RealNumber : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", -4.4433e-2 );
+                b.append( "a", strtod( "0.7", 0 ) );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : 0.7 }";
+            }            
+        };
+        
+        class FancyNumber : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", strtod( "-4.4433e-2", 0 ) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1124,6 +1129,7 @@ namespace JsonTests {
             add< FromJsonTests::ReservedFieldName >();
             add< FromJsonTests::OkDollarFieldName >();
             add< FromJsonTests::SingleNumber >();
+            add< FromJsonTests::RealNumber >();
             add< FromJsonTests::FancyNumber >();
             add< FromJsonTests::TwoElements >();
             add< FromJsonTests::Subobject >();
