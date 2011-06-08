@@ -8,29 +8,25 @@
 #include "wiredtiger.h"
 #include "util.h"
 
-const char *progname;
 extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 
-int	usage(void);
+static int usage(void);
 
 int
-main(int argc, char *argv[])
+util_dump(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
-	const char *home, *tablename;
+	WT_SESSION *session;
+	const char *tablename;
 	char cursor_config[100], datasrc[100];
-	int ch, debug, printable, ret, tret, verbose;
-
-	WT_UTILITY_INTRO(progname, argv);
+	int ch, debug, printable, ret, tret;
 
 	conn = NULL;
-	home = NULL;
-	debug = printable = verbose = 0;
+	debug = printable = 0;
 
-	while ((ch = getopt(argc, argv, "df:h:pVv")) != EOF)
+	while ((ch = getopt(argc, argv, "df:p")) != EOF)
 		switch (ch) {
 		case 'd':
 			debug = 1;
@@ -42,17 +38,8 @@ main(int argc, char *argv[])
 				return (EXIT_FAILURE);
 			}
 			break;
-		case 'h':			/* home directory */
-			home = optarg;
-			break;
 		case 'p':
 			printable = 1;
-			break;
-		case 'V':			/* version */
-			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
-			return (EXIT_SUCCESS);
-		case 'v':			/* version */
-			verbose = 1;
 			break;
 		case '?':
 		default:
@@ -66,7 +53,7 @@ main(int argc, char *argv[])
 		return (usage());
 	tablename = *argv;
 
-	if ((ret = wiredtiger_open(home, verbose ?
+	if ((ret = wiredtiger_open(".", verbose ?
 	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
@@ -106,10 +93,12 @@ err:		ret = 1;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-int
+static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dpV] [-f output-file] [-h home] file\n", progname);
+	    "usage: %s%s "
+	    "dump [-dp] [-f output-file] file\n",
+	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

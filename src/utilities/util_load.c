@@ -8,8 +8,6 @@
 #include "wiredtiger.h"
 #include "util.h"
 
-const char *progname;
-
 struct record_t {
 	WT_ITEM key;
 	size_t   key_memsize;
@@ -18,9 +16,9 @@ struct record_t {
 	size_t   value_memsize;
 };
 
+static int usage(void);
 int bulk_read(struct record_t *, int *);
 int bulk_read_line(WT_ITEM *, size_t *, int, int *);
-int usage(void);
 
 struct {
 	int pagesize_set;
@@ -28,25 +26,22 @@ struct {
 } config;
 
 int
-main(int argc, char *argv[])
+util_load(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	struct record_t record;
 	uint64_t insert_count;
-	int ch, debug, eof, ret, text_input, tret, verbose;
-	const char *tablename, *table_config, *home;
+	int ch, debug, eof, ret, text_input, tret;
+	const char *tablename, *table_config;
 	char cursor_config[100], datasink[100];
-
-	WT_UTILITY_INTRO(progname, argv);
 
 	conn = NULL;
 	table_config = NULL;
-	home = NULL;
-	debug = text_input = verbose = 0;
+	debug = text_input = 0;
 
-	while ((ch = getopt(argc, argv, "c:f:h:TVv")) != EOF)
+	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
 			table_config = optarg;
@@ -61,17 +56,8 @@ main(int argc, char *argv[])
 				return (EXIT_FAILURE);
 			}
 			break;
-		case 'h':			/* command-line option */
-			home = optarg;
-			break;
 		case 'T':
 			text_input = 1;
-			break;
-		case 'V':			/* version */
-			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
-			return (EXIT_SUCCESS);
-		case 'v':
-			verbose = 1;
 			break;
 		case '?':
 		default:
@@ -95,7 +81,7 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	if ((ret = wiredtiger_open(home, NULL, NULL, &conn)) != 0 ||
+	if ((ret = wiredtiger_open(".", NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
@@ -207,11 +193,12 @@ bulk_read_line(WT_ITEM *item, size_t *memsize, int iskey, int *eofp)
 	return (0);
 }
 
-int
+static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-TVv] [-c configuration] [-f input-file] file\n",
-	    progname);
+	    "usage: %s%s "
+	    "load [-dT] [-c configuration] [-f input-file] file\n",
+	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

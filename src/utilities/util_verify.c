@@ -8,36 +8,18 @@
 #include "wt_internal.h"
 #include "util.h"
 
-const char *progname;
-
-int	usage(void);
+static int usage(void);
 
 int
-main(int argc, char *argv[])
+util_verify(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	const char *home, *tablename;
-	int ch, debug, ret, tret, verbose;
+	const char *tablename;
+	int ch, ret, tret;
 
-	WT_UTILITY_INTRO(progname, argv);
-
-	home = NULL;
-	debug = verbose = 0;
-	while ((ch = getopt(argc, argv, "dh:Vv")) != EOF)
+	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
-		case 'd':
-			debug = 1;
-			break;
-		case 'h':			/* home directory */
-			home = optarg;
-			break;
-		case 'v':			/* verbose */
-			verbose = 1;
-			break;
-		case 'V':			/* version */
-			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
-			return (EXIT_SUCCESS);
 		case '?':
 		default:
 			return (usage());
@@ -50,7 +32,7 @@ main(int argc, char *argv[])
 		return (usage());
 	tablename = *argv;
 
-	if ((ret = wiredtiger_open(home, verbose ?
+	if ((ret = wiredtiger_open(".", verbose ?
 	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
@@ -71,9 +53,12 @@ err:		ret = 1;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-int
+static int
 usage(void)
 {
-	(void)fprintf(stderr, "usage: %s [-Vv] file\n", progname);
+	(void)fprintf(stderr,
+	    "usage: %s%s "
+	    "verify file\n",
+	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
