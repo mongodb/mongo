@@ -284,7 +284,7 @@ namespace mongo {
         case BIT: {
             uassert( 10136 ,  "$bit needs an array" , elt.type() == Object );
             uassert( 10137 ,  "$bit can only be applied to numbers" , in.isNumber() );
-            uassert( 10138 ,  "$bit can't use a double" , in.type() != NumberDouble );
+            uassert( 10138 ,  "$bit cannot update a value of type double" , in.type() != NumberDouble );
 
             int x = in.numberInt();
             long long y = in.numberLong();
@@ -293,23 +293,22 @@ namespace mongo {
             while ( it.more() ) {
                 BSONElement e = it.next();
                 uassert( 10139 ,  "$bit field must be number" , e.isNumber() );
-                if ( strcmp( e.fieldName() , "and" ) == 0 ) {
+                if ( str::equals(e.fieldName(), "and") ) {
                     switch( in.type() ) {
                     case NumberInt: x = x&e.numberInt(); break;
                     case NumberLong: y = y&e.numberLong(); break;
                     default: assert( 0 );
                     }
                 }
-                else if ( strcmp( e.fieldName() , "or" ) == 0 ) {
+                else if ( str::equals(e.fieldName(), "or") ) {
                     switch( in.type() ) {
                     case NumberInt: x = x|e.numberInt(); break;
                     case NumberLong: y = y|e.numberLong(); break;
                     default: assert( 0 );
                     }
                 }
-
                 else {
-                    throw UserException( 9016, (string)"unknown bit mod:" + e.fieldName() );
+                    uasserted(9016, str::stream() << "unknown $bit operation: " << e.fieldName());
                 }
             }
 
