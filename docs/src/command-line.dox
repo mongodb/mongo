@@ -1,4 +1,44 @@
-/*! @page command_line Command Line Interface
+/*! @page command-line Command Line Interface
 
-@todo write text
- */
+WiredTiger includes a command line tool, \c wt.
+
+\section Synopsis
+<code>wt [-Vv] [-h directory] command [command-specific arguments]</code>
+
+\section Description
+The \c wt tool is a command-line tool that acts as a front-end to a set
+of utilities supporting pieces of the WiredTiger functionality.
+
+\section Options
+There are three global options:
+
+\par <code>-V</code>
+Display WiredTiger version and exit.
+\par <code>-v</code>
+Set verbose output.
+\par <code>-h directory</code>
+Specify a database home directory.
+
+\section Commands
+The \c wt tool supports several commands.  For command-specific
+arguments, see the command-specific page.
+
+- @subpage utility-dump\n
+  dump a table in a portable format
+
+- @subpage utility-load\n
+  load a table from a portable format
+
+- @subpage utility-printlog\n
+  display the database log
+
+- @subpage utility-salvage\n
+  salvage a file
+
+- @subpage utility-stat\n
+  display table statistics
+
+- @subpage utility-verify\n
+  verify a file
+
+*/

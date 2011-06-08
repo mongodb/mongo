@@ -48,7 +48,7 @@ util_dump(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the file name. */
+	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
 	tablename = *argv;
