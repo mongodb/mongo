@@ -15,8 +15,10 @@ src/cursor/cur_btree.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
 src/cursor/cur_dump.c
+src/cursor/cur_index.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c
+src/cursor/cur_table.c
 src/btree/bt_alloc.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
@@ -73,7 +75,13 @@ src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_yield.c
-src/schema/packing.c
+src/schema/schema_create.c
+src/schema/schema_list.c
+src/schema/schema_mapping.c
+src/schema/schema_open.c
+src/schema/schema_pack.c
+src/schema/schema_repack.c
+src/schema/schema_table.c
 src/support/cksum.c
 src/support/err.c
 src/support/hazard.c

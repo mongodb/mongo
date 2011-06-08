@@ -15,32 +15,12 @@ int
 __wt_session_add_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION **btree_sessionp)
 {
-	const char *config;
-	char *format;
 	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONFIG_ITEM cval;
 
 	WT_RET(__wt_calloc_def(session, 1, &btree_session));
 	btree_session->btree = session->btree;
 	conn = S2C(session);
-
-	/*
-	 * Make a copy of the key and value format, it's easier for everyone
-	 * if they are NUL-terminated.  They live in the WT_BTREE_SESSION to
-	 * save allocating memory on every cursor open.
-	 */
-	config = session->btree->config;
-
-	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
-	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
-	memcpy(format, cval.str, cval.len);
-	btree_session->key_format = format;
-
-	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
-	WT_RET(__wt_calloc_def(session, cval.len + 1, &format));
-	memcpy(format, cval.str, cval.len);
-	btree_session->value_format = format;
 
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
 
@@ -93,8 +73,6 @@ __wt_session_remove_btree(
 
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 	session->btree = btree_session->btree;
-	__wt_free(session, btree_session->key_format);
-	__wt_free(session, btree_session->value_format);
 	__wt_free(session, btree_session);
 
 	__wt_lock(session, conn->mtx);

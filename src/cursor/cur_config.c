@@ -152,7 +152,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	const char *configitem;
-	CURSOR_CONFIG *cconfig;
+	WT_CURSOR_CONFIG *cconfig;
 	WT_CURSOR *cursor;
 	int ret;
 
@@ -166,10 +166,9 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	*cursor = iface;
 	cursor->session = &session->iface;
 	cursor->key_format = cursor->value_format = "S";
-	__wt_cursor_init(cursor, config);
 
-	STATIC_ASSERT(offsetof(CURSOR_CONFIG, iface) == 0);
-	TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
+	__wt_cursor_init(cursor, 1, config);
 	*cursorp = cursor;
 
 	return (ret);

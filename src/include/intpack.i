@@ -67,7 +67,7 @@ __wt_vpack_posint(
 	for (; len != 0; shift -= 8, --len)
 		*p++ = (x >> shift);
 
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -99,7 +99,7 @@ __wt_vpack_negint(
 	for (; len != 0; shift -= 8, --len)
 		*p++ = (x >> shift);
 
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -125,7 +125,7 @@ __wt_vunpack_posint(
 		x = (x << 8) | *p;
 
 	*retp = x;
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -151,7 +151,7 @@ __wt_vunpack_negint(
 		x = (x << 8) | *p;
 
 	*retp = x;
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -179,7 +179,7 @@ __wt_vpack_uint(
 		return (__wt_vpack_posint(session, pp, maxlen, x));
 	}
 
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -208,7 +208,7 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 		/* For non-negative values, use the unsigned code above. */
 		return (__wt_vpack_uint(session, pp, maxlen, (uint64_t)x));
 
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -284,7 +284,7 @@ __wt_vunpack_int(
 		    pp, maxlen, (uint64_t *)xp));
 	}
 
-	WT_ASSERT(session, (size_t)(p - *pp) < maxlen);
+	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }

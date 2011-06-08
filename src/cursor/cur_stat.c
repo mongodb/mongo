@@ -19,7 +19,7 @@ __curstat_first(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, first, NULL);
 	ret = WT_NOTFOUND;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -36,7 +36,7 @@ __curstat_last(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, last, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -53,7 +53,7 @@ __curstat_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	ret = WT_NOTFOUND;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -70,7 +70,7 @@ __curstat_prev(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -89,7 +89,7 @@ __curstat_search_near(WT_CURSOR *cursor, int *lastcmp)
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -106,7 +106,7 @@ __curstat_insert(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, insert, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -123,7 +123,7 @@ __curstat_update(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, update, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -140,7 +140,7 @@ __curstat_remove(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, insert, NULL);
 	ret = ENOTSUP;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -158,10 +158,10 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	ret = 0;
 
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	WT_TRET(__wt_cursor_close(cursor, config));
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -199,7 +199,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	CURSOR_STAT *cst;
+	WT_CURSOR_STAT *cst;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	int dump, printable, raw, ret;
@@ -222,15 +222,14 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 	cursor->key_format = "S";
 	cursor->value_format = printable ? "S" : "q";
-	__wt_cursor_init(cursor, config);
 
 	if (dump)
 		__wt_curdump_init(cursor, printable);
 	if (raw)
 		F_SET(cursor, WT_CURSTD_RAW);
 
-	STATIC_ASSERT(offsetof(CURSOR_STAT, iface) == 0);
-	TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+	__wt_cursor_init(cursor, 1, config);
 	*cursorp = cursor;
 
 	if (0) {

@@ -374,9 +374,10 @@ struct wt_cursor {
 #define	WT_CURSTD_KEY_SET	0x02
 #define	WT_CURSTD_POSITIONED	0x04
 #define	WT_CURSTD_PRINT		0x08
-#define	WT_CURSTD_RAW		0x10
-#define	WT_CURSTD_VALUE_RAW	0x20
-#define	WT_CURSTD_VALUE_SET	0x40
+#define	WT_CURSTD_PUBLIC	0x10
+#define	WT_CURSTD_RAW		0x20
+#define	WT_CURSTD_VALUE_RAW	0x40
+#define	WT_CURSTD_VALUE_SET	0x80
 	uint32_t flags;
 #endif
 };
@@ -491,6 +492,21 @@ struct wt_session {
 	 * @param name the uri of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
+	 * @config{colgroups, comma-separated list of names of column groups.
+	 * Each column group is stored separately\, keyed by the primary key of
+	 * the table.  Any column that does not appear in a column group is
+	 * stored in a default\, unnamed\, column group for the table.  Each
+	 * column group must be created with a separate call to
+	 * WT_SESSION::create}
+	 * @config{columns, list of the column names.  Comma-separated list of
+	 * the form <code>(column[\,...])</code>.  For tables\, the number of
+	 * entries must match the total number of values in \c key_format and \c
+	 * value_format. For colgroups and indices\, all column names must
+	 * appear in the list of columns for the table}
+	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
+	 * verifies that the table exists and has the specified schema}
+	 * @config{filename, override the default filename derived from the
+	 * object name}
 	 * @config{huffman_key, use Huffman encoding for Btree keys.  Permitted
 	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
 	 * huffman for more details.}
@@ -527,19 +543,6 @@ struct wt_session {
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate
 	 * raw byte arrays}
-	 * @config{colgroup.\<name\>, named group of columns to store together.
-	 * Comma-separated list of the form <code>(column[\,...])</code>.  Each
-	 * column group is stored separately\, keyed by the primary key of the
-	 * table.  Any column that does not appear in a column group is stored
-	 * in a default\, unnamed\, column group for the table}
-	 * @config{columns, list of the column names.  Comma-separated list of
-	 * the form <code>(column[\,...])</code>.  The number of entries must
-	 * match the total number of values in \c key_format and \c
-	 * value_format}
-	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
-	 * verifies that the table exists and has the specified schema}
-	 * @config{index.\<name\>, named index on a list of columns.  Comma-
-	 * separated list of the form <code>(column[\,...])</code>}
 	 * @configend
 	 * @errors
 	 */
@@ -669,10 +672,10 @@ struct wt_session {
 	 * @config{isolation, the isolation level for this transaction; default
 	 * "serializable"}
 	 * @config{name, name of the transaction for tracing and debugging}
-	 * @config{sync, how to sync log records when the transaction commits"}
 	 * @config{priority, priority of the transaction for resolving
 	 * conflicts\, an integer between -100 and 100.  Transactions with
 	 * higher values are less likely to abort}
+	 * @config{sync, how to sync log records when the transaction commits"}
 	 * @configend
 	 * @errors
 	 */
@@ -721,10 +724,10 @@ struct wt_session {
 	 * @configstart{session.checkpoint, see dist/api_data.py}
 	 * @config{archive, remove log files no longer required for
 	 * transactional durability}
-	 * @config{force, write a new checkpoint even if nothing has changed
-	 * since the last one}
 	 * @config{flush_cache, flush the cache}
 	 * @config{flush_log, flush the log to disk}
+	 * @config{force, write a new checkpoint even if nothing has changed
+	 * since the last one}
 	 * @config{log_size, only proceed if more than the specified number of
 	 * bytes of log records have been written since the last checkpoint}
 	 * @config{timeout, only proceed if more than the specified number of
@@ -962,17 +965,17 @@ struct wt_connection {
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{cache_size, maximum heap memory to allocate for the cache}
  * @config{create, create the database if it does not exist}
+ * @config{error_prefix, Prefix string for error messages}
  * @config{exclusive, fail if the database already exists}
  * @config{extensions, list of extensions to load.  Optional values override the
  * name of the default entry function \c "wiredtiger_init"}
- * @config{error_prefix, Prefix string for error messages}
  * @config{hazard_max, number of hazard references per session}
  * @config{logging, enable logging}
- * @config{session_max, maximum expected number of sessions (including server
- * threads)}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
  * processes)}
+ * @config{session_max, maximum expected number of sessions (including server
+ * threads)}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as \c "verbose=[evict\,read]"}
  * @configend

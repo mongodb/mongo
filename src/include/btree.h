@@ -309,8 +309,7 @@ struct __wt_page {
 
 			WT_INSERT *ins;		/* Bulk-loaded K/V or V items */
 			WT_UPDATE *upd;		/* Bulk-loaded V items */
-		}
-		bulk;
+		} bulk;
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */

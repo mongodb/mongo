@@ -5,67 +5,17 @@
  *	All rights reserved.
  */
 
-typedef struct {
-	WT_CURSOR iface;
-
-	WT_BTREE *btree;
-	WT_WALK walk;
-	WT_PAGE *page;
-	WT_COL *cip;
-	WT_ROW *rip;
-	WT_INSERT *ins;                 /* For walking through RLE pages. */
-	wiredtiger_recno_t recno;
-	uint32_t nitems;
-	uint32_t nrepeats;
-} CURSOR_BTREE;
-
-typedef struct {
-	CURSOR_BTREE cbt;
-
-	uint8_t	 page_type;			/* Page type */
-	uint64_t recno;				/* Total record number */
-	uint32_t ipp;				/* Items per page */
-
-	/*
-	 * K/V pairs for row-store leaf pages, and V objects for column-store
-	 * leaf pages, are stored in singly-linked lists (the lists are never
-	 * searched, only walked at reconciliation, so it's not so bad).
-	 */
-	WT_INSERT  *ins_base;			/* Base insert link */
-	WT_INSERT **insp;			/* Next insert link */
-	WT_UPDATE  *upd_base;			/* Base update link */
-	WT_UPDATE **updp;			/* Next update link */
-	uint32_t   ins_cnt;			/* Inserts on the list */
-
-	/*
-	 * Bulk load dynamically allocates an array of leaf-page references;
-	 * when the bulk load finishes, we build an internal page for those
-	 * references.
-	 */
-	WT_ROW_REF *rref;			/* List of row leaf pages */
-	WT_COL_REF *cref;			/* List of column leaf pages */
-	uint32_t ref_next;			/* Next leaf page slot */
-	uint32_t ref_entries;			/* Total leaf page slots */
-	uint32_t ref_allocated;			/* Bytes allocated */
-} CURSOR_BULK;
-
-typedef struct {
-	WT_CURSOR iface;
-} CURSOR_CONFIG;
-
-typedef struct {
-	WT_CURSOR iface;
-} CURSOR_STAT;
-
 struct __wt_btree {
-	WT_CONNECTION_IMPL *conn;	/* Enclosing connection */
-	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of files */
+	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
-	uint32_t refcnt;		/* Sessions with this tree open. */
+	const char *name;		/* File name */
 
 	const char *config;		/* Configuration string */
 
-	const char *name;		/* File name */
+	uint32_t refcnt;		/* Sessions using this tree. */
+
+	const char *key_format;
+	const char *value_format;
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_RLE=2,	/* Fixed-length, RLE column store */
@@ -119,18 +69,37 @@ struct __wt_btree {
 	uint32_t flags;
 };
 
-/*******************************************
- * Implementation of WT_SESSION
- *******************************************/
 struct __wt_btree_session {
 	WT_BTREE *btree;
-
-	const char *key_format;
-	const char *value_format;
 
 	TAILQ_ENTRY(__wt_btree_session) q;
 };
 
+struct __wt_table {
+	const char *name, *config;
+	const char *key_format;
+	const char *value_format;
+
+	const char *cgconf, *colconf;
+	size_t cgconf_len, colconf_len;
+
+	int is_simple;
+	int is_complete;
+
+	int ncolgroups;
+	int nindices;
+
+	WT_BTREE **colgroup;
+	int *cg_mapping;
+	WT_BTREE **index;
+	int *idx_mapping;
+
+	TAILQ_ENTRY(__wt_table) q;
+};
+
+/*******************************************
+ * Implementation of WT_SESSION
+ *******************************************/
 /*
  * WT_SESSION_BUFFER --
  *	A structure to accumulate file changes on a per-thread basis.
@@ -144,6 +113,14 @@ struct __wt_session_buffer {
 	uint32_t out;				/* Buffer chunks not in use */
 };
 
+struct __wt_hazard {
+	WT_PAGE *page;			/* Page address */
+#ifdef HAVE_DIAGNOSTIC
+	const char *file;		/* File/line where hazard acquired */
+	int	    line;
+#endif
+};
+
 typedef	enum {
 	WT_WORKQ_NONE=0,		/* No request */
 	WT_WORKQ_FUNC=1,		/* Function, then return */
@@ -153,24 +130,10 @@ typedef	enum {
 	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
-struct __wt_hazard {
-	WT_PAGE *page;			/* Page address */
-#ifdef HAVE_DIAGNOSTIC
-	const char *file;		/* File/line where hazard acquired */
-	int	    line;
-#endif
-};
-
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 struct __wt_session_impl {
 	WT_SESSION iface;
-
-	WT_EVENT_HANDLER *event_handler;
-
-	TAILQ_HEAD(__cursors, wt_cursor) cursors;
-
-	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
 	WT_MTX	 *mtx;			/* Blocking mutex */
 
@@ -207,9 +170,14 @@ struct __wt_session_impl {
 	WT_UPDATE      **srch_upd;	/* WT_UPDATE insert node */
 	uint32_t	 srch_slot;	/* WT_INSERT/WT_UPDATE slot */
 
-	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
+	WT_EVENT_HANDLER *event_handler;
 
-	FILE *msgfile;
+	TAILQ_HEAD(__cursors, wt_cursor) cursors;
+
+	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
+	WT_BTREE *schematab;		/* Schema tables */
+
+	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	uint32_t flags;
 };
@@ -291,6 +259,7 @@ struct __wt_connection_impl {
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
 #define	API_SESSION_INIT(s, h, n, cur, bt)				\
+	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
 	(s)->name = #h "." #n;						\
@@ -304,7 +273,10 @@ struct __wt_connection_impl {
 	if (cfg != NULL)						\
 		WT_RET(__wt_config_check((s), __wt_confchk_##h##_##n, (cfg)))
 
-#define	API_END()	} while (0)
+#define	API_END(s)							\
+	if ((s) != NULL)						\
+		(s)->name = __oldname;					\
+} while (0)
 
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);

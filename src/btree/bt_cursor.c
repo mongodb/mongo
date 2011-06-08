@@ -14,7 +14,7 @@
  *	Move to the first record in the tree.
  */
 int
-__wt_btcur_first(CURSOR_BTREE *cbt)
+__wt_btcur_first(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
 
@@ -27,7 +27,7 @@ __wt_btcur_first(CURSOR_BTREE *cbt)
 }
 
 static inline int
-__btcur_next_fix(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_fix(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
@@ -67,7 +67,7 @@ __btcur_next_fix(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 }
 
 static inline int
-__btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_rle(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
@@ -121,7 +121,7 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 }
 
 static inline int
-__btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_var(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
@@ -181,7 +181,7 @@ __btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 }
 
 static inline int
-__btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
+__btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_IKEY *ikey;
@@ -254,7 +254,7 @@ __btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
  *	Move to the next record in the tree.
  */
 int
-__wt_btcur_next(CURSOR_BTREE *cbt)
+__wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -310,7 +310,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(CURSOR_BTREE *cbt)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 {
 	WT_UNUSED(cbt);
 
@@ -322,7 +322,7 @@ __wt_btcur_prev(CURSOR_BTREE *cbt)
  *	Search for a record in the tree.
  */
 int
-__wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
+__wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -359,7 +359,7 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
  *	Insert a record into the tree.
  */
 int
-__wt_btcur_insert(CURSOR_BTREE *cbt)
+__wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -387,7 +387,7 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
  *	Update a record in the tree.
  */
 int
-__wt_btcur_update(CURSOR_BTREE *cbt)
+__wt_btcur_update(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -415,7 +415,7 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
  *	Remove a record from the tree.
  */
 int
-__wt_btcur_remove(CURSOR_BTREE *cbt)
+__wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -441,7 +441,7 @@ __wt_btcur_remove(CURSOR_BTREE *cbt)
  *	Close a btree cursor.
  */
 int
-__wt_btcur_close(CURSOR_BTREE *cbt, const char *config)
+__wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
 {
 	WT_SESSION_IMPL *session;
 

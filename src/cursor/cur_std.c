@@ -27,7 +27,7 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	    cursor->key.data, cursor->key.size, fmt, ap);
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 	return (ret);
 }
 
@@ -51,7 +51,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 	return (ret);
 }
 
@@ -74,9 +74,6 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	/* XXX Ignore fixed lengths for now. */
-	while (isdigit(*fmt))
-		++fmt;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
 		cursor->recno = va_arg(ap, wiredtiger_recno_t);
@@ -92,9 +89,12 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 		cursor->key.data = (void *)item->data;
 	} else {
 		buf = &cursor->key;
-		sz = wiredtiger_struct_sizev(fmt, ap);
+		sz = wiredtiger_struct_sizev(cursor->key_format, ap);
+		va_end(ap);
+		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
-		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
+		    (ret = wiredtiger_struct_packv(buf->mem, sz,
+		    cursor->key_format, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_KEY_SET);
 		else {
 			cursor->saved_err = ret;
@@ -106,7 +106,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	cursor->key.size = (uint32_t)sz;
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 }
 
 /*
@@ -128,9 +128,6 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
-	/* XXX Ignore fixed lengths for now. */
-	while (isdigit(*fmt))
-		++fmt;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
@@ -142,9 +139,12 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.data = item->data;
 	} else {
 		buf = &cursor->value;
-		sz = wiredtiger_struct_sizev(fmt, ap);
+		sz = wiredtiger_struct_sizev(cursor->value_format, ap);
+		va_end(ap);
+		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
-		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
+		    (ret = wiredtiger_struct_packv(buf->mem, sz,
+		    cursor->value_format, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_VALUE_SET);
 		else {
 			cursor->saved_err = ret;
@@ -157,7 +157,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	cursor->value.size = (uint32_t)sz;
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 }
 
 /*
@@ -186,32 +186,46 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	ret = 0;
 
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
 
-	TAILQ_REMOVE(&session->cursors, cursor, q);
+	if (F_ISSET(cursor, WT_CURSTD_PUBLIC))
+		TAILQ_REMOVE(&session->cursors, cursor, q);
 	__wt_free(session, cursor);
 
-	API_END();
+	API_END(session);
 	return (ret);
 }
 
 /*
  * __wt_cursor_init --
  *	Default cursor initialization.
+ *
+ *	Most cursors are "public", and added to the list in the session
+ *	to be closed when the cursor is closed.  However, some cursors are
+ *	opened for internal use, or are opened inside another cursor (such
+ *	as column groups or indices within a table cursor), and adding those
+ *	cursors to the list introduces ordering dependencies into
+ *	WT_SESSION->close that we prefer to avoid.
  */
 void
-__wt_cursor_init(WT_CURSOR *cursor, const char *config)
+__wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *config)
 {
+	WT_SESSION_IMPL *session;
+
 	WT_UNUSED(config);
+	session = (WT_SESSION_IMPL *)cursor->session;
 
-	cursor->get_key = __cursor_get_key;
-	cursor->get_value = __cursor_get_value;
-	cursor->set_key = __cursor_set_key;
-	cursor->set_value = __cursor_set_value;
-
+	if (cursor->get_key == NULL)
+		cursor->get_key = __cursor_get_key;
+	if (cursor->get_value == NULL)
+		cursor->get_value = __cursor_get_value;
+	if (cursor->set_key == NULL)
+		cursor->set_key = __cursor_set_key;
+	if (cursor->set_value == NULL)
+		cursor->set_value = __cursor_set_value;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 
@@ -219,4 +233,9 @@ __wt_cursor_init(WT_CURSOR *cursor, const char *config)
 	WT_CLEAR(cursor->value);
 
 	cursor->flags = 0;
+
+	if (is_public) {
+		F_SET(cursor, WT_CURSTD_PUBLIC);
+		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+	}
 }

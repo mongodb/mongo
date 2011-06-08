@@ -34,11 +34,11 @@ for line in open(f, 'r'):
 		continue
 
 	width = 80 - len(prefix.expandtabs())
-	for c in api_data.methods[config_name].config:
+	for c in sorted(api_data.methods[config_name].config):
 		desc = textwrap.dedent(c.desc).replace(',', '\\,')
 		name = c.name
 		if '.' in name:
-			name = '%s.\\<%s\\>' % tuple(name.split('.'))
+			print >>sys.stderr, "Bad config key " + name
 		output = '@config{' + name + ',' + desc + '}'
 		for l in textwrap.wrap(output, width):
 			tfile.write(prefix + l + '\n')
@@ -95,7 +95,7 @@ __wt_confdfl_%(name)s =
 	'name' : name,
 	'config' : '\n'.join('    "%s"' % line
 		for line in w.wrap(','.join('%s=%s' % (c.name, c.default)
-			for c in ctype)) or [""]),
+			for c in sorted(ctype))) or [""]),
 })
 	tfile.write('''
 const char *
@@ -105,7 +105,7 @@ __wt_confchk_%(name)s =
 	'name' : name,
 	'check' : '\n'.join('    "%s"' % line
 		for line in w.wrap(','.join('%s=(%s)' % (c.name, checkstr(c))
-			for c in ctype)) or [""]),
+			for c in sorted(ctype))) or [""]),
 })
 
 tfile.close()

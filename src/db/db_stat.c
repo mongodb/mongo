@@ -18,7 +18,7 @@ __wt_btree_stat_print(WT_SESSION_IMPL *session, FILE *stream)
 	WT_CONNECTION_IMPL *conn;
 
 	btree = session->btree;
-	conn = btree->conn;
+	conn = S2C(session);
 
 	fprintf(stream, "Btree statistics: %s\n", btree->name);
 	__wt_stat_print_btree_stats(btree->stats, stream);

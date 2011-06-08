@@ -25,7 +25,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, close, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
@@ -65,7 +65,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	session = &conn->default_session;
 	__wt_unlock(session, conn->mtx);
-	API_END();
+	API_END(session);
 
 	return (0);
 }
@@ -79,25 +79,32 @@ __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	WT_UNUSED(to_dup);
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 	/* Config parsing is done by each implementation. */
-	(void)cfg;
+	WT_UNUSED(cfg);
 
-	if (strncmp(uri, "config:", 7) == 0)
-		return (__wt_curconfig_open(session, uri, config, cursorp));
-	if (strncmp(uri, "stat:", 5) == 0)
-		return (__wt_curstat_open(session, uri, config, cursorp));
-	if (strncmp(uri, "table:", 6) == 0)
-		return (__wt_curbtree_open(session, uri, config, cursorp));
+	if (strncmp(uri, "btree:", 6) == 0)
+		ret = __wt_curbtree_open(session, uri, config, cursorp);
+	else if (strncmp(uri, "config:", 7) == 0)
+		ret = __wt_curconfig_open(session, uri, config, cursorp);
+	else if (strncmp(uri, "index:", 6) == 0)
+		ret = __wt_curindex_open(session, uri, config, cursorp);
+	else if (strncmp(uri, "stat:", 5) == 0)
+		ret = __wt_curstat_open(session, uri, config, cursorp);
+	else if (strncmp(uri, "table:", 6) == 0)
+		ret = __wt_curtable_open(session, uri, config, cursorp);
+	else {
+		__wt_errx(session, "Unknown cursor type '%s'", uri);
+		ret = EINVAL;
+	}
 
-	__wt_errx(session, "Unknown cursor type '%s'", uri);
-
-	API_END();
-	return (EINVAL);
+	API_END(session);
+	return (ret);
 }
 
 /*
@@ -107,71 +114,16 @@ __session_open_cursor(WT_SESSION *wt_session,
 static int
 __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
-	WT_CONFIG_ITEM cval;
-	const char *treeconf, *key_format, *value_format;
+	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
-	treeconf = NULL;
-
+	ret = 0;
 	SESSION_API_CALL(session, create, config, cfg);
-
-	if (strncmp(name, "table:", 6) != 0) {
-		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
-	}
-	name += sizeof("table:") - 1;
-
-	/*
-	 * Key / value formats.
-	 *
-	 * !!! TODO: these need to be saved in a table-of-tables.
-	 * Also, avoiding copies / memory allocation at the moment by
-	 * pointing to constant strings for the few cases we handle.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
-	if (strncmp(cval.str, "r", cval.len) == 0)
-		key_format = "r";
-	else if (cval.str[cval.len - 1] == 'S')
-		value_format = "S";
-	else if (cval.str[cval.len - 1] == 'u')
-		value_format = "u";
-	else {
-		__wt_errx(session, "Unknown key_format '%.*s'",
-		    (int)cval.len, cval.str);
-		return (EINVAL);
-	}
-
-	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
-	if (cval.str[cval.len - 1] == 'S')
-		value_format = "S";
-	else if (cval.str[cval.len - 1] == 'u')
-		value_format = "u";
-	else {
-		__wt_errx(session, "Unknown value_format '%.*s'",
-		    (int)cval.len, cval.str);
-		return (EINVAL);
-	}
-
-	/*
-	 * If the file doesn't exist, create it, and a ".conf" file to hold
-	 * the configuration information.
-	 */
-	if (!__wt_exist(name)) {
-		WT_RET(__wt_btree_create(session, name));
-		WT_RET(__wt_config_collapse(session, cfg, &treeconf));
-		WT_RET(__wt_btconf_write(session, name, treeconf));
-	} else
-		WT_RET(__wt_btconf_read(session, name, &treeconf));
-
-	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_RET(__wt_btree_open(session, name, treeconf, 0));
-	WT_RET(__wt_session_add_btree(session, NULL));
-
-	API_END();
-	return (0);
+	WT_UNUSED(cfg);
+	WT_TRET(__wt_schema_create(session, name, config));
+	API_END(session);
+	return (ret);
 }
 
 /*
@@ -211,13 +163,14 @@ __session_drop(
 	}
 	name += sizeof("table:") - 1;
 
-	WT_RET(__wt_config_gets(session, cfg, "force", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
 	/* TODO: Combine the table name with home to make a filename. */
 
 	ret = remove(name);
-	API_END();
+err:
+	API_END(session);
 
 	return (force ? 0 : ret);
 }
@@ -237,7 +190,7 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -253,15 +206,15 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 * it skips loading metadata such as the free list, which could be
 	 * corrupted.
 	 */
-	WT_RET(__wt_btconf_read(session, name, &treeconf));
-	WT_RET(__wt_btree_open(
+	WT_ERR(__wt_btconf_read(session, name, &treeconf));
+	WT_ERR(__wt_btree_open(
 	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
 
 	WT_TRET(__wt_salvage(session, config));
 
 	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
-	API_END();
+err:	API_END(session);
 
 	return (ret);
 }
@@ -280,7 +233,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -299,7 +252,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 
 	session->btree = btree_session->btree;
 	ret = __wt_bt_sync(session);
-	API_END();
+	API_END(session);
 
 	return (0);
 }
@@ -336,7 +289,7 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, verify, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -355,15 +308,15 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_RET(__wt_btconf_read(session, name, &treeconf));
-	WT_RET(__wt_btree_open(
+	WT_ERR(__wt_btconf_read(session, name, &treeconf));
+	WT_ERR(__wt_btree_open(
 	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
 	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
-	API_END();
+err:	API_END(session);
 
 	return (ret);
 }
@@ -410,7 +363,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 
 	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -516,7 +469,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t slot;
 
-	(void)config;   /* unused */
+	WT_UNUSED(config);
 	session = &conn->default_session;
 	session_ret = NULL;
 

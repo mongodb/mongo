@@ -101,13 +101,12 @@ __wt_realloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_strdup --
- *	ANSI strdup function.
+ * __wt_strndup --
+ *	Duplicate a string of a given length (and NUL-terminate).
  */
 int
-__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
+__wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
 {
-	size_t len;
 	void *p;
 
 	if (str == NULL) {
@@ -122,12 +121,22 @@ __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_STAT_INCR(S2C(session)->stats, memalloc);
 
-	len = strlen(str) + 1;
-	WT_RET(__wt_calloc(session, len, 1, &p));
+	WT_RET(__wt_calloc(session, len + 1, 1, &p));
 	memcpy(p, str, len);
 
 	*(void **)retp = p;
 	return (0);
+}
+
+/*
+ * __wt_strdup --
+ *	ANSI strdup function.
+ */
+int
+__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
+{
+	return (__wt_strndup(session,
+	    str, (str == NULL) ? 0 : strlen(str), retp));
 }
 
 /*

@@ -61,13 +61,10 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	int ret;
 
 	conn = S2C(session);
-	btree = session->btree;
-	ret = 0;
 
 	/* Create the WT_BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
 	btree->flags = flags;
-	btree->conn = conn;
 	session->btree = btree;
 
 	/* Use the config string: it will be freed when the btree handle. */
@@ -189,7 +186,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	int ret;
 
 	btree = session->btree;
-	conn = btree->conn;
+	conn = S2C(session);
 	ret = 0;
 
 	/* Remove from the connection's list. */
@@ -216,6 +213,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
+	__wt_free(session, btree->key_format);
+	__wt_free(session, btree->value_format);
 
 	__wt_btree_huffman_close(session);
 
@@ -267,26 +266,28 @@ static int
 __btree_type(WT_SESSION_IMPL *session)
 {
 	const char *config;
-	char *endp, t;
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	int fixed;
 
 	btree = session->btree;
 	config = btree->config;
 
+	/* Validate types and check for fixed-length data. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
+	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
 	if (cval.len > 0 && cval.str[0] == 'r')
 		btree->type = BTREE_COL_VAR;
 	else
 		btree->type = BTREE_ROW;
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
-	/* Check for fixed-length data. */
 	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
-	if (cval.len > 1 && ((t = cval.str[cval.len - 1]) == 'u' || t == 'S')) {
-		btree->fixed_len = (uint32_t)strtol(cval.str, &endp, 10);
-		if (endp == cval.str + cval.len - 1 && btree->fixed_len != 0)
-			btree->type = BTREE_COL_FIX;
-	}
+	WT_RET(__wt_struct_check(session,
+	    cval.str, cval.len, &fixed, &btree->fixed_len));
+	if (btree->type == BTREE_COL_VAR && fixed)
+		btree->type = BTREE_COL_FIX;
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
 	/* Check for run-length encoding */
 	WT_RET(__wt_config_getones(session,

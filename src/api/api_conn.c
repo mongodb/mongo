@@ -23,6 +23,7 @@ __conn_load_extension(WT_CONNECTION *wt_conn,
 	void *p;
 	WT_CONFIG_ITEM cval;
 	WT_DLH *dlh;
+	int ret;
 
 	WT_UNUSED(path);
 
@@ -30,25 +31,26 @@ __conn_load_extension(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
 	entry_name = "wiredtiger_extension_init";
-	WT_RET(__wt_config_gets(session, cfg, "entry", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
 	if (cval.len > 0) {
 		if (snprintf(namebuf, sizeof(namebuf), "%.*s",
 		    (int)cval.len, cval.str) >= (int)sizeof (namebuf)) {
 			__wt_errx(session,
 			    "extension entry name too long: %.*s",
 			    (int)cval.len, cval.str);
-			return (EINVAL);
+			ret = EINVAL;
+			goto err;
 		} else
 			entry_name = namebuf;
 	}
 
-	WT_RET(__wt_dlopen(session, path, &dlh));
-	WT_RET(__wt_dlsym(session, dlh, entry_name, &p));
+	WT_ERR(__wt_dlopen(session, path, &dlh));
+	WT_ERR(__wt_dlsym(session, dlh, entry_name, &p));
 	entry = p;
 	entry(wt_conn, config);
-	API_END();
+err:	API_END(session);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -67,8 +69,8 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_cursor_type, config, cfg);
-	(void)cfg;
-	API_END();
+	WT_UNUSED(cfg);
+	API_END(session);
 
 	return (ENOTSUP);
 }
@@ -89,8 +91,8 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
-	(void)cfg;
-	API_END();
+	WT_UNUSED(cfg);
+	API_END(session);
 
 	return (ENOTSUP);
 }
@@ -111,8 +113,8 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
-	(void)cfg;
-	API_END();
+	WT_UNUSED(cfg);
+	API_END(session);
 
 	return (ENOTSUP);
 }
@@ -133,8 +135,8 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
-	(void)cfg;
-	API_END();
+	WT_UNUSED(cfg);
+	API_END(session);
 
 	return (ENOTSUP);
 }
@@ -173,7 +175,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	/* Close open sessions. */
 	for (tp = conn->sessions; (s = *tp) != NULL;) {
@@ -191,7 +193,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	}
 
 	WT_TRET(__wt_connection_close(conn));
-	API_END();
+	/* We no longer have a session, don't try to update it. */
+	session = NULL;
+	API_END(session);
 
 	return (ret);
 }
@@ -212,7 +216,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	ret = 0;
 	__wt_lock(session, conn->mtx);
@@ -221,7 +225,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_sessionp = &session_ret->iface;
-	API_END();
+	API_END(session);
 
 	return (ret);
 }

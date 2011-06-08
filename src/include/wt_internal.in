@@ -74,6 +74,18 @@ struct __wt_conn_stats;
     typedef struct __wt_conn_stats WT_CONN_STATS;
 struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
+struct __wt_cursor_btree;
+    typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
+struct __wt_cursor_bulk;
+    typedef struct __wt_cursor_bulk WT_CURSOR_BULK;
+struct __wt_cursor_config;
+    typedef struct __wt_cursor_config WT_CURSOR_CONFIG;
+struct __wt_cursor_index;
+    typedef struct __wt_cursor_index WT_CURSOR_INDEX;
+struct __wt_cursor_stat;
+    typedef struct __wt_cursor_stat WT_CURSOR_STAT;
+struct __wt_cursor_table;
+    typedef struct __wt_cursor_table WT_CURSOR_TABLE;
 struct __wt_dlh;
     typedef struct __wt_dlh WT_DLH;
 struct __wt_evict_list;
@@ -116,6 +128,8 @@ struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
+struct __wt_table;
+    typedef struct __wt_table WT_TABLE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 struct __wt_walk;
@@ -144,6 +158,8 @@ struct __wt_walk_entry;
 #include "walk.h"
 
 #include "api.h"
+#include "cursor.h"
+#include "schema.h"
 
 #include "extern.h"
 #include "verify_build.h"

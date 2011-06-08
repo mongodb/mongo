@@ -21,7 +21,23 @@ class Config:
 		self.desc = desc
 		self.flags = flags
 
-btree_config = [
+	def __cmp__(self, other):
+		return cmp(self.name, other.name)
+
+format_meta = [
+	Config('key_format', 'u', r'''
+		the format of the data packed into key items.  See @ref packing for
+		details.  If not set, a default value of \c "u" is assumed, and
+		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		type='format'),
+	Config('value_format', 'u', r'''
+		the format of the data packed into value items.  See @ref packing for
+		details.  If not set, a default value of \c "u" is assumed, and
+		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		type='format'),
+]
+
+btree_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes''', min='512B', max='128MB'),
 	Config('huffman_key', '', r'''
@@ -41,11 +57,6 @@ btree_config = [
 	Config('internal_node_min', '2KB', r'''
 		minimum page size for internal nodes, in bytes''', min='512B',
 		max='512MB'),
-	Config('key_format', 'u', r'''
-		the format of the data packed into key items.  See @ref packing for
-		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
-		type='format'),
 	Config('key_gap', '10', r'''
 		configure the maximum gap between instantiated keys in a Btree leaf
 		page, constraining the number of keys processed to instantiate a random
@@ -70,38 +81,54 @@ btree_config = [
 		Btree page size, that is, when a Btree page is split, it will be split
 		into smaller pages, where each page is the specified percentage of the
 		maximum Btree page size''', min='0', max='100'),
-	Config('value_format', 'u', r'''
-		the format of the data packed into value items.  See @ref packing for
-		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
-		type='format'),
 ]
 
+columns_meta = [
+	Config('columns', '', r'''
+		list of the column names.  Comma-separated list of the form
+		<code>(column[,...])</code>.  For tables, the number of entries must
+		match the total number of values in \c key_format and \c value_format.
+		For colgroups and indices, all column names must appear in the list of
+		columns for the table''', type='list'),
+]
+
+filename_meta = [
+	Config('filename', '', r'''
+		override the default filename derived from the object name'''),
+]
+
+table_only_meta = [
+	Config('colgroups', '', r'''
+		comma-separated list of names of column groups.  Each column group is
+		stored separately, keyed by the primary key of the table.  Any column
+		that does not appear in a column group is stored in a default, unnamed,
+		column group for the table.  Each column group must be created with a
+		separate call to WT_SESSION::create'''),
+]
+
+colgroup_meta = btree_meta + columns_meta + filename_meta
+
+index_meta = colgroup_meta
+
+table_meta = format_meta + columns_meta + table_only_meta
+
 methods = {
-'btree.file' : Method(btree_config),
+'btree.meta' : Method(btree_meta),
+
+'colgroup.meta' : Method(colgroup_meta),
+
+'index.meta' : Method(index_meta),
+
+'table.meta' : Method(table_meta),
 
 'cursor.close' : Method([]),
 
 'session.close' : Method([]),
 
-'session.create' : Method(btree_config + [
-	Config('colgroup.name', '', r'''
-		named group of columns to store together.  Comma-separated list of
-		the form <code>(column[,...])</code>.  Each column group is stored
-		separately, keyed by the primary key of the table.  Any column that
-		does not appear in a column group is stored in a default, unnamed,
-		column group for the table'''),
-	Config('columns', '', r'''
-		list of the column names.  Comma-separated list of the form
-		<code>(column[,...])</code>.  The number of entries must match the
-		total number of values in \c key_format and \c value_format''',
-		type='list'),
+'session.create' : Method(index_meta + table_only_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema''', type='boolean'),
-	Config('index.name', '', r'''
-		named index on a list of columns.  Comma-separated list of the form
-		<code>(column[,...])</code>'''),
 ]),
 
 'session.drop' : Method([
@@ -164,9 +191,6 @@ methods = {
 	Config('archive', 'false', r'''
 		remove log files no longer required for transactional durability''',
 		type='boolean'),
-	Config('force', 'false', r'''
-		write a new checkpoint even if nothing has changed since the last
-		one''', type='boolean'),
 	Config('flush_cache', 'true', r'''
 		flush the cache''', type='boolean'),
 	Config('flush_log', 'true', r'''
@@ -174,6 +198,9 @@ methods = {
 	Config('log_size', '0', r'''
 		only proceed if more than the specified number of bytes of log
 		records have been written since the last checkpoint''', min='0'),
+	Config('force', 'false', r'''
+		write a new checkpoint even if nothing has changed since the last
+		one''', type='boolean'),
 	Config('timeout', '0', r'''
 		only proceed if more than the specified number of milliseconds have
 		elapsed since the last checkpoint''', min='0'),
@@ -212,13 +239,13 @@ methods = {
 		number of hazard references per session''', min='3'),
 	Config('logging', 'false', r'''
 		enable logging''', type='boolean'),
-	Config('session_max', '50', r'''
-		maximum expected number of sessions (including server threads)''',
-		min='1'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an RPC
 		server for primary processes and use RPC for secondary processes)''',
 		type='boolean'),
+	Config('session_max', '50', r'''
+		maximum expected number of sessions (including server threads)''',
+		min='1'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as
 		a list, such as \c "verbose=[evict,read]"''',

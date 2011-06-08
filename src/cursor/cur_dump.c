@@ -62,7 +62,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	key->size = cursor->key.size;
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 	return (0);
 }
 
@@ -92,7 +92,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	value->size = cursor->value.size;
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 	return (0);
 }
 
@@ -120,7 +120,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	}
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 }
 
 /*
@@ -147,7 +147,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	}
 	va_end(ap);
 
-	API_END();
+	API_END(session);
 }
 
 /*

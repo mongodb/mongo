@@ -8,17 +8,17 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_bulk_col(CURSOR_BULK *);
-static int __wt_bulk_col_page(CURSOR_BULK *);
-static int __wt_bulk_row(CURSOR_BULK *);
-static int __wt_bulk_row_page(CURSOR_BULK *);
+static int __wt_bulk_col(WT_CURSOR_BULK *);
+static int __wt_bulk_col_page(WT_CURSOR_BULK *);
+static int __wt_bulk_row(WT_CURSOR_BULK *);
+static int __wt_bulk_row_page(WT_CURSOR_BULK *);
 
 /*
  * __wt_bulk_init --
  *	Start a bulk load.
  */
 int
-__wt_bulk_init(CURSOR_BULK *cbulk)
+__wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -73,7 +73,7 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
  *	Bulk insert.
  */
 int
-__wt_bulk_insert(CURSOR_BULK *cbulk)
+__wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
@@ -116,7 +116,7 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
  *	Column-store bulk load.
  */
 static int
-__wt_bulk_col(CURSOR_BULK *cbulk)
+__wt_bulk_col(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -151,7 +151,7 @@ err:	if (upd != NULL)
  *	Variable-length row-store bulk load.
  */
 static int
-__wt_bulk_row(CURSOR_BULK *cbulk)
+__wt_bulk_row(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -192,7 +192,7 @@ err:	if (ins != NULL)
  *	Clean up after a bulk load.
  */
 int
-__wt_bulk_end(CURSOR_BULK *cbulk)
+__wt_bulk_end(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
@@ -254,7 +254,7 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
  *	Reconcile a set of row-store bulk-loaded items.
  */
 static int
-__wt_bulk_row_page(CURSOR_BULK *cbulk)
+__wt_bulk_row_page(WT_CURSOR_BULK *cbulk)
 {
 	WT_PAGE *page;
 	WT_REF *parent_ref;
@@ -313,7 +313,7 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
  *	Reconcile a set of column-store bulk-loaded items.
  */
 static int
-__wt_bulk_col_page(CURSOR_BULK *cbulk)
+__wt_bulk_col_page(WT_CURSOR_BULK *cbulk)
 {
 	WT_PAGE *page;
 	WT_REF *parent_ref;

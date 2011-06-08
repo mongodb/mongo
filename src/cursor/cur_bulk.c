@@ -15,10 +15,10 @@ static int
 __curbulk_insert(WT_CURSOR *cursor)
 {
 	WT_BTREE *btree;
-	CURSOR_BULK *cbulk;
+	WT_CURSOR_BULK *cbulk;
 	WT_SESSION_IMPL *session;
 
-	cbulk = (CURSOR_BULK *)cursor;
+	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 	CURSOR_API_CALL(cursor, session, insert, btree);
 
@@ -42,7 +42,7 @@ __curbulk_insert(WT_CURSOR *cursor)
 #endif
 
 	WT_RET(__wt_bulk_insert(cbulk));
-	API_END();
+	API_END(session);
 
 	return (0);
 }
@@ -55,19 +55,19 @@ static int
 __curbulk_close(WT_CURSOR *cursor, const char *config)
 {
 	WT_BTREE *btree;
-	CURSOR_BULK *cbulk;
+	WT_CURSOR_BULK *cbulk;
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	cbulk = (CURSOR_BULK *)cursor;
+	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 	ret = 0;
 
 	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 	WT_TRET(__wt_bulk_end(cbulk));
 	WT_TRET(__wt_cursor_close(cursor, config));
-	API_END();
+	API_END(session);
 
 	return (ret);
 }
@@ -77,7 +77,7 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
  *	initialize a bulk cursor.
  */
 int
-__wt_curbulk_init(CURSOR_BULK *cbulk)
+__wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_CURSOR *c = &cbulk->cbt.iface;
 
