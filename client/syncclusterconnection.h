@@ -43,9 +43,9 @@ namespace mongo {
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */
-        SyncClusterConnection( const list<HostAndPort> & );
-        SyncClusterConnection( string commaSeparated );
-        SyncClusterConnection( string a , string b , string c );
+        SyncClusterConnection( const list<HostAndPort> &, double socketTimeout = 0);
+        SyncClusterConnection( string commaSeparated, double socketTimeout = 0);
+        SyncClusterConnection( string a , string b , string c, double socketTimeout = 0 );
         ~SyncClusterConnection();
 
         /**
@@ -91,8 +91,10 @@ namespace mongo {
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SYNC; }
 
+        void setAllSoTimeouts( double socketTimeout );
+
     private:
-        SyncClusterConnection( SyncClusterConnection& prev );
+        SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout = 0 );
         string _toString() const;
         bool _commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
         auto_ptr<DBClientCursor> _queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
@@ -108,6 +110,8 @@ namespace mongo {
         mongo::mutex _mutex;
 
         vector<BSONObj> _lastErrors;
+
+        double _socketTimeout;
     };
 
     class UpdateNotTheSame : public UserException {

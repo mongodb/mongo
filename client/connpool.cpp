@@ -145,7 +145,7 @@ namespace mongo {
         return conn;
     }
 
-    DBClientBase* DBConnectionPool::get(const ConnectionString& url) {
+    DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
         DBClientBase * c = _get( url.toString() );
         if ( c ) {
             onHandedOut( c );
@@ -153,13 +153,13 @@ namespace mongo {
         }
 
         string errmsg;
-        c = url.connect( errmsg );
+        c = url.connect( errmsg, socketTimeout );
         uassert( 13328 ,  _name + ": connect failed " + url.toString() + " : " + errmsg , c );
 
         return _finishCreate( url.toString() , c );
     }
 
-    DBClientBase* DBConnectionPool::get(const string& host) {
+    DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
         DBClientBase * c = _get( host );
         if ( c ) {
             onHandedOut( c );
@@ -170,7 +170,7 @@ namespace mongo {
         ConnectionString cs = ConnectionString::parse( host , errmsg );
         uassert( 13071 , (string)"invalid hostname [" + host + "]" + errmsg , cs.isValid() );
 
-        c = cs.connect( errmsg );
+        c = cs.connect( errmsg, socketTimeout );
         if ( ! c )
             throw SocketException( SocketException::CONNECT_ERROR , host , 11002 , str::stream() << _name << " error: " << errmsg );
         return _finishCreate( host , c );
@@ -305,9 +305,17 @@ namespace mongo {
 
     ScopedDbConnection * ScopedDbConnection::steal() {
         assert( _conn );
-        ScopedDbConnection * n = new ScopedDbConnection( _host , _conn );
+        ScopedDbConnection * n = new ScopedDbConnection( _host , _conn, _socketTimeout );
         _conn = 0;
         return n;
+    }
+
+    void ScopedDbConnection::_setSocketTimeout(){
+        if( ! _conn ) return;
+        if( _conn->type() == ConnectionString::MASTER )
+            (( DBClientConnection* ) _conn)->setSoTimeout( _socketTimeout );
+        else if( _conn->type() == ConnectionString::SYNC )
+            (( SyncClusterConnection* ) _conn)->setAllSoTimeouts( _socketTimeout );
     }
 
     ScopedDbConnection::~ScopedDbConnection() {
@@ -320,12 +328,14 @@ namespace mongo {
         }
     }
 
-    ScopedDbConnection::ScopedDbConnection(const Shard& shard )
-        : _host( shard.getConnString() ) , _conn( pool.get(_host) ) {
+    ScopedDbConnection::ScopedDbConnection(const Shard& shard, double socketTimeout )
+        : _host( shard.getConnString() ) , _conn( pool.get(_host, socketTimeout) ), _socketTimeout( socketTimeout ) {
+        _setSocketTimeout();
     }
 
-    ScopedDbConnection::ScopedDbConnection(const Shard* shard )
-        : _host( shard->getConnString() ) , _conn( pool.get(_host) ) {
+    ScopedDbConnection::ScopedDbConnection(const Shard* shard, double socketTimeout )
+        : _host( shard->getConnString() ) , _conn( pool.get(_host, socketTimeout) ), _socketTimeout( socketTimeout ) {
+        _setSocketTimeout();
     }
 
 

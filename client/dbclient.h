@@ -183,7 +183,7 @@ namespace mongo {
 
         string toString() const { return _string; }
         
-        DBClientBase* connect( string& errmsg ) const;
+        DBClientBase* connect( string& errmsg, double socketTimeout = 0 ) const;
 
         string getSetName() const { return _setName; }
 

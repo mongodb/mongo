@@ -122,8 +122,8 @@ namespace mongo {
 
         void flush();
 
-        DBClientBase *get(const string& host);
-        DBClientBase *get(const ConnectionString& host);
+        DBClientBase *get(const string& host, double socketTimeout = 0);
+        DBClientBase *get(const ConnectionString& host, double socketTimeout = 0);
 
         void release(const string& host, DBClientBase *c);
 
@@ -192,19 +192,25 @@ namespace mongo {
         /** the main constructor you want to use
             throws UserException if can't connect
             */
-        explicit ScopedDbConnection(const string& host) : _host(host), _conn( pool.get(host) ) {}
+        explicit ScopedDbConnection(const string& host, double socketTimeout = 0) : _host(host), _conn( pool.get(host, socketTimeout) ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
-        ScopedDbConnection() : _host( "" ) , _conn(0) {}
+        ScopedDbConnection() : _host( "" ) , _conn(0), _socketTimeout( 0 ) {}
 
         /* @param conn - bind to an existing connection */
-        ScopedDbConnection(const string& host, DBClientBase* conn ) : _host( host ) , _conn( conn ) {}
+        ScopedDbConnection(const string& host, DBClientBase* conn, double socketTimeout = 0 ) : _host( host ) , _conn( conn ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
         /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const ConnectionString& url ) : _host(url.toString()), _conn( pool.get(url) ) {}
+        explicit ScopedDbConnection(const ConnectionString& url, double socketTimeout = 0 ) : _host(url.toString()), _conn( pool.get(url, socketTimeout) ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
         /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const Shard& shard );
-        explicit ScopedDbConnection(const Shard* shard );
+        explicit ScopedDbConnection(const Shard& shard, double socketTimeout = 0 );
+        explicit ScopedDbConnection(const Shard* shard, double socketTimeout = 0 );
 
         ~ScopedDbConnection();
 
@@ -260,8 +266,12 @@ namespace mongo {
         ScopedDbConnection * steal();
 
     private:
+
+        void _setSocketTimeout();
+
         const string _host;
         DBClientBase *_conn;
+        const double _socketTimeout;
 
     };
 
