@@ -936,6 +936,13 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 	dsk = page->dsk;
 
 	/*
+	 * For row-internal pages, the disk image was discarded because there
+	 * were no overflow items.
+	 */
+	if (dsk == NULL)
+		return (0);
+
+	/*
 	 * We're deleting the page, which means any overflow item we ever had
 	 * is deleted as well.
 	 */
