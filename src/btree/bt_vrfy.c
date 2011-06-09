@@ -325,11 +325,10 @@ __wt_verify_row_int_key_order(
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
 	WT_ITEM item;
-	int ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	func = btree->btree_compare;
-	ret = 0;
 
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr != WT_ADDR_INVALID);
@@ -346,15 +345,14 @@ __wt_verify_row_int_key_order(
 		    " on the page at addr %" PRIu32
 		    " sorts before the last key appearing on page %" PRIu32,
 		    WT_ROW_REF_SLOT(page, rref), WT_PADDR(page), vs->max_addr);
-		ret = WT_ERROR;
-	} else {
-		/* Update the largest key we've seen to the key just checked. */
-		WT_RET(
-		    __wt_buf_set(session, vs->max_key, item.data, item.size));
-		vs->max_addr = WT_PADDR(page);
+		return (WT_ERROR);
 	}
 
-	return (ret);
+	/* Update the largest key we've seen to the key just checked. */
+	WT_RET(__wt_buf_set(session, vs->max_key, item.data, item.size));
+	vs->max_addr = WT_PADDR(page);
+
+	return (0);
 }
 
 /*
