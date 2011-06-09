@@ -31,8 +31,12 @@ catch(e) {
 var config = master.getDB("local").system.replset.findOne();
 assert.eq(oldVersion+1, config.version);
 
+
 print("0 & 3 up; 1, 2, 4 down");
 replTest.restart(3);
+
+// in case 0 isn't master
+replTest.awaitReplication();
 
 replTest.stop(1);
 replTest.stop(2);
