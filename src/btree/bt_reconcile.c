@@ -94,14 +94,14 @@ typedef struct {
 		uint64_t recno;		/* Split's starting record */
 		uint32_t entries;	/* Split's entries */
 
-		WT_OFF off;		/* Address, size */
+		WT_OFF off;		/* Split's written addr/size pair */
 
 		/*
 		 * The key for a row-store page; no column-store key is needed
-		 * because the page's recno, stored in the WT_OFF_RECORD, is
-		 * the column-store key.
+		 * because the page's recno, stored in the recno field, is the
+		 * column-store key.
 		 */
-		WT_BUF key;		/* Row key */
+		WT_BUF key;		/* Promoted row-store key */
 
 		/*
 		 * If we're creating a new, in-memory version of the reconciled
@@ -133,7 +133,7 @@ typedef struct {
 	enum {	SPLIT_BOUNDARY=0,	/* Next: a split page boundary */
 		SPLIT_MAX=1,		/* Next: the maximum page boundary */
 		SPLIT_TRACKING_OFF=2 }	/* No boundary checks */
-		state;
+	bnd_state;
 
 	/*
 	 * We track current information about the current record number, the
@@ -153,16 +153,14 @@ typedef struct {
 	 * we create a set of new disk images that reflect the split of the
 	 * original page's disk image, we have to create a set of new in-memory
 	 * images reflecting the split of the original page's in-memory image.
-	 * Once that's done, the new in-memory image must references the same
+	 * Once that's done, the new in-memory image must reference the same
 	 * subtrees as the old in-memory image; we maintain a list of in-memory
 	 * subtrees the original page referenced to make that fixup possible.
 	 *
 	 * We obviously could maintain this list on a per-split-chunk basis:
-	 * copy it into the WT_BOUNDARY structure if the boundary is reached,
-	 * then from the WT_BOUNDARY structure into the WT_SPLIT structure if
-	 * we split.  We're binarily searching this array during fixup and I
-	 * don't expect it to be that large -- I don't expect this to be my
-	 * performance problem.
+	 * copy it into the WT_BOUNDARY structure if the boundary is reached.
+	 * We're binarily searching this array during fixup and I don't expect
+	 * it to be large.
 	 */
 	WT_REF **imref;			/* In-memory subtree reference list */
 	uint32_t imref_next;		/* Next list slot */
@@ -173,8 +171,8 @@ typedef struct {
 	int	    cell_zero;		/* Row-store internal page 0th key */
 	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
 
-	WT_HAZARD *hazard;		/* Copy of the hazard references */
-	uint32_t   hazard_elem;		/* Number of entries in the list */
+	WT_HAZARD  *hazard;		/* Copy of the hazard references */
+	uint32_t    hazard_elem;	/* Number of entries in the list */
 
 	/*
 	 * WT_KV--
@@ -370,7 +368,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->_full);
 	__wt_buf_free(session, &r->_last);
 
-	__wt_free(session, r);
+	__wt_free(session, S2C(session)->cache->rec);
 }
 
 /*
@@ -1015,8 +1013,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 *
 	 * It's lots of work to build these pages and don't want to start over
 	 * when we reach the maximum page size (it's painful to restart after
-	 * creating overflow items and compacted data, not to mention deleting
-	 * overflow items from the underlying pages).  So, the loop calls the
+	 * creating overflow items and compacted data, for example, as those
+	 * items have already been written to disk).  So, the loop calls the
 	 * helper functions when approaching a split boundary, and we save the
 	 * information at that point.  That allows us to go back and split the
 	 * page at the boundary points if we eventually overflow the maximum
@@ -1033,7 +1031,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * If the maximum page size is the same as the split page size, there
 	 * is no need to maintain split boundaries within a larger page.
 	 */
-	r->state = max == r->split_size ? SPLIT_TRACKING_OFF : SPLIT_BOUNDARY;
+	r->bnd_state =
+	    max == r->split_size ? SPLIT_TRACKING_OFF : SPLIT_BOUNDARY;
 
 	/*
 	 * Initialize the array of boundary items and set the initial record
@@ -1102,22 +1101,22 @@ __rec_split(WT_SESSION_IMPL *session)
 	 * the maximum page boundary: in that case, we do the actual split,
 	 * clean things up, then keep going.
 	 */
-	switch (r->state) {
+	switch (r->bnd_state) {
 	case SPLIT_BOUNDARY:				/* Case #1 */
 		/*
 		 * Save the information about where we are when the split would
 		 * have happened.
-		 *
-		 * Set the number of entries for the just finished chunk.
 		 */
 		WT_RET(__rec_split_bnd_grow(session));
 		bnd = &r->bnd[r->bnd_next++];
+
+		/* Set the number of entries for the just finished chunk. */
 		bnd->entries = r->entries - r->total_entries;
 		r->total_entries = r->entries;
 
 		/*
 		 * Set the starting record number and buffer address for the
-		 * next chunk, clear the entries.
+		 * next chunk, clear the entries (not required, but cleaner).
 		 */
 		++bnd;
 		bnd->recno = r->recno;
@@ -1126,26 +1125,22 @@ __rec_split(WT_SESSION_IMPL *session)
 
 		/*
 		 * Set the space available to another split-size chunk, if we
-		 * have one.
+		 * have one.  If we don't have room for another split chunk,
+		 * add whatever space remains in the maximum page size, and
+		 * hope it's enough.
 		 */
 		current_len = WT_PTRDIFF32(r->first_free, dsk);
-		if (current_len + r->split_size <= r->page_size) {
+		if (current_len + r->split_size <= r->page_size)
 			r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
-			break;
+		else {
+			r->bnd_state = SPLIT_MAX;
+			r->space_avail =
+			    (r->page_size - WT_PAGE_DISK_SIZE) - current_len;
 		}
-
-		/*
-		 * We don't have room for another split chunk.  Add whatever
-		 * space remains in the maximum page size, hopefully it will
-		 * be enough.
-		 */
-		r->state = SPLIT_MAX;
-		r->space_avail =
-		    (r->page_size - WT_PAGE_DISK_SIZE) - current_len;
 		break;
 	case SPLIT_MAX:					/* Case #2 */
 		/*
-		 * It didn't all fit, but we just noticed that.
+		 * It didn't all fit into a single page.
 		 *
 		 * Cycle through the saved split-point information, writing the
 		 * split chunks we have tracked.
@@ -1153,7 +1148,7 @@ __rec_split(WT_SESSION_IMPL *session)
 		WT_RET(__rec_split_fixup(session));
 
 		/* We're done saving split chunks. */
-		r->state = SPLIT_TRACKING_OFF;
+		r->bnd_state = SPLIT_TRACKING_OFF;
 		break;
 	case SPLIT_TRACKING_OFF:			/* Case #3 */
 		WT_RET(__rec_split_bnd_grow(session));
@@ -1162,7 +1157,7 @@ __rec_split(WT_SESSION_IMPL *session)
 		/*
 		 * It didn't all fit, but either we've already noticed it and
 		 * are now processing the rest of the page at the split-size
-		 * boundaries, or, the split size was the same as the page size,
+		 * boundaries, or the split size was the same as the page size,
 		 * so we never bothered with saving split-point information.
 		 *
 		 * Write the current disk image.
@@ -1172,15 +1167,18 @@ __rec_split(WT_SESSION_IMPL *session)
 		r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
 		WT_RET(__rec_split_write(session, bnd, &r->dsk));
 
+		/*
+		 * Set the starting record number for the next chunk, clear the
+		 * entries (not required, but cleaner).
+		 */
 		++bnd;
 		bnd->recno = r->recno;
 		bnd->entries = 0;
 
 		/*
-		 * Set the starting record number and buffer information for the
-		 * next chunk; we only get here if we've never split, or have
-		 * already split, so we're using using split-size chunks from
-		 * here on out.
+		 * Set the caller's entry count and buffer information for the
+		 * next chunk.  We only get here if we're not splitting or have
+		 * already split, so it's split-size chunks from here on out.
 		 */
 		r->entries = 0;
 		r->first_free = WT_PAGE_DISK_BYTE(dsk);
@@ -1228,7 +1226,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	 * boundary slot to represent the full page (the first boundary slot is
 	 * largely correct, just update the number of entries).
 	 */
-	if (r->state == SPLIT_TRACKING_OFF) {
+	if (r->bnd_state == SPLIT_TRACKING_OFF) {
 		WT_RET(__rec_split_bnd_grow(session));
 		bnd = &r->bnd[r->bnd_next++];
 	} else {
@@ -1247,7 +1245,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 
 /*
  * __rec_split_fixup --
- *	Physically split the already-written page data.
+ *	Fix up after crossing the maximum page boundary.
  */
 static int
 __rec_split_fixup(WT_SESSION_IMPL *session)
@@ -1266,10 +1264,11 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * the caller's information.
 	 */
 	r = S2C(session)->cache->rec;
+	tmp = NULL;
 	ret = 0;
 
 	/*
-	 * The data isn't laid out on page-boundaries or nul padded; copy it to
+	 * The data isn't laid out on a page boundary or nul padded; copy it to
 	 * a clean, aligned, padded buffer before writing it.
 	 *
 	 * Allocate a scratch buffer to hold the new disk image.  Copy the
@@ -1277,23 +1276,22 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_size, &tmp));
-	memcpy(tmp->mem, r->dsk.mem, WT_PAGE_DISK_SIZE);
+	dsk = tmp->mem;
+	dsk_start = WT_PAGE_DISK_BYTE(dsk);
+	memcpy(dsk, r->dsk.mem, WT_PAGE_DISK_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
 	 * it into place.
 	 */
-	dsk = tmp->mem;
-	dsk_start = WT_PAGE_DISK_BYTE(dsk);
 	for (i = 0, bnd = r->bnd; i < r->bnd_next; ++i, ++bnd) {
-		/* Set the starting record number and number of entries. */
-		dsk->recno = bnd->recno;
-		dsk->u.entries = bnd->entries;
-
-		/* Copy out the page contents, and write it. */
+		/* Copy the page contents to the temporary buffer. */
 		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
 		memcpy(dsk_start, bnd->start, len);
 
+		/* Write the page. */
+		dsk->recno = bnd->recno;
+		dsk->u.entries = bnd->entries;
 		tmp->size = WT_PAGE_DISK_SIZE + len;
 		WT_ERR(__rec_split_write(session, bnd, tmp));
 	}
@@ -1311,7 +1309,6 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, len < r->split_size - WT_PAGE_DISK_SIZE);
 
 	dsk = r->dsk.mem;
-	dsk->recno = bnd->recno;
 	dsk_start = WT_PAGE_DISK_BYTE(dsk);
 	(void)memmove(dsk_start, bnd->start, len);
 
@@ -1343,6 +1340,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 * Set the disk block size and clear trailing bytes.
 	 * Allocate file space.
 	 * Write the disk block.
+	 * Return the addr/size pair.
 	 */
 	size = __rec_allocation_size(session, buf);
 	WT_RET(__wt_block_alloc(session, &addr, size));
@@ -1373,7 +1371,9 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 * If we're evicting the page, there's no more work to do.
 	 *
 	 * If we're not evicting the page, we'll need a new in-memory version;
-	 * save a copy of the disk image for later.
+	 * save a copy of the disk image for later.  (We can't use the memory
+	 * in the original buffer because this memory is eventually attached to
+	 * an in-memory page as its disk image.)
 	 */
 	if (r->evict)
 		bnd->imp_dsk = NULL;
@@ -2400,6 +2400,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 static int
 __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
 	WT_PAGE *replace;
 	WT_RECONCILE *r;
@@ -2477,14 +2478,13 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * single page with another single page most of the time.
 	 */
 	if (r->bnd_next == 1) {
+		bnd = &r->bnd[0];
+
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: move %" PRIu32 " to %" PRIu32
 		    ", (%" PRIu32 "B to %" PRIu32 "B)",
-		    WT_PADDR(page), r->bnd[0].off.addr,
-		    WT_PSIZE(page), r->bnd[0].off.size));
-
-		/* Queue the original page to be discarded, we're done. */
-		WT_RET(__rec_discard_add_page(session, page));
+		    WT_PADDR(page), bnd->off.addr,
+		    WT_PSIZE(page), bnd->off.size));
 
 		/*
 		 * Create a new in-memory version of this page if necessary.
@@ -2493,15 +2493,13 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (r->evict)
 			WT_RET(__rec_parent_update(session, page, NULL,
-			    r->bnd[0].off.addr, r->bnd[0].off.size,
-			    WT_REF_DISK));
+			    bnd->off.addr, bnd->off.size, WT_REF_DISK));
 		else {
 			WT_RET(__rec_imref_fixup(
-			    session, &r->bnd[0],
+			    session, bnd,
 			    page->parent, page->parent_ref, &replace));
 			WT_RET(__rec_parent_update(session, page, replace,
-			    r->bnd[0].off.addr, r->bnd[0].off.size,
-			    WT_REF_MEM));
+			    bnd->off.addr, bnd->off.size, WT_REF_MEM));
 		}
 	} else {
 		/*
@@ -2540,9 +2538,6 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_ILLEGAL_FORMAT(session);
 		}
 
-		/* Queue the original page to be discarded, we're done. */
-		WT_RET(__rec_discard_add_page(session, page));
-
 		/*
 		 * Update the parent to reference the newly created internal
 		 * page.
@@ -2551,7 +2546,10 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    session, page, replace, WT_ADDR_INVALID, 0, WT_REF_MEM));
 	}
 
-	/* We're done, discard everything we've queued for discard. */
+	/* Queue the original page to be discarded, we're done with it. */
+	WT_RET(__rec_discard_add_page(session, page));
+
+	/* Discard everything we've queued for discard. */
 	WT_RET(__rec_discard_evict(session));
 
 	return (0);
