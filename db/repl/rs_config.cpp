@@ -390,7 +390,7 @@ namespace mongo {
         _populateTagMap(tagMap);
 
         for (BSONObj::iterator i = modes.begin(); i.more(); ) {
-            uint primaryOnly = 0;
+            int primaryOnly = 0;
 
             // ruleName : {dc : 2, m : 3}
             BSONElement rule = i.next();
