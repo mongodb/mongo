@@ -399,7 +399,7 @@ namespace mongo {
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
-            bb.append("ping", m->hbinfo().ping);
+            bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -410,8 +410,9 @@ namespace mongo {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
-        if (_currentSyncTarget) {
-            b.append("syncingTo", _currentSyncTarget->fullName());
+        const Member *syncTarget = _currentSyncTarget;
+        if (syncTarget) {
+            b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);
         if( replSetBlind )
