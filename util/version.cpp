@@ -170,7 +170,11 @@ namespace mongo {
                 // skip over pointer
                 const char* space = strchr(line, ' ');
                 
-                if (!startsWith(space+1, "interleave")){
+                if ( ! space ) {
+                    cout << "** WARNING: cannot parse numa_maps" << endl;
+                    warned = true;
+                }
+                else if ( ! startsWith(space+1, "interleave") ) {
                     cout << endl;
                     cout << "** WARNING: You are running on a NUMA machine." << endl;
                     cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
