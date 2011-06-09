@@ -158,11 +158,27 @@ namespace mongo {
 
         }
 
-        bool opReplicatedEnough( OpTime op , int w ) {
+        bool opReplicatedEnough( OpTime op , BSONElement w ) {
             RARELY {
                 REPLDEBUG( "looking for : " << op << " w=" << w );
             }
 
+            if (w.isNumber()) {
+                return replicatedToNum(op, w.numberInt());
+            }
+
+            if (!theReplSet) {
+                return false;
+            }
+
+            map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(w.String());
+            uassert(14830, str::stream() << "unrecognized getLastError mode: " << w.toString(),
+                    it != theReplSet->config().rules.end());
+
+            return op <= (*it).second->last;
+        }
+
+        bool replicatedToNum(OpTime& op, int w) {
             if ( w <= 1 || ! _isMaster() )
                 return true;
 
@@ -208,7 +224,7 @@ namespace mongo {
             return;
 
         slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
-        
+
         if (theReplSet && !theReplSet->isPrimary()) {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
@@ -217,8 +233,12 @@ namespace mongo {
         }
     }
 
-    bool opReplicatedEnough( OpTime op , int w ) {
+    bool opReplicatedEnough( OpTime op , BSONElement w ) {
         return slaveTracking.opReplicatedEnough( op , w );
+    }
+
+    bool opReplicatedEnough( OpTime op , int w ) {
+        return slaveTracking.replicatedToNum( op , w );
     }
 
     void resetSlaveCache() {

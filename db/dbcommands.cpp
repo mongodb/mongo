@@ -161,11 +161,9 @@ namespace mongo {
             }
 
             BSONElement e = cmdObj["w"];
-            if ( e.isNumber() ) {
+            if ( e.ok() ) {
                 int timeout = cmdObj["wtimeout"].numberInt();
                 Timer t;
-
-                int w = e.numberInt();
 
                 long long passes = 0;
                 char buf[32];
@@ -176,7 +174,7 @@ namespace mongo {
                         if ( anyReplEnabled() ) {
                             result.append( "wnote" , "no write has been done on this connection" );
                         }
-                        else if ( w <= 1 ) {
+                        else if ( e.isNumber() && e.numberInt() <= 1 ) {
                             // don't do anything
                             // w=1 and no repl, so this is fine
                         }
@@ -190,8 +188,9 @@ namespace mongo {
                     }
 
                     // check this first for w=0 or w=1
-                    if ( opReplicatedEnough( op, w ) )
+                    if ( opReplicatedEnough( op, e ) ) {
                         break;
+                    }
 
                     // if replication isn't enabled (e.g., config servers)
                     if ( ! anyReplEnabled() ) {
