@@ -292,7 +292,8 @@ namespace mongo {
         _currentSyncTarget(0),
         _hbmsgTime(0),
         _self(0),
-        mgr( new Manager(this) ) {
+        mgr( new Manager(this) ),
+        ghost( new GhostSync(this) ) {
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         strcpy( _hbmsg , "initial startup" );

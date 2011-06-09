@@ -122,6 +122,11 @@ namespace mongo {
 
             Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
+
+            if (theReplSet && theReplSet->isPrimary()) {
+                theReplSet->ghost->updateSlave(rid, last);
+            }
+
             if ( i.loc ) {
                 if( i.owned )
                     i.loc[0] = last;
@@ -208,7 +213,7 @@ namespace mongo {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
             log(2) << "percolating " << lastOp.toString() << " from " << rid << endl;
-            theReplSet->mgr->send( boost::bind(&ReplSet::percolate, theReplSet, rid, lastOp) );
+            theReplSet->ghost->send( boost::bind(&GhostSync::percolate, theReplSet->ghost, rid, lastOp) );
         }
     }
 

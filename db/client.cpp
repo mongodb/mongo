@@ -33,6 +33,7 @@
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
 #include "../util/file_allocator.h"
+#include "repl/rs.h"
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -452,6 +453,10 @@ namespace mongo {
         while ( i.more() )
             b.append( i.next() );
         _handshake = b.obj();
+
+        if (theReplSet && o.hasField("member")) {
+            theReplSet->ghost->associateSlave(_remoteId, o["member"].Int());
+        }
     }
 
     class HandshakeCmd : public Command {

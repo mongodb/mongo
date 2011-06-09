@@ -512,64 +512,60 @@ namespace mongo {
         cc().shutdown();
     }
 
-    bool ReplSetImpl::_getSlave(const BSONObj& rid, GhostSlave& slave) {
-        log(1) << "cache miss for " << rid << ", reloading slave info" << rsLog;
-        
-        for( Member *m = _members.head(); m; m=m->next() ) {
-            // no point in loading arbiters
-            if (!m->state().readable()) {
-                continue;
-            }
-            
-            try {
-                ScopedConn conn(m->fullName());
-                BSONObj me = conn.findOne("local.me", BSONObj(), 0, 0);
-                if (me.isEmpty() || !me.hasField("_id")) {
-                    continue;
-                }
-                log(1) << "adding " << me << " -> " << m->fullName() << endl;
-                
-                GhostSlave& someSlave = _ghostCache[me];
-                if (!someSlave.init) {
-                    someSlave.init = true;
-                    someSlave.slave = m;
-                }
-                if (rid == me) {
-                    return true;
-                }
-            }
-            catch (DBException& e) {
-                log() << "error adding member " << m->fullName()
-                      << " to ghost list: " << e.what() << rsLog;
-            }
-        }
-            
-        // if rid doesn't refer to a member of the set, this still might not
-        // be inited
-        return slave.init;
+    void GhostSync::starting() {
+        Client::initThread("rs ghost sync");
+        replLocalAuth();
     }
-    
-    void ReplSetImpl::percolate(const BSONObj& rid, const OpTime& last) {
+
+    void GhostSync::associateSlave(const BSONObj& rid, const int memberId) {
+        GhostSlave &slave = _ghostCache[rid];
+        if (slave.init) {
+            log(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
+            return;
+        }
+
+        slave.slave = (Member*)rs->findById(memberId);
+        if (slave.slave != 0) {
+            slave.init = true;
+        }
+        else {
+            log() << "replset couldn't find a slave with id " << memberId
+                  << ", not tracking " << rid << rsLog;
+        }
+    }
+
+    void GhostSync::updateSlave(const BSONObj& rid, const OpTime& last) {
+        GhostSlave& slave = _ghostCache[rid];
+        if (!slave.init) {
+            log() << "couldn't update slave " << rid << rsLog;
+            return;
+        }
+
+        ((ReplSetConfig::MemberCfg)slave.slave->config()).updateGroups(last);
+    }
+
+    void GhostSync::percolate(const BSONObj& rid, const OpTime& last) {
         GhostSlave &s = _ghostCache[rid];
-        if (!s.init  && !_getSlave(rid, s)) {
+        if (!s.init) {
             log() << "replSet couldn't find a slave with id " << rid
                   << ", not faux syncing" << rsLog;
             return;
         }
         assert(s.slave);
 
-        const Member *target = _currentSyncTarget;
-        if (!target || box.getState().primary()
+        const Member *target = rs->_currentSyncTarget;
+        if (!target || rs->box.getState().primary()
             // we are currently syncing from someone who's syncing from us
             // the target might end up with a new Member, but s.slave never
             // changes so we'll compare the names
             || target == s.slave || target->fullName() == s.slave->fullName()) {
+            log(1) << "replica set ghost target no good" << endl;
             return;
         }
 
         try {
             if (!s.reader.haveCursor()) {
-                if (!s.reader.connect(s.slave->fullName(), target->fullName())) {
+                if (!s.reader.connect(rid, s.slave->id(), target->fullName())) {
                     // error message logged in OplogReader::connect
                     return;
                 }

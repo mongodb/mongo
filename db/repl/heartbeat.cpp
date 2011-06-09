@@ -298,6 +298,8 @@ namespace mongo {
 
         boost::thread t(startSyncThread);
 
+        task::fork(ghost);
+
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
