@@ -158,7 +158,7 @@ namespace mongo {
         }
         virtual DiskLoc currLoc() { return _takeover ? _takeover->currLoc() : _currLoc(); }
         DiskLoc _currLoc() const {
-            verify( 14820, !_takeover );
+            verify( 14826, !_takeover );
             if ( _currOp ) {
                 return _currOp->currLoc();
             }
@@ -208,7 +208,7 @@ namespace mongo {
         
         virtual bool supportGetMore() { return false; }
 
-        virtual bool supportYields() { return _takeover ? _takeover->supportsYield() : true; }
+        virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
         virtual bool prepareToYield() {
             if ( _takeover ) {
                 return _takeover->prepareToYield();
