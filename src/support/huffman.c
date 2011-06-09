@@ -664,12 +664,16 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 		valid += len;
 		bitpos += len;
 		while (valid >= 8) {
+			WT_ASSERT(session,
+			    WT_PTRDIFF32(out, tmp->mem) < tmp->mem_size);
 			*out++ = (uint8_t)(bits >> (valid - 8));
 			valid -= 8;
 		}
 	}
-	if (valid > 0)			/* Flush shift register. */
+	if (valid > 0) {		/* Flush shift register. */
+		WT_ASSERT(session, WT_PTRDIFF32(out, tmp->mem) < tmp->mem_size);
 		*out = (uint8_t)(bits << (8 - valid));
+	}
 
 	/*
 	 * At this point, bitpos is the total number of used bits (including
@@ -801,8 +805,10 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		symbol = huffman->code2symbol[pattern & mask];
 		len = huffman->codes[symbol].length;
 		valid -= len;
+		WT_ASSERT(session, from_len_bits >= len);
 		from_len_bits -= len;
 
+		WT_ASSERT(session, WT_PTRDIFF32(to, tmp->mem) < tmp->mem_size);
 		*to++ = symbol;
 	}
 
