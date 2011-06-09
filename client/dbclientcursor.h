@@ -165,7 +165,7 @@ namespace mongo {
         bool init();
 
         void initLazy();
-        bool initLazyFinish();
+        bool initLazyFinish( bool& retry );
 
         class Batch : boost::noncopyable { 
             friend class DBClientCursor;
@@ -198,10 +198,11 @@ namespace mongo {
         long long cursorId;
         bool _ownCursor; // see decouple()
         string _scopedHost;
-        DBClientBase* _lazy; // only for lazy init
+        string _lazyHost;
         bool wasError;
 
-        void dataReceived();
+        void dataReceived() { bool retry; string lazyHost; dataReceived( retry, lazyHost ); }
+        void dataReceived( bool& retry, string& lazyHost );
         void requestMore();
         void exhaustReceiveMore(); // for exhaust
 

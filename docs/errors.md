@@ -81,7 +81,6 @@ client/connpool.h
 
 
 client/dbclient.cpp
-----
 * 10005 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L480) listdatabases failed" , runCommand( "admin" , BSON( "listDatabases
 * 10006 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L481) listDatabases.databases not array" , info["databases
 * 10007 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.cpp#L789) dropIndex failed
@@ -96,8 +95,8 @@ client/dbclient.cpp
 
 client/dbclient.h
 ----
-* 10011 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L498) no collection name
-* 9000 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L812) 
+* 10011 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L528) no collection name
+* 9000 [code](http://github.com/mongodb/mongo/blob/master/client/dbclient.h#L833) 
 
 
 client/dbclient_rs.cpp
@@ -110,9 +109,9 @@ client/dbclient_rs.cpp
 
 client/dbclientcursor.cpp
 ----
-* 13127 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L152) getMore: cursor didn't exist on server, possible restart or timeout?
-* 13422 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L200) DBClientCursor next() called but more() is false
-* 14821 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L258) No client or lazy client specified, cannot store multi-host connection.
+* 13127 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L155) getMore: cursor didn't exist on server, possible restart or timeout?
+* 13422 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L203) DBClientCursor next() called but more() is false
+* 14821 [code](http://github.com/mongodb/mongo/blob/master/client/dbclientcursor.cpp#L261) No client or lazy client specified, cannot store multi-host connection.
 
 
 client/dbclientcursor.h
@@ -155,12 +154,11 @@ client/parallel.cpp
 ----
 * 10017 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L80) cursor already done
 * 10018 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L335) no more items
-* 10019 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L537) no more elements
+* 10019 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L638) no more elements
 * 13431 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L395) have to have sort key in projection and removing it
 * 13633 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L109) error querying server: 
-* 14047 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L472) error querying server: 
-* 14812 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L586) Error running command on server: 
-* 14813 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L587) Command returned nothing
+* 14812 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L687) Error running command on server: 
+* 14813 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L688) Command returned nothing
 
 
 client/syncclusterconnection.cpp
@@ -793,8 +791,13 @@ db/queryoptimizer.h
 
 db/queryoptimizercursor.cpp
 ----
+<<<<<<< HEAD
 * 14809 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L304) Invalid access for cursor that is not ok()
 * 14826 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L174) 
+=======
+* 14809 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L287) Invalid access for cursor that is not ok()
+* 14826 [code](http://github.com/mongodb/mongo/blob/master/db/queryoptimizercursor.cpp#L161) 
+>>>>>>> Compiling version of this fix...
 
 
 db/queryutil.cpp

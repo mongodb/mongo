@@ -773,10 +773,6 @@ namespace mongo {
     }
 
 
-    DBClientBase* DBClientBase::callLazy( Message& toSend ) {
-        say( toSend );
-        return this;
-    }
     
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
@@ -968,11 +964,14 @@ namespace mongo {
         return ! getErrField( o ).eoo();
     }
 
-    void DBClientConnection::checkResponse( const char *data, int nReturned ) {
+    void DBClientConnection::checkResponse( const char *data, int nReturned, bool* retry, string* host ) {
         /* check for errors.  the only one we really care about at
          * this stage is "not master" 
         */
         
+        *retry = false;
+        *host = _serverString;
+
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);

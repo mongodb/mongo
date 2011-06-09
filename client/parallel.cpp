@@ -411,76 +411,240 @@ namespace mongo {
     }
 
     void ParallelSortClusteredCursor::_init() {
+
+        // log() << "Starting parallel search..." << endl;
+
         // make sure we're not already initialized
         assert( ! _cursors );
-
         _cursors = new FilteringClientCursor[_numServers];
 
+        bool returnPartial = ( _options & QueryOption_PartialResults );
 
-        size_t num = 0;
-        vector<shared_ptr<ShardConnection> > conns;
+        vector<ServerAndQuery> queries( _servers.begin(), _servers.end() );
+        set<int> retryQueries;
+        int finishedQueries = 0;
+
+        vector< shared_ptr<ShardConnection> > conns;
         vector<string> servers;
-        
-        for ( set<ServerAndQuery>::iterator i = _servers.begin(); i!=_servers.end(); ++i ) {
-            size_t me = num++;
-            const ServerAndQuery& sq = *i;
 
+        // Since we may get all sorts of errors, record them all as they come and throw them later if necessary
+        vector<string> staleConfigExs;
+        vector<string> socketExs;
+        vector<string> otherExs;
+        bool allConfigStale = false;
 
-            BSONObj q = _query;
-            if ( ! sq._extra.isEmpty() ) {
-                q = concatQuery( q , sq._extra );
+        int retries = -1;
+
+        // Loop through all the queries until we've finished or gotten a socket exception on all of them
+        // We break early for non-socket exceptions, and socket exceptions if we aren't returning partial results
+        do {
+            retries++;
+
+            bool firstPass = retryQueries.size() == 0;
+
+            if( ! firstPass ){
+                log() << "retrying " << ( returnPartial ? "(partial) " : "" ) << "parallel connection to ";
+                for( set<int>::iterator it = retryQueries.begin(); it != retryQueries.end(); ++it ){
+                    log() << queries[*it]._server << ", ";
+                }
+                log() << finishedQueries << " finished queries." << endl;
             }
 
-            conns.push_back( shared_ptr<ShardConnection>( new ShardConnection( sq._server , _ns ) ) );
-            servers.push_back( sq._server );
-            
-            if ( conns[me]->setVersion() ) {
-                // we can't cleanly release other sockets
-                // because there is data waiting on the sockets
-                // TODO: should we read from them?
-                // TODO: we should probably retry as well in this case, since a migrate commit means another
-                // migrate will take some time to complete.
-                // we can close this one because we know the state
-                conns[me]->done();
-                throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            size_t num = 0;
+            for ( vector<ServerAndQuery>::iterator it = queries.begin(); it != queries.end(); ++it ) {
+                size_t i = num++;
+
+                const ServerAndQuery& sq = *it;
+
+                // If we're not retrying this cursor on later passes, continue
+                if( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) continue;
+
+                // log() << "Querying " << _query << " from " << _ns << " for " << sq._server << endl;
+
+                BSONObj q = _query;
+                if ( ! sq._extra.isEmpty() ) {
+                    q = concatQuery( q , sq._extra );
+                }
+
+                string errLoc = " @ " + sq._server;
+
+                if( firstPass ){
+
+                    // This may be the first time connecting to this shard, if so we can get an error here
+                    try {
+                        conns.push_back( shared_ptr<ShardConnection>( new ShardConnection( sq._server , _ns ) ) );
+                    }
+                    catch( std::exception& e ){
+                        socketExs.push_back( e.what() + errLoc );
+                        if( ! returnPartial ){
+                            num--;
+                            break;
+                        }
+                        conns.push_back( shared_ptr<ShardConnection>() );
+                        continue;
+                    }
+
+                    servers.push_back( sq._server );
+                }
+
+                if ( conns[i]->setVersion() ) {
+                    conns[i]->done();
+                    staleConfigExs.push_back( StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true ).what() + errLoc );
+                    break;
+                }
+
+                LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns
+                       << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
+
+                if( ! _cursors[i].raw() )
+                    _cursors[i].reset( new DBClientCursor( conns[i]->get() , _ns , q ,
+                                                            0 , // nToReturn
+                                                            0 , // nToSkip
+                                                            _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
+                                                            _options ,
+                                                            _batchSize == 0 ? 0 : _batchSize + _needToSkip // batchSize
+                                                            ) );
+
+                try{
+                    _cursors[i].raw()->initLazy();
+                }
+                catch( SocketException& e ){
+                    socketExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    if( ! returnPartial ) break;
+                }
+                catch( std::exception& e){
+                    otherExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    break;
+                }
+
             }
 
-            LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns 
-                   << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
-            
-            _cursors[me].reset( new DBClientCursor( conns[me]->get() , _ns , q , 
-                                                    0 , // nToReturn
-                                                    0 , // nToSkip
-                                                    _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
-                                                    _options , 
-                                                    _batchSize == 0 ? 0 : _batchSize + _needToSkip // batchSize
-                                                    ) );
-            
-            // note: this may throw a scoket exception
-            // if it does, we lose our other connections as well
-            _cursors[me].raw()->initLazy();
-            
-        }
+            // Go through all the potentially started cursors and finish initializing them or log any errors and
+            // potentially retry
+            // TODO:  Better error classification would make this easier, errors are indicated in all sorts of ways
+            // here that we need to trap.
+            for ( size_t i = 0; i < num; i++ ) {
 
-        for ( size_t i=0; i<num; i++ ) {
-            try {
-                if ( ! _cursors[i].raw()->initLazyFinish() ) {
-                    // some sort of error
-                    // drop connection
-                    _cursors[i].reset( 0 );
-                    
-                    massert( 14047 , str::stream() << "error querying server: " << servers[i] , _options & QueryOption_PartialResults );
+                // log() << "Finishing query for " << cons[i].get()->getHost() << endl;
+                string errLoc = " @ " + queries[i]._server;
+
+                if( ! _cursors[i].raw() || ( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) ){
+                    if( conns[i] ) conns[i].get()->done();
+                    continue;
+                }
+
+                assert( conns[i] );
+                retryQueries.erase( i );
+
+                bool retry = false;
+
+                try {
+
+                    if( ! _cursors[i].raw()->initLazyFinish( retry ) ) {
+
+                        warning() << "invalid result from " << conns[i]->getHost() << ( retry ? ", retrying" : "" ) << endl;
+                        _cursors[i].reset( NULL );
+
+                        if( ! retry ){
+                            socketExs.push_back( str::stream() << "error querying server: " << servers[i] );
+                            conns[i]->done();
+                        }
+                        else {
+                            retryQueries.insert( i );
+                        }
+
+                        continue;
+                    }
+                }
+                catch ( MsgAssertionException& e ){
+                    socketExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
+                }
+                catch ( SocketException& e ) {
+                    socketExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
+                }
+                catch( std::exception& e ){
+                    otherExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
+                }
+
+                try {
+                    _cursors[i].raw()->attach( conns[i].get() ); // this calls done on conn
+                    _checkCursor( _cursors[i].raw() );
+
+                    finishedQueries++;
+                }
+                catch ( StaleConfigException& e ){
+
+                    // Our stored configuration data is actually stale, we need to reload it
+                    // when we throw our exception
+                    allConfigStale = true;
+
+                    staleConfigExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
+                }
+                catch( std::exception& e ){
+                    otherExs.push_back( e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
                 }
             }
-            catch ( SocketException& e ) {
-                if ( ! ( _options & QueryOption_PartialResults ) )
-                    throw e;
-            }
-            
-            _cursors[i].raw()->attach( conns[i].get() ); // this calls done on conn
-            _checkCursor( _cursors[i].raw() );
+
+            // Don't exceed our max retries, should not happen
+            assert( retries < 5 );
         }
-        
+        while( retryQueries.size() > 0 /* something to retry */ &&
+               ( socketExs.size() == 0 || returnPartial ) /* no conn issues */ &&
+               staleConfigExs.size() == 0 /* no config issues */ &&
+               otherExs.size() == 0 /* no other issues */);
+
+        // Assert that our conns are all closed!
+        for( vector< shared_ptr<ShardConnection> >::iterator i = conns.begin(); i < conns.end(); ++i ){
+            assert( ! (*i) || ! (*i)->ok() );
+        }
+
+        // Handle errors we got during initialization.
+        // If we're returning partial results, we can ignore socketExs, but nothing else
+        // Log a warning in any case, so we don't lose these messages
+        bool throwException = ( socketExs.size() > 0 && ! returnPartial ) || staleConfigExs.size() > 0 || otherExs.size() > 0;
+
+        if( socketExs.size() > 0 || staleConfigExs.size() > 0 || otherExs.size() > 0 ) {
+
+            vector<string> errMsgs;
+
+            errMsgs.insert( errMsgs.end(), staleConfigExs.begin(), staleConfigExs.end() );
+            errMsgs.insert( errMsgs.end(), otherExs.begin(), otherExs.end() );
+            errMsgs.insert( errMsgs.end(), socketExs.begin(), socketExs.end() );
+
+            stringstream errMsg;
+            errMsg << "could not initialize cursor across all shards because : ";
+            for( vector<string>::iterator i = errMsgs.begin(); i != errMsgs.end(); i++ ){
+                if( i != errMsgs.begin() ) errMsg << " :: and :: ";
+                errMsg << *i;
+            }
+
+            if( throwException && staleConfigExs.size() > 0 )
+                throw StaleConfigException( _ns , errMsg.str() , ! allConfigStale );
+            else if( throwException )
+                throw DBException( errMsg.str(), 14827 );
+            else
+                warning() << errMsg.str() << endl;
+        }
+
     }
 
     ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
@@ -577,7 +741,9 @@ namespace mongo {
             return _ok;
 
         try {
-            bool finished = _cursor->initLazyFinish();
+            // TODO:  Allow retries?
+            bool retry = false;
+            bool finished = _cursor->initLazyFinish( retry );
 
             // Shouldn't need to communicate with server any more
             if ( _connHolder )
