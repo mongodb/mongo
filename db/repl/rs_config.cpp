@@ -139,7 +139,7 @@ namespace mongo {
     string ReplSetConfig::TagSubgroup::toString() const {
         bool first = true;
         string result = "\""+name+"\": [";
-        for (set<MemberCfg*>::iterator i = m.begin(); i != m.end(); i++) {
+        for (set<MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
             if (!first) {
                 result += ", ";
             }
@@ -390,7 +390,7 @@ namespace mongo {
         _populateTagMap(tagMap);
 
         for (BSONObj::iterator i = modes.begin(); i.more(); ) {
-            int primaryOnly = 0;
+            unsigned int primaryOnly = 0;
 
             // ruleName : {dc : 2, m : 3}
             BSONElement rule = i.next();
