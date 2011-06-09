@@ -1350,8 +1350,9 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	bnd->off.size = size;
 
 	/*
-	 * For a column-store, the key is the recno, for a row-store, it's the
-	 * first key on the page, a variable-length byte string.  Save a copy.
+	 * For a column-store, the promoted key is the recno and we already have
+	 * a copy.  For a row-store, it's the first key on the page, a variable-
+	 * length byte string, get a copy.
 	 */
 	if (dsk->type == WT_PAGE_ROW_INT || dsk->type == WT_PAGE_ROW_LEAF) {
 		/*
