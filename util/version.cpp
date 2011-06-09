@@ -159,22 +159,24 @@ namespace mongo {
 
             File f;
             f.open("/proc/self/numa_maps", /*read_only*/true);
-            char line[100]; //we only need the first line
-            f.read(0, line, sizeof(line));
-
-            // just in case...
-            line[98] = ' ';
-            line[99] = '\0';
-
-            // skip over pointer
-            const char* space = strchr(line, ' ');
-
-            if (!startsWith(space+1, "interleave")){
-                cout << endl;
-                cout << "** WARNING: You are running on a NUMA machine." << endl;
-                cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
-                cout << "**              numactl --interleave=all mongod [other options]" << endl;
-                warned = true;
+            if ( f.is_open() && ! f.bad() ) {
+                char line[100]; //we only need the first line
+                f.read(0, line, sizeof(line));
+                
+                // just in case...
+                line[98] = ' ';
+                line[99] = '\0';
+                
+                // skip over pointer
+                const char* space = strchr(line, ' ');
+                
+                if (!startsWith(space+1, "interleave")){
+                    cout << endl;
+                    cout << "** WARNING: You are running on a NUMA machine." << endl;
+                    cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
+                    cout << "**              numactl --interleave=all mongod [other options]" << endl;
+                    warned = true;
+                }
             }
         }
 #endif
