@@ -202,7 +202,7 @@ static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static uint32_t
-	    __rec_allocation_size(WT_SESSION_IMPL *, WT_BUF *, uint8_t *);
+	    __rec_allocation_size(WT_SESSION_IMPL *, WT_BUF *);
 static int  __rec_cell_build_key(WT_SESSION_IMPL *, const void *, uint32_t);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *, WT_KV *, u_int);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *, void *, uint32_t);
@@ -239,7 +239,7 @@ static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(
 		WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
-static int  __rec_split_write(WT_SESSION_IMPL *, WT_BUF *, void *);
+static int  __rec_split_write(WT_SESSION_IMPL *, WT_BUF *);
 static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *);
 static void __rec_subtree_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
@@ -425,14 +425,14 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
  * (the page size can either grow or shrink), and zero out unused bytes.
  */
 static inline uint32_t
-__rec_allocation_size(WT_SESSION_IMPL *session, WT_BUF *buf, uint8_t *end)
+__rec_allocation_size(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
 	WT_BTREE *btree;
 	uint32_t alloc_len, current_len, write_len;
 
 	btree = session->btree;
+	current_len = buf->size;
 
-	current_len = WT_PTRDIFF32(end, buf->mem);
 	alloc_len = WT_ALIGN(current_len, btree->allocsize);
 	write_len = alloc_len - current_len;
 
@@ -440,11 +440,10 @@ __rec_allocation_size(WT_SESSION_IMPL *session, WT_BUF *buf, uint8_t *end)
 	 * There are lots of offset calculations going on in this code, make
 	 * sure we don't overflow the end of the temporary buffer.
 	 */
-	WT_ASSERT(
-	    session, end + write_len <= (uint8_t *)buf->mem + buf->mem_size);
+	WT_ASSERT(session, current_len + write_len <= buf->mem_size);
 
 	if (write_len != 0)
-		memset(end, 0, write_len);
+		memset((uint8_t *)buf->mem + current_len, 0, write_len);
 	return (alloc_len);
 }
 
@@ -1154,7 +1153,8 @@ __rec_split(WT_SESSION_IMPL *session)
 		 * Write the current disk image.
 		 */
 		dsk->u.entries = r->entries;
-		WT_RET(__rec_split_write(session, &r->dsk, r->first_free));
+		r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
+		WT_RET(__rec_split_write(session, &r->dsk));
 
 		/*
 		 * Set the starting record number and buffer information for the
@@ -1192,7 +1192,8 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 
 	dsk = r->dsk.mem;
 	dsk->u.entries = r->entries;
-	return (__rec_split_write(session, &r->dsk, r->first_free));
+	r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
+	return (__rec_split_write(session, &r->dsk));
 }
 
 /*
@@ -1219,8 +1220,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	ret = 0;
 
 	/*
-	 * The data isn't laid out on page-boundaries or nul-byte padded; copy
-	 * it into a clean buffer before writing it.
+	 * The data isn't laid out on page-boundaries or nul padded; copy it to
+	 * a clean, aligned, padded buffer before writing it.
 	 *
 	 * Allocate a scratch buffer to hold the new disk image.  Copy the
 	 * WT_PAGE_DISK header onto the scratch buffer, most of the header
@@ -1243,7 +1244,9 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 		/* Copy out the page contents, and write it. */
 		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
 		memcpy(dsk_start, bnd->start, len);
-		WT_ERR(__rec_split_write(session, tmp, dsk_start + len));
+
+		tmp->size = WT_PAGE_DISK_SIZE + len;
+		WT_ERR(__rec_split_write(session, tmp));
 	}
 
 	/*
@@ -1277,7 +1280,7 @@ err:	if (tmp != NULL)
  *	Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
+__rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
 	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
@@ -1293,7 +1296,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BUF *buf, void *end)
 	 * Allocate file space.
 	 * Write the disk block.
 	 */
-	size = __rec_allocation_size(session, buf, end);
+	size = __rec_allocation_size(session, buf);
 	WT_RET(__wt_block_alloc(session, &addr, size));
 	WT_RET(__wt_disk_write(session, dsk, addr, size));
 
