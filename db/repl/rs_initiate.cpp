@@ -50,11 +50,11 @@ namespace mongo {
                 if( !i->potentiallyHot() ) {
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
-                majority += i->votes;
             }
+            majority += i->votes;
         }
         majority = (majority / 2) + 1;
-        
+
         uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
@@ -110,7 +110,7 @@ namespace mongo {
 
                     bool allowFailure = false;
                     failures += i->votes;
-                    if( res.isEmpty() && !initial && failures >= majority ) {
+                    if( res.isEmpty() && !initial && failures < majority ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
                             assert( m->h().toString() == i->h.toString() );

@@ -38,13 +38,18 @@ replTest.stop(1);
 replTest.stop(2);
 
 print("try to reconfigure with a 'majority' down");
-oldVersion = config.version++;
+oldVersion = config.version;
+config.version++;
 master = replTest.getMaster();
-var result = master.getDB("admin").runCommand({replSetReconfig : config});
-assert.eq(13144, result.assertionCode);
+try {
+    master.getDB("admin").runCommand({replSetReconfig : config});
+}
+catch (e) {
+    print(e);
+}
 
 var config = master.getDB("local").system.replset.findOne();
-assert.eq(oldVersion, config.version);
+assert.eq(oldVersion+1, config.version);
 
 replTest.stopSet();
 
