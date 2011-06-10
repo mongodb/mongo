@@ -190,8 +190,10 @@ typedef struct {
 	WT_BUF *full, _full;		/* Full-key being built */
 	WT_BUF *last, _last;		/* Last full-key built */
 
-	int	key_prefix_compress;	/* If can prefix-compress next key */
-	int	key_suffix_compress;	/* If can suffix-compress next key */
+	int	key_pfx_compress;	/* If can prefix-compress next key */
+	int     key_pfx_compress_conf;	/* If prefix compression configured */
+	int	key_sfx_compress;	/* If can suffix-compress next key */
+	int     key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
 static inline void __rec_copy_incr(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
@@ -305,9 +307,20 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 		    session->btree->config, "btree_split_min", &cval));
 		if (cval.val != 0)
 			r->btree_split_min = 1;
+
 		WT_RET(__wt_config_getones(session,
 		    session->btree->config, "btree_split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
+
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config,
+		    "btree_internal_key_truncate", &cval));
+		r->key_sfx_compress_conf = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config,
+		    "btree_prefix_compression", &cval));
+		r->key_pfx_compress_conf = cval.val == 0 ? 0 : 1;
 	}
 
 	r->evict = LF_ISSET(WT_REC_EVICT);
@@ -994,7 +1007,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	btree = session->btree;
 
 						/* New page, compression off. */
-	r->key_prefix_compress = r->key_suffix_compress = 0;
+	r->key_pfx_compress = r->key_sfx_compress = 0;
 
 	/* Ensure the scratch buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
@@ -1444,7 +1457,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	 * we don't have a key against which to compare, and we can't do suffix
 	 * compression.
 	 */
-	if (type == WT_PAGE_ROW_LEAF && r->key_suffix_compress) {
+	if (type == WT_PAGE_ROW_LEAF && r->key_sfx_compress) {
 		pa = r->last->data;
 		pb = r->full->data;
 		len = WT_MIN(r->last->size, r->full->size);
@@ -2090,7 +2103,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				WT_RET(__wt_cell_copy(session, cell, r->full));
 			WT_RET(__rec_split(session));
 
-			r->key_prefix_compress = 0;
+			r->key_pfx_compress = 0;
 			if (!ovfl_key) {
 				WT_RET(__rec_cell_build_key(session, NULL, 0));
 				ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
@@ -2178,7 +2191,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session));
 
-			r->key_prefix_compress = 0;
+			r->key_pfx_compress = 0;
 			if (!ovfl_key) {
 				WT_RET(__rec_cell_build_key(session, NULL, 0));
 				ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
@@ -2369,7 +2382,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 				WT_RET(__wt_cell_copy(session, cell, r->full));
 			WT_ERR(__rec_split(session));
 
-			r->key_prefix_compress = 0;
+			r->key_pfx_compress = 0;
 			if (!ovfl_key) {
 				WT_ERR(__rec_cell_build_key(session, NULL, 0));
 				ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
@@ -2436,7 +2449,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session));
 
-			r->key_prefix_compress = 0;
+			r->key_pfx_compress = 0;
 			if (!ovfl_key) {
 				WT_RET(__rec_cell_build_key(session, NULL, 0));
 				ovfl_key = __wt_cell_type_is_ovfl(&key->cell);
@@ -2736,7 +2749,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, const void *data, uint32_t size)
 		 * shorter of the two keys.   Also, we can't compress out more
 		 * than 256 bytes, limit the comparison to that.
 		 */
-		if (r->key_prefix_compress) {
+		if (r->key_pfx_compress) {
 			pfx_len = size;
 			if (pfx_len > r->last->size)
 				pfx_len = r->last->size;
@@ -2913,13 +2926,14 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	 * value and turn on both prefix and suffix compression.
 	 */
 	if (ovfl_key)
-		r->key_suffix_compress = 0;
+		r->key_sfx_compress = 0;
 	else {
 		a = r->full;
 		r->full = r->last;
 		r->last = a;
 
-		r->key_prefix_compress = r->key_suffix_compress = 1;
+		r->key_pfx_compress = r->key_pfx_compress_conf;
+		r->key_sfx_compress = r->key_sfx_compress_conf;
 	}
 }
 

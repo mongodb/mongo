@@ -48,6 +48,12 @@ methods = {
 		configure the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a random Btree
 		leaf page key''', min='0'),
+	Config('btree_internal_key_truncate', 'true', r'''
+		configure the Btree for truncation of internal keys, discarding unnecessary
+		trailing bytes on internal keys''', type='boolean'),
+	Config('btree_prefix_compression', 'true', r'''
+		configure the Btree for prefix compression, storing keys as a count of
+		bytes matching the previous key plus a unique suffix''', type='boolean'),
 	Config('btree_split_min', 'false', r'''
 		configure minimal splits in Btree reconciliation code (debugging only)''',
 		type='boolean'),
