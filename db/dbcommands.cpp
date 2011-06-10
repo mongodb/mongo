@@ -260,35 +260,45 @@ namespace mongo {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         if (!force && theReplSet && theReplSet->isPrimary()) {
-            int timeout = curTimeMicros64()/1000000;
-            int now = timeout;
+            int timeout, now, start;
+            timeout = now = start = curTimeMicros64()/1000000;
             if (cmdObj.hasField("timeoutSecs")) {
                 timeout += cmdObj["timeoutSecs"].numberInt();
             }
 
-            long long int lastOp = 0, closest = 0, diff = 0;
-            bool okay = false;
-            while (now <= timeout) {
-                lastOp = (long long int)theReplSet->lastOpTimeWritten.getSecs();
-                closest = (long long int)theReplSet->lastOtherOpTime().getSecs();
-
-                diff = lastOp - closest;
-
-                if (diff >= 0 && diff <= 10) {
-                    okay = true;
-                    break;
-                }
-
+            OpTime lastOp = theReplSet->lastOpTimeWritten;
+            OpTime closest = theReplSet->lastOtherOpTime();
+            long long int diff = lastOp.getSecs() - closest.getSecs();
+            while (now <= timeout && (diff < 0 || diff > 10)) {
                 sleepsecs(1);
                 now++;
+
+                lastOp = theReplSet->lastOpTimeWritten;
+                closest = theReplSet->lastOtherOpTime();
+                diff = lastOp.getSecs() - closest.getSecs();
             }
 
-            if (!okay) {
+            if (diff < 0 || diff > 10) {
                 errmsg = "no secondaries within 10 seconds of my optime";
-                result.append("closest", closest);
+                result.append("closest", closest.getSecs());
                 result.append("difference", diff);
                 return false;
             }
+
+            // step down
+            theReplSet->stepDown(120);
+
+            log() << "waiting for secondaries to catch up" << endl;
+
+            lastOp = theReplSet->lastOpTimeWritten;
+            while (lastOp != closest && now - start < 60) {
+                closest = theReplSet->lastOtherOpTime();
+
+                now++;
+                sleepsecs(1);
+            }
+
+            // regardless of whether they caught up, we'll shut down
         }
 
         return shutdownHelper();
