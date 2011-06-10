@@ -340,7 +340,7 @@ struct __wt_page {
 
 #define	WT_PAGE_BULK_LOAD	0x01	/* Page bulk loaded */
 #define	WT_PAGE_CACHE_COUNTED	0x02	/* Page counted in cache stats */
-#define	WT_PAGE_DELETED		0x04	/* Page was empty at reconcilation */
+#define	WT_PAGE_DELETED		0x04	/* Page was empty at reconciliation */
 #define	WT_PAGE_INITIAL_EMPTY	0x08	/* Empty page created during open */
 #define	WT_PAGE_MODIFIED	0x10	/* Page is modified */
 #define	WT_PAGE_PINNED		0x20	/* Page is pinned */

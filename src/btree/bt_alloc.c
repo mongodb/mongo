@@ -124,7 +124,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 
 combine:/*
 	 * Insert the entry at the appropriate place in the address list after
-	 * checking to see if it ajoins adjacent entries.
+	 * checking to see if it adjoins adjacent entries.
 	 */
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		/*
@@ -173,7 +173,7 @@ combine:/*
 
 		/*
 		 * The freed entry must appear before the list entry, but does
-		 * not ajoin it.  Insert the freed entry before the list entry.
+		 * not adjoin it. Insert the freed entry before the list entry.
 		 */
 		TAILQ_INSERT_BEFORE(fe, new, qa);
 		break;

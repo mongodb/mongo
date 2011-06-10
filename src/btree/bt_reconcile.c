@@ -159,8 +159,8 @@ typedef struct {
 	 *
 	 * We obviously could maintain this list on a per-split-chunk basis:
 	 * copy it into the WT_BOUNDARY structure if the boundary is reached.
-	 * We're binarily searching this array during fixup and I don't expect
-	 * it to be large.
+	 * We're doing a binary search of this array during fixup and I don't
+	 * expect it to be large.
 	 */
 	WT_REF **imref;			/* In-memory subtree reference list */
 	uint32_t imref_next;		/* Next list slot */
@@ -328,14 +328,14 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 	r->locked = LF_ISSET(WT_REC_LOCKED);
 
 	/*
-	 * During internal page reconcilition we track referenced objects that
+	 * During internal page reconciliation we track referenced objects that
 	 * are discarded when the page is discarded.  That tracking is done per
 	 * reconciliation run, initialize it before anything else.
 	 */
 	__rec_discard_init(r);
 
 	/*
-	 * During internal page reconcilition we track in-memory subtrees we
+	 * During internal page reconciliation we track in-memory subtrees we
 	 * find in the page.  That tracking is done per reconciliation run,
 	 * initialize it before anything else.
 	 */
@@ -2937,7 +2937,7 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	WT_BUF *a;
 
 	/*
-	 * If writing an overflow key onto the page, dan't update the "last key"
+	 * If writing an overflow key onto the page, don't update the "last key"
 	 * value, and leave the state of prefix compression alone.  (If we are
 	 * currently doing prefix compression, we have a key state which will
 	 * continue to work, we're just skipping the key just created because

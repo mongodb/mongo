@@ -720,7 +720,7 @@ struct wt_session {
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
 	 * @config{archive, remove log files no longer required for
-	 * transactional durabilty}
+	 * transactional durability}
 	 * @config{force, write a new checkpoint even if nothing has changed
 	 * since the last one}
 	 * @config{flush_cache, flush the cache}

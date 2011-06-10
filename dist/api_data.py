@@ -168,7 +168,7 @@ methods = {
 
 'session.checkpoint' : Method([
 	Config('archive', 'false', r'''
-		remove log files no longer required for transactional durabilty''',
+		remove log files no longer required for transactional durability''',
 		type='boolean'),
 	Config('force', 'false', r'''
 		write a new checkpoint even if nothing has changed since the last

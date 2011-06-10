@@ -68,7 +68,7 @@ __wt_row_key(
 		 * read/write them during reconciliation simply because their
 		 * prefix might change.  That means we can't use instantiated
 		 * overflow keys to figure out the prefix for other keys,
-		 * specifially, in this code when we're looking for a key we
+		 * specifically, in this code when we're looking for a key we
 		 * can roll-forward to figure out the target key's prefix,
 		 * instantiated overflow keys aren't useful.
 		 *
