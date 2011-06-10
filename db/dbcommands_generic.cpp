@@ -34,7 +34,6 @@
 #include "repl.h"
 #include "repl_block.h"
 #include "replutil.h"
-#include "repl/rs.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
@@ -47,6 +46,8 @@
 #include "../util/ramlog.h"
 
 namespace mongo {
+
+    extern ReplSet *theReplSet;
 
     class CmdBuildInfo : public Command {
     public:
