@@ -1135,4 +1135,15 @@ namespace mongo {
         }
     } cmdReplSetGetStatus;
 
+    CmdShutdown cmdShutdown;
+
+    void CmdShutdown::help( stringstream& help ) const {
+        help << "shutdown the database.  must be ran against admin db and "
+             << "either (1) ran from localhost or (2) authenticated.";
+    }
+
+    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        return shutdownHelper();
+    }
+
 } // namespace mongo
