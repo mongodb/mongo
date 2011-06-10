@@ -233,6 +233,10 @@ namespace mongo {
             if( m )
                 b.append("primary", m->h().toString());
         }
+        else {
+            b.append("primary", _self->fullName());
+        }
+
         if( myConfig().arbiterOnly )
             b.append("arbiterOnly", true);
         if( myConfig().priority == 0 )
