@@ -44,6 +44,12 @@ methods = {
 'session.create' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes''', min='512B', max='128MB'),
+	Config('btree_huffman_key', '', r'''
+		use Huffman encoding for Btree keys.  Permitted values are empty (off),
+		\c "english" or \c "<filename>".  See @ref huffman for more details.'''),
+	Config('btree_huffman_value', '', r'''
+		use Huffman encoding for Btree values.  Permitted values are empty (off),
+		\c "english" or \c "<filename>".  See @ref huffman for more details.'''),
 	Config('btree_key_gap', '10', r'''
 		configure the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a random Btree
@@ -76,14 +82,6 @@ methods = {
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema''', type='boolean'),
-	Config('huffman_key', '', r'''
-		use Huffman encoding for the key.  Permitted values are empty (off),
-		\c "english", \c "utf8:<filename>" or \c "utf16:<filename>".  See @ref
-		huffman for more details.'''),
-	Config('huffman_value', '', r'''
-		use Huffman encoding for the value.  Permitted values are empty (off),
-		\c "english", \c "utf8:<filename>" or \c "utf16:<filename>".  See @ref
-		huffman for more details.'''),
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
 		<code>(column[,...])</code>'''),
