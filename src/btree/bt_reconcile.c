@@ -196,18 +196,13 @@ typedef struct {
 	int     key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
-static inline void __rec_copy_incr(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
-static inline int  __rec_discard_add_ovfl(WT_SESSION_IMPL *, WT_CELL *);
-static inline void __rec_incr(WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t);
-static inline void __rec_key_state_update(WT_RECONCILE *, int);
-static inline int  __rec_split_bnd_grow(WT_SESSION_IMPL *);
+#undef	STATIN
+#define	STATIN	static inline
 
 static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __hazard_qsort_cmp(const void *, const void *);
-static uint32_t
-	    __rec_allocation_size(WT_SESSION_IMPL *, WT_BUF *);
 static int  __rec_cell_build_key(WT_SESSION_IMPL *, const void *, uint32_t);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *, WT_KV *, u_int);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *, void *, uint32_t);
@@ -220,7 +215,9 @@ static int  __rec_col_rle_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var_bulk(WT_SESSION_IMPL *, WT_PAGE *);
+STATIN void __rec_copy_incr(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
 static int  __rec_discard_add(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, uint32_t);
+STATIN int  __rec_discard_add_ovfl(WT_SESSION_IMPL *, WT_CELL *);
 static int  __rec_discard_evict(WT_SESSION_IMPL *);
 static void __rec_discard_init(WT_RECONCILE *);
 static int  __rec_imref_add(WT_SESSION_IMPL *, WT_REF *);
@@ -229,7 +226,9 @@ static int  __rec_imref_fixup(WT_SESSION_IMPL *,
 		WT_BOUNDARY *, WT_PAGE *, WT_REF *, WT_PAGE **);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
+STATIN void __rec_incr(WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t);
 static int  __rec_init(WT_SESSION_IMPL *, uint32_t);
+STATIN void __rec_key_state_update(WT_RECONCILE *, int);
 static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_update(WT_SESSION_IMPL *,
 		WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
@@ -240,6 +239,8 @@ static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
 static int  __rec_row_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split(WT_SESSION_IMPL *);
+STATIN int  __rec_split_bnd_grow(WT_SESSION_IMPL *);
+STATIN void __rec_split_buf_prep(WT_SESSION_IMPL *, WT_BUF *, uint32_t *);
 static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(
@@ -433,34 +434,6 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
 	++r->entries;
 	r->space_avail -= size;
 	r->first_free += size;
-}
-
-/*
- * __rec_allocation_size --
- *	Return the size to the minimum number of allocation units needed
- * (the page size can either grow or shrink), and zero out unused bytes.
- */
-static inline uint32_t
-__rec_allocation_size(WT_SESSION_IMPL *session, WT_BUF *buf)
-{
-	WT_BTREE *btree;
-	uint32_t alloc_len, current_len, write_len;
-
-	btree = session->btree;
-	current_len = buf->size;
-
-	alloc_len = WT_ALIGN(current_len, btree->allocsize);
-	write_len = alloc_len - current_len;
-
-	/*
-	 * There are lots of offset calculations going on in this code, make
-	 * sure we don't overflow the end of the temporary buffer.
-	 */
-	WT_ASSERT(session, current_len + write_len <= buf->mem_size);
-
-	if (write_len != 0)
-		memset((uint8_t *)buf->mem + current_len, 0, write_len);
-	return (alloc_len);
 }
 
 /*
@@ -967,6 +940,39 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __rec_split_buf_prep --
+ *	Get a page buffer ready for writing.
+ */
+static inline void
+__rec_split_buf_prep(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
+{
+	WT_BTREE *btree;
+	uint32_t alloc_len, current_len, write_len;
+
+	btree = session->btree;
+
+	/*
+	 * Figure out the page's final size, and how many bytes need to be
+	 * cleared at the end.
+	 */
+	current_len = buf->size;
+	alloc_len = WT_ALIGN(current_len, btree->allocsize);
+	write_len = alloc_len - current_len;
+
+	/*
+	 * There are lots of offset calculations going on in this code, make
+	 * sure we don't overflow the end of the temporary buffer.
+	 */
+	WT_ASSERT(session, current_len + write_len <= buf->mem_size);
+
+	if (write_len != 0)
+		memset((uint8_t *)buf->mem + current_len, 0, write_len);
+
+	/* Return the page's final size. */
+	*sizep = alloc_len;
+}
+
+/*
  * __rec_split_bnd_grow --
  *	Grow the boundary array as necessary.
  */
@@ -1359,12 +1365,34 @@ err:	if (tmp != NULL)
 static int
 __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 {
+	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
-	uint32_t addr, size;
+	uint32_t addr, size, notused;
 
 	r = S2C(session)->cache->rec;
 	dsk = buf->mem;
+
+	/*
+	 * We always write an additional byte on row-store leaf pages after the
+	 * key value pairs.  The reason is that zero-length value items are not
+	 * written on the page and they're detected by finding two adjacent key
+	 * cells.  If the last value item on a page is zero length, we need a
+	 * key cell after it on the page to detect it.  The row-store leaf page
+	 * reconciliation code made sure we had a spare byte in the buffer, now
+	 * write a trailing zero-length key cell.  This isn't a valid key cell,
+	 * but since it's not referenced by the entries on the page, no code but
+	 * the code reading after the key cell, to find the key value, will ever
+	 * see it.
+	 */
+#define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
+	if (dsk->type == WT_PAGE_ROW_LEAF) {
+		WT_ASSERT(session, buf->size < buf->mem_size);
+
+		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
+		__wt_cell_set_fixed(cell, WT_CELL_KEY, &notused);
+		++buf->size;
+	}
 
 	/*
 	 * Set the disk block size and clear trailing bytes.
@@ -1372,7 +1400,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 * Write the disk block.
 	 * Return the addr/size pair.
 	 */
-	size = __rec_allocation_size(session, buf);
+	__rec_split_buf_prep(session, buf, &size);
 	WT_RET(__wt_block_alloc(session, &addr, size));
 	WT_RET(__wt_disk_write(session, dsk, addr, size));
 
@@ -2371,8 +2399,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 		 * fit: split the page, switch to the non-prefix-compressed key
 		 * and turn off compression until a full key is written to the
 		 * new page.
+		 *
+		 * We write a trailing key cell on the page after the K/V pairs
+		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len + val->len > r->space_avail) {
+		while (key->len +
+		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			/*
 			 * We have to have a copy of any overflow key because
 			 * we're about to promote it.
@@ -2445,8 +2477,12 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		 * fit: split the page, switch to the non-prefix-compressed key
 		 * and turn off compression until a full key is written to the
 		 * new page.
+		 *
+		 * We write a trailing key cell on the page after the K/V pairs
+		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len + val->len > r->space_avail) {
+		while (key->len +
+		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			WT_RET(__rec_split(session));
 
 			r->key_pfx_compress = 0;
