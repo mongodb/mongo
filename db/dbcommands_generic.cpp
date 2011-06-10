@@ -294,10 +294,49 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const {
-            help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
+            help << "shutdown the database.  must be ran against admin db and "
+                 << "either (1) ran from localhost or (2) authenticated. If "
+                 << "this is a primary in a replica set and there is no member "
+                 << "within 10 seconds of its optime, it will not shutdown "
+                 << "without force : true.  You can also specify timeoutSecs : "
+                 << "N to wait N seconds for other members to catch up.";
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+
+            if (!force && theReplSet && theReplSet->isPrimary()) {
+                int timeout = curTimeMicros64()/1000000;
+                int now = timeout;
+                if (cmdObj.hasField("timeoutSecs")) {
+                    timeout += cmdObj["timeoutSecs"].numberInt();
+                }
+
+                long long int lastOp = 0, closest = 0, diff = 0;
+                bool okay = false;
+                while (now <= timeout) {
+                    lastOp = (long long int)theReplSet->lastOpTimeWritten.getSecs();
+                    closest = (long long int)theReplSet->lastOtherOpTime().getSecs();
+
+                    diff = lastOp - closest;
+
+                    if (diff >= 0 && diff <= 10) {
+                        okay = true;
+                        break;
+                    }
+
+                    sleepsecs(1);
+                    now++;
+                }
+
+                if (!okay) {
+                    errmsg = "no secondaries within 10 seconds of my optime";
+                    result.append("closest", closest);
+                    result.append("difference", diff);
+                    return false;
+                }
+            }
+
             Client * c = currentClient.get();
             if ( c ) {
                 c->shutdown();
