@@ -504,10 +504,12 @@ namespace mongo {
                     /* TODO: use of string exceptions may be problematic for reconfig case! */
                     throw "_id must be numeric";
                 }
-                string s;
                 try {
-                    s = mobj["host"].String();
+                    string s = mobj["host"].String();
                     m.h = HostAndPort(s);
+                    if (!m.h.hasPort()) {
+                        m.h.setPort(m.h.port());
+                    }
                 }
                 catch(...) {
                     throw string("bad or missing host field? ") + mobj.toString();
