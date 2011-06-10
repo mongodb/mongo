@@ -191,12 +191,14 @@ typedef struct {
 	WT_BUF *last, _last;		/* Last full-key built */
 
 	int	key_prefix_compress;	/* If can prefix-compress next key */
+	int	key_suffix_compress;	/* If can suffix-compress next key */
 } WT_RECONCILE;
 
 static inline void __rec_copy_incr(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
 static inline int  __rec_discard_add_ovfl(WT_SESSION_IMPL *, WT_CELL *);
 static inline void __rec_incr(WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t);
-static inline void __rec_prefix_key_update(WT_RECONCILE *);
+static inline void __rec_key_state_update(WT_RECONCILE *, int);
+static inline int  __rec_split_bnd_grow(WT_SESSION_IMPL *);
 
 static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
@@ -236,12 +238,11 @@ static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
 static int  __rec_row_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split(WT_SESSION_IMPL *);
-static inline int
-	    __rec_split_bnd_grow(WT_SESSION_IMPL *);
 static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(
 		WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
+static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
 static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *);
@@ -992,6 +993,9 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	r = S2C(session)->cache->rec;
 	btree = session->btree;
 
+						/* New page, compression off. */
+	r->key_prefix_compress = r->key_suffix_compress = 0;
+
 	/* Ensure the scratch buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
 
@@ -1122,12 +1126,16 @@ __rec_split(WT_SESSION_IMPL *session)
 		r->total_entries = r->entries;
 
 		/*
-		 * Set the starting record number and buffer address for the
-		 * next chunk, clear the entries (not required, but cleaner).
+		 * Set the starting record number, buffer address and promotion
+		 * key for the next chunk, clear the entries (not required, but
+		 * cleaner).
 		 */
 		++bnd;
 		bnd->recno = r->recno;
 		bnd->start = r->first_free;
+		if (dsk->type == WT_PAGE_ROW_INT ||
+		    dsk->type == WT_PAGE_ROW_LEAF)
+			WT_RET(__rec_split_row_promote(session, dsk->type));
 		bnd->entries = 0;
 
 		/*
@@ -1175,11 +1183,14 @@ __rec_split(WT_SESSION_IMPL *session)
 		WT_RET(__rec_split_write(session, bnd, &r->dsk));
 
 		/*
-		 * Set the starting record number for the next chunk, clear the
-		 * entries (not required, but cleaner).
+		 * Set the starting record number and promotion key for the next
+		 * chunk, clear the entries (not required, but cleaner).
 		 */
 		++bnd;
 		bnd->recno = r->recno;
+		if (dsk->type == WT_PAGE_ROW_INT ||
+		    dsk->type == WT_PAGE_ROW_LEAF)
+			WT_RET(__rec_split_row_promote(session, dsk->type));
 		bnd->entries = 0;
 
 		/*
@@ -1335,7 +1346,6 @@ err:	if (tmp != NULL)
 static int
 __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 {
-	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
 	uint32_t addr, size;
@@ -1357,25 +1367,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	bnd->off.size = size;
 
 	/*
-	 * For a column-store, the promoted key is the recno and we already have
-	 * a copy.  For a row-store, it's the first key on the page, a variable-
-	 * length byte string, get a copy.
-	 */
-	if (dsk->type == WT_PAGE_ROW_INT || dsk->type == WT_PAGE_ROW_LEAF) {
-		/*
-		 * The cell had better have a zero-length prefix: it's the first
-		 * key on the page.  (If it doesn't have a zero-length prefix,
-		 * __wt_cell_copy() won't be sufficient any way, we'd only copy
-		 * the non-prefix-compressed portion of the key.)
-		 */
-		cell = WT_PAGE_DISK_BYTE(dsk);
-		WT_ASSERT(session,
-		    __wt_cell_prefix(cell) == 0 ||
-		    __wt_cell_type(cell) == WT_CELL_KEY_OVFL);
-		WT_RET(__wt_cell_copy(session, cell, &bnd->key));
-	}
-
-	/*
 	 * If we're evicting the page, there's no more work to do.
 	 *
 	 * If we're not evicting the page, we'll need a new in-memory version;
@@ -1391,6 +1382,82 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 		memcpy(bnd->imp_dsk, dsk, size);
 	}
 	return (0);
+}
+
+/*
+ * __rec_split_row_promote --
+ *	Key promotion for a row-store.
+ */
+static int
+__rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
+{
+	WT_CELL *cell;
+	WT_RECONCILE *r;
+	uint32_t cnt, len, size;
+	const uint8_t *pa, *pb;
+
+	r = S2C(session)->cache->rec;
+
+	/*
+	 * For a column-store, the promoted key is the recno and we already have
+	 * a copy.  For a row-store, it's the first key on the page, a variable-
+	 * length byte string, get a copy.
+	 *
+	 * This function is called from __rec_split at each split boundary, but
+	 * that means we're not called before the first boundary.  It's painful,
+	 * but we need to detect that case and copy the key from the page we're
+	 * building.  We could simplify this by grabbing a copy of the first key
+	 * we put on a page, perhaps in the function building keys for a page,
+	 * but that's going to be uglier than this.
+	 */
+	if (r->bnd_next == 1) {
+		/*
+		 * The cell had better have a zero-length prefix: it's the first
+		 * key on the page.  (If it doesn't have a zero-length prefix,
+		 * __wt_cell_copy() won't be sufficient any way, we'd only copy
+		 * the non-prefix-compressed portion of the key.)
+		 */
+		cell = WT_PAGE_DISK_BYTE(r->dsk.mem);
+		WT_ASSERT(session,
+		    __wt_cell_prefix(cell) == 0 ||
+		    __wt_cell_type(cell) == WT_CELL_KEY_OVFL);
+		WT_RET(__wt_cell_copy(session, cell, &r->bnd[0].key));
+	}
+
+	/*
+	 * For the current slot, take the last key we built, after doing suffix
+	 * compression.
+	 *
+	 * Suffix compression is a hack to shorten keys on internal pages.  We
+	 * only need enough bytes in the promoted key to ensure searches go to
+	 * the correct page: the promoted key has to be larger than the last key
+	 * on the leaf page preceding it, but we don't need any more bytes than
+	 * that.   In other words, we can discard any suffix bytes not required
+	 * to distinguish between the key being promoted and the last key on the
+	 * leaf page preceding it.  This can only be done for the first level of
+	 * internal pages, you cannot repeat suffix truncation as you split up
+	 * the tree, it loses too much information.
+	 *
+	 * The r->last key sorts before the r->full key, so we'll either find a
+	 * larger byte value in r->full, or r->full will be the longer key. One
+	 * caveat: if the largest key on the previous page was an overflow key,
+	 * we don't have a key against which to compare, and we can't do suffix
+	 * compression.
+	 */
+	if (type == WT_PAGE_ROW_LEAF && r->key_suffix_compress) {
+		pa = r->last->data;
+		pb = r->full->data;
+		len = WT_MIN(r->last->size, r->full->size);
+		size = len + 1;
+		for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
+			if (*pa != *pb) {
+				size = cnt;
+				break;
+			}
+	} else
+		size = r->full->size;
+	return (__wt_buf_set(
+	    session, &r->bnd[r->bnd_next].key, r->full->data, size));
 }
 
 /*
@@ -1891,7 +1958,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r = S2C(session)->cache->rec;
 	key = &r->k;
 	val = &r->v;
-	r->key_prefix_compress = 0;		/* New page, compression off. */
 
 	WT_RET(__rec_split_init(session,
 	    page, 0ULL, session->btree->intlmax, session->btree->intlmin));
@@ -2016,6 +2082,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * key.
 		 */
 		while (key->len + val->len > r->space_avail) {
+			/*
+			 * We have to have a copy of any overflow key because
+			 * we're about to promote it.
+			 */
+			if (ovfl_key && cell != NULL)
+				WT_RET(__wt_cell_copy(session, cell, r->full));
 			WT_RET(__rec_split(session));
 
 			r->key_prefix_compress = 0;
@@ -2037,14 +2109,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		val->off.size = WT_ROW_REF_SIZE(rref);
 		__rec_copy_incr(session, r, val);
 
-		/*
-		 * If we wrote a non-overflow key onto the page, update the
-		 * last-key value and turn on prefix compression.
-		 */
-		if (!ovfl_key) {
-			__rec_prefix_key_update(r);
-			r->key_prefix_compress = 1;
-		}
+		/* Update compression state. */
+		__rec_key_state_update(r, ovfl_key);
 	}
 
 	/* Write the remnant page. */
@@ -2131,14 +2197,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		val->off.size = WT_ROW_REF_SIZE(rref);
 		__rec_copy_incr(session, r, val);
 
-		/*
-		 * If we wrote a non-overflow key onto the page, update the
-		 * last-key value and turn on prefix compression.
-		 */
-		if (!ovfl_key) {
-			__rec_prefix_key_update(r);
-			r->key_prefix_compress = 1;
-		}
+		/* Update compression state. */
+		__rec_key_state_update(r, ovfl_key);
 	}
 
 	return (0);
@@ -2168,7 +2228,6 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 
 	key = &r->k;
 	val = &r->v;
-	r->key_prefix_compress = 0;		/* New page, compression off. */
 
 	WT_RET(__rec_split_init(session,
 	    page, 0ULL, session->btree->leafmax, session->btree->leafmin));
@@ -2301,6 +2360,13 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 		 * new page.
 		 */
 		while (key->len + val->len > r->space_avail) {
+			/*
+			 * We have to have a copy of any overflow key because
+			 * we're about to promote it.
+			 */
+			if (ovfl_key &&
+			    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+				WT_RET(__wt_cell_copy(session, cell, r->full));
 			WT_ERR(__rec_split(session));
 
 			r->key_prefix_compress = 0;
@@ -2315,14 +2381,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t slvg_skip)
 		if (val->len != 0)
 			__rec_copy_incr(session, r, val);
 
-		/*
-		 * If we wrote a non-overflow key onto the page, update the
-		 * last-key value and turn on prefix compression.
-		 */
-		if (!ovfl_key) {
-			__rec_prefix_key_update(r);
-			r->key_prefix_compress = 1;
-		}
+		/* Update compression state. */
+		__rec_key_state_update(r, ovfl_key);
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		if ((ins = WT_ROW_INSERT(page, rip)) != NULL)
@@ -2388,14 +2448,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		if (val->len != 0)
 			__rec_copy_incr(session, r, val);
 
-		/*
-		 * If we wrote a non-overflow key onto the page, update the
-		 * last-key value and turn on prefix compression.
-		 */
-		if (!ovfl_key) {
-			__rec_prefix_key_update(r);
-			r->key_prefix_compress = 1;
-		}
+		/* Update compression state. */
+		__rec_key_state_update(r, ovfl_key);
 	}
 
 	return (0);
@@ -2825,17 +2879,48 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __rec_prefix_key_update --
- *	Swap the full-key and last-key buffers.
+ * __rec_key_state_update --
+ *	Update prefix and suffix compression based on the last key.
  */
-static void
-__rec_prefix_key_update(WT_RECONCILE *r)
+static inline void
+__rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 {
 	WT_BUF *a;
 
-	a = r->full;
-	r->full = r->last;
-	r->last = a;
+	/*
+	 * If writing an overflow key onto the page, dan't update the "last key"
+	 * value, and leave the state of prefix compression alone.  (If we are
+	 * currently doing prefix compression, we have a key state which will
+	 * continue to work, we're just skipping the key just created because
+	 * it's an overflow key and doesn't participate in prefix compression.
+	 * If we are not currently doing prefix compression, we can't start, an
+	 * overflow key doesn't give us any state.)
+	 *
+	 * Additionally, if we wrote an overflow key onto the page, turn off the
+	 * suffix compression of row-store internal node keys.  (When we split,
+	 * "last key" is the largest key on the previous page, and "full key" is
+	 * the first key on the next page, which is being promoted.  In some
+	 * cases we can discard bytes from the "full key" that are not needed to
+	 * distinguish between the "last key" and "full key", compressing the
+	 * size of keys on internal nodes.  If we just built an overflow key,
+	 * we're not going to update the "last key", making suffix compression
+	 * impossible for the next key.   Alternatively, we could remember where
+	 * the last key was on the page, detect it's an overflow key, read it
+	 * from disk and do suffix compression, but that's too much work for an
+	 * unlikely event.
+	 *
+	 * If we're not writing an overflow key on the page, update the last-key
+	 * value and turn on both prefix and suffix compression.
+	 */
+	if (ovfl_key)
+		r->key_suffix_compress = 0;
+	else {
+		a = r->full;
+		r->full = r->last;
+		r->last = a;
+
+		r->key_prefix_compress = r->key_suffix_compress = 1;
+	}
 }
 
 /*
