@@ -126,13 +126,13 @@ wts_startup(void)
 		break;
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(
-			    p, (size_t)(end - p), ",huffman_key=english");
+			p += snprintf(p, (size_t)(end - p),
+			    ",btree_huffman_key=english");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
-			p += snprintf(
-			    p, (size_t)(end - p), ",huffman_value=english");
+			p += snprintf(p, (size_t)(end - p),
+			    ",btree_huffman_value=english");
 		break;
 	}
 
