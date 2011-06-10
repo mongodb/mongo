@@ -26,8 +26,15 @@ namespace mongo {
     
     static const int OutOfOrderDocumentsAssertionCode = 14810;
     
+    /**
+     * A QueryOp implementation utilized by the QueryOptimizerCursor
+     */
     class QueryOptimizerCursorOp : public QueryOp {
     public:
+        /**
+         * @param aggregateNscanned - shared int counting total nscanned for
+         * query ops for all cursors.
+         */
         QueryOptimizerCursorOp( long long &aggregateNscanned ) : _matchCount(), _mustAdvance(), _nscanned(), _aggregateNscanned( aggregateNscanned ) {}
         
         virtual void _init() {
@@ -126,6 +133,12 @@ namespace mongo {
         long long &_aggregateNscanned;
     };
     
+    /**
+     * This cursor runs a MultiPlanScanner iteratively and returns results from
+     * the scanner's cursors as they become available.  Once the scanner chooses
+     * a single plan, this cursor becomes a simple wrapper around that single
+     * plan's cursor (called the 'takeover' cursor).
+     */
     class QueryOptimizerCursor : public Cursor {
     public:
         QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps ) :
@@ -170,6 +183,7 @@ namespace mongo {
             }
             
             // Ok to advance if currOp in an error state due to failed yield recovery.
+            // This may be the case when advance() is called by recoverFromYield().
             if ( !( _currOp && _currOp->error() ) && !ok() ) {
                 return false;
             }
@@ -247,6 +261,7 @@ namespace mongo {
             return getsetdupInternal( loc );                
         }
         
+        /** Matcher needs to know if the the cursor being forwarded to is multikey. */
         virtual bool isMultiKey() const {
             if ( _takeover ) {
                 return _takeover->isMultiKey();
@@ -259,6 +274,7 @@ namespace mongo {
         
         virtual long long nscanned() { return _takeover ? _takeover->nscanned() : _nscanned; }
 
+        /** @return the matcher for the takeover cursor or current active op. */
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
             if ( _takeover ) {
                 return _takeover->matcherPtr();
@@ -267,6 +283,7 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() );
         }
 
+        /** @return the matcher for the takeover cursor or current active op. */
         virtual CoveredIndexMatcher* matcher() const {
             if ( _takeover ) {
                 return _takeover->matcher();
@@ -286,12 +303,14 @@ namespace mongo {
         void assertOk() const {
             massert( 14809, "Invalid access for cursor that is not ok()", !_currLoc().isNull() );
         }
-        
+
+        /** Insert and check for dups before takeover occurs */
         bool getsetdupInternal(const DiskLoc &loc) {
             pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
             return !p.second;
         }
 
+        /** Just check for dups - after takeover occurs */
         bool getdupInternal(const DiskLoc &loc) {
             return _dups.count( loc ) > 0;
         }
@@ -316,11 +335,6 @@ namespace mongo {
             throw;
         }
         return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
-    }
-    
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps );
     }
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
@@ -352,5 +366,11 @@ namespace mongo {
         }
         return newQueryOptimizerCursor( mps );
     }
-    
+
+    /** This interface just available for testing. */
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
+        return newQueryOptimizerCursor( mps );
+    }
+        
 } // namespace mongo;
