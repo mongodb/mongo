@@ -477,7 +477,7 @@ namespace mongo {
             catch(DBException& e) {
                 sethbmsg(str::stream() << "syncThread: " << e.toString() <<
                          ", try 'use local; db.oplog.rs.findOne({ts : {$gt : new Timestamp(" <<
-                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")});' on the primary");
+                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")}});' on the primary");
                 sleepsecs(10);
             }
             catch(...) {
