@@ -227,7 +227,7 @@ namespace mongo {
 
         bool newCapped = false;
         int mx = 0;
-        if( options.getBoolField("capped") ) {
+        if( options["capped"].trueValue() ) {
             newCapped = true;
             BSONElement e = options.getField("max");
             if ( e.isNumber() ) {

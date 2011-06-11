@@ -156,7 +156,7 @@ namespace ClientTests {
     public:
         Create() : Base( "Create" ) {}
         void run() {
-            db.createCollection( "unittests.clienttests.create", 0, true );
+            db.createCollection( "unittests.clienttests.create", 4096, true );
             BSONObj info;
             ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
         }

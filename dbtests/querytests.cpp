@@ -238,7 +238,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.ReturnOneOfManyAndTail";
-            client().createCollection( ns, 0, true );
+            client().createCollection( ns, 1024, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -257,7 +257,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailNotAtEnd";
-            client().createCollection( ns, 0, true );
+            client().createCollection( ns, 2047, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -282,7 +282,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.EmptyTail";
-            client().createCollection( ns, 0, true );
+            client().createCollection( ns, 1900, true );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
             ASSERT_EQUALS( 0, c->getCursorId() );
             ASSERT( c->isDead() );
@@ -300,7 +300,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableDelete";
-            client().createCollection( ns, 0, true, 2 );
+            client().createCollection( ns, 1300, true, 2 );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
@@ -321,7 +321,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableInsertDelete";
-            client().createCollection( ns, 0, true );
+            client().createCollection( ns, 1330, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
@@ -366,7 +366,7 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.TailableQueryOnId";
             BSONObj info;
-            client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "autoIndexId" << true ), info );
+            client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "size" << 1300 << "autoIndexId" << true ), info );
             insertA( ns, 0 );
             insertA( ns, 1 );
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );

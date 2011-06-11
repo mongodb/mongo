@@ -826,11 +826,13 @@ namespace mongo {
         }
         virtual LockType locktype() const { return WRITE; }
         virtual void help( stringstream& help ) const {
-            help << "create a collection";
+            help << "create a collection explicitly\n"
+                "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
             string err;
+            uassert(14832, "specify size:<n> when capped is true", !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() || cmdObj.hasField("$nExtents"));
             bool ok = userCreateNS(ns.c_str(), cmdObj, err, ! fromRepl );
             if ( !ok && !err.empty() )
                 errmsg = err;
