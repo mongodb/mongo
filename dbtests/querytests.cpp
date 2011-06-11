@@ -300,7 +300,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableDelete";
-            client().createCollection( ns, 1300, true, 2 );
+            client().createCollection( ns, 8192, true, 2 );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
@@ -366,7 +366,7 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.TailableQueryOnId";
             BSONObj info;
-            client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "size" << 1300 << "autoIndexId" << true ), info );
+            client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "size" << 8192 << "autoIndexId" << true ), info );
             insertA( ns, 0 );
             insertA( ns, 1 );
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
@@ -925,6 +925,7 @@ namespace QueryTests {
             unsigned long long slow , fast;
 
             int n = 10000;
+            DEV n = 1000;
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
@@ -991,14 +992,16 @@ namespace QueryTests {
     public:
         FindingStart() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
             __findingStartInitialTimeout = 0;
+            cout << "FindingStart" << endl;
         }
         ~FindingStart() {
+            cout << "~FindingStart" << endl;
             __findingStartInitialTimeout = _old;
         }
 
         void run() {
             BSONObj info;
-            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "size" << 1000 << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
+            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
             int i = 0;
             for( int oldCount = -1;
@@ -1015,6 +1018,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
+                cout << k << endl;
             }
         }
 
@@ -1035,7 +1039,7 @@ namespace QueryTests {
             unsigned startNumCursors = ClientCursor::numCursors();
 
             BSONObj info;
-            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "size" << 10000 << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
+            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
             int i = 0;
             for( ; i < 150; client().insert( ns(), BSON( "ts" << i++ ) ) );
@@ -1229,6 +1233,7 @@ namespace QueryTests {
         }
 
         void setupTests() {
+            add< FindingStart >();
             add< CountBasic >();
             add< CountQuery >();
             add< CountFields >();
@@ -1270,7 +1275,6 @@ namespace QueryTests {
             add< TailableCappedRaceCondition >();
             add< HelperTest >();
             add< HelperByIdTest >();
-            add< FindingStart >();
             add< FindingStartPartiallyFull >();
             add< WhatsMyUri >();
 

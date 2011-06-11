@@ -223,7 +223,7 @@ namespace mongo {
             }
         }
 
-        uassert( 10083 ,  "invalid size spec", size > 0 );
+        uassert( 10083 , "create collection invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
