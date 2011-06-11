@@ -116,6 +116,10 @@ conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallf
 work();
 stopMongod(30000);
 
+// hail mary for windows
+// Sat Jun 11 14:07:57 Error: boost::filesystem::create_directory: Access is denied: "\data\db\manyRestartsdur" (anon):1
+sleep(1000);
+
 log("starting 30001");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
 work();
