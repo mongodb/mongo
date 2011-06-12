@@ -161,19 +161,19 @@ __wt_debug_disk(
 	}
 
 	switch (dsk->type) {
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		ret = __wt_debug_dsk_cell(session, dsk, fp);
-		break;
 	case WT_PAGE_COL_FIX:
 		__wt_debug_dsk_col_fix(btree, dsk, fp);
+		break;
+	case WT_PAGE_COL_INT:
+		__wt_debug_dsk_col_int(dsk, fp);
 		break;
 	case WT_PAGE_COL_RLE:
 		__wt_debug_dsk_col_rle(btree, dsk, fp);
 		break;
-	case WT_PAGE_COL_INT:
-		__wt_debug_dsk_col_int(dsk, fp);
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		ret = __wt_debug_dsk_cell(session, dsk, fp);
 		break;
 	default:
 		break;
@@ -319,12 +319,12 @@ __wt_debug_page_work(
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
 			WT_RET(__wt_debug_page_col_var(session, page, fp));
 		break;
+	case WT_PAGE_ROW_INT:
+		WT_RET(__wt_debug_page_row_int(session, page, fp, flags));
+		break;
 	case WT_PAGE_ROW_LEAF:
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
 			WT_RET(__wt_debug_page_row_leaf(session, page, fp));
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_debug_page_row_int(session, page, fp, flags));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
