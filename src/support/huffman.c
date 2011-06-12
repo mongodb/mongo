@@ -602,10 +602,10 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	WT_BUF *tmp;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
-	uint32_t max_len, outlen, bitpos, bytes;
-	uint8_t symbol;
+	uint64_t bitpos;
+	uint32_t max_len, outlen, bytes;
 	const uint8_t *from;
-	uint8_t len, padding_info, *out;
+	uint8_t len, *out, padding_info, symbol;
 	int ret;
 
 	/*
@@ -740,12 +740,11 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 {
 	WT_BUF *tmp;
 	WT_HUFFMAN_OBJ *huffman;
-	uint32_t bits, from_bytes, from_len_bits, len, mask, max, max_len;
-	uint32_t outlen;
+	uint64_t from_len_bits;
+	uint32_t bits, from_bytes, len, mask, max, max_len, outlen;
 	uint16_t pattern;
-	uint8_t symbol;
 	const uint8_t *from;
-	uint8_t padding_info, *to, valid;
+	uint8_t padding_info, symbol, *to, valid;
 	int ret;
 
 	huffman = huffman_arg;
