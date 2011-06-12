@@ -474,25 +474,18 @@ namespace mongo {
         return ClientCursor::recoverFromYield( data );
     }
 
-    int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
-        if( 0 ) {
-            static long long z;
-            ++z;
-            cout << "TEMP alloccursorid " << z << endl;
-            return z;
-        }
-
+        long long ctm = curTimeMillis64();
+        dassert( ctm );
         long long x;
-        int ctm = (int) curTimeMillis64();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
-            x = x | ctm | 0x80000000; // OR to make sure not zero
+            x = x ^ ctm;
             if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
         ctmLast = ctm;
-        //DEV tlog() << "  alloccursorid " << x << endl;
         return x;
     }
 
