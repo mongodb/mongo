@@ -304,6 +304,9 @@ namespace mongo {
             resultFlags = ResultFlag_CursorNotFound;
         }
         else {
+            // check for spoofing of the ns such that it does not match the one originally there for the cursor
+            uassert(10000, "auth error", str::equals(ns, cc->ns().c_str()));
+
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
 
