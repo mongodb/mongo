@@ -2711,14 +2711,14 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * If we're replacing a valid addr/size pair, free the original disk
 	 * blocks, they're no longer in use.
 	 */
+	WT_ASSERT(session,
+	    replace == NULL || page->parent == replace->parent);
+	WT_ASSERT(session,
+	    replace == NULL || page->parent_ref == replace->parent_ref);
 	parent_ref = page->parent_ref;
 	parent_ref->page = replace;
-	if (replace != NULL) {
-		WT_ASSERT(session, page->parent == replace->parent);
-		WT_ASSERT(session, page->parent_ref == replace->parent_ref);
-	}
 	if (parent_ref->addr != WT_ADDR_INVALID)
-		WT_RET(__wt_block_free(
+		WT_RET(__rec_discard_add_block(
 		    session, parent_ref->addr, parent_ref->size));
 	parent_ref->addr = addr;
 	parent_ref->size = size;
