@@ -110,9 +110,9 @@ namespace mongo {
         ClientCursor::CleanupPointer _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
-        DiskLoc startLoc( const DiskLoc &rec );
+        DiskLoc extentFirstLoc( const DiskLoc &rec );
 
-        DiskLoc prevLoc( const DiskLoc &rec );
+        DiskLoc prevExtentFirstLoc( const DiskLoc &rec );
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() );
         void destroyClientCursor() {
             _findingStartCursor.reset( 0 );
