@@ -465,19 +465,29 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
+    void assertExtentNonempty( const Extent *e ) {
+        // TODO ensure this requirement is clearly enforced, or fix.
+        massert( 14834, "empty extent found during finding start scan", !e->firstRecord.isNull() );
+    }
+    
     DiskLoc FindingStartCursor::prevLoc( const DiskLoc &rec ) {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
-            if ( e->xprev.isNull() )
+            if ( e->xprev.isNull() ) {
                 e = _qp.nsd()->lastExtent.ext();
-            else
+            }
+            else {
                 e = e->xprev.ext();
-            if ( e->myLoc != _qp.nsd()->capExtent )
+            }
+            if ( e->myLoc != _qp.nsd()->capExtent ) {
+                assertExtentNonempty( e );
                 return e->firstRecord;
+            }
         }
         else {
             if ( !e->xprev.isNull() ) {
                 e = e->xprev.ext();
+                assertExtentNonempty( e );
                 return e->firstRecord;
             }
         }

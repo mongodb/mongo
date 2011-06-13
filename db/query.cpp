@@ -748,12 +748,12 @@ namespace mongo {
 
         virtual void next() {
             if ( _findingStartCursor.get() ) {
-                if ( _findingStartCursor->done() ) {
-                    _c = _findingStartCursor->cRelease();
-                    _findingStartCursor.reset( 0 );
-                }
-                else {
+                if ( !_findingStartCursor->done() ) {
                     _findingStartCursor->next();
+                }                    
+                if ( _findingStartCursor->done() ) {
+                    _c = _findingStartCursor->cursor();
+                    _findingStartCursor.reset( 0 );
                 }
                 _capped = true;
                 return;
