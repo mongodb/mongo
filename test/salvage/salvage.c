@@ -26,21 +26,19 @@
 
 #define	PSIZE	(2 * 1024)
 
-int  bulk(BTREE *, WT_ITEM **, WT_ITEM **);
 void build(int, int, int);
 void copy(int, int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
 void slvg_close(WT_CONNECTION *);
-void slvg_open(const char *, BTREE **, SESSION **, WT_CONNECTION **);
+void slvg_open(const char *, WT_SESSION **, WT_CONNECTION **);
 
 #define	OP_APPEND	1
 #define	OP_FIRST	2
 
 FILE *res_fp;					/* Results file */
 
-int gkey, gvalue, gcnt;				/* Records to build */
 u_int page_type;				/* Types of records */
 
 int
@@ -343,21 +341,42 @@ run(int r)
  *	Build a row- or column-store page in a file.
  */
 void
-build(int key, int value, int cnt)
+build(int ikey, int ivalue, int cnt)
 {
-	BTREE *btree;
-	SESSION *session;
 	WT_CONNECTION *conn;
+	WT_CURSOR *cursor;
+	WT_ITEM key, value;
+	WT_SESSION *session;
+	char kbuf[64], vbuf[64];
 
 	(void)remove(LOAD);
 
-	gvalue = value;
-	gkey = key;
-	gcnt = cnt;
+	slvg_open(LOAD, &session, &conn);
 
-	slvg_open(LOAD, &btree, &session, &conn);
-	assert(btree->bulk_load(btree, bulk) == 0);
-	assert(btree->sync(btree, session, 0) == 0);
+	assert(session->open_cursor(
+	    session, "table:" LOAD, NULL, "bulk", &cursor) == 0);
+	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
+		switch (page_type) {			/* Build the key. */
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
+		case WT_PAGE_COL_VAR:
+			break;
+		case WT_PAGE_ROW_LEAF:
+			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
+			key.data = kbuf;
+			key.size = 20;
+			cursor->set_key(cursor, &key);
+			break;
+		}
+							/* Build the value. */
+		snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", ivalue);
+		value.data = vbuf;
+		value.size = 20;
+		cursor->set_value(cursor, &value);
+		assert(cursor->insert(cursor) == 0);
+	}
+
+	assert(session->sync(session, "table:" LOAD, NULL) == 0);
 	slvg_close(conn);
 }
 
@@ -384,8 +403,8 @@ copy(int lsn, int recno)
 	/* Copy the first "page" (the metadata description). */
 	if (first) {
 		assert((ofp = fopen(SLVG, "w")) != NULL);
-		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
-		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		assert(fread(buf, 1, 512, ifp) == 512);
+		assert(fwrite(buf, 1, 512, ofp) == 512);
 	}
 
 	/* Copy/update the first formatted page. */
@@ -416,23 +435,37 @@ copy(int lsn, int recno)
 void
 process(void)
 {
-	BTREE *btree;
 	FILE *fp;
-	SESSION *session;
 	WT_CONNECTION *conn;
+	WT_CURSOR *cursor;
+	WT_ITEM key, value;
+	WT_SESSION *session;
 
-	slvg_open(SLVG, &btree, &session, &conn);
-	assert(btree->salvage(btree, session, 0) == 0);
+	slvg_open(SLVG, &session, &conn);
+	assert(session->salvage(session, SLVG, 0) == 0);
 	slvg_close(conn);
 
-	slvg_open(SLVG, &btree, &session, &conn);
-	assert(btree->verify(btree, session, 0) == 0);
+	slvg_open(SLVG, &session, &conn);
+	assert(session->verify(session, SLVG, 0) == 0);
 	slvg_close(conn);
 
-	slvg_open(SLVG, &btree, &session, &conn);
+	slvg_open(SLVG, &session, &conn);
+
 	assert((fp = fopen(DUMP, "w")) != NULL);
-	assert(btree->dump(btree, fp, WT_PRINTABLES) == 0);
+	assert(session->open_cursor(
+	    session, "table:" SLVG, NULL, "dump,printable", &cursor) == 0);
+	while (cursor->next(cursor) == 0) {
+		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
+			fwrite(key.data, key.size, 1, fp);
+			fwrite("\n", 1, 1, fp);
+		}
+		cursor->get_value(cursor, &value);
+		fwrite(value.data, value.size, 1, fp);
+		fwrite("\n", 1, 1, fp);
+	}
+	assert(cursor->close(cursor, NULL) == 0);
 	assert(fclose(fp) == 0);
+
 	slvg_close(conn);
 }
 
@@ -441,20 +474,18 @@ process(void)
  *	Open the salvage file.
  */
 void
-slvg_open(
-    const char *name, BTREE **btreep, SESSION **sessionp, WT_CONNECTION **connp)
+slvg_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char buf[512];
+	char config[512], table[512];
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
-		(void)snprintf(buf, sizeof(buf),
+		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=\"20u\","
 		    "allocation_size=%d,"
 		    "intl_node_min=%d,intl_node_max=%d,"
@@ -462,7 +493,7 @@ slvg_open(
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
 	case WT_PAGE_COL_RLE:
-		(void)snprintf(buf, sizeof(buf),
+		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=\"20u\",runlength_encoding,"
 		    "allocation_size=%d,"
 		    "intl_node_min=%d,intl_node_max=%d,"
@@ -470,7 +501,7 @@ slvg_open(
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
 	case WT_PAGE_COL_VAR:
-		(void)snprintf(buf, sizeof(buf),
+		(void)snprintf(config, sizeof(config),
 		    "key_format=r,"
 		    "allocation_size=%d,"
 		    "intl_node_min=%d,intl_node_max=%d,"
@@ -478,7 +509,7 @@ slvg_open(
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		(void)snprintf(buf, sizeof(buf),
+		(void)snprintf(config, sizeof(config),
 		    "key_format=u,"
 		    "allocation_size=%d,"
 		    "intl_node_min=%d,intl_node_max=%d,"
@@ -487,12 +518,10 @@ slvg_open(
 		break;
 	}
 
-	assert(session->create_table(session, name, buf) == 0);
-	snprintf(buf, sizeof(buf), "table:%s", name);
-	assert(session->open_cursor(session, buf, NULL, NULL, &cursor) == 0);
+	snprintf(table, sizeof(table), "table:%s", name);
+	assert(session->create(session, table, config) == 0);
 
-	*btreep = ((CURSOR_BTREE *)cursor)->btree;
-	*sessionp = (SESSION *)session;
+	*sessionp = session;
 	*connp = conn;
 }
 
@@ -518,46 +547,4 @@ print_res(int key, int value, int cnt)
 			fprintf(res_fp, "%010d KEY------\n", key);
 		fprintf(res_fp, "%010d VALUE----\n", value);
 	}
-}
-
-/*
- * bulk --
- *	Bulk load records.
- */
-int
-bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
-{
-	static WT_ITEM key, value;
-	static char kbuf[64], vbuf[64];
-
-	if (gcnt == 0)
-		return (1);
-	--gcnt;
-
-	/* Build the key. */
-	switch (page_type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-		*keyp = NULL;
-		break;
-	case WT_PAGE_ROW_LEAF:
-		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", gkey);
-		key.data = kbuf;
-		key.size = 20;
-		*keyp = &key;
-		break;
-	}
-
-	/* Build the value. */
-	snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", gvalue);
-	value.data = vbuf;
-	value.size = 20;
-	*valuep = &value;
-
-	++gkey;
-	++gvalue;
-
-	btree = NULL;
-	return (0);
 }
