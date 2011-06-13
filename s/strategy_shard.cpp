@@ -207,7 +207,7 @@ namespace mongo {
 
                 if ( bad ) {
                     log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
-                    uasserted( 14812 , "tried to insert object without shard key" );
+                    uasserted( 14842 , "tried to insert object without shard key" );
                 }
 
             }
@@ -241,7 +241,7 @@ namespace mongo {
                     LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
                     if (!manager) {
-                        uasserted(14813, "collection no longer sharded");
+                        uasserted(14843, "collection no longer sharded");
                     }
                 }
                 sleepmillis( i * 20 );

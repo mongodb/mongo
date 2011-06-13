@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
+#include "../scripting/engine.h"
 
 #include "mr_shard.h"
 
@@ -41,7 +42,7 @@ namespace mongo {
             _scope->init( &_wantedScope );
 
             _func = _scope->createFunction( _code.c_str() );
-            uassert( 14814 , str::stream() << "couldn't compile code for: " << _type , _func );
+            uassert( 14836 , str::stream() << "couldn't compile code for: " << _type , _func );
 
             // install in JS scope so that it can be called in JS mode
             _scope->setFunction(_type.c_str(), _code.c_str());
@@ -145,7 +146,7 @@ namespace mongo {
 
                 BSONElement ee = j.next();
 
-                uassert( 14815 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
+                uassert( 14837 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
                 if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ) {
                     assert( n > 1 ); // if not, inf. loop
@@ -165,7 +166,7 @@ namespace mongo {
             ++numReduces;
 
             if ( s->type( "return" ) == Array ) {
-                uasserted( 14816 , "reduce -> multiple not supported yet");
+                uasserted( 14838 , "reduce -> multiple not supported yet");
                 return;
             }
 
@@ -199,7 +200,7 @@ namespace mongo {
             reduceTriggerRatio = 2.0;
             maxInMemSize = 5 * 1024 * 1024;
 
-            uassert( 14819 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
+            uassert( 14841 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
             if ( cmdObj["out"].type() == String ) {
                 finalShort = cmdObj["out"].String();
@@ -227,7 +228,7 @@ namespace mongo {
                     outType = INMEMORY;
                 }
                 else {
-                    uasserted( 14817 , str::stream() << "unknown out specifier [" << t << "]" );
+                    uasserted( 14839 , str::stream() << "unknown out specifier [" << t << "]" );
                 }
 
                 if (o.hasElement("db")) {
@@ -235,7 +236,7 @@ namespace mongo {
                 }
             }
             else {
-                uasserted( 14818 , "'out' has to be a string or an object" );
+                uasserted( 14840 , "'out' has to be a string or an object" );
             }
 
             if ( outType != INMEMORY ) { // setup names

@@ -25,6 +25,7 @@
 #include "../db/commands.h"
 #include "../db/query.h"
 #include "../db/queryutil.h"
+#include "../scripting/engine.h"
 
 #include "config.h"
 #include "chunk.h"

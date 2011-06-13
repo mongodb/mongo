@@ -27,6 +27,7 @@
 #include "../util/signal_handlers.h"
 #include "../util/admin_access.h"
 #include "../db/dbwebserver.h"
+#include "../scripting/engine.h"
 
 #include "server.h"
 #include "request.h"
