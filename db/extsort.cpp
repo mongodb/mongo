@@ -52,7 +52,6 @@ namespace mongo {
             delete _cur;
             _cur = 0;
         }
-
         unsigned long removed = remove_all( _root );
         wassert( removed == 1 + _files.size() );
     }

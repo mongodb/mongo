@@ -28,7 +28,7 @@ namespace mongo {
 
 
     /**
-       for sorting by BSONObj and attaching a value
+       for external (disk) sorting by BSONObj and attaching a value
      */
     class BSONObjExternalSorter : boost::noncopyable {
     public:
@@ -36,17 +36,30 @@ namespace mongo {
         typedef pair<BSONObj,DiskLoc> Data;
 
     private:
-        static BSONObj extSortOrder;
-
-        static int extSortComp( const void *lv, const void *rv ) {
+        static int _compare(const Data& l, const Data& r, const BSONObj& order) { 
             RARELY killCurrentOp.checkForInterrupt();
             _compares++;
+            int x = l.first.woCompare( r.first , order );
+            if ( x )
+                return x;
+            return l.second.compare( r.second );
+        }
+
+        class MyCmp {
+        public:
+            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
+            bool operator()( const Data &l, const Data &r ) const {
+                return _compare(l, r, _order) < 0;
+            };
+        private:
+            const BSONObj _order;
+        };
+
+        static BSONObj extSortOrder;
+        static int extSortComp( const void *lv, const void *rv ) {
             Data * l = (Data*)lv;
             Data * r = (Data*)rv;
-            int cmp = l->first.woCompare( r->first , extSortOrder );
-            if ( cmp )
-                return cmp;
-            return l->second.compare( r->second );
+            return _compare(*l, *r, extSortOrder);
         };
 
         class FileIterator : boost::noncopyable {
@@ -59,22 +72,6 @@ namespace mongo {
             MemoryMappedFile _file;
             char * _buf;
             char * _end;
-        };
-
-        class MyCmp {
-        public:
-            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
-            bool operator()( const Data &l, const Data &r ) const {
-                RARELY killCurrentOp.checkForInterrupt();
-                _compares++;
-                int x = l.first.woCompare( r.first , _order );
-                if ( x )
-                    return x < 0;
-                return l.second.compare( r.second ) < 0;
-            };
-
-        private:
-            BSONObj _order;
         };
 
     public:
