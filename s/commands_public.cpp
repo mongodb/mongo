@@ -1140,9 +1140,9 @@ namespace mongo {
 
                     mr_shard::BSONList values;
                     Strategy* s = SHARDED;
+                    long long finalCount = 0;
                     while ( cursor.more() ) {
                         BSONObj t = cursor.next().getOwned();
-                        cout << t.toString() << endl;
 
                         if ( values.size() == 0 ) {
                             values.push_back( t );
@@ -1154,30 +1154,40 @@ namespace mongo {
                             continue;
                         }
 
-                        cout << "Doing sharded reduce on " << values.size() << " objects";
                         BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
                         s->insertSharded(conf, outns.c_str(), final, 0);
+                        ++finalCount;
                         values.clear();
                         values.push_back( t );
                     }
 
                     if ( values.size() ) {
-                        cout << "Doing sharded reduce on " << values.size() << " objects";
-                        const BSONObj& final = config.reducer->finalReduce(values, config.finalizer.get());
-                        s->insertSharded(conf, outns.c_str(), (BSONObj&) final, 0);
+                        BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
+                        s->insertSharded(conf, outns.c_str(), final, 0);
+                        ++finalCount;
                     }
 
-//                state.dumpToInc();
-//                state.postProcessCollection();
-//                state.appendResults( result );
+                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn( i->_server );
+                        conn->dropCollection( dbName + "." + shardedOutputCollection );
+                        conn.done();
+                    }
 
-//                for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-//                    ScopedDbConnection conn( i->_server );
-//                    conn->dropCollection( dbname + "." + shardedOutputCollection );
-//                    conn.done();
-//                }
                     result.append("shardCounts", shardCounts);
-                    result.append("counts", aggCounts);
+
+                    // fix the global counts
+                    BSONObjBuilder countsB(32);
+                    BSONObjIterator j(aggCounts);
+                    while (j.more()) {
+                        BSONElement elmt = j.next();
+                        if (!strcmp(elmt.fieldName(), "reduce"))
+                            countsB.append("reduce", elmt.numberLong() + state.numReduces());
+                        else if (!strcmp(elmt.fieldName(), "output"))
+                            countsB.append("output", finalCount);
+                        else
+                            countsB.append(elmt);
+                    }
+                    result.append( "counts" , countsB.obj() );
                     ok = true;
                 }
 

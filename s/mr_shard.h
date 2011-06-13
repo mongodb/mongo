@@ -216,6 +216,8 @@ namespace mongo {
 
             const bool isOnDisk() { return _onDisk; }
 
+            long long numReduces() const { return _config.reducer->numReduces; }
+
             const Config& _config;
 
         protected:
