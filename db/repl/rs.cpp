@@ -31,7 +31,6 @@ namespace mongo {
 
     bool replSet = false;
     ReplSet *theReplSet = 0;
-    extern string *discoveredSeed;
 
     bool isCurrentlyAReplSetPrimary() { 
         return theReplSet && theReplSet->isPrimary();
@@ -553,12 +552,15 @@ namespace mongo {
                     }
                 }
 
-                if( discoveredSeed ) {
-                    try {
-                        configs.push_back( ReplSetConfig(HostAndPort(*discoveredSeed)) );
-                    }
-                    catch( DBException& ) {
-                        log(1) << "replSet exception trying to load config from discovered seed " << *discoveredSeed << rsLog;
+                if( replSettings.discoveredSeeds.size() > 0 ) {
+                    for (set<string>::iterator i = replSettings.discoveredSeeds.begin(); i != replSettings.discoveredSeeds.end(); i++) {
+                        try {
+                            configs.push_back( ReplSetConfig(HostAndPort(*i)) );
+                        }
+                        catch( DBException& ) {
+                            log(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
+                            replSettings.discoveredSeeds.erase(*i);
+                        }
                     }
                 }
 
