@@ -171,8 +171,15 @@ namespace mongo {
                 return false;
             }
 
-            map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(w.String());
-            uassert(14830, str::stream() << "unrecognized getLastError mode: " << w.toString(),
+            string wStr = w.String();
+            if (wStr == "majority") {
+                // use the entire set, including arbiters, to prevent writing
+                // to a majority of the set but not a majority of voters
+                return replicatedToNum(op, theReplSet->config().members.size()/2+1);
+            }
+
+            map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
+            uassert(14830, str::stream() << "unrecognized getLastError mode: " << wStr,
                     it != theReplSet->config().rules.end());
 
             return op <= (*it).second->last;
