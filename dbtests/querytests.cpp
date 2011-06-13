@@ -992,10 +992,8 @@ namespace QueryTests {
     public:
         FindingStart() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
             __findingStartInitialTimeout = 0;
-            cout << "FindingStart" << endl;
         }
         ~FindingStart() {
-            cout << "~FindingStart" << endl;
             __findingStartInitialTimeout = _old;
         }
 
@@ -1018,7 +1016,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
-                cout << k << endl;
+                //cout << k << endl;
             }
         }
 
