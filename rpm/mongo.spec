@@ -106,6 +106,7 @@ fi
 %{_bindir}/mongorestore
 %{_bindir}/mongostat
 %{_bindir}/bsondump
+%{_bindir}/mongotop
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
@@ -116,6 +117,7 @@ fi
 %{_mandir}/man1/mongosniff.1*
 %{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
+%{_mandir}/man1/bsondum.1*
 
 %files server
 %defattr(-,root,root,-)
