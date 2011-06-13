@@ -7,13 +7,13 @@ CFLAGS=-g ${__GCC_WARN} -I${WT} -I${SRC}/include
 SRCS=	salvage.c
 OBJS=	salvage.o
 
-all: salvage
+all: t
 
-salvage: salvage.o ${LIB}
+t: salvage.o ${LIB}
 	cc ${CFLAGS} -o $@ salvage.o \
-	    ${WT}/simple_setup.o ${WT}/libwiredtiger.a -lpthread
+	    ${WT}/libwiredtiger.a -lpthread
 
 clean distclean realclean:
-	rm -f salvage ${OBJS} __* *.core
+	rm -f t ${OBJS} __* *.core
 
 ${OBJS}: ${SRCS}
