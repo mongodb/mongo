@@ -44,6 +44,7 @@ namespace mongo {
     Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
+    static bool scriptingEnabled = true;
 
     bool inShutdown() {
         return dbexitCalled;
@@ -220,6 +221,7 @@ int _main(int argc, char* argv[]) {
     ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
     ( "ipv6", "enable IPv6 support (disabled by default)" )
     ( "jsonp","allow JSONP access via http (has security implications)" )
+    ("noscripting", "disable scripting engine")
     ;
 
     options.add(sharding_options);
@@ -259,6 +261,10 @@ int _main(int argc, char* argv[]) {
         UnitTest::runTests();
         cout << "tests passed" << endl;
         return 0;
+    }
+
+    if (params.count("noscripting")) {
+        scriptingEnabled = false;
     }
 
     if ( ! params.count( "configdb" ) ) {
@@ -347,6 +353,12 @@ int _main(int argc, char* argv[]) {
     init();
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
+
+    if ( scriptingEnabled ) {
+        ScriptEngine::setup();
+//        globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
+//        globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
+    }
 
     MessageServer::Options opts;
     opts.port = cmdLine.port;

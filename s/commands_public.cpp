@@ -30,6 +30,7 @@
 #include "chunk.h"
 #include "strategy.h"
 #include "grid.h"
+#include "mr_shard.h"
 
 namespace mongo {
 
@@ -890,12 +891,13 @@ namespace mongo {
 
         class MRCmd : public PublicGridCommand {
         public:
+            AtomicUInt JOB_NUMBER;
+
             MRCmd() : PublicGridCommand( "mapreduce" ) {}
 
             string getTmpName( const string& coll ) {
-                static int inc = 1;
                 stringstream ss;
-                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << inc++;
+                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER++;
                 return ss.str();
             }
 
@@ -921,8 +923,8 @@ namespace mongo {
                     	if (fn == "out" && e.type() == Object) {
                     		// check if there is a custom output
                     		BSONObj out = e.embeddedObject();
-                    		if (out.hasField("db"))
-                    			customOut = out;
+//                    		if (out.hasField("db"))
+                    	    customOut = out;
                     	}
                     }
                     else {
@@ -946,7 +948,7 @@ namespace mongo {
                 BSONObj customOut;
                 BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut , badShardedField );
 
-                bool customOutDB = ! customOut.isEmpty() && customOut.hasField( "db" );
+                bool customOutDB = customOut.hasField( "db" );
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
@@ -981,11 +983,16 @@ namespace mongo {
                 finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
                 
                 
+                set<ServerAndQuery> servers;
+                BSONObj shardCounts;
+                BSONObj aggCounts;
+                map<string,long long> countsMap;
                 {
                     // we need to use our connections to the shard
                     // so filtering is done correctly for un-owned docs
                     // so we allocate them in our thread
                     // and hand off
+                    // Note: why not use pooled connections? This has been reported to create too many connections
 
                     vector< shared_ptr<ShardConnection> > shardConns;
 
@@ -999,8 +1006,11 @@ namespace mongo {
                     }
                     
                     bool failed = false;
-                    
-                    BSONObjBuilder shardresults;
+
+                    // now wait for the result of all shards
+                    BSONObjBuilder shardResultsB;
+                    BSONObjBuilder shardCountsB;
+                    BSONObjBuilder aggCountsB;
                     for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                         shared_ptr<Future::CommandResult> res = *i;
                         if ( ! res->join() ) {
@@ -1011,7 +1021,19 @@ namespace mongo {
                             failed = true;
                             continue;
                         }
-                        shardresults.append( res->getServer() , res->result() );
+                        BSONObj result = res->result();
+                        shardResultsB.append( res->getServer() , result );
+                        BSONObj counts = result["counts"].embeddedObjectUserCheck();
+                        shardCountsB.append( res->getServer() , counts );
+                        servers.insert(res->getServer());
+
+                        // add up the counts for each shard
+                        // some of them will be fixed later like output and reduce
+                        BSONObjIterator j( counts );
+                        while ( j.more() ) {
+                            BSONElement temp = j.next();
+                            countsMap[temp.fieldName()] += temp.numberLong();
+                        }
                     }
 
                     for ( unsigned i=0; i<shardConns.size(); i++ )
@@ -1020,28 +1042,143 @@ namespace mongo {
                     if ( failed )
                         return 0;
 
-                    finalCmd.append( "shards" , shardresults.obj() );
+                    finalCmd.append( "shards" , shardResultsB.obj() );
+                    shardCounts = shardCountsB.obj();
+                    finalCmd.append( "shardCounts" , shardCounts );
                     timingBuilder.append( "shards" , t.millis() );
+
+                    for ( map<string,long long>::iterator i=countsMap.begin(); i!=countsMap.end(); i++ ) {
+                        aggCountsB.append( i->first , i->second );
+                    }
+                    aggCounts = aggCountsB.obj();
+                    finalCmd.append( "counts" , aggCounts );
                 }
 
                 Timer t2;
-                // by default the target database is same as input
-                Shard outServer = conf->getPrimary();
-                string outns = fullns;
-                if ( customOutDB ) {
-                	// have to figure out shard for the output DB
-                	BSONElement elmt = customOut.getField("db");
-                	string outdb = elmt.valuestrsafe();
-                	outns = outdb + "." + collection;
-                    DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
-                	outServer = conf2->getPrimary();
-                }
-                log() << "customOut: " << customOut << " outServer: " << outServer << endl;
-                        
-                ShardConnection conn( outServer , outns );
                 BSONObj finalResult;
-                bool ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
-                conn.done();
+                bool ok = false;
+                string outdb = dbName;
+                if (customOutDB) {
+                    BSONElement elmt = customOut.getField("db");
+                    outdb = elmt.valuestrsafe();
+                }
+
+                if (!customOut.getBoolField("sharded")) {
+                    // non-sharded, use the MRFinish command on target server
+                    // This will save some data transfer
+
+                    // by default the target database is same as input
+                    Shard outServer = conf->getPrimary();
+                    string outns = fullns;
+                    if ( customOutDB ) {
+                        // have to figure out shard for the output DB
+                        DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
+                        outServer = conf2->getPrimary();
+                        outns = outdb + "." + collection;
+                    }
+                    log() << "customOut: " << customOut << " outServer: " << outServer << endl;
+
+                    ShardConnection conn( outServer , outns );
+                    ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
+                    conn.done();
+                } else {
+                    // grab records from each shard and insert back in correct shard in "temp" collection
+                    // we do the final reduce in mongos since records are ordered and already reduced on each shard
+//                    string shardedIncLong = str::stream() << outdb << ".tmp.mr." << collection << "_" << "shardedTemp" << "_" << time(0) << "_" << JOB_NUMBER++;
+
+                    mr_shard::Config config( dbName , cmdObj );
+                    mr_shard::State state(config);
+                    log(1) << "mr sharded output ns: " << config.ns << endl;
+
+                    // for now we only support replace output collection in sharded mode
+                    if (config.outType != mr_shard::Config::REPLACE) {
+                        errmsg = "Only support REPLACE mode for sharded output M/R";
+                        return false;
+                    }
+
+                    if (!config.outDB.empty()) {
+                        BSONObjBuilder loc;
+                        if ( !config.outDB.empty())
+                            loc.append( "db" , config.outDB );
+                        if ( !config.finalShort.empty() )
+                            loc.append( "collection" , config.finalShort );
+                        result.append("result", loc.obj());
+                    }
+                    else {
+                        if ( !config.finalShort.empty() )
+                            result.append( "result" , config.finalShort );
+                    }
+                    string outns = config.finalLong;
+
+                    if (config.outType == mr_shard::Config::REPLACE) {
+                        // drop previous collection
+                        BSONObj dropColCmd = BSON("drop" << config.finalShort);
+                        BSONObjBuilder dropColResult(32);
+                        string outdbCmd = outdb + ".$cmd";
+                        bool res = Command::runAgainstRegistered(outdbCmd.c_str(), dropColCmd, dropColResult);
+                        if (!res) {
+                            errmsg = str::stream() << "Could not drop sharded output collection " << outns << ": " << dropColResult.obj().toString();
+                            return false;
+                        }
+                    }
+
+                    // create the sharded collection
+                    BSONObj sortKey = BSON( "_id" << 1 );
+                    BSONObj shardColCmd = BSON("shardCollection" << outns << "key" << sortKey);
+                    BSONObjBuilder shardColResult(32);
+                    bool res = Command::runAgainstRegistered("admin.$cmd", shardColCmd, shardColResult);
+                    if (!res) {
+                        errmsg = str::stream() << "Could not create sharded output collection " << outns << ": " << shardColResult.obj().toString();
+                        return false;
+                    }
+
+                    ParallelSortClusteredCursor cursor( servers , dbName + "." + shardedOutputCollection ,
+                                                        Query().sort( sortKey ) );
+                    cursor.init();
+                    state.init();
+
+                    mr_shard::BSONList values;
+                    Strategy* s = SHARDED;
+                    while ( cursor.more() ) {
+                        BSONObj t = cursor.next().getOwned();
+                        cout << t.toString() << endl;
+
+                        if ( values.size() == 0 ) {
+                            values.push_back( t );
+                            continue;
+                        }
+
+                        if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
+                            values.push_back( t );
+                            continue;
+                        }
+
+                        cout << "Doing sharded reduce on " << values.size() << " objects";
+                        BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
+                        s->insertSharded(conf, outns.c_str(), final, 0);
+                        values.clear();
+                        values.push_back( t );
+                    }
+
+                    if ( values.size() ) {
+                        cout << "Doing sharded reduce on " << values.size() << " objects";
+                        const BSONObj& final = config.reducer->finalReduce(values, config.finalizer.get());
+                        s->insertSharded(conf, outns.c_str(), (BSONObj&) final, 0);
+                    }
+
+//                state.dumpToInc();
+//                state.postProcessCollection();
+//                state.appendResults( result );
+
+//                for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+//                    ScopedDbConnection conn( i->_server );
+//                    conn->dropCollection( dbname + "." + shardedOutputCollection );
+//                    conn.done();
+//                }
+                    result.append("shardCounts", shardCounts);
+                    result.append("counts", aggCounts);
+                    ok = true;
+                }
 
                 if ( ! ok ) {
                     errmsg = "final reduce failed: ";

@@ -289,7 +289,7 @@ db/commands/mr.cpp
 * 10075 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L196) reduce -> multiple not supported yet
 * 10076 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L421) rename failed: 
 * 10077 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L877) fast_emit takes 2 args
-* 10078 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L1131) something bad happened" , shardedOutputCollection == res["result
+* 10078 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L1130) something bad happened" , shardedOutputCollection == res["result
 * 13069 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L878) an emit can't be more than half max bson size
 * 13070 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L176) value too large to reduce
 * 13522 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L258) unknown out specifier [" << t << "]
@@ -1062,26 +1062,27 @@ s/client.cpp
 
 s/commands_public.cpp
 ----
-* 10418 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L264) how could chunk manager be null!
-* 10420 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L719) how could chunk manager be null!
-* 12594 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L487) how could chunk manager be null!
-* 13002 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L609) how could chunk manager be null!
-* 13091 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L784) how could chunk manager be null!
-* 13092 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L785) GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id
-* 13137 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L321) Source and destination collections must be on same shard
-* 13138 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L315) You can't rename a sharded collection
-* 13139 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L316) You can't rename to a sharded collection
-* 13140 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L314) Don't recognize source or target DB
-* 13343 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L612) query for sharded findAndModify must have shardkey
-* 13398 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L335) cant copy to sharded DB
-* 13399 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L343) need a fromdb argument
-* 13400 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L346) don't know where source DB is
-* 13401 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L347) cant copy from sharded DB
-* 13402 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L332) need a todb argument
-* 13407 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L641) how could chunk manager be null!
-* 13408 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L647) keyPattern must equal shard key
-* 13500 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L815) how could chunk manager be null!
-* 13512 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L267) drop collection attempted on non-sharded collection
+* 1 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L1094) 
+* 10418 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L265) how could chunk manager be null!
+* 10420 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L720) how could chunk manager be null!
+* 12594 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L488) how could chunk manager be null!
+* 13002 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L610) how could chunk manager be null!
+* 13091 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L785) how could chunk manager be null!
+* 13092 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L786) GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id
+* 13137 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L322) Source and destination collections must be on same shard
+* 13138 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L316) You can't rename a sharded collection
+* 13139 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L317) You can't rename to a sharded collection
+* 13140 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L315) Don't recognize source or target DB
+* 13343 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L613) query for sharded findAndModify must have shardkey
+* 13398 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L336) cant copy to sharded DB
+* 13399 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L344) need a fromdb argument
+* 13400 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L347) don't know where source DB is
+* 13401 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L348) cant copy from sharded DB
+* 13402 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L333) need a todb argument
+* 13407 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L642) how could chunk manager be null!
+* 13408 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L648) keyPattern must equal shard key
+* 13500 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L816) how could chunk manager be null!
+* 13512 [code](http://github.com/mongodb/mongo/blob/master/s/commands_public.cpp#L268) drop collection attempted on non-sharded collection
 
 
 s/config.cpp
@@ -1155,6 +1156,16 @@ s/grid.cpp
 * 10421 [code](http://github.com/mongodb/mongo/blob/master/s/grid.cpp#L445) getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime
 
 
+s/mr_shard.cpp
+----
+* 14814 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L44) couldn't compile code for: 
+* 14815 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L148) value too large to reduce
+* 14816 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L168) reduce -> multiple not supported yet
+* 14817 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L230) unknown out specifier [" << t << "]
+* 14818 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L238) 'out' has to be a string or an object
+* 14819 [code](http://github.com/mongodb/mongo/blob/master/s/mr_shard.cpp#L202) outType is no longer a valid option" , cmdObj["outType
+
+
 s/request.cpp
 ----
 * 10192 [code](http://github.com/mongodb/mongo/blob/master/s/request.cpp#L65) db config reload failed!
@@ -1167,7 +1178,7 @@ s/request.cpp
 
 s/server.cpp
 ----
-* 10197 [code](http://github.com/mongodb/mongo/blob/master/s/server.cpp#L187) createDirectClient not implemented for sharding yet
+* 10197 [code](http://github.com/mongodb/mongo/blob/master/s/server.cpp#L188) createDirectClient not implemented for sharding yet
 
 
 s/shard.cpp
@@ -1208,6 +1219,7 @@ s/strategy.cpp
 
 s/strategy_shard.cpp
 ----
+<<<<<<< HEAD
 * 10201 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L199) invalid update
 * 10203 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L299) bad delete message
 * 12376 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L255) 
@@ -1225,6 +1237,27 @@ s/strategy_shard.cpp
 * 8014 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L250) 
 * 8015 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L330) can only delete with a non-shard key pattern if can delete as many as we find
 * 8016 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L358) can't do this write op on sharded collection
+=======
+* 10201 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L263) invalid update
+* 10203 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L363) bad delete message
+* 12376 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L319) 
+* 13123 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L306) 
+* 13465 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L278) shard key in upsert query must be an exact match
+* 13505 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L365) $atomic not supported sharded" , pattern["$atomic
+* 13506 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L262) $atomic not supported sharded" , query["$atomic
+* 14804 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L184) collection no longer sharded
+* 14805 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L389) collection no longer sharded
+* 14806 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L351) collection no longer sharded
+* 14812 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L216) tried to insert object without shard key
+* 14813 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L251) collection no longer sharded
+* 8010 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L41) something is wrong, shouldn't see a command here
+* 8011 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L149) tried to insert object without shard key
+* 8012 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L272) can't upsert something without shard key
+* 8013 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L287) can't do non-multi update with query that doesn't have the shard key
+* 8014 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L314) 
+* 8015 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L394) can only delete with a non-shard key pattern if can delete as many as we find
+* 8016 [code](http://github.com/mongodb/mongo/blob/master/s/strategy_shard.cpp#L422) can't do this write op on sharded collection
+>>>>>>> SERVER-2531: added M/R output to shard collection for mode REPLACE
 
 
 s/strategy_single.cpp

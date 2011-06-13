@@ -191,6 +191,63 @@ namespace mongo {
             }
         }
 
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
+            ChunkManagerPtr manager = conf->getChunkManager(ns);
+            if ( ! manager->hasShardKey( o ) ) {
+
+                bool bad = true;
+
+                if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
+                    BSONObjBuilder b;
+                    b.appendOID( "_id" , 0 , true );
+                    b.appendElements( o );
+                    o = b.obj();
+                    bad = ! manager->hasShardKey( o );
+                }
+
+                if ( bad ) {
+                    log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
+                    uasserted( 14812 , "tried to insert object without shard key" );
+                }
+
+            }
+
+            // Many operations benefit from having the shard key early in the object
+            o = manager->getShardKey().moveToFront(o);
+
+            const int maxTries = 30;
+
+            bool gotThrough = false;
+            for ( int i=0; i<maxTries; i++ ) {
+                try {
+                    ChunkPtr c = manager->findChunk( o );
+                    log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                    insert( c->getShard() , ns , o , flags);
+
+//                    r.gotInsert();
+//                    if ( r.getClientInfo()->autoSplitOk() )
+                        c->splitIfShould( o.objsize() );
+                    gotThrough = true;
+                    break;
+                }
+                catch ( StaleConfigException& e ) {
+                    int logLevel = i < ( maxTries / 2 );
+                    LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+//                    r.reset();
+
+                    unsigned long long old = manager->getSequenceNumber();
+                    manager = conf->getChunkManager(ns);
+
+                    LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+
+                    if (!manager) {
+                        uasserted(14813, "collection no longer sharded");
+                    }
+                }
+                sleepmillis( i * 20 );
+            }
+        }
+
         void _update( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
             int flags = d.pullInt();
 
