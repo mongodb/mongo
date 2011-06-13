@@ -66,8 +66,7 @@ extern "C" {
 
 /*
  * WT_BTREE_DESC --
- *	The file's description is written into the first allocation-size bytes
- * of the file.
+ *	The file's description is written into the first 512B of the file.
  */
 struct __wt_btree_desc {
 #define	WT_BTREE_MAGIC		120897
@@ -110,6 +109,9 @@ struct __wt_btree_desc {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_BTREE_DESC_SIZE		40
+
+/* The file's description is written into the first 512B of the file. */
+#define	WT_BTREE_DESCRIPTION_SIZE	(512)
 
 /*
  * WT_DISK_REQUIRED--

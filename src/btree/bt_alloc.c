@@ -88,7 +88,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	fh = btree->fh;
 
 	/* We should never be allocating from an empty file. */
-	WT_ASSERT(session, fh->file_size >= btree->allocsize);
+	WT_ASSERT(session, fh->file_size >= WT_BTREE_DESCRIPTION_SIZE);
 
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
