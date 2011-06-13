@@ -1186,7 +1186,7 @@ namespace mongo {
 
 
                 state.dumpToInc();
-                state.postProcessCollection();
+                long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
 
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
@@ -1196,7 +1196,20 @@ namespace mongo {
                 }
 
                 result.append( "shardCounts" , shardCounts );
-                result.append( "counts" , counts );
+
+                // fix the global counts
+                BSONObjBuilder countsB(32);
+                BSONObjIterator j(counts);
+                while (j.more()) {
+                    BSONElement elmt = j.next();
+                    if (!strcmp(elmt.fieldName(), "reduce"))
+                        countsB.append("reduce", elmt.numberLong() + state.numReduces());
+                    else if (!strcmp(elmt.fieldName(), "output"))
+                        countsB.append("output", finalCount);
+                    else
+                        countsB.append(elmt);
+                }
+                result.append( "counts" , countsB.obj() );
 
                 return 1;
             }
