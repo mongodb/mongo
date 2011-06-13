@@ -30,15 +30,14 @@
 #include "connections.h"
 #include "../../util/unittest.h"
 #include "../instance.h"
+#include "../repl.h"
 
 namespace mongo {
 
     using namespace bson;
 
     extern bool replSetBlind;
-
-    // hacky
-    string *discoveredSeed = 0;
+    extern ReplSettings replSettings;
 
     long long HeartbeatInfo::timeDown() const {
         if( up() ) return 0;
@@ -91,8 +90,8 @@ namespace mongo {
             }
             if( theReplSet == 0 ) {
                 string from( cmdObj.getStringField("from") );
-                if( !from.empty() && discoveredSeed == 0 ) {
-                    discoveredSeed = new string(from);
+                if( !from.empty() ) {
+                    replSettings.discoveredSeeds.insert(from);
                 }
                 errmsg = "still initializing";
                 return false;
