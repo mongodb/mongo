@@ -64,15 +64,21 @@ util_printlog(int argc, char *argv[])
 	}
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &key);
-		fwrite(key.data, key.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
-		cursor->get_value(cursor, &value);
-		fwrite(value.data, value.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			break;
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			break;
+		if (fwrite(key.data, key.size, 1, stdout) != key.size ||
+		    fwrite("\n", 1, 1, stdout) != 1 ||
+		    fwrite(value.data, value.size, 1, stdout) != value.size ||
+		    fwrite("\n", 1, 1, stdout) != 1) {
+			ret = errno;
+			break;
+		}
 	}
-
-	if (ret != WT_NOTFOUND) {
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	else {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
 		    progname, datasrc, wiredtiger_strerror(ret));
 		goto err;

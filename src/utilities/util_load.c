@@ -16,14 +16,9 @@ struct record_t {
 	size_t   value_memsize;
 };
 
+static int bulk_read(struct record_t *, int *);
+static int bulk_read_line(WT_ITEM *, size_t *, int, int *);
 static int usage(void);
-int bulk_read(struct record_t *, int *);
-int bulk_read_line(WT_ITEM *, size_t *, int, int *);
-
-struct {
-	int pagesize_set;
-	uint32_t allocsize, intlmin, intlmax, leafmin, leafmax;
-} config;
 
 int
 util_load(int argc, char *argv[])
@@ -32,13 +27,16 @@ util_load(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	struct record_t record;
+	size_t len;
 	uint64_t insert_count;
 	int ch, debug, eof, ret, text_input, tret;
-	const char *tablename, *table_config;
-	char cursor_config[100], datasink[100];
+	const char *table_config;
+	char cursor_config[100];
+	char *tablename;
 
 	conn = NULL;
 	table_config = NULL;
+	tablename = NULL;
 	debug = text_input = 0;
 
 	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
@@ -66,11 +64,6 @@ util_load(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the table name. */
-	if (argc != 1)
-		return (usage());
-	tablename = *argv;
-
 	/*
 	 * Right now, we only support text input -- require the T option to
 	 * match Berkeley DB's API.
@@ -81,23 +74,32 @@ util_load(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
+	/* The remaining argument is the table name. */
+	if (argc != 1)
+		return (usage());
+
+	len = sizeof("table:") + strlen(*argv);
+	if ((tablename = calloc(len, 1)) == NULL) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+	snprintf(tablename, len, "table:%s", *argv);
+
 	if ((ret = wiredtiger_open(".", NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	snprintf(datasink, sizeof(datasink), "table:%s", tablename);
-
-	if ((ret = session->drop(session, datasink, "force")) != 0)
+	if ((ret = session->drop(session, tablename, "force")) != 0)
 		goto err;
 
-	if ((ret = session->create(session, datasink, table_config)) != 0)
+	if ((ret = session->create(session, tablename, table_config)) != 0)
 		goto err;
 
 	snprintf(cursor_config, sizeof(cursor_config), "bulk,dump=%s%s",
 	    text_input ? "print" : "raw", debug ? ",debug" : "");
 
-	if ((ret = session->open_cursor(session, datasink, NULL,
-	    cursor_config, &cursor)) != 0) {
+	if ((ret = session->open_cursor(
+	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, tablename, wiredtiger_strerror(ret));
 		goto err;
@@ -131,6 +133,10 @@ err:		ret = 1;
 	}
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
+
+	if (tablename != NULL)
+		free(tablename);
+
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

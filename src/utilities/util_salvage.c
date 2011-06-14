@@ -15,8 +15,12 @@ util_salvage(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	const char *tablename;
+	size_t len;
 	int ch, ret, tret;
+	char *tablename;
+
+	conn = NULL;
+	tablename = NULL;
 
 	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
@@ -30,14 +34,20 @@ util_salvage(int argc, char *argv[])
 	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
-	tablename = *argv;
+
+	len = sizeof("table:") + strlen(*argv);
+	if ((tablename = calloc(len, 1)) == NULL) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+	snprintf(tablename, len, "table:%s", *argv);
 
 	if ((ret = wiredtiger_open(".", verbose ?
 	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	if ((ret = session->verify(session, tablename, "salvage")) != 0) {
+	if ((ret = session->salvage(session, tablename, NULL)) != 0) {
 		fprintf(stderr, "%s: salvage(%s): %s\n",
 		    progname, tablename, wiredtiger_strerror(ret));
 		goto err;
@@ -50,6 +60,10 @@ err:		ret = 1;
 	}
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
+
+	if (tablename != NULL)
+		free(tablename);
+
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

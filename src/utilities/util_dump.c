@@ -19,11 +19,13 @@ util_dump(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	const char *tablename;
-	char cursor_config[100], datasrc[100];
+	size_t len;
+	char cursor_config[100];
 	int ch, debug, printable, ret, tret;
+	char *tablename;
 
 	conn = NULL;
+	tablename = NULL;
 	debug = printable = 0;
 
 	while ((ch = getopt(argc, argv, "df:p")) != EOF)
@@ -51,37 +53,48 @@ util_dump(int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	tablename = *argv;
+
+	len = sizeof("table:") + strlen(*argv);
+	if ((tablename = calloc(len, 1)) == NULL) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+	snprintf(tablename, len, "table:%s", *argv);
 
 	if ((ret = wiredtiger_open(".", verbose ?
 	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	snprintf(datasrc, sizeof(datasrc), "table:%s", tablename);
 	snprintf(cursor_config, sizeof(cursor_config), "dump=%s%s",
 	    printable ? "print" : "raw", debug ? ",debug" : "");
 
-	if ((ret = session->open_cursor(session, datasrc, NULL,
-	    cursor_config, &cursor)) != 0) {
+	if ((ret = session->open_cursor(
+	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, datasrc, wiredtiger_strerror(ret));
+		    progname, tablename, wiredtiger_strerror(ret));
 		goto err;
 	}
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
-			fwrite(key.data, key.size, 1, stdout);
-			fwrite("\n", 1, 1, stdout);
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			break;
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			break;
+		if ((key.data != NULL && (
+		    fwrite(key.data, key.size, 1, stdout) != key.size ||
+		    fwrite("\n", 1, 1, stdout) != 1)) ||
+		    fwrite(value.data, value.size, 1, stdout) != value.size ||
+		    fwrite("\n", 1, 1, stdout) != 1) {
+			ret = errno;
+			break;
 		}
-		cursor->get_value(cursor, &value);
-		fwrite(value.data, value.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
 	}
-
-	if (ret != WT_NOTFOUND) {
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	else {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
-		    progname, datasrc, wiredtiger_strerror(ret));
+		    progname, tablename, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -90,6 +103,10 @@ err:		ret = 1;
 	}
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
+
+	if (tablename != NULL)
+		free(tablename);
+
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
