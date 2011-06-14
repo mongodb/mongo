@@ -63,7 +63,7 @@ namespace mongo {
             //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
-            if( !comment.isEmpty() )
+            if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(comment);
 
             cx.db()->flushFiles(true);
@@ -225,8 +225,9 @@ namespace mongo {
                   if someone had some intermediate config this node doesnt have, that could be
                   necessary.  but then how did we become primary?  so perhaps we are fine as-is.
                   */
-        if( o.version + 1 != n.version ) {
-            errmsg = "version number wrong";
+        if( o.version >= n.version ) {
+            errmsg = str::stream() << "version number must increase, old: "
+                                   << o.version << " new: " << n.version;
             return false;
         }
 
@@ -571,10 +572,13 @@ namespace mongo {
         uassert(13122, "bad repl set config?", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(BSONObj cfg) {
+    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) {
         clear();
         from(cfg);
-        configAssert( version < 0 /*unspecified*/ || (version >= 1 && version <= 5000) );
+        if( force ) {
+            version += rand() % 100000 + 10000;
+        }
+        configAssert( version < 0 /*unspecified*/ || (version >= 1) );
         if( version < 1 )
             version = 1;
         _ok = true;

@@ -53,10 +53,10 @@ config.version = 3;
 printjson(config);
 wait(function() {
     try {
-      master.getDB("admin").runCommand({replSetReconfig:config});
+        master.getDB("admin").runCommand({replSetReconfig:config});
     }
     catch(e) {
-      print(e);
+        print(e);
     }
     reconnect(master);
 
@@ -86,6 +86,33 @@ wait(function() {
     }
     return true;
 } , "wait2" );
+
+
+print("reconfig with minority");
+replTest.stop(1);
+
+assert.soon(function() {
+    reconnect(master);
+    return master.getDB("admin").runCommand({isMaster : 1}).secondary;
+});
+
+config.version = 4;
+config.members.pop();
+try {
+    master.getDB("admin").runCommand({replSetReconfig : config, force : true});
+}
+catch(e) {
+    print(e);
+}
+
+reconnect(master);
+assert.soon(function() {
+    return master.getDB("admin").runCommand({isMaster : 1}).ismaster;
+});
+
+config = master.getDB("local").system.replset.findOne();
+printjson(config);
+assert(config.version > 4);
 
 replTest.stopSet();
 

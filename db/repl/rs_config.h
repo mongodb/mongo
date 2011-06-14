@@ -46,7 +46,7 @@ namespace mongo {
          */
         ReplSetConfig(const HostAndPort& h);
 
-        ReplSetConfig(BSONObj cfg);
+        ReplSetConfig(BSONObj cfg, bool force=false);
 
         bool ok() const { return _ok; }
 
