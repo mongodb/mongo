@@ -181,7 +181,7 @@ namespace mongo {
             return false;
 
         ci.unshard();
-        _save();
+        _save( false, true );
         return true;
     }
 
@@ -289,24 +289,32 @@ namespace mongo {
         return true;
     }
 
-    void DBConfig::_save() {
+    void DBConfig::_save( bool db, bool coll ) {
         ScopedDbConnection conn( configServer.modelServer() );
 
-        BSONObj n;
-        {
-            BSONObjBuilder b;
-            serialize(b);
-            n = b.obj();
+        if( db ){
+
+            BSONObj n;
+            {
+                BSONObjBuilder b;
+                serialize(b);
+                n = b.obj();
+            }
+
+            conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
+            string err = conn->getLastError();
+            uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+
         }
 
-        conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
-        string err = conn->getLastError();
-        uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+        if( coll ){
 
-        for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
-            if ( ! i->second.isDirty() )
-                continue;
-            i->second.save( i->first , conn.get() );
+            for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
+                if ( ! i->second.isDirty() )
+                    continue;
+                i->second.save( i->first , conn.get() );
+            }
+
         }
 
         conn.done();
