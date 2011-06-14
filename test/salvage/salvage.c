@@ -392,16 +392,17 @@ copy(int lsn, int recno)
 	int first;
 	char buf[PSIZE];
 
-	/*
-	 * If the file doesn't exist, then we're creating it, copy a metadata
-	 * page to the salvage file.
-	 */
 	assert((ifp = fopen(LOAD, "r")) != NULL);
+
+	/*
+	 * If the file doesn't exist, then we're creating it: copy the .conf
+	 * file and the first sector (the file description).
+	 */
 	first = access(SLVG, F_OK) ? 1 : 0;
 	assert((ofp = fopen(SLVG, "a")) != NULL);
-
-	/* Copy the first "page" (the metadata description). */
 	if (first) {
+		system("cp " LOAD ".conf " SLVG ".conf");
+
 		assert((ofp = fopen(SLVG, "w")) != NULL);
 		assert(fread(buf, 1, 512, ifp) == 512);
 		assert(fwrite(buf, 1, 512, ofp) == 512);
