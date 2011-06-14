@@ -217,7 +217,6 @@ namespace mongo {
 
             const int maxTries = 30;
 
-            bool gotThrough = false;
             for ( int i=0; i<maxTries; i++ ) {
                 try {
                     ChunkPtr c = manager->findChunk( o );
@@ -227,7 +226,6 @@ namespace mongo {
 //                    r.gotInsert();
 //                    if ( r.getClientInfo()->autoSplitOk() )
                         c->splitIfShould( o.objsize() );
-                    gotThrough = true;
                     break;
                 }
                 catch ( StaleConfigException& e ) {
