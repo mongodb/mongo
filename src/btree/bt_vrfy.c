@@ -68,7 +68,7 @@ __wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
 	if ((btree->fh->file_size -
 	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
 		__wt_errx(session,
-		    "the file size is not a multiple of the allocation size");
+		    "the file size is not valid for the allocation size");
 		    goto err;
 	}
 
