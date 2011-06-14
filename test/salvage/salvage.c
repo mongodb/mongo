@@ -443,11 +443,11 @@ process(void)
 	WT_SESSION *session;
 
 	slvg_open(SLVG, &session, &conn);
-	assert(session->salvage(session, SLVG, 0) == 0);
+	assert(session->salvage(session, "table:" SLVG, 0) == 0);
 	slvg_close(conn);
 
 	slvg_open(SLVG, &session, &conn);
-	assert(session->verify(session, SLVG, 0) == 0);
+	assert(session->verify(session, "table:" SLVG, 0) == 0);
 	slvg_close(conn);
 
 	slvg_open(SLVG, &session, &conn);
