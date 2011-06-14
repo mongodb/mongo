@@ -29,7 +29,7 @@ __wt_btconf_read(
 	fh = NULL;
 	WT_ERR(__wt_open(session, fullname, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &filesize));
-	WT_ERR(__wt_calloc_def(session, filesize, &config));
+	WT_ERR(__wt_calloc_def(session, (size_t)filesize, &config));
 	WT_ERR(__wt_read(session, fh, (off_t)0, (uint32_t)filesize, config));
 
 	/* Verify that the string is NUL-terminated. */
