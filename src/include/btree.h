@@ -18,10 +18,19 @@ extern "C" {
  *
  * We use 32-bit unsigned integers to store file locations on file pages, and
  * all such file locations are counts of file allocation units.  In the code
- * these are called "addrs".  To simplify bookkeeping, page sizes must be a
- * multiple of the allocation unit size.  There are two special addresses,
+ * these are called "addrs".  To simplify bookkeeping, page sizes must also be
+ * a multiple of the allocation unit size.  There are two special addresses,
  * one for pages which don't exist, and one for pages that have been deleted.
  *
+ * XXX
+ * The special address for deleted pages is not yet used -- the goal is to
+ * use it to delete empty pages in column-store tables: the name space has
+ * to exist, but we don't want to leave the pages around.
+ */
+#define	WT_ADDR_INVALID		UINT32_MAX	/* Invalid file address */
+#define	WT_ADDR_DELETED		(UINT32_MAX - 1)/* Deleted file address */
+
+/*
  * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
  * maximum maximum file size is almost 512PB (2^27 x 2^32 - 2).
  *
@@ -51,18 +60,20 @@ extern "C" {
  */
 #define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)
 
-#define	WT_ADDR_INVALID	UINT32_MAX	/* Invalid file address */
-
 /*
  * Underneath the Btree code is the OS layer, where sizes are stored as numbers
  * of bytes.   In the OS layer, 32-bits is too small (a file might be larger
  * than 4GB), so we use a standard type known to hold the size of a file, off_t.
+ *
+ * The first 512B of the file hold the file's description.  Since I don't want
+ * to give up a full allocation-size to the file's description, we offset addrs
+ * by 512B.
  */
 /* Convert a data address to/from a byte offset. */
 #define	WT_ADDR_TO_OFF(btree, addr)					\
-	((off_t)(addr) * (off_t)(btree)->allocsize)
+	(512 + (off_t)(addr) * (off_t)(btree)->allocsize)
 #define	WT_OFF_TO_ADDR(btree, off)					\
-	((uint32_t)((off) / (btree)->allocsize))
+	((uint32_t)((off - 512) / (btree)->allocsize))
 
 /*
  * WT_BTREE_DESC --
@@ -103,7 +114,7 @@ struct __wt_btree_desc {
 #define	WT_BTREE_DESC_SIZE		32
 
 /* The file's description is written into the first 512B of the file. */
-#define	WT_BTREE_DESCRIPTION_SIZE	(512)
+#define	WT_BTREE_DESC_SECTOR		512
 
 /*
  * WT_DISK_REQUIRED--

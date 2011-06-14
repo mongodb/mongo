@@ -17,7 +17,7 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	WT_CONFIG_ITEM cval;
-	uint8_t buf[512];
+	uint8_t buf[WT_BTREE_DESC_SECTOR];
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -63,7 +63,7 @@ int
 __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BTREE_DESC *desc;
-	uint8_t buf[512];
+	uint8_t buf[WT_BTREE_DESC_SECTOR];
 
 	memset(buf, 0, sizeof(buf));
 	desc = (WT_BTREE_DESC *)buf;
@@ -75,7 +75,7 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc->root_addr = WT_ADDR_INVALID;
 	desc->free_addr = WT_ADDR_INVALID;
 
-	return (__wt_write(session, fh, (off_t)0, 512, buf));
+	return (__wt_write(session, fh, (off_t)0, sizeof(buf), buf));
 }
 
 /*
@@ -87,7 +87,7 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
-	uint8_t buf[512];
+	uint8_t buf[WT_BTREE_DESC_SECTOR];
 
 	btree = session->btree;
 

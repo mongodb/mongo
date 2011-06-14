@@ -274,8 +274,7 @@ __wt_debug_page_work(
 		fprintf(fp, "[NoAddr]");
 	else
 		fprintf(fp, "[%" PRIu32 "-%" PRIu32 "]", WT_PADDR(page),
-		    WT_PADDR(page) +
-		    (WT_OFF_TO_ADDR(btree, WT_PSIZE(page)) - 1));
+		    WT_PADDR(page) + (WT_PSIZE(page) / btree->allocsize) - 1);
 	fprintf(fp, "/%" PRIu32 " %s",
 	    WT_PSIZE(page), __wt_page_type_string(page->type));
 

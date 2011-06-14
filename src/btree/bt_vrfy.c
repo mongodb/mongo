@@ -52,8 +52,25 @@ __wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
 	WT_UNUSED(config);			/* XXX: unused for now */
 
 	btree = session->btree;
-	vs = NULL;
 	ret = 0;
+
+	WT_CLEAR(_vstuff);
+	vs = &_vstuff;
+
+	vs->stream = stream;
+	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
+	vs->max_addr = WT_ADDR_INVALID;
+
+	/*
+	 * The file size should be a multiple of the allocsize, offset by the
+	 * size of the descriptor sector, the first 512B of the file.
+	 */
+	if ((btree->fh->file_size -
+	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
+		__wt_errx(session,
+		    "the file size is not a multiple of the allocation size");
+		    goto err;
+	}
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -74,24 +91,12 @@ __wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	WT_CLEAR(_vstuff);
-	vs = &_vstuff;
 	vs->frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
 	if (vs->frags > INT_MAX) {
 		__wt_errx(session, "file is too large to verify");
-		ret = WT_ERROR;
 		goto err;
 	}
 	WT_ERR(bit_alloc(session, vs->frags, &vs->fragbits));
-	vs->stream = stream;
-	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
-	vs->max_addr = WT_ADDR_INVALID;
-
-	/*
-	 * The first allocsize bytes of the file are the file's metadata and
-	 * configuration string, which we've already verified.
-	 */
-	WT_RET(__wt_verify_addfrag(session, 0, btree->allocsize, vs));
 
 	/* Verify the tree, starting at the root. */
 	WT_ERR(__wt_verify_tree(session, &btree->root_page, (uint64_t)1, vs));
@@ -102,7 +107,11 @@ __wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
 	/* Verify we read every file block. */
 	WT_ERR(__wt_verify_checkfrag(session, vs));
 
-err:	if (vs != NULL) {
+	if (0) {
+err:		if (ret == 0)
+			ret = WT_ERROR;
+	}
+	if (vs != NULL) {
 		/* Wrap up reporting. */
 		__wt_progress(session, NULL, vs->fcnt);
 
@@ -523,7 +532,7 @@ __wt_verify_addfrag(
 
 	btree = session->btree;
 
-	frags = WT_OFF_TO_ADDR(btree, size);
+	frags = size / btree->allocsize;
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
 			__wt_errx(session,
