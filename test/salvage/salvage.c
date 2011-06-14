@@ -409,7 +409,7 @@ copy(int lsn, int recno)
 	}
 
 	/* Copy/update the first formatted page. */
-	assert(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
+	assert(fseek(ifp, (long)512, SEEK_SET) == 0);
 	assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
 	dsk = (WT_PAGE_DISK *)buf;
 	dsk->lsn = (uint64_t)lsn;
