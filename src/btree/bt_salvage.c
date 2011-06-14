@@ -17,7 +17,7 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  * to make the code prettier.
  */
 struct __wt_stuff {
-	WT_BTREE	  *btree;			/* Enclosing Btree */
+	WT_BTREE  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
@@ -88,24 +88,24 @@ static int  __slvg_free_trk_ovfl(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_free_trk_row(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_key_copy(WT_SESSION_IMPL *, WT_BUF *, WT_BUF *);
 static int  __slvg_ovfl_col_dsk_ref(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+		WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_col_inmem_ref(WT_PAGE *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_row_dsk_ref(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+		WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_row_inmem_ref(WT_PAGE *, uint32_t, WT_STUFF *);
 static int  __slvg_range_col(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_range_overlap_col(
-	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_range_overlap_row(
-	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_range_row(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_trk_compare(const void *, const void *);
 static int  __slvg_trk_leaf(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+		WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_ovfl(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
+		WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static void __slvg_trk_ovfl_ref(WT_TRACK *, WT_STUFF *);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -136,40 +136,34 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	stuff.page_type = WT_PAGE_INVALID;
 	ss = &stuff;
 
-	/*
-	 * Clear any existing free list -- presumably it's garbage, otherwise
-	 * nobody would be calling salvage.
-	 */
-	__wt_block_discard(session);
+	if (btree->fh->file_size > WT_BTREE_DESC_SECTOR) {
+		/*
+		 * Truncate the file to an initial sector plus N allocation size
+		 * units (bytes after the last allocation size unit have to be
+		 * garbage).
+		 */
+		allocsize = btree->allocsize;
+		len = btree->fh->file_size - WT_BTREE_DESC_SECTOR;
+		len = (len / allocsize) * allocsize;
+		len += WT_BTREE_DESC_SECTOR;
+		if (len != btree->fh->file_size)
+			WT_ERR(__wt_ftruncate(session, btree->fh, len));
+	}
 
-	/*
-	 * Truncate the file to our minimal allocation size unit -- anything
-	 * after the end of the file has to be garbage.
-	 */
-	allocsize = btree->allocsize;
-	len = (btree->fh->file_size / allocsize) * allocsize;
-	if (len != btree->fh->file_size)
-		WT_ERR(__wt_ftruncate(session, btree->fh, len));
-
-	/* If the file doesn't have any pages, we're done. */
-	if (btree->fh->file_size <= allocsize) {
-		__wt_errx(session, "file is too small to salvage");
-		ret = WT_ERROR;
+	/* If the file has no data pages, we're done. */
+	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
+		__wt_errx(session,
+		    "the file contains no data pages and is too small to "
+		    "salvage");
 		goto err;
 	}
 
-	/* Build the page list. */
+	/* Read the file and build the page list. */
 	WT_ERR(__slvg_read(session, ss));
 
-	/*
-	 * If the file has no pages we understand, we shouldn't overwrite it --
-	 * the user gave us the wrong file and right now they're frantically
-	 * pounding at their interrupt key.
-	 */
 	if (ss->pages_next == 0) {
 		__wt_errx(session,
 		    "file has no valid pages and cannot be salvaged");
-		ret = WT_ERROR;
 		goto err;
 	}
 
@@ -257,7 +251,12 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));
 
-err:	/* Wrap up reporting. */
+	if (0) {
+err:		if (ret == 0)
+			ret = WT_ERROR;
+	}
+
+	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);
 
 	/* Free allocated memory. */
@@ -296,14 +295,12 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	 * The first sector of the file is the description record -- ignore
 	 * it for now.
 	 */
-	off = allocsize;
-	max = fh->file_size;
-	while (off < max) {
+	for (off = WT_BTREE_DESC_SECTOR, max = fh->file_size; off < max;) {
 		/* Report progress every 10 reads. */
 		if (++ss->fcnt % 10 == 0)
 			__wt_progress(session, NULL, ss->fcnt);
 
-		addr = (uint32_t)(off / allocsize);
+		addr = WT_OFF_TO_ADDR(btree, off);
 
 		/*
 		 * Read the start of a possible page (an allocation-size block),

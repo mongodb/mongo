@@ -55,12 +55,14 @@ int
 __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name, const char *config, uint32_t flags)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_PAGE *page;
+	int ret;
 
 	conn = S2C(session);
 	btree = session->btree;
+	ret = 0;
 
 	/* Create the WT_BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
@@ -72,28 +74,32 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	btree->config = config;
 
 	/* Initialize the WT_BTREE structure. */
-	WT_RET(__btree_init(session, name));
+	WT_ERR(__btree_init(session, name));
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, name, 0666, 1, &btree->fh));
+	WT_ERR(__wt_open(session, name, 0666, 1, &btree->fh));
 
 	/*
-	 * Read in the file's metadata, configure the WT_BTREE structure based
-	 * on the configuration string, read in the free-list.
-	 *
-	 * XXX Take extra care with this if WT_BTREE_VERIFY is set?
+	 * Read the file's metadata and configure the WT_BTREE structure based
+	 * on the configuration string.
 	 */
-	WT_RET(__wt_desc_read(session));
-	WT_RET(__btree_conf(session));
-	WT_RET(__wt_block_read(session));
+	WT_ERR(__wt_desc_read(session));
+	WT_ERR(__btree_conf(session));
+
+	/* If an open for a salvage operation, that's all we do. */
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		goto done;
+
+	/* Read in the free list. */
+	WT_ERR(__wt_block_read(session));
 
 	/*
-	 * If there's no root page, create an in-memory page but leave it clean;
-	 * if it's never written, that's OK.  If there is a root page, read it
-	 * in and pin it.
+	 * Get a root page.  If there's a root page in the file, read it in and
+	 * pin it.  If there's no root page, create an in-memory page but don't
+	 * mark it dirty, if it's never written, that's OK.
 	 */
 	if (btree->root_page.addr == WT_ADDR_INVALID) {
-		WT_RET(__wt_calloc_def(session, 1, &page));
+		WT_ERR(__wt_calloc_def(session, 1, &page));
 		switch (btree->type) {
 		case BTREE_COL_FIX:
 			page->u.col_leaf.recno = 1;
@@ -120,12 +126,14 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		btree->root_page.size = 0;
 		btree->root_page.page = page;
 	} else  {
-		WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
+		/* If an open for a verify operation, check the disk image. */
+		WT_ERR(__wt_page_in(session, NULL,
+		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		__wt_hazard_clear(session, btree->root_page.page);
 	}
 
-	/* Add to the connection's list. */
+done:	/* Add to the connection list. */
 	__wt_lock(session, conn->mtx);
 	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
 	++conn->dbqcnt;
@@ -134,6 +142,9 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(conn->stats, file_open);
 
 	return (0);
+
+err:	__wt_free(session, session->btree);
+	return (ret);
 }
 
 /*
@@ -239,6 +250,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Huffman encoding configuration. */
 	WT_RET(__wt_btree_huffman_open(session));
 
+	/* Set the key gap for prefix compression. */
 	WT_RET(__wt_config_getones(session,
 	    btree->config, "btree_key_gap", &cval));
 	btree->key_gap = (uint32_t)cval.val;

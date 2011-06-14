@@ -114,7 +114,8 @@ struct __wt_btree {
 	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
 
 #define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
-#define	WT_BTREE_VERIFY		0x02	/* Handle is for verify/salvage */
+#define	WT_BTREE_SALVAGE	0x02	/* Handle is for salvage */
+#define	WT_BTREE_VERIFY		0x04	/* Handle is for verify */
 	uint32_t flags;
 };
 

@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
+static void __wt_block_discard(WT_SESSION_IMPL *);
 static void __wt_block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
-static int __wt_block_truncate(WT_SESSION_IMPL *);
+static int  __wt_block_truncate(WT_SESSION_IMPL *);
 
 /*
  * __wt_block_alloc --
@@ -240,7 +241,17 @@ __wt_block_read(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	ret = 0;
 
-	/* Make sure there's a free-list to read. */
+	/*
+	 * The free-list is read before the file is verified, which means we
+	 * need to be a little paranoid.   We know the free-list chunk itself
+	 * is entirely in the file because we checked when we first read the
+	 * file's description structure.   Nothing here is unsafe, all we're
+	 * doing is entering addr/size pairs into the in-memory free-list.
+	 * The verify code will separately check every addr/size pair to make
+	 * sure they're in the file.
+	 *
+	 * Make sure there's a free-list to read.
+	 */
 	if (btree->free_addr == WT_ADDR_INVALID)
 		return (0);
 
@@ -389,7 +400,7 @@ __wt_block_truncate(WT_SESSION_IMPL *session)
  * __wt_block_discard --
  *	Discard any free-list entries.
  */
-void
+static void
 __wt_block_discard(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
