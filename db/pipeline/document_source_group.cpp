@@ -284,8 +284,11 @@ namespace mongo {
         pResult->addField(Document::idName, rIter->first);
 
         /* add the rest of the fields */
-        for(size_t i = 0; i < n; ++i)
-            pResult->addField(vFieldName[i], (*pGroup)[i]->getValue());
+        for(size_t i = 0; i < n; ++i) {
+	    shared_ptr<const Value> pValue((*pGroup)[i]->getValue());
+	    if (pValue->getType() != Undefined)
+		pResult->addField(vFieldName[i], pValue);
+	}
 
         return pResult;
     }

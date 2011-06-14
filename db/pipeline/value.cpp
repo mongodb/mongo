@@ -474,13 +474,13 @@ namespace mongo {
             break;
 
         case jstNULL:
+        case Undefined:
             /* nothing to do */
             break;
 
             /* these shouldn't happen in this context */
         case MinKey:
         case EOO:
-        case Undefined:
         case DBRef:
         case Code:
         case MaxKey:
@@ -500,6 +500,32 @@ namespace mongo {
         return Value::getFalse();
     }
 
+    int Value::coerceToInt() const {
+        switch(type) {
+        case NumberDouble:
+            return (int)simple.doubleValue;
+
+        case NumberInt:
+            return simple.intValue;
+
+        case NumberLong:
+            return (int)simple.longValue;
+
+        case String:
+            assert(false); // CW TODO try to convert w/atod()
+            return (int)0;
+
+	case jstNULL:
+	case Undefined:
+	    break;
+
+        default:
+            assert(false); // CW TODO no conversion available
+        } // switch(type)
+
+        return (int)0;
+    }
+
     long long Value::coerceToLong() const {
         switch(type) {
         case NumberDouble:
@@ -513,15 +539,17 @@ namespace mongo {
 
         case String:
             assert(false); // CW TODO try to convert w/atod()
-            return (double)0;
+            return (long long)0;
+
+	case jstNULL:
+	case Undefined:
+	    break;
 
         default:
             assert(false); // CW TODO no conversion available
         } // switch(type)
 
-        /* NOTREACHED */
-        return (double)0;
-
+        return (long long)0;
     }
 
     double Value::coerceToDouble() const {
@@ -539,11 +567,14 @@ namespace mongo {
             assert(false); // CW TODO try to convert w/atod()
             return (double)0;
 
+	case jstNULL:
+	case Undefined:
+	    break;
+
         default:
             assert(false); // CW TODO no conversion available
         } // switch(type)
 
-        /* NOTREACHED */
         return (double)0;
     }
 
@@ -791,30 +822,67 @@ namespace mongo {
     }
 
     BSONType Value::getWidestNumeric(BSONType lType, BSONType rType) {
-        /* check that the left operand is numeric */
-        assert((lType == NumberDouble) || (lType == NumberLong) ||
-               (lType == NumberInt)); // CW TODO rL is not numeric
+	if (lType == NumberDouble) {
+	    switch(rType) {
+	    case NumberDouble:
+	    case NumberLong:
+	    case NumberInt:
+	    case jstNULL:
+	    case Undefined:
+		return NumberDouble;
 
-        /*
-          Check the right operand for numeric types.  Start with the largest
-          and go to the smallest.  If either value has that type, that's
-          the wider of the two.
+	    default:
+		break;
+	    }
+	}
+	else if (lType == NumberLong) {
+	    switch(rType) {
+	    case NumberDouble:
+		return NumberDouble;
 
-          We check the right operand first because we already know the
-          left operand is numeric, but we don't know if the right one is or not.
-         */
-        if ((rType == NumberDouble) || (lType == NumberDouble))
-            return NumberDouble;
+	    case NumberLong:
+	    case NumberInt:
+	    case jstNULL:
+	    case Undefined:
+		return NumberLong;
 
-        if ((rType == NumberLong) || (lType == NumberLong))
-            return NumberLong;
+	    default:
+		break;
+	    }
+	}
+	else if (lType == NumberInt) {
+	    switch(rType) {
+	    case NumberDouble:
+		return NumberDouble;
 
-        /* if we got here, lType must be NumberInt */
-        if (rType == NumberInt)
-            return NumberInt;
+	    case NumberLong:
+		return NumberLong;
 
-        /* if we got here, rType must not be numeric */
-        assert(false); // CW TODO rR is not numeric
+	    case NumberInt:
+	    case jstNULL:
+	    case Undefined:
+		return NumberInt;
+
+	    default:
+		break;
+	    }
+	}
+	else if ((lType == jstNULL) || (lType == Undefined)) {
+	    switch(rType) {
+	    case NumberDouble:
+		return NumberDouble;
+
+	    case NumberLong:
+		return NumberLong;
+
+	    case NumberInt:
+		return NumberInt;
+
+	    default:
+		break;
+	    }
+	}
+
         /* NOTREACHED */
         return Undefined;
     }

@@ -773,33 +773,11 @@ namespace mongo {
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
-        BSONType leftType = pLeft->getType();
-        BSONType rightType = pRight->getType();
-        assert(leftType == rightType);
-        // CW TODO at least for now.  later, handle automatic conversions
+        double right = pRight->coerceToDouble();
+	if (right == 0)
+	    return Value::getUndefined();
 
-        double left;
-        double right;
-        switch(leftType) {
-        case NumberDouble:
-            left = pLeft->getDouble();
-            right = pRight->getDouble();
-            break;
-
-        case NumberLong:
-            left = pLeft->getLong();
-            right = pRight->getLong();
-            break;
-
-        case NumberInt:
-            left = pLeft->getInt();
-            right = pRight->getInt();
-            break;
-
-        default:
-            assert(false); // CW TODO unimplemented for now
-            break;
-        }
+        double left = pLeft->coerceToDouble();
 
         return Value::createDouble(left / right);
     }

@@ -27,24 +27,20 @@ namespace mongo {
 	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */
-        BSONType rhsType = prhs->getType();
-        if ((totalType == NumberLong) || (rhsType == NumberLong))
-            totalType = NumberLong;
-        if ((totalType == NumberDouble) || (rhsType == NumberDouble))
-            totalType = NumberDouble;
+	totalType = Value::getWidestNumeric(totalType, prhs->getType());
 
         if (totalType == NumberInt) {
-            int v = prhs->getInt();
+            int v = prhs->coerceToInt();
             longTotal += v;
             doubleTotal += v;
         }
         else if (totalType == NumberLong) {
-            long long v = prhs->getLong();
+            long long v = prhs->coerceToLong();
             longTotal += v;
             doubleTotal += v;
         }
         else { /* (totalType == NumberDouble) */
-            double v = prhs->getDouble();
+            double v = prhs->coerceToDouble();
             doubleTotal += v;
         }
 

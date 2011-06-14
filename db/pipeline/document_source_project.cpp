@@ -86,8 +86,9 @@ namespace mongo {
 	      going to pick off elements one by one, and make fields of
 	      them below.
 	    */
-	    if (unwindName.length()) {
-		unwindWhich = pNoUnwindDocument->getFieldIndex(unwindName);
+	    if (unwindName.length() &&
+		((unwindWhich = pNoUnwindDocument->getFieldIndex(unwindName)) <
+		 pNoUnwindDocument->getFieldCount())) {
 		Document::FieldPair outPair(
 		    pNoUnwindDocument->getField(unwindWhich));
 		if (outPair.second->getType() == Array) {

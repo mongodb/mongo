@@ -26,7 +26,9 @@ namespace mongo {
         assert(vpOperand.size() == 1);
 	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-	if (!pCtx->getInRouter())
+	if (prhs->getType() == Undefined)
+	    ; /* nothing to add to the array */
+	else if (!pCtx->getInRouter())
 	    vpValue.push_back(prhs);
 	else {
 	    /*

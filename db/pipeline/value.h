@@ -177,6 +177,13 @@ namespace mongo {
         shared_ptr<const Value> coerceToBoolean() const;
 
         /*
+          Coerce (cast) a value to an int, using JSON rules.
+
+          @returns the int value
+        */
+        int coerceToInt() const;
+
+        /*
           Coerce (cast) a value to a long long, using JSON rules.
 
           @returns the long value
