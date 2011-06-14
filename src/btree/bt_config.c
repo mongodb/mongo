@@ -21,7 +21,7 @@ __wt_btconf_read(
 	char *config, *fullname;
 	int ret;
 
-	namesize = strlen(name) + strlen(".conf") + 1;
+	namesize = strlen(name) + sizeof(".conf");
 	WT_RET(__wt_calloc_def(session, namesize, &fullname));
 	snprintf(fullname, namesize, "%s.conf", name);
 
@@ -30,17 +30,16 @@ __wt_btconf_read(
 	WT_ERR(__wt_open(session, fullname, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &filesize));
 	WT_ERR(__wt_calloc_def(session, filesize, &config));
-	WT_ERR(__wt_read(session,
-	    fh, (off_t)0, (uint32_t)filesize, config));
+	WT_ERR(__wt_read(session, fh, (off_t)0, (uint32_t)filesize, config));
 
-        /* Verify that the string is NUL-terminated. */
-        if (config[filesize - 1] != '\0') {
-                __wt_errx(session,
-                    "Corrupt config file %s: string not NUL-terminated",
-                    fullname);
-                ret = EINVAL;
-                goto err;
-        }
+	/* Verify that the string is NUL-terminated. */
+	if (config[filesize - 1] != '\0') {
+		__wt_errx(session,
+		    "Corrupt config file %s: string not NUL-terminated",
+		    fullname);
+		ret = EINVAL;
+		goto err;
+	}
 
 	*configp = config;
 
@@ -63,7 +62,7 @@ __wt_btconf_write(
 	char *fullname;
 	int ret;
 
-	namesize = strlen(name) + strlen(".conf") + 1;
+	namesize = strlen(name) + sizeof(".conf");
 	WT_RET(__wt_calloc_def(session, namesize, &fullname));
 	snprintf(fullname, namesize, "%s.conf", name);
 
