@@ -621,6 +621,10 @@ namespace mongo {
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
 
+                if (!ok && res.getIntField("code") == 9996) { // code for StaleConfigException
+                    throw StaleConfigException(fullns, "FindAndModify"); // Command code traps this and re-runs
+                }
+
                 result.appendElements(res);
                 return ok;
             }
