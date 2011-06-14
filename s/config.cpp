@@ -263,7 +263,7 @@ namespace mongo {
     }
 
     bool DBConfig::_load() {
-        ScopedDbConnection conn( configServer.modelServer() );
+        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
 
         BSONObj o = conn->findOne( ShardNS::database , BSON( "_id" << _name ) );
 
@@ -290,7 +290,7 @@ namespace mongo {
     }
 
     void DBConfig::_save( bool db, bool coll ) {
-        ScopedDbConnection conn( configServer.modelServer() );
+        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
 
         if( db ){
 
@@ -351,7 +351,7 @@ namespace mongo {
         // 2
         grid.removeDB( _name );
         {
-            ScopedDbConnection conn( configServer.modelServer() );
+            ScopedDbConnection conn( configServer.modelServer(), 30.0 );
             conn->remove( ShardNS::database , BSON( "_id" << _name ) );
             errmsg = conn->getLastError();
             if ( ! errmsg.empty() ) {
@@ -383,7 +383,7 @@ namespace mongo {
 
         // 4
         {
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -394,7 +394,7 @@ namespace mongo {
 
         // 5
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
-            ScopedDbConnection conn( *i );
+            ScopedDbConnection conn( *i, 30.0 );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -518,7 +518,7 @@ namespace mongo {
         for ( unsigned i=0; i<_config.size(); i++ ) {
             BSONObj x;
             try {
-                ScopedDbConnection conn( _config[i] );
+                ScopedDbConnection conn( _config[i], 30.0 );
                 if ( ! conn->simpleCommand( "config" , &x , "dbhash" ) )
                     x = BSONObj();
                 else {
@@ -599,7 +599,7 @@ namespace mongo {
 
     bool ConfigServer::allUp( string& errmsg ) {
         try {
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
             conn->getLastError();
             conn.done();
             return true;
@@ -613,7 +613,7 @@ namespace mongo {
     }
 
     int ConfigServer::dbConfigVersion() {
-        ScopedDbConnection conn( _primary );
+        ScopedDbConnection conn( _primary, 30.0 );
         int version = dbConfigVersion( conn.conn() );
         conn.done();
         return version;
@@ -639,7 +639,7 @@ namespace mongo {
     void ConfigServer::reloadSettings() {
         set<string> got;
 
-        ScopedDbConnection conn( _primary );
+        ScopedDbConnection conn( _primary, 30.0 );
         auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
         assert( c.get() );
         while ( c->more() ) {
@@ -713,7 +713,7 @@ namespace mongo {
 
             assert( _primary.ok() );
 
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
 
             static bool createdCapped = false;
             if ( ! createdCapped ) {
@@ -741,7 +741,7 @@ namespace mongo {
 
     void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ) {
         try {
-            ScopedDbConnection conn( configServer.getConnectionString() );
+            ScopedDbConnection conn( configServer.getConnectionString(), 30.0 );
             conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
             conn.done();
         }
