@@ -443,7 +443,7 @@ namespace mongo {
             sleepsecs(1);
             return;
         }
-        if( sp.state.fatal() ) {
+        if( sp.state.fatal() || sp.state.startup() ) {
             sleepsecs(5);
             return;
         }
@@ -591,8 +591,9 @@ namespace mongo {
         }
         catch (DBException& e) {
             // we'll be back
-            log() << "replSet ghost sync error: " << e.what() << " for "
-                  << s.slave->fullName() << rsLog;
+            log(2) << "replSet ghost sync error: " << e.what() << " for "
+                   << s.slave->fullName() << rsLog;
+            s.reader.resetConnection();
         }
     }
 }

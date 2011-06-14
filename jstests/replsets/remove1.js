@@ -47,27 +47,6 @@ assert.soon(function() {
         return c.version == 2;
     });
 
-print("make sure 1 & 2 are dead before continuing");
-assert.soon(function() {
-        try {
-            replTest.nodes[1].getDB("foo").stats();
-        }
-        catch (e) {
-            print(e);
-            return true;
-        }
-        return false;
-    });
-
-
-print("clear slave ports");
-// these are already down, but this clears their ports from memory so that they
-// can be restarted later
-replTest.stop(1);
-
-print("Bring slave1 back up");
-replTest.restart(1, {"fastsync":null});
-
 print("Add it back as a slave");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
 config.version = 3;
