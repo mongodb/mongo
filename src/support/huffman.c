@@ -688,7 +688,7 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	((uint8_t *)tmp->mem)[0] |= padding_info;
 
 	/* Copy result of exact known size into caller's buffer. */
-	outlen = (bitpos + 7) / 8;
+	outlen = (uint32_t)((bitpos + 7) / 8);
 	WT_ERR(__wt_buf_initsize(session, to_buf, outlen));
 	memcpy(to_buf->mem, tmp->mem, outlen);
 
@@ -780,7 +780,7 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 	 * then allocate a new buffer of exactly the right size and copy the
 	 * result into it.
 	 */
-	max_len = from_len_bits / huffman->min_depth;
+	max_len = (uint32_t)(from_len_bits / huffman->min_depth);
 	WT_ERR(__wt_scr_alloc(session, max_len, &tmp));
 	to = tmp->mem;
 
