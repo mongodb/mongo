@@ -256,8 +256,9 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 static int
 __wt_bulk_row_page(CURSOR_BULK *cbulk)
 {
-	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
+	WT_REF *parent_ref;
+	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
@@ -277,6 +278,11 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	    WT_INSERT_KEY_SIZE(cbulk->ins_base),
 	    (WT_IKEY **)&cbulk->rref[cbulk->ref_next].key));
 
+	/* Make sure reconciliation doesn't free up random disk space. */
+	parent_ref = &cbulk->rref[cbulk->ref_next].ref;
+	parent_ref->addr = WT_ADDR_INVALID;
+	parent_ref->size = 0;
+
 	/*
 	 * Allocate a page.  Bulk load pages are skeleton pages: there's no
 	 * underlying WT_PAGE_DISK image and each K/V pair is represented by
@@ -284,7 +290,7 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->parent = NULL;
-	page->parent_ref = &cbulk->rref[cbulk->ref_next].ref;
+	page->parent_ref = parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = 0;
 	page->u.bulk.ins = cbulk->ins_base;
@@ -309,8 +315,9 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 static int
 __wt_bulk_col_page(CURSOR_BULK *cbulk)
 {
-	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
+	WT_REF *parent_ref;
+	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
@@ -326,6 +333,11 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 	}
 	cbulk->cref[cbulk->ref_next].recno = cbulk->recno;
 
+	/* Make sure reconciliation doesn't free up random disk space. */
+	parent_ref = &cbulk->cref[cbulk->ref_next].ref;
+	parent_ref->addr = WT_ADDR_INVALID;
+	parent_ref->size = 0;
+
 	/*
 	 * Allocate a page.  Bulk load pages are skeleton pages: there's no
 	 * underlying WT_PAGE_DISK image and each V object is represented by
@@ -333,7 +345,7 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->parent = NULL;
-	page->parent_ref = &cbulk->cref[cbulk->ref_next].ref;
+	page->parent_ref = parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = cbulk->recno;
 	page->u.bulk.upd = cbulk->upd_base;
