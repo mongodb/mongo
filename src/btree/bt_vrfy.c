@@ -139,10 +139,7 @@ err:		if (ret == 0)
  */
 static int
 __wt_verify_tree(
-	WT_SESSION_IMPL *session,		/* Thread of control */
-	WT_REF *ref,			/* Page to verify */
-	uint64_t parent_recno,		/* First record in this subtree */
-	WT_VSTUFF *vs)			/* The verify package */
+    WT_SESSION_IMPL *session, WT_REF *ref, uint64_t parent_recno, WT_VSTUFF *vs)
 {
 	WT_COL *cip;
 	WT_COL_REF *cref;
@@ -512,8 +509,17 @@ __wt_verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 	btree = session->btree;
 	ret = 0;
 
-	TAILQ_FOREACH(fe, &btree->freeqa, qa)
+	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
+		if (WT_ADDR_TO_OFF(btree, fe->addr) +
+		    fe->size > btree->fh->file_size) {
+			__wt_errx(session,
+			    "free-list entry addr %" PRIu32 "references "
+			    "non-existent file pages",
+			    fe->addr);
+			return (WT_ERROR);
+		}
 		WT_TRET(__wt_verify_addfrag(session, fe->addr, fe->size, vs));
+	}
 
 	return (ret);
 }
