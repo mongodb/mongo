@@ -578,10 +578,10 @@ namespace mongo {
             return false;
         }
 
-        if( _so_timeout == 0 ){
-            printStackTrace();
-            log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
-        }
+        // if( _so_timeout == 0 ){
+        //    printStackTrace();
+        //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
+        // }
         if ( !p->connect(*server) ) {
             stringstream ss;
             ss << "couldn't connect to server " << _serverString;
