@@ -479,6 +479,15 @@ namespace mongo {
         }
 
         /**
+         * Insert doc into the inc collection, taking proper lock
+         */
+        void State::insertToInc( BSONObj& o ) {
+            writelock l(_config.incLong);
+            Client::Context ctx(_config.incLong);
+            _insertToInc(o);
+        }
+
+        /**
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
@@ -1174,18 +1183,24 @@ namespace mongo {
                             continue;
                         }
 
-
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
+                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                        if (state.isOnDisk())
+                            state.insertToInc(res);
+                        else
+                            state.emit(res);
                         values.clear();
                         values.push_back( t );
                     }
 
-                    if ( values.size() )
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
+                    if ( values.size() ) {
+                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get() );
+                        if (state.isOnDisk())
+                            state.insertToInc(res);
+                        else
+                            state.emit(res);
+                    }
                 }
 
-
-                state.dumpToInc();
                 long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
 
