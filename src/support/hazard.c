@@ -186,6 +186,6 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    "(%p: %s, line %d)",
 			    hp->page, hp->file, hp->line);
 			WT_ASSERT(session, hp->page != page);
-	}
+		}
 }
 #endif
