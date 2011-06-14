@@ -34,6 +34,18 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	btree->allocsize = (uint32_t)cval.val;
 
 	desc = (WT_BTREE_DESC *)buf;
+	if (desc->magic != WT_BTREE_MAGIC) {
+		__wt_errx(session, "file is not a WiredTiger Btree file");
+		return (WT_ERROR);
+	}
+	if (desc->majorv > WT_BTREE_MAJOR_VERSION ||
+	    (desc->majorv == WT_BTREE_MAJOR_VERSION &&
+	    desc->minorv > WT_BTREE_MINOR_VERSION)) {
+		__wt_errx(session,
+		    "file is an unsupported version of a WiredTiger "
+		    "Btree file");
+		return (WT_ERROR);
+	}
 	if (desc->root_addr != WT_ADDR_INVALID &&
 	    WT_ADDR_TO_OFF(btree, desc->root_addr) +
 	    desc->root_size > btree->fh->file_size)
