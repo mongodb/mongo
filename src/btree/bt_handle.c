@@ -17,8 +17,7 @@ static int __btree_type(WT_SESSION_IMPL *);
  *	Create a Btree.
  */
 int
-__wt_btree_create(
-    WT_SESSION_IMPL *session, const char *name, const char *config)
+__wt_btree_create(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_FH *fh;
 	int ret;
@@ -36,7 +35,7 @@ __wt_btree_create(
 	WT_RET(__wt_open(session, name, 0666, 1, &fh));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_write(session, config, fh);
+	ret = __wt_desc_write(session, fh);
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
@@ -47,9 +46,14 @@ __wt_btree_create(
 /*
  * __wt_btree_open --
  *	Open a Btree.
+ *
+ *	Note that the config string must point to allocated memory: it will
+ *	be stored in the returned btree handle and freed when the handle is
+ *	closed.
  */
 int
-__wt_btree_open(WT_SESSION_IMPL *session, const char *name, uint32_t flags)
+__wt_btree_open(WT_SESSION_IMPL *session,
+    const char *name, const char *config, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_BTREE *btree;
@@ -63,6 +67,9 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *name, uint32_t flags)
 	btree->flags = flags;
 	btree->conn = conn;
 	session->btree = btree;
+
+	/* Use the config string: it will be freed when the btree handle. */
+	btree->config = config;
 
 	/* Initialize the WT_BTREE structure. */
 	WT_RET(__btree_init(session, name));

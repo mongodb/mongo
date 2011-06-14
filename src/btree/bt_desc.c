@@ -17,7 +17,7 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	WT_CONFIG_ITEM cval;
-	uint8_t *p, *ep, buf[512];
+	uint8_t buf[512];
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -27,35 +27,6 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 
 	/* Read the first sector. */
 	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
-
-	/*
-	 * Verify there's a string, and that it's nul-terminated.
-	 *
-	 * XXX
-	 * Should we do basic checks here, only printable characters?
-	 *
-	 * XXX
-	 * Should we call a schema-layer validate function to prove it's
-	 * correctly formed?
-	 *
-	 * XXX
-	 * For verification we should compare the configuration string with
-	 * whatever is the backup configuration string, wherever it happens
-	 * to be?
-	 */
-	for (p = buf + sizeof(WT_BTREE_DESC), ep = buf + sizeof(buf);; ++p) {
-		if (p == ep) {
-			__wt_errx(session,
-			    "no configuration string found in the file");
-			return (WT_ERROR);
-		}
-		if (*p == '\0')
-			break;
-	}
-
-	/* Copy the file's configuration string. */
-	WT_RET(__wt_strdup(
-	    session, (char *)(buf + sizeof(WT_BTREE_DESC)), &btree->config));
 
 	/* Get the allocation size, we need it to validate the addresses. */
 	WT_RET(__wt_config_getones(session,
@@ -71,18 +42,13 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	btree->root_page.size = desc->root_size;
 	if (desc->free_addr != WT_ADDR_INVALID &&
 	    WT_ADDR_TO_OFF(btree, desc->free_addr) +
-	    desc->free_size > btree->fh->file_size)
-		goto eof;
-	btree->free_addr = desc->free_addr;
-	btree->free_size = desc->free_size;
-	if (desc->config_addr != WT_ADDR_INVALID &&
-	    WT_ADDR_TO_OFF(btree, desc->config_addr) +
-	    desc->config_size > btree->fh->file_size) {
+	    desc->free_size > btree->fh->file_size) {
 eof:		__wt_errx(session,
-		    "file root, free or configuration addresses reference "
-		    "non-existent file pages");
+		    "root or free addresses reference non-existent pages");
 		return (WT_ERROR);
 	}
+	btree->free_addr = desc->free_addr;
+	btree->free_size = desc->free_size;
 
 	btree->lsn = desc->lsn;
 
@@ -94,7 +60,7 @@ eof:		__wt_errx(session,
  *	Write the file's descriptor structure.
  */
 int
-__wt_desc_write(WT_SESSION_IMPL *session, const char *config, WT_FH *fh)
+__wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BTREE_DESC *desc;
 	uint8_t buf[512];
@@ -108,9 +74,6 @@ __wt_desc_write(WT_SESSION_IMPL *session, const char *config, WT_FH *fh)
 
 	desc->root_addr = WT_ADDR_INVALID;
 	desc->free_addr = WT_ADDR_INVALID;
-	desc->config_addr = WT_ADDR_INVALID;
-
-	strcpy((char *)(buf + sizeof(WT_BTREE_DESC)), config);
 
 	return (__wt_write(session, fh, (off_t)0, 512, buf));
 }
@@ -144,5 +107,5 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 	desc->lsn = btree->lsn;
 
 	/* Write the first sector. */
-	return (__wt_write(session, btree->fh, (off_t)0, 512, buf));
+	return (__wt_write(session, btree->fh, (off_t)0, sizeof(buf), buf));
 }

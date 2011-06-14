@@ -134,6 +134,7 @@ boolean
 breakpoint
 bsearch
 bt
+btconf
 btcur
 btree
 buf

@@ -221,6 +221,7 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	int bulk, dump, printable, raw, ret;
 	size_t csize;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
+	const char *tableconf;
 
 	conn = S2C(session);
 
@@ -232,7 +233,8 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
 
-		WT_RET(__wt_btree_open(session, tablename, 0));
+		WT_RET(__wt_btconf_read(session, tablename, &tableconf));
+		WT_RET(__wt_btree_open(session, tablename, tableconf, 0));
 
 		WT_RET(__wt_session_add_btree(session, &btree_session));
 	} else {

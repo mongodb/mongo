@@ -37,7 +37,7 @@ __wt_read(WT_SESSION_IMPL *session,
  */
 int
 __wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+    WT_FH *fh, off_t offset, uint32_t bytes, const void *buf)
 {
 	WT_STAT_INCR(fh->stats, write_io);
 	WT_STAT_INCR(S2C(session)->stats, total_write_io);

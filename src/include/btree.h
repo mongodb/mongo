@@ -77,22 +77,14 @@ struct __wt_btree_desc {
 	uint16_t minorv;		/* 06-07: Minor version */
 
 	/*
-	 * We store three page addr/size pairs: the root page for the tree, the
-	 * free-list and the configuration string.  The configuration string is
-	 * normally stored after this structure in the first sector of the file,
-	 * but if it's too large to fit, it gets its own chunk.
-	 *
-	 * XXX
-	 * Not currently implemented...
+	 * We store two page addr/size pairs: the root page for the tree and
+	 * the free-list.
 	 */
-	uint32_t root_addr;		/* 36-39: Root page address */
-	uint32_t root_size;		/* 40-43: Root page length */
+	uint32_t root_addr;		/* 08-11: Root page address */
+	uint32_t root_size;		/* 12-15: Root page length */
 
-	uint32_t free_addr;		/* 44-47: Free list page address */
-	uint32_t free_size;		/* 48-51: Free list page length */
-
-	uint32_t config_addr;		/* 52-55: Free list page address */
-	uint32_t config_size;		/* 56-59: Free list page length */
+	uint32_t free_addr;		/* 16-19: Free list page address */
+	uint32_t free_size;		/* 20-23: Free list page length */
 
 	/*
 	 * We maintain page LSN's for the file in the non-transactional case
@@ -102,13 +94,13 @@ struct __wt_btree_desc {
 	 * has to be semi-permanent, which means we include it in the file's
 	 * metadata.
 	 */
-	uint64_t lsn;			/* 60-67: Non-transactional page LSN */
+	uint64_t lsn;			/* 24-32: Non-transactional page LSN */
 };
 /*
  * WT_BTREE_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_BTREE_DESC_SIZE		40
+#define	WT_BTREE_DESC_SIZE		32
 
 /* The file's description is written into the first 512B of the file. */
 #define	WT_BTREE_DESCRIPTION_SIZE	(512)

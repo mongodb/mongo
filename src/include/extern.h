@@ -146,6 +146,12 @@ extern int __wt_cell_copy(WT_SESSION_IMPL *session,
 extern int __wt_bt_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
+extern int __wt_btconf_read( WT_SESSION_IMPL *session,
+    const char *name,
+    const char **configp);
+extern int __wt_btconf_write( WT_SESSION_IMPL *session,
+    const char *name,
+    const char *config);
 extern int __wt_btcur_first(CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(CURSOR_BTREE *cbt);
@@ -183,9 +189,7 @@ extern void __wt_debug_pair(const char *tag,
     uint32_t size,
     FILE *fp);
 extern int __wt_desc_read(WT_SESSION_IMPL *session);
-extern int __wt_desc_write(WT_SESSION_IMPL *session,
-    const char *config,
-    WT_FH *fh);
+extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern void __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_btree_dump(WT_SESSION_IMPL *session,
@@ -198,11 +202,10 @@ extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
 extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
-extern int __wt_btree_create( WT_SESSION_IMPL *session,
-    const char *name,
-    const char *config);
+extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
+    const char *config,
     uint32_t flags);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
@@ -386,7 +389,7 @@ extern int __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
     uint32_t bytes,
-    void *buf);
+    const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
 extern int __wt_thread_create(pthread_t *tidret,
     void *(*func)(void *),

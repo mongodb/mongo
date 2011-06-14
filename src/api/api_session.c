@@ -110,10 +110,11 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 	WT_CONFIG_ITEM cval;
-	const char *collapse, *key_format, *value_format;
+	const char *treeconf, *key_format, *value_format;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
+	treeconf = NULL;
 
 	SESSION_API_CALL(session, create, config, cfg);
 
@@ -155,18 +156,18 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	/*
-	 * XXX
-	 * If the file doesn't exist, create it -- creation places a collapsed
-	 * copy of the configuration information into the file.
+	 * If the file doesn't exist, create it, and a ".conf" file to hold
+	 * the configuration information.
 	 */
 	if (!__wt_exist(name)) {
-		WT_RET(__wt_config_collapse(session, cfg, &collapse));
-		WT_RET(__wt_btree_create(session, name, collapse));
-		__wt_free(session, collapse);
-	}
+		WT_RET(__wt_btree_create(session, name));
+		WT_RET(__wt_config_collapse(session, cfg, &treeconf));
+		WT_RET(__wt_btconf_write(session, name, treeconf));
+	} else
+		WT_RET(__wt_btconf_read(session, name, &treeconf));
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_RET(__wt_btree_open(session, name, 0));
+	WT_RET(__wt_btree_open(session, name, treeconf, 0));
 	WT_RET(__wt_session_add_btree(session, NULL));
 
 	API_END();
@@ -229,6 +230,7 @@ static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
+	const char *treeconf;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -251,7 +253,8 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 * it skips loading metadata such as the free list, which could be
 	 * corrupted.
 	 */
-	WT_RET(__wt_btree_open(session, name,
+	WT_RET(__wt_btconf_read(session, name, &treeconf));
+	WT_RET(__wt_btree_open(session, name, treeconf,
 	    WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_salvage(session, config));
@@ -326,6 +329,7 @@ static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
+	const char *treeconf;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -351,7 +355,8 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_RET(__wt_btree_open(session, name,
+	WT_RET(__wt_btconf_read(session, name, &treeconf));
+	WT_RET(__wt_btree_open(session, name, treeconf,
 	    WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, NULL, config));
