@@ -178,7 +178,14 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
 		for (hp = session->hazard;
-		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
+		    hp < session->hazard + S2C(session)->hazard_size; ++hp) {
+			if (hp->page != page)
+				continue;
+			__wt_errx(session,
+			    "discarded page has hazard reference: "
+			    "(%p: %s, line %d)",
+			    hp->page, hp->file, hp->line);
 			WT_ASSERT(session, hp->page != page);
+	}
 }
 #endif
