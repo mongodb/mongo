@@ -66,8 +66,8 @@ util_dump(int argc, char *argv[])
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump=%s%s",
-	    printable ? "print" : "raw", debug ? ",debug" : "");
+	snprintf(cursor_config, sizeof(cursor_config), "dump%s%s",
+	    printable ? ",printable" : ",raw", debug ? ",debug" : "");
 
 	if ((ret = session->open_cursor(
 	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
