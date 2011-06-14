@@ -605,7 +605,6 @@ int main(int argc, char* argv[]) {
 
     replication_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("autoresync", "automatically resync if slave data is stale")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
     ;
 
@@ -615,6 +614,7 @@ int main(int argc, char* argv[]) {
     ("source", po::value<string>(), "when slave: specify master as <server:port>")
     ("only", po::value<string>(), "when slave: specify a single database to replicate")
     ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
+    ("autoresync", "automatically resync if slave data is stale")
     ;
 
     rs_options.add_options()
@@ -821,6 +821,11 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
+            if( params.count("replSet") ) {
+                out() << "--autoresync is not used with --replSet" << endl;
+                out() << "see http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
