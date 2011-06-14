@@ -33,6 +33,15 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	    btree->config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
 
+	/*
+	 * We fail the open if the magic number is wrong or the major/minor
+	 * numbers are unsupported for this version.  This test is done even
+	 * if the caller is verifying or salvaging the file: it makes sense
+	 * for verify, and for salvage we don't overwrite files without some
+	 * reason to believe they are WiredTiger files.  The user may have
+	 * entered the wrong file name, and are now frantically pounding on
+	 * their interrupt key.
+	 */
 	desc = (WT_BTREE_DESC *)buf;
 	if (desc->magic != WT_BTREE_MAGIC) {
 		__wt_errx(session, "file is not a WiredTiger Btree file");
