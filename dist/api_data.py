@@ -240,7 +240,7 @@ flags = {
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],
-	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED' ],
+	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],
 	'verbose' : [
 		'VERB_EVICT',
 		'VERB_FILEOPS',
