@@ -11,6 +11,11 @@
 #include <string.h>
 #include <unistd.h>
 
+/*
+ * Quiet compiler warnings about unused parameters.
+ */
+#define	WT_UNUSED(var)	(void)(var)
+
 int util_dump(int, char *[]);
 int util_load(int, char *[]);
 int util_printlog(int, char *[]);

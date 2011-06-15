@@ -5,7 +5,7 @@
  *	All rights reserved.
  */
 
-#include "wt_internal.h"
+#include "wiredtiger.h"
 #include "util.h"
 
 static int usage(void);

@@ -5,7 +5,8 @@
  *	All rights reserved.
  */
 
-#include "wt_internal.h"
+#include "wiredtiger.h"
+#include "util.h"
 
 /*
  * __handle_error_verbose --
