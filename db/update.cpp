@@ -962,6 +962,7 @@ namespace mongo {
                                     NamespaceDetailsTransient *nsdt,
                                     bool god, const char *ns,
                                     const BSONObj& updateobj, BSONObj patternOrig, bool logop, OpDebug& debug) {
+
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
@@ -972,8 +973,30 @@ namespace mongo {
                 return UpdateResult(0, 0, 0);
             }
         }
-
         Record *r = loc.rec();
+
+        if ( ! r->likelyInPhysicalMemory() ) {
+            {
+                auto_ptr<RWLockRecursive::Shared> lk( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+                dbtemprelease t;
+                r->touch();
+                lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
+            }
+            
+            {
+                // we need to re-find in case something changed
+                
+                IndexDetails& i = d->idx(idIdxNo);
+                BSONObj key = i.getKeyFromQuery( patternOrig );            
+                loc = i.idxInterface().findSingle(i, i.head, key);
+                if( loc.isNull() ) {
+                    // no upsert support in _updateById yet, so we are done.
+                    return UpdateResult(0, 0, 0);
+                }
+                
+                r = loc.rec();
+            }
+        }
 
         /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
            regular ones at the moment. */
@@ -1074,6 +1097,21 @@ namespace mongo {
                 nscanned++;
 
                 bool atomic = c->matcher()->docMatcher().atomic();
+                
+                // *****************
+                if ( cc.get() == 0 ) {
+                    shared_ptr< Cursor > cPtr = c;
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                }
+
+                if ( ! cc->yield() ) {
+                    cc.release();
+                    break;
+                }
+                if ( !c->ok() ) {
+                    break;
+                }
+                // *****************
 
                 // May have already matched in UpdateOp, but do again to get details set correctly
                 if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
