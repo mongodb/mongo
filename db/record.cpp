@@ -5,12 +5,6 @@
 #include "../util/processinfo.h"
 #include "../util/message.h"
 
-#define _BACKWARD_BACKWARD_WARNING_H 1
-
-#include <hash_map>
-using namespace __gnu_cxx;
-
-
 namespace mongo {
     
     namespace ps {
