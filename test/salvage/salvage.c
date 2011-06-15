@@ -33,6 +33,7 @@ void process(void);
 void run(int);
 void slvg_close(WT_CONNECTION *);
 void slvg_open(const char *, WT_SESSION **, WT_CONNECTION **);
+int  usage(void);
 
 #define	OP_APPEND	1
 #define	OP_FIRST	2
@@ -41,29 +42,75 @@ FILE *res_fp;					/* Results file */
 
 u_int page_type;				/* Types of records */
 
+const char *progname;				/* Program name */
+
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int r;
+	int ch, r;
 
-	page_type = WT_PAGE_COL_FIX;
-	for (r = 1; r <= 21; ++r)
-		run(r);
+	if ((progname = strrchr(argv[0], '/')) == NULL)
+		progname = argv[0];
+	else
+		++progname;
 
-	page_type = WT_PAGE_COL_RLE;
-	for (r = 1; r <= 21; ++r)
-		run(r);
+	r = 0;
+	while ((ch = getopt(argc, argv, "r:t:")) != EOF)
+		switch (ch) {
+		case 'r':
+			r = atoi(optarg);
+			if (r == 0)
+				return (usage());
+			break;
+		case 't':
+			if (strcmp(optarg, "fix") == 0)
+				page_type = WT_PAGE_COL_FIX;
+			else if (strcmp(optarg, "rle") == 0)
+				page_type = WT_PAGE_COL_RLE;
+			else if (strcmp(optarg, "var") == 0)
+				page_type = WT_PAGE_COL_VAR;
+			else if (strcmp(optarg, "row") == 0)
+				page_type = WT_PAGE_ROW_LEAF;
+			else
+				return (usage());
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
 
-	page_type = WT_PAGE_COL_VAR;
-	for (r = 1; r <= 21; ++r)
-		run(r);
+	printf("salvage test run started\n");
+	if (r == 0) {
+		page_type = WT_PAGE_COL_FIX;
+		for (r = 1; r <= 21; ++r)
+			run(r);
 
-	page_type = WT_PAGE_ROW_LEAF;
-	for (r = 1; r <= 21; ++r)
-		run(r);
+		page_type = WT_PAGE_COL_RLE;
+		for (r = 1; r <= 21; ++r)
+			run(r);
+
+		page_type = WT_PAGE_COL_VAR;
+		for (r = 1; r <= 21; ++r)
+			run(r);
+
+		page_type = WT_PAGE_ROW_LEAF;
+		for (r = 1; r <= 21; ++r)
+			run(r);
+	} else
+		run (r);
 
 	printf("salvage test run completed\n");
 	return (EXIT_SUCCESS);
+}
+
+int
+usage(void)
+{
+	(void)fprintf(stderr,
+	    "usage: %s [-r run] [-t fix|rle|var|row]\n", progname);
+	return (EXIT_FAILURE);
 }
 
 void
@@ -71,7 +118,7 @@ run(int r)
 {
 	char buf[128];
 
-	printf("%s: run %d\n", __wt_page_type_string(page_type), r);
+	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
 	(void)remove(SLVG);
 
