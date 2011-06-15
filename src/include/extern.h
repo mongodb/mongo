@@ -56,6 +56,8 @@ extern int __wt_config_check(WT_SESSION_IMPL *session,
 extern int __wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
+extern const char *__wt_confdfl_btree_file;
+extern const char *__wt_confchk_btree_file;
 extern const char *__wt_confdfl_connection_add_collator;
 extern const char *__wt_confchk_connection_add_collator;
 extern const char *__wt_confdfl_connection_add_compressor;

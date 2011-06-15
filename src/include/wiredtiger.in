@@ -491,27 +491,42 @@ struct wt_session {
 	 * @param name the uri of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
-	 * @config{btree_huffman_key, use Huffman encoding for Btree keys.
+	 * @config{huffman_key, use Huffman encoding for Btree keys.  Permitted
+	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
+	 * huffman for more details.}
+	 * @config{huffman_value, use Huffman encoding for Btree values.
 	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
 	 * See @ref huffman for more details.}
-	 * @config{btree_huffman_value, use Huffman encoding for Btree values.
-	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
-	 * See @ref huffman for more details.}
-	 * @config{btree_key_gap, configure the maximum gap between instantiated
-	 * keys in a Btree leaf page\, constraining the number of keys processed
-	 * to instantiate a random Btree leaf page key}
-	 * @config{btree_internal_key_truncate, configure the Btree for
-	 * truncation of internal keys\, discarding unnecessary trailing bytes
-	 * on internal keys}
-	 * @config{btree_prefix_compression, configure the Btree for prefix
+	 * @config{internal_key_truncate, configure the Btree for truncation of
+	 * internal keys\, discarding unnecessary trailing bytes on internal
+	 * keys}
+	 * @config{internal_node_max, maximum page size for internal nodes\, in
+	 * bytes}
+	 * @config{internal_node_min, minimum page size for internal nodes\, in
+	 * bytes}
+	 * @config{key_format, the format of the data packed into key items.
+	 * See @ref packing for details.  If not set\, a default value of \c "u"
+	 * is assumed\, and applications use the WT_ITEM struct to manipulate
+	 * raw byte arrays}
+	 * @config{key_gap, configure the maximum gap between instantiated keys
+	 * in a Btree leaf page\, constraining the number of keys processed to
+	 * instantiate a random Btree leaf page key}
+	 * @config{leaf_node_max, maximum page size for leaf nodes\, in bytes}
+	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes}
+	 * @config{prefix_compression, configure the Btree for prefix
 	 * compression\, storing keys as a count of bytes matching the previous
 	 * key plus a unique suffix}
-	 * @config{btree_split_min, configure minimal splits in Btree
-	 * reconciliation code (debugging only)}
-	 * @config{btree_split_pct, configure the Btree page split size as a
+	 * @config{runlength_encoding, compress repeated adjacent values}
+	 * @config{split_min, configure minimal splits in Btree reconciliation
+	 * code (debugging only)}
+	 * @config{split_pct, configure the Btree page split size as a
 	 * percentage of the maximum Btree page size\, that is\, when a Btree
 	 * page is split\, it will be split into smaller pages\, where each page
 	 * is the specified percentage of the maximum Btree page size}
+	 * @config{value_format, the format of the data packed into value items.
+	 * See @ref packing for details.  If not set\, a default value of \c "u"
+	 * is assumed\, and applications use the WT_ITEM struct to manipulate
+	 * raw byte arrays}
 	 * @config{colgroup.\<name\>, named group of columns to store together.
 	 * Comma-separated list of the form <code>(column[\,...])</code>.  Each
 	 * column group is stored separately\, keyed by the primary key of the
@@ -525,21 +540,6 @@ struct wt_session {
 	 * verifies that the table exists and has the specified schema}
 	 * @config{index.\<name\>, named index on a list of columns.  Comma-
 	 * separated list of the form <code>(column[\,...])</code>}
-	 * @config{intl_node_max, maximum page size for internal nodes\, in
-	 * bytes}
-	 * @config{intl_node_min, minimum page size for internal nodes\, in
-	 * bytes}
-	 * @config{key_format, the format of the data packed into key items.
-	 * See @ref packing for details.  If not set\, a default value of \c "u"
-	 * is assumed\, and applications use the WT_ITEM struct to manipulate
-	 * raw byte arrays}
-	 * @config{leaf_node_max, maximum page size for leaf nodes\, in bytes}
-	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes}
-	 * @config{runlength_encoding, compress repeated adjacent values}
-	 * @config{value_format, the format of the data packed into value items.
-	 * See @ref packing for details.  If not set\, a default value of \c "u"
-	 * is assumed\, and applications use the WT_ITEM struct to manipulate
-	 * raw byte arrays}
 	 * @configend
 	 * @errors
 	 */

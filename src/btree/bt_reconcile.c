@@ -438,23 +438,23 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 
 		/* Configuration. */
 		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "btree_split_min", &cval));
+		    session->btree->config, "split_min", &cval));
 		if (cval.val != 0)
 			r->btree_split_min = 1;
 
 		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "btree_split_pct", &cval));
+		    session->btree->config, "split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
 
 		WT_RET(__wt_config_getones(session,
 		    session->btree->config,
-		    "btree_internal_key_truncate", &cval));
-		r->key_sfx_compress_conf = cval.val == 0 ? 0 : 1;
+		    "internal_key_truncate", &cval));
+		r->key_sfx_compress_conf = (cval.val != 0);
 
 		WT_RET(__wt_config_getones(session,
 		    session->btree->config,
-		    "btree_prefix_compression", &cval));
-		r->key_pfx_compress_conf = cval.val == 0 ? 0 : 1;
+		    "prefix_compression", &cval));
+		r->key_pfx_compress_conf = (cval.val != 0);
 	}
 
 	r->evict = LF_ISSET(WT_REC_EVICT);

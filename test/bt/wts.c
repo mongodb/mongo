@@ -98,9 +98,9 @@ wts_startup(void)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
-	    "intl_node_min=%d,intl_node_max=%d,"
+	    "internal_node_min=%d,internal_node_max=%d,"
 	    "leaf_node_min=%d,leaf_node_max=%d,"
-	    "btree_split_min",
+	    "split_min",
 	    (g.c_file_type == ROW) ? "u" : "r",
 	    1U << g.c_intl_node_min,
 	    1U << g.c_intl_node_max,
@@ -124,12 +124,12 @@ wts_startup(void)
 	case ROW:
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
-			    ",btree_huffman_key=english");
+			    ",huffman_key=english");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
 			p += snprintf(p, (size_t)(end - p),
-			    ",btree_huffman_value=english");
+			    ",huffman_value=english");
 		break;
 	}
 

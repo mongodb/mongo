@@ -253,8 +253,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 	WT_RET(__wt_btree_huffman_open(session));
 
 	/* Set the key gap for prefix compression. */
-	WT_RET(__wt_config_getones(session,
-	    btree->config, "btree_key_gap", &cval));
+	WT_RET(__wt_config_getones(session, btree->config, "key_gap", &cval));
 	btree->key_gap = (uint32_t)cval.val;
 
 	return (0);
@@ -321,9 +320,11 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_config_getones(session, config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(session, config, "intl_node_max", &cval));
+	WT_RET(__wt_config_getones(session, config,
+	    "internal_node_max", &cval));
 	btree->intlmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(session, config, "intl_node_min", &cval));
+	WT_RET(__wt_config_getones(session, config,
+	    "internal_node_min", &cval));
 	btree->intlmin = (uint32_t)cval.val;
 	WT_RET(__wt_config_getones(session, config, "leaf_node_max", &cval));
 	btree->leafmax = (uint32_t)cval.val;

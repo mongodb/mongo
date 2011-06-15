@@ -21,38 +21,70 @@ class Config:
 		self.desc = desc
 		self.flags = flags
 
+btree_config = [
+	Config('allocation_size', '512B', r'''
+		file unit allocation size, in bytes''', min='512B', max='128MB'),
+	Config('huffman_key', '', r'''
+		use Huffman encoding for Btree keys.  Permitted values are empty (off),
+		\c "english" or \c "<filename>".  See @ref huffman for more
+		details.'''),
+	Config('huffman_value', '', r'''
+		use Huffman encoding for Btree values.  Permitted values are empty
+		(off), \c "english" or \c "<filename>".  See @ref huffman for more
+		details.'''),
+	Config('internal_key_truncate', 'true', r'''
+		configure the Btree for truncation of internal keys, discarding
+		unnecessary trailing bytes on internal keys''', type='boolean'),
+	Config('internal_node_max', '2KB', r'''
+		maximum page size for internal nodes, in bytes''', min='512B',
+		max='512MB'),
+	Config('internal_node_min', '2KB', r'''
+		minimum page size for internal nodes, in bytes''', min='512B',
+		max='512MB'),
+	Config('key_format', 'u', r'''
+		the format of the data packed into key items.  See @ref packing for
+		details.  If not set, a default value of \c "u" is assumed, and
+		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		type='format'),
+	Config('key_gap', '10', r'''
+		configure the maximum gap between instantiated keys in a Btree leaf
+		page, constraining the number of keys processed to instantiate a random
+		Btree leaf page key''', min='0'),
+	Config('leaf_node_max', '1MB', r'''
+		maximum page size for leaf nodes, in bytes''',
+		min='512B', max='512MB'),
+	Config('leaf_node_min', '32KB', r'''
+		minimum page size for leaf nodes, in bytes''',
+		min='512B', max='512MB'),
+	Config('prefix_compression', 'true', r'''
+		configure the Btree for prefix compression, storing keys as a count of
+		bytes matching the previous key plus a unique suffix''',
+		type='boolean'),
+	Config('runlength_encoding', 'false', r'''
+		compress repeated adjacent values''', type='boolean'),
+	Config('split_min', 'false', r'''
+		configure minimal splits in Btree reconciliation code (debugging
+		only)''', type='boolean'),
+	Config('split_pct', '75', r'''
+		configure the Btree page split size as a percentage of the maximum
+		Btree page size, that is, when a Btree page is split, it will be split
+		into smaller pages, where each page is the specified percentage of the
+		maximum Btree page size''', min='0', max='100'),
+	Config('value_format', 'u', r'''
+		the format of the data packed into value items.  See @ref packing for
+		details.  If not set, a default value of \c "u" is assumed, and
+		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		type='format'),
+]
+
 methods = {
+'btree.file' : Method(btree_config),
+
 'cursor.close' : Method([]),
 
 'session.close' : Method([]),
 
-'session.create' : Method([
-	Config('allocation_size', '512B', r'''
-		file unit allocation size, in bytes''', min='512B', max='128MB'),
-	Config('btree_huffman_key', '', r'''
-		use Huffman encoding for Btree keys.  Permitted values are empty (off),
-		\c "english" or \c "<filename>".  See @ref huffman for more details.'''),
-	Config('btree_huffman_value', '', r'''
-		use Huffman encoding for Btree values.  Permitted values are empty (off),
-		\c "english" or \c "<filename>".  See @ref huffman for more details.'''),
-	Config('btree_key_gap', '10', r'''
-		configure the maximum gap between instantiated keys in a Btree leaf page,
-		constraining the number of keys processed to instantiate a random Btree
-		leaf page key''', min='0'),
-	Config('btree_internal_key_truncate', 'true', r'''
-		configure the Btree for truncation of internal keys, discarding unnecessary
-		trailing bytes on internal keys''', type='boolean'),
-	Config('btree_prefix_compression', 'true', r'''
-		configure the Btree for prefix compression, storing keys as a count of
-		bytes matching the previous key plus a unique suffix''', type='boolean'),
-	Config('btree_split_min', 'false', r'''
-		configure minimal splits in Btree reconciliation code (debugging only)''',
-		type='boolean'),
-	Config('btree_split_pct', '75', r'''
-		configure the Btree page split size as a percentage of the maximum Btree
-		page size, that is, when a Btree page is split, it will be split into
-		smaller pages, where each page is the specified percentage of the maximum
-		Btree page size''', min='0', max='100'),
+'session.create' : Method(btree_config + [
 	Config('colgroup.name', '', r'''
 		named group of columns to store together.  Comma-separated list of
 		the form <code>(column[,...])</code>.  Each column group is stored
@@ -70,30 +102,6 @@ methods = {
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
 		<code>(column[,...])</code>'''),
-	Config('intl_node_max', '2KB', r'''
-		maximum page size for internal nodes, in bytes''',
-		min='512B', max='512MB'),
-	Config('intl_node_min', '2KB', r'''
-		minimum page size for internal nodes, in bytes''',
-		min='512B', max='512MB'),
-	Config('key_format', 'u', r'''
-		the format of the data packed into key items.  See @ref packing for
-		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
-		type='format'),
-	Config('leaf_node_max', '1MB', r'''
-		maximum page size for leaf nodes, in bytes''',
-		min='512B', max='512MB'),
-	Config('leaf_node_min', '32KB', r'''
-		minimum page size for leaf nodes, in bytes''',
-		min='512B', max='512MB'),
-	Config('runlength_encoding', 'false', r'''
-		compress repeated adjacent values''', type='boolean'),
-	Config('value_format', 'u', r'''
-		the format of the data packed into value items.  See @ref packing
-		for details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
-		type='format'),
 ]),
 
 'session.drop' : Method([
