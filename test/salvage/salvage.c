@@ -430,24 +430,23 @@ copy(u_int lsn, u_int recno)
 {
 	FILE *ifp, *ofp;
 	WT_PAGE_DISK *dsk;
-	int first;
 	char buf[PSIZE];
 
 	assert((ifp = fopen(LOAD, "r")) != NULL);
 
 	/*
 	 * If the file doesn't exist, then we're creating it: copy the .conf
-	 * file and the first sector (the file description).
+	 * file and the first sector (the file description).  Otherwise, we
+	 * are appending to an existing file.
 	 */
-	first = access(SLVG, F_OK) ? 1 : 0;
-	assert((ofp = fopen(SLVG, "a")) != NULL);
-	if (first) {
+	if (access(SLVG, F_OK)) {
 		assert(system("cp " LOAD ".conf " SLVG ".conf") == 0);
 
 		assert((ofp = fopen(SLVG, "w")) != NULL);
 		assert(fread(buf, 1, 512, ifp) == 512);
 		assert(fwrite(buf, 1, 512, ofp) == 512);
-	}
+	} else
+		assert((ofp = fopen(SLVG, "a")) != NULL);
 
 	/* Copy/update the first formatted page. */
 	assert(fseek(ifp, (long)512, SEEK_SET) == 0);
