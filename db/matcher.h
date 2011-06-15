@@ -32,13 +32,13 @@ namespace mongo {
 
     class RegexMatcher {
     public:
-        const char *fieldName;
-        const char *regex;
-        const char *flags;
-        string prefix;
-        shared_ptr< pcrecpp::RE > re;
-        bool isNot;
-        RegexMatcher() : isNot() {}
+        const char *_fieldName;
+        const char *_regex;
+        const char *_flags;
+        string _prefix;
+        shared_ptr< pcrecpp::RE > _re;
+        bool _isNot;
+        RegexMatcher() : _isNot() {}
     };
 
     struct element_lt {
@@ -57,27 +57,27 @@ namespace mongo {
         ElementMatcher() {
         }
 
-        ElementMatcher( BSONElement _e , int _op, bool _isNot );
+        ElementMatcher( BSONElement e , int op, bool isNot );
 
-        ElementMatcher( BSONElement _e , int _op , const BSONObj& array, bool _isNot );
+        ElementMatcher( BSONElement e , int op , const BSONObj& array, bool isNot );
 
         ~ElementMatcher() { }
 
-        BSONElement toMatch;
-        int compareOp;
-        bool isNot;
-        shared_ptr< set<BSONElement,element_lt> > myset;
-        shared_ptr< vector<RegexMatcher> > myregex;
+        BSONElement _toMatch;
+        int _compareOp;
+        bool _isNot;
+        shared_ptr< set<BSONElement,element_lt> > _myset;
+        shared_ptr< vector<RegexMatcher> > _myregex;
 
         // these are for specific operators
-        int mod;
-        int modm;
-        BSONType type;
+        int _mod;
+        int _modm;
+        BSONType _type;
 
-        shared_ptr<Matcher> subMatcher;
-        bool subMatcherOnPrimitives ;
+        shared_ptr<Matcher> _subMatcher;
+        bool _subMatcherOnPrimitives ;
 
-        vector< shared_ptr<Matcher> > allMatchers;
+        vector< shared_ptr<Matcher> > _allMatchers;
     };
 
     class Where; // used for $where javascript eval
@@ -89,19 +89,19 @@ namespace mongo {
         }
 
         void reset() {
-            loadedObject = false;
-            elemMatchKey = 0;
+            _loadedObject = false;
+            _elemMatchKey = 0;
         }
 
         string toString() const {
             stringstream ss;
-            ss << "loadedObject: " << loadedObject << " ";
-            ss << "elemMatchKey: " << ( elemMatchKey ? elemMatchKey : "NULL" ) << " ";
+            ss << "loadedObject: " << _loadedObject << " ";
+            ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey : "NULL" ) << " ";
             return ss.str();
         }
 
-        bool loadedObject;
-        const char * elemMatchKey; // warning, this may go out of scope if matched object does
+        bool _loadedObject;
+        const char * _elemMatchKey; // warning, this may go out of scope if matched object does
     };
 
     /* Match BSON objects against a query pattern.
@@ -145,7 +145,7 @@ namespace mongo {
         bool hasType( BSONObj::MatchType type ) const;
 
         string toString() const {
-            return jsobj.toString();
+            return _jsobj.toString();
         }
 
         void addOrDedupConstraint( const shared_ptr< FieldRangeVector > &frv ) {
@@ -171,7 +171,7 @@ namespace mongo {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
-            basics.push_back( ElementMatcher( e , c, isNot ) );
+            _basics.push_back( ElementMatcher( e , c, isNot ) );
         }
 
         void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
@@ -184,14 +184,14 @@ namespace mongo {
 
         void parseMatchExpressionElement( const BSONElement &e );
         
-        Where *where;                    // set if query uses $where
-        BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
-        BSONObj constrainIndexKey_;
-        vector<ElementMatcher> basics;
-        bool haveSize;
-        bool all;
-        bool hasArray;
-        bool haveNeg;
+        Where *_where;                    // set if query uses $where
+        BSONObj _jsobj;                  // the query pattern.  e.g., { name: "joe" }
+        BSONObj _constrainIndexKey;
+        vector<ElementMatcher> _basics;
+        bool _haveSize;
+        bool _all;
+        bool _hasArray;
+        bool _haveNeg;
 
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield -
@@ -200,8 +200,8 @@ namespace mongo {
         */
         bool _atomic;
 
-        RegexMatcher regexs[4];
-        int nRegex;
+        RegexMatcher _regexs[4];
+        int _nRegex;
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;

@@ -778,7 +778,7 @@ namespace mongo {
             _nscanned = _c->nscanned();
             if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
                 // not a match, continue onward
-                if ( _details.loadedObject )
+                if ( _details._loadedObject )
                     _nscannedObjects++;
             }
             else {
