@@ -679,11 +679,11 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            if (scope->exec("prompt", "", false, false, false)) {
-                prompt = scope->getString("prompt");
-             } else {
+            prompt = scope->getString("prompt");
+
+            if (prompt == "undefined") {
                 prompt = sayReplSetMemberState()+"> ";
-             }
+            }
             char * line = shellReadline( prompt.c_str() );
 
             if ( line ) {
