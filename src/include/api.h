@@ -319,8 +319,9 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUMP_PRINT					0x00000001
-#define	WT_REC_EVICT					0x00000002
-#define	WT_REC_LOCKED					0x00000001
+#define	WT_REC_EVICT					0x00000004
+#define	WT_REC_LOCKED					0x00000002
+#define	WT_REC_SALVAGE					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SESSION_INTERNAL				0x00000001
 #define	WT_VERB_EVICT					0x00000010
