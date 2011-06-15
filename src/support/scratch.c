@@ -245,12 +245,8 @@ err:	__wt_errx(session,
 void
 __wt_scr_release(WT_BUF **bufp)
 {
-	WT_BUF *buf;
-
-	buf = *bufp;
+	F_CLR(*bufp, WT_BUF_INUSE);
 	*bufp = NULL;
-
-	F_CLR(buf, WT_BUF_INUSE);
 }
 
 /*
@@ -260,14 +256,14 @@ __wt_scr_release(WT_BUF **bufp)
 void
 __wt_scr_free(WT_SESSION_IMPL *session)
 {
-	WT_BUF **p;
+	WT_BUF **bufp;
 	u_int i;
 
 	for (i = 0,
-	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
-		if (*p != NULL)
-			__wt_buf_free(session, *p);
-		__wt_free(session, *p);
+	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp) {
+		if (*bufp != NULL)
+			__wt_buf_free(session, *bufp);
+		__wt_free(session, *bufp);
 	}
 
 	__wt_free(session, session->scratch);
