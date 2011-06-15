@@ -633,7 +633,7 @@ doneCheckOrder:
                     if ( !prepareToYield() ) {
                         return;   
                     }
-                    ClientCursor::staticYield( micros , _plans._ns );
+                    ClientCursor::staticYield( micros , _plans._ns , 0 );
                     recoverFromYield();
                 }
             }
