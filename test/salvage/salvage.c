@@ -27,16 +27,13 @@
 #define	PSIZE	(2 * 1024)
 
 void build(int, int, int);
-void copy(int, int);
+void copy(u_int, u_int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
 void slvg_close(WT_CONNECTION *);
 void slvg_open(const char *, WT_SESSION **, WT_CONNECTION **);
 int  usage(void);
-
-#define	OP_APPEND	1
-#define	OP_FIRST	2
 
 FILE *res_fp;					/* Results file */
 
@@ -76,7 +73,7 @@ main(int argc, char *argv[])
 			break;
 		case '?':
 		default:
-			usage();
+			return (usage());
 		}
 	argc -= optind;
 	argv += optind;
@@ -429,7 +426,7 @@ build(int ikey, int ivalue, int cnt)
  *	Copy the created page to the end of the salvage file.
  */
 void
-copy(int lsn, int recno)
+copy(u_int lsn, u_int recno)
 {
 	FILE *ifp, *ofp;
 	WT_PAGE_DISK *dsk;
@@ -445,7 +442,7 @@ copy(int lsn, int recno)
 	first = access(SLVG, F_OK) ? 1 : 0;
 	assert((ofp = fopen(SLVG, "a")) != NULL);
 	if (first) {
-		system("cp " LOAD ".conf " SLVG ".conf");
+		assert(system("cp " LOAD ".conf " SLVG ".conf") == 0);
 
 		assert((ofp = fopen(SLVG, "w")) != NULL);
 		assert(fread(buf, 1, 512, ifp) == 512);
@@ -456,9 +453,9 @@ copy(int lsn, int recno)
 	assert(fseek(ifp, (long)512, SEEK_SET) == 0);
 	assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
 	dsk = (WT_PAGE_DISK *)buf;
-	dsk->lsn = (uint64_t)lsn;
+	dsk->lsn = lsn;
 	if (page_type != WT_PAGE_ROW_LEAF)
-		dsk->recno = (uint64_t)recno;
+		dsk->recno = recno;
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, PSIZE);
 	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
@@ -504,7 +501,7 @@ process(void)
 			fwrite(key.data, key.size, 1, fp);
 			fwrite("\n", 1, 1, fp);
 		}
-		cursor->get_value(cursor, &value);
+		assert(cursor->get_value(cursor, &value) == 0);
 		fwrite(value.data, value.size, 1, fp);
 		fwrite("\n", 1, 1, fp);
 	}
@@ -561,6 +558,8 @@ slvg_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
+	default:
+		assert(0);
 	}
 
 	snprintf(table, sizeof(table), "table:%s", name);
