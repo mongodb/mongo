@@ -419,14 +419,15 @@ __slvg_trk_leaf(
     WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell, *last_key_cell;
+	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint64_t stop_recno;
 	uint32_t i;
-	uint8_t *p;
 	int ret;
+	uint8_t *p;
 
 	btree = session->btree;
+	page = NULL;
 	ret = 0;
 
 	/* Re-allocate the array of pages, as necessary. */
@@ -470,28 +471,19 @@ __slvg_trk_leaf(
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
-		 * Row-store format: instantiate and copy the first and last
-		 * keys.  Additionally, row-store pages can contain overflow
-		 * items.
+		 * Row-store format: copy the first and last keys on the page.
+		 * Keys are prefix-compressed, the simplest and slowest thing
+		 * to do is instantiate the in-memory page, then instantiate
+		 * and copy the keys, then free the page.
+		 *
+		 * Additionally, row-store pages can contain overflow items.
 		 */
-		cell = WT_PAGE_DISK_BYTE(dsk);
-		WT_ASSERT(session, __wt_cell_prefix(cell) == 0);
-		WT_ERR(__wt_cell_copy(session, cell, &trk->u.row.range_start));
-		WT_CELL_FOREACH(dsk, cell, i)
-			switch (__wt_cell_type(cell)) {
-			case WT_CELL_KEY:
-			case WT_CELL_KEY_OVFL:
-				last_key_cell = cell;
-				break;
-			}
-		/*
-		 * THIS WON'T WORK: we will have to write code that gets us a
-		 * real key for the last key, because the last key is prefix
-		 * compressed.
-		 */
-		WT_ASSERT(session, __wt_cell_prefix(last_key_cell) == 0);
-		WT_ERR(__wt_cell_copy(
-		    session, last_key_cell, &trk->u.row.range_stop));
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
+		WT_ERR(__wt_row_key(session,
+		    page, &page->u.row_leaf.d[0], &trk->u.row.range_start));
+		WT_ERR(__wt_row_key(session,
+		    page, &page->u.row_leaf.d[page->entries - 1],
+		    &trk->u.row.range_stop));
 
 		WT_ERR(__slvg_ovfl_row_dsk_ref(session, dsk, trk));
 		break;
@@ -504,6 +496,8 @@ __slvg_trk_leaf(
 err:		if (trk != NULL)
 			__wt_free(session, trk);
 	}
+	if (page != NULL)
+		__wt_page_free(session, page);
 	return (ret);
 }
 
