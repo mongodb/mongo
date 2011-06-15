@@ -190,7 +190,9 @@ extern void __wt_debug_pair(const char *tag,
 extern int __wt_desc_read(WT_SESSION_IMPL *session);
 extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
-extern void __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_page_free(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    uint32_t flags);
 extern int __wt_btree_dump(WT_SESSION_IMPL *session,
     FILE *stream,
     uint32_t flags);

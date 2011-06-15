@@ -3336,7 +3336,7 @@ __rec_discard_evict(WT_SESSION_IMPL *session)
 			    "discard addr %" PRIu32 "/%" PRIu32 " (%s)",
 			    discard->addr, discard->size,
 			    __wt_page_type_string(discard->page->type)));
-			__wt_page_free(session, discard->page);
+			__wt_page_free(session, discard->page, 0);
 		}
 	return (0);
 }

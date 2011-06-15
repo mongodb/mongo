@@ -24,7 +24,7 @@ static void __wt_free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
  *	Free all memory associated with a page.
  */
 void
-__wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);
@@ -90,7 +90,7 @@ __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		}
 
-	if (page->dsk != NULL)
+	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK) && page->dsk != NULL)
 		__wt_free(session, page->dsk);
 	__wt_free(session, page);
 }

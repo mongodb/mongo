@@ -497,7 +497,7 @@ err:		if (trk != NULL)
 			__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_free(session, page);
+		__wt_page_free(session, page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -1111,7 +1111,7 @@ __slvg_build_leaf_col(WT_SESSION_IMPL *session,
 
 	/* Discard our hazard reference and the page. */
 	__wt_hazard_clear(session, page);
-	__wt_page_free(session, page);
+	__wt_page_free(session, page, 0);
 
 	return (ret);
 }
@@ -1633,7 +1633,7 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 
 	/* Discard our hazard reference and the page. */
 	__wt_hazard_clear(session, page);
-	__wt_page_free(session, page);
+	__wt_page_free(session, page, 0);
 
 err:	__wt_scr_release(&key);
 
