@@ -346,6 +346,7 @@ __wt_block_write(WT_SESSION_IMPL *session)
 done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
+	WT_ERR(__wt_desc_update(session));
 
 	/* Discard the in-memory free-list. */
 	__wt_block_discard(session);

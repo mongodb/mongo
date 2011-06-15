@@ -206,9 +206,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));
 
-	/* Write out the file's metadata. */
-	WT_TRET(__wt_desc_update(session));
-
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(session, btree->fh));
 
