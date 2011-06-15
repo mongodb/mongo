@@ -1098,17 +1098,15 @@ __slvg_build_leaf_col(WT_SESSION_IMPL *session,
 	 * (The problem is we don't want to overwrite any original information
 	 * until the salvage run succeeds -- if we free the blocks now, the next
 	 * merge page we write might allocate those blocks and overwrite them,
-	 * and should the salvage run eventually fail for any reason, the
-	 * original information would have been lost.)  Clear the page's addr so
-	 * reconciliation does not free the underlying blocks, and set a flag so
-	 * we eventually free the blocks.
-	 *
-	 * THIS IS WRONG -- THE PARENT ADDR IS WHAT WE USE TO FREE BLOCKS
-	 * IN RECONCILIATION.
+	 * and should the salvage run eventually fail, the original information
+	 * would have been lost.)  Clear the reference addr so reconciliation
+	 * does not free the underlying blocks.
 	 */
 	WT_PAGE_SET_MODIFIED(page);
-	ret =
-	    __wt_page_reconcile(session, page, 0, WT_REC_EVICT | WT_REC_LOCKED);
+	WT_COL_REF_ADDR(cref) = WT_ADDR_INVALID;
+	WT_COL_REF_SIZE(cref) = 0;
+	ret = __wt_page_reconcile(
+	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 
 	/*
 	 * Reset the page.  (Don't reset the record number or RLE counts -- it
@@ -1117,9 +1115,9 @@ __slvg_build_leaf_col(WT_SESSION_IMPL *session,
 	page->u.col_leaf.d = save_col_leaf;
 	page->entries = save_entries;
 
-	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page);
+	/* Discard our hazard reference and the page. */
 	__wt_hazard_clear(session, page);
+	__wt_page_free(session, page);
 
 	return (ret);
 }
@@ -1606,20 +1604,18 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			 * this page now.  (The problem is we don't want to
 			 * overwrite any original information until the salvage
 			 * run succeeds -- if we free the blocks now, the next
-			 * merge page we write might those blocks and overwrite
-			 * them, and should the salvage run eventually fail for
-			 * any reason, the original information would have been
-			 * lost.)  Clear the page's addr so reconciliation does
-			 * not free the underlying blocks, and set a flag so we
-			 * eventually free the blocks.
+			 * merge page we write might allocate those blocks and
+			 * overwrite them, and should the salvage run eventually
+			 * fail, the original information would have been lost.)
+			 * Clear the reference addr so reconciliation does not
+			 * free the underlying blocks.
 			 */
 			WT_PAGE_SET_MODIFIED(page);
-	/*
-	 * THIS IS WRONG -- THE PARENT ADDR IS WHAT WE USE TO FREE BLOCKS
-	 * IN RECONCILIATION.
-	 */
+			WT_ROW_REF_ADDR(rref) = WT_ADDR_INVALID;
+			WT_ROW_REF_SIZE(rref) = 0;
 			ret = __wt_page_reconcile(session,
-			    page, skip_start, WT_REC_EVICT | WT_REC_LOCKED);
+			    page, skip_start,
+			    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 			page->entries += skip_stop;
 		}
 
@@ -1641,9 +1637,9 @@ __slvg_build_leaf_row(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		}
 	}
 
-	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page);
+	/* Discard our hazard reference and the page. */
 	__wt_hazard_clear(session, page);
+	__wt_page_free(session, page);
 
 err:	__wt_scr_release(&key);
 
