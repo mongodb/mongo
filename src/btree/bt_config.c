@@ -31,7 +31,7 @@ __wt_btconf_read(
 	WT_ERR(__wt_filesize(session, fh, &filesize));
 	WT_ERR(__wt_calloc_def(session, (size_t)filesize, &config));
 	WT_ERR(__wt_read(session, fh, (off_t)0, (uint32_t)filesize, config));
-	
+
 	/* The file has a newline at the end, replace that with a NUL. */
 	config[(uint32_t)filesize - 1] = '\0';
 
