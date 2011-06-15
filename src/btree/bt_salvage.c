@@ -248,9 +248,6 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 if (ss->range_merge)
 		WT_ERR(__slvg_discard_ovfl(session, ss));
 
-	/* Write out the free list. */
-	WT_TRET(__wt_block_write(session));
-
 	if (0) {
 err:		if (ret == 0)
 			ret = WT_ERROR;
