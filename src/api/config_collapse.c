@@ -27,8 +27,9 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 	/*
 	 * Be conservative when allocating the buffer: it can't be longer
 	 * than the sum of the lengths of the layered configurations.
+	 * Add 2 to allow for a trailing comma and NUL.
 	 */
-	for (cp = cfg, len = 0; *cp != NULL; ++cp)
+	for (cp = cfg, len = 2; *cp != NULL; ++cp)
 		len += strlen(*cp);
 
 	WT_RET(__wt_calloc_def(session, len, &config));
@@ -54,6 +55,10 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
+		/* Strip off the trailing comma and NUL-terminate. */
+		if (p > config)
+			--p;
+		*p = '\0';
 		*config_ret = config;
 	} else {
 err:		__wt_free(session, config);
