@@ -11,4 +11,4 @@ valgrind \
     --read-var-info=yes \
     --suppressions=../bt/vt.suppress \
     --track-fds=yes \
-    ./t -r 1 -t row
+    ./t
