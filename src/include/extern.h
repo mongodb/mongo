@@ -39,12 +39,12 @@ extern  int __wt_config_getones(WT_SESSION_IMPL *session,
     const char *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_collapse(WT_SESSION_IMPL *session,
-    const char **cfg,
-    const char **config_ret);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     const char *checks,
     const char *config);
+extern int __wt_config_collapse(WT_SESSION_IMPL *session,
+    const char **cfg,
+    const char **config_ret);
 extern const char *__wt_confdfl_connection_add_collator;
 extern const char *__wt_confchk_connection_add_collator;
 extern const char *__wt_confdfl_connection_add_compressor;
