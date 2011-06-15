@@ -263,178 +263,6 @@ static int  __rec_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 	__rec_discard_add(session, NULL, addr, size)
 #define	__rec_discard_add_page(session, page)				\
 	__rec_discard_add(session, page, WT_PADDR(page), WT_PSIZE(page))
-static inline int
-__rec_discard_add_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell)
-{
-	WT_OFF ovfl;
-
-	if (__wt_cell_type_is_ovfl(cell)) {
-		__wt_cell_off(cell, &ovfl);
-		return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
-	}
-	return (0);
-}
-
-/*
- * __rec_init --
- *	Initialize the reconciliation structure.
- */
-static int
-__rec_init(WT_SESSION_IMPL *session, uint32_t flags)
-{
-	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
-	WT_RECONCILE *r;
-
-	/* Allocate a reconciliation structure if we don't already have one. */
-	if ((r = S2C(session)->cache->rec) == NULL) {
-		WT_RET(__wt_calloc_def(session, 1, &r));
-		S2C(session)->cache->rec = r;
-
-		/*
-		 * Allocate memory for a copy of the hazard references -- it's
-		 * a fixed size so doesn't need run-time adjustments.
-		 */
-		conn = S2C(session);
-		WT_RET(__wt_calloc_def(session,
-		    conn->session_size * conn->hazard_size, &r->hazard));
-
-		/* Connect prefix compression pointers/buffers. */
-		r->full = &r->_full;
-		r->last = &r->_last;
-
-		/* Configuration. */
-		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "btree_split_min", &cval));
-		if (cval.val != 0)
-			r->btree_split_min = 1;
-
-		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "btree_split_pct", &cval));
-		r->btree_split_pct = (uint32_t)cval.val;
-
-		WT_RET(__wt_config_getones(session,
-		    session->btree->config,
-		    "btree_internal_key_truncate", &cval));
-		r->key_sfx_compress_conf = cval.val == 0 ? 0 : 1;
-
-		WT_RET(__wt_config_getones(session,
-		    session->btree->config,
-		    "btree_prefix_compression", &cval));
-		r->key_pfx_compress_conf = cval.val == 0 ? 0 : 1;
-	}
-
-	r->evict = LF_ISSET(WT_REC_EVICT);
-	r->locked = LF_ISSET(WT_REC_LOCKED);
-
-	/*
-	 * During internal page reconciliation we track referenced objects that
-	 * are discarded when the page is discarded.  That tracking is done per
-	 * reconciliation run, initialize it before anything else.
-	 */
-	__rec_discard_init(r);
-
-	/*
-	 * During internal page reconciliation we track in-memory subtrees we
-	 * find in the page.  That tracking is done per reconciliation run,
-	 * initialize it before anything else.
-	 */
-	__rec_imref_init(r);
-
-	return (0);
-}
-
-/*
- * __rec_destroy --
- *	Clean up the reconciliation structure.
- */
-void
-__wt_rec_destroy(WT_SESSION_IMPL *session)
-{
-	WT_BOUNDARY *bnd;
-	WT_RECONCILE *r;
-	uint32_t i;
-
-	if ((r = S2C(session)->cache->rec) == NULL)
-		return;
-
-	__wt_buf_free(session, &r->dsk);
-
-	if (r->discard != NULL)
-		__wt_free(session, r->discard);
-
-	if (r->bnd != NULL) {
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
-			__wt_buf_free(session, &bnd->key);
-			if (bnd->imp_dsk != NULL)
-				__wt_free(session, bnd->imp_dsk);
-		}
-		__wt_free(session, r->bnd);
-	}
-
-	if (r->imref != NULL)
-		__wt_free(session, r->imref);
-
-	if (r->hazard != NULL)
-		__wt_free(session, r->hazard);
-
-	__wt_buf_free(session, &r->k.buf);
-	__wt_buf_free(session, &r->v.buf);
-	__wt_buf_free(session, &r->_full);
-	__wt_buf_free(session, &r->_last);
-
-	__wt_free(session, S2C(session)->cache->rec);
-}
-
-/*
- * __rec_copy_incr --
- *	Copy a key/value cell and buffer pair onto a page.
- */
-static inline void
-__rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
-{
-	uint32_t len;
-	uint8_t *p, *t;
-
-	/*
-	 * If there's only one chunk of data to copy (because the cell and data
-	 * are being copied from the original disk page), the cell length won't
-	 * be set, the WT_BUF data/length will reference the data to be copied.
-	 *
-	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
-	 * the copy in-line.
-	 */
-	for (p = (uint8_t *)r->first_free,
-	    t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
-		*p++ = *t++;
-
-	/* The data can be quite large -- call memcpy. */
-	if (kv->buf.size != 0)
-		memcpy(p, kv->buf.data, kv->buf.size);
-
-	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
-	__rec_incr(session, r, kv->len);
-}
-
-/*
- * __rec_incr --
- *	Update the memory tracking structure for a new entry.
- */
-static inline void
-__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
-{
-	/*
-	 * The buffer code is fragile and prone to off-by-one errors --
-	 * check for overflow in diagnostic mode.
-	 */
-	WT_ASSERT(session, r->space_avail >= size);
-	WT_ASSERT(session, WT_PTRDIFF32(
-	    r->first_free + size, r->dsk.mem) <= r->page_size);
-
-	++r->entries;
-	r->space_avail -= size;
-	r->first_free += size;
-}
 
 /*
  * __wt_page_reconcile --
@@ -577,6 +405,117 @@ __wt_page_reconcile(
 	}
 
 	return (ret);
+}
+
+/*
+ * __rec_init --
+ *	Initialize the reconciliation structure.
+ */
+static int
+__rec_init(WT_SESSION_IMPL *session, uint32_t flags)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_RECONCILE *r;
+
+	/* Allocate a reconciliation structure if we don't already have one. */
+	if ((r = S2C(session)->cache->rec) == NULL) {
+		WT_RET(__wt_calloc_def(session, 1, &r));
+		S2C(session)->cache->rec = r;
+
+		/*
+		 * Allocate memory for a copy of the hazard references -- it's
+		 * a fixed size so doesn't need run-time adjustments.
+		 */
+		conn = S2C(session);
+		WT_RET(__wt_calloc_def(session,
+		    conn->session_size * conn->hazard_size, &r->hazard));
+
+		/* Connect prefix compression pointers/buffers. */
+		r->full = &r->_full;
+		r->last = &r->_last;
+
+		/* Configuration. */
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config, "btree_split_min", &cval));
+		if (cval.val != 0)
+			r->btree_split_min = 1;
+
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config, "btree_split_pct", &cval));
+		r->btree_split_pct = (uint32_t)cval.val;
+
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config,
+		    "btree_internal_key_truncate", &cval));
+		r->key_sfx_compress_conf = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config,
+		    "btree_prefix_compression", &cval));
+		r->key_pfx_compress_conf = cval.val == 0 ? 0 : 1;
+	}
+
+	r->evict = LF_ISSET(WT_REC_EVICT);
+	r->locked = LF_ISSET(WT_REC_LOCKED);
+
+	/*
+	 * During internal page reconciliation we track referenced objects that
+	 * are discarded when the page is discarded.  That tracking is done per
+	 * reconciliation run, initialize it before anything else.
+	 */
+	__rec_discard_init(r);
+
+	/*
+	 * During internal page reconciliation we track in-memory subtrees we
+	 * find in the page.  That tracking is done per reconciliation run,
+	 * initialize it before anything else.
+	 */
+	__rec_imref_init(r);
+
+	return (0);
+}
+
+/*
+ * __rec_destroy --
+ *	Clean up the reconciliation structure.
+ */
+void
+__wt_rec_destroy(WT_SESSION_IMPL *session)
+{
+	WT_BOUNDARY *bnd;
+	WT_RECONCILE *r;
+	uint32_t i;
+
+	if ((r = S2C(session)->cache->rec) == NULL)
+		return;
+
+	__wt_buf_free(session, &r->dsk);
+
+	if (r->discard != NULL)
+		__wt_free(session, r->discard);
+
+	if (r->bnd != NULL) {
+		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
+			__wt_buf_free(session, &bnd->key);
+			if (bnd->imp_dsk != NULL)
+				__wt_free(session, bnd->imp_dsk);
+		}
+		__wt_free(session, r->bnd);
+	}
+
+	if (r->imref != NULL)
+		__wt_free(session, r->imref);
+
+	if (r->hazard != NULL)
+		__wt_free(session, r->hazard);
+
+	__wt_buf_free(session, &r->k.buf);
+	__wt_buf_free(session, &r->v.buf);
+	__wt_buf_free(session, &r->_full);
+	__wt_buf_free(session, &r->_last);
+
+	__wt_free(session, S2C(session)->cache->rec);
 }
 
 /*
@@ -937,6 +876,56 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__rec_discard_add_ovfl(session, cell));
 
 	return (0);
+}
+
+/*
+ * __rec_copy_incr --
+ *	Copy a key/value cell and buffer pair onto a page.
+ */
+static inline void
+__rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
+{
+	uint32_t len;
+	uint8_t *p, *t;
+
+	/*
+	 * If there's only one chunk of data to copy (because the cell and data
+	 * are being copied from the original disk page), the cell length won't
+	 * be set, the WT_BUF data/length will reference the data to be copied.
+	 *
+	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
+	 * the copy in-line.
+	 */
+	for (p = (uint8_t *)r->first_free,
+	    t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
+		*p++ = *t++;
+
+	/* The data can be quite large -- call memcpy. */
+	if (kv->buf.size != 0)
+		memcpy(p, kv->buf.data, kv->buf.size);
+
+	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
+	__rec_incr(session, r, kv->len);
+}
+
+/*
+ * __rec_incr --
+ *	Update the memory tracking structure for a new entry.
+ */
+static inline void
+__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
+{
+	/*
+	 * The buffer code is fragile and prone to off-by-one errors --
+	 * check for overflow in diagnostic mode.
+	 */
+	WT_ASSERT(session, r->space_avail >= size);
+	WT_ASSERT(session, WT_PTRDIFF32(
+	    r->first_free + size, r->dsk.mem) <= r->page_size);
+
+	++r->entries;
+	r->space_avail -= size;
+	r->first_free += size;
 }
 
 /*
@@ -3258,6 +3247,23 @@ __rec_imref_add(WT_SESSION_IMPL *session, WT_REF *ref)
 		r->imref_entries += 20;
 	}
 	r->imref[r->imref_next++] = ref;
+	return (0);
+}
+
+/*
+ * __rec_discard_add_ovfl --
+ *	If the cell argument references an overflow chunk, schedule it for
+ * discard.
+ */
+static inline int
+__rec_discard_add_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell)
+{
+	WT_OFF ovfl;
+
+	if (__wt_cell_type_is_ovfl(cell)) {
+		__wt_cell_off(cell, &ovfl);
+		return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
+	}
 	return (0);
 }
 
