@@ -1647,7 +1647,7 @@ err:	__wt_scr_release(&key);
 static void
 __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 {
-	WT_CELL *key_cell, *value_cell;
+	WT_CELL *cell;
 	WT_ROW *rip;
 	WT_OFF ovfl;
 	WT_TRACK **searchp;
@@ -1660,17 +1660,21 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 			continue;
 		}
 
-		key_cell = rip->key;
-		if (__wt_cell_type(key_cell) == WT_CELL_KEY_OVFL) {
-			__wt_cell_off(key_cell, &ovfl);
+		if (__wt_off_page(page, rip->key))
+			cell = WT_REF_OFFSET(
+			    page, ((WT_IKEY *)rip->key)->cell_offset);
+		else
+			cell = rip->key;
+		if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
+			__wt_cell_off(cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
 			F_SET(*searchp, WT_TRACK_OVFL_REFD);
 		}
-		if ((value_cell = __wt_row_value(page, rip)) != NULL &&
-		    __wt_cell_type(value_cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_off(value_cell, &ovfl);
+		if ((cell = __wt_row_value(page, rip)) != NULL &&
+		    __wt_cell_type(cell) == WT_CELL_DATA_OVFL) {
+			__wt_cell_off(cell, &ovfl);
 			searchp =
 			    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
 			    sizeof(WT_TRACK *), __slvg_ovfl_compare);
