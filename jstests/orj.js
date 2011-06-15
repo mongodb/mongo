@@ -33,3 +33,12 @@ assert.eq( 0, t.find( {a:1,$and:[{$or:[{$or:[{b:3}]}]}]} ).itcount() );
 
 assert.eq( 1, t.find( {$and:[{$or:[{a:1},{a:2}]},{$or:[{b:1},{b:2}]}]} ).itcount() );
 assert.eq( 0, t.find( {$and:[{$or:[{a:3},{a:2}]},{$or:[{b:1},{b:2}]}]} ).itcount() );
+assert.eq( 0, t.find( {$and:[{$or:[{a:1},{a:2}]},{$or:[{b:3},{b:1}]}]} ).itcount() );
+
+assert.eq( 0, t.find( {$and:[{$nor:[{a:1},{a:2}]},{$nor:[{b:1},{b:2}]}]} ).itcount() );
+assert.eq( 0, t.find( {$and:[{$nor:[{a:3},{a:2}]},{$nor:[{b:1},{b:2}]}]} ).itcount() );
+assert.eq( 1, t.find( {$and:[{$nor:[{a:3},{a:2}]},{$nor:[{b:3},{b:1}]}]} ).itcount() );
+
+assert.eq( 1, t.find( {$and:[{$or:[{a:1},{a:2}]},{$nor:[{b:1},{b:3}]}]} ).itcount() );
+assert.eq( 0, t.find( {$and:[{$or:[{a:3},{a:2}]},{$nor:[{b:1},{b:3}]}]} ).itcount() );
+assert.eq( 0, t.find( {$and:[{$or:[{a:1},{a:2}]},{$nor:[{b:1},{b:2}]}]} ).itcount() );
