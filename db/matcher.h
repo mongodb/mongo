@@ -134,21 +134,11 @@ namespace mongo {
             return op <= BSONObj::LTE ? -1 : 1;
         }
 
-        Matcher(const BSONObj &pattern, bool nested = false);
+        Matcher(const BSONObj &pattern);
 
         ~Matcher();
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
-
-        // fast rough check to see if we must load the real doc - we also
-        // compare field counts against covereed index matcher; for $or clauses
-        // we just compare field counts
-        bool keyMatch() const { return
-            !all
-            && !haveSize
-            && !hasArray // We can't match an array to its first indexed element using keymatch
-            && !haveNeg;
-        }
 
         bool atomic() const { return _atomic; }
 
@@ -158,15 +148,19 @@ namespace mongo {
             return jsobj.toString();
         }
 
-        void addOrConstraint( const shared_ptr< FieldRangeVector > &frv ) {
-            _orConstraints.push_back( frv );
+        void addOrDedupConstraint( const shared_ptr< FieldRangeVector > &frv ) {
+            _orDedupConstraints.push_back( frv );
         }
 
         void popOrClause() {
             _orMatchers.pop_front();
         }
 
-        bool sameCriteriaCount( const Matcher &other ) const;
+        /**
+         * @return true if this key matcher will return the same true/false
+         * value as the provided doc matcher.
+         */
+        bool keyMatch( const Matcher &docMatcher ) const;
         
     private:
         // Only specify constrainIndexKey if matches() will be called with
@@ -185,11 +179,10 @@ namespace mongo {
 
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
 
-        bool parseOrNor( const BSONElement &e, bool nested );
-        void parseOr( const BSONElement &e, bool nested, list< shared_ptr< Matcher > > &matchers );
-        bool parseAnd( const BSONElement &e, bool nested );
+        bool parseClause( const BSONElement &e );
+        void parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers );
 
-        void parseMatchExpressionElement( const BSONElement &e, bool subMatcher );
+        void parseMatchExpressionElement( const BSONElement &e );
         
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
@@ -212,9 +205,10 @@ namespace mongo {
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;
+        list< shared_ptr< Matcher > > _andMatchers;
         list< shared_ptr< Matcher > > _orMatchers;
         list< shared_ptr< Matcher > > _norMatchers;
-        vector< shared_ptr< FieldRangeVector > > _orConstraints;
+        vector< shared_ptr< FieldRangeVector > > _orDedupConstraints;
 
         friend class CoveredIndexMatcher;
     };
@@ -238,7 +232,7 @@ namespace mongo {
 
         // once this is called, shouldn't use this matcher for matching any more
         void advanceOrClause( const shared_ptr< FieldRangeVector > &frv ) {
-            _docMatcher->addOrConstraint( frv );
+            _docMatcher->addOrDedupConstraint( frv );
             // TODO this is not yet optimal.  Since we could skip an entire
             // or clause (if a match is impossible) between calls to advanceOrClause()
             // we may not pop all the clauses we can.

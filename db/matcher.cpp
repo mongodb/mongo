@@ -280,27 +280,28 @@ namespace mongo {
         return true;
     }
 
-    void Matcher::parseOr( const BSONElement &e, bool nested, list< shared_ptr< Matcher > > &matchers ) {
-        uassert( 13090, "nested $or/$nor not allowed", !nested );
-        uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+    void Matcher::parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers ) {
+        uassert( 13086, "$and/$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
             BSONElement f = j.next();
-            uassert( 13087, "$or/$nor match element must be an object", f.type() == Object );
-            // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
-            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), true ) ) );
+            uassert( 13087, "$and/$or/$nor match element must be an object", f.type() == Object );
+            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject() ) ) );
         }
     }
 
-    bool Matcher::parseOrNor( const BSONElement &e, bool nested ) {
+    bool Matcher::parseClause( const BSONElement &e ) {
         const char *ef = e.fieldName();
         if ( ef[ 0 ] != '$' )
             return false;
-        if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
-            parseOr( e, nested, _orMatchers );
+        if ( ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' ) {
+            parseExtractedClause( e, _andMatchers );
+        }
+        else if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
+            parseExtractedClause( e, _orMatchers );
         }
         else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
-            parseOr( e, nested, _norMatchers );
+            parseExtractedClause( e, _norMatchers );
         }
         else {
             return false;
@@ -308,35 +309,12 @@ namespace mongo {
         return true;
     }
     
-    bool Matcher::parseAnd( const BSONElement &e, bool nested ) {
-        const char *ef = e.fieldName();
-        if (!( ef[ 0 ] == '$' && ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' && ef[ 4 ] == 0 )) {
-            return false;
-        }
-        
-        uassert( 14815 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
-        BSONObjIterator i( e.embeddedObject() );
-        while( i.more() ) {
-            BSONElement e = i.next();
-            uassert( 14818 , "$and elements must be objects" , e.type() == Object );
-            BSONObjIterator j( e.embeddedObject() );
-            while( j.more() ) {
-                parseMatchExpressionElement( j.next(), true );
-            }
-        }
-        return true;
-    }
-
-    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
+    void Matcher::parseMatchExpressionElement( const BSONElement &e ) {
         
         uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
         
-        if ( parseAnd( e, nested ) ) {
+        if ( parseClause( e ) ) {
             return;   
-        }
-        
-        if ( parseOrNor( e, nested ) ) {
-            return;
         }
         
         if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
@@ -437,18 +415,19 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    Matcher::Matcher(const BSONObj &_jsobj, bool nested) :
+    Matcher::Matcher(const BSONObj &_jsobj) :
         where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
-            parseMatchExpressionElement( i.next(), nested );
+            parseMatchExpressionElement( i.next() );
         }
     }
 
     Matcher::Matcher( const Matcher &other, const BSONObj &key ) :
         where(0), constrainIndexKey_( key ), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
-        // do not include field matches which would make keyMatch() false
+        // Filter out match components that will provide an incorrect result
+        // given a key from a single key index.
         for( vector< ElementMatcher >::const_iterator i = other.basics.begin(); i != other.basics.end(); ++i ) {
             if ( key.hasField( i->toMatch.fieldName() ) ) {
                 switch( i->compareOp ) {
@@ -456,7 +435,7 @@ namespace mongo {
                 case BSONObj::opALL:
                 case BSONObj::NE:
                 case BSONObj::NIN:
-                case BSONObj::opEXISTS: // Not part of keyMatch() determination, but we can't match on index in this case.
+                case BSONObj::opEXISTS: // We can't match on index in this case.
                 case BSONObj::opTYPE: // For $type:10 (null), a null key could be a missing field or a null value field.
                     break;
                 case BSONObj::opIN: {
@@ -486,6 +465,10 @@ namespace mongo {
             if ( !other.regexs[ i ].isNot && key.hasField( other.regexs[ i ].fieldName ) ) {
                 regexs[ nRegex++ ] = other.regexs[ i ];
             }
+        }
+        // Recursively filter match components for and and or matchers.
+        for( list< shared_ptr< Matcher > >::const_iterator i = other._andMatchers.begin(); i != other._andMatchers.end(); ++i ) {
+            _andMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
         }
         for( list< shared_ptr< Matcher > >::const_iterator i = other._orMatchers.begin(); i != other._orMatchers.end(); ++i ) {
             _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
@@ -874,13 +857,32 @@ namespace mongo {
                 return false;
         }
 
+        if ( _orDedupConstraints.size() > 0 ) {
+            for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orDedupConstraints.begin();
+                i != _orDedupConstraints.end(); ++i ) {
+                if ( (*i)->matches( jsobj ) ) {
+                    return false;
+                }
+            }
+        }
+        
+        if ( _andMatchers.size() > 0 ) {
+            for( list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
+                i != _andMatchers.end(); ++i ) {
+                // SERVER-3192 Track field matched using details the same as for
+                // top level fields, at least for now.
+                if ( !(*i)->matches( jsobj, details ) ) {
+                    return false;
+                }
+            }
+        }
+
         if ( _orMatchers.size() > 0 ) {
             bool match = false;
             for( list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
                     i != _orMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
-                // matched within $or, and at this point we've already loaded the
-                // whole document
+                // matched within $or
                 if ( (*i)->matches( jsobj ) ) {
                     match = true;
                     break;
@@ -895,18 +897,10 @@ namespace mongo {
             for( list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
                     i != _norMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
-                // matched within $nor, and at this point we've already loaded the
-                // whole document
+                // matched within $nor
                 if ( (*i)->matches( jsobj ) ) {
                     return false;
                 }
-            }
-        }
-
-        for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orConstraints.begin();
-                i != _orConstraints.end(); ++i ) {
-            if ( (*i)->matches( jsobj ) ) {
-                return false;
             }
         }
 
@@ -948,24 +942,38 @@ namespace mongo {
         return false;
     }
 
-    bool Matcher::sameCriteriaCount( const Matcher &other ) const {
-        if ( !( basics.size() == other.basics.size() && nRegex == other.nRegex && !where == !other.where ) ) {
+    bool Matcher::keyMatch( const Matcher &docMatcher ) const {
+        // Quick check certain non key match cases.
+        if ( docMatcher.all
+        	|| docMatcher.haveSize
+        	|| docMatcher.hasArray // We can't match an array to its first indexed element using keymatch
+        	|| docMatcher.haveNeg ) {
+         	return false;   
+        }
+        
+        // Check that all match components are available in the index matcher.
+        if ( !( basics.size() == docMatcher.basics.size() && nRegex == docMatcher.nRegex && !where == !docMatcher.where ) ) {
             return false;
         }
-        if ( _norMatchers.size() != other._norMatchers.size() ) {
+        if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {
             return false;
         }
-        if ( _orMatchers.size() != other._orMatchers.size() ) {
+        if ( _orMatchers.size() != docMatcher._orMatchers.size() ) {
             return false;
         }
-        if ( _orConstraints.size() != other._orConstraints.size() ) {
+        if ( _norMatchers.size() != docMatcher._norMatchers.size() ) {
             return false;
         }
+        if ( _orDedupConstraints.size() != docMatcher._orDedupConstraints.size() ) {
+            return false;
+        }
+        
+        // Recursively check that all submatchers support key match.
         {
-            list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
-            list< shared_ptr< Matcher > >::const_iterator j = other._norMatchers.begin();
-            while( i != _norMatchers.end() ) {
-                if ( !(*i)->sameCriteriaCount( **j ) ) {
+            list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
+            list< shared_ptr< Matcher > >::const_iterator j = docMatcher._andMatchers.begin();
+            while( i != _andMatchers.end() ) {
+                if ( !(*i)->keyMatch( **j ) ) {
                     return false;
                 }
                 ++i; ++j;
@@ -973,14 +981,16 @@ namespace mongo {
         }
         {
             list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
-            list< shared_ptr< Matcher > >::const_iterator j = other._orMatchers.begin();
+            list< shared_ptr< Matcher > >::const_iterator j = docMatcher._orMatchers.begin();
             while( i != _orMatchers.end() ) {
-                if ( !(*i)->sameCriteriaCount( **j ) ) {
+                if ( !(*i)->keyMatch( **j ) ) {
                     return false;
                 }
                 ++i; ++j;
             }
         }
+        // Nor matchers and or dedup constraints aren't created for index matchers,
+        // so no need to check those here.
         return true;
     }
 
