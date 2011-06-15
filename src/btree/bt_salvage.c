@@ -346,7 +346,10 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 		 * for the file.
 		 *
 		 * We only care about leaf and overflow pages from here on out;
-		 * discard all of the others.
+		 * discard all of the others.  We put them on the free list now,
+		 * because we might as well overwrite them, we want the file to
+		 * grow as little as possible, or shrink, and future salvage
+		 * calls don't need them either.
 		 */
 		switch (dsk->type) {
 		case WT_PAGE_COL_INT:
