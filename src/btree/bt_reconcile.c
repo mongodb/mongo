@@ -28,6 +28,7 @@ typedef struct {
 
 	int evict;			/* The page is being discarded */
 	int locked;			/* The tree is locked down */
+	int salvage;			/* Called from salvage */
 
 	int	 btree_split_min;	/* use tiny split sizes (debugging) */
 	uint32_t btree_split_pct;	/* Split page percent */
@@ -458,6 +459,7 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 
 	r->evict = LF_ISSET(WT_REC_EVICT);
 	r->locked = LF_ISSET(WT_REC_LOCKED);
+	r->salvage = LF_ISSET(WT_REC_SALVAGE);
 
 	/*
 	 * During internal page reconciliation we track referenced objects that
@@ -1622,7 +1624,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ERR(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,
-	    page->parent_ref->size, page->parent_ref->size));
+	    session->btree->leafmax, session->btree->leafmin));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_FOREACH(page, cip, i) {
@@ -2646,8 +2648,13 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    session, page, replace, WT_ADDR_INVALID, 0, WT_REF_MEM));
 	}
 
-	/* Queue the original page to be discarded, we're done with it. */
-	WT_RET(__rec_discard_add_page(session, page));
+	/*
+	 * Queue the original page to be discarded, we're done with it.  Salvage
+	 * is a special case because it's giving us modified pages to reconcile,
+	 * and it has to free them itself.
+	 */
+	if (!r->salvage)
+		WT_RET(__rec_discard_add_page(session, page));
 
 	/* Discard everything we've queued for discard. */
 	WT_RET(__rec_discard_evict(session));
