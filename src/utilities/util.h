@@ -18,6 +18,9 @@ int util_salvage(int, char *[]);
 int util_stat(int, char *[]);
 int util_verify(int, char *[]);
 
+extern const char *home;				/* Home directory */
 extern const char *progname;				/* Program name */
 extern const char *usage_prefix;			/* Global arguments */
 extern int verbose;					/* Verbose flag */
+
+extern WT_EVENT_HANDLER *verbose_handler;

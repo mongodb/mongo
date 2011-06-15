@@ -42,8 +42,8 @@ util_verify(int argc, char *argv[])
 	}
 	snprintf(tablename, len, "table:%s", *argv);
 
-	if ((ret = wiredtiger_open(".", verbose ?
-	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
+	if ((ret = wiredtiger_open(home,
+	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 

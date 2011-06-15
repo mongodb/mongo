@@ -49,7 +49,8 @@ util_printlog(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = wiredtiger_open(".", NULL, NULL, &conn)) != 0 ||
+	if ((ret = wiredtiger_open(home,
+	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 

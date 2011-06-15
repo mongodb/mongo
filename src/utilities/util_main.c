@@ -8,6 +8,7 @@
 #include "wiredtiger.h"
 #include "util.h"
 
+const char *home = ".";				/* Home directory to open */
 const char *progname;				/* Program name */
 const char *usage_prefix = "[-Vv] [-h home]";	/* Global arguments */
 int verbose;					/* Verbose flag */
