@@ -134,7 +134,7 @@ namespace mongo {
             return op <= BSONObj::LTE ? -1 : 1;
         }
 
-        Matcher(const BSONObj &pattern);
+        Matcher(const BSONObj &pattern, bool nested=false);
 
         ~Matcher();
 
@@ -182,7 +182,7 @@ namespace mongo {
         bool parseClause( const BSONElement &e );
         void parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers );
 
-        void parseMatchExpressionElement( const BSONElement &e );
+        void parseMatchExpressionElement( const BSONElement &e, bool nested );
         
         Where *_where;                    // set if query uses $where
         BSONObj _jsobj;                  // the query pattern.  e.g., { name: "joe" }

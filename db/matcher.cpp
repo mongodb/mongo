@@ -286,7 +286,7 @@ namespace mongo {
         while( j.more() ) {
             BSONElement f = j.next();
             uassert( 13087, "$and/$or/$nor match element must be an object", f.type() == Object );
-            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject() ) ) );
+            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), true ) ) );
         }
     }
 
@@ -309,7 +309,7 @@ namespace mongo {
         return true;
     }
     
-    void Matcher::parseMatchExpressionElement( const BSONElement &e ) {
+    void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
         
         uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
         
@@ -405,6 +405,7 @@ namespace mongo {
             _hasArray = true;
         }
         else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
+            uassert( 14844, "$atomic specifier must be a top level field", !nested );
             _atomic = e.trueValue();
             return;
         }
@@ -415,12 +416,12 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    Matcher::Matcher(const BSONObj &jsobj) :
+    Matcher::Matcher(const BSONObj &jsobj, bool nested) :
         _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
 
         BSONObjIterator i(_jsobj);
         while ( i.more() ) {
-            parseMatchExpressionElement( i.next() );
+            parseMatchExpressionElement( i.next(), nested );
         }
     }
 
