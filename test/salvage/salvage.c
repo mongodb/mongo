@@ -76,8 +76,6 @@ run(int r)
 	(void)remove(SLVG);
 
 	assert((res_fp = fopen(RSLT, "w")) != NULL);
-	fprintf(res_fp, "VERSION=1\n");
-	fprintf(res_fp, "HEADER=END\n");
 
 	/*
 	 * Each run builds the LOAD file, and then appends the first page of
@@ -323,7 +321,6 @@ run(int r)
 		exit (EXIT_FAILURE);
 	}
 
-	fprintf(res_fp, "DATA=END\n");
 	assert(fclose(res_fp) == 0);
 
 	process();
