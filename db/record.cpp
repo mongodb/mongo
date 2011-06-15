@@ -24,8 +24,9 @@ namespace mongo {
             return 
                 abs( ( ( 7 + (int)(region & 0xFFFF) ) * 
                        ( 11 + (int)( ( region >> 16 ) & 0xFFFF ) ) *
-                       ( 13 + (int)( ( region >> 32 ) & 0xFFFF ) ) *
-                       ( 17 + (int)( ( region >> 48 ) & 0xFFFF ) ) ) % SliceSize );
+                       ( sizeof(size_t) == 4 ? 1 : 
+                         ( 13 + (int)( ( region >> 32 ) & 0xFFFF ) ) *
+                         ( 17 + (int)( ( region >> 48 ) & 0xFFFF ) ) ) ) % SliceSize );
         }
         
                 
