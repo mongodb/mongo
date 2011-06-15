@@ -680,7 +680,7 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-           promptType = scope->type("prompt");
+            promptType = scope->type("prompt");
             if (promptType == String){
                 prompt = scope->getString("prompt");
             } else if (promptType  == Code) {
