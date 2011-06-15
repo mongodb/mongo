@@ -424,11 +424,11 @@ namespace mongo {
         }
     }
 
-    Matcher::Matcher( const Matcher &other, const BSONObj &key ) :
+    Matcher::Matcher( const Matcher &docMatcher, const BSONObj &key ) :
         _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
         // Filter out match components that will provide an incorrect result
         // given a key from a single key index.
-        for( vector< ElementMatcher >::const_iterator i = other._basics.begin(); i != other._basics.end(); ++i ) {
+        for( vector< ElementMatcher >::const_iterator i = docMatcher._basics.begin(); i != docMatcher._basics.end(); ++i ) {
             if ( key.hasField( i->_toMatch.fieldName() ) ) {
                 switch( i->_compareOp ) {
                 case BSONObj::opSIZE:
@@ -461,16 +461,16 @@ namespace mongo {
                 }
             }
         }
-        for( int i = 0; i < other._nRegex; ++i ) {
-            if ( !other._regexs[ i ]._isNot && key.hasField( other._regexs[ i ]._fieldName ) ) {
-                _regexs[ _nRegex++ ] = other._regexs[ i ];
+        for( int i = 0; i < docMatcher._nRegex; ++i ) {
+            if ( !docMatcher._regexs[ i ]._isNot && key.hasField( docMatcher._regexs[ i ]._fieldName ) ) {
+                _regexs[ _nRegex++ ] = docMatcher._regexs[ i ];
             }
         }
         // Recursively filter match components for and and or matchers.
-        for( list< shared_ptr< Matcher > >::const_iterator i = other._andMatchers.begin(); i != other._andMatchers.end(); ++i ) {
+        for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._andMatchers.begin(); i != docMatcher._andMatchers.end(); ++i ) {
             _andMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
         }
-        for( list< shared_ptr< Matcher > >::const_iterator i = other._orMatchers.begin(); i != other._orMatchers.end(); ++i ) {
+        for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._orMatchers.begin(); i != docMatcher._orMatchers.end(); ++i ) {
             _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
         }
     }
@@ -935,13 +935,6 @@ namespace mongo {
         return true;
     }
 
-    bool Matcher::hasType( BSONObj::MatchType type ) const {
-        for ( unsigned i=0; i<_basics.size() ; i++ )
-            if ( _basics[i]._compareOp == type )
-                return true;
-        return false;
-    }
-
     bool Matcher::keyMatch( const Matcher &docMatcher ) const {
         // Quick check certain non key match cases.
         if ( docMatcher._all
@@ -952,7 +945,7 @@ namespace mongo {
         }
         
         // Check that all match components are available in the index matcher.
-        if ( !( _basics.size() == docMatcher._basics.size() && _nRegex == docMatcher._nRegex && !_where == !docMatcher._where ) ) {
+        if ( !( _basics.size() == docMatcher._basics.size() && _nRegex == docMatcher._nRegex && !docMatcher._where ) ) {
             return false;
         }
         if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {
@@ -961,10 +954,10 @@ namespace mongo {
         if ( _orMatchers.size() != docMatcher._orMatchers.size() ) {
             return false;
         }
-        if ( _norMatchers.size() != docMatcher._norMatchers.size() ) {
+        if ( docMatcher._norMatchers.size() > 0 ) {
             return false;
         }
-        if ( _orDedupConstraints.size() != docMatcher._orDedupConstraints.size() ) {
+        if ( docMatcher._orDedupConstraints.size() > 0 ) {
             return false;
         }
         

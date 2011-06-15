@@ -142,8 +142,6 @@ namespace mongo {
 
         bool atomic() const { return _atomic; }
 
-        bool hasType( BSONObj::MatchType type ) const;
-
         string toString() const {
             return _jsobj.toString();
         }
@@ -163,9 +161,11 @@ namespace mongo {
         bool keyMatch( const Matcher &docMatcher ) const;
         
     private:
-        // Only specify constrainIndexKey if matches() will be called with
-        // index keys having empty string field names.
-        Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
+        /**
+         * Generate a matcher for the provided index key format using the
+         * provided full doc matcher.
+         */
+        Matcher( const Matcher &docMatcher, const BSONObj &constrainIndexKey );
 
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
