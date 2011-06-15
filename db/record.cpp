@@ -123,6 +123,7 @@ namespace mongo {
              * @return whether we know the page is in ram
              */
             bool access( size_t region , short offset ) {
+                scoped_spinlock lk( _lock );
 
                 RARELY {
                     long long now = Listener::getElapsedTimeMillis();
@@ -168,7 +169,9 @@ namespace mongo {
             int _curSlice;
             long long _lastRotate;
             Slice _slices[NumSlices];
-        };
+
+            SpinLock _lock;
+        } rolling;
         
     }
 
@@ -188,13 +191,12 @@ namespace mongo {
 
     bool Record::likelyInPhysicalMemory() {
         static bool blockSupported = ProcessInfo::blockCheckSupported();
-        static ps::Rolling rolling;
 
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
-        if ( rolling.access( region , offset ) )
+        if ( ps::rolling.access( region , offset ) )
             return true;
 
         if ( ! blockSupported )
