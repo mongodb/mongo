@@ -14,6 +14,10 @@ t: salvage.o ${LIB}
 	    ${WT}/libwiredtiger.a -lpthread
 
 clean distclean realclean:
-	rm -f t ${OBJS} __* *.core
+	rm -f t ${OBJS} __* *.core tags
+
+tags: ${SRCS}
+	ctags -w $>
 
 ${OBJS}: ${SRCS}
+
