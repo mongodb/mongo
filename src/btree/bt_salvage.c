@@ -517,7 +517,7 @@ __slvg_trk_ovfl(
 		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
 		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
 
-	WT_RET(__wt_calloc_def(session, sizeof(WT_TRACK), &trk));
+	WT_RET(__wt_calloc_def(session, 1, &trk));
 
 	WT_TRACK_INIT(ss, trk, dsk->lsn, addr, dsk->size);
 	ss->ovfl[ss->ovfl_next++] = trk;
@@ -1757,7 +1757,7 @@ static int
 __slvg_discard_ovfl(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_TRACK *trk, **p, **t;
-	uint32_t i;
+	uint32_t i, discard;
 
 	/*
 	 * Walk the overflow page array -- if an overflow page isn't referenced,
@@ -1765,16 +1765,19 @@ __slvg_discard_ovfl(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	 * again when we create the internal pages, and the smaller it is, the
 	 * faster that search will go.
 	 */
+	discard = 0;
 	for (i = 0, p = t = ss->ovfl; i < ss->ovfl_next; ++i, ++t) {
 		trk = *t;
 		if (F_ISSET(trk, WT_TRACK_OVFL_REFD)) {
 			F_CLR(trk, WT_TRACK_OVFL_REFD);
 			*p++ = trk;
-		} else
+		} else {
 			WT_RET(__slvg_free_trk_ovfl(session, t, 1));
+			++discard;
+		}
 	}
 
-	ss->ovfl_next = WT_PTRDIFF32(p, ss->ovfl);
+	ss->ovfl_next -= discard;
 	return (0);
 }
 
