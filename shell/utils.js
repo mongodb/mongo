@@ -1423,6 +1423,7 @@ rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs 
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
+rs.config = function () { return rs.conf(); }
 
 rs.remove = function (hn) {
     var local = db.getSisterDB("local");
