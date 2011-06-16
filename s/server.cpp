@@ -280,7 +280,7 @@ int _main(int argc, char* argv[]) {
         return 5;
     }
 
-    // we either have a seeting were all process are in localhost or none is
+    // we either have a setting where all processes are in localhost or none are
     for ( vector<string>::const_iterator it = configdbs.begin() ; it != configdbs.end() ; ++it ) {
         try {
 
