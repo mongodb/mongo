@@ -1,4 +1,4 @@
-// index.cpp
+/** @file index.cpp */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -65,16 +65,19 @@ namespace mongo {
 
     int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
 
-    int IndexInterfaceImpl<V0>::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+    template <>
+    int IndexInterfaceImpl< V0 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
         return oldCompare(l, r, ordering);
     }
 
-    int IndexInterfaceImpl<V1>::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+    template <>
+    int IndexInterfaceImpl< V1 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
         return l.woCompare(r, ordering, /*considerfieldname*/false);
     }
 
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;
+
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
