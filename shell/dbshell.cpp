@@ -642,16 +642,17 @@ int _main(int argc, char* argv[]) {
         cout << "type \"help\" for help" << endl;
 
 #ifndef _WINDOWS
-    char *rcLocation = strcat( getenv("HOME"), "/.mongorc" );
+    char *rcLocation = strcat( getenv("HOME"), "/.mongorc.js" );
+#else
+    char *rcLocation = strcat( getenv("HOME"), "\.mongorc.js" );
+#endif
     if ( fileExists(rcLocation) ) {
         mongo::shellUtils::MongoProgramScope s;
-        //cout<<buffer<<endl;
-        if ( ! scope->execFile( rcLocation , false , true , false , 0 ) )
+        if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
+            cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
             return -5;
+        }
     }
-#else
-#endif
-
 
     if ( !script.empty() ) {
         mongo::shellUtils::MongoProgramScope s;
