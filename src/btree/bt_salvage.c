@@ -47,8 +47,8 @@ struct __wt_track {
 	uint32_t size;				/* Page size */
 
 	/*
-	 * Pages that reference overflow pages contain a list of the pages
-	 * they reference.
+	 * Pages that reference overflow pages contain a list of the overflow
+	 * pages they reference.
 	 */
 	WT_OFF	*ovfl;				/* Referenced overflow pages */
 	uint32_t ovfl_cnt;			/* Overflow list elements */
@@ -70,7 +70,6 @@ struct __wt_track {
 #define	WT_TRACK_NO_FB		0x008		/* Don't free blocks */
 #define	WT_TRACK_OVFL_MISSING	0x010		/* Overflow page missing */
 #define	WT_TRACK_OVFL_REFD	0x020		/* Overflow page referenced */
-
 	uint32_t flags;
 };
 
@@ -87,12 +86,9 @@ static int  __slvg_free_trk_col(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_free_trk_ovfl(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_free_trk_row(WT_SESSION_IMPL *, WT_TRACK **, int);
 static int  __slvg_key_copy(WT_SESSION_IMPL *, WT_BUF *, WT_BUF *);
-static int  __slvg_ovfl_col_dsk_ref(
-		WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_col_inmem_ref(WT_PAGE *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
-static int  __slvg_ovfl_row_dsk_ref(
-		WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+static int  __slvg_ovfl_dsk_ref(WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
 static void __slvg_ovfl_row_inmem_ref(WT_PAGE *, uint32_t, WT_STUFF *);
 static int  __slvg_range_col(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_range_overlap_col(
@@ -457,7 +453,7 @@ __slvg_trk_leaf(
 		trk->u.col.range_stop = dsk->recno + (dsk->u.entries - 1);
 
 		if (dsk->type == WT_PAGE_COL_VAR)
-			WT_ERR(__slvg_ovfl_col_dsk_ref(session, dsk, trk));
+			WT_ERR(__slvg_ovfl_dsk_ref(session, dsk, trk));
 		break;
 	case WT_PAGE_COL_RLE:
 		/*
@@ -478,8 +474,6 @@ __slvg_trk_leaf(
 		 * Keys are prefix-compressed, the simplest and slowest thing
 		 * to do is instantiate the in-memory page, then instantiate
 		 * and copy the keys, then free the page.
-		 *
-		 * Additionally, row-store pages can contain overflow items.
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
 		WT_ERR(__wt_row_key(session,
@@ -488,7 +482,8 @@ __slvg_trk_leaf(
 		    page, &page->u.row_leaf.d[page->entries - 1],
 		    &trk->u.row.range_stop));
 
-		WT_ERR(__slvg_ovfl_row_dsk_ref(session, dsk, trk));
+		/* Row-store pages can contain overflow items. */
+		WT_ERR(__slvg_ovfl_dsk_ref(session, dsk, trk));
 		break;
 	}
 
@@ -531,12 +526,11 @@ __slvg_trk_ovfl(
 }
 
 /*
- * __slvg_ovfl_col_dsk_ref --
- *	Search a column-store page for overflow items.
+ * __slvg_ovfl_dsk_ref --
+ *	Search a page for overflow items.
  */
 static int
-__slvg_ovfl_col_dsk_ref(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
+__slvg_ovfl_dsk_ref(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
 	WT_OFF ovfl;
@@ -548,7 +542,7 @@ __slvg_ovfl_col_dsk_ref(
 	 */
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(dsk, cell, i)
-		if (__wt_cell_type(cell) == WT_CELL_DATA_OVFL)
+		if (__wt_cell_type_is_ovfl(cell))
 			++ovfl_cnt;
 	if (ovfl_cnt == 0)
 		return (0);
@@ -558,55 +552,12 @@ __slvg_ovfl_col_dsk_ref(
 
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(dsk, cell, i)
-		if (__wt_cell_type(cell) == WT_CELL_DATA_OVFL) {
+		if (__wt_cell_type_is_ovfl(cell)) {
 			__wt_cell_off(cell, &ovfl);
 			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
 			trk->ovfl[ovfl_cnt].size = ovfl.size;
-			++ovfl_cnt;
-		}
-	return (0);
-}
-
-/*
- * __slvg_ovfl_row_dsk_ref --
- *	Search a row-store page for overflow items.
- */
-static int
-__slvg_ovfl_row_dsk_ref(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
-{
-	WT_CELL *cell;
-	WT_OFF ovfl;
-	uint32_t i, ovfl_cnt;
-
-	/*
-	 * Two passes: count the overflow items, then copy them into an
-	 * allocated array.
-	 */
-	ovfl_cnt = 0;
-	WT_CELL_FOREACH(dsk, cell, i)
-		switch (__wt_cell_type(cell)) {
-		case WT_CELL_KEY_OVFL:
-		case WT_CELL_DATA_OVFL:
-			++ovfl_cnt;
-			break;
-		}
-	if (ovfl_cnt == 0)
-		return (0);
-
-	WT_RET(__wt_calloc(session, ovfl_cnt, sizeof(WT_OFF), &trk->ovfl));
-	trk->ovfl_cnt = ovfl_cnt;
-
-	ovfl_cnt = 0;
-	WT_CELL_FOREACH(dsk, cell, i)
-		switch (__wt_cell_type(cell)) {
-		case WT_CELL_KEY_OVFL:
-		case WT_CELL_DATA_OVFL:
-			__wt_cell_off(cell, &ovfl);
-			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
-			trk->ovfl[ovfl_cnt].size = ovfl.size;
-			++ovfl_cnt;
-			break;
+			if (++ovfl_cnt == trk->ovfl_cnt)
+				break;
 		}
 	return (0);
 }
