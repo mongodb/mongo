@@ -1833,13 +1833,14 @@ __slvg_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	for (i = 0; i < ss->pages_next; ++i)
 		if (ss->pages[i] != NULL)
 			WT_RET(func(session, &ss->pages[i], 0));
+	__wt_free(session, ss->pages);
 
 	/* Discard the overflow page array. */
 	for (i = 0; i < ss->ovfl_next; ++i)
 		if (ss->ovfl[i] != NULL)
 			WT_RET(__slvg_free_trk_ovfl(session, &ss->ovfl[i], 0));
+	__wt_free(session, ss->ovfl);
 
-	__wt_free(session, ss->pages);
 	return (0);
 }
 
