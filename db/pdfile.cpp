@@ -1142,12 +1142,13 @@ namespace mongo {
         }
     }
 
+#if 0    
     void testSorting() {
         BSONObjBuilder b;
         b.appendNull("");
         BSONObj x = b.obj();
 
-        BSONObjExternalSorter sorter;
+        BSONObjExternalSorter sorter(*IndexDetails::iis[1]);
 
         sorter.add(x, DiskLoc(3,7));
         sorter.add(x, DiskLoc(4,7));
@@ -1165,6 +1166,7 @@ namespace mongo {
             cout<<"SORTER next:" << d.first.toString() << endl;*/
         }
     }
+#endif
 
     SortPhaseOne *precalced = 0;
 
@@ -1238,7 +1240,7 @@ namespace mongo {
             phase1 = &_ours;
             SortPhaseOne& p1 = *phase1;
             shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-            p1.sorter.reset( new BSONObjExternalSorter(order) );
+            p1.sorter.reset( new BSONObjExternalSorter(idx.idxInterface(), order) );
             p1.sorter->hintNumObjects( d->stats.nrecords );
             const IndexSpec& spec = idx.getSpec();
             while ( c->ok() ) {

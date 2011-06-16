@@ -160,7 +160,8 @@ namespace mongo {
             int x = 0;
             while( ii.more() ) { 
                 BSONObjBuilder b;
-                BSONObj::iterator i(ii.next().info.obj());
+                IndexDetails& idx = ii.next();
+                BSONObj::iterator i(idx.info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
                     if( !str::equals(e.fieldName(), "v") && !str::equals(e.fieldName(), "background") ) {
@@ -168,7 +169,7 @@ namespace mongo {
                     }
                 }
                 BSONObj o = b.obj().getOwned();
-                phase1[x].sorter.reset( new BSONObjExternalSorter( o.getObjectField("key") ) );
+                phase1[x].sorter.reset( new BSONObjExternalSorter( idx.idxInterface(), o.getObjectField("key") ) );
                 phase1[x].sorter->hintNumObjects( d->stats.nrecords );
                 indexSpecs[x++].reset(o);
             }

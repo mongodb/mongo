@@ -35,6 +35,7 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -61,6 +62,16 @@ namespace mongo {
             }
         }
     };
+
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    int IndexInterfaceImpl<V0>::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return oldCompare(l, r, ordering);
+    }
+
+    int IndexInterfaceImpl<V1>::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return l.woCompare(r, ordering, /*considerfieldname*/false);
+    }
 
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;

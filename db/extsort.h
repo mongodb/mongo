@@ -26,20 +26,22 @@
 
 namespace mongo {
 
-
     /**
        for external (disk) sorting by BSONObj and attaching a value
      */
     class BSONObjExternalSorter : boost::noncopyable {
     public:
-
+        BSONObjExternalSorter( IndexInterface &i, const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
+        ~BSONObjExternalSorter();
         typedef pair<BSONObj,DiskLoc> Data;
-
+ 
     private:
-        static int _compare(const Data& l, const Data& r, const BSONObj& order) { 
+        IndexInterface& _idxi;
+
+        static int _compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
             RARELY killCurrentOp.checkForInterrupt();
             _compares++;
-            int x = l.first.woCompare( r.first , order );
+            int x = i.keyCompare(l.first, r.first, order);
             if ( x )
                 return x;
             return l.second.compare( r.second );
@@ -47,19 +49,24 @@ namespace mongo {
 
         class MyCmp {
         public:
-            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
+            MyCmp( IndexInterface& i, BSONObj order = BSONObj() ) : _i(i), _order( Ordering::make(order) ) {}
             bool operator()( const Data &l, const Data &r ) const {
-                return _compare(l, r, _order) < 0;
+                return _compare(_i, l, r, _order) < 0;
             };
         private:
-            const BSONObj _order;
+            IndexInterface& _i;
+            const Ordering _order;
         };
 
-        static BSONObj extSortOrder;
+        static IndexInterface *extSortIdxInterface;
+        static Ordering extSortOrder;
         static int extSortComp( const void *lv, const void *rv ) {
+            DEV RARELY {                 
+                dbMutex.assertWriteLocked(); // must be as we use a global var
+            }
             Data * l = (Data*)lv;
             Data * r = (Data*)rv;
-            return _compare(*l, *r, extSortOrder);
+            return _compare(*extSortIdxInterface, *l, *r, extSortOrder);
         };
 
         class FileIterator : boost::noncopyable {
@@ -95,9 +102,6 @@ namespace mongo {
             InMemory::iterator _it;
 
         };
-
-        BSONObjExternalSorter( const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
-        ~BSONObjExternalSorter();
 
         void add( const BSONObj& o , const DiskLoc & loc );
         void add( const BSONObj& o , int a , int b ) {

@@ -31,6 +31,8 @@
 
 namespace JsobjTests {
 
+    IndexInterface& indexInterfaceForTheseTests = (time(0)%2) ? *IndexDetails::iis[0] : *IndexDetails::iis[1];
+
     void keyTest(const BSONObj& o, bool mustBeCompact = false) {
         static KeyV1Owned *kLast;
         static BSONObj last;
@@ -1369,7 +1371,8 @@ namespace JsobjTests {
         class Basic1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
+
                 sorter.add( BSON( "x" << 10 ) , 5  , 1);
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1401,7 +1404,7 @@ namespace JsobjTests {
         class Basic2 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.add( BSON( "x" << 10 ) , 5  , 11 );
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1434,7 +1437,7 @@ namespace JsobjTests {
         class Basic3 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.sort();
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
@@ -1447,7 +1450,7 @@ namespace JsobjTests {
         class ByDiskLock {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add( BSON( "x" << 10 ) , 5  , 4);
                 sorter.add( BSON( "x" << 2 ) , 3 , 0 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 2 );
@@ -1481,7 +1484,7 @@ namespace JsobjTests {
         class Big1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 2000 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 2000 );
                 for ( int i=0; i<10000; i++ ) {
                     sorter.add( BSON( "x" << rand() % 10000 ) , 5  , i );
                 }
@@ -1506,7 +1509,7 @@ namespace JsobjTests {
         public:
             void run() {
                 const int total = 100000;
-                BSONObjExternalSorter sorter( BSONObj() , total * 2 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
                 for ( int i=0; i<total; i++ ) {
                     sorter.add( BSON( "a" << "b" ) , 5  , i );
                 }
@@ -1536,7 +1539,7 @@ namespace JsobjTests {
                 b.appendNull("");
                 BSONObj x = b.obj();
 
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add(x, DiskLoc(3,7));
                 sorter.add(x, DiskLoc(4,7));
                 sorter.add(x, DiskLoc(2,7));

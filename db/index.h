@@ -22,6 +22,7 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "indexkey.h"
+#include "key.h"
 
 namespace mongo {
 
@@ -29,6 +30,7 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
         virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
@@ -185,7 +187,6 @@ namespace mongo {
             return *iis[v&1];
         }
 
-    private:
         static IndexInterface *iis[];
     };
 

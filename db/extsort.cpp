@@ -27,11 +27,12 @@
 
 namespace mongo {
 
-    BSONObj BSONObjExternalSorter::extSortOrder;
+    IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
+    Ordering BSONObjExternalSorter::extSortOrder( Ordering::make(BSONObj()) );
     unsigned long long BSONObjExternalSorter::_compares = 0;
 
-    BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
-        : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) ,
+    BSONObjExternalSorter::BSONObjExternalSorter( IndexInterface &i, const BSONObj & order , long maxFileSize )
+        : _idxi(i), _order( order.getOwned() ) , _maxFilesize( maxFileSize ) ,
           _arraySize(1000000), _cur(0), _curSizeSoFar(0), _sorted(0) {
 
         stringstream rootpath;
@@ -60,7 +61,8 @@ namespace mongo {
         // extSortComp needs to use glbals
         // qsort_r only seems available on bsd, which is what i really want to use
         dblock l;
-        extSortOrder = _order;
+        extSortIdxInterface = &_idxi;
+        extSortOrder = Ordering::make(_order);
         _cur->sort( BSONObjExternalSorter::extSortComp );
     }
 
@@ -146,7 +148,7 @@ namespace mongo {
     // ---------------------------------
 
     BSONObjExternalSorter::Iterator::Iterator( BSONObjExternalSorter * sorter ) :
-        _cmp( sorter->_order ) , _in( 0 ) {
+        _cmp( sorter->_idxi, sorter->_order ) , _in( 0 ) {
 
         for ( list<string>::iterator i=sorter->_files.begin(); i!=sorter->_files.end(); i++ ) {
             _files.push_back( new FileIterator( *i ) );
@@ -157,8 +159,6 @@ namespace mongo {
             _in = sorter->_cur;
             _it = sorter->_cur->begin();
         }
-
-
     }
 
     BSONObjExternalSorter::Iterator::~Iterator() {
