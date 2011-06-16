@@ -491,12 +491,13 @@ process(void)
 	assert(session->open_cursor(
 	    session, "table:" SLVG, NULL, "dump,printable", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
-		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
-			fwrite(key.data, key.size, 1, fp);
+		assert (cursor->get_key(cursor, &key) == 0);
+		if (key.data != NULL) {
+			fwrite(key.data, 1, key.size, fp);
 			fwrite("\n", 1, 1, fp);
 		}
 		assert(cursor->get_value(cursor, &value) == 0);
-		fwrite(value.data, value.size, 1, fp);
+		fwrite(value.data, 1, value.size, fp);
 		fwrite("\n", 1, 1, fp);
 	}
 	assert(cursor->close(cursor, NULL) == 0);
