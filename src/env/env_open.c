@@ -9,7 +9,7 @@
 
 /*
  * __wt_connection_open --
- *	Open a Env handle.
+ *	Open a connection.
  */
 int
 __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *home, mode_t mode)
@@ -83,7 +83,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Complain if files weren't closed. */
 	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL && fh != conn->log_fh) {
 		__wt_errx(session,
-		    "Env handle has open file handles: %s", fh->name);
+		    "connection has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(session, fh));
 		secondary_err = WT_ERROR;
 	}
