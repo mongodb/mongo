@@ -28,10 +28,7 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
-	WT_SESSION *session;
-
 	WT_UNUSED(handler);
-	session = g.wts_session;
 
 	if (g.logfp != NULL)
 		fprintf(g.logfp, "%s\n", message);
@@ -152,7 +149,7 @@ wts_startup(void)
 	}
 
 	if (g.logging) {
-		time(&now);
+		(void)time(&now);
 		session->msg_printf(session,
 		    "===============\nWT start: %s===============",
 		    ctime(&now));
@@ -164,12 +161,13 @@ wts_startup(void)
 	return (0);
 }
 
-void
+int
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	time_t now;
+	int ret;
 
 	conn = g.wts_conn;
 	session = g.wts_session;
@@ -181,9 +179,16 @@ wts_teardown(void)
 		    ctime(&now));
 	}
 
-	assert(wts_sync() == 0);
+	if ((ret = wts_sync()) != 0)
+		return (ret);
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr, "%s: conn.close: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
 	g.wts_session = NULL;
-	assert(conn->close(conn, NULL) == 0);
+	return (0);
 }
 
 int
@@ -245,7 +250,7 @@ wts_dump(void)
 		return (1);
 	}
 
-	track("dump", 0);
+	track("dump", 0ULL);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: fopen: %s\n",
@@ -277,7 +282,7 @@ wts_dump(void)
 		return (1);
 	}
 
-	track("dump comparison", 0);
+	track("dump comparison", 0ULL);
 	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
@@ -298,16 +303,36 @@ wts_dump(void)
 int
 wts_salvage(void)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+	char config[200];
 
-	session = g.wts_session;
+	snprintf(config, sizeof(config),
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
+	    g.progname, g.c_cache);
 
+	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
+		fprintf(stderr, "%s: wiredtiger_open: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		fprintf(stderr, "%s: conn.session: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
 	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0) {
 		fprintf(stderr, "%s: salvage: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr, "%s: conn.close: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
 	return (0);
 }
 
@@ -331,16 +356,36 @@ wts_sync(void)
 int
 wts_verify(void)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+	char config[200];
 
-	session = g.wts_session;
+	snprintf(config, sizeof(config),
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
+	    g.progname, g.c_cache);
 
+	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
+		fprintf(stderr, "%s: wiredtiger_open: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		fprintf(stderr, "%s: conn.session: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
 	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0) {
 		fprintf(stderr, "%s: verify: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr, "%s: conn.close: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
 	return (0);
 }
 
@@ -360,7 +405,7 @@ wts_stats(void)
 
 	session = g.wts_session;
 
-	track("stat", 0);
+	track("stat", 0ULL);
 	p = fname("stats");
 	if ((fp = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: fopen: %s\n",

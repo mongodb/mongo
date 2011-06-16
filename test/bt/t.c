@@ -92,12 +92,8 @@ main(int argc, char *argv[])
 
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
-
-		wts_teardown();			/* Close and  re-open */
-		if (wts_startup())
-			goto err;
-
-		if (wts_verify())		/* Verify the file */
+						/* Close, verify, re-open */
+		if (wts_teardown() || wts_verify() || wts_startup())
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
@@ -113,35 +109,32 @@ main(int argc, char *argv[])
 
 			if (wts_ops())		/* Random operations */
 				goto err;
-
-			wts_teardown();		/* Close and  re-open */
-			if (wts_startup())
-				goto err;
-
-			if (wts_verify())	/* Verify the file */
+						/* Close, verify, re-open */
+			if (wts_teardown() || wts_verify() || wts_startup())
 				goto err;
 		}
 
 		if (wts_stats())		/* Statistics */
 			goto err;
 						/* Close the file */
-		track("shutting down BDB", 0);
+		track("shutting down BDB", 0ULL);
 		bdb_teardown();	
 
 		if (wts_dump())			/* Dump the file */
 			goto err;
 
 #if 0
-		track("salvage", 0);
+		track("salvage", 0ULL);
 		if (wts_salvage())		/* Salvage the file */
 			goto err;
 #endif
 
-		track("shutting down WT", 0);
-		wts_teardown();
+		track("shutting down WT", 0ULL);
+		if (wts_teardown())
+			goto err;
 
-		track(config_dtype(), 0);
-		track("\n", 0);
+		track(config_dtype(), 0ULL);
+		track("\n", 0ULL);
 	}
 
 	if (g.rand_log != NULL)
@@ -168,7 +161,7 @@ restart(void)
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	system("rm -f __bdb* __log __wt*");
+	(void)system("rm -f __bdb* __log __wt*");
 
 	p = "__log";
 	if (g.logging &&

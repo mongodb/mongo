@@ -2722,9 +2722,6 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 	parent_ref->state = state;
 
 	/*
-	 * If we just updated the root page, we have to update the file's
-	 * description.
-	 *
 	 * If it's not the root page, mark the parent page dirty.
 	 *
 	 * There's no chance we need to flush this write -- the eviction thread
@@ -2736,9 +2733,7 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * with us, the page will still be marked dirty and that's all we care
 	 * about.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
-		WT_RET(__wt_desc_update(session));
-	else
+	if (!WT_PAGE_IS_ROOT(page))
 		WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);

@@ -114,5 +114,5 @@ int	 wts_read_scan(void);
 int	 wts_salvage(void);
 int	 wts_startup(void);
 int	 wts_stats(void);
-void	 wts_teardown(void);
+int	 wts_teardown(void);
 int	 wts_verify(void);

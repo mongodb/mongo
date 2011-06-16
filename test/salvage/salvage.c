@@ -31,8 +31,8 @@ void copy(u_int, u_int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
-void slvg_close(WT_CONNECTION *);
-void slvg_open(const char *, WT_SESSION **, WT_CONNECTION **);
+void table_create(const char *, WT_SESSION **, WT_CONNECTION **);
+void table_open(const char *, WT_SESSION **, WT_CONNECTION **);
 int  usage(void);
 
 FILE *res_fp;					/* Results file */
@@ -390,10 +390,7 @@ build(int ikey, int ivalue, int cnt)
 	WT_SESSION *session;
 	char kbuf[64], vbuf[64];
 
-	(void)remove(LOAD);
-
-	slvg_open(LOAD, &session, &conn);
-
+	table_create(LOAD, &session, &conn);
 	assert(session->open_cursor(
 	    session, "table:" LOAD, NULL, "bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
@@ -418,7 +415,7 @@ build(int ikey, int ivalue, int cnt)
 	}
 
 	assert(session->sync(session, "table:" LOAD, NULL) == 0);
-	slvg_close(conn);
+	assert(conn->close(conn, 0) == 0);
 }
 
 /*
@@ -482,16 +479,14 @@ process(void)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 
-	slvg_open(SLVG, &session, &conn);
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+
 	assert(session->salvage(session, "table:" SLVG, 0) == 0);
-	slvg_close(conn);
 
-	slvg_open(SLVG, &session, &conn);
 	assert(session->verify(session, "table:" SLVG, 0) == 0);
-	slvg_close(conn);
 
-	slvg_open(SLVG, &session, &conn);
-
+	table_open(SLVG, &session, &conn);
 	assert((fp = fopen(DUMP, "w")) != NULL);
 	assert(session->open_cursor(
 	    session, "table:" SLVG, NULL, "dump,printable", &cursor) == 0);
@@ -507,19 +502,21 @@ process(void)
 	assert(cursor->close(cursor, NULL) == 0);
 	assert(fclose(fp) == 0);
 
-	slvg_close(conn);
+	assert(conn->close(conn, 0) == 0);
 }
 
 /*
- * slvg_open --
- *	Open the salvage file.
+ * table_create --
+ *	Create a new table.
  */
 void
-slvg_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
+table_create(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	char config[512], table[512];
+
+	(void)remove(name);
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
@@ -569,13 +566,23 @@ slvg_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
 }
 
 /*
- * slvg_close --
- *	Close the salvage file.
+ * table_open --
+ *	Open an existing table.
  */
 void
-slvg_close(WT_CONNECTION *conn)
+table_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
 {
-	assert(conn->close(conn, 0) == 0);
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	char table[512];
+
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+	snprintf(table, sizeof(table), "table:%s", name);
+	assert(session->create(session, table, NULL) == 0);
+
+	*sessionp = session;
+	*connp = conn;
 }
 
 /*
