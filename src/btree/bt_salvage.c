@@ -1795,29 +1795,16 @@ __slvg_free_merge_block(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 	uint32_t i;
+	int (*func)(WT_SESSION_IMPL *, WT_TRACK **, int);
 
-	switch (ss->page_type) {
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-		for (i = 0; i < ss->pages_next; ++i) {
-			if ((trk = ss->pages[i]) == NULL)
-				continue;
-			if (F_ISSET(trk, WT_TRACK_MERGE) &&
-			    !F_ISSET(trk, WT_TRACK_NO_FB))
-				WT_RET(__slvg_free_trk_col(
-				    session, &ss->pages[i], 1));
-		}
-		break;
-	case WT_PAGE_ROW_LEAF:
-		for (i = 0; i < ss->pages_next; ++i) {
-			if ((trk = ss->pages[i]) == NULL)
-				continue;
-			if (F_ISSET(trk, WT_TRACK_MERGE) &&
-			    !F_ISSET(trk, WT_TRACK_NO_FB))
-				WT_RET(__slvg_free_trk_row(
-				    session, &ss->pages[i], 1));
-		}
+	func = ss->page_type == WT_PAGE_ROW_LEAF ?
+	    __slvg_free_trk_row : __slvg_free_trk_col;
+	for (i = 0; i < ss->pages_next; ++i) {
+		if ((trk = ss->pages[i]) == NULL)
+			continue;
+		if (F_ISSET(trk, WT_TRACK_MERGE) &&
+		    !F_ISSET(trk, WT_TRACK_NO_FB))
+			WT_RET(func(session, &ss->pages[i], 1));
 	}
 
 	return (0);
@@ -1831,23 +1818,14 @@ static int
 __slvg_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	uint32_t i;
+	int (*func)(WT_SESSION_IMPL *, WT_TRACK **, int);
 
 	/* Discard the leaf page array. */
-	switch (ss->page_type) {
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-		for (i = 0; i < ss->pages_next; ++i)
-			if (ss->pages[i] != NULL)
-				WT_RET(__slvg_free_trk_col(
-				    session, &ss->pages[i], 0));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		for (i = 0; i < ss->pages_next; ++i)
-			if (ss->pages[i] != NULL)
-				WT_RET(__slvg_free_trk_row(
-				    session, &ss->pages[i], 0));
-	}
+	func = ss->page_type == WT_PAGE_ROW_LEAF ?
+	    __slvg_free_trk_row : __slvg_free_trk_col;
+	for (i = 0; i < ss->pages_next; ++i)
+		if (ss->pages[i] != NULL)
+			WT_RET(func(session, &ss->pages[i], 0));
 
 	/* Discard the overflow page array. */
 	for (i = 0; i < ss->ovfl_next; ++i)
@@ -1935,25 +1913,16 @@ __wt_trk_dump(const char *l, void *ss_arg)
 	WT_STUFF *ss;
 	WT_TRACK *trk;
 	uint32_t i;
+	void (*func)(WT_TRACK *);
 
 	ss = ss_arg;
 
 	fprintf(stderr, "salvage page track list (%s):\n", l);
-
-	switch (ss->page_type) {
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-		for (i = 0; i < ss->pages_next; ++i)
-			if ((trk = ss->pages[i]) != NULL)
-				__slvg_trk_dump_col(trk);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		for (i = 0; i < ss->pages_next; ++i)
-			if ((trk = ss->pages[i]) != NULL)
-				__slvg_trk_dump_row(trk);
-		break;
-	}
+	func = ss->page_type == WT_PAGE_ROW_LEAF ?
+	    __slvg_trk_dump_row : __slvg_trk_dump_col;
+	for (i = 0; i < ss->pages_next; ++i)
+		if ((trk = ss->pages[i]) != NULL)
+			func(trk);
 
 	fprintf(stderr, "overflow page track list: ");
 	for (i = 0; i < ss->ovfl_next; ++i) {
