@@ -641,10 +641,10 @@ int _main(int argc, char* argv[]) {
     if( runShell )
         cout << "type \"help\" for help" << endl;
 
-#ifndef _WINDOWS
+#ifndef _WIN32
     char *rcLocation = strcat( getenv("HOME"), "/.mongorc.js" );
 #else
-    char *rcLocation = strcat( getenv("HOME"), "\.mongorc.js" );
+    char *rcLocation = strcat( strcat( getenv("HOMEDRIVE"), getenv("HOMEPATH")), "\\.mongorc.js");
 #endif
     if ( fileExists(rcLocation) ) {
         mongo::shellUtils::MongoProgramScope s;
