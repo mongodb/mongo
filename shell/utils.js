@@ -1394,9 +1394,13 @@ rs._runCmd = function (c) {
     }
     return res;
 }
-rs.reconfig = function (cfg) {
+rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
-    return this._runCmd({ replSetReconfig: cfg });
+    cmd = { replSetReconfig: cfg };
+    for (var i in options) {
+        cmd[i] = options[i];
+    }
+    return this._runCmd(cmd);
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
