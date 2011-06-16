@@ -220,6 +220,14 @@ namespace mongo {
         /** This cursor will be ignored for yielding by the client cursor implementation. */
         virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
+        virtual BSONObj indexKeyPattern() {
+            if ( _takeover ) {
+                return _takeover->indexKeyPattern();
+            }
+            assertOk();
+            return _currOp->cursor()->indexKeyPattern();
+        }
+        
         virtual bool supportGetMore() { return false; }
 
         virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }

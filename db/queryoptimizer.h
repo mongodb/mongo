@@ -492,6 +492,7 @@ namespace mongo {
         virtual void checkLocation() { _c->checkLocation(); }
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return _c->supportYields(); }
+        virtual BSONObj indexKeyPattern() { return _c->indexKeyPattern(); }
 
         /**
          * with update we could potentially get the same document on multiple
