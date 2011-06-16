@@ -830,6 +830,9 @@
     <ClCompile Include="..\db\queryoptimizercursor.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\record.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

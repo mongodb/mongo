@@ -73,7 +73,7 @@ namespace mongo {
             }
 
             // the move requires acquiring the collection metadata's lock, which can fail
-            log() << "balacer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
+            log() << "balancer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
                   << " chunk: " << chunkToMove << endl;
 
             if ( res["chunkTooBig"].trueValue() ) {

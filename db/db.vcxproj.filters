@@ -160,6 +160,7 @@
     <ClCompile Include="key.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="queryoptimizercursor.cpp" />
+    <ClCompile Include="record.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

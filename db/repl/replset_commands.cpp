@@ -140,7 +140,9 @@ namespace mongo {
         bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( !theReplSet->box.getState().primary() ) {
+
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+            if( !force && !theReplSet->box.getState().primary() ) {
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
             }
@@ -162,13 +164,8 @@ namespace mongo {
                 return false;
             }
 
-            /** TODO
-                Support changes when a majority, but not all, members of a set are up.
-                Determine what changes should not be allowed as they would cause erroneous states.
-                What should be possible when a majority is not up?
-                */
             try {
-                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj());
+                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj(), force);
 
                 log() << "replSet replSetReconfig config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 

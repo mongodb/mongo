@@ -1055,7 +1055,7 @@ namespace mongo {
                 MatchDetails details;
                 if ( _matcher.get() ) {
                     bool good = _matcher->matchesWithSingleKeyIndex( node.key.toBson() , node.recordLoc , &details );
-                    if ( details.loadedObject )
+                    if ( details._loadedObject )
                         _objectsLoaded++;
 
                     if ( ! good ) {
@@ -1067,7 +1067,7 @@ namespace mongo {
 
                 _matched[ node.recordLoc ] = true;
 
-                if ( ! details.loadedObject ) // don't double count
+                if ( ! details._loadedObject ) // don't double count
                     _objectsLoaded++;
 
             }

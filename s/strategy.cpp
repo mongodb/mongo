@@ -76,4 +76,5 @@ namespace mongo {
         dbcon->insert( ns , obj , flags);
         dbcon.done();
     }
+
 }

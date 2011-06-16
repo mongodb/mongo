@@ -748,12 +748,12 @@ namespace mongo {
 
         virtual void next() {
             if ( _findingStartCursor.get() ) {
-                if ( _findingStartCursor->done() ) {
-                    _c = _findingStartCursor->cRelease();
-                    _findingStartCursor.reset( 0 );
-                }
-                else {
+                if ( !_findingStartCursor->done() ) {
                     _findingStartCursor->next();
+                }                    
+                if ( _findingStartCursor->done() ) {
+                    _c = _findingStartCursor->cursor();
+                    _findingStartCursor.reset( 0 );
                 }
                 _capped = true;
                 return;
@@ -778,7 +778,7 @@ namespace mongo {
             _nscanned = _c->nscanned();
             if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
                 // not a match, continue onward
-                if ( _details.loadedObject )
+                if ( _details._loadedObject )
                     _nscannedObjects++;
             }
             else {

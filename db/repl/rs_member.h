@@ -49,6 +49,7 @@ namespace mongo {
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
         explicit MemberState(int ms) : s((MS) ms) { }
 
+        bool startup() const { return s == RS_STARTUP; }
         bool primary() const { return s == RS_PRIMARY; }
         bool secondary() const { return s == RS_SECONDARY; }
         bool recovering() const { return s == RS_RECOVERING; }

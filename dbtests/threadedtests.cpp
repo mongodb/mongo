@@ -240,7 +240,7 @@ namespace ThreadedTests {
         void run() { 
             RWLock lk( "eliot" );
             {
-                rwlock r( lk , true , false , 1000 );
+                rwlock r( lk , true , 1000 );
             }
         }
     };

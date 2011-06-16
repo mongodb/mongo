@@ -182,7 +182,7 @@ namespace mongo {
 
         bool _load();
         bool _reload();
-        void _save();
+        void _save( bool db = true, bool coll = true );
 
         string _name; // e.g. "alleyinsider"
         Shard _primary; // e.g. localhost , mongo.foo.com:9999

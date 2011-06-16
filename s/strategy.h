@@ -32,6 +32,8 @@ namespace mongo {
         virtual void getMore( Request& r ) = 0;
         virtual void writeOp( int op , Request& r ) = 0;
 
+        virtual void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) = 0;
+
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );

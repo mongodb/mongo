@@ -1,4 +1,4 @@
-// mr.h
+// mr_shard.h
 
 /**
  *
@@ -21,21 +21,13 @@
 
 namespace mongo {
 
-    namespace mr {
+    namespace mr_shard {
 
         typedef vector<BSONObj> BSONList;
 
         class State;
 
         // ------------  function interfaces -----------
-
-        class Mapper : boost::noncopyable {
-        public:
-            virtual ~Mapper() {}
-            virtual void init( State * state ) = 0;
-
-            virtual void map( const BSONObj& o ) = 0;
-        };
 
         class Finalizer : boost::noncopyable {
         public:
@@ -89,17 +81,6 @@ namespace mongo {
             ScriptingFunction _func;
         };
 
-        class JSMapper : public Mapper {
-        public:
-            JSMapper( const BSONElement & code ) : _func( "_map" , code ) {}
-            virtual void map( const BSONObj& o );
-            virtual void init( State * state );
-
-        private:
-            JSFunction _func;
-            BSONObj _params;
-        };
-
         class JSReducer : public Reducer {
         public:
             JSReducer( const BSONElement& code ) : _func( "_reduce" , code ) {}
@@ -132,17 +113,6 @@ namespace mongo {
 
         // -----------------
 
-
-        class TupleKeyCmp {
-        public:
-            TupleKeyCmp() {}
-            bool operator()( const BSONObj &l, const BSONObj &r ) const {
-                return l.firstElement().woCompare( r.firstElement() ) < 0;
-            }
-        };
-
-        typedef map< BSONObj,BSONList,TupleKeyCmp > InMemory; // from key to list of tuples
-
         /**
          * holds map/reduce config information
          */
@@ -164,8 +134,6 @@ namespace mongo {
             long long limit;
 
             // functions
-
-            scoped_ptr<Mapper> mapper;
             scoped_ptr<Reducer> reducer;
             scoped_ptr<Finalizer> finalizer;
 
@@ -231,13 +199,6 @@ namespace mongo {
              */
             void reduceInMemory();
 
-            /**
-             * transfers in memory storage to temp collection
-             */
-            void dumpToInc();
-            void insertToInc( BSONObj& o );
-            void _insertToInc( BSONObj& o );
-
             // ------ reduce stage -----------
 
             void prepTempCollection();
@@ -245,26 +206,6 @@ namespace mongo {
             void finalReduce( BSONList& values );
 
             void finalReduce( CurOp * op , ProgressMeterHolder& pm );
-
-            // ------- cleanup/data positioning ----------
-
-            /**
-               @return number objects in collection
-             */
-            long long postProcessCollection();
-
-            /**
-             * if INMEMORY will append
-             * may also append stats or anything else it likes
-             */
-            void appendResults( BSONObjBuilder& b );
-
-            // -------- util ------------
-
-            /**
-             * inserts with correct replication semantics
-             */
-            void insert( const string& ns , const BSONObj& o );
 
             // ------ simple accessors -----
 
@@ -275,39 +216,15 @@ namespace mongo {
 
             const bool isOnDisk() { return _onDisk; }
 
-            long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
-            long long numReduces() const { if (_jsMode) return _scope->getNumberLongLong("_redCt"); return _config.reducer->numReduces; }
-
-            bool jsMode() {return _jsMode;}
-            void switchMode(bool jsMode);
-            void bailFromJS();
+            long long numReduces() const { return _config.reducer->numReduces; }
 
             const Config& _config;
 
         protected:
 
-            void _add( InMemory* im , const BSONObj& a , long& size );
-
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
-
-            DBDirectClient _db;
-
-            scoped_ptr<InMemory> _temp;
-            long _size; // bytes in _temp
-            long _dupCount; // number of duplicate key entries
-
-            long long _numEmits;
-
-            bool _jsMode;
-            ScriptingFunction _reduceAll;
-            ScriptingFunction _reduceAndEmit;
-            ScriptingFunction _reduceAndFinalize;
-            ScriptingFunction _reduceAndFinalizeAndInsert;
         };
-
-        BSONObj fast_emit( const BSONObj& args, void* data );
-        BSONObj _bailFromJS( const BSONObj& args, void* data );
 
     } // end mr namespace
 }

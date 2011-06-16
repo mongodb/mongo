@@ -262,6 +262,10 @@ namespace mongo {
             return true;
         }
 
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
+            // only useful for shards
+        }
+
         set<string> _commandsSafeToPass;
     };
 

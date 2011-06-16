@@ -1394,9 +1394,13 @@ rs._runCmd = function (c) {
     }
     return res;
 }
-rs.reconfig = function (cfg) {
+rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
-    return this._runCmd({ replSetReconfig: cfg });
+    cmd = { replSetReconfig: cfg };
+    for (var i in options) {
+        cmd[i] = options[i];
+    }
+    return this._runCmd(cmd);
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1423,6 +1427,7 @@ rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs 
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
+rs.config = function () { return rs.conf(); }
 
 rs.remove = function (hn) {
     var local = db.getSisterDB("local");

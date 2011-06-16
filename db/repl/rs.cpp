@@ -77,6 +77,7 @@ namespace mongo {
             const Member *temp = findById(*it);
             if (!temp) {
                 log() << "couldn't find member: " << *it << endl;
+                _electableSet.erase(*it);
                 continue;
             }
             if (!max || max->config().priority < temp->config().priority) {
@@ -416,14 +417,15 @@ namespace mongo {
                 }
             }
             if( me == 0 ) {
-                // initial startup with fastsync
-                if (!reconf && replSettings.fastsync) {
-                    return false;
-                }
-                // log() << "replSet config : " << _cfg->toString() << rsLog;
+                _members.orphanAll();
+                // hbs must continue to pick up new config
+                // stop sync thread
+                box.set(MemberState::RS_STARTUP, 0);
+
+                // go into holding pattern
                 log() << "replSet error self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
-                uasserted(13497, "replSet error self not present in the configuration");
+                return false;
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
@@ -626,10 +628,11 @@ namespace mongo {
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
 
         newConfig.saveConfigLocally(comment);
-        
+
         try {
-            initFromConfig(newConfig, true);
-            log() << "replSet replSetReconfig new config saved locally" << rsLog;
+            if (initFromConfig(newConfig, true)) {
+                log() << "replSet replSetReconfig new config saved locally" << rsLog;
+            }
         }
         catch(DBException& e) {
             if( e.getCode() == 13497 /* removed from set */ ) {

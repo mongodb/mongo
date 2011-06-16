@@ -53,7 +53,7 @@ namespace mongo {
 
         bool supported();
 
-        bool blockCheckSupported();
+        static bool blockCheckSupported();
         static bool blockInMemory( char * start );
 
     private:
