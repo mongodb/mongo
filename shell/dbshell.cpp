@@ -641,6 +641,18 @@ int _main(int argc, char* argv[]) {
     if( runShell )
         cout << "type \"help\" for help" << endl;
 
+#ifndef _WINDOWS
+    char *rcLocation = strcat( getenv("HOME"), "/.mongorc" );
+    if ( fileExists(rcLocation) ) {
+        mongo::shellUtils::MongoProgramScope s;
+        //cout<<buffer<<endl;
+        if ( ! scope->execFile( rcLocation , false , true , false , 0 ) )
+            return -5;
+    }
+#else
+#endif
+
+
     if ( !script.empty() ) {
         mongo::shellUtils::MongoProgramScope s;
         if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )
