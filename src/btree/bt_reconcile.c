@@ -1645,11 +1645,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 				data = cipdata;		/* On-disk data */
 		}
 
-		/*
-		 * When reconciling a fixed-width page that doesn't support
-		 * run-length encoding, the on-page information can't change
-		 * size -- there's no reason to ever split such a page.
-		 */
+		/* Boundary: split or write the page. */
+		while (len > r->space_avail)
+			WT_RET(__rec_split(session));
+
 		memcpy(r->first_free, data, len);
 		__rec_incr(session, r, len);
 	}
