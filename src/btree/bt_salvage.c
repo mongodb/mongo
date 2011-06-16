@@ -1917,7 +1917,9 @@ __wt_trk_dump(const char *l, void *ss_arg)
 
 	ss = ss_arg;
 
-	fprintf(stderr, "salvage page track list (%s):\n", l);
+	if (l != NULL)
+		fprintf(stderr, "%s: ", l);
+	fprintf(stderr, "salvage page track list\n");
 	func = ss->page_type == WT_PAGE_ROW_LEAF ?
 	    __slvg_trk_dump_row : __slvg_trk_dump_col;
 	for (i = 0; i < ss->pages_next; ++i)
