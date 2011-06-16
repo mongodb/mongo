@@ -58,9 +58,9 @@ namespace DirectClientTests {
                 if( pass ) {
                     BSONObj info;
                     BSONObj cmd = BSON( "captrunc" << "b" << "n" << 1 << "inc" << true );
-                    cout << cmd.toString() << endl;
+                    //cout << cmd.toString() << endl;
                     bool ok = client().runCommand("a", cmd, info);
-                    cout << info.toString() << endl;
+                    //cout << info.toString() << endl;
                     assert(ok);
                 }
 
