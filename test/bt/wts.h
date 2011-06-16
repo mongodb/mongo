@@ -24,9 +24,7 @@
 #endif
 
 /* General purpose. */
-#define	KB(v)	((v) * 1024)			/* Kilobytes */
 #define	M(v)	((v) * 1000000)			/* Million */
-#define	MB(v)	((v) * 1024 * 1024)		/* Megabytes */
 
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
@@ -35,10 +33,9 @@
 #define	ROW		2
 #define	VAR		3
 
-#define	WT_PREFIX	"wt"			/* Output file prefix */
-#define	WT_TABLENAME	"table:__wt"
 #define	BDB_PREFIX	"bdb"
-
+#define	WT_PREFIX	"wt"
+#define	WT_TABLENAME	"table:__wt"
 
 typedef struct {
 	char *progname;				/* Program name */
@@ -71,7 +68,6 @@ typedef struct {
 	uint32_t c_insert_pct;
 	uint32_t c_intl_node_max;
 	uint32_t c_intl_node_min;
-	uint32_t c_key_cnt;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_node_max;
@@ -106,7 +102,6 @@ void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
 void	 track(const char *, uint64_t);
 int	 wts_bulk_load(void);
-int	 wts_del(uint64_t);
 int	 wts_dump(void);
 int	 wts_ops(void);
 uint32_t wts_rand(void);

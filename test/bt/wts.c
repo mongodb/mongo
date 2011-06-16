@@ -65,7 +65,6 @@ wts_startup(void)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
 	int ret;
 	char config[200], *end, *p;
 
@@ -102,10 +101,10 @@ wts_startup(void)
 	    "leaf_node_min=%d,leaf_node_max=%d,"
 	    "btree_split_min",
 	    (g.c_file_type == ROW) ? "u" : "r",
-	    intl_node_min = 1U << g.c_intl_node_min,
-	    intl_node_max = 1U << g.c_intl_node_max,
-	    leaf_node_min = 1U << g.c_leaf_node_min,
-	    leaf_node_max = 1U << g.c_leaf_node_max);
+	    1U << g.c_intl_node_min,
+	    1U << g.c_intl_node_max,
+	    1U << g.c_leaf_node_min,
+	    1U << g.c_leaf_node_max);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -113,8 +112,8 @@ wts_startup(void)
 		 * XXX
 		 * Don't go past the WT limit of 20 objects per leaf page.
 		 */
-		if (20 * g.c_data_min > leaf_node_min)
-			g.c_data_min = leaf_node_min / 20;
+		if (20 * g.c_data_min > (1U << g.c_leaf_node_min))
+			g.c_data_min = (1U << g.c_leaf_node_min) / 20;
 		p += snprintf(p,
 		    (size_t)(end - p), ",value_format=\"%du\"", g.c_data_min);
 		if (g.c_repeat_comp_pct != 0)
@@ -150,7 +149,7 @@ wts_startup(void)
 
 	if (g.logging) {
 		(void)time(&now);
-		session->msg_printf(session,
+		(void)session->msg_printf(session,
 		    "===============\nWT start: %s===============",
 		    ctime(&now));
 	}
@@ -173,8 +172,8 @@ wts_teardown(void)
 	session = g.wts_session;
 
 	if (g.logging) {
-		time(&now);
-		session->msg_printf(session,
+		(void)time(&now);
+		(void)session->msg_printf(session,
 		    "===============\nWT stop: %s===============",
 		    ctime(&now));
 	}
@@ -260,20 +259,26 @@ wts_dump(void)
 
         fprintf(fp, "VERSION=1\n");
         fprintf(fp, "HEADER=END\n");
+
 	row_count = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
 		if (++row_count % 100 == 0)
 			track("dump", row_count);
-		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
-			fwrite(key.data, key.size, 1, fp);
-			fwrite("\n", 1, 1, fp);
+		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+		    (ret = cursor->get_value(cursor, &value)) != 0)
+			break;
+		if (key.data != NULL &&
+		    (fwrite(key.data, 1, key.size, fp) != key.size ||
+		    fwrite("\n", 1, 1, fp) != 1)) {
+			ret = errno;
+			break;
 		}
-		cursor->get_value(cursor, &value);
-		fwrite(value.data, value.size, 1, fp);
-		fwrite("\n", 1, 1, fp);
+		if (fwrite(value.data, 1, value.size, fp) != value.size ||
+		    fwrite("\n", 1, 1, fp) != 1) {
+			ret = errno;
+			break;
+		}
 	}
-	fprintf(fp, "DATA=END\n");
-	(void)fclose(fp);
 	WT_TRET(cursor->close(cursor, NULL));
 
 	if (ret != WT_NOTFOUND) {
@@ -281,6 +286,9 @@ wts_dump(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	fprintf(fp, "DATA=END\n");
+	(void)fclose(fp);
 
 	track("dump comparison", 0ULL);
 	switch (g.c_file_type) {
@@ -421,12 +429,16 @@ wts_stats(void)
 	}
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &key);
-		fwrite(key.data, key.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
-		cursor->get_value(cursor, &value);
-		fwrite(value.data, value.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
+		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+		    (ret = cursor->get_value(cursor, &value)) != 0)
+			break;
+		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
+		    fwrite("\n", 1, 1, stdout) != 1 ||
+		    fwrite(value.data, 1, value.size, stdout) != value.size ||
+		    fwrite("\n", 1, 1, stdout) != 1) {
+			ret = errno;
+			break;
+		}
 	}
 	(void)fclose(fp);
 	(void)cursor->close(cursor, NULL);
@@ -458,7 +470,7 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 		return (1);
 	}
 
-	key_gen(&key.data, &key.size, g.key_cnt, 0);
+	key_gen(&key.data, &key.size, (uint64_t)g.key_cnt, 0);
 	value_gen(&value.data, &value.size, 1);
 
 	switch (g.c_file_type) {
@@ -469,14 +481,14 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			session->msg_printf(session,
+			(void)session->msg_printf(session,
                             "%-10s %" PRIu32 " {%.*s}", "bulk K",
                             g.key_cnt, (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		session->msg_printf(session,
+		(void)session->msg_printf(session,
                     "%-10s %" PRIu32 " {%.*s}", "bulk V",
                     g.key_cnt, (int)value.size, (char *)value.data);
 
@@ -493,8 +505,7 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 int
 wts_ops(void)
 {
-	uint64_t keyno;
-	u_int cnt;
+	uint64_t cnt, keyno;
 	uint32_t op;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
@@ -601,7 +612,8 @@ wts_read(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%" PRIu64, "read", keyno);
+		(void)session->msg_printf(
+		    session, "%-10s%" PRIu64, "read", keyno);
 
 	/* Retrieve the BDB value. */
 	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
@@ -662,7 +674,7 @@ wts_row_put(uint64_t keyno, int insert)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
+		(void)session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
 		    "put key", (int)key.size, (char *)key.data,
 		    "put data", (int)value.size, (char *)value.data);
 
@@ -699,7 +711,7 @@ wts_col_put(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%" PRIu64 " {%.*s}",
+		(void)session->msg_printf(session, "%-10s%" PRIu64 " {%.*s}",
 		    "put", keyno, (int)value.size, (char *)value.data);
 
 	key_gen(&key.data, &key.size, keyno, 0);
@@ -736,7 +748,8 @@ wts_row_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%" PRIu64, "delete", keyno);
+		(void)session->msg_printf(
+		    session, "%-10s%" PRIu64, "delete", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -768,7 +781,8 @@ wts_col_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->msg_printf(session, "%-10s%" PRIu64, "delete", keyno);
+		(void)session->msg_printf(
+		    session, "%-10s%" PRIu64, "delete", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);

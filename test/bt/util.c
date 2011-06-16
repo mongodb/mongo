@@ -69,9 +69,9 @@ key_gen_setup(void)
 void
 value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 {
-	static size_t blen;
-	static u_int r;
-	static char *buf;
+	static size_t blen = 0;
+	static u_int r = 0;
+	static char *buf = NULL;
 	size_t i, len;
 	char *p;
 
@@ -101,7 +101,7 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 	 * The data always starts with a 10-digit number.  Change the leading
 	 * number to ensure every data item is unique.
 	 */
-	sprintf(buf, "%010u", ++r);
+	snprintf(buf, blen, "%010u", ++r);
 	buf[10] = '/';
 
 	p = buf;
@@ -191,7 +191,7 @@ wts_rand(void)
 			exit(EXIT_FAILURE);
 		}
 		if (!g.replay)
-			setvbuf(g.rand_log, NULL, _IOLBF, 0);
+			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
 	}
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
