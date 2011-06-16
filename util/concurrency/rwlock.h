@@ -57,6 +57,7 @@ namespace mongo {
 
 #if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
+    // Windows RWLock implementation (requires newer versions of windows thus the above macro)
     class RWLock : boost::noncopyable {
     public:
         RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
@@ -102,9 +103,11 @@ namespace mongo {
     };
 
 #elif defined(BOOST_RWLOCK)
+
+    // Boost RWLock implementation
     class RWLock : boost::noncopyable {
         shared_mutex _m;
-        int _lowPriorityWaitMS;
+        const int _lowPriorityWaitMS;
     public:
 #if defined(_DEBUG)
         const char *_name;
@@ -157,10 +160,13 @@ namespace mongo {
 
 
     };
+
 #else
+
+    // Posix RWLock implementation
     class RWLock : boost::noncopyable {
         pthread_rwlock_t _lock;
-        int _lowPriorityWaitMS;    
+        const int _lowPriorityWaitMS;    
         inline static void check( int x ) {
             if( x == 0 )
                 return;
@@ -279,14 +285,10 @@ namespace mongo {
          * @param write acquire write lock if true sharable if false
          * @param lowPriority if > 0, will try to get the lock non-greedily for that many ms
          */
-        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false , int lowPriorityWaitMS = 0 )
+        rwlock( const RWLock& lock , bool write, /* bool alreadyHaveLock = false , */int lowPriorityWaitMS = 0 )
             : _lock( (RWLock&)lock ) , _write( write ) {
             
-            // alreadyHaveLock should probably go away.  this as a starter in that direction:
-            dassert(!alreadyHaveLock);
-
-            if ( ! alreadyHaveLock ) {
-                
+            {
                 if ( _write ) {
                     
                     if ( ! lowPriorityWaitMS && lock.lowPriorityWaitMS() )
@@ -338,7 +340,8 @@ namespace mongo {
         RWLock _lk;
         friend class Exclusive;
     public:
-        RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
+        /** @param lpwaitms lazy wait */
+        RWLockRecursive(const char *name, int lpwaitms) : _lk(name, lpwaitms) { }
 
         void assertExclusivelyLocked() {
             dassert( _state.get() < 0 );
