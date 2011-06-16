@@ -69,10 +69,10 @@ namespace mongo {
         return true;
     }
     
-    void DBClientCursor::initLazy() {
+    void DBClientCursor::initLazy( bool isRetry ) {
         Message toSend;
         _assembleInit( toSend );
-        _client->say( toSend );
+        _client->say( toSend, isRetry );
     }
 
     bool DBClientCursor::initLazyFinish( bool& retry ) {
@@ -87,12 +87,14 @@ namespace mongo {
             if( b.m->empty() )
                 log() << "DBClientCursor::init message from say() was empty" << endl;
 
-            _client->checkResponse( NULL, 0, &retry, &_lazyHost );
+            _client->checkResponse( NULL, -1, &retry, &_lazyHost );
+
             return false;
+
         }
 
         dataReceived( retry, _lazyHost );
-        return !retry;
+        return ! retry;
     }
 
     void DBClientCursor::requestMore() {

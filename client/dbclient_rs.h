@@ -210,7 +210,7 @@ namespace mongo {
 
         // ---- callback pieces -------
 
-        virtual void say( Message &toSend );
+        virtual void say( Message &toSend, bool isRetry = false );
         virtual bool recv( Message &toRecv );
         virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL );
 

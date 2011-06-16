@@ -348,7 +348,7 @@ namespace mongo {
         throw UserException( 8008 , "all servers down!" );
     }
 
-    void SyncClusterConnection::say( Message &toSend ) {
+    void SyncClusterConnection::say( Message &toSend, bool isRetry ) {
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 13397 , (string)"SyncClusterConnection::say prepare failed: " + errmsg );

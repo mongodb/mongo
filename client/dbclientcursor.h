@@ -164,7 +164,7 @@ namespace mongo {
          */
         bool init();
 
-        void initLazy();
+        void initLazy( bool isRetry = false );
         bool initLazyFinish( bool& retry );
 
         class Batch : boost::noncopyable { 

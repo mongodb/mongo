@@ -436,7 +436,6 @@ namespace mongo {
     }
 
     DBClientConnection * DBClientReplicaSet::checkMaster() {
-        if( _lazyState._lastClient ) _lazyState = LazyState();
         HostAndPort h = _monitor->getMaster();
 
         if ( h == _masterHost && _master ) {
@@ -458,7 +457,6 @@ namespace mongo {
     }
 
     DBClientConnection * DBClientReplicaSet::checkSlave() {
-        if( _lazyState._lastClient ) _lazyState = LazyState();
         HostAndPort h = _monitor->getSlave( _slaveHost );
 
         if ( h == _slaveHost && _slave ) {
@@ -613,7 +611,10 @@ namespace mongo {
         _slave.reset();
     }
 
-    void DBClientReplicaSet::say( Message& toSend ) {
+    void DBClientReplicaSet::say( Message& toSend, bool isRetry ) {
+
+        if( ! isRetry )
+            _lazyState = LazyState();
 
         int lastOp = -1;
         bool slaveOk = false;
@@ -682,30 +683,24 @@ namespace mongo {
         else *targetHost = "";
 
         if( ! _lazyState._lastClient ) return;
-        if( nReturned > 1 ) return;
+        if( nReturned != 1 && nReturned != -1 ) return;
 
         BSONObj dataObj;
-        if( nReturned == 1 && data )
-            dataObj = BSONObj( data );
+        if( nReturned == 1 ) dataObj = BSONObj( data );
 
         // Check if we should retry here
         if( _lazyState._lastOp == dbQuery && _lazyState._slaveOk ){
 
-            bool mayRetry = false;
-            if( dataObj.isEmpty() ){
-                warning() << "no data received from " << _lazyState._lastClient->toString() << endl;
-                mayRetry = true;
-            }
             // Check the error code for a slave not secondary error
-            else if( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ){
-                mayRetry = true;
-            }
+            if( nReturned == -1 ||
+                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ) ){
 
-            if( mayRetry ){
+                bool wasMaster = false;
                 if( _lazyState._lastClient == _slave.get() ){
                     isntSecondary();
                 }
                 else if( _lazyState._lastClient == _master.get() ){
+                    wasMaster = true;
                     isntMaster();
                 }
                 else
@@ -715,7 +710,11 @@ namespace mongo {
                     _lazyState._retries++;
                     *retry = true;
                 }
-                else log() << "Could not slave retries!" << endl;
+                else{
+                    // assert( wasMaster );
+                    // printStackTrace();
+                    log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
+                }
             }
         }
     }

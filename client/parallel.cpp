@@ -506,7 +506,7 @@ namespace mongo {
                                                             ) );
 
                 try{
-                    _cursors[i].raw()->initLazy();
+                    _cursors[i].raw()->initLazy( ! firstPass );
                 }
                 catch( SocketException& e ){
                     socketExs.push_back( e.what() + errLoc );
@@ -644,6 +644,9 @@ namespace mongo {
             else
                 warning() << errMsg.str() << endl;
         }
+
+        if( retries > 0 )
+            log() <<  "successfully finished parallel query after " << retries << " retries" << endl;
 
     }
 
