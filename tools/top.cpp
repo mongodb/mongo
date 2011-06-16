@@ -153,7 +153,7 @@ namespace mongo {
             
             
             int diffTimeMS( const char * field  ) const {
-                return diffTime( field ) / 1000;
+                return (int)(diffTime( field ) / 1000);
             }
 
             double diffTime( const char * field ) const {
