@@ -1407,8 +1407,15 @@ __slvg_build_internal_row(
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
 			WT_ERR(__slvg_build_leaf_row(
 			    session, trk, page, rref, ss, &deleted));
-			if (deleted)
+
+			/*
+			 * If we take none of the keys, we don't need the page;
+			 * fix up the count of entries we're creating.
+			 */
+			if (deleted) {
+				--page->entries;
 				continue;
+			}
 		} else {
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->u.row.range_start.data,
