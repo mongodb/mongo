@@ -70,9 +70,9 @@ util_stat(int argc, char *argv[])
 			break;
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			break;
-		if (fwrite(key.data, key.size, 1, stdout) != key.size ||
+		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
 		    fwrite("\n", 1, 1, stdout) != 1 ||
-		    fwrite(value.data, value.size, 1, stdout) != value.size ||
+		    fwrite(value.data, 1, value.size, stdout) != value.size ||
 		    fwrite("\n", 1, 1, stdout) != 1) {
 			ret = errno;
 			break;
