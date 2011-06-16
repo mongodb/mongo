@@ -845,9 +845,12 @@ delete:		WT_RET(__slvg_free_trk_col(session, &ss->pages[b_slot], 1));
 	 * but it could be a few slots away.)  Then shift all entries sorting
 	 * greater than the new entry up by one slot, and insert the new entry.
 	 */
-	for (i = a_slot + 1; i < ss->pages_next; ++i)
+	for (i = a_slot + 1; i < ss->pages_next; ++i) {
+		if (ss->pages[i] == NULL)
+			continue;
 		if (__slvg_trk_compare(&new, &ss->pages[i]) <= 0)
 			break;
+	}
 	for (j = ss->pages_next; j > i; --j)
 		ss->pages[j] = ss->pages[j - 1];
 	ss->pages[i] = new;
@@ -1322,9 +1325,12 @@ delete:		WT_RET(__slvg_free_trk_row(session, &ss->pages[b_slot], 1));
 	 * but it could be a few slots away.)  Then shift all entries sorting
 	 * greater than the new entry up by one slot, and insert the new entry.
 	 */
-	for (i = a_slot + 1; i < ss->pages_next; ++i)
+	for (i = a_slot + 1; i < ss->pages_next; ++i) {
+		if (ss->pages[i] == NULL)
+			continue;
 		if (__slvg_trk_compare(&new, &ss->pages[i]) <= 0)
 			break;
+	}
 	for (j = ss->pages_next; j > i; --j)
 		ss->pages[j] = ss->pages[j - 1];
 	ss->pages[i] = new;
