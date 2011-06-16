@@ -848,7 +848,7 @@ namespace mongo {
 
         // Log our lock results
         if(gotLock)
-            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, now : " << currLock << endl;
+            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
         else
             log( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 
