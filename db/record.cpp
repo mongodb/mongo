@@ -22,11 +22,13 @@ namespace mongo {
         
         int hash( size_t region ) {
             return 
-                abs( ( ( 7 + (int)(region & 0xFFFF) ) * 
-                       ( 11 + (int)( ( region >> 16 ) & 0xFFFF ) ) *
-                       ( sizeof(size_t) == 4 ? 1 : 
-                         ( 13 + (int)( ( region >> 32 ) & 0xFFFF ) ) *
-                         ( 17 + (int)( ( region >> 48 ) & 0xFFFF ) ) ) ) % SliceSize );
+                abs( ( ( 7 + (int)(region & 0xFFFF) ) 
+                       * ( 11 + (int)( ( region >> 16 ) & 0xFFFF ) ) 
+#if defined(_WIN64) || defined(__amd64__)
+                       * ( 13 + (int)( ( region >> 32 ) & 0xFFFF ) )
+                       * ( 17 + (int)( ( region >> 48 ) & 0xFFFF ) )
+#endif
+                       ) % SliceSize );
         }
         
                 
