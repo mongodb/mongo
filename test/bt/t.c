@@ -7,11 +7,6 @@
 
 #include "wts.h"
 
-#if defined(DOING_NDBM_LOGGING) || 0
-#include <ndbm.h>
-extern DBM *dbm;
-#endif
-
 GLOBAL g;
 
 static void restart(void);
@@ -77,10 +72,6 @@ main(int argc, char *argv[])
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		restart();			/* Clean up previous runs */
 
-#if defined(DOING_NDBM_LOGGING) || 0
-		xxreset();
-#endif
-
 		config_setup();
 		key_gen_setup();
 
@@ -120,14 +111,25 @@ main(int argc, char *argv[])
 		track("shutting down BDB", 0ULL);
 		bdb_teardown();	
 
+#if 0
+		/*
+		 * If we don't delete any records, we can salvage the file.  The
+		 * problem with deleting records is that WiredTiger will restore
+		 * deleted records during salvage when a page fragments, leaving
+		 * a deleted record on one side of the split.
+		 */
+		if (g.c_delete_pct == 0) {
+			track("salvage", 0ULL);
+						/* Close,
+						    salvage, verify, re-open */
+			if (wts_teardown() ||
+			    wts_salvage() || wts_verify() || wts_startup())
+				goto err;
+		}
+#endif
+
 		if (wts_dump())			/* Dump the file */
 			goto err;
-
-#if 0
-		track("salvage", 0ULL);
-		if (wts_salvage())		/* Salvage the file */
-			goto err;
-#endif
 
 		track("shutting down WT", 0ULL);
 		if (wts_teardown())

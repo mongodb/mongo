@@ -316,6 +316,10 @@ wts_salvage(void)
 	int ret;
 	char config[200];
 
+	/* Save a copy of the file before we salvage it. */
+	(void)system("cp __" WT_PREFIX ".conf __wt.salvage.conf");
+	(void)system("cp __" WT_PREFIX " __wt.salvage");
+
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
 	    g.progname, g.c_cache);
