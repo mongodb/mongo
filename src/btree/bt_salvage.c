@@ -318,17 +318,17 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		WT_ERR(__wt_read(session, fh, off, size, t->mem));
 		dsk = t->mem;
 
-		/* Verify the checksum. */
+		/*
+		 * If the checksum matches, assume we have a valid page, or, in
+		 * other words, assume corruption will always fail the checksum.
+		 * We could verify the page itself, but that's slow and we'd
+		 * have to modify the page verification routines to be silent
+		 * and to ignore off-page items, as it's reasonable for salvage
+		 * to see pages that reference non-existent objects.
+		 */
 		checksum = dsk->checksum;
 		dsk->checksum = 0;
-		if (checksum != __wt_cksum(dsk, size))
-			goto skip_allocsize;
-
-		/*
-		 * Verify the page -- it's unexpected if the page has a valid
-		 * checksum but doesn't verify, but it's technically possible.
-		 */
-		if (__wt_verify_dsk_page(session, dsk, addr, size)) {
+		if (checksum != __wt_cksum(dsk, size)) {
 skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 			off += allocsize;
 			continue;
@@ -338,8 +338,7 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 		off += size;
 
 		/*
-		 * We have a valid page -- make sure it's an expected page type
-		 * for the file.
+		 * Make sure it's an expected page type for the file.
 		 *
 		 * We only care about leaf and overflow pages from here on out;
 		 * discard all of the others.  We put them on the free list now,
