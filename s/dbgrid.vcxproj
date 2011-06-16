@@ -233,6 +233,7 @@
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp" />
     <ClCompile Include="grid.cpp" />
+    <ClCompile Include="mr_shard.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="shardconnection.cpp" />
     <ClCompile Include="shard_version.cpp" />

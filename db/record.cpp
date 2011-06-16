@@ -1,6 +1,6 @@
 // record.cpp
 
-#include "../pch.h"
+#include "pch.h"
 #include "pdfile.h"
 #include "../util/processinfo.h"
 #include "../util/message.h"
@@ -10,7 +10,7 @@ namespace mongo {
     namespace ps {
 
         enum State {
-            IN , OUT , UNK
+            In , Out, Unk
         };
 
         enum Constants {
@@ -55,9 +55,9 @@ namespace mongo {
             State get( size_t region  , short offset ) {
                 Entry * e = _get( region , false );
                 if ( ! e )
-                    return UNK;
+                    return Unk;
                 
-                return ( e->value & ( 1 << offset ) ) ? IN : OUT;
+                return ( e->value & ( ((unsigned long long)1) << offset ) ) ? In : Out;
             }
             
             /**
@@ -68,7 +68,7 @@ namespace mongo {
                 if ( ! e )
                     return false;
                 
-                e->value |= ( 1 << offset );
+                e->value |= ((unsigned long long)1) << offset;
                 return true;
             }
 
@@ -135,10 +135,10 @@ namespace mongo {
                     int pos = (_curSlice+i)%NumSlices;
                     State s = _slices[pos].get( region , offset );
 
-                    if ( s == IN )
+                    if ( s == In )
                         return true;
                     
-                    if ( s == OUT ) {
+                    if ( s == Out ) {
                         _slices[pos].in( region , offset );
                         return false;
                     }
@@ -198,6 +198,5 @@ namespace mongo {
             return false;
         return ProcessInfo::blockInMemory( data );
     }
-
     
 }
