@@ -171,6 +171,13 @@ namespace mongo {
                 newShardConn.done();
                 return false;
             }
+            if ( !commandSetName.empty() && setName.empty() ) {
+                ostringstream ss;
+                ss << "host did not return a set name, is the replica set still initializing? " << resIsMaster;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
 
             // if the shard is part of replica set, make sure it is the right one
             if ( ! commandSetName.empty() && ( commandSetName != setName ) ) {
