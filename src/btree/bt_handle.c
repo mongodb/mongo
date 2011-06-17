@@ -143,7 +143,9 @@ done:	/* Add to the connection list. */
 
 	return (0);
 
-err:	__wt_free(session, session->btree);
+err:	if (btree->fh != NULL)
+		(void)__wt_close(session, btree->fh);
+	__wt_free(session, session->btree);
 	return (ret);
 }
 
