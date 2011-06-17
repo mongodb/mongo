@@ -178,8 +178,16 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this._rs = []
         for ( var i=0; i<numShards; i++){
             var setName = testName + "-rs" + i;
+            
+            var rsDefaults = { oplogSize : 40 }
+            var rsParams = otherParams["rs" + i]
+            
+            for( var param in rsParams ){
+                rsDefaults[param] = rsParams[param]
+            }
+            
             var rs = new ReplSetTest( { name : setName , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
-            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( { oplogSize:40 } ) , url : rs.getURL() };
+            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsParams ) , url : rs.getURL() };
             rs.initiate();
             
         }
@@ -232,6 +240,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this._mongos.push( conn );
         if ( i == 0 )
             this.s = conn;
+        this["s" + i] = conn
     }
 
     var admin = this.admin = this.s.getDB( "admin" );
@@ -266,7 +275,7 @@ ShardingTest.prototype.getDB = function( name ){
 }
 
 ShardingTest.prototype.getServerName = function( dbname ){
-    var x = this.config.databases.findOne( { _id : dbname } );
+    var x = this.config.databases.findOne( { _id : "" + dbname } );
     if ( x )
         return x.primary;
     this.config.databases.find().forEach( printjson );
@@ -637,18 +646,98 @@ ShardingTest.prototype.chunkDiff = function( collName , dbName ){
     return max - min;
 }
 
+ShardingTest.prototype.getShard = function( coll, query ){
+    var shards = this.getShards( coll, query )
+    assert.eq( shards.length, 1 )
+    return shards[0]
+}
+
+// Returns the shards on which documents matching a particular query reside
+ShardingTest.prototype.getShards = function( coll, query ){
+    if( ! coll.getDB )
+        coll = this.s.getCollection( coll )
+    
+    var explain = coll.find( query ).explain()
+    
+    var shards = []
+        
+    if( explain.shards ){
+        
+        for( var shardName in explain.shards ){           
+            for( var i = 0; i < explain.shards[shardName].length; i++ ){
+                if( explain.shards[shardName][i].n && explain.shards[shardName][i].n > 0 )
+                    shards.push( shardName )
+            }
+        }
+        
+    }
+    
+    for( var i = 0; i < shards.length; i++ ){
+        for( var j = 0; j < this._connections.length; j++ ){
+            if( this._connections[j].name == shards[i] ){
+                shards[i] = this._connections[j]
+                break;
+            }
+        }
+    }
+    
+    return shards
+}
+
+ShardingTest.prototype.isSharded = function( collName ){
+    
+    var collName = "" + collName
+    var dbName = undefined
+    
+    if( typeof collName.getCollectionNames == 'function' ){
+        dbName = "" + collName
+        collName = undefined
+    }
+    
+    if( dbName ){
+        var x = this.config.databases.findOne( { _id : dbname } )
+        if( x ) return x.partitioned
+        else return false
+    }
+    
+    if( collName ){
+        var x = this.config.collections.findOne( { _id : collName } )
+        if( x ) return true
+        else return false
+    }
+    
+}
+
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
+    
     split = split || key;
     move = move || split;
-    dbName = dbName || "test";
+    
+    if( collName.getDB )
+        dbName = "" + collName.getDB()
+    else dbName = dbName || "test";
 
     var c = dbName + "." + collName;
+    if( collName.getDB )
+        c = "" + collName
 
-    s.adminCommand( { shardcollection : c , key : key } );
-    s.adminCommand( { split : c , middle : split } );
-    s.adminCommand( { movechunk : c , find : move , to : this.getOther( s.getServer( dbName ) ).name } );
+    if( ! this.isSharded( dbName ) )
+        this.s.adminCommand( { enableSharding : dbName } )
+    
+    this.s.adminCommand( { shardcollection : c , key : key } );
+    this.s.adminCommand( { split : c , middle : split } );
+    this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
     
 };
+
+ShardingTest.prototype.setBalancer = function( balancer ){
+    if( balancer || balancer == undefined ){
+        this.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true )
+    }
+    else if( balancer == false ){
+        this.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true )
+    }
+}
 
 /**
  * Run a mongod process.
@@ -946,6 +1035,10 @@ ReplSetTest = function( opts ){
     this.nodes = [];
     this.nodeIds = {};
     this.initLiveNodes();
+    
+    Object.extend( this, ReplSetTest.Health )
+    Object.extend( this, ReplSetTest.State )
+    
 }
 
 ReplSetTest.prototype.initBridges = function() {
@@ -971,14 +1064,33 @@ ReplSetTest.prototype.initLiveNodes = function(){
 }
 
 ReplSetTest.prototype.getNodeId = function(node) {
-    return this.nodeIds[node];
+    
+    var result = this.nodeIds[node]
+    if( result ) return result
+    
+    if( node.toFixed ) return node
+    return node.nodeId
+    
 }
 
 ReplSetTest.prototype.getPort = function( n ){
+    if( n.getDB ){
+        // is a connection, look up
+        for( var i = 0; i < this.nodes.length; i++ ){
+            if( this.nodes[i] == n ){
+                n = i
+                break
+            }
+        }
+    }
     return this.ports[ n ];
 }
 
 ReplSetTest.prototype.getPath = function( n ){
+    
+    if( n.host )
+        n = this.getNodeId( n )
+    
     var p = "/data/db/" + this.name + "-";
     p += n.toString();
     if ( ! this._alldbpaths )
@@ -1072,13 +1184,19 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     a.push( this.getPort( n ) );
 
     a.push( "--dbpath" );
-    a.push( this.getPath( n ) );
-
+    a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
+    
     for ( var k in extra ){
-        var v = extra[k];
+        var v = extra[k];        
         a.push( "--" + k );
-        if ( v != null )
+        if ( v != null ){
+            if( v.replace ){
+                v = v.replace(/\$node/g, "" + ( n.host ? this.getNodeId( n ) : n ) )
+                v = v.replace(/\$set/g, this.name )
+                v = v.replace(/\$path/g, this.getPath( n ) )
+            }
             a.push( v );
+        }
     }
 
     return a;
@@ -1098,22 +1216,26 @@ ReplSetTest.prototype.startSet = function(options) {
 }
 
 ReplSetTest.prototype.callIsMaster = function() {
+  
   var master = null;
   this.initLiveNodes();
+    
   for(var i=0; i<this.nodes.length; i++) {
 
     try {
       var n = this.nodes[i].getDB('admin').runCommand({ismaster:1});
-
+      
       if(n['ismaster'] == true) {
         master = this.nodes[i];
         this.liveNodes.master = master;
         this.nodeIds[master] = i;
+        master.nodeId = i
       }
       else {
         this.nodes[i].setSlaveOk();
         this.liveNodes.slaves.push(this.nodes[i]);
         this.nodeIds[this.nodes[i]] = i;
+        this.nodes[i].nodeId = i
       }
 
     }
@@ -1148,6 +1270,18 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
 
   master = this.attempt({context: this, timeout: 60000, desc: "Finding master"}, this.callIsMaster);
   return master;
+}
+
+
+ReplSetTest.prototype.getSecondaries = function( timeout ){
+    var master = this.getMaster( timeout )
+    var secs = []
+    for( var i = 0; i < this.nodes.length; i++ ){
+        if( this.nodes[i] != master ){
+            secs.push( this.nodes[i] )
+        }
+    }
+    return secs
 }
 
 // Add a node to the test set
@@ -1190,7 +1324,7 @@ ReplSetTest.prototype.attempt = function( opts, func ) {
         tries += 1;
         sleep(sleepTime);
         if( tries * sleepTime > timeout) {
-            throw('[' + opts['desc'] + ']' + " timed out");
+            throw('[' + opts['desc'] + ']' + " timed out after " + timeout + "ms ( " + tries + " tries )");
         }
     }
 
@@ -1288,45 +1422,172 @@ ReplSetTest.prototype.getHashes = function( db ){
 }
 
 /**
- * Starts up a server.
+ * Starts up a server.  Options are saved by default for subsequent starts.
+ * 
+ * 
+ * Options { remember : true } re-applies the saved options from a prior start.
+ * Options { noRemember : true } ignores the current properties.
+ * Options { appendOptions : true } appends the current options to those remembered.
+ * Options { startClean : true } clears the data directory before starting.
  *
- * @param {int} n server number (0, 1, 2, ...)
+ * @param @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
  * @param {object} [options]
  * @param {boolean} [restart] If false, the data directory will be cleared 
  * before the server starts.  Defaults to false.
+ * 
  */
-ReplSetTest.prototype.start = function( n , options , restart ){
+ReplSetTest.prototype.start = function( n , options , restart , wait ){
+    
+    if( n.length ){
+        
+        var nodes = n
+        var started = []
+        
+        for( var i = 0; i < nodes.length; i++ ){
+            if( this.start( nodes[i], Object.extend({}, options), restart, wait ) ){
+                started.push( nodes[i] )
+            }
+        }
+        
+        return started
+        
+    }
+    
+    print( " n is : " + n )
+    
     var lockFile = this.getPath( n ) + "/mongod.lock";
     removeFile( lockFile );
-    var o = this.getOptions( n , options , restart );
+    
+    options = options || {}
+    var noRemember = options.noRemember
+    delete options.noRemember
+    var appendOptions = options.appendOptions
+    delete options.appendOptions
+    var startClean = options.startClean
+    delete options.startClean
+    
+    if( restart && options.remember ){
+        delete options.remember
+        
+        var oldOptions = {}
+        if( this.savedStartOptions && this.savedStartOptions[n] ){
+            oldOptions = this.savedStartOptions[n]
+        }        
+        
+        var newOptions = options
+        var options = {}
+        Object.extend( options, oldOptions )
+        Object.extend( options, newOptions )
+        
+    }
+    
+    var shouldRemember = ( ! restart && ! noRemember ) || ( restart && appendOptions ) 
+    
+    if ( shouldRemember ){
+        this.savedStartOptions = this.savedStartOptions || {}
+        this.savedStartOptions[n] = options
+    }
+    
+    printjson( options )
+        
+    var o = this.getOptions( n , options , restart && ! startClean );
 
-    print("Starting....");
+    print( (restart ? "(Re)" : "") + "Starting....");
     print( o );
+    
+    var rval = null
     if ( restart ) {
-        this.nodes[n] = startMongoProgram.apply( null , o );
-        printjson(this.nodes);
-        return this.nodes[n];
+        n = this.getNodeId( n )
+        this.nodes[n] = ( startClean ? startMongod.apply( null , o ) : startMongoProgram.apply( null , o ) );
+        this.nodes[n].host = this.nodes[n].host.replace( "127.0.0.1", this.host )
+        if( shouldRemember ) this.savedStartOptions[this.nodes[n]] = options
+		printjson( this.nodes )
+        rval = this.nodes[n];
     }
     else {
-        return startMongod.apply( null , o );
+       var conn = startMongod.apply( null , o );
+       if( shouldRemember ) this.savedStartOptions[conn] = options
+       conn.host = conn.host.replace( "127.0.0.1", this.host )
+       rval = conn;
     }
+    
+    wait = wait || false
+    if( ! wait.toFixed ){
+        if( wait ) wait = 0
+        else wait = -1
+    }
+    
+    if( rval == null || wait < 0 ) return rval
+    
+    // Wait for startup
+    this.waitForHealth( rval, this.UP, wait )
+    
+    return rval
+    
 }
+
 
 /**
- * Restarts a db without clearing the data directory.  If the server is not
- * stopped first, this function will not work.
+ * Restarts a db without clearing the data directory by default.  If the server is not
+ * stopped first, this function will not work.  
  * 
- * @param {int} n server number (0, 1, 2, ...)
+ * Option { startClean : true } forces clearing the data directory.
+ * 
+ * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
  */
-ReplSetTest.prototype.restart = function( n , options ){
-    return this.start( n , options , true );
+ReplSetTest.prototype.restart = function( n , options, signal, wait ){
+    // Can specify wait as third parameter, if using default signal
+    if( signal == true || signal == false ){
+        wait = signal
+        signal = undefined
+    }
+    
+    this.stop( n, signal, wait && wait.toFixed ? wait : true )
+    return this.start( n , options , true, wait );
 }
 
-ReplSetTest.prototype.stop = function( n , signal ){
+
+// Stops a particular node or nodes, specified by conn or id
+ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
+        
+    // Flatten array of nodes to stop
+    if( n.length ){
+        nodes = n
+        
+        var stopped = []
+        for( var i = 0; i < nodes.length; i++ ){
+            if( this.stop( nodes[i], signal, wait ) )
+                stopped.push( nodes[i] )
+        }
+        
+        return stopped
+    }
+    
+
+    // Can specify wait as second parameter, if using default signal
+    if( signal == true || signal == false ){
+        wait = signal
+        signal = undefined
+    }
+        
+    wait = wait || false
+    if( ! wait.toFixed ){
+        if( wait ) wait = 0
+        else wait = -1
+    }
+    
     var port = this.getPort( n );
     print('*** Shutting down mongod in port ' + port + ' ***');
-    return stopMongod( port , signal || 15 );
+    var ret = stopMongod( port , signal || 15 );
+    
+    if( ! ret || wait < 0 ) return ret
+    
+    // Wait for shutdown
+    this.waitForHealth( n, this.DOWN, wait )
+    
+    return true
 }
+
 
 ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
     for(i=0; i < this.ports.length; i++) {
@@ -1341,6 +1602,161 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
 
     print('*** Shut down repl set - test worked ****' )
 };
+
+
+/**
+ * Waits until there is a master node
+ */
+ReplSetTest.prototype.waitForMaster = function( timeout ){
+    
+    var master = undefined
+    
+    this.attempt({context: this, timeout: timeout, desc: "waiting for master"}, function() {
+        return ( master = this.getMaster() )
+    });
+    
+    return master
+}
+
+
+/**
+ * Wait for a health indicator to go to a particular state or states.
+ * 
+ * @param node is a single node or list of nodes, by id or conn
+ * @param state is a single state or list of states
+ * 
+ */
+ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
+    this.waitForIndicator( node, state, "health", timeout )    
+}
+
+/**
+ * Wait for a state indicator to go to a particular state or states.
+ * 
+ * @param node is a single node or list of nodes, by id or conn
+ * @param state is a single state or list of states
+ * 
+ */
+ReplSetTest.prototype.waitForState = function( node, state, timeout ){
+    this.waitForIndicator( node, state, "state", timeout )
+}
+
+/**
+ * Wait for a rs indicator to go to a particular state or states.
+ * 
+ * @param node is a single node or list of nodes, by id or conn
+ * @param states is a single state or list of states
+ * @param ind is the indicator specified
+ * 
+ */
+ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
+    
+    if( node.length ){
+        
+        var nodes = node        
+        for( var i = 0; i < nodes.length; i++ ){
+            if( states.length )
+                this.waitForIndicator( nodes[i], states[i], ind, timeout )
+            else
+                this.waitForIndicator( nodes[i], states, ind, timeout )
+        }
+        
+        return;
+    }    
+    
+    timeout = timeout || 30000;
+    
+    if( ! node.getDB ){
+        node = this.nodes[node]
+    }
+    
+    if( ! states.length ) states = [ states ]
+    
+    print( "Waiting for indicator " + ind )
+    printjson( states )
+    print( "from node " + node )
+    
+    var lastTime = null
+    var currTime = new Date().getTime()
+    var status = undefined
+    
+    this.attempt({context: this, timeout: timeout, desc: "waiting for state indicator " + ind + " for " + timeout + "ms" }, function() {
+        
+        status = this.getMaster().getDB("admin").runCommand({ replSetGetStatus : 1 })
+        
+        if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ){
+            if( lastTime == null ) print( "Initial status ( timeout : " + timeout + " ) :" )
+            printjson( status )
+            lastTime = new Date().getTime()
+        }
+        
+        for( var i = 0; i < status.members.length; i++ ){
+            if( status.members[i].name == node.host ){
+                for( var j = 0; j < states.length; j++ ){
+                    if( status.members[i][ind] == states[j] ) return true;
+                }
+            }
+        }
+        
+        return false
+        
+    });
+    
+    print( "Final status :" )
+    printjson( status )
+    
+}
+
+ReplSetTest.Health = {}
+ReplSetTest.Health.UP = 1
+ReplSetTest.Health.DOWN = 0
+
+ReplSetTest.State = {}
+ReplSetTest.State.PRIMARY = 1
+ReplSetTest.State.SECONDARY = 2
+ReplSetTest.State.RECOVERING = 3
+
+/** 
+ * Overflows a replica set secondary or secondaries, specified by id or conn.
+ */
+ReplSetTest.prototype.overflow = function( secondaries ){
+    
+    // Create a new collection to overflow, allow secondaries to replicate
+    var master = this.getMaster()
+    var overflowColl = master.getCollection( "_overflow.coll" )
+    overflowColl.insert({ replicated : "value" })
+    this.awaitReplication()
+    
+    this.stop( secondaries, undefined, 5 * 60 * 1000 )
+        
+    var count = master.getDB("local").oplog.rs.count();
+    var prevCount = -1;
+    
+    // Keep inserting till we hit our capped coll limits
+    while (count != prevCount) {
+      
+      print("inserting 10000");
+      
+      for (var i = 0; i < 10000; i++) {
+          overflowColl.insert({ overflow : "value" });
+      }
+      prevCount = count;
+      this.awaitReplication();
+      
+      count = master.getDB("local").oplog.rs.count();
+      
+      print( "count : " + count + " prev : " + prevCount );
+      
+    }
+    
+    // Restart all our secondaries and wait for recovery state
+    this.start( secondaries, { remember : true }, true, true )
+    this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 )
+    
+}
+
+
+
 
 /**
  * Bridging allows you to test network partitioning.  For example, you can set
@@ -1386,17 +1802,18 @@ ReplSetTest.prototype.bridge = function() {
             printjson(this.nodes[i].getDB("local").system.namespaces.find().toArray());
             assert(false);
         }
-        
+
+        var updateMod = {"$set" : {}};
         for (var j = 0; j<config.members.length; j++) {
             if (config.members[j].host == this.host+":"+this.ports[i]) {
                 continue;
             }
 
-            config.members[j].host = this.bridges[i][j].host;
+            updateMod['$set']["members."+j+".host"] = this.bridges[i][j].host;
         }
         print("for node "+i+":");
-        printjson(config);
-        this.nodes[i].getDB("local").system.replset.update({},config);
+        printjson(updateMod);
+        this.nodes[i].getDB("local").system.replset.update({},updateMod);
     }
 
     this.stopSet(null, true);

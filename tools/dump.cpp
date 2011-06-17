@@ -18,6 +18,7 @@
 
 #include "../pch.h"
 #include "../client/dbclient.h"
+#include "../db/db.h"
 #include "tool.h"
 
 #include <fcntl.h>

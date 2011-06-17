@@ -120,18 +120,16 @@ namespace mongo {
         // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 
-        /** @param o both and in and out param -- insert can sometimes modify an object (such as add _id). */
-        DiskLoc insertWithObjMod(const char *ns, BSONObj &o, bool god = false);
-
-        /** @param o both and in and out param -- insert can sometimes modify an object (such as add _id). */
-        void insertWithObjModNoRet(const char *ns, BSONObj &o, bool god = false) {
-            insert( ns, o.objdata(), o.objsize(), god );
-        }
+        /** insert will add an _id to the object if not present.  if you would like to see the final object
+            after such an addition, use this method.
+            @param o both and in and out param 
+            */
+        DiskLoc insertWithObjMod(const char *ns, BSONObj & /*out*/o, bool god = false);
 
         /** @param obj in value only for this version. */
         void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
 
-        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, /*const BSONElement &writeId = BSONElement(), */bool mayAddIndex = true);
+        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, bool mayAddIndex = true, bool *addedID = 0);
         static shared_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
@@ -162,6 +160,9 @@ namespace mongo {
         int lengthWithHeaders;
         int extentOfs;
         DiskLoc nextDeleted;
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+            return DiskLoc(myLoc.a(), extentOfs);
+        }
         Extent* myExtent(const DiskLoc& myLoc) {
             return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
         }
@@ -218,6 +219,19 @@ namespace mongo {
             int prevOfs;
         };
         NP* np() { return (NP*) &nextOfs; }
+
+        /** 
+         * touches the data so that is in physical memory
+         * @param entireRecrd if false, only the header and first byte is touched
+         *                    if true, the entire record is touched
+         * */
+        void touch( bool entireRecrd = false );
+
+        /**
+         * @return if this record is likely in physical memory
+         *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
+         */
+        bool likelyInPhysicalMemory();
     };
 
     /* extents are datafile regions where all the records within the region

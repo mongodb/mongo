@@ -212,7 +212,16 @@ namespace mongo {
                         }
 #endif
                         if (_bytes > UncommittedBytesLimit * 3) {
-                            wassert(!"DR102 too much data written uncommitted");
+                            static time_t lastComplain;
+                            static unsigned nComplains;
+                            // throttle logging
+                            if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
+                                lastComplain = time(0);
+                                log() << "replSet warning DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
+                                if( nComplains < 10 || nComplains % 10 == 0 ) {
+                                    wassert(!"replSet warning DR102 too much data written uncommitted");
+                                }
+                            }
                         }
                     }
                 }

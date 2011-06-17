@@ -133,7 +133,7 @@ namespace mongo {
     };
 
     struct OldDataCleanup {
-        static AtomicUInt _numThreads; // how many threads are doing async cleanusp
+        static AtomicUInt _numThreads; // how many threads are doing async cleanup
 
         string ns;
         BSONObj min;
@@ -439,7 +439,7 @@ namespace mongo {
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
-            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
             const long long totalRecs = d->stats.nrecords;
@@ -453,8 +453,6 @@ namespace mongo {
                 maxRecsWhenFull = numeric_limits<long long>::max();
             }
 
-            scoped_spinlock lk( _trackerLocks );
-
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
@@ -462,6 +460,7 @@ namespace mongo {
             while ( cc->ok() ) {
                 DiskLoc dl = cc->currLoc();
                 if ( ! isLargeChunk ) {
+                    scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
                 }
                 cc->advance();
@@ -479,7 +478,7 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
                           << " because maximum size allowed to move is " << maxChunkSize
                           << " ns: " << _ns << " " << _min << " -> " << _max
                           << migrateLog;
@@ -489,7 +488,10 @@ namespace mongo {
                 return false;
             }
 
-            log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            {
+                scoped_spinlock lk( _trackerLocks );
+                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            }
             return true;
         }
 
@@ -856,7 +858,7 @@ namespace mongo {
                 log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
-                    warning() << "moveChunk error transfering data caused migration abort: " << res << migrateLog;
+                    warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
                     errmsg = "data transfer error";
                     result.append( "cause" , res );
                     return false;

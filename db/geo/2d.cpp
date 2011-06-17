@@ -164,7 +164,7 @@ namespace mongo {
         }
 
         /** Finds the key objects to put in an index */
-        virtual void getKeys( const BSONObj& obj, BSONObjSetDefaultOrder& keys ) const {
+        virtual void getKeys( const BSONObj& obj, BSONObjSet& keys ) const {
             getKeys( obj, &keys, NULL );
         }
 
@@ -175,7 +175,7 @@ namespace mongo {
         }
 
         /** Finds the key objects and/or locations for a geo-indexed object */
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
+        void getKeys( const BSONObj &obj, BSONObjSet* keys, vector< BSONObj >* locs ) const {
 
             BSONElementMSet bSet;
 
@@ -1055,7 +1055,7 @@ namespace mongo {
                 MatchDetails details;
                 if ( _matcher.get() ) {
                     bool good = _matcher->matchesWithSingleKeyIndex( node.key.toBson() , node.recordLoc , &details );
-                    if ( details.loadedObject )
+                    if ( details._loadedObject )
                         _objectsLoaded++;
 
                     if ( ! good ) {
@@ -1067,7 +1067,7 @@ namespace mongo {
 
                 _matched[ node.recordLoc ] = true;
 
-                if ( ! details.loadedObject ) // don't double count
+                if ( ! details._loadedObject ) // don't double count
                     _objectsLoaded++;
 
             }

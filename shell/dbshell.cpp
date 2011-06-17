@@ -442,18 +442,6 @@ namespace mongo {
     extern DBClientWithCommands *latestConn;
 }
 
-string stateToString(MemberState s) {
-    if( s.s == MemberState::RS_STARTUP ) return "STARTUP";
-    if( s.s == MemberState::RS_PRIMARY ) return "PRIMARY";
-    if( s.s == MemberState::RS_SECONDARY ) return "SECONDARY";
-    if( s.s == MemberState::RS_RECOVERING ) return "RECOVERING";
-    if( s.s == MemberState::RS_FATAL ) return "FATAL";
-    if( s.s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-    if( s.s == MemberState::RS_ARBITER ) return "ARBITER";
-    if( s.s == MemberState::RS_DOWN ) return "DOWN";
-    if( s.s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
-    return "";
-}
 string sayReplSetMemberState() {
     try {
         if( latestConn ) {
@@ -463,8 +451,7 @@ string sayReplSetMemberState() {
                 ss << info["set"].String() << ':';
                 int s = info["myState"].Int();
                 MemberState ms(s);
-                ss << stateToString(ms);
-                return ss.str();
+                return ms.toString();
             }
             else if( str::equals(info.getStringField("info"), "mongos") ) { 
                 return "mongos";
@@ -682,6 +669,8 @@ int _main(int argc, char* argv[]) {
 
         shellHistoryInit();
 
+        string prompt;
+
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
         while ( 1 ) {
@@ -690,8 +679,11 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            string prompt(sayReplSetMemberState()+"> ");
-
+            if (scope->exec("prompt", "", false, false, false)) {
+                prompt = scope->getString("prompt");
+             } else {
+                prompt = sayReplSetMemberState()+"> ";
+             }
             char * line = shellReadline( prompt.c_str() );
 
             if ( line ) {

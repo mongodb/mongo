@@ -41,6 +41,8 @@ namespace mongo {
 
     class AlignedBuilder;
 
+    unsigned goodRandomNumberSlow();
+
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
         // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
@@ -118,14 +120,12 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)getRandomNumber()) << 32;
+                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
             n1 = n2 = n3 = n4 = '\n';
         }
-
-        // class Journal
 
         Journal j;
 

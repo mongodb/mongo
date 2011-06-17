@@ -223,11 +223,11 @@ namespace mongo {
             }
         }
 
-        uassert( 10083 ,  "invalid size spec", size > 0 );
+        uassert( 10083 , "create collection invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
-        if( options.getBoolField("capped") ) {
+        if( options["capped"].trueValue() ) {
             newCapped = true;
             BSONElement e = options.getField("max");
             if ( e.isNumber() ) {
@@ -874,10 +874,10 @@ namespace mongo {
 
     /* unindex all keys in index for this record. */
     static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         id.getKeysFromObject(obj, keys);
         IndexInterface& ii = id.idxInterface();
-        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
             if ( otherTraceLevel >= 5 ) {
                 out() << "_unindexRecord() " << obj.toString() << endl;
@@ -1112,7 +1112,7 @@ namespace mongo {
     /* add keys to index idxNo for a new record */
     static inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->idx(idxNo);
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         idx.getKeysFromObject(obj, keys);
         if( keys.empty() ) 
             return;
@@ -1120,7 +1120,7 @@ namespace mongo {
         IndexInterface& ii = idx.idxInterface();
         Ordering ordering = Ordering::make(order);
         int n = 0;
-        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             if( ++n == 2 ) {
                 d->setIndexIsMultikey(idxNo);
             }
@@ -1142,12 +1142,13 @@ namespace mongo {
         }
     }
 
+#if 0    
     void testSorting() {
         BSONObjBuilder b;
         b.appendNull("");
         BSONObj x = b.obj();
 
-        BSONObjExternalSorter sorter;
+        BSONObjExternalSorter sorter(*IndexDetails::iis[1]);
 
         sorter.add(x, DiskLoc(3,7));
         sorter.add(x, DiskLoc(4,7));
@@ -1165,6 +1166,7 @@ namespace mongo {
             cout<<"SORTER next:" << d.first.toString() << endl;*/
         }
     }
+#endif
 
     SortPhaseOne *precalced = 0;
 
@@ -1238,7 +1240,7 @@ namespace mongo {
             phase1 = &_ours;
             SortPhaseOne& p1 = *phase1;
             shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-            p1.sorter.reset( new BSONObjExternalSorter(order) );
+            p1.sorter.reset( new BSONObjExternalSorter(idx.idxInterface(), order) );
             p1.sorter->hintNumObjects( d->stats.nrecords );
             const IndexSpec& spec = idx.getSpec();
             while ( c->ok() ) {
@@ -1417,13 +1419,9 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
-        tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
+        tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
-
-        if( background ) {
-            log(2) << "buildAnIndex: background=true\n";
-        }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         assert( d->indexBuildInProgress == 0 );
@@ -1441,7 +1439,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
+        tlog() << "build index done " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1517,21 +1515,18 @@ namespace mongo {
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
         BSONObj tmp = o;
-        insertWithObjModNoRet( ns, tmp, god );
+        insertWithObjMod( ns, tmp, god );
         logOp( "i", ns, tmp );
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param
      */
     DiskLoc DataFileMgr::insertWithObjMod(const char *ns, BSONObj &o, bool god) {
-        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god );
-        if ( !loc.isNull() )
+        bool addedID = false;
+        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god, true, &addedID );
+        if( addedID && !loc.isNull() )
             o = BSONObj( loc.rec() );
         return loc;
-    }
-
-    void DataFileMgr::insertNoReturnVal(const char *ns,  BSONObj o, bool god) {
-        insert( ns, o.objdata(), o.objsize(), god );
     }
 
     bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject );
@@ -1544,11 +1539,11 @@ namespace mongo {
         for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
             if( d->idx(idxNo).unique() ) {
                 IndexDetails& idx = d->idx(idxNo);
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 idx.getKeysFromObject(obj, keys);
                 BSONObj order = idx.keyPattern();
                 IndexInterface& ii = idx.idxInterface();
-                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
                     // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
                     // findSingle code.
                     uassert( 12582, "duplicate key insert for unique index of capped collection",
@@ -1705,8 +1700,12 @@ namespace mongo {
          after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
 
        @param mayAddIndex almost always true, except for invocation from rename namespace command.
+       @param addedID if not null, set to true if adding _id element. you must assure false before calling
+              if using.
     */
-    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex) {
+
+
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex, bool *addedID) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
@@ -1741,7 +1740,7 @@ namespace mongo {
             }
         }
 
-        int addID = 0;
+        int addID = 0; // 0 if not adding _id; if adding, the length of that new element
         if( !god ) {
             /* Check if we have an _id field. If we don't, we'll add it.
                Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
@@ -1749,7 +1748,10 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
-            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
+            // we don't add _id for capped collections as they don't have an _id index
+            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && d->haveIdIndex() ) {
+                if( addedID )
+                    *addedID = true;
                 addID = len;
                 idToInsert_.oid.init();
                 len += idToInsert.size();
@@ -1791,7 +1793,7 @@ namespace mongo {
                 memcpy(r->data+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
             }
             else {
-                if( obuf )
+                if( obuf ) // obuf can be null from internal callers
                     memcpy(r->data, obuf, len);
             }
         }
@@ -1805,7 +1807,7 @@ namespace mongo {
             s->nrecords++;
         }
 
-        // we don't bother resetting query optimizer stats for the god tables - also god is true when adidng a btree bucket
+        // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
 
@@ -1850,10 +1852,7 @@ namespace mongo {
         DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
         DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
-        if ( loc.isNull() ) {
-            assert(false);
-            return 0;
-        }
+        assert( !loc.isNull() );
 
         Record *r = loc.rec();
         assert( r->lengthWithHeaders >= lenWHdr );

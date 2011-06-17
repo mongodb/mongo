@@ -24,8 +24,7 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
-#include "db.h"
-#include "../scripting/engine.h"
+#include "../util/hostandport.h"
 
 namespace mongo {
 
@@ -183,26 +182,18 @@ namespace mongo {
         }
         bool isStarted() const { return _start > 0; }
 
-        void enter( Client::Context * context ) {
-            ensureStarted();
-            setNS( context->ns() );
-            _dbprofile = context->_db ? context->_db->profile : 0;
-        }
+        void enter( Client::Context * context );
 
-        void leave( Client::Context * context ) {
-            unsigned long long now = curTimeMicros64();
-            Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
-            _checkpoint = now;
-        }
+        void leave( Client::Context * context );
 
         void reset() {
             _reset();
             _start = _checkpoint = 0;
-            _active = true;
             _opNum = _nextOpNum++;
-            _ns[0] = '?'; // just in case not set later
+            _ns[0] = 0;
             _debug.reset();
             _query.reset();
+            _active = true; // this should be last for ui clarity
         }
 
         void reset( const HostAndPort& remote, int op ) {
@@ -305,6 +296,7 @@ namespace mongo {
         CurOp *parent() const { return _wrapped; }
         void kill() { _killed = true; }
         bool killed() const { return _killed; }
+        void yielded() { _numYields++; }
         void setNS(const char *ns) {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
@@ -332,6 +324,7 @@ namespace mongo {
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
         volatile bool _killed;
+        int _numYields;
 
         void _reset() {
             _command = false;
@@ -342,6 +335,7 @@ namespace mongo {
             _message = "";
             _progressMeter.finished();
             _killed = false;
+            _numYields = 0;
         }
     };
 

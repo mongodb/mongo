@@ -14,7 +14,7 @@ var everyoneOkSoon = function() {
     assert.soon(function() {
             var ok = true;
             status = master.adminCommand({replSetGetStatus : 1});
-            
+
             if (!status.members) {
                 return false;
             }
@@ -50,7 +50,7 @@ var checkPrimaryIs = function(node) {
             }
             status.members.forEach( function(m) {
                     str += m.name + ": "+m.state +" ";
-                    
+
                     if (m.name == node.host) {
                         ok &= m.state == 1;
                     }
@@ -59,11 +59,11 @@ var checkPrimaryIs = function(node) {
                     }
                 });
             print(str);
-            
+
             occasionally(function() {
                     printjson(status);
                 }, 15);
-            
+
             return ok;
         }, node.host+'==1', 60000, 1000);
 
@@ -86,17 +86,14 @@ for (i=0; i<n; i++) {
     var second = null;
     reconnect(master);
     var config = master.getDB("local").system.replset.findOne();
-    for (var j = 0; j < 3; j++) {
-        rs.nodes[j].getDB("admin").runCommand({setParameter : 1, logLevel : 5});
-    }
-    
+
     var version = config.version;
     config.version++;
 
     for (var j=0; j<config.members.length; j++) {
         var priority = Math.random()*100;
         config.members[j].priority = priority;
-        
+
         if (!max || priority > max.priority) {
             max = config.members[j];
         }
@@ -110,17 +107,17 @@ for (i=0; i<n; i++) {
             second = config.members[j];
         }
     }
-    
+
     print("max is "+max.host+" with priority "+max.priority+", reconfiguring...");
 
     var count = 0;
     while (config.version != version && count < 100) {
         reconnect(master);
-        
+
         occasionally(function() {
                 print("version is "+version+", trying to update to "+config.version);
             });
-        
+
         try {
             master.adminCommand({replSetReconfig : config});
             master = rs.getMaster();
@@ -147,9 +144,9 @@ for (i=0; i<n; i++) {
     // the reconfiguration needs to be replicated! the hb sends it out
     // separately from the repl
     rs.awaitReplication();
-    
+
     print("reconfigured.  Checking statuses.");
-    
+
     checkPrimaryIs(max);
 
     rs.stop(max._id);
@@ -157,10 +154,10 @@ for (i=0; i<n; i++) {
     var master = rs.getMaster();
 
     print("killed max primary.  Checking statuses.");
-    
+
     print("second is "+second.host+" with priority "+second.priority);
     checkPrimaryIs(second);
-        
+
     rs.restart(max._id);
     master = rs.getMaster();
 }

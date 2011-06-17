@@ -4,12 +4,12 @@ tn = "capped5"
 t = db[tn]
 t.drop();
 
+
 db.createCollection( tn , {capped: true, size: 1024 * 1024 * 1 } );
 t.insert( { _id : 5 , x : 11 , z : 52 } );
-
 assert.eq( 0 , t.getIndexKeys().length , "A0" )
 assert.eq( 52 , t.findOne( { x : 11 } ).z , "A1" );
-assert.eq( 52 , t.findOne( { _id : 5 } ).z , "A2" );
+assert.eq( 52 , t.findOne( { _id : 5, x : 11 } ).z , "A2" );
 
 t.ensureIndex( { _id : 1 } )
 t.ensureIndex( { x : 1 } )
@@ -41,10 +41,10 @@ t.ensureIndex( { x:1 }, {unique:true, dropDups:true } );
 assert.eq( 1, db.system.indexes.count( {ns:"test."+tn} ) );
 assert.eq( 2, t.find().hint( {x:1} ).toArray().length );
 
-// SERVER-525
+// SERVER-525 (closed) unique indexes in capped collection
 t.drop();
 db.createCollection( tn , {capped: true, size: 1024 * 1024 * 1 } );
-t.ensureIndex( { _id:1 } );
+t.ensureIndex( { _id:1 } ); // note we assume will be automatically unique because it is _id
 t.insert( { _id : 5 , x : 11 } );
 t.insert( { _id : 5 , x : 12 } );
 assert.eq( 1, t.find().toArray().length );

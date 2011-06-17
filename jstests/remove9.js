@@ -1,6 +1,5 @@
 // SERVER-2009 Count odd numbered entries while updating and deleting even numbered entries.
 
-if ( 0 ) { // SERVER-2009
 t = db.jstests_remove9;
 t.drop();
 t.ensureIndex( {i:1} );
@@ -15,4 +14,3 @@ for( i = 0; i < 1000; ++i ) {
 }
 
 s();
-}

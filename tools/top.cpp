@@ -92,16 +92,16 @@ namespace mongo {
 
             cout << "\n"
                  << setw(longest) << "ns" 
-                 << "\t total"  
-                 << "\t read"  
-                 << "\t write"  
+                 << "\ttotal   "  
+                 << "\tread    "    
+                 << "\twrite   "  
                  << "\t\t" << terseCurrentTime()
                  << endl;
             for ( int i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
                 cout << setw(longest) << data[i].ns 
-                     << "\t" << setprecision(3) << ( data[i].timeDiff / ( 1000 * _sleep ) ) << "%" 
-                     << "\t" << setprecision(3) << data[i].percentTime( "readLock" , _sleep) << "%" 
-                     << "\t" << setprecision(3) << data[i].percentTime( "writeLock" , _sleep ) << "%" 
+                     << "\t" << setprecision(3) << data[i].diffTimeMS( "total" ) << "ms" 
+                     << "\t" << setprecision(3) << data[i].diffTimeMS( "readLock" ) << "ms" 
+                     << "\t" << setprecision(3) << data[i].diffTimeMS( "writeLock" ) << "ms" 
                      << endl;
             }
         }
@@ -152,8 +152,8 @@ namespace mongo {
             }
             
             
-            double percentTime( const char * field , double sleep ) const {
-                return diffTime( field ) / ( 1000 * sleep );
+            int diffTimeMS( const char * field  ) const {
+                return (int)(diffTime( field ) / 1000);
             }
 
             double diffTime( const char * field ) const {

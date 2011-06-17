@@ -22,6 +22,7 @@
 #include "../db/querypattern.h"
 #include "../db/queryutil.h"
 #include "../util/unittest.h"
+#include "../util/timer.h"
 
 #include "chunk.h"
 #include "config.h"
@@ -280,7 +281,7 @@ namespace mongo {
             warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
-            // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
+            // reloading won't strictly solve all problems, e.g. the collection's metadata lock can be taken
             // but we issue here so that mongos may refresh without needing to be written/read against
             _manager->reload();
 
@@ -343,7 +344,7 @@ namespace mongo {
                 return false;
 
             // this is a bit ugly
-            // we need it so that mongos blocks for the writes to actually be commited
+            // we need it so that mongos blocks for the writes to actually be committed
             // this does mean mongos has more back pressure than mongod alone
             // since it nots 100% tcp queue bound
             // this was implicit before since we did a splitVector on the same socket
@@ -364,7 +365,7 @@ namespace mongo {
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
                   << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
-                  << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
+                  << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
                   << endl;
 
@@ -503,7 +504,12 @@ namespace mongo {
         while (tries--) {
             ChunkMap chunkMap;
             set<Shard> shards;
+            Timer t;
             _load(chunkMap, shards);
+            {
+                int ms = t.millis();
+                log( ms < 100 ) << "time to load chunks for " << ns << ": " << ms << "ms" << endl;
+            }
 
             if (_isValid(chunkMap)) {
                 // These variables are const for thread-safety. Since the
@@ -514,10 +520,12 @@ namespace mongo {
                 const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
                 return;
             }
-
+            
             if (_chunkMap.size() < 10) {
                 _printChunks();
             }
+            
+            warning() << "ChunkManager loaded an invalid config, trying again" << endl;
 
             sleepmillis(10 * (3-tries));
         }

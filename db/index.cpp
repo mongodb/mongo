@@ -1,4 +1,4 @@
-// index.cpp
+/** @file index.cpp */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -35,6 +35,7 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -62,8 +63,21 @@ namespace mongo {
         }
     };
 
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    template <>
+    int IndexInterfaceImpl< V0 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return oldCompare(l, r, ordering);
+    }
+
+    template <>
+    int IndexInterfaceImpl< V1 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return l.woCompare(r, ordering, /*considerfieldname*/false);
+    }
+
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;
+
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
@@ -106,7 +120,7 @@ namespace mongo {
     }
 
     const IndexSpec& IndexDetails::getSpec() const {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
@@ -144,13 +158,15 @@ namespace mongo {
         }
     }
 
-    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
+    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const {
         getSpec().getKeys( obj, keys );
     }
 
-    void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
-        BSONObjSetDefaultOrder::iterator i = l.begin();
-        BSONObjSetDefaultOrder::iterator j = r.begin();
+    void setDifference(BSONObjSet &l, BSONObjSet &r, vector<BSONObj*> &diff) {
+        // l and r must use the same ordering spec.
+        verify( 14819, l.key_comp().order() == r.key_comp().order() );
+        BSONObjSet::iterator i = l.begin();
+        BSONObjSet::iterator j = r.begin();
         while ( 1 ) {
             if ( i == l.end() )
                 break;

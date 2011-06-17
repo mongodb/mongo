@@ -210,11 +210,17 @@ namespace mongo {
 
         // ---- callback pieces -------
 
-        virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+        virtual void say( Message &toSend, bool isRetry = false );
+        virtual bool recv( Message &toRecv );
+        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL );
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster();
+
+        /* this is used to indicate we got a "not master or secondary" error from a secondary.
+         */
+        void isntSecondary();
 
         // ----- status ------
 
@@ -231,15 +237,15 @@ namespace mongo {
         // ---- low level ------
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
-        virtual DBClientBase* callLazy( Message& toSend );
-
 
     protected:
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
+
+        // Used to simplify slave-handling logic on errors
+        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();
@@ -272,6 +278,22 @@ namespace mongo {
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
         list<AuthInfo> _auths;
+
+    protected:
+
+        /**
+         * for storing (non-threadsafe) information between lazy calls
+         */
+        class LazyState {
+        public:
+            LazyState() : _lastClient( NULL ), _lastOp( -1 ), _slaveOk( false ), _retries( 0 ) {}
+            DBClientConnection* _lastClient;
+            int _lastOp;
+            bool _slaveOk;
+            int _retries;
+
+        } _lazyState;
+
     };
 
 

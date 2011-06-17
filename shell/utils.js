@@ -9,10 +9,8 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
-
     if ( tojson( a ) == tojson( b ) )
         return true;
-
     return false;
 }
 
@@ -35,10 +33,8 @@ doassert = function (msg) {
 
 assert = function( b , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
-
     if ( b )
-        return;
-    
+        return;    
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
@@ -533,16 +529,24 @@ if ( typeof( BinData ) != "undefined" ){
         //return "BinData type: " + this.type + " len: " + this.len;
         return this.toString();
     }
+    
+    BinData.prototype.subtype = function () {
+        return this.type;
+    }
+    
+    BinData.prototype.length = function () {
+        return this.len;
+    }    
 }
 else {
     print( "warning: no BinData class" );
 }
 
-if ( typeof( UUID ) != "undefined" ){
+/*if ( typeof( UUID ) != "undefined" ){
     UUID.prototype.tojson = function () {
         return this.toString();
     }
-}
+}*/
 
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
@@ -1390,9 +1394,13 @@ rs._runCmd = function (c) {
     }
     return res;
 }
-rs.reconfig = function (cfg) {
+rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
-    return this._runCmd({ replSetReconfig: cfg });
+    cmd = { replSetReconfig: cfg };
+    for (var i in options) {
+        cmd[i] = options[i];
+    }
+    return this._runCmd(cmd);
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1419,6 +1427,7 @@ rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs 
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
+rs.config = function () { return rs.conf(); }
 
 rs.remove = function (hn) {
     var local = db.getSisterDB("local");
@@ -1486,6 +1495,10 @@ help = shellHelper.help = function (x) {
         print("\tb.hex()                             the data as a hex encoded string");
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
+        print();
+        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
+        print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");

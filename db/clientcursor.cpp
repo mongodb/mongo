@@ -231,10 +231,13 @@ namespace mongo {
             c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
-                /* this might indicate a failure to call ClientCursor::updateLocation() */
+                // This might indicate a failure to call ClientCursor::updateLocation() but it can
+                // also happen during correct operation, see SERVER-2009.
                 problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
-            c->advance();
+            else {
+                c->advance();
+            }
             if ( c->eof() ) {
                 // advanced to end
                 // leave ClientCursor in place so next getMore doesn't fail
@@ -388,9 +391,13 @@ namespace mongo {
         return ( micros > 0 ) ? yield( micros ) : true;
     }
 
-    void ClientCursor::staticYield( int micros , const StringData& ns ) {
+    void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
         killCurrentOp.checkForInterrupt( false );
         {
+            auto_ptr<RWLockRecursive::Shared> lk;
+            if ( rec )
+                lk.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+            
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
                 if ( micros == -1 )
@@ -407,6 +414,11 @@ namespace mongo {
                           << " top: " << c->info()
                           << endl;
             }
+
+            if ( rec )
+                rec->touch();
+
+            lk.reset(0); // need to release this before dbtempreleasecond
         }
     }
 
@@ -460,36 +472,30 @@ namespace mongo {
         return true;
     }
 
-    bool ClientCursor::yield( int micros ) {
+    bool ClientCursor::yield( int micros , Record * recordToLoad ) {
         if ( ! _c->supportYields() )
             return true;
+
         YieldData data;
         prepareToYield( data );
 
-        staticYield( micros , _ns );
+        staticYield( micros , _ns , recordToLoad );
 
         return ClientCursor::recoverFromYield( data );
     }
 
-    int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
-        if( 0 ) {
-            static long long z;
-            ++z;
-            cout << "TEMP alloccursorid " << z << endl;
-            return z;
-        }
-
+        long long ctm = curTimeMillis64();
+        dassert( ctm );
         long long x;
-        int ctm = (int) curTimeMillis();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
-            x = x | ctm | 0x80000000; // OR to make sure not zero
+            x = x ^ ctm;
             if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
         ctmLast = ctm;
-        //DEV tlog() << "  alloccursorid " << x << endl;
         return x;
     }
 
@@ -577,21 +583,16 @@ namespace mongo {
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
-
-        unsigned old = curTimeMillis();
-
+        Timer t;
         const int Secs = 4;
         unsigned n = 0;
         while ( ! inShutdown() ) {
-            unsigned now = curTimeMillis();
-            ClientCursor::idleTimeReport( now - old );
-            old = now;
+            ClientCursor::idleTimeReport( t.millisReset() );
             sleepsecs(Secs);
             if( ++n % (60/4) == 0 /*once a minute*/ ) { 
                 sayMemoryStatus();
             }
         }
-
         client.shutdown();
     }
 

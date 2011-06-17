@@ -320,7 +320,7 @@ namespace mongo {
             lower = e;
             break;
         case BSONObj::opALL: {
-            massert( 10370 ,  "$all requires array", e.type() == Array );
+            uassert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
             bool bound = false;
             while ( i.more() ) {
@@ -408,6 +408,8 @@ namespace mongo {
                 upper = addObj( b.obj() ).firstElement();
             }
             else if ( lower.type() == MinKey && upper.type() != MaxKey && upper.isSimpleType() ) { // TODO: get rid of isSimpleType
+                if( upper.type() == Date ) 
+                    lowerInclusive = false;
                 BSONObjBuilder b;
                 b.appendMinForType( upper.fieldName() , upper.type() );
                 lower = addObj( b.obj() ).firstElement();
@@ -735,7 +737,7 @@ namespace mongo {
         int op2 = g.getGtLtOp();
         if ( op2 == BSONObj::opALL ) {
             BSONElement h = g;
-            massert( 13050 ,  "$all requires array", h.type() == Array );
+            uassert( 13050 ,  "$all requires array", h.type() == Array );
             BSONObjIterator i( h.embeddedObject() );
             if( i.more() ) {
                 BSONElement x = i.next();
@@ -771,6 +773,31 @@ namespace mongo {
     }
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
+        if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
+            uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+            BSONObjIterator i( e.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 14817 , "$and elements must be objects" , e.type() == Object );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    processQueryField( j.next(), optimize );
+                }
+            }            
+        }
+        
+        if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+            return;
+        }        
+        
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
             equality = ( strcmp( e.embeddedObject().firstElementFieldName(), "$not" ) != 0 );
@@ -813,22 +840,7 @@ namespace mongo {
         BSONObjIterator i( _queries[ 0 ] );
 
         while( i.more() ) {
-            BSONElement e = i.next();
-            // e could be x:1 or x:{$gt:1}
-
-            if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                continue;
-            }
-
-            processQueryField( e, optimize );
+            processQueryField( i.next(), optimize );
         }
     }
     
@@ -1150,34 +1162,48 @@ namespace mongo {
         return l;
     }
 
+    bool FieldRangeVector::matchesKey( const BSONObj &key ) const {
+        BSONObjIterator j( key );
+        BSONObjIterator k( _indexSpec.keyPattern );
+        for( int l = 0; l < (int)_ranges.size(); ++l ) {
+            int number = (int) k.next().number();
+            bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
+            if ( !matchesElement( j.next(), l, forward ) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
         // fields individually instead of constructing several bson objects using
         // multikey arrays.)  But getKeys() canonically defines the key set for a
         // given object and for now we are using it as is.
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         _indexSpec.getKeys( obj, keys );
-        for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
-            BSONObjIterator j( *i );
-            BSONObjIterator k( _indexSpec.keyPattern );
-            bool match = true;
-            for( int l = 0; l < (int)_ranges.size(); ++l ) {
-                int number = (int) k.next().number();
-                bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-                if ( !matchesElement( j.next(), l, forward ) ) {
-                    match = false;
-                    break;
-                }
-            }
-            if ( match ) {
-                // The *i key matched a valid range for every element.
-                return true;
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            if ( matchesKey( *i ) ) {
+                return true;   
             }
         }
         return false;
     }
 
+    BSONObj FieldRangeVector::firstMatch( const BSONObj &obj ) const {
+        // NOTE Only works in forward direction.
+        assert( _direction >= 0 );
+        BSONObjSet keys( BSONObjCmp( _indexSpec.keyPattern ) );
+        _indexSpec.getKeys( obj, keys );
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            if ( matchesKey( *i ) ) {
+                return *i;
+            }
+        }
+        return BSONObj();
+    }
+    
     // TODO optimize more
     int FieldRangeVectorIterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
@@ -1353,13 +1379,13 @@ namespace mongo {
         while( i.more() ) {
             BSONElement e = i.next();
             if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                uassert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
                     BSONElement f = j.next();
-                    massert( 13263, "$or array must contain objects", f.type() == Object );
+                    uassert( 13263, "$or array must contain objects", f.type() == Object );
                     _orSets.push_back( FieldRangeSetPair( ns, f.embeddedObject(), optimize ) );
-                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
+                    uassert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
                     _originalOrSets.push_back( _orSets.back() );
                 }
                 _orFound = true;

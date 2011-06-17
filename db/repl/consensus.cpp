@@ -267,7 +267,7 @@ namespace mongo {
                 assert( remoteOrd <= ord );
 
                 if( i->result["priorityVeto"].trueValue() ) {
-                    log() << "not electing self, another member has majority and higher priority" << rsLog;
+                    log() << "not electing self, " << i->toHost << " thinks another member is more electable" << rsLog;
                     return false;
                 }
             }

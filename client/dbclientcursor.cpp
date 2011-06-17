@@ -69,26 +69,32 @@ namespace mongo {
         return true;
     }
     
-    void DBClientCursor::initLazy() {
+    void DBClientCursor::initLazy( bool isRetry ) {
         Message toSend;
         _assembleInit( toSend );
-        _lazy = _client->callLazy( toSend );
-        assert( _lazy );
+        _client->say( toSend, isRetry );
     }
 
-    bool DBClientCursor::initLazyFinish() {
-        assert( _lazy );
-        if ( ! _lazy->recv( *b.m ) ) {
-            log() << "DBClientCursor::init lazy call() failed" << endl;
+    bool DBClientCursor::initLazyFinish( bool& retry ) {
+
+        bool recvd = _client->recv( *b.m );
+
+        // If we get a bad response, return false
+        if ( ! recvd || b.m->empty() ) {
+
+            if( !recvd )
+                log() << "DBClientCursor::init lazy say() failed" << endl;
+            if( b.m->empty() )
+                log() << "DBClientCursor::init message from say() was empty" << endl;
+
+            _client->checkResponse( NULL, -1, &retry, &_lazyHost );
+
             return false;
+
         }
-        if ( b.m->empty() ) {
-            // log msg temp?
-            log() << "DBClientCursor::init message from call() was empty" << endl;
-            return false;
-        }
-        dataReceived();
-        return true;
+
+        dataReceived( retry, _lazyHost );
+        return ! retry;
     }
 
     void DBClientCursor::requestMore() {
@@ -136,9 +142,14 @@ namespace mongo {
         dataReceived();
     }
 
-    void DBClientCursor::dataReceived() {
+    void DBClientCursor::dataReceived( bool& retry, string& host ) {
+
         QueryResult *qr = (QueryResult *) b.m->singleData();
         resultFlags = qr->resultFlags();
+
+        if ( qr->resultFlags() & ResultFlag_ErrSet ) {
+            wasError = true;
+        }
 
         if ( qr->resultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
@@ -158,7 +169,7 @@ namespace mongo {
         b.pos = 0;
         b.data = qr->data();
 
-        _client->checkResponse( b.data, b.nReturned ); // watches for "not master"
+        _client->checkResponse( b.data, b.nReturned, &retry, &host ); // watches for "not master"
 
         /* this assert would fire the way we currently work:
             assert( nReturned || cursorId == 0 );
@@ -226,6 +237,19 @@ namespace mongo {
         }
     }
     
+    bool DBClientCursor::peekError(BSONObj* error){
+        if( ! wasError ) return false;
+
+        vector<BSONObj> v;
+        peek(v, 1);
+
+        assert( v.size() == 1 );
+        assert( hasErrField( v[0] ) );
+
+        if( error ) *error = v[0].getOwned();
+        return true;
+    }
+
     void DBClientCursor::attach( AScopedConnection * conn ) {
         assert( _scopedHost.size() == 0 );
         assert( conn );
@@ -233,14 +257,20 @@ namespace mongo {
 
         if ( conn->get()->type() == ConnectionString::SET ||
              conn->get()->type() == ConnectionString::SYNC ) {
-            _scopedHost = _client->getServerAddress();
+            if( _lazyHost.size() > 0 )
+                _scopedHost = _lazyHost;
+            else if( _client )
+                _scopedHost = _client->getServerAddress();
+            else
+                massert(14821, "No client or lazy client specified, cannot store multi-host connection.", false);
         }
         else {
             _scopedHost = conn->getHost();
         }
-        
+
         conn->done();
         _client = 0;
+        _lazyHost = "";
     }
 
     DBClientCursor::~DBClientCursor() {

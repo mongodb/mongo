@@ -66,13 +66,7 @@ namespace mongo {
             ClusteredCursor * cursor = 0;
 
             BSONObj sort = query.getSort();
-
-            if ( sort.isEmpty() ) {
-                cursor = new SerialServerClusteredCursor( servers , q );
-            }
-            else {
-                cursor = new ParallelSortClusteredCursor( servers , q , sort );
-            }
+            cursor = new ParallelSortClusteredCursor( servers , q , sort );
 
             assert( cursor );
 
@@ -154,7 +148,7 @@ namespace mongo {
                     // Many operations benefit from having the shard key early in the object
                     o = manager->getShardKey().moveToFront(o);
 
-                    const int maxTries = 10;
+                    const int maxTries = 30;
 
                     bool gotThrough = false;
                     for ( int i=0; i<maxTries; i++ ) {
@@ -177,14 +171,14 @@ namespace mongo {
                             unsigned long long old = manager->getSequenceNumber();
                             manager = r.getChunkManager();
                             
-                            LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
                             if (!manager) {
                                 keepGoing = false;
                                 uasserted(14804, "collection no longer sharded");
                             }
                         }
-                        sleepmillis( i * 200 );
+                        sleepmillis( i * 20 );
                     }
                     
                     assert( inShutdown() || gotThrough ); // not caught below
@@ -194,6 +188,61 @@ namespace mongo {
                     }
                     // otherwise ignore and keep going
                 }
+            }
+        }
+
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
+            ChunkManagerPtr manager = conf->getChunkManager(ns);
+            if ( ! manager->hasShardKey( o ) ) {
+
+                bool bad = true;
+
+                if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
+                    BSONObjBuilder b;
+                    b.appendOID( "_id" , 0 , true );
+                    b.appendElements( o );
+                    o = b.obj();
+                    bad = ! manager->hasShardKey( o );
+                }
+
+                if ( bad ) {
+                    log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
+                    uasserted( 14842 , "tried to insert object without shard key" );
+                }
+
+            }
+
+            // Many operations benefit from having the shard key early in the object
+            o = manager->getShardKey().moveToFront(o);
+
+            const int maxTries = 30;
+
+            for ( int i=0; i<maxTries; i++ ) {
+                try {
+                    ChunkPtr c = manager->findChunk( o );
+                    log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                    insert( c->getShard() , ns , o , flags);
+
+//                    r.gotInsert();
+//                    if ( r.getClientInfo()->autoSplitOk() )
+                        c->splitIfShould( o.objsize() );
+                    break;
+                }
+                catch ( StaleConfigException& e ) {
+                    int logLevel = i < ( maxTries / 2 );
+                    LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+//                    r.reset();
+
+                    unsigned long long old = manager->getSequenceNumber();
+                    manager = conf->getChunkManager(ns);
+
+                    LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+
+                    if (!manager) {
+                        uasserted(14843, "collection no longer sharded");
+                    }
+                }
+                sleepmillis( i * 20 );
             }
         }
 

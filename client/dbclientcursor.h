@@ -71,11 +71,11 @@ namespace mongo {
         /** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
             BSONObj o = next();
-            BSONElement e = o.firstElement();
-            if( strcmp(e.fieldName(), "$err") == 0 ) {
+            if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
+                string s = "nextSafe(): " + o.toString();
                 if( logLevel >= 5 )
-                    log() << "nextSafe() error " << o.toString() << endl;
-                uassert(13106, "nextSafe(): " + o.toString(), false);
+                    log() << s << endl;
+                uasserted(13106, s);
             }
             return o;
         }
@@ -86,6 +86,11 @@ namespace mongo {
             WARNING: no support for _putBack yet!
         */
         void peek(vector<BSONObj>&, int atMost);
+
+        /**
+         * peek ahead and see if an error occurred, and get the error if so.
+         */
+        bool peekError(BSONObj* error = NULL);
 
         /**
            iterate the rest of the cursor and return the number if items
@@ -104,13 +109,9 @@ namespace mongo {
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
         */
-        bool isDead() const {
-            return  !this || cursorId == 0;
-        }
+        bool isDead() const { return  !this || cursorId == 0; }
 
-        bool tailable() const {
-            return (opts & QueryOption_CursorTailable) != 0;
-        }
+        bool tailable() const { return (opts & QueryOption_CursorTailable) != 0; }
 
         /** see ResultFlagType (constants.h) for flag values
             mostly these flags are for internal purposes -
@@ -133,7 +134,8 @@ namespace mongo {
             opts(queryOptions),
             batchSize(bs==1?2:bs),
             cursorId(),
-            _ownCursor( true ) {
+            _ownCursor( true ),
+            wasError( false ) {
         }
 
         DBClientCursor( DBClientBase* client, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -162,8 +164,8 @@ namespace mongo {
          */
         bool init();
 
-        void initLazy();
-        bool initLazyFinish();
+        void initLazy( bool isRetry = false );
+        bool initLazyFinish( bool& retry );
 
         class Batch : boost::noncopyable { 
             friend class DBClientCursor;
@@ -196,9 +198,11 @@ namespace mongo {
         long long cursorId;
         bool _ownCursor; // see decouple()
         string _scopedHost;
-        DBClientBase* _lazy; // only for lazy init
+        string _lazyHost;
+        bool wasError;
 
-        void dataReceived();
+        void dataReceived() { bool retry; string lazyHost; dataReceived( retry, lazyHost ); }
+        void dataReceived( bool& retry, string& lazyHost );
         void requestMore();
         void exhaustReceiveMore(); // for exhaust
 

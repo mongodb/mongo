@@ -126,19 +126,6 @@ namespace mongo {
         return "";
     }
 
-    string MemberState::toString() const {
-        if( s == MemberState::RS_STARTUP ) return "STARTUP";
-        if( s == MemberState::RS_PRIMARY ) return "PRIMARY";
-        if( s == MemberState::RS_SECONDARY ) return "SECONDARY";
-        if( s == MemberState::RS_RECOVERING ) return "RECOVERING";
-        if( s == MemberState::RS_FATAL ) return "FATAL";
-        if( s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-        if( s == MemberState::RS_ARBITER ) return "ARBITER";
-        if( s == MemberState::RS_DOWN ) return "DOWN";
-        if( s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
-        return "";
-    }
-
     extern time_t started;
 
     // oplogdiags in web ui
@@ -412,7 +399,7 @@ namespace mongo {
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
-            bb.append("ping", m->hbinfo().ping);
+            bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -423,8 +410,9 @@ namespace mongo {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
-        if (_currentSyncTarget) {
-            b.append("syncingTo", _currentSyncTarget->fullName());
+        const Member *syncTarget = _currentSyncTarget;
+        if (syncTarget) {
+            b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);
         if( replSetBlind )

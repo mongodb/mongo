@@ -33,6 +33,8 @@
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
 #include "../util/file_allocator.h"
+#include "repl/rs.h"
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -55,6 +57,7 @@ namespace mongo {
             memset(buf, 42, sizeof(buf)); 
         }
         static void check(const char *tname) { 
+            static int max;
             StackChecker *sc = checker.get();
             const char *p = sc->buf;
             int i = 0;
@@ -62,7 +65,11 @@ namespace mongo {
                 if( p[i] != 42 )
                     break;
             }
-            log() << "thread " << tname << " stack usage was " << SZ-i << " bytes" << endl;
+            int z = SZ-i;
+            if( z > max ) {
+                max = z;
+                log() << "thread " << tname << " stack usage was " << z << " bytes" << endl;
+            }
             wassert( i > 16000 );
         }
     };
@@ -96,6 +103,11 @@ namespace mongo {
         _mp(p) {
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
+#ifndef _WIN32
+        stringstream temp;
+        temp << hex << showbase << pthread_self();
+        _threadId = temp.str();
+#endif
         scoped_lock bl(clientsMutex);
         clients.insert(this);
     }
@@ -362,6 +374,18 @@ namespace mongo {
         _client = 0;
     }
 
+    void CurOp::enter( Client::Context * context ) {
+        ensureStarted();
+        setNS( context->ns() );
+        _dbprofile = context->_db ? context->_db->profile : 0;
+    }
+    
+    void CurOp::leave( Client::Context * context ) {
+        unsigned long long now = curTimeMicros64();
+        Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
+        _checkpoint = now;
+    }
+
 
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
@@ -387,9 +411,12 @@ namespace mongo {
         clientStr << _remote.toString();
         b.append("client", clientStr.str());
 
-        if ( _client )
+        if ( _client ) {
             b.append( "desc" , _client->desc() );
-
+            if ( _client->_threadId.size() ) 
+                b.append( "threadId" , _client->_threadId );
+        }
+        
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf(128);
@@ -407,6 +434,8 @@ namespace mongo {
 
         if( killed() ) 
             b.append("killed", true);
+        
+        b.append( "numYields" , _numYields );
 
         return b.obj();
     }
@@ -424,6 +453,10 @@ namespace mongo {
         while ( i.more() )
             b.append( i.next() );
         _handshake = b.obj();
+
+        if (theReplSet && o.hasField("member")) {
+            theReplSet->ghost->associateSlave(_remoteId, o["member"].Int());
+        }
     }
 
     class HandshakeCmd : public Command {

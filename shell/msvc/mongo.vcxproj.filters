@@ -231,6 +231,9 @@
     <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
       <Filter>thirdparty</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\concurrency\spin_lock.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\SConstruct" />

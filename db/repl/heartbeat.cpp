@@ -30,15 +30,14 @@
 #include "connections.h"
 #include "../../util/unittest.h"
 #include "../instance.h"
+#include "../repl.h"
 
 namespace mongo {
 
     using namespace bson;
 
     extern bool replSetBlind;
-
-    // hacky
-    string *discoveredSeed = 0;
+    extern ReplSettings replSettings;
 
     long long HeartbeatInfo::timeDown() const {
         if( up() ) return 0;
@@ -91,8 +90,8 @@ namespace mongo {
             }
             if( theReplSet == 0 ) {
                 string from( cmdObj.getStringField("from") );
-                if( !from.empty() && discoveredSeed == 0 ) {
-                    discoveredSeed = new string(from);
+                if( !from.empty() ) {
+                    replSettings.discoveredSeeds.insert(from);
                 }
                 errmsg = "still initializing";
                 return false;
@@ -161,14 +160,14 @@ namespace mongo {
                 Timer timer;
 
                 bool ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(), h.toString(), info, theReplSet->config().version, theirConfigVersion);
-                
-                mem.ping = (unsigned int)timer.micros();
+
+                mem.ping = (unsigned int)timer.millis();
 
                 time_t before = timer.startTime() / 1000000;
                 // we set this on any response - we don't get this far if
                 // couldn't connect because exception is thrown
-                time_t after = mem.lastHeartbeat = before + (mem.ping / 1000000);
-                
+                time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
+
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
                     if( t > after )
@@ -297,6 +296,8 @@ namespace mongo {
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         boost::thread t(startSyncThread);
+
+        task::fork(ghost);
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }

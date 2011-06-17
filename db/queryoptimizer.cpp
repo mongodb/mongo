@@ -55,6 +55,7 @@ namespace mongo {
         const FieldRangeSetPair &frsp, const FieldRangeSetPair &originalFrsp, const BSONObj &originalQuery, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
+        _frsMulti( frsp.frsForIndex( _d, -1 ) ),
         _originalQuery( originalQuery ),
         _order( order ),
         _index( 0 ),
@@ -244,7 +245,7 @@ doneCheckOrder:
     void QueryPlan::registerSelf( long long nScanned ) const {
         // FIXME SERVER-2864 Otherwise no query pattern can be generated.
         if ( _frs.matchPossible() ) {
-            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+            SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
         }
     }
@@ -632,7 +633,7 @@ doneCheckOrder:
                     if ( !prepareToYield() ) {
                         return;   
                     }
-                    ClientCursor::staticYield( micros , _plans._ns );
+                    ClientCursor::staticYield( micros , _plans._ns , 0 );
                     recoverFromYield();
                 }
             }
@@ -687,8 +688,8 @@ doneCheckOrder:
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
         mayYield();
-        OpHolder holder = _queue.top();
-        _queue.pop();
+        dassert( !_queue.empty() );
+        OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
         if ( op.complete() ) {
@@ -934,6 +935,9 @@ doneCheckOrder:
         if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
             return shared_ptr<Cursor>();
         }
+        // If there is only one plan and it does not require an in memory
+        // sort, we do not expect its cursor op to throw an exception and
+        // so do not need a QueryOptimizerCursor to handle this case.
         return _currentQps->firstPlan()->newCursor();
     }
 
@@ -1201,14 +1205,14 @@ doneCheckOrder:
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
         nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
     }
     
     pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.

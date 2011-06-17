@@ -38,7 +38,7 @@ namespace mongo {
        @param initial true when initiating
     */
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
-        int failures = 0, majority = 0;
+        int failures = 0, allVotes = 0, allowableFailures = 0;
         int me = 0;
         stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
@@ -50,11 +50,11 @@ namespace mongo {
                 if( !i->potentiallyHot() ) {
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
-                majority += i->votes;
             }
+            allVotes += i->votes;
         }
-        majority = (majority / 2) + 1;
-        
+        allowableFailures = allVotes - (allVotes/2 + 1);
+
         uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
@@ -110,7 +110,7 @@ namespace mongo {
 
                     bool allowFailure = false;
                     failures += i->votes;
-                    if( res.isEmpty() && !initial && failures >= majority ) {
+                    if( res.isEmpty() && !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
                             assert( m->h().toString() == i->h.toString() );

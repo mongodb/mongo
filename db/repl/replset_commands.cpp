@@ -63,7 +63,10 @@ namespace mongo {
         }
     } cmdReplSetTest;
 
-    /** get rollback id */
+    /** get rollback id.  used to check if a rollback happened during some interval of time.
+        as consumed, the rollback id is not in any particular order, it simply changes on each rollback.
+        @see incRBID()
+    */
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
         /* todo: ideally this should only change on rollbacks NOT on mongod restarts also. fix... */
@@ -72,7 +75,9 @@ namespace mongo {
             help << "internal";
         }
         CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {
-            rbid = (int) curTimeMillis();
+            // this is ok but micros or combo with some rand() and/or 64 bits might be better -- 
+            // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
+            rbid = (int) curTimeMillis64();
         }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -135,7 +140,9 @@ namespace mongo {
         bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( !theReplSet->box.getState().primary() ) {
+
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+            if( !force && !theReplSet->box.getState().primary() ) {
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
             }
@@ -157,13 +164,8 @@ namespace mongo {
                 return false;
             }
 
-            /** TODO
-                Support changes when a majority, but not all, members of a set are up.
-                Determine what changes should not be allowed as they would cause erroneous states.
-                What should be possible when a majority is not up?
-                */
             try {
-                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj());
+                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj(), force);
 
                 log() << "replSet replSetReconfig config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 

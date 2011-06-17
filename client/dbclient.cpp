@@ -64,15 +64,17 @@ namespace mongo {
     }
 
 
-    DBClientBase* ConnectionString::connect( string& errmsg ) const {
+    DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
         switch ( _type ) {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
+            c->setSoTimeout( socketTimeout );
             log(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
+            log(1) << "connected connection!" << endl;
             return c;
         }
 
@@ -93,7 +95,8 @@ namespace mongo {
             list<HostAndPort> l;
             for ( unsigned i=0; i<_servers.size(); i++ )
                 l.push_back( _servers[i] );
-            return new SyncClusterConnection( l );
+            SyncClusterConnection* c = new SyncClusterConnection( l, socketTimeout );
+            return c;
         }
 
         case INVALID:
@@ -391,6 +394,7 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
+        assert(!capped||size);
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
@@ -529,19 +533,31 @@ namespace mongo {
         return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
     }
 
-    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
-        auto_ptr<DBClientCursor> c =
-            this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
+    /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
+        query() and iterate the cursor. 
+     */
+    void DBClientInterface::findN(vector<BSONObj>& out, const string& ns, Query query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) { 
+        out.reserve(nToReturn);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findOne: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
+        auto_ptr<DBClientCursor> c =
+            this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+
+        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw StaleConfigException( ns , "findOne has stale config" );
+            throw StaleConfigException( ns , "findN stale config" );
 
-        if ( !c->more() )
-            return BSONObj();
+        for( int i = 0; i < nToReturn; i++ ) {
+            if ( !c->more() )
+                break;
+            out.push_back( c->nextSafe().copy() );
+        }
+    }
 
-        return c->nextSafe().copy();
+    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
+        vector<BSONObj> v;
+        findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions);
+        return v.empty() ? BSONObj() : v[0];
     }
 
     bool DBClientConnection::connect(const HostAndPort& server, string& errmsg) {
@@ -562,6 +578,10 @@ namespace mongo {
             return false;
         }
 
+        // if( _so_timeout == 0 ){
+        //    printStackTrace();
+        //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
+        // }
         if ( !p->connect(*server) ) {
             stringstream ss;
             ss << "couldn't connect to server " << _serverString;
@@ -753,10 +773,6 @@ namespace mongo {
     }
 
 
-    DBClientBase* DBClientBase::callLazy( Message& toSend ) {
-        say( toSend );
-        return this;
-    }
     
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
@@ -886,7 +902,7 @@ namespace mongo {
         toSend.setData(dbQuery, b.buf(), b.len());
     }
 
-    void DBClientConnection::say( Message &toSend ) {
+    void DBClientConnection::say( Message &toSend, bool isRetry ) {
         checkConnection();
         try {
             port().say( toSend );
@@ -944,11 +960,18 @@ namespace mongo {
         return BSONElement();
     }
 
-    void DBClientConnection::checkResponse( const char *data, int nReturned ) {
+    bool hasErrField( const BSONObj& o ){
+        return ! getErrField( o ).eoo();
+    }
+
+    void DBClientConnection::checkResponse( const char *data, int nReturned, bool* retry, string* host ) {
         /* check for errors.  the only one we really care about at
          * this stage is "not master" 
         */
         
+        *retry = false;
+        *host = _serverString;
+
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);

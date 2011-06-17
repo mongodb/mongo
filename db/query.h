@@ -259,7 +259,7 @@ namespace mongo {
                         _order = transformOrderFromArrayFormat( _order );
                     }
                     else {
-                        uassert(13513, "sort must be an object or array", 0);
+                        uasserted(13513, "sort must be an object or array");
                     }
                     continue;
                 }
@@ -282,6 +282,9 @@ namespace mongo {
                         _maxScan = e.numberInt();
                     else if ( strcmp( "showDiskLoc" , name ) == 0 )
                         _showDiskLoc = e.trueValue();
+                    else if ( strcmp( "comment" , name ) == 0 ) {
+                        ; // no-op
+                    }
                 }
             }
 

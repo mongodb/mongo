@@ -304,6 +304,9 @@ namespace mongo {
             resultFlags = ResultFlag_CursorNotFound;
         }
         else {
+            // check for spoofing of the ns such that it does not match the one originally there for the cursor
+            uassert(14833, "auth error", str::equals(ns, cc->ns().c_str()));
+
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
 
@@ -319,6 +322,9 @@ namespace mongo {
             scoped_ptr<Projection::KeyOnly> keyFieldsOnly;
             if ( cc->modifiedKeys() == false && cc->isMultiKey() == false && cc->fields )
                 keyFieldsOnly.reset( cc->fields->checkKey( cc->indexKeyPattern() ) );
+
+            // This manager may be stale, but it's the state of chunking when the cursor was created.
+            ShardChunkManagerPtr manager = cc->getChunkManager();
 
             while ( 1 ) {
                 if ( !c->ok() ) {
@@ -343,15 +349,13 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
+
                 // in some cases (clone collection) there won't be a matcher
                 if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
-                /*
-                  TODO
-                else if ( _chunkMatcher && ! _chunkMatcher->belongsToMe( c->currKey(), c->currLoc() ) ){
-                    cout << "TEMP skipping un-owned chunk: " << c->current() << endl;
+                else if ( manager && ! manager->belongsToMe( c->currLoc().obj() ) ){
+                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
                 }
-                */
                 else {
                     if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
@@ -474,7 +478,7 @@ namespace mongo {
                     _gotOne();
                 }
                 else {
-                    if ( ! _firstMatch.woEqual( _bc->currKey() ) ) {
+                    if ( ! _firstMatch.equal( _bc->currKey() ) ) {
                         setComplete();
                         return;
                     }
@@ -687,7 +691,7 @@ namespace mongo {
 
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
-                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder() ) );
+                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder(), qp().multikeyFrs() ) );
             }
 
             if ( _pq.isExplain() ) {
@@ -744,12 +748,12 @@ namespace mongo {
 
         virtual void next() {
             if ( _findingStartCursor.get() ) {
-                if ( _findingStartCursor->done() ) {
-                    _c = _findingStartCursor->cRelease();
-                    _findingStartCursor.reset( 0 );
-                }
-                else {
+                if ( !_findingStartCursor->done() ) {
                     _findingStartCursor->next();
+                }                    
+                if ( _findingStartCursor->done() ) {
+                    _c = _findingStartCursor->cursor();
+                    _findingStartCursor.reset( 0 );
                 }
                 _capped = true;
                 return;
@@ -774,7 +778,7 @@ namespace mongo {
             _nscanned = _c->nscanned();
             if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
                 // not a match, continue onward
-                if ( _details.loadedObject )
+                if ( _details._loadedObject )
                     _nscannedObjects++;
             }
             else {
@@ -936,6 +940,9 @@ namespace mongo {
                 cc->slaveReadTill( _slaveReadTill );
 
         }
+
+        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
+
     private:
         BufBuilder _buf;
         const ParsedQuery& _pq;
@@ -1083,6 +1090,10 @@ namespace mongo {
         }
 
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+
+            //NamespaceDetails* d = nsdetails(ns);
+            //uassert(14820, "capped collections have no _id index by default, can only query by _id if one added", d == NULL || d->haveIdIndex() );
+
             bool nsFound = false;
             bool indexFound = false;
 
@@ -1160,6 +1171,9 @@ namespace mongo {
                 if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher( cursor ) );
                 cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
+
+            cc->setChunkManager( dqo.getChunkManager() );
+
             cursorid = cc->cursorid();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->setPos( n );

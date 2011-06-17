@@ -32,6 +32,7 @@ namespace mongo {
 
     /** @return true if op has made it to w servers */
     bool opReplicatedEnough( OpTime op , int w );
+    bool opReplicatedEnough( OpTime op , BSONElement w );
 
     void resetSlaveCache();
     unsigned getSlaveCount();

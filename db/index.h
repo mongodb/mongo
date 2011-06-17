@@ -22,6 +22,7 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "indexkey.h"
+#include "key.h"
 
 namespace mongo {
 
@@ -29,6 +30,7 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
         virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
@@ -83,7 +85,7 @@ namespace mongo {
            only when it's a "multikey" array.
            keys will be left empty if key not found in the object.
         */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
+        void getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const;
 
         /* get the key pattern for this object.
            e.g., { lastname:1, firstname:1 }
@@ -185,13 +187,12 @@ namespace mongo {
             return *iis[v&1];
         }
 
-    private:
         static IndexInterface *iis[];
     };
 
     struct IndexChanges { /*on an update*/
-        BSONObjSetDefaultOrder oldkeys;
-        BSONObjSetDefaultOrder newkeys;
+        BSONObjSet oldkeys;
+        BSONObjSet newkeys;
         vector<BSONObj*> removed; // these keys were removed as part of the change
         vector<BSONObj*> added;   // these keys were added as part of the change
 

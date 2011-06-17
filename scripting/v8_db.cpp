@@ -70,9 +70,42 @@ namespace mongo {
 
     v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> binData = scope->createV8Function(binDataInit);
+        binData->InstanceTemplate()->SetInternalFieldCount(1);
         v8::Local<v8::Template> proto = binData->PrototypeTemplate();
         scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
         return binData;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getUUIDFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(uuidInit);
+        templ->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return templ;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getMD5FunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(md5Init);
+        templ->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return templ;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getHexDataFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(hexDataInit);
+        templ->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return templ;
     }
 
     v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate(V8Scope* scope) {
@@ -128,6 +161,9 @@ namespace mongo {
         scope->injectV8Function("DBPointer", dbPointerInit, global);
 
         global->Set( scope->getV8Str("BinData") , getBinDataFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("UUID") , getUUIDFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("MD5") , getMD5FunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("HexData") , getHexDataFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("NumberLong") , getNumberLongFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("Timestamp") , getTimestampFunctionTemplate(scope)->GetFunction() );
 
@@ -403,7 +439,10 @@ namespace mongo {
             V8Unlock u;
             o = cursor->next();
         }
-        return scope->mongoToLZV8( o );
+        bool ro = false;
+        if (args.This()->Has(scope->V8STR_RO))
+            ro = args.This()->Get(scope->V8STR_RO)->BooleanValue();
+        return scope->mongoToLZV8( o, false, ro );
     }
 
     v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args) {
@@ -430,6 +469,11 @@ namespace mongo {
         return v8::Number::New( (double) ret );
     }
 
+//    v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args) {
+//        Local<v8::Object> cursor = args.This();
+//        cursor->Set(scope->V8STR_RO, v8::Undefined());
+//        return cursor;
+//    }
 
     // --- DB ----
 
@@ -641,62 +685,151 @@ namespace mongo {
 
 
     v8::Handle<v8::Value> binDataInit( V8Scope* scope, const v8::Arguments& args ) {
-        v8::Handle<v8::Object> it = args.This();
+        v8::Local<v8::Object> it = args.This();
 
-        // 3 args: len, type, data
+        Handle<Value> type;
+        Handle<Value> len;
+        int rlen;
+        char* data;
         if (args.Length() == 3) {
+            // 3 args: len, type, data
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
                 v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
-            it->Set( scope->getV8Str( "len" ) , args[0] );
-            it->Set( scope->getV8Str( "type" ) , args[1] );
-            it->Set( scope->getV8Str( "data" ), args[2] );
-            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
-
-            // 2 args: type, base64 string
+            len = args[0];
+            rlen = len->IntegerValue();
+            type = args[1];
+            v8::String::Utf8Value utf( args[ 2 ] );
+            char* tmp = *utf;
+            data = new char[rlen];
+            memcpy(data, tmp, rlen);
         }
         else if ( args.Length() == 2 ) {
+            // 2 args: type, base64 string
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
                 v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
-            v8::String::Utf8Value data( args[ 1 ] );
-            string decoded = base64::decode( *data );
-            it->Set( scope->getV8Str( "len" ) , v8::Number::New( decoded.length() ) );
-            it->Set( scope->getV8Str( "type" ) , args[ 0 ] );
-            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
-            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
-
+            type = args[0];
+            v8::String::Utf8Value utf( args[ 1 ] );
+            string decoded = base64::decode( *utf );
+            const char* tmp = decoded.data();
+            rlen = decoded.length();
+            data = new char[rlen];
+            memcpy(data, tmp, rlen);
+            len = v8::Number::New(rlen);
+//            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
         }
         else {
-            return v8::ThrowException( v8::String::New( "BinData needs 3 arguments" ) );
+            return v8::ThrowException( v8::String::New( "BinData needs 2 or 3 arguments" ) );
         }
 
-        return it;
+        it->Set( scope->getV8Str( "len" ) , len );
+        it->Set( scope->getV8Str( "type" ) , type );
+        it->SetHiddenValue( scope->V8STR_BINDATA, v8::Number::New( 1 ) );
+        Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
+        return res;
     }
 
     v8::Handle<v8::Value> binDataToString( V8Scope* scope, const v8::Arguments& args ) {
-
-        if (args.Length() != 0) {
-            return v8::ThrowException( v8::String::New( "toString needs 0 arguments" ) );
-        }
-
         v8::Handle<v8::Object> it = args.This();
-        int len = it->Get( scope->getV8Str( "len" ) )->ToInt32()->Value();
-        int type = it->Get( scope->getV8Str( "type" ) )->ToInt32()->Value();
-        v8::String::Utf8Value data( it->Get( scope->getV8Str( "data" ) ) );
+        int len = it->Get( scope->V8STR_LEN )->Int32Value();
+        int type = it->Get( scope->V8STR_TYPE )->Int32Value();
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        char* data = (char*)(c->Value());
 
         stringstream ss;
         ss << "BinData(" << type << ",\"";
-        base64::encode( ss, *data, len );
+        base64::encode( ss, data, len );
         ss << "\")";
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
+    }
+
+    v8::Handle<v8::Value> binDataToBase64( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        int len = Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        char* data = (char*)(c->Value());
+        stringstream ss;
+        base64::encode( ss, (const char *)data, len );
+        return v8::String::New(ss.str().c_str());
+    }
+
+    v8::Handle<v8::Value> binDataToHex( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        int len = Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+        char* data = (char*)(c->Value());
+        stringstream ss;
+        ss << hex;
+        for( int i = 0; i < len; i++ ) {
+            unsigned v = (unsigned char) data[i];
+            ss << v;
+        }
+        return v8::String::New(ss.str().c_str());
+    }
+
+    static v8::Handle<v8::Value> hexToBinData( V8Scope* scope, v8::Local<v8::Object> it, int type, string hexstr ) {
+        int len = hexstr.length() / 2;
+        char* data = new char[len];
+        const char* src = hexstr.c_str();
+        for( int i = 0; i < 16; i++ ) {
+            data[i] = fromHex(src + i * 2);
+        }
+
+        it->Set( scope->V8STR_LEN , v8::Number::New(len) );
+        it->Set( scope->V8STR_TYPE , v8::Number::New(type) );
+        it->SetHiddenValue( scope->V8STR_BINDATA, v8::Number::New( 1 ) );
+        Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
+        return res;
+    }
+
+    v8::Handle<v8::Value> uuidInit( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 1) {
+            return v8::ThrowException( v8::String::New( "UUIS needs 1 argument" ) );
+        }
+        v8::String::Utf8Value utf( args[ 0 ] );
+        if( utf.length() != 32 ) {
+            return v8::ThrowException( v8::String::New( "UUIS string must have 32 characters" ) );
+        }
+
+        return hexToBinData(scope, args.This(), bdtUUID, *utf);
+    }
+
+//    v8::Handle<v8::Value> uuidToString( V8Scope* scope, const v8::Arguments& args ) {
+//        v8::Handle<v8::Object> it = args.This();
+//        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
+//        char* data = (char*)(c->Value());
+//
+//        stringstream ss;
+//        ss << "UUID(\"" << toHex(data, 16) << "\")";
+//        return v8::String::New( ss.str().c_str() );
+//    }
+
+    v8::Handle<v8::Value> md5Init( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 1) {
+            return v8::ThrowException( v8::String::New( "MD5 needs 1 argument" ) );
+        }
+        v8::String::Utf8Value utf( args[ 0 ] );
+        if( utf.length() != 32 ) {
+            return v8::ThrowException( v8::String::New( "MD5 string must have 32 characters" ) );
+        }
+
+        return hexToBinData(scope, args.This(), MD5Type, *utf);
+    }
+
+    v8::Handle<v8::Value> hexDataInit( V8Scope* scope, const v8::Arguments& args ) {
+        if (args.Length() != 2) {
+            return v8::ThrowException( v8::String::New( "HexData needs 2 arguments" ) );
+        }
+        v8::String::Utf8Value utf( args[ 1 ] );
+        return hexToBinData(scope, args.This(), args[0]->IntegerValue(), *utf);
     }
 
     v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args ) {

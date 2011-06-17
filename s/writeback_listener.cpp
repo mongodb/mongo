@@ -94,7 +94,7 @@ namespace mongo {
                 WBStatus s = _seenWritebacks[ident];
                 if ( oid < s.id ) {
                     // this means we're waiting for a GLE that already passed.
-                    // it should be impossible becauseonce we call GLE, no other
+                    // it should be impossible because once we call GLE, no other
                     // writebacks should happen with that connection id
 
                     msgasserted( 14041 , str::stream() << "got writeback waitfor for older id " <<

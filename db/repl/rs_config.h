@@ -30,6 +30,8 @@ namespace mongo {
 
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
+    private:
+        struct TagSubgroup;
     public:
         /**
          * This contacts the given host and tries to get a config from them.
@@ -44,9 +46,11 @@ namespace mongo {
          */
         ReplSetConfig(const HostAndPort& h);
 
-        ReplSetConfig(BSONObj cfg);
+        ReplSetConfig(BSONObj cfg, bool force=false);
 
         bool ok() const { return _ok; }
+
+        struct TagRule;
 
         struct MemberCfg {
             MemberCfg() : _id(-1), votes(1), priority(1.0), arbiterOnly(false), slaveDelay(0), hidden(false), buildIndexes(true) { }
@@ -59,10 +63,17 @@ namespace mongo {
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
             set<string> tags;     /* tagging for data center, rack, etc. */
+            set<TagSubgroup*> groups; // the subgroups this member belongs to
 
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
+            void updateGroups(const OpTime& last) {
+                log(5) << h.toString() << " updating to " << last.toString() << endl;
+                for (set<TagSubgroup*>::iterator it = groups.begin(); it != groups.end(); it++) {
+                    ((TagSubgroup*)(*it))->updateLast(last);
+                }
+            }
             bool operator==(const MemberCfg& r) const {
                 return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
                        arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
@@ -77,6 +88,7 @@ namespace mongo {
         HealthOptions ho;
         string md5;
         BSONObj getLastErrorDefaults;
+        map<string,TagRule*> rules;
 
         list<HostAndPort> otherMemberHostnames() const; // except self
 
@@ -101,6 +113,102 @@ namespace mongo {
         bool _ok;
         void from(BSONObj);
         void clear();
+
+        struct TagClause;
+
+        /**
+         * This is a logical grouping of servers.  It is pointed to by a set of
+         * servers with a certain tag.
+         *
+         * For example, suppose servers A, B, and C have the tag "dc.nyc". If we
+         * have a rule {"dc" : 2}, then we want A _or_ B _or_ C to have the
+         * write for one of the "dc" critiria to be fulfilled, so all three will
+         * point to this subgroup. When one of their oplog-tailing cursors is
+         * updated, this subgroup is updated.
+         */
+        struct TagSubgroup {
+            string name;
+            OpTime last;
+            vector<TagClause*> clauses;
+
+            // this probably won't actually point to valid members after the
+            // subgroup is created, as initFromConfig() makes a copy of the
+            // config
+            set<MemberCfg*> m;
+
+            void updateLast(const OpTime& op);
+            string toString() const;
+
+            /**
+             * If two tags have the same name, they should compare as equal so
+             * that members don't have to update two identical groups on writes.
+             */
+            bool operator() (TagSubgroup& lhs, TagSubgroup& rhs) const {
+                return lhs.name < rhs.name;
+            }
+        };
+
+        /**
+         * An argument in a rule.  For example, if we had the rule {dc : 2,
+         * machines : 3}, "dc" : 2 and "machines" : 3 would be two TagClauses.
+         *
+         * Each tag clause has a set of associated subgroups.  For example, if
+         * we had "dc" : 2, our subgroups might be "dc.nyc", "dc.sf", and
+         * "dc.hk".
+         */
+        struct TagClause {
+            OpTime last;
+            map<string,TagSubgroup*> subgroups;
+            TagRule *rule;
+            string name;
+            /**
+             * If we have get a clause like {machines : 3} and this server is
+             * tagged with "machines", then it's really {machines : 2}, as we
+             * will always be up-to-date.  So, target would be 3 and
+             * actualTarget would be 2, in that example.
+             */
+            int target;
+            int actualTarget;
+
+            void updateLast(const OpTime& op);
+            string toString() const;
+        };
+
+        /**
+         * Parses getLastErrorModes.
+         */
+        void parseRules(const BSONObj& modes);
+
+        /**
+         * Create a  hash containing every possible clause that could be used in a
+         * rule and the servers related to that clause.
+         *
+         * For example, suppose we have the following servers:
+         * A ["dc.ny.rk1"]
+         * B ["dc.ny.rk1"]
+         * C ["dc.ny.rk2"]
+         * D ["dc.sf.rk1"]
+         * E ["dc.sf.rk2"]
+         *
+         * This would give us the possible criteria:
+         * "dc.ny.rk1" -> {A},{B}
+         * "dc.ny.rk2" -> {C}
+         * "dc.ny"     -> {A,B},{C}
+         * "dc.sf.rk1" -> {D}
+         * "dc.sf.rk2" -> {E}
+         * "dc.sf"     -> {D},{E}
+         * "dc"        -> {A,B,C},{D,E}
+         */
+        void _populateTagMap(map<string,TagClause> &tagMap);
+
+    public:
+        struct TagRule {
+            vector<TagClause*> clauses;
+            OpTime last;
+
+            void updateLast(const OpTime& op);
+            string toString() const;
+        };
     };
 
 }

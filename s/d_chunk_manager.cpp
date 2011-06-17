@@ -29,7 +29,7 @@ namespace mongo {
     ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) {
 
         // have to get a connection to the config db
-        // special case if i'm the configdb since i'm locked and if i connect to myself
+        // special case if I'm the configdb since I'm locked and if I connect to myself
         // its a deadlock
         scoped_ptr<ScopedDbConnection> scoped;
         scoped_ptr<DBDirectClient> direct;
@@ -112,7 +112,7 @@ namespace mongo {
             BSONObj currMax = it->second;
             ++it;
 
-            // coallesce the chunk's bounds in ranges if they are adjacent chunks
+            // coalesce the chunk's bounds in ranges if they are adjacent chunks
             if ( min.isEmpty() ) {
                 min = currMin;
                 max = currMax;
@@ -206,7 +206,7 @@ namespace mongo {
 
     ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
 
-        // check that we have the exact chunk that'll be subtracted
+        // check that we have the exact chunk that will be subtracted
         _assertChunkExists( min , max );
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
@@ -285,7 +285,7 @@ namespace mongo {
             uasserted( 14039 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
         }
 
-        // check that we have the exact chunk that'll be split and that the split point is valid
+        // check that we have the exact chunk that will be split and that the split point is valid
         _assertChunkExists( min , max );
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
             if ( ! contains( min , max , *it ) ) {

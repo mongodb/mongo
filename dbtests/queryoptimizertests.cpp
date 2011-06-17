@@ -950,7 +950,7 @@ namespace QueryOptimizerTests {
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true );
             {
-                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+                SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
             }
             m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
@@ -2211,6 +2211,43 @@ namespace QueryOptimizerTests {
                 }
             }
         };
+
+        /** Yield with BacicCursor takeover cursor. */
+        class YieldTakeoverBasic : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << BSON_ARRAY( i << i+1 ) ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                auto_ptr<ClientCursor> cc;
+                auto_ptr<ClientCursor::YieldData> data( new ClientCursor::YieldData() );
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "b" << NE << 0 << "a" << GTE << 0 ) );
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
+                    for( int i = 0; i < 120; ++i ) {
+                     	ASSERT( advance() );
+                    }
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 120, current().getIntField( "_id" ) );
+                    cc->prepareToYield( *data );
+                }                
+                _cli.remove( ns(), BSON( "_id" << 120 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT( ClientCursor::recoverFromYield( *data ) );
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 121, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 122, current().getIntField( "_id" ) );
+                }
+            }
+        };
         
         /** Yield with advance of inactive cursor. */
         class YieldInactiveCursorAdvance : public Base {
@@ -2515,7 +2552,24 @@ namespace QueryOptimizerTests {
                     ASSERT( !c );
                 }
             };
-
+            
+            class BestSavedOutOfOrder : public QueryOptimizerCursorTests::Base {
+            public:
+                void run() {
+                    _cli.insert( ns(), BSON( "_id" << 5 << "b" << BSON_ARRAY( 1 << 2 << 3 << 4 << 5 ) ) );
+                    _cli.insert( ns(), BSON( "_id" << 1 << "b" << 6 ) );
+                    _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                    // record {_id:1} index for this query
+                    ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 << "b" << GT << 0 ).sort( "b" ) )->more() );
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 << "b" << GT << 0 ), BSON( "b" << 1 ) );
+                    // {_id:1} requires scan and order, so {b:1} must be chosen.
+                    ASSERT( c );
+                    ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
+                }
+            };
+            
             class MultiIndex : public Base {
             public:
                 MultiIndex() {
@@ -2620,6 +2674,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
             add<QueryOptimizerCursorTests::TryYieldGeo>();
             add<QueryOptimizerCursorTests::YieldTakeover>();
+            add<QueryOptimizerCursorTests::YieldTakeoverBasic>();
             add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
             add<QueryOptimizerCursorTests::OrderId>();
             add<QueryOptimizerCursorTests::OrderMultiIndex>();
@@ -2635,6 +2690,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
             add<QueryOptimizerCursorTests::GetCursor::Geo>();
             add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
+            add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
         }
     } myall;

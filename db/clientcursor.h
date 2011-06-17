@@ -34,6 +34,7 @@
 #include "matcher.h"
 #include "../client/dbclient.h"
 #include "projection.h"
+#include "s/d_chunk_manager.h"
 
 namespace mongo {
 
@@ -166,6 +167,7 @@ namespace mongo {
         /**
          * @param microsToSleep -1 : ask client
          *                     >=0 : sleep for that amount
+         * @param recordToLoad after yielding lock, load this record with only mmutex
          * do a dbtemprelease
          * note: caller should check matcher.docMatcher().atomic() first and not yield if atomic -
          *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
@@ -174,7 +176,7 @@ namespace mongo {
          *         if false is returned, then this ClientCursor should be considered deleted -
          *         in fact, the whole database could be gone.
          */
-        bool yield( int microsToSleep = -1 );
+        bool yield( int microsToSleep = -1 , Record * recordToLoad = 0 );
 
         /**
          * @return same as yield()
@@ -182,7 +184,7 @@ namespace mongo {
         bool yieldSometimes();
 
         static int yieldSuggest();
-        static void staticYield( int micros , const StringData& ns );
+        static void staticYield( int micros , const StringData& ns , Record * rec );
 
         struct YieldData { CursorId _id; bool _doingDeletes; };
         bool prepareToYield( YieldData &data );
@@ -257,6 +259,9 @@ namespace mongo {
                 return true;
             return _c->matcher()->matchesCurrent( _c.get() );
         }
+
+        void setChunkManager( ShardChunkManagerPtr manager ){ _chunkManager = manager; }
+        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
 
     private:
         void setLastLoc_inlock(DiskLoc);
@@ -370,6 +375,8 @@ namespace mongo {
 
         bool _doingDeletes;
         ElapsedTracker _yieldSometimesTracker;
+
+        ShardChunkManagerPtr _chunkManager;
 
     public:
         shared_ptr<ParsedQuery> pq;

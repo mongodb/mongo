@@ -258,8 +258,12 @@ namespace mongo {
 
     struct numberValue {
         numberValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( double d ) const {
-            b.back()->append( b.fieldName(), d );
+        void operator() ( const char *start, const char *end ) const {
+            // We re-parse the numeric string here because spirit parsing of strings
+            // to doubles produces different results from strtod in some cases and
+            // we want to use strtod to ensure consistency with other string to
+            // double conversions in our code.
+            b.back()->append( b.fieldName(), strtod( start, 0 ) );
         }
         ObjectBuilder &b;
     };
@@ -462,7 +466,7 @@ namespace mongo {
                 elements = list_p(value, ch_p(',')[arrayNext( self.b )]);
                 value =
                     str[ stringEnd( self.b ) ] |
-                    number |
+                    number[ numberValue( self.b ) ] |
                     integer |
                     array[ arrayEnd( self.b ) ] |
                     lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
@@ -510,7 +514,7 @@ namespace mongo {
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
-                number = strict_real_p[ numberValue( self.b ) ];
+                number = strict_real_p;
 
                 static int_parser<long long, 10,  1, numeric_limits<long long>::digits10 + 1> long_long_p;
                 integer = long_long_p[ intValue(self.b) ];

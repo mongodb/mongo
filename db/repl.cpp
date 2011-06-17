@@ -1085,6 +1085,9 @@ namespace mongo {
 
         BSONObjBuilder cmd;
         cmd.appendAs( me["_id"] , "handshake" );
+        if (theReplSet) {
+            cmd.append("member", theReplSet->selfId());
+        }
 
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
@@ -1099,7 +1102,7 @@ namespace mongo {
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                 (!noauth && !replAuthenticate(_conn.get())) ) {                
+                 (!noauth && !replAuthenticate(_conn.get())) ) {
                 resetConnection();
                 log() << "repl:  " << errmsg << endl;
                 return false;
@@ -1109,33 +1112,31 @@ namespace mongo {
     }
     
     bool OplogReader::connect(string hostName) {
+        if (conn() != 0) {
+            return true;
+        }
+
         if (commonConnect(hostName)) {
             return replHandshake(_conn.get());
         }
         return false;
     }
 
-    bool OplogReader::connect(const string& from, const string& to) {
+    bool OplogReader::connect(const BSONObj& rid, const int from, const string& to) {
         if (conn() != 0) {
             return true;
         }
         if (commonConnect(to)) {
             log() << "handshake between " << from << " and " << to << endl;
-            return passthroughHandshake(from);
+            return passthroughHandshake(rid, from);
         }
         return false;
     }
 
-    bool OplogReader::passthroughHandshake(const string& f) {
-        ScopedConn from(f);
-
-        BSONObj me = from.findOne("local.me", BSONObj(), NULL, 0);
-        if (me.isEmpty() || !me.hasField("_id")) {
-            return false;
-        }
-        
+    bool OplogReader::passthroughHandshake(const BSONObj& rid, const int f) {
         BSONObjBuilder cmd;
-        cmd.appendAs( me["_id"] , "handshake" );
+        cmd.appendAs( rid["_id"], "handshake" );
+        cmd.append( "member" , f );
 
         BSONObj res;
         return conn()->runCommand( "admin" , cmd.obj() , res );

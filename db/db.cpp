@@ -576,7 +576,6 @@ int main(int argc, char* argv[]) {
     ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
-    ("maxConns",po::value<int>(), "max number of simultaneous connections")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
@@ -606,7 +605,6 @@ int main(int argc, char* argv[]) {
 
     replication_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("autoresync", "automatically resync if slave data is stale")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
     ;
 
@@ -616,6 +614,7 @@ int main(int argc, char* argv[]) {
     ("source", po::value<string>(), "when slave: specify master as <server:port>")
     ("only", po::value<string>(), "when slave: specify a single database to replicate")
     ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
+    ("autoresync", "automatically resync if slave data is stale")
     ;
 
     rs_options.add_options()
@@ -822,6 +821,11 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
+            if( params.count("replSet") ) {
+                out() << "--autoresync is not used with --replSet" << endl;
+                out() << "see http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -907,18 +911,6 @@ int main(int argc, char* argv[]) {
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
-        }
-        if ( params.count( "maxConns" ) ) {
-            int newSize = params["maxConns"].as<int>();
-            if ( newSize < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            else if ( newSize >= 10000000 ) {
-                out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            connTicketHolder.resize( newSize );
         }
         if (params.count("nounixsocket")) {
             noUnixSocket = true;

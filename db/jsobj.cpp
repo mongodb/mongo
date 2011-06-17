@@ -337,124 +337,6 @@ namespace mongo {
         return def;
     }
 
-    /* wo = "well ordered" */
-    int BSONElement::woCompare( const BSONElement &e,
-                                bool considerFieldName ) const {
-        int lt = (int) canonicalType();
-        int rt = (int) e.canonicalType();
-        int x = lt - rt;
-        if( x != 0 && (!isNumber() || !e.isNumber()) )
-            return x;
-        if ( considerFieldName ) {
-            x = strcmp(fieldName(), e.fieldName());
-            if ( x != 0 )
-                return x;
-        }
-        x = compareElementValues(*this, e);
-        return x;
-    }
-
-    /* must be same type when called, unless both sides are #s
-    */
-    int compareElementValues(const BSONElement& l, const BSONElement& r) {
-        int f;
-        double x;
-
-        switch ( l.type() ) {
-        case EOO:
-        case Undefined:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            f = l.canonicalType() - r.canonicalType();
-            if ( f<0 ) return -1;
-            return f==0 ? 0 : 1;
-        case Bool:
-            return *l.value() - *r.value();
-        case Timestamp:
-        case Date:
-            if ( l.date() < r.date() )
-                return -1;
-            return l.date() == r.date() ? 0 : 1;
-        case NumberLong:
-            if( r.type() == NumberLong ) {
-                long long L = l._numberLong();
-                long long R = r._numberLong();
-                if( L < R ) return -1;
-                if( L == R ) return 0;
-                return 1;
-            }
-            // else fall through
-        case NumberInt:
-        case NumberDouble: {
-            double left = l.number();
-            double right = r.number();
-            bool lNan = !( left <= numeric_limits< double >::max() &&
-                           left >= -numeric_limits< double >::max() );
-            bool rNan = !( right <= numeric_limits< double >::max() &&
-                           right >= -numeric_limits< double >::max() );
-            if ( lNan ) {
-                if ( rNan ) {
-                    return 0;
-                }
-                else {
-                    return -1;
-                }
-            }
-            else if ( rNan ) {
-                return 1;
-            }
-            x = left - right;
-            if ( x < 0 ) return -1;
-            return x == 0 ? 0 : 1;
-        }
-        case jstOID:
-            return memcmp(l.value(), r.value(), 12);
-        case Code:
-        case Symbol:
-        case String:
-            /* todo: utf version */
-            return strcmp(l.valuestr(), r.valuestr());
-        case Object:
-        case Array:
-            return l.embeddedObject().woCompare( r.embeddedObject() );
-        case DBRef: {
-            int lsz = l.valuesize();
-            int rsz = r.valuesize();
-            if ( lsz - rsz != 0 ) return lsz - rsz;
-            return memcmp(l.value(), r.value(), lsz);
-        }
-        case BinData: {
-            int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
-            int rsz = r.objsize();
-            if ( lsz - rsz != 0 ) return lsz - rsz;
-            return memcmp(l.value()+4, r.value()+4, lsz+1);
-        }
-        case RegEx: {
-            int c = strcmp(l.regex(), r.regex());
-            if ( c )
-                return c;
-            return strcmp(l.regexFlags(), r.regexFlags());
-        }
-        case CodeWScope : {
-            f = l.canonicalType() - r.canonicalType();
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
-            if ( f )
-                return f;
-            return 0;
-        }
-        default:
-            out() << "compareElementValues: bad type " << (int) l.type() << endl;
-            assert(false);
-        }
-        return -1;
-    }
-
     /* Matcher --------------------------------------*/
 
 // If the element is something like:
@@ -1094,7 +976,7 @@ namespace mongo {
             c.appendRegex("x", "goo");
             BSONObj p = c.done();
 
-            assert( !o.woEqual( p ) );
+            assert( !o.shallowEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
         }
@@ -1199,7 +1081,7 @@ namespace mongo {
             BSONObj a = A.done();
             BSONObj b = B.done();
             BSONObj c = C.done();
-            assert( !a.woEqual( b ) ); // comments on operator==
+            assert( !a.shallowEqual( b ) ); // comments on operator==
             int cmp = a.woCompare(b);
             assert( cmp == 0 );
             cmp = a.woCompare(c);
@@ -1232,7 +1114,11 @@ namespace mongo {
             return;
         }
         case Bool: appendBool( fieldName , false); return;
-        case Date: appendDate( fieldName , 0); return;
+        case Date: 
+            // min varies with V0 and V1 indexes, so we go one type lower.
+            appendBool(fieldName, true);
+            //appendDate( fieldName , numeric_limits<long long>::min() ); 
+            return;
         case jstNULL: appendNull( fieldName ); return;
         case Symbol:
         case String: append( fieldName , "" ); return;
@@ -1281,7 +1167,7 @@ namespace mongo {
         case jstNULL:
             appendMinForType( fieldName , NumberInt );
         case Bool: appendBool( fieldName , true); break;
-        case Date: appendDate( fieldName , 0xFFFFFFFFFFFFFFFFLL ); break;
+        case Date: appendDate( fieldName , numeric_limits<long long>::max() ); break;
         case Symbol:
         case String: append( fieldName , BSONObj() ); break;
         case Code:

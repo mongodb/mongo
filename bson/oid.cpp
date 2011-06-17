@@ -34,7 +34,7 @@ namespace mongo {
 #elif defined(__linux__) || defined(__APPLE__) || defined(__sunos__)
         pid = (unsigned short) getpid();
 #else
-        pid = (unsigned short) security.getNonce();
+        pid = (unsigned short) Security::getNonce();
 #endif
         return pid;
     }
@@ -53,13 +53,13 @@ namespace mongo {
         // this is not called often, so the following is not expensive, and gives us some
         // testing that nonce generation is working right and that our OIDs are (perhaps) ok.
         {
-            nonce a = security.getNonce();
-            nonce b = security.getNonce();
-            nonce c = security.getNonce();
+            nonce64 a = Security::getNonceDuringInit();
+            nonce64 b = Security::getNonceDuringInit();
+            nonce64 c = Security::getNonceDuringInit();
             assert( !(a==b && b==c) );
         }
 
-        unsigned long long n = security.getNonce();
+        unsigned long long n = Security::getNonceDuringInit();
         OID::MachineAndPid x = ourMachine = (OID::MachineAndPid&) n;
         foldInPid(x);
         return x;
@@ -96,7 +96,7 @@ namespace mongo {
     }
 
     void OID::init() {
-        static AtomicUInt inc = (unsigned) security.getNonce();
+        static AtomicUInt inc = (unsigned) Security::getNonce();
 
         {
             unsigned t = (unsigned) time(0);

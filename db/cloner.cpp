@@ -106,6 +106,8 @@ namespace mongo {
     }
 
     struct Cloner::Fun {
+        Fun() : lastLog(0) { }
+        time_t lastLog;
         void operator()( DBClientCursorBatchIterator &i ) {
             mongolock l( true );
             if ( context ) {
@@ -114,6 +116,13 @@ namespace mongo {
 
             while( i.moreInCurrentBatch() ) {
                 if ( n % 128 == 127 /*yield some*/ ) {
+                    time_t now = time(0);
+                    if( now - lastLog >= 60 ) { 
+                        // report progress
+                        if( lastLog )
+                            log() << "clone " << to_collection << ' ' << n << endl;
+                        lastLog = now;
+                    }
                     mayInterrupt( _mayBeInterrupted );
                     dbtempreleaseif t( _mayYield );
                 }
@@ -147,7 +156,7 @@ namespace mongo {
                 }
 
                 try {
-                    theDataFileMgr.insertWithObjModNoRet(to_collection, js);
+                    theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
 
@@ -216,7 +225,7 @@ namespace mongo {
             for ( list<BSONObj>::iterator i = storedForLater.begin(); i!=storedForLater.end(); i++ ) {
                 BSONObj js = *i;
                 try {
-                    theDataFileMgr.insertWithObjModNoRet(to_collection, js);
+                    theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
 
@@ -613,6 +622,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; } // do our own auth
         virtual bool slaveOk() const {
             return false;
         }
@@ -634,7 +644,7 @@ namespace mongo {
             bool capped = false;
             long long size = 0;
             {
-                Client::Context ctx( source );
+                Client::Context ctx( source ); // auths against source
                 NamespaceDetails *nsd = nsdetails( source.c_str() );
                 uassert( 10026 ,  "source namespace does not exist", nsd );
                 capped = nsd->capped;
@@ -643,7 +653,7 @@ namespace mongo {
                         size += i.ext()->length;
             }
 
-            Client::Context ctx( target );
+            Client::Context ctx( target ); //auths against target
 
             if ( nsdetails( target.c_str() ) ) {
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );
@@ -685,7 +695,7 @@ namespace mongo {
                         break;
                 }
                 BSONObj o = c->next();
-                theDataFileMgr.insertWithObjModNoRet( target.c_str(), o );
+                theDataFileMgr.insertWithObjMod( target.c_str(), o );
             }
 
             char cl[256];
@@ -716,7 +726,7 @@ namespace mongo {
                     }
                 }
                 BSONObj n = b.done();
-                theDataFileMgr.insertWithObjModNoRet( targetIndexes.c_str(), n );
+                theDataFileMgr.insertWithObjMod( targetIndexes.c_str(), n );
             }
 
             {

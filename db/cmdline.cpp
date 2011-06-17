@@ -20,6 +20,7 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/processinfo.h"
+#include "../util/message.h"
 #include "security_key.h"
 
 #ifdef _WIN32
@@ -50,6 +51,7 @@ namespace mongo {
         ("quiet", "quieter output")
         ("port", po::value<int>(&cmdLine.port), "specify port number")
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
+        ("maxConns",po::value<int>(), "max number of simultaneous connections")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
@@ -161,6 +163,19 @@ namespace mongo {
 
         if (params.count("quiet")) {
             cmdLine.quiet = true;
+        }
+
+        if ( params.count( "maxConns" ) ) {
+            int newSize = params["maxConns"].as<int>();
+            if ( newSize < 5 ) {
+                out() << "maxConns has to be at least 5" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+            else if ( newSize >= 10000000 ) {
+                out() << "maxConns can't be greater than 10000000" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+            connTicketHolder.resize( newSize );
         }
 
         string logpath;

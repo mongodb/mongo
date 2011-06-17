@@ -379,7 +379,7 @@ namespace mongo {
             while( 1 ) {
                 //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
                 //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                if ( keyAt(keyOfs).woEqual(keyAtKeyOfs) ) {
+                if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
                     const _KeyNode& kn = keyNode(keyOfs);
                     if( kn.recordLoc == locAtKeyOfs ) {
                         if ( !kn.isUsed() ) {

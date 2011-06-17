@@ -58,8 +58,10 @@ namespace mongo {
 
         int slavedelay;
 
+        set<string> discoveredSeeds;
+
         ReplSettings()
-            : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay() {
+            : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay(), discoveredSeeds() {
         }
 
     };

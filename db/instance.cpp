@@ -297,7 +297,7 @@ namespace mongo {
             char *p = m.singleData()->_data;
             int len = strlen(p);
             if ( len > 400 )
-                out() << curTimeMillis() % 10000 <<
+                out() << curTimeMillis64() % 10000 <<
                       " long msg received, len:" << len << endl;
 
             Message *resp = new Message();
@@ -355,7 +355,7 @@ namespace mongo {
 
         //DEV log = true;
         if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
@@ -580,7 +580,7 @@ namespace mongo {
                 uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
             }
         }
-        theDataFileMgr.insertWithObjModNoRet(ns, js, false); // js may be modified in the call to add an _id field.
+        theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
         logOp("i", ns, js);
     }
 
@@ -687,7 +687,7 @@ namespace mongo {
         return true;
     }
 
-    void DBDirectClient::say( Message &toSend ) {
+    void DBDirectClient::say( Message &toSend, bool isRetry ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;

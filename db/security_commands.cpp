@@ -39,12 +39,12 @@ namespace mongo {
 
        getnonce sends nonce to client
 
-       client then sends { authenticate:1, nonce:<nonce_str>, user:<username>, key:<key> }
+       client then sends { authenticate:1, nonce64:<nonce_str>, user:<username>, key:<key> }
 
        where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
     */
 
-    boost::thread_specific_ptr<nonce> lastNonce;
+    boost::thread_specific_ptr<nonce64> lastNonce;
 
     class CmdGetNonce : public Command {
     public:
@@ -57,7 +57,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
         bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            nonce *n = new nonce(security.getNonce());
+            nonce64 *n = new nonce64(Security::getNonce());
             stringstream ss;
             ss << hex << *n;
             result.append("nonce", ss.str() );
@@ -116,7 +116,7 @@ namespace mongo {
 
             {
                 bool reject = false;
-                nonce *ln = lastNonce.release();
+                nonce64 *ln = lastNonce.release();
                 if ( ln == 0 ) {
                     reject = true;
                     log(1) << "auth: no lastNonce" << endl;

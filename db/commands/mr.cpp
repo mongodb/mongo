@@ -69,7 +69,7 @@ namespace mongo {
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             assert( s );
-            if ( s->invoke( _func.func() , &_params, &o , 0 , true ) )
+            if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
 
@@ -479,11 +479,20 @@ namespace mongo {
         }
 
         /**
+         * Insert doc into the inc collection, taking proper lock
+         */
+        void State::insertToInc( BSONObj& o ) {
+            writelock l(_config.incLong);
+            Client::Context ctx(_config.incLong);
+            _insertToInc(o);
+        }
+
+        /**
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
             assert( _onDisk );
-            theDataFileMgr.insertWithObjModNoRet( _config.incLong.c_str() , o , true );
+            theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
             getDur().commitIfNeeded();
         }
 
@@ -1113,10 +1122,9 @@ namespace mongo {
 
                 set<ServerAndQuery> servers;
 
-                BSONObjBuilder shardCounts;
-                map<string,long long> counts;
-
                 BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
+                BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
+                BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
                 vector< auto_ptr<DBClientCursor> > shardCursors;
 
                 {
@@ -1130,13 +1138,6 @@ namespace mongo {
 
                         uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
                         servers.insert( shard );
-                        shardCounts.appendAs( res["counts"] , shard );
-
-                        BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
-                        while ( j.more() ) {
-                            BSONElement temp = j.next();
-                            counts[temp.fieldName()] += temp.numberLong();
-                        }
 
                     }
 
@@ -1182,19 +1183,25 @@ namespace mongo {
                             continue;
                         }
 
-
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
+                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                        if (state.isOnDisk())
+                            state.insertToInc(res);
+                        else
+                            state.emit(res);
                         values.clear();
                         values.push_back( t );
                     }
 
-                    if ( values.size() )
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
+                    if ( values.size() ) {
+                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get() );
+                        if (state.isOnDisk())
+                            state.insertToInc(res);
+                        else
+                            state.emit(res);
+                    }
                 }
 
-
-                state.dumpToInc();
-                state.postProcessCollection();
+                long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
 
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
@@ -1203,15 +1210,21 @@ namespace mongo {
                     conn.done();
                 }
 
-                result.append( "shardCounts" , shardCounts.obj() );
+                result.append( "shardCounts" , shardCounts );
 
-                {
-                    BSONObjBuilder c;
-                    for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); i++ ) {
-                        c.append( i->first , i->second );
-                    }
-                    result.append( "counts" , c.obj() );
+                // fix the global counts
+                BSONObjBuilder countsB(32);
+                BSONObjIterator j(counts);
+                while (j.more()) {
+                    BSONElement elmt = j.next();
+                    if (!strcmp(elmt.fieldName(), "reduce"))
+                        countsB.append("reduce", elmt.numberLong() + state.numReduces());
+                    else if (!strcmp(elmt.fieldName(), "output"))
+                        countsB.append("output", finalCount);
+                    else
+                        countsB.append(elmt);
                 }
+                result.append( "counts" , countsB.obj() );
 
                 return 1;
             }

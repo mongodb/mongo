@@ -33,10 +33,10 @@ namespace mongo {
         bool multi; // multikey index
 
         void addKeys(const IndexSpec& spec, const BSONObj& o, DiskLoc loc) { 
-            BSONObjSetDefaultOrder keys;
+            BSONObjSet keys;
             spec.getKeys(o, keys);
             int k = 0;
-            for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+            for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
                 if( ++k == 2 ) {
                     multi = true;
                 }

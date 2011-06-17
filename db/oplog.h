@@ -65,18 +65,34 @@ namespace mongo {
 
     class QueryPlan;
     
+    /** Implements an optimized procedure for finding the first op in the oplog. */
     class FindingStartCursor {
     public:
+
+        /**
+         * The cursor will attempt to find the first op in the oplog matching the
+         * 'ts' field of the qp's query.
+         */
         FindingStartCursor( const QueryPlan & qp );
+
+        /** @return true if the first matching op in the oplog has been found. */
         bool done() const { return !_findingStart; }
-        shared_ptr<Cursor> cRelease() { return _c; }
+
+        /** @return cursor pointing to the first matching op, if done(). */
+        shared_ptr<Cursor> cursor() { verify( 14835, done() ); return _c; }
+
+        /** Iterate the cursor, to continue trying to find matching op. */
         void next();
+
+        /** Yield cursor, if not done(). */
         bool prepareToYield() {
             if ( _findingStartCursor ) {
                 return _findingStartCursor->prepareToYield( _yieldData );
             }
-            return true;
+            return false;
         }
+        
+        /** Recover from cursor yield. */
         void recoverFromYield() {
             if ( _findingStartCursor ) {
                 if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
@@ -94,10 +110,9 @@ namespace mongo {
         ClientCursor::CleanupPointer _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
-        DiskLoc startLoc( const DiskLoc &rec );
+        DiskLoc extentFirstLoc( const DiskLoc &rec );
 
-        // should never have an empty extent in the oplog, so don't worry about that case
-        DiskLoc prevLoc( const DiskLoc &rec );
+        DiskLoc prevExtentFirstLoc( const DiskLoc &rec );
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() );
         void destroyClientCursor() {
             _findingStartCursor.reset( 0 );

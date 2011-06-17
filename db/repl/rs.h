@@ -100,6 +100,45 @@ namespace mongo {
         void msgCheckNewState();
     };
 
+    class GhostSync : public task::Server {
+        struct GhostSlave {
+        GhostSlave() : last(0), slave(0), init(false) {}
+            OplogReader reader;
+            OpTime last;
+            Member* slave;
+            bool init;
+        };
+        /**
+         * This is a cache of ghost slaves
+         */
+        map<BSONObj,GhostSlave> _ghostCache;
+        ReplSetImpl *rs;
+        virtual void starting();
+    public:
+        GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), rs(_rs) {}
+        ~GhostSync() {
+            log() << "~GhostSync() called" << rsLog;
+        }
+
+        /**
+         * Replica sets can sync in a hierarchical fashion, which throws off w
+         * calculation on the master.  percolate() faux-syncs from an upstream
+         * node so that the primary will know what the slaves are up to.
+         *
+         * We can't just directly sync to the primary because it could be
+         * unreachable, e.g., S1--->S2--->S3--->P.  S2 should ghost sync from S3
+         * and S3 can ghost sync from the primary.
+         *
+         * Say we have an S1--->S2--->P situation and this node is S2.  rid
+         * would refer to S1.  S2 would create a ghost slave of S1 and connect
+         * it to P (_currentSyncTarget). Then it would use this connection to
+         * pretend to be S1, replicating off of P.
+         */
+        void percolate(const BSONObj& rid, const OpTime& last);
+        void associateSlave(const BSONObj& rid, const int memberId);
+        void updateSlave(const BSONObj& rid, const OpTime& last);
+    };
+
     struct Target;
 
     class Consensus {
@@ -392,7 +431,11 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
-        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
+        bool iAmPotentiallyHot() const {
+          return myConfig().potentiallyHot() && // not an arbiter
+            elect.steppedDown <= time(0) && // not stepped down/frozen
+            state() == MemberState::RS_SECONDARY; // not stale
+        }
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
@@ -405,7 +448,7 @@ namespace mongo {
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
-
+        GhostSync *ghost;
     private:
         Member* head() const { return _members.head(); }
     public:
@@ -418,6 +461,7 @@ namespace mongo {
         friend class CmdReplSetElect;
         friend class Member;
         friend class Manager;
+        friend class GhostSync;
         friend class Consensus;
 
     private:
@@ -434,37 +478,9 @@ namespace mongo {
         void syncFixUp(HowToFixUp& h, OplogReader& r);
         bool _getOplogReader(OplogReader& r, string& hn);
         bool _isStale(OplogReader& r, const string& hn);
-
-        struct GhostSlave {
-        GhostSlave() : last(0), slave(0), init(false) {}
-            OplogReader reader;
-            OpTime last;
-            Member* slave;
-            bool init;
-        };
-        /**
-         * This is a cache of ghost slaves
-         */
-        map<BSONObj,GhostSlave> _ghostCache;
-        bool _getSlave(const BSONObj& rid, GhostSlave& slave);
     public:
         void syncThread();
         const OpTime lastOtherOpTime() const;
-        /**
-         * Replica sets can sync in a hierarchical fashion, which throws off w
-         * calculation on the master.  percolate() faux-syncs from an upstream
-         * node so that the primary will know what the slaves are up to.
-         *
-         * We can't just directly sync to the primary because it could be
-         * unreachable, e.g., S1--->S2--->S3--->P.  S2 should ghost sync from S3
-         * and S3 can ghost sync from the primary.
-         *
-         * Say we have an S1--->S2--->P situation and this node is S2.  rid
-         * would refer to S1.  S2 would create a ghost slave of S1 and connect
-         * it to P (_currentSyncTarget). Then it would use this connection to
-         * pretend to be S1, replicating off of P.
-         */
-        void percolate(const BSONObj& rid, const OpTime& last);
     };
 
     class ReplSet : public ReplSetImpl {
@@ -519,9 +535,6 @@ namespace mongo {
         string hbmsg() const {
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
-        }
-        void percolate(const BSONObj& rid, const OpTime& last) {
-          ReplSetImpl::percolate(rid, last);
         }
     };
 
