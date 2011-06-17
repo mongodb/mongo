@@ -23,9 +23,11 @@
 #include "time_support.h"
 using namespace std;
 
-#ifndef _WIN32
-#include <cxxabi.h>
-#include <sys/file.h>
+#ifdef _WIN32
+# include <io.h>
+#else
+# include <cxxabi.h>
+# include <sys/file.h>
 #endif
 
 //#include "../db/jsobj.h"
@@ -109,14 +111,15 @@ namespace mongo {
 # define dup2 _dup2
 # define fileno _fileno
 #endif
-            massert(14845, "failed to redirect stderr to log file",
-                    dup2(fileno(tmp), 2) == 2);
+            // redirect stderr to log file
+            dup2(fileno(tmp), 2);
 
             Logstream::setLogFile(tmp); // after this point no thread will be using old file
 
 #if 0 // enable to test redirection
             cout << "written to cout" << endl;
             cerr << "written to cerr" << endl;
+            log() << "written to log()" << endl;
 #endif
 
             _file = tmp;
