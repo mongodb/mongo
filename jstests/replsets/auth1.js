@@ -4,7 +4,7 @@ load("jstests/replsets/rslib.js");
 
 var name = "rs_auth1";
 var port = allocatePorts(4);
-var path = "jstests/replsets/";
+var path = "jstests/libs/";
 
 
 print("reset permissions");
