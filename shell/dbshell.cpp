@@ -670,6 +670,7 @@ int _main(int argc, char* argv[]) {
         shellHistoryInit();
 
         string prompt;
+        int promptType; 
 
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
@@ -679,11 +680,16 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            if (scope->exec("prompt", "", false, false, false)) {
+            promptType = scope->type("prompt");
+            if (promptType == String){
                 prompt = scope->getString("prompt");
-             } else {
+            } else if (promptType  == Code) {
+                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
+                prompt = scope->getString("__prompt__");
+            } else {
                 prompt = sayReplSetMemberState()+"> ";
-             }
+            }
+
             char * line = shellReadline( prompt.c_str() );
 
             if ( line ) {
