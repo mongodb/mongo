@@ -118,7 +118,9 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 
 	/* Update the possibly changed fields. */
 	if (desc->root_addr == btree->root_page.addr &&
-	    desc->free_addr == btree->free_addr)
+	    desc->root_size == btree->root_page.size &&
+	    desc->free_addr == btree->free_addr &&
+	    desc->free_size == btree->free_size)
 		return (0);
 
 	desc->root_addr = btree->root_page.addr;
