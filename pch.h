@@ -155,6 +155,11 @@ namespace mongo {
     using boost::uint32_t;
     using boost::uint64_t;
 
+    /** called by mongos, mongod, test. do not call from clients and such. 
+        invoked before about everything except global var construction.
+     */
+    void doPreServerStatupInits();
+
 } // namespace mongo
 
 #endif // MONGO_PCH_H

@@ -1,4 +1,5 @@
-// common.cpp
+// @file common.cpp
+
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -23,6 +24,12 @@
  * this just has globals
  */
 namespace mongo {
+
+    /** called by mongos, mongod, test. do not call from clients and such. 
+        invoked before about everything except global var construction.
+     */
+    void doPreServerStatupInits() { 
+    }
 
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
     MongoMutex &dbMutex( *(new MongoMutex("dbMutex")) );

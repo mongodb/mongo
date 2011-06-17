@@ -22,5 +22,6 @@
 
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
+    doPreServerStatupInits();
     return Suite::run(argc, argv, "/tmp/unittest");
 }
