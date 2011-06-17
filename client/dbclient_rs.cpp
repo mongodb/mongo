@@ -711,6 +711,7 @@ namespace mongo {
                     *retry = true;
                 }
                 else{
+                    (void)wasMaster; // silence set-but-not-used warning
                     // assert( wasMaster );
                     // printStackTrace();
                     log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
