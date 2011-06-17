@@ -686,6 +686,7 @@ __slvg_range_col(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_range_overlap_col(session, i, j, ss));
+			ss->range_merge = 1;
 		}
 	}
 	return (0);
@@ -854,8 +855,6 @@ delete:		WT_RET(__slvg_free_trk_col(session, &ss->pages[b_slot], 1));
 		ss->pages[j] = ss->pages[j - 1];
 	ss->pages[i] = new;
 	++ss->pages_next;
-
-	ss->range_merge = 1;
 	return (0);
 }
 
@@ -1149,6 +1148,7 @@ __slvg_range_row(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_range_overlap_row(session, i, j, ss));
+			ss->range_merge = 1;
 		}
 	}
 	return (0);
@@ -1334,8 +1334,6 @@ delete:		WT_RET(__slvg_free_trk_row(session, &ss->pages[b_slot], 1));
 		ss->pages[j] = ss->pages[j - 1];
 	ss->pages[i] = new;
 	++ss->pages_next;
-
-	ss->range_merge = 1;
 	return (0);
 }
 
