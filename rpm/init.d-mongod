@@ -36,7 +36,14 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
+
+  # Redhat/Centos uses a different version of killproc
+  if [ -f /etc/redhat-release ]; then
+    killproc -d 30 /usr/bin/mongod -TERM
+  else
+    killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
+  fi
+
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
