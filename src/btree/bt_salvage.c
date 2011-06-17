@@ -309,7 +309,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		    size % allocsize != 0 ||
 		    size > WT_BTREE_PAGE_SIZE_MAX ||
 		    off + (off_t)size > max)
-			goto skip_allocsize;
+			goto skip;
 
 		/* The page size isn't insane, read the entire page. */
 		WT_ERR(__wt_buf_initsize(session, t, size));
@@ -327,7 +327,11 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		checksum = dsk->checksum;
 		dsk->checksum = 0;
 		if (checksum != __wt_cksum(dsk, size)) {
-skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
+skip:			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "skip %" PRIu32 "B at file offset %" PRIu64,
+			    allocsize, (uint64_t)off));
+
+			WT_RET(__wt_block_free(session, addr, allocsize));
 			off += allocsize;
 			continue;
 		}
@@ -348,8 +352,12 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_FREELIST:
 		case WT_PAGE_ROW_INT:
+			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "discarding %s page [%" PRIu32 "/%" PRIu32 "]",
+			    __wt_page_type_string(dsk->type), addr, size));
+
 			WT_RET(__wt_block_free(session, addr, size));
-			continue;
+			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
@@ -364,6 +372,10 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 				    __wt_page_type_string(dsk->type));
 				return (WT_ERROR);
 			}
+
+			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "tracking %s page [%" PRIu32 "/%" PRIu32 "]",
+			    __wt_page_type_string(dsk->type), addr, size));
 
 			/*
 			 * After reading the file, we may write pages in order
@@ -385,6 +397,10 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 			WT_ERR(__slvg_trk_leaf(session, dsk, addr, ss));
 			break;
 		case WT_PAGE_OVFL:
+			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "tracking %s page [%" PRIu32 "/%" PRIu32 "]",
+			    __wt_page_type_string(dsk->type), addr, size));
+
 			WT_ERR(__slvg_trk_ovfl(session, dsk, addr, ss));
 			break;
 		}
@@ -449,6 +465,10 @@ __slvg_trk_leaf(
 		trk->u.col.range_start = dsk->recno;
 		trk->u.col.range_stop = dsk->recno + (dsk->u.entries - 1);
 
+		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
+		    addr, trk->u.col.range_start, trk->u.col.range_stop));
+
 		if (dsk->type == WT_PAGE_COL_VAR)
 			WT_ERR(__slvg_ovfl_dsk_ref(session, dsk, trk));
 		break;
@@ -464,6 +484,10 @@ __slvg_trk_leaf(
 
 		trk->u.col.range_start = dsk->recno;
 		trk->u.col.range_stop = stop_recno - 1;
+
+		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
+		    addr, trk->u.col.range_start, trk->u.col.range_stop));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -478,6 +502,19 @@ __slvg_trk_leaf(
 		WT_ERR(__wt_row_key(session,
 		    page, &page->u.row_leaf.d[page->entries - 1],
 		    &trk->u.row.range_stop));
+
+		/*
+		 * XXX
+		 * This assumes the keys are printable strings.
+		 */
+		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+		    "[%" PRIu32 "] start key %.*s",
+		    addr, trk->u.row.range_start.size,
+		    (char *)trk->u.row.range_start.data));
+		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+		    "[%" PRIu32 "] stop key %.*s",
+		    addr, trk->u.row.range_stop.size,
+		    (char *)trk->u.row.range_stop.data));
 
 		/* Row-store pages can contain overflow items. */
 		WT_ERR(__slvg_ovfl_dsk_ref(session, dsk, trk));

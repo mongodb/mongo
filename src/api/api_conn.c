@@ -251,11 +251,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		const char *vname;
 		uint32_t vflag;
 	} *vt, verbtypes[] = {
+		{ "evict", WT_VERB_EVICT },
 		{ "fileops", WT_VERB_FILEOPS },
 		{ "hazard", WT_VERB_HAZARD },
 		{ "mutex", WT_VERB_MUTEX },
 		{ "read", WT_VERB_READ },
-		{ "evict", WT_VERB_EVICT },
+		{ "salvage", WT_VERB_SALVAGE },
 		{ NULL, 0 }
 	};
 	WT_CONNECTION_IMPL *conn;

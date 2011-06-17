@@ -321,8 +321,9 @@ wts_salvage(void)
 	(void)system("cp __" WT_PREFIX " __wt.salvage");
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
-	    g.progname, g.c_cache);
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
+	    g.progname, g.c_cache,
+	    g.verbose ? "salvage" : "");
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",

@@ -228,7 +228,7 @@ methods = {
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as
 		a list, such as \c "verbose=[evict,read]"''',
-		type='list', choices=['evict', 'fileops', 'hazard', 'mutex', 'read']),
+		type='list', choices=['evict', 'fileops', 'hazard', 'mutex', 'read', 'salvage']),
 ]),
 }
 
@@ -247,7 +247,8 @@ flags = {
 		'VERB_FILEOPS',
 		'VERB_HAZARD',
 		'VERB_MUTEX',
-		'VERB_READ'
+		'VERB_READ',
+		'VERB_SALVAGE'
 	],
 
 ###################################################
