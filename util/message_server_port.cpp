@@ -116,7 +116,27 @@ namespace mongo {
             }
 
             try {
+#ifndef __linux__  // TODO: consider making this ifdef _WIN32
                 boost::thread thr( boost::bind( &pms::threadRun , p ) );
+#else
+                pthread_attr_t attrs;
+                pthread_attr_init(&attrs);
+
+                static const size_t STACK_SIZE = 1024*1024;
+                pthread_attr_setstacksize(&attrs, (DEBUG_BUILD 
+                                                    ? (STACK_SIZE / 2)
+                                                    : STACK_SIZE));
+
+                pthread_t thread;
+                int failed = pthread_create(&thread, &attrs, (void*(*)(void*)) &pms::threadRun, p);
+
+                pthread_attr_destroy(&attrs);
+
+                if (failed) {
+                    log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
+                    throw boost::thread_resource_error(); // for consistency with boost::thread
+                }
+#endif
             }
             catch ( boost::thread_resource_error& ) {
                 connTicketHolder.release();
