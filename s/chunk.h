@@ -350,6 +350,7 @@ namespace mongo {
         void _load();
 
         void ensureIndex_inlock();
+        void getAllShards_inlock( set<Shard>& all );
 
         string _ns;
         ShardKeyPattern _key;

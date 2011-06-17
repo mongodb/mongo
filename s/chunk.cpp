@@ -749,7 +749,7 @@ namespace mongo {
                 FieldRange range = frs->range(_key.key().firstElement().fieldName());
                 if ( !range.nontrivial() ) {
                     DEV PRINT(range.nontrivial());
-                    getAllShards(shards);
+                    getAllShards_inlock(shards);
                     return;
                 }
             }
@@ -806,6 +806,10 @@ namespace mongo {
 
     void ChunkManager::getAllShards( set<Shard>& all ) {
         rwlock lk( _lock , false );
+        getAllShards_inlock( all );
+    }
+
+    void ChunkManager::getAllShards_inlock( set<Shard>& all ){
         all.insert(_shards.begin(), _shards.end());
     }
 
