@@ -1738,7 +1738,6 @@ __slvg_ovfl_review(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 	}
 
-
 	/*
 	 * Walk the overflow page array -- if an overflow page isn't referenced,
 	 * we have no use for it.   Collapse the array as we go, we search it
