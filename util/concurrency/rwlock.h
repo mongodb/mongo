@@ -133,10 +133,19 @@ namespace mongo {
             _m.unlock();
         }
 
+        void lockAsUpgradable() { 
+            _m.lock_upgrade();
+        }
+        void unlockFromUpgradable() { // upgradable -> unlocked
+            _m.unlock_upgrade();
+        }
+        void upgrade() { // upgradable -> exclusive lock
+            _m.unlock_upgrade_and_lock();
+        }
+
         void lock_shared() {
             _m.lock_shared();
         }
-
         void unlock_shared() {
             _m.unlock_shared();
         }
@@ -157,8 +166,6 @@ namespace mongo {
             }
             return false;
         }
-
-
     };
 
 #else
