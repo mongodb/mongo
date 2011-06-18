@@ -5,6 +5,12 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
+# If aspell has not been installed, quit
+type aspell > /dev/null 2>&1 || {
+	echo 'skipped: aspell not found'
+	exit 0
+}
+
 check() {
 	aspell --mode=ccpp --lang=en list < ../$1 |
 	sort -u |
