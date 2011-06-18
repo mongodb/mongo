@@ -48,7 +48,8 @@ REPOPATH="/var/www/repo"
 ARCHES=["i686", "x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["debian-sysvinit", "ubuntu-upstart", "redhat"]
+#DISTROS=["debian-sysvinit", "ubuntu-upstart", "redhat"]
+DISTROS=["redhat"]
 
 # When we're preparing a directory containing packaging tool inputs
 # and our binaries, use this relative subdirectory for placing the
@@ -73,6 +74,11 @@ class Spec(object):
 
     def version(self):
         return self.ver
+
+    def version_better_than(self, version_string):
+        # FIXME: this is wrong, but I'm in a hurry.
+        # e.g., "1.8.2" < "1.8.10", "1.8.2" < "1.8.2-rc1"
+        return self.ver > version_string
 
     def suffix(self):
         # suffix is what we tack on after pkgbase.
@@ -899,13 +905,14 @@ fi
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
+#@@VERSION>1.9@@%{_bindir}/mongotop
 %{_bindir}/mongostat
 # FIXME: uncomment when mongosniff is back in the package
 #%{_bindir}/mongosniff
 
 # FIXME: uncomment this when there's a stable release whose source
 # tree contains a bsondump man page.
-#%{_mandir}/man1/bsondump.1*
+#@@VERSION>1.9@@%{_mandir}/man1/bsondump.1*
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
@@ -956,6 +963,15 @@ fi
         s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-unstable", s)
     else:
         raise Exception("BUG: unknown suffix %s" % suffix)
+
+    lines=[]
+    for line in s.split("\n"):
+        m = re.search("@@VERSION>(.*)@@(.*)", line)
+        if m and spec.version_better_than(m.group(1)):
+            lines.append(m.group(2))
+        else:
+            lines.append(line)
+    s="\n".join(lines)
 
     f=open(path, 'w')
     try:
