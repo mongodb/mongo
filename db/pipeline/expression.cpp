@@ -187,6 +187,7 @@ namespace mongo {
         {"$ifnull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
+        {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
@@ -558,13 +559,13 @@ namespace mongo {
     };
     static const CmpLookup cmpLookup[7] = {
         /*           -1      0      1       reverse       name   */
-        /* EQ  */ { false, true,  false, Expression::EQ,  "$eq"  },
-        /* NE  */ { true,  false, true,  Expression::NE,  "$ne"  },
-        /* GT  */ { false, false, true,  Expression::LTE, "$gt"  },
-        /* GTE */ { false, true,  true,  Expression::LT,  "$gte" },
-        /* LT  */ { true,  false, false, Expression::GTE, "$lt"  },
-        /* LTE */ { true,  true,  false, Expression::GT,  "$lte" },
-        /* CMP */ { false, false, false, Expression::CMP, "$cmp" },
+        /* EQ  */ { {false, true,  false}, Expression::EQ,  "$eq"  },
+        /* NE  */ { {true,  false, true},  Expression::NE,  "$ne"  },
+        /* GT  */ { {false, false, true},  Expression::LTE, "$gt"  },
+        /* GTE */ { {false, true,  true},  Expression::LT,  "$gte" },
+        /* LT  */ { {true,  false, false}, Expression::GTE, "$lt"  },
+        /* LTE */ { {true,  true,  false}, Expression::GT,  "$lte" },
+        /* CMP */ { {false, false, false}, Expression::CMP, "$cmp" },
     };
 
     shared_ptr<Expression> ExpressionCompare::optimize() {
@@ -1594,6 +1595,56 @@ namespace mongo {
 	}
 
 	return true;
+    }
+
+    /* ------------------------- ExpressionMultiply ----------------------------- */
+
+    ExpressionMultiply::~ExpressionMultiply() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMultiply::create() {
+        shared_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
+        return pExpression;
+    }
+
+    ExpressionMultiply::ExpressionMultiply():
+        ExpressionNary() {
+    }
+
+    shared_ptr<const Value> ExpressionMultiply::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        /*
+          We'll try to return the narrowest possible result value.  To do that
+          without creating intermediate Values, do the arithmetic for double
+          and integral types in parallel, tracking the current narrowest
+          type.
+         */
+        double doubleProduct = 1;
+        long long longProduct = 1;
+        BSONType productType = NumberInt;
+
+        const size_t n = vpOperand.size();
+        for(size_t i = 0; i < n; ++i) {
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+
+            productType = Value::getWidestNumeric(productType, pValue->getType());
+            doubleProduct *= pValue->coerceToDouble();
+            longProduct *= pValue->coerceToLong();
+        }
+
+        if (productType == NumberDouble)
+            return Value::createDouble(doubleProduct);
+        if (productType == NumberLong)
+            return Value::createLong(longProduct);
+        return Value::createInt((int)longProduct);
+    }
+
+    const char *ExpressionMultiply::getOpName() const {
+    return "$multiply";
+    }
+
+    shared_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
+    return ExpressionMultiply::create;
     }
 
     /* ----------------------- ExpressionIfNull ---------------------------- */

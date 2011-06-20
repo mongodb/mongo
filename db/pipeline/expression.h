@@ -489,7 +489,7 @@ namespace mongo {
 	  @param pDocument current document traversed to (not the top-level one)
 	  @returns the field found; could be an array
 	 */
-	shared_ptr<const Value> ExpressionFieldPath::evaluatePath(
+	shared_ptr<const Value> evaluatePath(
 	    size_t index, const size_t pathLength,
 	    shared_ptr<Document> pDocument) const;
 
@@ -604,6 +604,30 @@ namespace mongo {
 
     private:
         ExpressionIfNull();
+    };
+
+
+    class ExpressionMultiply :
+        public ExpressionNary {
+    public:
+        // virtuals from Expression
+        virtual ~ExpressionMultiply();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual const char *getOpName() const;
+
+        // virtuals from ExpressionNary
+        virtual shared_ptr<ExpressionNary> (*getFactory() const)();
+
+        /*
+          Create an expression that finds the product of n operands.
+
+          @returns multiplication expression
+         */
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMultiply();
     };
 
 
