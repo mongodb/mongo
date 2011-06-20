@@ -582,6 +582,62 @@ p11result = [
 assert(arrayEq(p11.result, p11result), 'p11 failed');
 
 
+// multiply test
+var p12 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	theProduct : { $multiply:["$pageViews",
+			 { $ifnull:["$other.foo",
+				    "$other.bar"] } ] }
+    }}
+]});
+
+var p12result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce6"),
+        "theProduct" : 25
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "theProduct" : 98
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "theProduct" : 84
+    }
+];
+
+assert(arrayEq(p12.result, p12result), 'p12 failed');
+
+
+// subtraction test
+var p13 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	theDifference : { $subtract:["$pageViews",
+			 { $ifnull:["$other.foo",
+				    "$other.bar"] } ] }
+    }}
+]});
+
+var p13result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce6"),
+        "theDifference" : 0
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "theDifference" : -7
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "theDifference" : -8
+    }
+];
+
+assert(arrayEq(p13.result, p13result), 'p13 failed');
+
+
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
