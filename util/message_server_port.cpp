@@ -93,28 +93,13 @@ namespace mongo {
 
     }
 
-    void* trun(void *v) { 
-        pms::threadRun( (MessagingPort*) v );    
-        return 0;
-    }
-
-#if defined(__linux__) && defined(_DEBUG)
-//#define POSIXSTACKSIZE 1
-#endif
-
     class PortMessageServer : public MessageServer , public Listener {
-#if defined(POSIXSTACKSIZE)
-        pthread_attr_t attr;
-#endif
     public:
         PortMessageServer(  const MessageServer::Options& opts, MessageHandler * handler ) :
             Listener( opts.ipList, opts.port ) {
+
             uassert( 10275 ,  "multiple PortMessageServer not supported" , ! pms::handler );
             pms::handler = handler;
-#if defined(POSIXSTACKSIZE)
-	    pthread_attr_init(&attr);
-	    pthread_attr_setstacksize(&attr, 512 * 1024);
-#endif
         }
 
         virtual void accepted(MessagingPort * p) {
@@ -131,12 +116,7 @@ namespace mongo {
             }
 
             try {
-#if defined(POSIXSTACKSIZE)
-		pthread_t tid;
-		assert( pthread_create(&tid, &attr, trun, p) == 0 );
-#else
-  	        boost::thread thr( boost::bind( &pms::threadRun , p ) );
-#endif
+                boost::thread thr( boost::bind( &pms::threadRun , p ) );
             }
             catch ( boost::thread_resource_error& ) {
                 connTicketHolder.release();
