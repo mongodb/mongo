@@ -50,7 +50,6 @@
 
 namespace mongo {
 
-    extern int otherTraceLevel;
     void flushDiagLog();
 
     /* reset any errors so that getlasterror comes back clean.

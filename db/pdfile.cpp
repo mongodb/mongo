@@ -35,7 +35,6 @@ _ disallow system* manipulations from the database.
 #include "btreebuilder.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace-inl.h"
@@ -44,6 +43,7 @@ _ disallow system* manipulations from the database.
 #include "curop-inl.h"
 #include "background.h"
 #include "compact.h"
+#include "ops/delete.h"
 
 namespace mongo {
 
@@ -131,7 +131,6 @@ namespace mongo {
     DatabaseHolder dbHolder;
     int MAGIC = 0x1000;
 
-    extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
@@ -879,10 +878,6 @@ namespace mongo {
         IndexInterface& ii = id.idxInterface();
         for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
-            if ( otherTraceLevel >= 5 ) {
-                out() << "_unindexRecord() " << obj.toString() << endl;
-                out() << "  unindex:" << j.toString() << endl;
-            }
 
             bool ok = false;
             try {

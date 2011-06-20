@@ -25,8 +25,6 @@
 
 namespace mongo {
 
-    extern int otherTraceLevel;
-
     template< class V >
     class BtreeCursorImpl : public BtreeCursor { 
     public:
@@ -150,14 +148,8 @@ namespace mongo {
             return thisLoc.btree<V>()->advance(thisLoc, keyOfs, direction, caller);
         }
         virtual void _audit() {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree<V>()->fullValidate(indexDetails.head, _order);
-            }
-            else {
-                out() << "BtreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree<V>()->dump();
-            }
+            out() << "BtreeCursor(). dumping head bucket" << endl;
+            indexDetails.head.btree<V>()->dump();
         }
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) {
             bool found;
@@ -215,14 +207,8 @@ namespace mongo {
             return thisLoc.btree<V1>()->advance(thisLoc, keyOfs, direction, caller);
         }
         virtual void _audit() {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree<V1>()->fullValidate(indexDetails.head, _order);
-            }
-            else {
-                out() << "BtreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree<V1>()->dump();
-            }
+            out() << "BtreeCursor(). dumping head bucket" << endl;
+            indexDetails.head.btree<V1>()->dump();
         }
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc);
         virtual const _KeyNode& keyNode(int keyOfs) { 
@@ -319,9 +305,6 @@ namespace mongo {
     
     void BtreeCursor::audit() {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
-        if ( otherTraceLevel >= 12 ) {
-            _audit();
-        }
     }
 
     void BtreeCursor::init() {

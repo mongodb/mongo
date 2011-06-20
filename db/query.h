@@ -37,11 +37,6 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
-    class RemoveSaver;
-
-    // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false, RemoveSaver * rs=0);
-
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
 
     const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
