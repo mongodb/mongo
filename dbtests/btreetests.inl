@@ -821,23 +821,11 @@
     public:
         void run() {
             ArtificialTree::setTree( "{h:{e:{b:{a:null},c:null,d:null},_:{f:null}},_:{i:null}}", id() );
-//            dump();
             string ns = id().indexNamespace();
-            const BtreeBucket* b = bt();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
-
-//            cout << "---------------------" << endl;
-
-//            dump();
-
-//            cout << "---------------------" << endl;
-
             BSONObj k = BSON( "" << "c" );
             assert( unindex( k ) );
-
-//            dump();
-
             long long keyCount = bt()->fullValidate( dl(), order(), 0, true );
             ASSERT_EQUALS( 7, keyCount );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
