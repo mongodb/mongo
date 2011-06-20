@@ -25,6 +25,7 @@
 #include "btree.h"
 #include "pdfile.h"
 #include "oplog.h"
+#include "ops/update.h"
 
 namespace mongo {
 

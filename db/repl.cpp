@@ -49,6 +49,7 @@
 #include "repl/rs.h"
 #include "replutil.h"
 #include "repl/connections.h"
+#include "ops/update.h"
 
 namespace mongo {
 

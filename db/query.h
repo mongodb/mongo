@@ -37,33 +37,7 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
-    struct UpdateResult {
-        bool existing; // if existing objects were modified
-        bool mod;      // was this a $ mod
-        long long num; // how many objects touched
-        OID upserted;  // if something was upserted, the new _id of the object
-
-        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
-            : existing(e) , mod(m), num(n) {
-            upserted.clear();
-
-            BSONElement id = upsertedObject["_id"];
-            if ( ! e && n == 1 && id.type() == jstOID ) {
-                upserted = id.OID();
-            }
-        }
-
-    };
-
     class RemoveSaver;
-
-    /* returns true if an existing object was updated, false if no existing object was found.
-       multi - update multiple objects - mostly useful with things like $set
-       god - allow access to system namespaces
-    */
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
-                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
 
     // If justOne is true, deletedId is set to the id of the deleted object.
     long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false, RemoveSaver * rs=0);

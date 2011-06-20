@@ -22,6 +22,7 @@
 #include "../repl.h"
 #include "../query.h"
 #include "../cloner.h"
+#include "../ops/update.h"
 
 /* Scenarios
 
