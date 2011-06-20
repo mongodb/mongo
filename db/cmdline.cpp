@@ -27,6 +27,8 @@
 #include <direct.h>
 #endif
 
+#define MAX_LINE_LENGTH 256
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
@@ -141,7 +143,30 @@ namespace mongo {
                     return false;
                 }
 
-                po::store( po::parse_config_file( f , all ) , params );
+                stringstream ss;
+                char line[MAX_LINE_LENGTH];
+                string test;
+                while ( f ) {
+                    f.getline(line, MAX_LINE_LENGTH);
+                    stringstream internalss;
+                    for ( unsigned i = 0; i < strlen(line); i++ ) {
+                        if ( line[i] != ' ' && line[i] !='\t' ){
+                            internalss << line[i];
+                        }
+                    }
+                    test = internalss.str();
+                    boost::to_upper(test);
+                    if ( test.find( "FASTSYNC" ) != string::npos )
+                        cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
+
+                    if ( test[0] == '#' ) { // skipping comment
+                    } else if ( test.find( "=FALSE" ) == string::npos ) {
+                        ss << line << endl;
+                    } else {
+                        cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
+                    }
+                }
+                po::store( po::parse_config_file( ss , all ) , params );
                 f.close();
             }
 
