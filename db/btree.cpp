@@ -913,9 +913,9 @@ namespace mongo {
     }
 
 //#define BTREE(loc) (static_cast<DiskLoc>(loc).btree<V>())
-#define BTREE(loc) (loc.btree<V>())
+#define BTREE(loc) (loc.template btree<V>())
 //#define BTREEMOD(loc) (static_cast<DiskLoc>(loc).btreemod<V>())
-#define BTREEMOD(loc) (loc.btreemod<V>())
+#define BTREEMOD(loc) (loc.template btreemod<V>())
 
     template< class V >
     void BtreeBucket<V>::replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id ) {
@@ -930,7 +930,7 @@ namespace mongo {
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
 
-        (this->nextChild.btree<V>())->parent.writing() = this->parent;
+        BTREE(this->nextChild)->parent.writing() = this->parent;
         //(static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
         ClientCursor::informAboutToDeleteBucket( thisLoc );
         deallocBucket( thisLoc, id );
