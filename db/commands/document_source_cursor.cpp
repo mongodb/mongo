@@ -18,7 +18,7 @@
 
 #include "db/pipeline/document_source.h"
 
-#include "db/Cursor.h"
+#include "db/cursor.h"
 #include "db/pipeline/document.h"
 
 namespace mongo {

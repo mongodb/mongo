@@ -36,6 +36,8 @@ namespace mongo {
     class Builder :
         boost::noncopyable {
     public:
+	virtual ~Builder() {};
+
         virtual void append() = 0; // append a null
 	virtual void append(bool b) = 0;
 	virtual void append(int i) = 0;

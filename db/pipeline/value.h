@@ -27,7 +27,7 @@ namespace mongo {
 
     class ValueIterator {
     public:
-        ~ValueIterator();
+        virtual ~ValueIterator();
 
         /*
           Ask if there are more fields to return.

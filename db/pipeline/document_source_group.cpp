@@ -156,10 +156,9 @@ namespace mongo {
                   Use the projection-like set of field paths to create the
                   group-by key.
                  */
+		Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
                 shared_ptr<Expression> pId(
-                    Expression::parseObject(&groupField,
-				 &Expression::ObjectCtx(
-					Expression::ObjectCtx::DOCUMENT_OK)));
+                    Expression::parseObject(&groupField, &oCtx));
 
                 pGroup->setIdExpression(pId);
                 idSet = true;
@@ -193,10 +192,12 @@ namespace mongo {
                     shared_ptr<Expression> pGroupExpr;
 
                     BSONType elementType = subElement.type();
-                    if (elementType == Object)
-                        pGroupExpr = Expression::parseObject(&subElement,
-                                        &Expression::ObjectCtx(
-				     Expression::ObjectCtx::DOCUMENT_OK));
+                    if (elementType == Object) {
+			Expression::ObjectCtx oCtx(
+			    Expression::ObjectCtx::DOCUMENT_OK);
+                        pGroupExpr = Expression::parseObject(
+			    &subElement, &oCtx);
+		    }
                     else if (elementType == Array) {
                         assert(false); // CW TODO group operators are unary
                     }

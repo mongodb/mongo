@@ -70,9 +70,9 @@ namespace mongo {
         assert(pBsonElement->type() == Object);
         // CW TODO error: expression object must be an object
 
+	Expression::ObjectCtx oCtx(0);
         shared_ptr<Expression> pExpression(
-	    Expression::parseObject(pBsonElement,
-				    &Expression::ObjectCtx(0)));
+	    Expression::parseObject(pBsonElement, &oCtx));
         shared_ptr<DocumentSourceFilter> pFilter(
             DocumentSourceFilter::create(pExpression));
 

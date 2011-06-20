@@ -124,9 +124,10 @@ namespace mongo {
                 string fieldName(pFieldName);
                 if (fieldType == Object) {
                     /* it's a nested document */
+		    ObjectCtx oCtx(
+			(pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
                     shared_ptr<Expression> pNested(
-                        parseObject(&fieldElement, &ObjectCtx(
-                         (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0))));
+                        parseObject(&fieldElement, &oCtx));
                     pExpressionObject->addField(fieldName, pNested);
                 }
                 else if (fieldType == String) {
@@ -212,9 +213,9 @@ namespace mongo {
         if (elementType == Object) {
             /* the operator must be unary and accept an object argument */
             BSONObj objOperand(pBsonElement->Obj());
+	    ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
             shared_ptr<Expression> pOperand(
-                Expression::parseObject(pBsonElement,
-                            &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
+                Expression::parseObject(pBsonElement, &oCtx));
             pExpression->addOperand(pOperand);
         }
         else if (elementType == Array) {
@@ -265,9 +266,9 @@ namespace mongo {
         }
 
         case Object: {
+	    ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
             shared_ptr<Expression> pSubExpression(
-                Expression::parseObject(pBsonElement,
-                            &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
+                Expression::parseObject(pBsonElement, &oCtx));
             return pSubExpression;
         }
 
@@ -557,14 +558,14 @@ namespace mongo {
 	char name[5]; /* string name (w/trailing '\0') */
     };
     static const CmpLookup cmpLookup[7] = {
-        /*           -1      0      1       reverse       name   */
-        /* EQ  */ { false, true,  false, Expression::EQ,  "$eq"  },
-        /* NE  */ { true,  false, true,  Expression::NE,  "$ne"  },
-        /* GT  */ { false, false, true,  Expression::LTE, "$gt"  },
-        /* GTE */ { false, true,  true,  Expression::LT,  "$gte" },
-        /* LT  */ { true,  false, false, Expression::GTE, "$lt"  },
-        /* LTE */ { true,  true,  false, Expression::GT,  "$lte" },
-        /* CMP */ { false, false, false, Expression::CMP, "$cmp" },
+        /*             -1      0      1      reverse          name   */
+        /* EQ  */ { { false, true,  false }, Expression::EQ,  "$eq"  },
+        /* NE  */ { { true,  false, true },  Expression::NE,  "$ne"  },
+        /* GT  */ { { false, false, true },  Expression::LTE, "$gt"  },
+        /* GTE */ { { false, true,  true },  Expression::LT,  "$gte" },
+        /* LT  */ { { true,  false, false }, Expression::GTE, "$lt"  },
+        /* LTE */ { { true,  true,  false }, Expression::GT,  "$lte" },
+        /* CMP */ { { false, false, false }, Expression::CMP, "$cmp" },
     };
 
     shared_ptr<Expression> ExpressionCompare::optimize() {
@@ -818,7 +819,6 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
 	const size_t pathSize = path.size();
 	set<string>::iterator end(path.end());
-	bool addedId = false;
 
 	/*
 	  Take care of inclusions or exclusions.  Note that _id is special,
