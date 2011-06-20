@@ -191,6 +191,7 @@ namespace mongo {
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$subtract", ExpressionSubtract::create},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -1966,5 +1967,42 @@ namespace mongo {
 
     const char *ExpressionOr::getOpName() const {
 	return "$or";
+    }
+
+    /* ----------------------- ExpressionSubtract ---------------------------- */
+
+    ExpressionSubtract::~ExpressionSubtract() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSubtract::create() {
+        shared_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
+        return pExpression;
+    }
+
+    ExpressionSubtract::ExpressionSubtract():
+        ExpressionNary() {
+    }
+
+    void ExpressionSubtract::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSubtract::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+
+        double right = pRight->coerceToDouble();
+
+        double left = pLeft->coerceToDouble();
+
+        return Value::createDouble(left - right);
+    }
+
+    const char *ExpressionSubtract::getOpName() const {
+	return "$divide";
     }
 }
