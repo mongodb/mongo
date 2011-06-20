@@ -495,6 +495,8 @@
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
+    <ClCompile Include="ops\delete.cpp" />
+    <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="queryoptimizercursor.cpp" />
     <ClCompile Include="querypattern.cpp">
@@ -559,7 +561,6 @@
     <ClCompile Include="security_commands.cpp" />
     <ClCompile Include="security_key.cpp" />
     <ClCompile Include="tests.cpp" />
-    <ClCompile Include="update.cpp" />
     <ClCompile Include="cmdline.cpp" />
     <ClCompile Include="queryutil.cpp" />
     <ClCompile Include="..\util\assert_util.cpp" />
@@ -676,6 +677,8 @@
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
+    <ClInclude Include="ops\delete.h" />
+    <ClInclude Include="ops\update.h" />
     <ClInclude Include="projection.h" />
     <ClInclude Include="queryutil.h" />
     <ClInclude Include="repl.h" />
@@ -721,7 +724,6 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
     <ClInclude Include="security.h" />
-    <ClInclude Include="update.h" />
     <ClInclude Include="..\util\allocator.h" />
     <ClInclude Include="..\util\array.h" />
     <ClInclude Include="..\util\assert_util.h" />

@@ -215,6 +215,8 @@
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
+    <ClInclude Include="..\db\ops\delete.h" />
+    <ClInclude Include="..\db\ops\update.h" />
     <ClInclude Include="..\pcre-7.4\pcrecpp.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp" />
@@ -299,6 +301,8 @@
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
+    <ClCompile Include="..\db\ops\delete.cpp" />
+    <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\queryoptimizercursor.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">
@@ -623,7 +627,6 @@
     <ClCompile Include="..\db\security.cpp" />
     <ClCompile Include="..\db\security_commands.cpp" />
     <ClCompile Include="..\db\tests.cpp" />
-    <ClCompile Include="..\db\update.cpp" />
     <ClCompile Include="..\db\cmdline.cpp" />
     <ClCompile Include="..\db\matcher_covered.cpp" />
     <ClCompile Include="..\db\oplog.cpp" />

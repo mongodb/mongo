@@ -292,6 +292,12 @@
     <ClInclude Include="..\bson\stringdata.h">
       <Filter>bson</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\ops\delete.h">
+      <Filter>db\cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\update.h">
+      <Filter>db\cpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -483,9 +489,6 @@
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\tests.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\update.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\cmdline.cpp">
@@ -831,6 +834,12 @@
       <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\db\record.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\delete.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\update.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

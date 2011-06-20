@@ -16,7 +16,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../../pch.h"
+#include "pch.h"
 #include "../query.h"
 #include "../pdfile.h"
 #include "../jsobjmanipulator.h"
@@ -24,7 +24,6 @@
 #include "../repl.h"
 #include "../btree.h"
 #include "update.h"
-
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
