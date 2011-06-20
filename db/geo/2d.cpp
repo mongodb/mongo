@@ -742,247 +742,7 @@ namespace mongo {
         geo2dplugin.getName();
     }
     
-    struct GeoUnitTest : public UnitTest {
 
-        int round( double d ) {
-            return (int)(.5+(d*1000));
-        }
-
-#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == GeoHash(b) ); }
-
-        void run() {
-            assert( ! GeoHash::isBitSet( 0 , 0 ) );
-            assert( ! GeoHash::isBitSet( 0 , 31 ) );
-            assert( GeoHash::isBitSet( 1 , 31 ) );
-
-            IndexSpec i( BSON( "loc" << "2d" ) );
-            Geo2dType g( &geo2dplugin , &i );
-            {
-                double x = 73.01212;
-                double y = 41.352964;
-                BSONObj in = BSON( "x" << x << "y" << y );
-                GeoHash h = g._hash( in );
-                BSONObj out = g._unhash( h );
-                assert( round(x) == round( out["x"].number() ) );
-                assert( round(y) == round( out["y"].number() ) );
-                assert( round( in["x"].number() ) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
-            }
-
-            {
-                double x = -73.01212;
-                double y = 41.352964;
-                BSONObj in = BSON( "x" << x << "y" << y );
-                GeoHash h = g._hash( in );
-                BSONObj out = g._unhash( h );
-                assert( round(x) == round( out["x"].number() ) );
-                assert( round(y) == round( out["y"].number() ) );
-                assert( round( in["x"].number() ) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
-            }
-
-            {
-                GeoHash h( "0000" );
-                h.move( 0 , 1 );
-                GEOHEQ( h , "0001" );
-                h.move( 0 , -1 );
-                GEOHEQ( h , "0000" );
-
-                h.init( "0001" );
-                h.move( 0 , 1 );
-                GEOHEQ( h , "0100" );
-                h.move( 0 , -1 );
-                GEOHEQ( h , "0001" );
-
-
-                h.init( "0000" );
-                h.move( 1 , 0 );
-                GEOHEQ( h , "0010" );
-            }
-
-            {
-                Box b( 5 , 5 , 2 );
-                assert( "(5,5) -->> (7,7)" == b.toString() );
-            }
-
-            {
-                GeoHash a = g.hash( 1 , 1 );
-                GeoHash b = g.hash( 4 , 5 );
-                assert( 5 == (int)(g.distance( a , b ) ) );
-                a = g.hash( 50 , 50 );
-                b = g.hash( 42 , 44 );
-                assert( round(10) == round(g.distance( a , b )) );
-            }
-
-            {
-                GeoHash x("0000");
-                assert( 0 == x.getHash() );
-                x.init( 0 , 1 , 32 );
-                GEOHEQ( x , "0000000000000000000000000000000000000000000000000000000000000001" )
-
-                assert( GeoHash( "1100").hasPrefix( GeoHash( "11" ) ) );
-                assert( ! GeoHash( "1000").hasPrefix( GeoHash( "11" ) ) );
-            }
-
-            {
-                GeoHash x("1010");
-                GEOHEQ( x , "1010" );
-                GeoHash y = x + "01";
-                GEOHEQ( y , "101001" );
-            }
-
-            {
-
-                GeoHash a = g.hash( 5 , 5 );
-                GeoHash b = g.hash( 5 , 7 );
-                GeoHash c = g.hash( 100 , 100 );
-                /*
-                cout << "a: " << a << endl;
-                cout << "b: " << b << endl;
-                cout << "c: " << c << endl;
-
-                cout << "a: " << a.toStringHex1() << endl;
-                cout << "b: " << b.toStringHex1() << endl;
-                cout << "c: " << c.toStringHex1() << endl;
-                */
-                BSONObj oa = a.wrap();
-                BSONObj ob = b.wrap();
-                BSONObj oc = c.wrap();
-                /*
-                cout << "a: " << oa.hexDump() << endl;
-                cout << "b: " << ob.hexDump() << endl;
-                cout << "c: " << oc.hexDump() << endl;
-                */
-                assert( oa.woCompare( ob ) < 0 );
-                assert( oa.woCompare( oc ) < 0 );
-
-            }
-
-            {
-                GeoHash x( "000000" );
-                x.move( -1 , 0 );
-                GEOHEQ( x , "101010" );
-                x.move( 1 , -1 );
-                GEOHEQ( x , "010101" );
-                x.move( 0 , 1 );
-                GEOHEQ( x , "000000" );
-            }
-
-            {
-                GeoHash prefix( "110011000000" );
-                GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
-                assert( ! entry.hasPrefix( prefix ) );
-
-                entry = GeoHash("1100110000001100000111000001110000011100000111000001000000000000");
-                assert( entry.toString().find( prefix.toString() ) == 0 );
-                assert( entry.hasPrefix( GeoHash( "1100" ) ) );
-                assert( entry.hasPrefix( prefix ) );
-            }
-
-            {
-                GeoHash a = g.hash( 50 , 50 );
-                GeoHash b = g.hash( 48 , 54 );
-                assert( round( 4.47214 ) == round( g.distance( a , b ) ) );
-            }
-
-
-            {
-                Box b( Point( 29.762283 , -95.364271 ) , Point( 29.764283000000002 , -95.36227099999999 ) );
-                assert( b.inside( 29.763 , -95.363 ) );
-                assert( ! b.inside( 32.9570255 , -96.1082497 ) );
-                assert( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
-            }
-
-            {
-                GeoHash a( "11001111" );
-                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
-                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
-            }
-
-            {
-                int N = 10000;
-                {
-                    Timer t;
-                    for ( int i=0; i<N; i++ ) {
-                        unsigned x = (unsigned)rand();
-                        unsigned y = (unsigned)rand();
-                        GeoHash h( x , y );
-                        unsigned a,b;
-                        h.unhash_slow( a,b );
-                        assert( a == x );
-                        assert( b == y );
-                    }
-                    //cout << "slow: " << t.millis() << endl;
-                }
-
-                {
-                    Timer t;
-                    for ( int i=0; i<N; i++ ) {
-                        unsigned x = (unsigned)rand();
-                        unsigned y = (unsigned)rand();
-                        GeoHash h( x , y );
-                        unsigned a,b;
-                        h.unhash_fast( a,b );
-                        assert( a == x );
-                        assert( b == y );
-                    }
-                    //cout << "fast: " << t.millis() << endl;
-                }
-
-            }
-
-            {
-                // see http://en.wikipedia.org/wiki/Great-circle_distance#Worked_example
-
-                {
-                    Point BNA (-86.67, 36.12);
-                    Point LAX (-118.40, 33.94);
-
-                    double dist1 = spheredist_deg(BNA, LAX);
-                    double dist2 = spheredist_deg(LAX, BNA);
-
-                    // target is 0.45306
-                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
-                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
-                }
-                {
-                    Point BNA (-1.5127, 0.6304);
-                    Point LAX (-2.0665, 0.5924);
-
-                    double dist1 = spheredist_rad(BNA, LAX);
-                    double dist2 = spheredist_rad(LAX, BNA);
-
-                    // target is 0.45306
-                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
-                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
-                }
-                {
-                    Point JFK (-73.77694444, 40.63861111 );
-                    Point LAX (-118.40, 33.94);
-
-                    double dist = spheredist_deg(JFK, LAX) * EARTH_RADIUS_MILES;
-                    assert( dist > 2469 && dist < 2470 );
-                }
-
-                {
-                    Point BNA (-86.67, 36.12);
-                    Point LAX (-118.40, 33.94);
-                    Point JFK (-73.77694444, 40.63861111 );
-                    assert( spheredist_deg(BNA, BNA) < 1e-6);
-                    assert( spheredist_deg(LAX, LAX) < 1e-6);
-                    assert( spheredist_deg(JFK, JFK) < 1e-6);
-
-                    Point zero (0, 0);
-                    Point antizero (0,-180);
-
-                    // these were known to cause NaN
-                    assert( spheredist_deg(zero, zero) < 1e-6);
-                    assert( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
-                    assert( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
-                }
-            }
-        }
-    } geoUnitTest;
 
     class GeoHopper;
 
@@ -1025,8 +785,8 @@ namespace mongo {
     // GeoBrowse subclasses this
     class GeoAccumulator {
     public:
-        GeoAccumulator( const Geo2dType * g , const BSONObj& filter )
-            : _g(g) , _lookedAt(0) , _objectsLoaded(0) , _found(0) {
+        GeoAccumulator( const Geo2dType * g , const BSONObj& filter, bool uniqueDocs, bool needDistance )
+            : _g(g) , _lookedAt(0) , _objectsLoaded(0) , _found(0), _uniqueDocs( uniqueDocs ), _needDistance( needDistance ) {
             if ( ! filter.isEmpty() ) {
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
             }
@@ -1050,20 +810,28 @@ namespace mongo {
             return false;
         }
 
-        void add( const GeoKeyNode& node ) {
+        enum KeyResult { BAD, BORDER, GOOD };
+
+        virtual void add( const GeoKeyNode& node ) {
 
             GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
 
             _lookedAt++;
 
-            // distance check
-            double d = 0;
-            if ( ! checkDistance( node , d ) ) {
+            ////
+            // Approximate distance check using key data
+            ////
+            double keyD = 0;
+            KeyResult keyOk = approxKeyCheck( node, keyD );
+            if ( keyOk == BAD ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
             }
             GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
 
+            ////
+            // Check for match using other key (and potentially doc) criteria
+            ////
             // Remember match results for each object
             map<DiskLoc, bool>::iterator match = _matched.find( node.recordLoc );
             bool newDoc = match == _matched.end();
@@ -1094,12 +862,39 @@ namespace mongo {
                 return;
             }
 
-            addSpecific( node , d, newDoc );
+            ////
+            // Exact check with particular data fields
+            ////
+            addSpecific( node , keyOk == BORDER, keyD, newDoc );
             _found++;
         }
 
-        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) = 0;
-        virtual bool checkDistance( const GeoKeyNode& node , double& d ) = 0;
+        virtual void getPointsFor( const GeoKeyNode& node, vector< BSONObj >& locsForNode, bool allPoints = false ){
+
+            // Find all the location objects from the keys
+            vector< BSONObj > locs;
+            _g->getKeys( node.recordLoc.obj(), allPoints ? locsForNode : locs );
+            if( allPoints ) return;
+
+            // Find the particular location we want
+            GeoHash keyHash( node.key._firstElement(), _g->_bits );
+
+            log() << "Hash: " << node.key << " and " << keyHash.getHash() << " unique " << _uniqueDocs << endl;
+            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+
+                // Ignore all locations not hashed to the key's hash, since we may see
+                // those later
+                if( ! allPoints && _g->_hash( *i ) != keyHash ) continue;
+
+                locsForNode.push_back( *i );
+
+            }
+
+        }
+
+        virtual void addSpecific( const GeoKeyNode& node , bool inBounds, double d, bool newDoc ) = 0;
+        virtual KeyResult approxKeyCheck( const GeoKeyNode& node , double& keyD ) = 0;
+        virtual bool exactDocCheck( const Point& p, double& d ) = 0;
 
         long long found() const {
             return _found;
@@ -1112,6 +907,10 @@ namespace mongo {
         long long _lookedAt;
         long long _objectsLoaded;
         long long _found;
+
+        bool _uniqueDocs;
+        bool _needDistance;
+
     };
 
     struct BtreeLocation {
@@ -1264,8 +1063,8 @@ namespace mongo {
             DONE
         } _state;
 
-        GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj() )
-            : GeoCursorBase( g ), GeoAccumulator( g , filter ) ,
+        GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj(), bool uniqueDocs = true, bool needDistance = false )
+            : GeoCursorBase( g ), GeoAccumulator( g , filter, uniqueDocs, needDistance ) ,
               _type( type ) , _filter( filter ) , _firstCall(true), _nscanned(), _centerPrefix(0, 0, 0) {
 
             // Set up the initial expand state
@@ -1571,14 +1370,40 @@ namespace mongo {
         // The amount the current box overlaps our search area
         virtual double intersectsBox( Box& cur ) = 0;
 
-        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
+        virtual void addSpecific( const GeoKeyNode& node , bool onBounds , double keyD , bool newDoc ) {
 
-            if( ! newDoc ) return;
+            if( _uniqueDocs && ! newDoc ){
+                log() << "Already handled doc!" << endl;
+                return;
+            }
 
-            if ( _cur.isEmpty() )
-                _cur = GeoPoint( node );
-            else
-                _stack.push_back( GeoPoint( node ) );
+            if( _uniqueDocs && ! onBounds ) {
+                log() << "Added ind to " << _type << endl;
+                _stack.push_front( GeoPoint( node ) );
+            }
+            else {
+                // We now handle every possible point in the document, even those not in the key value,
+                // since we're iterating through them anyway - prevents us from having to save the hashes
+                // we've seen per-doc
+                vector< BSONObj > locs;
+                getPointsFor( node, locs, true );
+                for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ){
+                    double d;
+                    log() << "On bounds? " << onBounds << " exact " << exactDocCheck( Point( *i ), d ) << " point " << Point( *i ) << endl;
+                    if( ! onBounds || exactDocCheck( Point( *i ), d ) ){
+                        log() << "Added mult to " << _type << endl;
+                        _stack.push_front( GeoPoint( node ) );
+                        // If returning unique, just exit after first point is added
+                        if( _uniqueDocs ) break;
+                    }
+                }
+            }
+
+            if ( _cur.isEmpty() && _stack.size() > 0 ){
+                _cur = _stack.front();
+                _stack.pop_front();
+            }
+
         }
 
         virtual long long nscanned() {
@@ -1623,11 +1448,11 @@ namespace mongo {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
-            : GeoBrowse( g, "search", filter ), _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
+        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool uniqueDocs = false, bool needDistance = true )
+            : GeoBrowse( g, "search", filter, uniqueDocs, needDistance ), _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
         {}
 
-        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
+        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
 
             // Always check approximate distance, since it lets us avoid doing
             // checks of the rest of the object if it succeeds
@@ -1645,7 +1470,7 @@ namespace mongo {
                       << "\t" << GeoHash( node.key.firstElement() ) << "\t" << d
                       << " ok: " << good << " farthest: " << farthest() );
 
-            return good;
+            return good ? GOOD : BAD;
         }
 
         double approxDistance( const GeoKeyNode& node ) {
@@ -1725,6 +1550,10 @@ namespace mongo {
 
         }
 
+        virtual bool exactDocCheck( const Point& p, double& d ){
+            return true;
+        }
+
         // Always in distance units, whether radians or normal
         double farthest() const {
             return _farthest;
@@ -1734,7 +1563,7 @@ namespace mongo {
             return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
         }
 
-        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
+        virtual void addSpecific( const GeoKeyNode& node, bool onBounds, double keyD, bool newDoc ) {
 
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
 
@@ -1766,8 +1595,8 @@ namespace mongo {
 
     class GeoSearch : public GeoHopper {
     public:
-        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
-           : GeoHopper( g , numWanted , startPt , filter , maxDistance, type ),
+        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool uniqueDocs = false, bool needDistance = true )
+           : GeoHopper( g , numWanted , startPt , filter , maxDistance, type, uniqueDocs, needDistance ),
              _start( g->hash( startPt._x, startPt._y ) ),
               _numWanted( numWanted ),
               _type(type)
@@ -1975,8 +1804,8 @@ namespace mongo {
     class GeoCircleBrowse : public GeoBrowse {
     public:
 
-        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center")
-            : GeoBrowse( g , "circle" , filter ) {
+        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center", bool uniqueDocs = true )
+            : GeoBrowse( g , "circle" , filter, uniqueDocs ) {
 
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
 
@@ -2040,7 +1869,7 @@ namespace mongo {
             return cur.intersects( _bBox );
         }
 
-        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
+        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
 
             GeoHash h( node._key.firstElement(), _g->_bits );
 
@@ -2062,40 +1891,25 @@ namespace mongo {
             }
 
             // If our distance is in the error bounds...
-            if( d >= _maxDistance - error && d <= _maxDistance + error ) {
+            if( d >= _maxDistance - error && d <= _maxDistance + error ) return BORDER;
+            return d > _maxDistance ? BAD : GOOD;
+        }
 
-                // Do exact check
-                vector< BSONObj > locs;
-                _g->getKeys( node.recordLoc.obj(), locs );
+        virtual bool exactDocCheck( const Point& p, double& d ){
 
-                for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
-
-                    GEODEBUG( "Inexact distance : " << d << " vs " << _maxDistance << " from " << ( *i ).toString() << " due to error " << error );
-
-                    Point p( *i );
-                    // Exact distance checks.
-                    switch (_type) {
-                    case GEO_PLAIN: {
-                        if( _startPt.distanceWithin( p, _maxDistance ) ) return true;
-                        break;
-                    }
-                    case GEO_SPHERE:
-                        // Ignore all locations not hashed to the key's hash, since spherical calcs are
-                        // more expensive.
-                        if( _g->_hash( *i ) != h ) break;
-                        checkEarthBounds( p );
-                        if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
-                        break;
-                    default: assert( false );
-                    }
-
-                }
-
-                return false;
+            switch (_type) {
+            case GEO_PLAIN: {
+                if( p.distanceWithin( p, _maxDistance ) ) return true;
+                break;
+            }
+            case GEO_SPHERE:
+                checkEarthBounds( p );
+                if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
+                break;
+            default: assert( false );
             }
 
-            GEODEBUG( "\t " << h << "\t" << d );
-            return d <= _maxDistance;
+            return false;
         }
 
         GeoDistType _type;
@@ -2111,8 +1925,8 @@ namespace mongo {
     class GeoBoxBrowse : public GeoBrowse {
     public:
 
-        GeoBoxBrowse( const Geo2dType * g , const BSONObj& box , BSONObj filter = BSONObj() )
-            : GeoBrowse( g , "box" , filter ) {
+        GeoBoxBrowse( const Geo2dType * g , const BSONObj& box , BSONObj filter = BSONObj(), bool uniqueDocs = true )
+            : GeoBrowse( g , "box" , filter, uniqueDocs ) {
 
             uassert( 13063 , "$box needs 2 fields (bottomLeft,topRight)" , box.nFields() == 2 );
 
@@ -2171,39 +1985,18 @@ namespace mongo {
             return cur.intersects( _want );
         }
 
-        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
+        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
 
             GeoHash h( node._key.firstElement() );
             Point approxPt( _g, h );
 
-            bool approxInside = _want.inside( approxPt, _fudge );
+            if( _want.onBoundary( approxPt, _fudge ) ) return BORDER;
+            else return _want.inside( approxPt, _fudge ) ? GOOD : BAD;
 
-            if( approxInside && _want.onBoundary( approxPt, _fudge ) ) {
+        }
 
-                // Do exact check
-                vector< BSONObj > locs;
-                _g->getKeys( node.recordLoc.obj(), locs );
-
-                for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
-                    if( _want.inside( Point( *i ) ) ) {
-
-                        GEODEBUG( "found exact point : " << _want.toString()
-                                  << " exact point : " << Point( *i ).toString()
-                                  << " approx point : " << approxPt.toString()
-                                  << " because of error: " << _fudge );
-
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            GEODEBUG( "checking point : " << _want.toString()
-                      << " point: " << approxPt.toString()
-                      << " in : " << _want.inside( approxPt, _fudge ) );
-
-            return approxInside;
+        virtual bool exactDocCheck( const Point& p, double& d ){
+            return _want.inside( p );
         }
 
         Box _want;
@@ -2218,7 +2011,7 @@ namespace mongo {
     public:
 
         GeoPolygonBrowse( const Geo2dType* g , const BSONObj& polyPoints ,
-                          BSONObj filter = BSONObj() ) : GeoBrowse( g , "polygon" , filter ) {
+                          BSONObj filter = BSONObj(), bool uniqueDocs = true ) : GeoBrowse( g , "polygon" , filter, uniqueDocs ) {
 
             GEODEBUG( "In Polygon" )
 
@@ -2253,51 +2046,20 @@ namespace mongo {
             return cur.intersects( _bounds );
         }
 
-        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
+        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
 
             GeoHash h( node._key.firstElement(), _g->_bits );
             Point p( _g, h );
 
             int in = _poly.contains( p, _g->_error );
-            if( in != 0 ) {
 
-                if ( in > 0 ) {
-                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] approx in polygon" );
-                }
-                else {
-                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] approx not in polygon" );
-                }
+            if( in == 0 ) return BORDER;
+            else return in > 0 ? GOOD : BAD;
 
-                if( in != 0 ) return in > 0;
-            }
+        }
 
-            // Do exact check, since to approximate check was inconclusive
-            vector< BSONObj > locs;
-            _g->getKeys( node.recordLoc.obj(), locs );
-
-            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
-
-                Point p( *i );
-
-                // Ignore all points not hashed to the current value
-                // This implicitly assumes hashing is less costly than the polygon check, which
-                // may or may not be true.
-                if( _g->hash( p ) != h ) continue;
-
-                // Use the point in polygon algorithm to see if the point
-                // is contained in the polygon.
-                bool in = _poly.contains( p );
-                if ( in ) {
-                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] exactly in polygon" );
-                }
-                else {
-                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] exactly not in polygon" );
-                }
-                if( in ) return in;
-
-            }
-
-            return false;
+        virtual bool exactDocCheck( const Point& p, double& d ){
+            return _poly.contains( p );
         }
 
     private:
@@ -2324,7 +2086,7 @@ namespace mongo {
 
             if ( e.type() == Array ) {
                 // If we get an array query, assume it is a location, and do a $within { $center : [[x, y], 0] } search
-                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ) ) );
+                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), true ) ) );
                 return c;
             }
             else if ( e.type() == Object ) {
@@ -2371,26 +2133,33 @@ namespace mongo {
                     return c;
                 }
                 case BSONObj::opWITHIN: {
+
                     e = e.embeddedObject().firstElement();
                     uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
+
+                    BSONObj context = e.embeddedObject();
                     e = e.embeddedObject().firstElement();
                     string type = e.fieldName();
+
+                    bool uniqueDocs = true;
+                    if( ! context["$uniqueDocs"].eoo() ) uniqueDocs = context["$unique"].trueValue();
+
                     if ( startsWith(type,  "$center") ) {
                         uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                        shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
+                        shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type, uniqueDocs ) );
                         return c;
                     }
                     else if ( type == "$box" ) {
                         uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                        shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query, uniqueDocs ) );
                         return c;
                     }
                     else if ( startsWith( type, "$poly" ) ) {
                         uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
-                        shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query, uniqueDocs ) );
                         return c;
                     }
-                    throw UserException( 13058 , (string)"unknown $with type: " + type );
+                    throw UserException( 13058 , (string)"unknown $within type: " + type );
                 }
                 default:
                     // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center
@@ -2570,5 +2339,248 @@ namespace mongo {
         }
 
     } geoWalkCmd;
+
+    struct GeoUnitTest : public UnitTest {
+
+        int round( double d ) {
+            return (int)(.5+(d*1000));
+        }
+
+#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == GeoHash(b) ); }
+
+        void run() {
+            assert( ! GeoHash::isBitSet( 0 , 0 ) );
+            assert( ! GeoHash::isBitSet( 0 , 31 ) );
+            assert( GeoHash::isBitSet( 1 , 31 ) );
+
+            IndexSpec i( BSON( "loc" << "2d" ) );
+            Geo2dType g( &geo2dplugin , &i );
+            {
+                double x = 73.01212;
+                double y = 41.352964;
+                BSONObj in = BSON( "x" << x << "y" << y );
+                GeoHash h = g._hash( in );
+                BSONObj out = g._unhash( h );
+                assert( round(x) == round( out["x"].number() ) );
+                assert( round(y) == round( out["y"].number() ) );
+                assert( round( in["x"].number() ) == round( out["x"].number() ) );
+                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+            }
+
+            {
+                double x = -73.01212;
+                double y = 41.352964;
+                BSONObj in = BSON( "x" << x << "y" << y );
+                GeoHash h = g._hash( in );
+                BSONObj out = g._unhash( h );
+                assert( round(x) == round( out["x"].number() ) );
+                assert( round(y) == round( out["y"].number() ) );
+                assert( round( in["x"].number() ) == round( out["x"].number() ) );
+                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+            }
+
+            {
+                GeoHash h( "0000" );
+                h.move( 0 , 1 );
+                GEOHEQ( h , "0001" );
+                h.move( 0 , -1 );
+                GEOHEQ( h , "0000" );
+
+                h.init( "0001" );
+                h.move( 0 , 1 );
+                GEOHEQ( h , "0100" );
+                h.move( 0 , -1 );
+                GEOHEQ( h , "0001" );
+
+
+                h.init( "0000" );
+                h.move( 1 , 0 );
+                GEOHEQ( h , "0010" );
+            }
+
+            {
+                Box b( 5 , 5 , 2 );
+                assert( "(5,5) -->> (7,7)" == b.toString() );
+            }
+
+            {
+                GeoHash a = g.hash( 1 , 1 );
+                GeoHash b = g.hash( 4 , 5 );
+                assert( 5 == (int)(g.distance( a , b ) ) );
+                a = g.hash( 50 , 50 );
+                b = g.hash( 42 , 44 );
+                assert( round(10) == round(g.distance( a , b )) );
+            }
+
+            {
+                GeoHash x("0000");
+                assert( 0 == x.getHash() );
+                x.init( 0 , 1 , 32 );
+                GEOHEQ( x , "0000000000000000000000000000000000000000000000000000000000000001" )
+
+                assert( GeoHash( "1100").hasPrefix( GeoHash( "11" ) ) );
+                assert( ! GeoHash( "1000").hasPrefix( GeoHash( "11" ) ) );
+            }
+
+            {
+                GeoHash x("1010");
+                GEOHEQ( x , "1010" );
+                GeoHash y = x + "01";
+                GEOHEQ( y , "101001" );
+            }
+
+            {
+
+                GeoHash a = g.hash( 5 , 5 );
+                GeoHash b = g.hash( 5 , 7 );
+                GeoHash c = g.hash( 100 , 100 );
+                /*
+                cout << "a: " << a << endl;
+                cout << "b: " << b << endl;
+                cout << "c: " << c << endl;
+
+                cout << "a: " << a.toStringHex1() << endl;
+                cout << "b: " << b.toStringHex1() << endl;
+                cout << "c: " << c.toStringHex1() << endl;
+                */
+                BSONObj oa = a.wrap();
+                BSONObj ob = b.wrap();
+                BSONObj oc = c.wrap();
+                /*
+                cout << "a: " << oa.hexDump() << endl;
+                cout << "b: " << ob.hexDump() << endl;
+                cout << "c: " << oc.hexDump() << endl;
+                */
+                assert( oa.woCompare( ob ) < 0 );
+                assert( oa.woCompare( oc ) < 0 );
+
+            }
+
+            {
+                GeoHash x( "000000" );
+                x.move( -1 , 0 );
+                GEOHEQ( x , "101010" );
+                x.move( 1 , -1 );
+                GEOHEQ( x , "010101" );
+                x.move( 0 , 1 );
+                GEOHEQ( x , "000000" );
+            }
+
+            {
+                GeoHash prefix( "110011000000" );
+                GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
+                assert( ! entry.hasPrefix( prefix ) );
+
+                entry = GeoHash("1100110000001100000111000001110000011100000111000001000000000000");
+                assert( entry.toString().find( prefix.toString() ) == 0 );
+                assert( entry.hasPrefix( GeoHash( "1100" ) ) );
+                assert( entry.hasPrefix( prefix ) );
+            }
+
+            {
+                GeoHash a = g.hash( 50 , 50 );
+                GeoHash b = g.hash( 48 , 54 );
+                assert( round( 4.47214 ) == round( g.distance( a , b ) ) );
+            }
+
+
+            {
+                Box b( Point( 29.762283 , -95.364271 ) , Point( 29.764283000000002 , -95.36227099999999 ) );
+                assert( b.inside( 29.763 , -95.363 ) );
+                assert( ! b.inside( 32.9570255 , -96.1082497 ) );
+                assert( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
+            }
+
+            {
+                GeoHash a( "11001111" );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
+            }
+
+            {
+                int N = 10000;
+                {
+                    Timer t;
+                    for ( int i=0; i<N; i++ ) {
+                        unsigned x = (unsigned)rand();
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
+                        unsigned a,b;
+                        h.unhash_slow( a,b );
+                        assert( a == x );
+                        assert( b == y );
+                    }
+                    //cout << "slow: " << t.millis() << endl;
+                }
+
+                {
+                    Timer t;
+                    for ( int i=0; i<N; i++ ) {
+                        unsigned x = (unsigned)rand();
+                        unsigned y = (unsigned)rand();
+                        GeoHash h( x , y );
+                        unsigned a,b;
+                        h.unhash_fast( a,b );
+                        assert( a == x );
+                        assert( b == y );
+                    }
+                    //cout << "fast: " << t.millis() << endl;
+                }
+
+            }
+
+            {
+                // see http://en.wikipedia.org/wiki/Great-circle_distance#Worked_example
+
+                {
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
+
+                    double dist1 = spheredist_deg(BNA, LAX);
+                    double dist2 = spheredist_deg(LAX, BNA);
+
+                    // target is 0.45306
+                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                }
+                {
+                    Point BNA (-1.5127, 0.6304);
+                    Point LAX (-2.0665, 0.5924);
+
+                    double dist1 = spheredist_rad(BNA, LAX);
+                    double dist2 = spheredist_rad(LAX, BNA);
+
+                    // target is 0.45306
+                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                }
+                {
+                    Point JFK (-73.77694444, 40.63861111 );
+                    Point LAX (-118.40, 33.94);
+
+                    double dist = spheredist_deg(JFK, LAX) * EARTH_RADIUS_MILES;
+                    assert( dist > 2469 && dist < 2470 );
+                }
+
+                {
+                    Point BNA (-86.67, 36.12);
+                    Point LAX (-118.40, 33.94);
+                    Point JFK (-73.77694444, 40.63861111 );
+                    assert( spheredist_deg(BNA, BNA) < 1e-6);
+                    assert( spheredist_deg(LAX, LAX) < 1e-6);
+                    assert( spheredist_deg(JFK, JFK) < 1e-6);
+
+                    Point zero (0, 0);
+                    Point antizero (0,-180);
+
+                    // these were known to cause NaN
+                    assert( spheredist_deg(zero, zero) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
+                    assert( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
+                }
+            }
+        }
+    } geoUnitTest;
+
 
 }

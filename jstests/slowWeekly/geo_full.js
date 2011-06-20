@@ -287,7 +287,7 @@ var locsArray = function( locs ){
 	}
 }
 
-var numTests = 30
+var numTests = 300
 
 // Our seed will change every time this is run, but 
 // each individual test will be reproducible given
@@ -305,14 +305,14 @@ for ( var test = 0; test < numTests; test++ ) {
 	var env = randEnvironment()
 	var query = randQuery( env )
 	var data = randDataType()
-	
+	data.numDocs = 5; data.maxLocs = 2; 
 	var results = {}
 	var totalPoints = 0
 	print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
 
 	// Index after a random number of docs added
 	var indexIt = Math.floor( Random.rand() * data.numDocs )
-	
+		
 	for ( var i = 0; i < data.numDocs; i++ ) {
 
 		if( indexIt == i ){
