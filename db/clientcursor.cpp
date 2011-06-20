@@ -146,7 +146,7 @@ namespace mongo {
             i++;
             if( j->second->shouldTimeout( millis ) ) {
                 numberTimedOut++;
-                log(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
+                LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
             }
