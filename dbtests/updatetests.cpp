@@ -24,7 +24,7 @@
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
-#include "../db/update.h"
+#include "../db/ops/update.h"
 
 #include "dbtests.h"
 
