@@ -48,7 +48,7 @@ namespace mongo {
     template<class V>
     void BtreeBuilder<V>::newBucket() {
         DiskLoc L = BtreeBucket<V>::addBucket(idx);
-        b->tempNext() = L;
+        b->setTempNext(L);
         cur = L;
         b = cur.btreemod<V>();
     }
@@ -123,7 +123,7 @@ namespace mongo {
                 if ( ! up->_pushBack(r, k, ordering, keepLoc) ) {
                     // current bucket full
                     DiskLoc n = BtreeBucket<V>::addBucket(idx);
-                    up->tempNext() = n;
+                    up->setTempNext(n);
                     upLoc = n;
                     up = upLoc.btreemod<V>();
                     up->pushBack(r, k, ordering, keepLoc);

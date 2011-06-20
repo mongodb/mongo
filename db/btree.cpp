@@ -28,6 +28,7 @@
 #include "stats/counters.h"
 #include "dur_commitjob.h"
 #include "btreebuilder.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -36,15 +37,10 @@ namespace mongo {
 
 #define VERIFYTHISLOC dassert( thisLoc.btree<V>() == this );
 
-    _KeyNode& _KeyNode::writing() const {
-        return *getDur().writing( const_cast< _KeyNode* >( this ) );
+    template< class Loc >
+    __KeyNode<Loc> & __KeyNode<Loc>::writing() const {
+        return *getDur().writing( const_cast< __KeyNode<Loc> * >( this ) );
     }
-
-    template< class V >
-    BucketBasics<V>::KeyNode::KeyNode(const BucketBasics<V>& bb, const _KeyNode &k) :
-        prevChildBucket(k.prevChildBucket),
-        recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
-    { }
 
     // BucketBasics::lowWaterMark()
     //
@@ -227,9 +223,9 @@ namespace mongo {
                 }
                 else if ( z == 0 ) {
                     if ( !(k(i).recordLoc < k(i+1).recordLoc) ) {
-                        out() << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
-                        out() << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
-                        out() << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
+                        out() << "ERROR: btree key order corrupt (recordloc's wrong):" << endl;
+                        out() << " k(" << i << ")" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
+                        out() << " k(" << i+1 << ")" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
                         wassert( k(i).recordLoc < k(i+1).recordLoc );
                     }
                 }
@@ -734,8 +730,10 @@ namespace mongo {
      * note result might be an Unused location!
      */
     template< class V >
-    bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, 
+    bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &rl, 
 			      const Ordering &order, int& pos, bool assertIfDup) const {
+        Loc recordLoc;
+        recordLoc = rl;
         globalIndexCounters.btree( (char*)this );
 
         // binary search for this key
@@ -744,7 +742,7 @@ namespace mongo {
         int h=this->n-1;
         while ( l <= h ) {
             int m = (l+h)/2;
-	    KeyNode M = this->keyNode(m);
+            KeyNode M = this->keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) {
                 if( assertIfDup ) {
@@ -770,7 +768,7 @@ namespace mongo {
                 }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
-                DiskLoc unusedRL = M.recordLoc;
+                Loc unusedRL = M.recordLoc;
                 unusedRL.GETOFS() &= ~1; // so we can test equality without the used bit messing us up
                 x = recordLoc.compare(unusedRL);
             }
@@ -914,8 +912,10 @@ namespace mongo {
         advanceLoc.btreemod<V>()->delKeyAtPos( advanceLoc, id, advanceKeyOfs, order );
     }
 
-#define BTREE(loc) (static_cast<DiskLoc>(loc).btree<V>())
-#define BTREEMOD(loc) (static_cast<DiskLoc>(loc).btreemod<V>())
+//#define BTREE(loc) (static_cast<DiskLoc>(loc).btree<V>())
+#define BTREE(loc) (loc.btree<V>())
+//#define BTREEMOD(loc) (static_cast<DiskLoc>(loc).btreemod<V>())
+#define BTREEMOD(loc) (loc.btreemod<V>())
 
     template< class V >
     void BtreeBucket<V>::replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id ) {
@@ -929,7 +929,9 @@ namespace mongo {
             ll.btree<V>()->childForPos( indexInParent( thisLoc ) ).writing() = this->nextChild;
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
-        (static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
+
+        (this->nextChild.btree<V>())->parent.writing() = this->parent;
+        //(static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
         ClientCursor::informAboutToDeleteBucket( thisLoc );
         deallocBucket( thisLoc, id );
     }
@@ -1214,15 +1216,13 @@ namespace mongo {
     bool BtreeBucket<V>::unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc ) const {
         int pos;
         bool found;
-        DiskLoc loc = locate(id, thisLoc, key, Ordering::make(id.keyPattern()), pos, found, recordLoc, 1);
+        const Ordering ord = Ordering::make(id.keyPattern());
+        DiskLoc loc = locate(id, thisLoc, key, ord, pos, found, recordLoc, 1);
         if ( found ) {
-
             if ( key.objsize() > KeyMax ) {
                 OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
-            }
-            
-            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, Ordering::make(id.keyPattern()));
-            
+            }            
+            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);            
             return true;
         }
         return false;
@@ -1239,7 +1239,7 @@ namespace mongo {
     inline void BtreeBucket<V>::fix(const DiskLoc thisLoc, const DiskLoc child) {
         if ( !child.isNull() ) {
             if ( insert_debug )
-                out() << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
+                out() << "     fix " << child.toString() << ".parent=" << thisLoc.toString() << endl;
             child.btree<V>()->parent.writing() = thisLoc;
         }
     }
@@ -1335,8 +1335,8 @@ namespace mongo {
                     dump();
                     assert(false);
                 }
-                const DiskLoc *pc = &k(keypos+1).prevChildBucket;
-                *getDur().alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
+                const Loc *pc = &k(keypos+1).prevChildBucket;
+                *getDur().alreadyDeclared( const_cast<Loc*>(pc) ) = rchild; // declared in basicInsert()
                 if ( !rchild.isNull() )
                     rchild.btree<V>()->parent.writing() = thisLoc;
             }
@@ -1513,7 +1513,7 @@ namespace mongo {
         DiskLoc child = this->childForPos(p);
 
         if ( !child.isNull() ) {
-	  DiskLoc l = BTREE(child)->locate(idx, child, key, order, pos, found, recordLoc, direction);
+            DiskLoc l = BTREE(child)->locate(idx, child, key, order, pos, found, recordLoc, direction);
             if ( !l.isNull() )
                 return l;
         }
@@ -1716,7 +1716,8 @@ namespace mongo {
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
-        DiskLoc child = this->childForPos(pos);
+        Loc ch = this->childForPos(pos);
+        DiskLoc child = ch;
         if ( insert_debug )
             out() << "    getChild(" << pos << "): " << child.toString() << endl;
         // In current usage, rChild isNull() for a this->new key and false when we are
@@ -1841,25 +1842,45 @@ namespace mongo {
 
         b->dumpTree(id.head, orderObj);
 
-        /*        b->bt_insert(id.head, B, key, order, false, id);
+        /* b->bt_insert(id.head, B, key, order, false, id);
         b->k(1).setUnused();
-
         b->dumpTree(id.head, order);
-
         b->bt_insert(id.head, A, key, order, false, id);
-
         b->dumpTree(id.head, order);
         */
 
         // this should assert.  does it? (it might "accidentally" though, not asserting proves a problem, asserting proves nothing)
         b->bt_insert(id.head, C, key, order, false, id);
 
-//        b->dumpTree(id.head, order);
+        // b->dumpTree(id.head, order);
     }
 
     template class BucketBasics<V0>;
     template class BucketBasics<V1>;
     template class BtreeBucket<V0>;
     template class BtreeBucket<V1>;
+
+    struct BTUnitTest : public UnitTest {
+        void run() {
+            DiskLoc big(0xf12312, 0x70001234);
+            DiskLoc56Bit bigl;
+            {
+                bigl = big;
+                assert( big == bigl );
+                DiskLoc e = bigl;
+                assert( big == e );
+            }
+            {
+                DiskLoc d;
+                assert( d.isNull() );
+                DiskLoc56Bit l;
+                l = d;
+                assert( l.isNull() );
+                d = l;
+                assert( d.isNull() );
+                assert( l < bigl );
+            }
+        }
+    } btunittest;
 
 }
