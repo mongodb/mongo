@@ -121,6 +121,7 @@ namespace mongo {
 #else
                 pthread_attr_t attrs;
                 pthread_attr_init(&attrs);
+                pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
                 static const size_t STACK_SIZE = 1024*1024;
                 pthread_attr_setstacksize(&attrs, (DEBUG_BUILD 
