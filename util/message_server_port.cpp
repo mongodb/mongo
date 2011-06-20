@@ -93,28 +93,13 @@ namespace mongo {
 
     }
 
-    void* trun(void *v) { 
-        pms::threadRun( (MessagingPort*) v );    
-        return 0;
-    }
-
-#if defined(__linux__) && defined(_DEBUG)
-//#define POSIXSTACKSIZE 1
-#endif
-
     class PortMessageServer : public MessageServer , public Listener {
-#if defined(POSIXSTACKSIZE)
-        pthread_attr_t attr;
-#endif
     public:
         PortMessageServer(  const MessageServer::Options& opts, MessageHandler * handler ) :
             Listener( opts.ipList, opts.port ) {
+
             uassert( 10275 ,  "multiple PortMessageServer not supported" , ! pms::handler );
             pms::handler = handler;
-#if defined(POSIXSTACKSIZE)
-	    pthread_attr_init(&attr);
-	    pthread_attr_setstacksize(&attr, 512 * 1024);
-#endif
         }
 
         virtual void accepted(MessagingPort * p) {
@@ -131,11 +116,26 @@ namespace mongo {
             }
 
             try {
-#if defined(POSIXSTACKSIZE)
-		pthread_t tid;
-		assert( pthread_create(&tid, &attr, trun, p) == 0 );
+#ifndef __linux__  // TODO: consider making this ifdef _WIN32
+                boost::thread thr( boost::bind( &pms::threadRun , p ) );
 #else
-  	        boost::thread thr( boost::bind( &pms::threadRun , p ) );
+                pthread_attr_t attrs;
+                pthread_attr_init(&attrs);
+
+                static const size_t STACK_SIZE = 1024*1024;
+                pthread_attr_setstacksize(&attrs, (DEBUG_BUILD 
+                                                    ? (STACK_SIZE / 2)
+                                                    : STACK_SIZE));
+
+                pthread_t thread;
+                int failed = pthread_create(&thread, &attrs, (void*(*)(void*)) &pms::threadRun, p);
+
+                pthread_attr_destroy(&attrs);
+
+                if (failed) {
+                    log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
+                    throw boost::thread_resource_error(); // for consistency with boost::thread
+                }
 #endif
             }
             catch ( boost::thread_resource_error& ) {
