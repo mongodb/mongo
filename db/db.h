@@ -190,7 +190,7 @@ namespace mongo {
             if ( _context ) 
                 _context->unlocked();
             dbMutex.unlock();
-            verify( 14814 , c.curop() );
+            verify( 14845 , c.curop() );
             c.curop()->yielded();            
         }
         ~dbtempreleasewritelock() {
