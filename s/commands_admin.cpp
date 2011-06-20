@@ -606,6 +606,11 @@ namespace mongo {
                         return false;
                     }
 
+                    if (!fieldsMatch(middle, info->getShardKey().key())){
+                        errmsg = "middle has different fields (or different order) than shard key";
+                        return false;
+                    }
+
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
                     worked = chunk->multiSplit( splitPoints , res );
