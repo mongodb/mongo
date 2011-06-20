@@ -39,6 +39,8 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
+#include "ops/update.h"
+#include "ops/delete.h"
 
 namespace mongo {
 

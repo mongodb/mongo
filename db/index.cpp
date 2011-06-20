@@ -20,9 +20,10 @@
 #include "namespace-inl.h"
 #include "index.h"
 #include "btree.h"
-#include "query.h"
 #include "background.h"
 #include "repl/rs.h"
+#include "ops/delete.h"
+
 
 namespace mongo {
 

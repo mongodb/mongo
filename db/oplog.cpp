@@ -26,6 +26,8 @@
 #include "../util/file.h"
 #include "../util/unittest.h"
 #include "queryoptimizer.h"
+#include "ops/update.h"
+#include "ops/delete.h"
 
 namespace mongo {
 

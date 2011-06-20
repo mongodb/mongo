@@ -25,48 +25,6 @@
 #include "diskloc.h"
 #include "projection.h"
 
-/* db request message format
-
-   unsigned opid;         // arbitary; will be echoed back
-   byte operation;
-   int options;
-
-   then for:
-
-   dbInsert:
-      string collection;
-      a series of JSObjects
-   dbDelete:
-      string collection;
-      int flags=0; // 1=DeleteSingle
-      JSObject query;
-   dbUpdate:
-      string collection;
-      int flags; // 1=upsert
-      JSObject query;
-      JSObject objectToUpdate;
-        objectToUpdate may include { $inc: <field> } or { $set: ... }, see struct Mod.
-   dbQuery:
-      string collection;
-      int nToSkip;
-      int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
-                     // greater than zero is simply a hint on how many objects to send back per "cursor batch".
-                     // a negative number indicates a hard limit.
-      JSObject query;
-      [JSObject fieldsToReturn]
-   dbGetMore:
-      string collection; // redundant, might use for security.
-      int nToReturn;
-      int64 cursorID;
-   dbKillCursors=2007:
-      int n;
-      int64 cursorIDs[n];
-
-   Note that on Update, there is only one object, which is different
-   from insert where you can pass a list of objects to insert in the db.
-   Note that the update field layout is very similar layout to Query.
-*/
-
 // struct QueryOptions, QueryResult, QueryResultFlags in:
 #include "../client/dbclient.h"
 
@@ -78,37 +36,6 @@ namespace mongo {
     struct GetMoreWaitException { };
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
-
-    struct UpdateResult {
-        bool existing; // if existing objects were modified
-        bool mod;      // was this a $ mod
-        long long num; // how many objects touched
-        OID upserted;  // if something was upserted, the new _id of the object
-
-        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
-            : existing(e) , mod(m), num(n) {
-            upserted.clear();
-
-            BSONElement id = upsertedObject["_id"];
-            if ( ! e && n == 1 && id.type() == jstOID ) {
-                upserted = id.OID();
-            }
-        }
-
-    };
-
-    class RemoveSaver;
-
-    /* returns true if an existing object was updated, false if no existing object was found.
-       multi - update multiple objects - mostly useful with things like $set
-       god - allow access to system namespaces
-    */
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
-                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
-
-    // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false, RemoveSaver * rs=0);
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
 

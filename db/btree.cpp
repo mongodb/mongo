@@ -64,8 +64,6 @@ namespace mongo {
     static const int split_debug = 0;
     static const int insert_debug = 0;
 
-    extern int otherTraceLevel;
-
     /**
      * this error is ok/benign when doing a background indexing -- that logic in pdfile checks explicitly
      * for the 10287 error code.
