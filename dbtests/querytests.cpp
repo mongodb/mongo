@@ -732,6 +732,90 @@ namespace QueryTests {
     };
     BSONObj MinMax::empty_;
 
+    class MatchCodeCodeWScope : public ClientBase {
+    public:
+        MatchCodeCodeWScope() : _ns( "unittests.querytests.MatchCodeCodeWScope" ) {}
+        ~MatchCodeCodeWScope() {
+            client().dropCollection( "unittests.querytests.MatchCodeCodeWScope" );
+        }
+        void run() {
+            checkMatch();
+            client().ensureIndex( _ns, BSON( "a" << 1 ) );
+            checkMatch();
+            // Use explain queries to check index bounds.
+            {
+                BSONObj explain = client().findOne( _ns, QUERY( "a" << BSON( "$type" << (int)Code ) ).explain() );
+                BSONObjBuilder lower;
+                lower.appendCode( "", "" );
+                BSONObjBuilder upper;
+                upper.appendCodeWScope( "", "", BSONObj() );
+                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
+                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
+            }
+            {
+                BSONObj explain = client().findOne( _ns, QUERY( "a" << BSON( "$type" << (int)CodeWScope ) ).explain() );
+                BSONObjBuilder lower;
+                lower.appendCodeWScope( "", "", BSONObj() );
+                // This upper bound may change if a new bson type is added.
+                BSONObjBuilder upper;
+                upper << "" << BSON( "$maxElement" << 1 );
+                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
+                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
+            }
+        }
+    private:
+        void checkMatch() {
+            client().remove( _ns, BSONObj() );
+            
+            client().insert( _ns, code() );
+            client().insert( _ns, codeWScope() );
+            
+            ASSERT_EQUALS( 1U, client().count( _ns, code() ) );
+            ASSERT_EQUALS( 1U, client().count( _ns, codeWScope() ) );
+            
+            ASSERT_EQUALS( 1U, client().count( _ns, BSON( "a" << BSON( "$type" << (int)Code ) ) ) );
+            ASSERT_EQUALS( 1U, client().count( _ns, BSON( "a" << BSON( "$type" << (int)CodeWScope ) ) ) );
+        }
+        BSONObj code() const {
+            BSONObjBuilder codeBuilder;
+            codeBuilder.appendCode( "a", "return 1;" );
+            return codeBuilder.obj();            
+        }
+        BSONObj codeWScope() const {
+            BSONObjBuilder codeWScopeBuilder;
+            codeWScopeBuilder.appendCodeWScope( "a", "return 1;", BSONObj() );
+            return codeWScopeBuilder.obj();            
+        }
+        const char *_ns;
+    };
+    
+    class MatchDBRefType : public ClientBase {
+    public:
+        MatchDBRefType() : _ns( "unittests.querytests.MatchDBRefType" ) {}
+        ~MatchDBRefType() {
+            client().dropCollection( "unittests.querytests.MatchDBRefType" );
+        }
+        void run() {
+            checkMatch();
+            client().ensureIndex( _ns, BSON( "a" << 1 ) );
+            checkMatch();
+        }
+    private:
+        void checkMatch() {
+            client().remove( _ns, BSONObj() );            
+            client().insert( _ns, dbref() );
+            ASSERT_EQUALS( 1U, client().count( _ns, dbref() ) );
+            ASSERT_EQUALS( 1U, client().count( _ns, BSON( "a" << BSON( "$type" << (int)DBRef ) ) ) );
+        }
+        BSONObj dbref() const {
+            BSONObjBuilder b;
+            OID oid;
+            b.appendDBRef( "a", "ns", oid );
+            return b.obj();            
+        }
+        const char *_ns;
+    };
+    
     class DirectLocking : public ClientBase {
     public:
         void run() {
@@ -1265,6 +1349,8 @@ namespace QueryTests {
             add< IndexInsideArrayCorrect >();
             add< SubobjArr >();
             add< MinMax >();
+            add< MatchCodeCodeWScope >();
+            add< MatchDBRefType >();
             add< DirectLocking >();
             add< FastCountIn >();
             add< EmbeddedArray >();

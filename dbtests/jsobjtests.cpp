@@ -1298,11 +1298,10 @@ namespace JsobjTests {
                 stringstream ss;
                 ss << "type: " << t;
                 string s = ss.str();
-                massert( 10403 ,  s , min( t ).woCompare( max( t ) ) < 0 );
-                massert( 10404 ,  s , max( t ).woCompare( min( t ) ) > 0 );
-                massert( 10405 ,  s , min( t ).woCompare( min( t ) ) == 0 );
-                massert( 10406 ,  s , max( t ).woCompare( max( t ) ) == 0 );
-                massert( 10407 ,  s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
+                ASSERT( min( t ).woCompare( max( t ) ) <= 0 );
+                ASSERT( max( t ).woCompare( min( t ) ) >= 0 );
+                ASSERT( min( t ).woCompare( min( t ) ) == 0 );
+                ASSERT( max( t ).woCompare( max( t ) ) == 0 );
             }
         }
     };

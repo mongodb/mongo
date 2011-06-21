@@ -1101,83 +1101,114 @@ namespace mongo {
 
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {
-        case MinKey: appendMinKey( fieldName ); return;
-        case MaxKey: appendMinKey( fieldName ); return;
+                
+        // Shared canonical types
         case NumberInt:
         case NumberDouble:
         case NumberLong:
             append( fieldName , - numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            append( fieldName , "" ); return;
+        case Date: 
+            // min varies with V0 and V1 indexes, so we go one type lower.
+            appendBool(fieldName, true);
+            //appendDate( fieldName , numeric_limits<long long>::min() ); 
+            return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            appendTimestamp( fieldName , 0 ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+                
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
         case jstOID: {
             OID o;
             memset(&o, 0, sizeof(o));
             appendOID( fieldName , &o);
             return;
         }
-        case Bool: appendBool( fieldName , false); return;
-        case Date: 
-            // min varies with V0 and V1 indexes, so we go one type lower.
-            appendBool(fieldName, true);
-            //appendDate( fieldName , numeric_limits<long long>::min() ); 
-            return;
-        case jstNULL: appendNull( fieldName ); return;
-        case Symbol:
-        case String: append( fieldName , "" ); return;
-        case Object: append( fieldName , BSONObj() ); return;
+        case Bool:
+            appendBool( fieldName , false); return;
+        case jstNULL:
+            appendNull( fieldName ); return;
+        case Object:
+            append( fieldName , BSONObj() ); return;
         case Array:
             appendArray( fieldName , BSONObj() ); return;
         case BinData:
-            appendBinData( fieldName , 0 , Function , (const char *) 0 ); return;
-        case Undefined:
-            appendUndefined( fieldName ); return;
-        case RegEx: appendRegex( fieldName , "" ); return;
+            appendBinData( fieldName , 0 , BinDataGeneral , (const char *) 0 ); return;
+        case RegEx:
+            appendRegex( fieldName , "" ); return;
         case DBRef: {
             OID o;
             memset(&o, 0, sizeof(o));
             appendDBRef( fieldName , "" , o );
             return;
         }
-        case Code: appendCode( fieldName , "" ); return;
-        case CodeWScope: appendCodeWScope( fieldName , "" , BSONObj() ); return;
-        case Timestamp: appendTimestamp( fieldName , 0); return;
-
+        case Code:
+            appendCode( fieldName , "" ); return;
+        case CodeWScope:
+            appendCodeWScope( fieldName , "" , BSONObj() ); return;
         };
-        log() << "type not support for appendMinElementForType: " << t << endl;
+        log() << "type not supported for appendMinElementForType: " << t << endl;
         uassert( 10061 ,  "type not supported for appendMinElementForType" , false );
     }
 
     void BSONObjBuilder::appendMaxForType( const StringData& fieldName , int t ) {
         switch ( t ) {
-        case MinKey: appendMaxKey( fieldName );  break;
-        case MaxKey: appendMaxKey( fieldName ); break;
+                
+        // Shared canonical types
         case NumberInt:
         case NumberDouble:
         case NumberLong:
-            append( fieldName , numeric_limits<double>::max() );
-            break;
-        case BinData:
-            appendMinForType( fieldName , jstOID );
-            break;
+            append( fieldName , numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            appendMinForType( fieldName, Object ); return;
+        case Date:
+            appendDate( fieldName , numeric_limits<long long>::max() ); return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
         case jstOID: {
             OID o;
             memset(&o, 0xFF, sizeof(o));
             appendOID( fieldName , &o);
-            break;
+            return;
         }
-        case Undefined:
+        case Bool:
+            appendBool( fieldName , true ); return;
         case jstNULL:
-            appendMinForType( fieldName , NumberInt );
-        case Bool: appendBool( fieldName , true); break;
-        case Date: appendDate( fieldName , numeric_limits<long long>::max() ); break;
-        case Symbol:
-        case String: append( fieldName , BSONObj() ); break;
+            appendNull( fieldName ); return;
+        case Object:
+            appendMinForType( fieldName, Array ); return;
+        case Array:
+            appendMinForType( fieldName, BinData ); return;
+        case BinData:
+            appendMinForType( fieldName, jstOID ); return;
+        case RegEx:
+            appendMinForType( fieldName, DBRef ); return;
+        case DBRef:
+            appendMinForType( fieldName, Code ); return;                
         case Code:
+            appendMinForType( fieldName, CodeWScope ); return;
         case CodeWScope:
-            appendCodeWScope( fieldName , "ZZZ" , BSONObj() ); break;
-        case Timestamp:
-            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); break;
-        default:
-            appendMinForType( fieldName , t + 1 );
+            // This upper bound may change if a new bson type is added.
+            appendMinForType( fieldName , MaxKey ); return;
         }
+        log() << "type not supported for appendMaxElementForType: " << t << endl;
+        uassert( 14836 ,  "type not supported for appendMaxElementForType" , false );
     }
 
     const string BSONObjBuilder::numStrs[] = {
