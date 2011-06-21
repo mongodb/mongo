@@ -611,23 +611,28 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
+                // No best plan - all must be tried.
                 nPlans( 3 );
                 runQuery();
+                // Best plan selected by query.
                 nPlans( 1 );
                 nPlans( 1 );
                 Helpers::ensureIndex( ns(), BSON( "c" << 1 ), false, "c_1" );
+                // Best plan cleared when new index added.
                 nPlans( 3 );
                 runQuery();
+                // Best plan selected by query.
                 nPlans( 1 );
 
                 {
                     DBDirectClient client;
-                    for( int i = 0; i < 34; ++i ) {
+                    for( int i = 0; i < 334; ++i ) {
                         client.insert( ns(), BSON( "i" << i ) );
                         client.update( ns(), QUERY( "i" << i ), BSON( "i" << i + 1 ) );
                         client.remove( ns(), BSON( "i" << i + 1 ) );
                     }
                 }
+                // Best plan cleared by ~1000 writes.
                 nPlans( 3 );
 
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
@@ -635,6 +640,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 NoRecordTestOp original;
                 s.runOp( original );
+                // NoRecordTestOp doesn't record a best plan (test cases where mayRecordPlan() is false).
                 nPlans( 3 );
 
                 BSONObj hint = fromjson( "{hint:{$natural:1}}" );
@@ -644,6 +650,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ), &hintElt );
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
+                // No plan recorded when a hint is used.
                 nPlans( 3 );
 
                 auto_ptr< FieldRangeSetPair > frsp3( new FieldRangeSetPair( ns(), BSON( "a" << 4 ), true ) );
@@ -651,8 +658,10 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s3( ns(), frsp3, frspOrig3, BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) );
                 TestOp newerOriginal;
                 s3.runOp( newerOriginal );
+                // Plan recorded was for a different query pattern (different sort spec).
                 nPlans( 3 );
 
+                // Best plan still selected by query after all these other tests.
                 runQuery();
                 nPlans( 1 );
             }
