@@ -187,6 +187,7 @@ namespace mongo {
         {"$ifnull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
+        {"$mod", ExpressionMod::create},
         {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
@@ -1596,6 +1597,49 @@ namespace mongo {
 	}
 
 	return true;
+    }
+
+    /* ----------------------- ExpressionMod ---------------------------- */
+
+    ExpressionMod::~ExpressionMod() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMod::create() {
+        shared_ptr<ExpressionMod> pExpression(new ExpressionMod());
+        return pExpression;
+    }
+
+    ExpressionMod::ExpressionMod():
+        ExpressionNary() {
+    }
+
+    void ExpressionMod::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMod::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        BSONType productType;
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+
+        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+
+        long right = pRight->coerceToLong();
+	if (right == 0)
+	    return Value::getUndefined();
+
+        long left = pLeft->coerceToLong();
+        if (productType == NumberLong)
+            return Value::createLong(left % right);
+        return Value::createInt((int)left % right);
+    }
+
+    const char *ExpressionMod::getOpName() const {
+	return "$mod";
     }
 
     /* ------------------------- ExpressionMultiply ----------------------------- */
