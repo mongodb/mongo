@@ -34,6 +34,11 @@
 
 namespace mongo {
 
+    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl )
+    { 
+        return true;
+    }
+
     namespace dbgrid_pub_cmds {
 
         class PublicGridCommand : public Command {

@@ -50,6 +50,19 @@
 
 namespace mongo {
 
+    namespace dur { 
+        void setAgeOutJournalFiles(bool rotate);
+    }
+    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) { 
+        BSONElement e = cmdObj["ageOutJournalFiles"];
+        if( !e.eoo() ) {
+            bool r = e.trueValue();
+            log() << "ageOutJournalFiles " << r << endl;
+            dur::setAgeOutJournalFiles(r);
+        }
+        return true;
+    }
+
     void flushDiagLog();
 
     /* reset any errors so that getlasterror comes back clean.

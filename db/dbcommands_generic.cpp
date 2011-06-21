@@ -122,6 +122,9 @@ namespace mongo {
         int groupCommitIntervalMs = 100;
     }
 
+    // tempish
+    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl );
+
     class CmdSet : public Command {
     public:
         CmdSet() : Command( "setParameter" ) { }
@@ -139,6 +142,7 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
+            setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
             if( cmdObj.hasElement("groupCommitIntervalMs") ) { 
                 if( !cmdLine.dur ) { 
                     errmsg = "journaling is off";
