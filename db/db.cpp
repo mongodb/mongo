@@ -596,6 +596,9 @@ int main(int argc, char* argv[]) {
     ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
     ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
     ("smallfiles", "use a smaller default file size")
+#if defined(__linux__)
+    ("shutdown", "kill a running server (for init scripts)")
+#endif
     ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
@@ -964,6 +967,67 @@ int main(int argc, char* argv[]) {
 
         if( cmdLine.pretouch )
             log() << "--pretouch " << cmdLine.pretouch << endl;
+
+#ifdef __linux__
+        if (params.count("shutdown")){
+            bool failed = false;
+
+            string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+            if ( !boost::filesystem::exists( name ) || boost::filesystem::file_size( name ) == 0 )
+                failed = true;
+
+            pid_t pid;
+            string procPath;
+            if (!failed){
+                try {
+                    ifstream f (name.c_str());
+                    f >> pid;
+                    procPath = (str::stream() << "/proc/" << pid);
+                    if (!boost::filesystem::exists(procPath))
+                        failed = true;
+
+                    string exePath = procPath + "/exe";
+                    if (boost::filesystem::exists(exePath)){
+                        char buf[256];
+                        int ret = readlink(exePath.c_str(), buf, sizeof(buf)-1);
+                        buf[ret] = '\0'; // readlink doesn't terminate string
+                        if (ret == -1) {
+                            int e = errno;
+                            cerr << "Error resolving " << exePath << ": " << errnoWithDescription(e);
+                            failed = true;
+                        }
+                        else if (!endsWith(buf, "mongod")){
+                            cerr << "Process " << pid << " is running " << buf << " not mongod" << endl;
+                            ::exit(-1);
+                        }
+                    }
+                }
+                catch (const std::exception& e){
+                    cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
+                    failed = true;
+                }
+            }
+
+            if (failed) {
+                cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
+                ::exit(-1);
+            }
+
+            cout << "killing process with pid: " << pid << endl;
+            int ret = kill(pid, SIGTERM);
+            if (ret) {
+                int e = errno;
+                cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
+                ::exit(-1);
+            }
+
+            while (boost::filesystem::exists(procPath)) {
+                sleepsecs(1);
+            }
+
+            ::exit(0);
+        }
+#endif
 
 #if defined(_WIN32)
         if (serviceParamsCheck( params, dbpath, argc, argv )) {
