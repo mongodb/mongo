@@ -151,6 +151,14 @@ namespace mongo {
                 delete j->second;
             }
         }
+        unsigned sz = clientCursorsById.size();
+        static time_t last;
+        if( sz >= 100000 ) { 
+            if( time(0) - last > 300 ) {
+                last = time(0);
+                log() << "warning number of open cursors is very large: " << sz << endl;
+            }
+        }
     }
 
     /* must call when a btree bucket going away.
@@ -523,6 +531,19 @@ namespace mongo {
         result.appendNumber("totalOpen", clientCursorsById.size() );
         result.appendNumber("clientCursors_size", (int) numCursors());
         result.appendNumber("timedOut" , numberTimedOut);
+        unsigned pinned = 0;
+        unsigned notimeout = 0;
+        for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); i++ ) {
+            unsigned p = i->second->_pinValue;
+            if( p >= 100 )
+                pinned++;
+            else if( p > 0 )
+                notimeout++;
+        }
+        if( pinned ) 
+            result.append("pinned", pinned);
+        if( notimeout )
+            result.append("totalNoTimeout", notimeout);
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?
@@ -617,7 +638,6 @@ namespace mongo {
         return found;
 
     }
-
 
     ClientCursorMonitor clientCursorMonitor;
 
