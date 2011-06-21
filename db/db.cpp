@@ -429,6 +429,7 @@ namespace mongo {
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
+        printCommandLineOpts();
 
         {
             stringstream ss;

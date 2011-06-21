@@ -133,6 +133,8 @@ namespace mongo {
 
     string prettyHostName();
 
+    void printCommandLineOpts();
+
     /**
      * used for setParameter
      * so you can write validation code that lives with code using it
