@@ -341,7 +341,7 @@ namespace QueryOptimizerTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                NamespaceDetailsTransient::_get( ns() ).clearQueryCache();
+                NamespaceDetailsTransient::get_inlock( ns() ).clearQueryCache();
                 dropCollection( ns() );
             }
             static void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
@@ -760,8 +760,8 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 1 );
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 1, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) );
             }
         };
 
@@ -816,7 +816,7 @@ namespace QueryOptimizerTests {
                     QueryMessage q(d);
                     runQuery( m, q);
                 }
-                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
+                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
 
                 Message m2;
                 assembleRequest( ns(), QUERY( "b" << 99 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m2 );
@@ -825,8 +825,8 @@ namespace QueryOptimizerTests {
                     QueryMessage q(d);
                     runQuery( m2, q);
                 }
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 3, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 3, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) );
             }
         };
 
