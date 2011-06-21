@@ -490,7 +490,7 @@ namespace mongo {
 	  @returns the field found; could be an array
 	 */
 	shared_ptr<const Value> evaluatePath(
-	    size_t index, const size_t pathLength,
+	    size_t index, const size_t pathLength, 
 	    shared_ptr<Document> pDocument) const;
 
 	FieldPath fieldPath;

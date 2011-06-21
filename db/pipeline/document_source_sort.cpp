@@ -86,10 +86,7 @@ namespace mongo {
 
     DocumentSourceSort::DocumentSourceSort(
 	const intrusive_ptr<ExpressionContext> &pTheCtx):
-	vSortKey(),
-	vAscending(),
         populated(false),
-        documents(),
         pCtx(pTheCtx) {
     }
 

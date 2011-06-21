@@ -302,10 +302,10 @@ namespace mongo {
 	pBuilder->append(pipelineName, arrayBuilder.arr());
 
 	bool btemp;
-	if (btemp = getSplitMongodPipeline()) {
+	if ((btemp = getSplitMongodPipeline())) {
 	    pBuilder->append(splitMongodPipelineName, btemp);
 	}
-	if (btemp = pCtx->getInRouter()) {
+	if ((btemp = pCtx->getInRouter())) {
 	    pBuilder->append(fromRouterName, btemp);
 	}
     }
