@@ -279,7 +279,7 @@ void processMessage( Connection& c , Message& m ) {
 
     if ( m.operation() == mongo::opReply )
         out() << " - " << (unsigned)m.header()->responseTo;
-    out() << endl;
+    out() << '\n';
 
     try {
         switch( m.operation() ) {
@@ -294,7 +294,16 @@ void processMessage( Connection& c , Message& m ) {
         }
         case mongo::dbQuery: {
             mongo::QueryMessage q(d);
-            out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
+            out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip;
+            if( !q.fields.isEmpty() )
+                out() << " hasfields";
+            if( q.queryOptions & mongo::QueryOption_SlaveOk )
+                out() << " SlaveOk";
+            if( q.queryOptions & mongo::QueryOption_NoCursorTimeout )
+                out() << " NoCursorTimeout";
+            if( q.queryOptions & ~(mongo::QueryOption_SlaveOk | mongo::QueryOption_NoCursorTimeout) )
+                out() << " queryOptions:" << hex << q.queryOptions;
+            out() << endl;
             break;
         }
         case mongo::dbUpdate: {
@@ -331,6 +340,7 @@ void processMessage( Connection& c , Message& m ) {
             break;
         }
         default:
+            out() << "\tunknown opcode " << m.operation() << endl;
             cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
         }
     }
