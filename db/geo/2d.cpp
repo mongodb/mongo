@@ -789,6 +789,7 @@ namespace mongo {
             : _g(g) , _lookedAt(0) , _objectsLoaded(0) , _found(0), _uniqueDocs( uniqueDocs ), _needDistance( needDistance ) {
             if ( ! filter.isEmpty() ) {
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
+                GEODEBUG( "Matcher is now " << _matcher->docMatcher().toString() );
             }
         }
 
@@ -824,10 +825,10 @@ namespace mongo {
             double keyD = 0;
             KeyResult keyOk = approxKeyCheck( node, keyD );
             if ( keyOk == BAD ) {
-                GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
+                GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << keyD );
                 return;
             }
-            GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
+            GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << keyD );
 
             ////
             // Check for match using other key (and potentially doc) criteria
@@ -836,6 +837,8 @@ namespace mongo {
             map<DiskLoc, bool>::iterator match = _matched.find( node.recordLoc );
             bool newDoc = match == _matched.end();
             if( newDoc ) {
+
+                GEODEBUG( "\t\t\t\t matching new doc with " << (_matcher ? _matcher->docMatcher().toString() : "(empty)" ) );
 
                 // matcher
                 MatchDetails details;
@@ -879,7 +882,7 @@ namespace mongo {
             // Find the particular location we want
             GeoHash keyHash( node.key._firstElement(), _g->_bits );
 
-            log() << "Hash: " << node.key << " and " << keyHash.getHash() << " unique " << _uniqueDocs << endl;
+            // log() << "Hash: " << node.key << " and " << keyHash.getHash() << " unique " << _uniqueDocs << endl;
             for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
 
                 // Ignore all locations not hashed to the key's hash, since we may see
@@ -1149,11 +1152,9 @@ namespace mongo {
         virtual void fillStack( int maxToCheck, int maxToAdd = -1, bool onlyExpand = false ) {
 
 #ifdef GEODEBUGGING
-
-            int s = _state;
             log() << "Filling stack with maximum of " << maxToCheck << ", state : " << (int) _state << endl;
-
 #endif
+
             if( maxToAdd < 0 ) maxToAdd = maxToCheck;
             int maxFound = _foundInExp + maxToCheck;
             assert( maxToCheck > 0 );
@@ -1373,12 +1374,12 @@ namespace mongo {
         virtual void addSpecific( const GeoKeyNode& node , bool onBounds , double keyD , bool newDoc ) {
 
             if( _uniqueDocs && ! newDoc ){
-                log() << "Already handled doc!" << endl;
+                // log() << "Already handled doc!" << endl;
                 return;
             }
 
             if( _uniqueDocs && ! onBounds ) {
-                log() << "Added ind to " << _type << endl;
+                // log() << "Added ind to " << _type << endl;
                 _stack.push_front( GeoPoint( node ) );
             }
             else {
@@ -1389,9 +1390,9 @@ namespace mongo {
                 getPointsFor( node, locs, true );
                 for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ){
                     double d;
-                    log() << "On bounds? " << onBounds << " exact " << exactDocCheck( Point( *i ), d ) << " point " << Point( *i ) << endl;
+                    // log() << "On bounds? " << onBounds << " exact " << exactDocCheck( Point( *i ), d ) << " point " << Point( *i ) << endl;
                     if( ! onBounds || exactDocCheck( Point( *i ), d ) ){
-                        log() << "Added mult to " << _type << endl;
+                        // log() << "Added mult to " << _type << endl;
                         _stack.push_front( GeoPoint( node ) );
                         // If returning unique, just exit after first point is added
                         if( _uniqueDocs ) break;
@@ -1467,7 +1468,7 @@ namespace mongo {
                           || d <= farthest() + 2 * _distError /* could be closer than previous points */ );
 
             GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
-                      << "\t" << GeoHash( node.key.firstElement() ) << "\t" << d
+                      << "\t" << GeoHash( node.key._firstElement() ) << "\t" << d
                       << " ok: " << good << " farthest: " << farthest() );
 
             return good ? GOOD : BAD;
@@ -1565,7 +1566,7 @@ namespace mongo {
 
         virtual void addSpecific( const GeoKeyNode& node, bool onBounds, double keyD, bool newDoc ) {
 
-            GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
+            GEODEBUG( "\t\t" << GeoHash( node.key._firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << keyD );
 
             double maxDistance = exactDistances( node );
             if( maxDistance >= 0 ){
@@ -1899,7 +1900,7 @@ namespace mongo {
 
             switch (_type) {
             case GEO_PLAIN: {
-                if( p.distanceWithin( p, _maxDistance ) ) return true;
+                if( _startPt.distanceWithin( p, _maxDistance ) ) return true;
                 break;
             }
             case GEO_SPHERE:
@@ -2086,7 +2087,7 @@ namespace mongo {
 
             if ( e.type() == Array ) {
                 // If we get an array query, assume it is a location, and do a $within { $center : [[x, y], 0] } search
-                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), true ) ) );
+                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ), "$center", true ) );
                 return c;
             }
             else if ( e.type() == Object ) {
