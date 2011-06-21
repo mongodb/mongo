@@ -126,9 +126,16 @@ function arrayEq(al, ar, v) {
 	return false;
     }
 
-    for(var i = 0; i < al.length; ++i) {
-	if (!anyEq(al[i], ar[i], v))
-	    return false;
+    var i, j = 0;
+    while ( i < al.length ) {
+        if (anyEq(al[i], ar[j], v) ) {
+            j = 0;
+            i++;
+        } else if ( j < ar.length ) {
+            j++;
+        } else {
+            return false;
+        }
     }
 
     /* if we got here, the two objects matched */

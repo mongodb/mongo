@@ -188,9 +188,12 @@ namespace mongo {
         {"$ifnull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
+        {"$mod", ExpressionMod::create},
+        {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$subtract", ExpressionSubtract::create},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -1596,6 +1599,99 @@ namespace mongo {
 	return true;
     }
 
+    /* ----------------------- ExpressionMod ---------------------------- */
+
+    ExpressionMod::~ExpressionMod() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMod::create() {
+        shared_ptr<ExpressionMod> pExpression(new ExpressionMod());
+        return pExpression;
+    }
+
+    ExpressionMod::ExpressionMod():
+        ExpressionNary() {
+    }
+
+    void ExpressionMod::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMod::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        BSONType productType;
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+
+        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+
+        long right = pRight->coerceToLong();
+	if (right == 0)
+	    return Value::getUndefined();
+
+        long left = pLeft->coerceToLong();
+        if (productType == NumberLong)
+            return Value::createLong(left % right);
+        return Value::createInt((int)left % right);
+    }
+
+    const char *ExpressionMod::getOpName() const {
+	return "$mod";
+    }
+
+    /* ------------------------- ExpressionMultiply ----------------------------- */
+
+    ExpressionMultiply::~ExpressionMultiply() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMultiply::create() {
+        shared_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
+        return pExpression;
+    }
+
+    ExpressionMultiply::ExpressionMultiply():
+        ExpressionNary() {
+    }
+
+    shared_ptr<const Value> ExpressionMultiply::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        /*
+          We'll try to return the narrowest possible result value.  To do that
+          without creating intermediate Values, do the arithmetic for double
+          and integral types in parallel, tracking the current narrowest
+          type.
+         */
+        double doubleProduct = 1;
+        long long longProduct = 1;
+        BSONType productType = NumberInt;
+
+        const size_t n = vpOperand.size();
+        for(size_t i = 0; i < n; ++i) {
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+
+            productType = Value::getWidestNumeric(productType, pValue->getType());
+            doubleProduct *= pValue->coerceToDouble();
+            longProduct *= pValue->coerceToLong();
+        }
+
+        if (productType == NumberDouble)
+            return Value::createDouble(doubleProduct);
+        if (productType == NumberLong)
+            return Value::createLong(longProduct);
+        return Value::createInt((int)longProduct);
+    }
+
+    const char *ExpressionMultiply::getOpName() const {
+    return "$multiply";
+    }
+
+    shared_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
+    return ExpressionMultiply::create;
+    }
+
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
     ExpressionIfNull::~ExpressionIfNull() {
@@ -1915,5 +2011,42 @@ namespace mongo {
 
     const char *ExpressionOr::getOpName() const {
 	return "$or";
+    }
+
+    /* ----------------------- ExpressionSubtract ---------------------------- */
+
+    ExpressionSubtract::~ExpressionSubtract() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSubtract::create() {
+        shared_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
+        return pExpression;
+    }
+
+    ExpressionSubtract::ExpressionSubtract():
+        ExpressionNary() {
+    }
+
+    void ExpressionSubtract::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSubtract::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+
+        double right = pRight->coerceToDouble();
+
+        double left = pLeft->coerceToDouble();
+
+        return Value::createDouble(left - right);
+    }
+
+    const char *ExpressionSubtract::getOpName() const {
+	return "$divide";
     }
 }

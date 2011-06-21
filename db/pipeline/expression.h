@@ -607,6 +607,47 @@ namespace mongo {
     };
 
 
+    class ExpressionMod :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionMod();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMod();
+    };
+    
+
+    class ExpressionMultiply :
+        public ExpressionNary {
+    public:
+        // virtuals from Expression
+        virtual ~ExpressionMultiply();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual const char *getOpName() const;
+
+        // virtuals from ExpressionNary
+        virtual shared_ptr<ExpressionNary> (*getFactory() const)();
+
+        /*
+          Create an expression that finds the product of n operands.
+
+          @returns multiplication expression
+         */
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMultiply();
+    };
+
+
     class ExpressionNot :
         public ExpressionNary {
     public:
@@ -810,6 +851,23 @@ namespace mongo {
 
     private:
         ExpressionOr();
+    };
+
+
+    class ExpressionSubtract :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionSubtract();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSubtract();
     };
 }
 
