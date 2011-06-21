@@ -524,7 +524,7 @@ namespace mongo {
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
-            if ( ++_qcWriteCount >= 100 )
+            if ( ++_qcWriteCount >= 1000 )
                 clearQueryCache();
         }
         BSONObj indexForPattern( const QueryPattern &pattern ) {
