@@ -24,6 +24,7 @@
 #include "../dbhelpers.h"
 #include "connections.h"
 #include "../oplog.h"
+#include "../instance.h"
 
 using namespace bson;
 

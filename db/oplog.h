@@ -26,7 +26,7 @@
 #include "pdfile.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "query.h"
+#include "clientcursor.h"
 #include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "../util/timer.h"

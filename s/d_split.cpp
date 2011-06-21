@@ -22,10 +22,10 @@
 
 #include "../db/btree.h"
 #include "../db/commands.h"
-#include "../db/dbmessage.h"
 #include "../db/jsobj.h"
-#include "../db/query.h"
+#include "../db/instance.h"
 #include "../db/queryoptimizer.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"

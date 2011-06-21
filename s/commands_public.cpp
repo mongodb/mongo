@@ -23,7 +23,6 @@
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
-#include "../db/query.h"
 #include "../db/queryutil.h"
 #include "../scripting/engine.h"
 

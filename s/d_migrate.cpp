@@ -29,13 +29,12 @@
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
 #include "../db/repl_block.h"
 #include "../db/dur.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
