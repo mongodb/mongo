@@ -77,4 +77,17 @@ namespace mongo {
         dbcon.done();
     }
 
+    void Strategy::update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags ) {
+        bool upsert = flags & UpdateOption_Upsert;
+        bool multi = flags & UpdateOption_Multi;
+
+        ShardConnection dbcon( shard , ns );
+        if ( dbcon.setVersion() ) {
+            dbcon.done();
+            throw StaleConfigException( ns , "for insert" );
+        }
+        dbcon->update( ns , query , toupdate, upsert, multi);
+        dbcon.done();
+    }
+
 }

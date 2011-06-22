@@ -266,6 +266,10 @@ namespace mongo {
             // only useful for shards
         }
 
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags ) {
+            // only useful for shards
+        }
+
         set<string> _commandsSafeToPass;
     };
 

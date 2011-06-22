@@ -1100,8 +1100,9 @@ namespace mongo {
                     log(1) << "mr sharded output ns: " << config.ns << endl;
 
                     // for now we only support replace output collection in sharded mode
-                    if (config.outType != mr_shard::Config::REPLACE) {
-                        errmsg = "Only support REPLACE mode for sharded output M/R";
+                    if (config.outType != mr_shard::Config::REPLACE &&
+                            config.outType != mr_shard::Config::MERGE) {
+                        errmsg = "This Map Reduce mode is not supported with sharded output";
                         return false;
                     }
 
@@ -1119,7 +1120,8 @@ namespace mongo {
                     }
                     string outns = config.finalLong;
 
-                    if (config.outType == mr_shard::Config::REPLACE) {
+                    bool merge = (config.outType == mr_shard::Config::MERGE);
+                    if (!merge) {
                         // drop previous collection
                         BSONObj dropColCmd = BSON("drop" << config.finalShort);
                         BSONObjBuilder dropColResult(32);
@@ -1149,30 +1151,33 @@ namespace mongo {
                     mr_shard::BSONList values;
                     Strategy* s = SHARDED;
                     long long finalCount = 0;
-                    while ( cursor.more() ) {
-                        BSONObj t = cursor.next().getOwned();
+                    while ( cursor.more() || values.size() > 0 ) {
+                        BSONObj t;
+                        if ( cursor.more() ) {
+                            t = cursor.next().getOwned();
 
-                        if ( values.size() == 0 ) {
-                            values.push_back( t );
-                            continue;
-                        }
+                            if ( values.size() == 0 ) {
+                                values.push_back( t );
+                                continue;
+                            }
 
-                        if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                            values.push_back( t );
-                            continue;
+                            if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
+                                values.push_back( t );
+                                continue;
+                            }
                         }
 
                         BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
-                        s->insertSharded(conf, outns.c_str(), final, 0);
+                        if (merge) {
+                            BSONObj id = final["_id"].wrap();
+                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert);
+                        } else {
+                            s->insertSharded(conf, outns.c_str(), final, 0);
+                        }
                         ++finalCount;
                         values.clear();
-                        values.push_back( t );
-                    }
-
-                    if ( values.size() ) {
-                        BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
-                        s->insertSharded(conf, outns.c_str(), final, 0);
-                        ++finalCount;
+                        if (!t.isEmpty())
+                            values.push_back( t );
                     }
 
                     for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
