@@ -31,6 +31,7 @@
 #include "strategy.h"
 #include "grid.h"
 #include "mr_shard.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -1239,4 +1240,64 @@ namespace mongo {
 
     }
 
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+        const char *p = strchr(ns, '.');
+        if ( !p ) return false;
+        if ( strcmp(p, ".$cmd") != 0 ) return false;
+
+        bool ok = false;
+
+        BSONElement e = jsobj.firstElement();
+        map<string,Command*>::iterator i;
+
+        if ( e.eoo() )
+            ;
+        // check for properly registered command objects.
+        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
+            string errmsg;
+            Command *c = i->second;
+            ClientInfo *client = ClientInfo::get();
+            AuthenticationInfo *ai = client->getAuthenticationInfo();
+
+            char cl[256];
+            nsToDatabase(ns, cl);
+            if( c->requiresAuth() && !ai->isAuthorized(cl)) {
+                ok = false;
+                errmsg = "unauthorized";
+            }
+            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost ) {
+                ok = false;
+                errmsg = "unauthorized: this command must run from localhost when running db without auth";
+                log() << "command denied: " << jsobj.toString() << endl;
+            }
+            else if ( c->adminOnly() && !startsWith(ns, "admin.") ) {
+                ok = false;
+                errmsg = "access denied - use admin db";
+            }
+            else if ( jsobj.getBoolField( "help" ) ) {
+                stringstream help;
+                help << "help for: " << e.fieldName() << " ";
+                c->help( help );
+                anObjBuilder.append( "help" , help.str() );
+            }
+            else {
+                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
+            }
+
+            BSONObj tmp = anObjBuilder.asTempObj();
+            bool have_ok = tmp.hasField("ok");
+            bool have_errmsg = tmp.hasField("errmsg");
+
+            if (!have_ok)
+                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
+
+            if ( !ok && !have_errmsg) {
+                anObjBuilder.append("errmsg", errmsg);
+                uassert_nothrow(errmsg.c_str());
+            }
+            return true;
+        }
+
+        return false;
+    }
 }
