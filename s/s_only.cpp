@@ -85,6 +85,11 @@ namespace mongo {
             log( 2 ) << "command: " << cmdObj << endl;
         }
 
+        if (!client.getAuthenticationInfo()->isAuthorized(dbname)) {
+            result.append("errmsg" , "unauthorized");
+            return false;
+        }
+
         string errmsg;
         int ok = c->run( dbname , cmdObj , errmsg , result , fromRepl );
         if ( ! ok )

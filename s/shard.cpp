@@ -20,6 +20,7 @@
 #include "shard.h"
 #include "config.h"
 #include "request.h"
+#include "client.h"
 #include "../db/commands.h"
 #include <set>
 
@@ -356,4 +357,20 @@ namespace mongo {
         _writeLock = 0; // TODO
     }
 
+    void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
+        if( !noauth ) {
+            string err;
+            log(2) << "calling onCreate auth for " << conn->toString() << endl;
+            uassert( 15847, "can't authenticate to shard server",
+                    conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
+        }
+
+        if ( _shardedConnections ) {
+            conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+        }
+    }
+
+    void ShardingConnectionHook::onDestory( DBClientBase * conn ) {
+        resetShardVersionCB( conn );
+    }
 }

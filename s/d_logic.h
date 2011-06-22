@@ -173,6 +173,7 @@ namespace mongo {
 
         static ShardedConnectionInfo* get( bool create );
         static void reset();
+        static void addHook();
 
         bool inForceVersionOkMode() const {
             return _forceVersionOk;

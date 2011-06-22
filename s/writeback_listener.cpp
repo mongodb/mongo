@@ -190,6 +190,9 @@ namespace mongo {
                         r.init();
 
                         ClientInfo * ci = r.getClientInfo();
+                        if (!noauth) {
+                            ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
+                        }
                         ci->noAutoSplit();
 
                         r.process();

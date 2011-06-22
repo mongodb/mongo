@@ -280,5 +280,18 @@ namespace mongo {
 
 
     extern DBConnectionPool shardConnectionPool;
-    
+
+    class ShardingConnectionHook : public DBConnectionHook {
+    public:
+
+        ShardingConnectionHook( bool shardedConnections )
+            : _shardedConnections( shardedConnections ) {
+        }
+
+        virtual void onCreate( DBClientBase * conn );
+        virtual void onHandedOut( DBClientBase * conn );
+        virtual void onDestory( DBClientBase * conn );
+
+        bool _shardedConnections;
+    };
 }
