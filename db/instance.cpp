@@ -19,7 +19,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -41,6 +40,7 @@
 #include "dur_recover.h"
 #include "ops/update.h"
 #include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 

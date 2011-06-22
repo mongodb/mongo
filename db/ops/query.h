@@ -18,15 +18,15 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../util/message.h"
-#include "dbmessage.h"
-#include "jsobj.h"
-#include "diskloc.h"
-#include "projection.h"
+#include "../../pch.h"
+#include "../../util/message.h"
+#include "../dbmessage.h"
+#include "../jsobj.h"
+#include "../diskloc.h"
+#include "../projection.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
-#include "../client/dbclient.h"
+#include "../../client/dbclient.h"
 
 namespace mongo {
 
@@ -250,4 +250,4 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "clientcursor.h"
+

@@ -26,8 +26,8 @@
 #include "btree.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "json.h"
+#include "clientcursor.h"
 
 /*
  capped collection layout

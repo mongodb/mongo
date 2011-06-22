@@ -29,7 +29,7 @@
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
 
 #include "../client/connpool.h"
 

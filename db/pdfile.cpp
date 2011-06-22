@@ -44,6 +44,7 @@ _ disallow system* manipulations from the database.
 #include "background.h"
 #include "compact.h"
 #include "ops/delete.h"
+#include "instance.h"
 
 namespace mongo {
 

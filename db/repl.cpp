@@ -40,7 +40,7 @@
 #include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
-#include "query.h"
+#include "ops/query.h"
 #include "db.h"
 #include "commands.h"
 #include "security.h"

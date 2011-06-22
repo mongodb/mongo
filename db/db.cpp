@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"

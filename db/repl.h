@@ -30,7 +30,6 @@
 #include "pdfile.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "query.h"
 #include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "oplog.h"

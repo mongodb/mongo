@@ -23,7 +23,7 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "clientcursor.h"
 #include "introspect.h"
 #include <time.h>
 #include "db.h"

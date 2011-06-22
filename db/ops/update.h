@@ -44,6 +44,7 @@ namespace mongo {
     };
 
 
+    class RemoveSaver;
 
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set

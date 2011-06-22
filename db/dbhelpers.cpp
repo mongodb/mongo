@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "query.h"
 #include "json.h"
 #include "queryoptimizer.h"
 #include "btree.h"

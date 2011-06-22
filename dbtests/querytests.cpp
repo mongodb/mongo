@@ -18,7 +18,9 @@
  */
 
 #include "pch.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
+#include "../db/dbhelpers.h"
+#include "../db/clientcursor.h"
 
 #include "../db/instance.h"
 #include "../db/json.h"

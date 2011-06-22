@@ -18,7 +18,7 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "../bson/util/builder.h"

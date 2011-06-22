@@ -20,7 +20,7 @@
 #include "../../client/dbclient.h"
 #include "rs.h"
 #include "../repl.h"
-#include "../query.h"
+#include "../ops/query.h"
 #include "../cloner.h"
 #include "../ops/update.h"
 #include "../ops/delete.h"

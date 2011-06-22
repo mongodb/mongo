@@ -21,7 +21,7 @@
 #include "../db/queryoptimizer.h"
 #include "../db/querypattern.h"
 #include "../db/instance.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
 #include "../db/ops/delete.h"
 #include "dbtests.h"
 

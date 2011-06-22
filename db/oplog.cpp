@@ -28,6 +28,7 @@
 #include "queryoptimizer.h"
 #include "ops/update.h"
 #include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 

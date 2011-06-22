@@ -22,7 +22,7 @@
 #include "../client/dbclient.h"
 #include "../bson/util/builder.h"
 #include "jsobj.h"
-#include "query.h"
+#include "ops/query.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"

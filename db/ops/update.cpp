@@ -17,7 +17,7 @@
  */
 
 #include "pch.h"
-#include "../query.h"
+#include "query.h"
 #include "../pdfile.h"
 #include "../jsobjmanipulator.h"
 #include "../queryoptimizer.h"

@@ -20,7 +20,7 @@
 #include "namespace-inl.h"
 #include "index.h"
 #include "btree.h"
-#include "query.h"
+#include "ops/query.h"
 #include "background.h"
 
 namespace mongo {
