@@ -205,6 +205,7 @@ namespace mongo {
                 b.append("_id", name);
                 bob members;
                 members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::Me().toString() ));
+                result.append("me", HostAndPort::Me().toString());
                 for( unsigned i = 0; i < seeds.size(); i++ )
                     members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
                 b.appendArray("members", members.obj());
