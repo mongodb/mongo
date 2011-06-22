@@ -352,13 +352,13 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(14851, "can't upsert something without shard key",
+                uassert(14854, "can't upsert something without shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
                 BSONObj key = manager->getShardKey().extractKey(query);
                 BSONForEach(e, key) {
-                    uassert(14852, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
+                    uassert(14855, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
                 }
             }
 
@@ -386,7 +386,7 @@ namespace mongo {
                         BSONObjIterator fields(op.embeddedObject());
                         while(fields.more()) {
                             const string field = fields.next().fieldName();
-                            uassert(14846,
+                            uassert(14851,
                                     str::stream() << "Can't modify shard key's value field" << field
                                     << " for collection: " << manager->getns(),
                                     ! manager->getShardKey().partOfShardKey(field));
@@ -394,12 +394,12 @@ namespace mongo {
                     }
                 }
                 else if ( manager->hasShardKey( toupdate ) ) {
-                    uassert( 14847,
+                    uassert( 14856,
                              str::stream() << "cannot modify shard key for collection: " << manager->getns(),
                              manager->getShardKey().compare( query , toupdate ) == 0 );
                 }
                 else {
-                    uasserted(14848,
+                    uasserted(14857,
                               str::stream() << "shard key must be in update object for collection: " << manager->getns() );
                 }
             }
