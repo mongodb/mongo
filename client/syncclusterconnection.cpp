@@ -195,6 +195,16 @@ namespace mongo {
         return DBClientBase::findOne( ns , query , fieldsToReturn , queryOptions );
     }
 
+    bool SyncClusterConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
+        for (vector<DBClientConnection*>::iterator it = _conns.begin(); it < _conns.end(); it++) {
+            massert( 15848, "sync cluster of sync clusters?", (*it)->type() != ConnectionString::SYNC);
+
+            if (!(*it)->auth(dbname, username, password_text, errmsg, digestPassword)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
