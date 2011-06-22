@@ -79,7 +79,7 @@ namespace mongo {
         for ( size_t i=0; i<_conns.size(); i++ ) {
             BSONObj res;
             try {
-                if ( _conns[i]->simpleCommand( "admin" , 0 , "fsync" ) )
+                if ( _conns[i]->simpleCommand( "admin" , &res , "fsync" ) )
                     continue;
             }
             catch ( DBException& e ) {
