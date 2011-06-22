@@ -214,7 +214,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     else {
         for ( var i=0; i<numShards; i++){
-            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname, extraOptions : otherParams.extraOptions} );
+            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname} );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
         }
