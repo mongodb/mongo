@@ -28,7 +28,7 @@
 
 namespace mongo {
 
-    extern bool AuthenticationInfo::_warned;
+    bool AuthenticationInfo::_warned;
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
         if (user == internalSecurity.user) {
