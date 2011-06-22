@@ -297,7 +297,6 @@ var seed = Math.floor( Random.rand() * ( 10 ^ 30) )
 for ( var test = 0; test < numTests; test++ ) {
 	
 	Random.srand( seed + test );
-	
 	var t = db.testAllGeo
 	t.drop()
 	
@@ -305,7 +304,7 @@ for ( var test = 0; test < numTests; test++ ) {
 	var env = randEnvironment()
 	var query = randQuery( env )
 	var data = randDataType()
-	data.numDocs = 5; data.maxLocs = 2; 
+	// data.numDocs = 2; data.maxLocs = 2; 
 	var results = {}
 	var totalPoints = 0
 	print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
@@ -365,20 +364,24 @@ for ( var test = 0; test < numTests; test++ ) {
 	
 	// $center
 	print( "Center query..." )
-	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ] } }, "center.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.center.locsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() } ).count() )
 	if( query.sphereRadius >= 0 ){
 		print( "Center sphere query...")
 		// $centerSphere
 		assert.eq( results.sphere.docsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ] } }, "sphere.docIn" : randYesQuery() } ).count() )
+		assert.eq( results.sphere.locsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : 0.0 } }, "sphere.docIn" : randYesQuery() } ).count() )
 	}
 	
 	// $box
 	print( "Box query..." )
-	assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box } }, "box.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : true } }, "box.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.box.locsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : false } }, "box.docIn" : randYesQuery() } ).count() )
 	
 	// $polygon
 	print( "Polygon query..." )
 	assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.poly.locsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly, $uniqueDocs : 0 } }, "poly.docIn" : randYesQuery() } ).count() )
 					 
 	// $near
 	print( "Near query..." )
@@ -401,7 +404,7 @@ for ( var test = 0; test < numTests; test++ ) {
 			near : query.center, 
 			maxDistance : query.radius , 
 			num : num } ).results
-			
+				
 		assert.eq( Math.min( 200, results.center.locsIn ), output.length )
 	
 		var distance = 0;

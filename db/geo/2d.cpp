@@ -138,7 +138,11 @@ namespace mongo {
             GeoHash b = a;
             b.move(1, 1);
 
-            _error = distance(a, b);
+            // Epsilon is 1/100th of a bucket size
+            // TODO:  Can we actually find error bounds for the sqrt function?
+            double epsilon = 0.001 / _scaling;
+            _error = distance(a, b) + epsilon;
+
             // Error in radians
             _errorSphere = deg2rad( _error );
         }
@@ -368,6 +372,10 @@ namespace mongo {
         }
 
         double sizeEdge( const GeoHash& a ) const {
+
+            if( ! a.constrains() )
+                return _max - _min;
+
             double ax,ay,bx,by;
             GeoHash b = a;
             b.move( 1 , 1 );
@@ -753,13 +761,13 @@ namespace mongo {
         //// Distance not used ////
 
         GeoPoint( const GeoKeyNode& node )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _exactDistance( -1 ), _exactWithin( false ) {
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _exactDistance( -1 ) {
         }
         
         //// Immediate initialization of exact distance ////
 
-        GeoPoint( const GeoKeyNode& node , double exactDistance, bool exactWithin )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _exactDistance( exactDistance ), _exactWithin( exactWithin ) {
+        GeoPoint( const GeoKeyNode& node , double exactDistance )
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _exactDistance( exactDistance ) {
         }
 
         bool operator<( const GeoPoint& other ) const {
@@ -771,7 +779,7 @@ namespace mongo {
         }
 
         string toString() const {
-            return str::stream() << "Point from " << _o.toString() << " dist : " << _exactDistance << " within ? " << _exactWithin;
+            return str::stream() << "Point from " << _o.toString() << " dist : " << _exactDistance ;
         }
 
         BSONObj _key;
@@ -779,8 +787,7 @@ namespace mongo {
         BSONObj _o;
 
         double _exactDistance;
-        bool _exactWithin;
-    };
+    }
 
     // GeoBrowse subclasses this
     class GeoAccumulator {
@@ -823,7 +830,8 @@ namespace mongo {
             // Approximate distance check using key data
             ////
             double keyD = 0;
-            KeyResult keyOk = approxKeyCheck( node, keyD );
+            Point keyP( _g, GeoHash( node.key._firstElement(), _g->_bits ) );
+            KeyResult keyOk = approxKeyCheck( keyP, keyD );
             if ( keyOk == BAD ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << keyD );
                 return;
@@ -868,8 +876,9 @@ namespace mongo {
             ////
             // Exact check with particular data fields
             ////
-            addSpecific( node , keyOk == BORDER, keyD, newDoc );
-            _found++;
+            // Can add multiple points
+            _found += addSpecific( node , keyP, keyOk == BORDER, keyD, newDoc );
+
         }
 
         virtual void getPointsFor( const GeoKeyNode& node, vector< BSONObj >& locsForNode, bool allPoints = false ){
@@ -895,9 +904,11 @@ namespace mongo {
 
         }
 
-        virtual void addSpecific( const GeoKeyNode& node , bool inBounds, double d, bool newDoc ) = 0;
-        virtual KeyResult approxKeyCheck( const GeoKeyNode& node , double& keyD ) = 0;
-        virtual bool exactDocCheck( const Point& p, double& d ) = 0;
+        virtual int addSpecific( const GeoKeyNode& node, const Point& p , bool inBounds, double d, bool newDoc ) = 0;
+        virtual KeyResult approxKeyCheck( const Point& p , double& keyD ) = 0;
+        virtual bool exactDocCheck( const Point& p , double& d ) = 0;
+        virtual bool expensiveExactCheck(){ return false; }
+
 
         long long found() const {
             return _found;
@@ -1342,7 +1353,7 @@ namespace mongo {
                         // be entirely done.  Max recurse depth is < 8 * 16.
 
                         // If we're maxed out on points, return
-                        if( _foundInExp >= maxFound ) {
+                        if( _foundInExp >= maxFound || _found >= maxAdded ) {
                             // Make sure we'll come back to add more points
                             assert( _state == DOING_EXPAND );
                             return;
@@ -1371,29 +1382,51 @@ namespace mongo {
         // The amount the current box overlaps our search area
         virtual double intersectsBox( Box& cur ) = 0;
 
-        virtual void addSpecific( const GeoKeyNode& node , bool onBounds , double keyD , bool newDoc ) {
+        virtual int addSpecific( const GeoKeyNode& node , const Point& keyP , bool onBounds , double keyD , bool newDoc ) {
 
-            if( _uniqueDocs && ! newDoc ){
+            int found = 0;
+
+            // We need to handle every possible point in this method, even those not in the key value, to
+            // avoid us tracking which hashes we've already seen.
+            if( ! newDoc ){
                 // log() << "Already handled doc!" << endl;
-                return;
+                return 0;
             }
 
             if( _uniqueDocs && ! onBounds ) {
                 // log() << "Added ind to " << _type << endl;
                 _stack.push_front( GeoPoint( node ) );
+                found++;
             }
             else {
                 // We now handle every possible point in the document, even those not in the key value,
                 // since we're iterating through them anyway - prevents us from having to save the hashes
                 // we've seen per-doc
+
+                // If we're filtering by hash, get the original
+                bool expensiveExact = expensiveExactCheck();
+
                 vector< BSONObj > locs;
                 getPointsFor( node, locs, true );
                 for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ){
-                    double d;
-                    // log() << "On bounds? " << onBounds << " exact " << exactDocCheck( Point( *i ), d ) << " point " << Point( *i ) << endl;
-                    if( ! onBounds || exactDocCheck( Point( *i ), d ) ){
+
+                    double d = -1;
+                    Point p( *i );
+
+                    // We can avoid exact document checks by redoing approx checks,
+                    // if the exact checks are more expensive.
+                    bool needExact = true;
+                    if( expensiveExact ){
+                        assert( false );
+                        KeyResult result = approxKeyCheck( p, d );
+                        if( result == BAD ) continue;
+                        else if( result == GOOD ) needExact = false;
+                    }
+
+                    if( ! needExact || exactDocCheck( p, d ) ){
                         // log() << "Added mult to " << _type << endl;
                         _stack.push_front( GeoPoint( node ) );
+                        found++;
                         // If returning unique, just exit after first point is added
                         if( _uniqueDocs ) break;
                     }
@@ -1405,6 +1438,7 @@ namespace mongo {
                 _stack.pop_front();
             }
 
+            return found;
         }
 
         virtual long long nscanned() {
@@ -1453,47 +1487,33 @@ namespace mongo {
             : GeoBrowse( g, "search", filter, uniqueDocs, needDistance ), _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
         {}
 
-        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
+        virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
 
             // Always check approximate distance, since it lets us avoid doing
             // checks of the rest of the object if it succeeds
-            // TODO:  Refactor so that we can check exact distance and within if we are going to
-            // anyway.
-            d = approxDistance( node );
-            assert( d >= 0 );
 
-            // Out of the error range, see how close we are to the furthest points
-            bool good = d <= _maxDistance + 2 * _distError /* In error range */
-                        && ( _points.size() < _max /* need more points */
-                          || d <= farthest() + 2 * _distError /* could be closer than previous points */ );
-
-            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
-                      << "\t" << GeoHash( node.key._firstElement() ) << "\t" << d
-                      << " ok: " << good << " farthest: " << farthest() );
-
-            return good ? GOOD : BAD;
-        }
-
-        double approxDistance( const GeoKeyNode& node ) {
-            return approxDistance( GeoHash( node._key.firstElement() ) );
-        }
-
-        double approxDistance( const GeoHash& h ) {
-
-            double approxDistance = -1;
-            Point p( _g, h );
             switch (_type) {
             case GEO_PLAIN:
-                approxDistance = _near.distance( p );
+                d = _near.distance( p );
                 break;
             case GEO_SPHERE:
                 checkEarthBounds( p );
-                approxDistance = spheredist_deg( _near, p );
+                d = spheredist_deg( _near, p );
                 break;
             default: assert( false );
             }
+            assert( d >= 0 );
 
-            return approxDistance;
+            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
+                      << "\t" << p.toString() << "\t" << d
+                      << " farthest: " << farthest() );
+
+            // If we need more points
+            double borderDist = ( _points.size() < _max ? _maxDistance : farthest() );
+
+            if( d >= borderDist - 2 * _distError && d <= borderDist + 2 * _distError ) return BORDER;
+            else return d <= borderDist - 2 * _distError ? GOOD : BAD;
+
         }
 
         double exactDistances( const GeoKeyNode& node ) {
@@ -1539,10 +1559,10 @@ namespace mongo {
                 assert( exactDistance >= 0 );
                 if( !exactWithin ) continue;
 
-                GEODEBUG( "Inserting exact point: " << GeoPoint( node , exactDistance, exactWithin ).toString() );
+                GEODEBUG( "Inserting exact point: " << GeoPoint( node , exactDistance ).toString() );
 
                 // Add a point for this location
-                _points.insert( GeoPoint( node , exactDistance, exactWithin ) );
+                _points.insert( GeoPoint( node , exactDistance ) );
 
                 if( exactDistance > maxDistance ) maxDistance = exactDistance;
             }
@@ -1564,9 +1584,11 @@ namespace mongo {
             return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
         }
 
-        virtual void addSpecific( const GeoKeyNode& node, bool onBounds, double keyD, bool newDoc ) {
+        virtual int addSpecific( const GeoKeyNode& node, const Point& keyP, bool onBounds, double keyD, bool newDoc ) {
 
             GEODEBUG( "\t\t" << GeoHash( node.key._firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << keyD );
+
+            int prevSize = _points.size();
 
             double maxDistance = exactDistances( node );
             if( maxDistance >= 0 ){
@@ -1580,6 +1602,9 @@ namespace mongo {
                _farthest = boost::next( _points.end(), -1 )->_exactDistance;
 
             }
+
+            assert( _points.size() - prevSize >= 0 );
+            return _points.size() - prevSize;
         }
 
         unsigned _max;
@@ -1596,7 +1621,7 @@ namespace mongo {
 
     class GeoSearch : public GeoHopper {
     public:
-        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool uniqueDocs = false, bool needDistance = true )
+        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool uniqueDocs = false, bool needDistance = false )
            : GeoHopper( g , numWanted , startPt , filter , maxDistance, type, uniqueDocs, needDistance ),
              _start( g->hash( startPt._x, startPt._y ) ),
               _numWanted( numWanted ),
@@ -1635,7 +1660,7 @@ namespace mongo {
 
 #ifdef GEODEBUGGING
 
-           log() << "start near search for points near " << _near << " (max dist " << _maxDistance << ")" << endl;
+           log() << "start near search for " << _numWanted << " points near " << _near << " (max dist " << _maxDistance << ")" << endl;
 
 #endif
 
@@ -1870,19 +1895,16 @@ namespace mongo {
             return cur.intersects( _bBox );
         }
 
-        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
-
-            GeoHash h( node._key.firstElement(), _g->_bits );
+        virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
 
             // Inexact hash distance checks.
             double error = 0;
             switch (_type) {
             case GEO_PLAIN:
-                d = _g->distance( _start , h );
+                d = _startPt.distance( p );
                 error = _g->_error;
                 break;
             case GEO_SPHERE: {
-                Point p( _g, h );
                 checkEarthBounds( p );
                 d = spheredist_deg( _startPt, p );
                 error = _g->_errorSphere;
@@ -1986,13 +2008,9 @@ namespace mongo {
             return cur.intersects( _want );
         }
 
-        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
-
-            GeoHash h( node._key.firstElement() );
-            Point approxPt( _g, h );
-
-            if( _want.onBoundary( approxPt, _fudge ) ) return BORDER;
-            else return _want.inside( approxPt, _fudge ) ? GOOD : BAD;
+        virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
+            if( _want.onBoundary( p, _fudge ) ) return BORDER;
+            else return _want.inside( p, _fudge ) ? GOOD : BAD;
 
         }
 
@@ -2047,10 +2065,7 @@ namespace mongo {
             return cur.intersects( _bounds );
         }
 
-        virtual KeyResult approxKeyCheck( const GeoKeyNode& node, double& d ) {
-
-            GeoHash h( node._key.firstElement(), _g->_bits );
-            Point p( _g, h );
+        virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
 
             int in = _poly.contains( p, _g->_error );
 
@@ -2127,7 +2142,11 @@ namespace mongo {
                         if ( e.isNumber() )
                             maxDistance = e.numberDouble();
                     }
-                    shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
+
+                    bool uniqueDocs = false;
+                    if( ! n["$uniqueDocs"].eoo() ) uniqueDocs = n["$uniqueDocs"].trueValue();
+
+                    shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type, uniqueDocs ) );
                     s->exec();
                     shared_ptr<Cursor> c;
                     c.reset( new GeoSearchCursor( s ) );
@@ -2143,7 +2162,7 @@ namespace mongo {
                     string type = e.fieldName();
 
                     bool uniqueDocs = true;
-                    if( ! context["$uniqueDocs"].eoo() ) uniqueDocs = context["$unique"].trueValue();
+                    if( ! context["$uniqueDocs"].eoo() ) uniqueDocs = context["$uniqueDocs"].trueValue();
 
                     if ( startsWith(type,  "$center") ) {
                         uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
