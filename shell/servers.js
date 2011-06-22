@@ -203,22 +203,22 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         
         this._configServers = []
         for ( var i=0; i<3; i++ ){
-            var conn = startMongodTest( 30000 + i , testName + "-config" + i );
+            var conn = startMongodTest( 30000 + i , testName + "-config" + i, false, otherParams.extraOptions );
             this._alldbpaths.push( testName + "-config" + i )
             this._configServers.push( conn );
         }
-        
+
         this._configDB = localhost + ":30000," + localhost + ":30001," + localhost + ":30002";
         this._configConnection = new Mongo( this._configDB );
         this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
     }
     else {
         for ( var i=0; i<numShards; i++){
-            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname} );
+            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname, extraOptions : otherParams.extraOptions} );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
         }
-        
+
         if ( otherParams.sync ){
             this._configDB = localhost+":30000,"+localhost+":30001,"+localhost+":30002";
             this._configConnection = new Mongo( this._configDB );
@@ -235,11 +235,16 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     for ( var i=0; i<(numMongos||1); i++ ){
         var myPort =  startMongosPort - i;
         print("config: "+this._configDB);
-        var conn = startMongos( { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB }  );
+        var opts = { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB };
+        for (var j in otherParams.extraOptions) {
+            opts[j] = otherParams.extraOptions[j];
+        }
+        var conn = startMongos( opts );
         conn.name = localhost + ":" + myPort;
         this._mongos.push( conn );
-        if ( i == 0 )
+        if ( i == 0 ) {
             this.s = conn;
+        }
         this["s" + i] = conn
     }
 
