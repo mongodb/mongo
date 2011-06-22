@@ -59,6 +59,7 @@ namespace mongo {
         int slavedelay;
 
         set<string> discoveredSeeds;
+        BSONObj reconfig;
 
         ReplSettings()
             : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay(), discoveredSeeds() {

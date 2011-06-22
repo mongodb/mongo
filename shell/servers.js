@@ -726,14 +726,7 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
     
     this.s.adminCommand( { shardcollection : c , key : key } );
     this.s.adminCommand( { split : c , middle : split } );
-    
-    var result = null
-    for( var i = 0; i < 5; i++ ){
-        result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
-        if( result.ok ) break;
-        sleep( 5 * 1000 );
-    }
-    assert( result.ok )
+    this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
     
 };
 
