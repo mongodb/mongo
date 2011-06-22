@@ -22,7 +22,7 @@ var wait = function(f) {
 }
 
 var reconnect = function(a) {
-  wait(function() { 
+  wait(function() {
       try {
         a.getDB("foo").bar.stats();
         return true;
@@ -59,7 +59,7 @@ while (count < 10 && result.ok != 1) {
   count++;
   sleep(2000);
   result = admin.runCommand({replSetInitiate : config});
-}   
+}
 
 assert(result.ok, tojson(result));
 assert.soon(function() { result = false;
@@ -110,11 +110,11 @@ while (status.members[1].state != 2 && count < 200) {
     printjson(status);
   }
   assert(!status.members[1].errmsg || !status.members[1].errmsg.match("^initial sync cloning db"));
-  
+
   sleep(1000);
 
   // disconnection could happen here
-  try {  
+  try {
     status = admin.runCommand({replSetGetStatus : 1});
   }
   catch (e) {
@@ -124,3 +124,36 @@ while (status.members[1].state != 2 && count < 200) {
 }
 
 assert.eq(status.members[1].state, 2);
+
+print("restart member with a different port and make it a new set");
+try {
+  p.getDB("admin").runCommand({shutdown:1});
+}
+catch(e) {
+  print("good, shutting down: " +e);
+}
+sleep(10000);
+
+pargs = new MongodRunner( ports[ 2 ], basePath + "-p", false, false,
+                          ["--replSet", basename, "--oplogSize", 2],
+                          {no_bind : true} );
+p = pargs.start(true);
+
+printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
+
+p.getDB("admin").runCommand({replSetReconfig : {
+      _id : basename,
+      members : [{_id:0, host : hostname+":"+ports[2]}]
+        }, force : true});
+
+print("start waiting for primary...");
+assert.soon(function() {
+    try {
+      return p.getDB("admin").runCommand({isMaster : 1}).ismaster;
+    }
+    catch(e) {
+      print(e);
+    }
+    return false;
+  }, "waiting for master", 60000);
+
