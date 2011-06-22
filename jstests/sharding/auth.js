@@ -125,3 +125,4 @@ assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
 assert.eq(s.getDB("test").foo.count(), 100001);
 
+s.stop();
