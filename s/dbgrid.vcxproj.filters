@@ -317,9 +317,6 @@
     <ClCompile Include="client.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\security_key.cpp">
-      <Filter>Shared Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\dbcommands_generic.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
@@ -334,6 +331,12 @@
     </ClCompile>
     <ClCompile Include="..\db\common.cpp">
       <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\security_common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="security.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

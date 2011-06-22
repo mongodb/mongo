@@ -68,36 +68,18 @@ namespace mongo {
         out() << endl;
     }
 
-    class ShardingConnectionHook : public DBConnectionHook {
-    public:
-
-        ShardingConnectionHook( bool shardedConnections )
-            : _shardedConnections( shardedConnections ) {
-        }
-
-        virtual void onCreate( DBClientBase * conn ) {
-            if ( _shardedConnections ) {
-                conn->simpleCommand( "admin" , 0 , "setShardVersion" );
-            }
-        }
-
-        virtual void onHandedOut( DBClientBase * conn ) {
-            ClientInfo::get()->addShard( conn->getServerAddress() );
-        }
-
-        virtual void onDestory( DBClientBase * conn ) {
-            resetShardVersionCB( conn );
-        }
-
-        bool _shardedConnections;
-    };
+    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
+        ClientInfo::get()->addShard( conn->getServerAddress() );
+    }
 
     class ShardedMessageHandler : public MessageHandler {
     public:
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            assert( ClientInfo::get() );
+            ClientInfo *c = ClientInfo::get();
+            massert(15849, "client info not defined", c);
+            c->getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {

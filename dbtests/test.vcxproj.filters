@@ -809,9 +809,6 @@
     <ClCompile Include="directclienttests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\security_key.cpp">
-      <Filter>db\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\file_allocator.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
@@ -840,6 +837,9 @@
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\ops\update.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\security_common.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

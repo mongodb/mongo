@@ -21,7 +21,7 @@
 #include "commands.h"
 #include "../util/processinfo.h"
 #include "../util/message.h"
-#include "security_key.h"
+#include "security_common.h"
 
 #ifdef _WIN32
 #include <direct.h>

@@ -313,6 +313,15 @@ namespace mongo {
         _versions[ns] = version;
     }
 
+    void ShardedConnectionInfo::addHook() {
+        static bool done = false;
+        if (!done) {
+            log(1) << "adding sharding hook" << endl;
+            pool.addHook(new ShardingConnectionHook(false));
+            done = true;
+        }
+    }
+
     void ShardedConnectionInfo::setID( const OID& id ) {
         _id = id;
     }
@@ -411,6 +420,7 @@ namespace mongo {
             }
             
             if ( locked ) {
+                ShardedConnectionInfo::addHook();
                 shardingState.enable( configdb );
                 configServer.init( configdb );
                 return true;
@@ -702,4 +712,7 @@ namespace mongo {
         return false;
     }
 
+    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
+        // no-op for mongod
+    }
 }

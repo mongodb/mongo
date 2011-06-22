@@ -152,7 +152,6 @@
     <ClCompile Include="repl\rs.cpp" />
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
-    <ClCompile Include="security_key.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="querypattern.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
@@ -162,6 +161,7 @@
     <ClCompile Include="record.cpp" />
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\update.cpp" />
+    <ClCompile Include="security_common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

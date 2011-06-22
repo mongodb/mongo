@@ -559,7 +559,7 @@
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />
-    <ClCompile Include="security_key.cpp" />
+    <ClCompile Include="security_common.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="cmdline.cpp" />
     <ClCompile Include="queryutil.cpp" />

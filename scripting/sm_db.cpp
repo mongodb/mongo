@@ -757,10 +757,12 @@ zzz
         assert( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
-        ss << hex;
+        ss.setf (ios_base::hex , ios_base::basefield);
+        ss.fill ('0');
+        ss.setf (ios_base::right , ios_base::adjustfield);
         for( int i = 0; i < len; i++ ) {
             unsigned v = (unsigned char) data[i];
-            ss << v;
+            ss << setw(2) << v;
         }
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );

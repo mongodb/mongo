@@ -20,8 +20,10 @@
 
 #include "nonce.h"
 #include "concurrency.h"
-#include "security_key.h"
+#include "security_common.h"
 #include "../util/concurrency/spin_lock.h"
+
+// this is used by both mongos and mongod
 
 namespace mongo {
 

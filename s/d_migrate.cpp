@@ -169,6 +169,9 @@ namespace mongo {
 
     void _cleanupOldData( OldDataCleanup cleanup ) {
         Client::initThread( cleanUpThreadName );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
 
         int loops = 0;
@@ -1525,6 +1528,9 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         migrateStatus.go();
         cc().shutdown();
     }
