@@ -17,7 +17,6 @@
 #include "pch.h"
 #include "../cmdline.h"
 #include "../commands.h"
-#include "../repl.h"
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"
@@ -139,22 +138,10 @@ namespace mongo {
         }
     private:
         bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( cmdObj["replSetReconfig"].type() != Object ) {
-                errmsg = "no configuration specified";
+            if( !check(errmsg, result) )
                 return false;
-            }
 
             bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            if( force && !theReplSet ) {
-                replSettings.reconfig = cmdObj["replSetReconfig"].Obj().getOwned();
-                result.append("msg", "will try this config momentarily, try running rs.conf() again in a few seconds");
-                return true;
-            }
-
-            if ( !check(errmsg, result) ) {
-                return false;
-            }
-
             if( !force && !theReplSet->box.getState().primary() ) {
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
@@ -170,6 +157,11 @@ namespace mongo {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;
                 }
+            }
+
+            if( cmdObj["replSetReconfig"].type() != Object ) {
+                errmsg = "no configuration specified";
+                return false;
             }
 
             try {
