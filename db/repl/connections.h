@@ -20,7 +20,7 @@
 
 #include <map>
 #include "../../client/dbclient.h"
-#include "../security_key.h"
+#include "../security_common.h"
 
 namespace mongo {
 

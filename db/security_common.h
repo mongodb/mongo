@@ -1,4 +1,4 @@
-// security_key.h
+// security_common.h
 
 /**
 *    Copyright (C) 2009 10gen Inc.
@@ -17,6 +17,10 @@
 */
 
 #pragma once
+
+#include "commands.h"
+#include "concurrency.h"
+#include "../util/concurrency/spin_lock.h"
 
 namespace mongo {
 
@@ -43,5 +47,37 @@ namespace mongo {
      * @return if the key was successfully stored
      */
     bool setUpSecurityKey(const string& filename);
+
+    class CmdAuthenticate : public Command {
+    public:
+        virtual bool requiresAuth() { return false; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual LockType locktype() const { return WRITE; }
+        virtual void help(stringstream& ss) const { ss << "internal"; }
+        CmdAuthenticate() : Command("authenticate") {}
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+    private:
+        bool getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd);
+        void authenticate(const string& dbname, const string& user, const bool readOnly);
+    };
+
+    class CmdLogout : public Command {
+    public:
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        void help(stringstream& h) const { h << "de-authenticate"; }
+        virtual LockType locktype() const { return NONE; }
+        CmdLogout() : Command("logout") {}
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+    };
 
 } // namespace mongo

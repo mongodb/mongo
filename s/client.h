@@ -18,6 +18,7 @@
 
 #include "../pch.h"
 #include "writeback_listener.h"
+#include "../db/security.h"
 
 namespace mongo {
 
@@ -82,9 +83,10 @@ namespace mongo {
         void noAutoSplit() { _autoSplitOk = false; }
 
         static ClientInfo * get();
-
+        AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
+        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
     private:
-
+        AuthenticationInfo _ai;
         struct WBInfo {
             WBInfo( const WriteBackListener::ConnectionIdent& c , OID o ) : ident( c ) , id( o ) {}
             WriteBackListener::ConnectionIdent ident;
