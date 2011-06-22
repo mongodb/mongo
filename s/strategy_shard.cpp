@@ -352,13 +352,13 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(14844, "can't upsert something without shard key",
+                uassert(14851, "can't upsert something without shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
                 BSONObj key = manager->getShardKey().extractKey(query);
                 BSONForEach(e, key) {
-                    uassert(14845, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
+                    uassert(14852, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
                 }
             }
 

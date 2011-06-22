@@ -1208,7 +1208,7 @@ namespace mongo {
             appendMinForType( fieldName , MaxKey ); return;
         }
         log() << "type not supported for appendMaxElementForType: " << t << endl;
-        uassert( 14846 ,  "type not supported for appendMaxElementForType" , false );
+        uassert( 14853 ,  "type not supported for appendMaxElementForType" , false );
     }
 
     const string BSONObjBuilder::numStrs[] = {
