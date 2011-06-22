@@ -566,6 +566,16 @@ namespace mongo {
                     }
                 }
 
+                if (!replSettings.reconfig.isEmpty()) {
+                    try {
+                        configs.push_back(ReplSetConfig(replSettings.reconfig, true));
+                    }
+                    catch( DBException& re) {
+                        log() << "couldn't load reconfig: " << re.what() << endl;
+                        replSettings.reconfig = BSONObj();
+                    }
+                }
+
                 int nok = 0;
                 int nempty = 0;
                 for( vector<ReplSetConfig>::iterator i = configs.begin(); i != configs.end(); i++ ) {
