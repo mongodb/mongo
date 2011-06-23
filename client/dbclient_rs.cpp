@@ -680,7 +680,7 @@ namespace mongo {
 
         *retry = false;
         if( targetHost && _lazyState._lastClient ) *targetHost = _lazyState._lastClient->getServerAddress();
-        else *targetHost = "";
+        else if (targetHost) *targetHost = "";
 
         if( ! _lazyState._lastClient ) return;
         if( nReturned != 1 && nReturned != -1 ) return;
