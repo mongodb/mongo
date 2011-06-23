@@ -29,10 +29,6 @@ using namespace boost;
 #include <map>
 #include <sstream>
 #include <vector>
-#if !defined(_WIN32)
-#include <sys/socket.h>
-#include <netinet/in.h>
-#endif
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
