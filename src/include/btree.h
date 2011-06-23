@@ -150,12 +150,8 @@ struct __wt_page_disk {
 	((uint32_t)(((lsn) & 0xffffffff00000000ULL) >> 32))
 #define	WT_LSN_OFFSET(lsn)						\
 	((uint32_t)((lsn) & 0xffffffff))
-#define	WT_LSN_INCR(lsn) do {						\
-	if (WT_LSN_OFFSET(lsn) == UINT32_MAX)				\
-		((lsn) = WT_LSN_FILE(lsn) + 0x100000000ULL);		\
-	else								\
-		++(lsn);						\
-} while (0)
+#define	WT_LSN_INCR(lsn)						\
+	(++(lsn))
 	uint64_t lsn;			/* 08-15: LSN file/offset pair */
 
 	uint32_t checksum;		/* 16-19: checksum */
