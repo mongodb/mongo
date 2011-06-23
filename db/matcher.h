@@ -242,6 +242,9 @@ namespace mongo {
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
             return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
         }
+
+        string toString() const;
+
     private:
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
         CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
@@ -250,7 +253,6 @@ namespace mongo {
         Matcher _keyMatcher;
 
         bool _needRecord; // if the key itself isn't good enough to determine a positive match
-        bool _useRecordOnly;
     };
 
 } // namespace mongo

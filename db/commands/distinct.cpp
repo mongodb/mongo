@@ -126,7 +126,7 @@ namespace mongo {
 
                 cursor->advance();
 
-                if (!cc->yieldSometimes()) {
+                if (!cc->yieldSometimes( ClientCursor::MaybeCovered )) {
                     cc.release();
                     break;
                 }

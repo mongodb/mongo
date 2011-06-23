@@ -259,6 +259,16 @@ namespace mongo {
         cc->setDoingDeletes( true );
 
         while ( c->ok() ) {
+
+            if ( yield && ! cc->yieldSometimes( ClientCursor::WillNeed) ) {
+                // cursor got finished by someone else, so we're done
+                cc.release(); // if the collection/db is dropped, cc may be deleted
+                break;
+            }
+
+            if ( ! c->ok() )
+                break;
+
             DiskLoc rloc = c->currLoc();
 
             if ( callback )
@@ -275,11 +285,7 @@ namespace mongo {
 
             getDur().commitIfNeeded();
 
-            if ( yield && ! cc->yieldSometimes() ) {
-                // cursor got finished by someone else, so we're done
-                cc.release(); // if the collection/db is dropped, cc may be deleted
-                break;
-            }
+
         }
 
         return num;

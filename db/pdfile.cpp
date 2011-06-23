@@ -1335,7 +1335,7 @@ namespace mongo {
 
                 getDur().commitIfNeeded();
 
-                if ( cc->yieldSometimes() ) {
+                if ( cc->yieldSometimes( ClientCursor::WillNeed ) ) {
                     progress.setTotalWhileRunning( d->stats.nrecords );
                 }
                 else {

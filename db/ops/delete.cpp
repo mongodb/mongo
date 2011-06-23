@@ -136,7 +136,21 @@ namespace mongo {
         bool canYield = !god && !creal->matcher()->docMatcher().atomic();
 
         do {
-            if ( canYield && ! cc->yieldSometimes() ) {
+            // TODO: we can generalize this I believe
+            //       
+            bool willNeedRecord = creal->matcher()->needRecord() || pattern.isEmpty() || isSimpleIdQuery( pattern );
+            if ( ! willNeedRecord ) {
+                // TODO: this is a total hack right now
+                // check if the index full encompasses query
+                
+                if ( pattern.nFields() == 1 && 
+                     str::equals( pattern.firstElement().fieldName() , creal->indexKeyPattern().firstElement().fieldName() ) )
+                    willNeedRecord = true;
+            }
+            
+            log() << ns << "\t" << pattern << "\t" << willNeedRecord << endl;
+
+            if ( canYield && ! cc->yieldSometimes( willNeedRecord ? ClientCursor::WillNeed : ClientCursor::MaybeCovered ) ) {
                 cc.release(); // has already been deleted elsewhere
                 // TODO should we assert or something?
                 break;
@@ -203,6 +217,10 @@ namespace mongo {
         while ( cc->ok() );
 
         if ( cc.get() && ClientCursor::find( id , false ) == 0 ) {
+            // TODO: remove this and the id declaration above if this doesn't trigger
+            //       if it does, then i'm very confused (ERH 06/2011)
+            error() << "this should be impossible" << endl;
+            printStackTrace();
             cc.release();
         }
 

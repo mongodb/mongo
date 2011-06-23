@@ -79,4 +79,19 @@ namespace mongo {
         return _docMatcher->matches(recLoc.obj() , details );
     }
 
+    string CoveredIndexMatcher::toString() const {
+        StringBuilder buf;
+        buf << "(CoveredIndexMatcher ";
+        
+        if ( _needRecord )
+            buf << "needRecord ";
+        
+        buf << "keyMatcher: " << _keyMatcher.toString() << " ";
+        
+        if ( _docMatcher )
+            buf << "docMatcher: " << _docMatcher->toString() << " ";
+        
+        buf << ")";
+        return buf.str();
+    }
 }

@@ -469,7 +469,7 @@ namespace mongo {
 
                 // we can afford to yield here because any change to the base data that we might miss is already being
                 // queued and will be migrated in the 'transferMods' stage
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                     cc.release();
                     break;
                 }

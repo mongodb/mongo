@@ -82,7 +82,7 @@ namespace mongo {
                 while ( c->ok() ) {
                     num++;
                     c->advance();
-                    if ( ! cc->yieldSometimes() ) {
+                    if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                         cc.release();
                         break;
                     }
@@ -220,7 +220,7 @@ namespace mongo {
                 }
                 cc->advance();
 
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                     cc.release();
                     break;
                 }
@@ -419,7 +419,7 @@ namespace mongo {
                             break;
                         }
                         
-                        if ( ! cc->yieldSometimes() ) {
+                        if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                             // we were near and and got pushed to the end
                             // i think returning the splits we've already found is fine
                             

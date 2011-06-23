@@ -190,7 +190,7 @@ namespace mongo {
                 }
                 c->advance();
 
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::MaybeCovered ) ) {
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;

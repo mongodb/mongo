@@ -390,13 +390,44 @@ namespace mongo {
 
         return micros;
     }
+    
+    Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        if ( need == DontNeed ) {
+            return 0;
+        }
+        else if ( need == MaybeCovered ) {
+            // TODO
+            return 0;
+        }
+        else if ( need == WillNeed ) {
+            // no-op
+        }
+        else {
+            warning() << "don't understand RecordNeeds: " << (int)need << endl;
+            return 0;
+        }
 
-    bool ClientCursor::yieldSometimes() {
-        if ( ! _yieldSometimesTracker.ping() )
+        DiskLoc l = currLoc();
+        if ( l.isNull() )
+            return 0;
+        
+        Record * rec = l.rec();
+        if ( rec->likelyInPhysicalMemory() ) 
+            return 0;
+        
+        return rec;
+    }
+
+    bool ClientCursor::yieldSometimes( RecordNeeds need ) {
+        if ( ! _yieldSometimesTracker.ping() ) {
+            Record* rec = _recordForYield( need );
+            if ( rec ) 
+                return yield( yieldSuggest() , rec );
             return true;
+        }
 
         int micros = yieldSuggest();
-        return ( micros > 0 ) ? yield( micros ) : true;
+        return ( micros > 0 ) ? yield( micros , _recordForYield( need ) ) : true;
     }
 
     void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {

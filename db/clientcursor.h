@@ -178,10 +178,16 @@ namespace mongo {
          */
         bool yield( int microsToSleep = -1 , Record * recordToLoad = 0 );
 
+        enum RecordNeeds {
+            DontNeed = -1 , MaybeCovered = 0 , WillNeed = 100
+        };
+            
         /**
+         * @param needRecord whether or not the next record has to be read from disk for sure
+         *                   if this is true, will yield of next record isn't in memory
          * @return same as yield()
          */
-        bool yieldSometimes();
+        bool yieldSometimes( RecordNeeds need );
 
         static int yieldSuggest();
         static void staticYield( int micros , const StringData& ns , Record * rec );
@@ -347,6 +353,8 @@ namespace mongo {
         void noTimeout() { _pinValue++; }
 
         CCByLoc& byLoc() { return _db->ccByLoc; }
+        
+        Record* _recordForYield( RecordNeeds need );
 
     private:
 
