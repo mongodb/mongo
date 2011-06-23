@@ -13,10 +13,16 @@
 # things from mongod.conf get there by mongod reading it
 
 
-
-OPTIONS=" -f /etc/mongod.conf"
+# NOTE: if you change any OPTIONS here, you get what you pay for:
+# this script assumes all options are in the config file.
+CONFIGFILE="/etc/mongod.conf"
+OPTIONS=" -f $CONFIGFILE"
 SYSCONFIG="/etc/sysconfig/mongod"
 
+# FIXME: 1.9.x has a --shutdown flag that parses the config file and
+# shuts down the correct running pid, but that's unavailable in 1.8
+# for now.  This can go away when this script stops supporting 1.8.
+DBPATH=`awk -F= '/^dbpath=/{print $2}' "$CONFIGFILE"`
 mongod=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
@@ -36,7 +42,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
+  killproc -p "$DBPATH"/mongod.lock -t30 -TERM /usr/bin/mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
