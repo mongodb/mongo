@@ -138,6 +138,9 @@ namespace mongo {
                 if ( op == "findOne" ) {
                     conn->findOne( ns , fixQuery( e["query"].Obj() ) );
                 }
+                else if ( op == "remove" ) {
+                    conn->remove( ns , fixQuery( e["query"].Obj() ) );
+                }
                 else if ( op == "update" ) {
                     conn->update( ns , fixQuery( e["query"].Obj() ) , e["update"].Obj() );
                 }
