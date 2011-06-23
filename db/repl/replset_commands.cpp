@@ -29,7 +29,7 @@ using namespace bson;
 
 namespace mongo {
 
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial);
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial);
 
     /* commands in other files:
          replSetHeartbeat - health.cpp
@@ -181,7 +181,7 @@ namespace mongo {
                     return false;
                 }
 
-                checkMembersUpForConfigChange(newConfig,false);
+                checkMembersUpForConfigChange(newConfig, result, false);
 
                 log() << "replSet replSetReconfig [2]" << rsLog;
 

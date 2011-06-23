@@ -37,7 +37,7 @@ namespace mongo {
        throws
        @param initial true when initiating
     */
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial) {
         int failures = 0, allVotes = 0, allowableFailures = 0;
         int me = 0;
         stringstream selfs;
@@ -64,6 +64,7 @@ namespace mongo {
             uasserted(13279, ss.str());
         }
 
+        vector<string> down;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             // we know we're up
             if (i->h.isSelf()) {
@@ -103,6 +104,8 @@ namespace mongo {
                     }
                 }
                 if( !ok && !res["rs"].trueValue() ) {
+                    down.push_back(i->h.toString());
+
                     if( !res.isEmpty() ) {
                         /* strange.  got a response, but not "ok". log it. */
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
@@ -133,6 +136,9 @@ namespace mongo {
                 uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.",
                         !hasData || i->h.isSelf());
             }
+        }
+        if (down.size() > 0) {
+            result.append("down", down);
         }
     }
 
@@ -228,7 +234,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkMembersUpForConfigChange(newConfig, true);
+                checkMembersUpForConfigChange(newConfig, result, true);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
