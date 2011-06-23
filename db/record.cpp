@@ -54,8 +54,10 @@ namespace mongo {
                 memset( _data , 0 , SliceSize * sizeof(Entry) );
             }
 
-            State get( size_t region  , short offset ) {
-                Entry * e = _get( region , false );
+            State get( int regionHash , size_t region  , short offset ) {
+                DEV assert( hash( region ) == regionHash );
+                
+                Entry * e = _get( regionHash , region , false );
                 if ( ! e )
                     return Unk;
                 
@@ -65,8 +67,10 @@ namespace mongo {
             /**
              * @return true if added, false if full
              */
-            bool in( size_t region , short offset ) {
-                Entry * e = _get( region , true );
+            bool in( int regionHash , size_t region , short offset ) {
+                DEV assert( hash( region ) == regionHash );
+                
+                Entry * e = _get( regionHash , region , true );
                 if ( ! e )
                     return false;
                 
@@ -76,8 +80,7 @@ namespace mongo {
 
         private:
 
-            Entry* _get( size_t region , bool add ) {
-                int start = hash( region );
+            Entry* _get( int start , size_t region , bool add ) {
                 for ( int i=0; i<MaxChain; i++ ) {
 
                     int bucket = ( start + i ) % SliceSize;
@@ -120,6 +123,8 @@ namespace mongo {
              * @return whether we know the page is in ram
              */
             bool access( size_t region , short offset ) {
+                int regionHash = hash(region);
+                
                 scoped_spinlock lk( _lock );
 
                 RARELY {
@@ -135,22 +140,22 @@ namespace mongo {
 
                 for ( int i=0; i<NumSlices; i++ ) {
                     int pos = (_curSlice+i)%NumSlices;
-                    State s = _slices[pos].get( region , offset );
+                    State s = _slices[pos].get( regionHash , region , offset );
 
                     if ( s == In )
                         return true;
                     
                     if ( s == Out ) {
-                        _slices[pos].in( region , offset );
+                        _slices[pos].in( regionHash , region , offset );
                         return false;
                     }
                 }
 
                 // we weren't in any slice
                 // so add to cur
-                if ( ! _slices[_curSlice].in( region , offset ) ) {
+                if ( ! _slices[_curSlice].in( regionHash , region , offset ) ) {
                     _rotate();
-                    _slices[_curSlice].in( region , offset );
+                    _slices[_curSlice].in( regionHash , region , offset );
                 }
                 return false;
             }
