@@ -28,7 +28,7 @@ function getShardName(rsTest) {
     return config._id+"/"+members.join(",");
 }
 
-var s = new ShardingTest( "auth1", 0 , 0 , 1 , {rs: true, chunksize : 2, extraOptions : {"keyFile" : "jstests/libs/key1"}});
+var s = new ShardingTest( "auth1", 0 , 0 , 1 , {rs: true, extraOptions : {"keyFile" : "jstests/libs/key1"}, noChunkSize : true});
 
 print("logging in first, if there was an unclean shutdown the user might already exist");
 login(adminUser);
@@ -42,6 +42,19 @@ else {
     print("adding user");
     s.getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
 }
+
+login(adminUser);
+s.getDB( "config" ).settings.update( { _id : "chunksize" }, {$set : {value : 1 }}, true );
+printjson(s.getDB("config").runCommand({getlasterror:1}));
+printjson(s.getDB("config").settings.find().toArray());
+
+print("restart mongos");
+stopMongoProgram(31000);
+var opts = { port : 31000, v : 0, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
+var conn = startMongos( opts );
+s.s = s._mongos[0] = s["s0"] = conn;
+
+login(adminUser);
 
 d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 34000});
 d1.startSet({keyFile : "jstests/libs/key2"});
@@ -92,7 +105,7 @@ logout(adminUser);
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
 result = s.getDB("test").runCommand({getLastError : 1});
-printjson(result);
+assert.eq(result.err, "unauthorized");
 
 logout(adminUser);
 
@@ -101,9 +114,9 @@ login(testUser);
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});
 result = s.getDB("test").runCommand({getLastError : 1});
-printjson(result);
+assert.eq(result.err, null);
 
-login(adminUser);
+logout(testUser);
 
 d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 36000});
 d2.startSet({keyFile : "jstests/libs/key1"});
@@ -111,9 +124,13 @@ d2.initiate();
 
 shardName = getShardName(d2);
 
-result = s.adminCommand({addShard : shardName})
+print("adding shard "+shardName);
+login(adminUser);
+print("logged in");
+result = s.getDB("admin").runCommand({addShard : shardName})
 
-for (i=0; i<100000; i++) {
+var num = 100000;
+for (i=0; i<num; i++) {
     s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
 
@@ -121,8 +138,22 @@ var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
 var totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
 
+print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
+
 assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
-assert.eq(s.getDB("test").foo.count(), 100001);
+assert.eq(s.getDB("test").foo.count(), num+1);
+
+s.s.setSlaveOk();
+
+var cursor = s.getDB("test").foo.find({x:{$lt : 500}});
+
+var count = 0;
+while (cursor.hasNext()) {
+    cursor.next();
+    count++;
+}
+
+assert.eq(count, 501);
 
 s.stop();

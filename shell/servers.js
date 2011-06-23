@@ -210,7 +210,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
         this._configDB = localhost + ":30000," + localhost + ":30001," + localhost + ":30002";
         this._configConnection = new Mongo( this._configDB );
-        this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
+        if (!otherParams.noChunkSize) {
+            this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+        }
     }
     else {
         for ( var i=0; i<numShards; i++){

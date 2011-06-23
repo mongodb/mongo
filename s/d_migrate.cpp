@@ -1529,6 +1529,7 @@ namespace mongo {
     void migrateThread() {
         Client::initThread( "migrateThread" );
         if (!noauth) {
+            ShardedConnectionInfo::addHook();
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
         migrateStatus.go();
