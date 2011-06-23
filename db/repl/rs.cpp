@@ -326,13 +326,13 @@ namespace mongo {
 
     void newReplUp();
 
-    void ReplSetImpl::loadLastOpTimeWritten() {
+    void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
-            uassert(13290, "bad replSet oplog entry?", !lastOpTimeWritten.isNull());
+            uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
         }
     }
 

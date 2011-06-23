@@ -329,7 +329,7 @@ namespace mongo {
         bool _freeze(int secs);
     private:
         void assumePrimary();
-        void loadLastOpTimeWritten();
+        void loadLastOpTimeWritten(bool quiet=false);
         void changeState(MemberState s);
         
         /**
