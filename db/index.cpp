@@ -59,13 +59,13 @@ namespace mongo {
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
                 KeyOwned k(**i);
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
-				if (dup) {
-					stringstream ss;
-			        ss << "E11001 duplicate key on update error ";
-			        ss << "index: " << idx.indexNamespace() << "  ";
-			        ss << "dup key: " << k.toString();
-			        uasserted(11001, ss.str());
-				}
+                if (dup) {
+                    stringstream ss;
+                    ss << "E11001 duplicate key on update error ";
+                    ss << "index: " << idx.indexNamespace() << "  ";
+                    ss << "dup key: " << k.toString();
+                    uasserted(11001, ss.str());
+                }
             }
         }
     };
