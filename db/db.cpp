@@ -139,7 +139,7 @@ namespace mongo {
 #endif
 
     void sysRuntimeInfo() {
-        out() << "sysinfo:\n";
+        out() << "sysinfo:" << endl;
 #if defined(_SC_PAGE_SIZE)
         out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
 #endif
