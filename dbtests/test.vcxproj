@@ -216,6 +216,7 @@
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
     <ClInclude Include="..\db\ops\delete.h" />
+    <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
     <ClInclude Include="..\pcre-7.4\pcrecpp.h" />
     <ClInclude Include="..\targetver.h" />
@@ -302,6 +303,7 @@
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\db\ops\delete.cpp" />
+    <ClCompile Include="..\db\ops\query.cpp" />
     <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\queryoptimizercursor.cpp" />
@@ -620,7 +622,6 @@
     <ClCompile Include="..\db\namespace.cpp" />
     <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\db\pdfile.cpp" />
-    <ClCompile Include="..\db\query.cpp" />
     <ClCompile Include="..\db\queryoptimizer.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\db\repl.cpp" />

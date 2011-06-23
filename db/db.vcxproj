@@ -496,6 +496,7 @@
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="ops\delete.cpp" />
+    <ClCompile Include="ops\query.cpp" />
     <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="queryoptimizercursor.cpp" />
@@ -555,7 +556,6 @@
     <ClCompile Include="nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
-    <ClCompile Include="query.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />

@@ -118,7 +118,6 @@
     <ClCompile Include="nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
-    <ClCompile Include="query.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />
@@ -162,6 +161,7 @@
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="security_common.cpp" />
+    <ClCompile Include="ops\query.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
