@@ -626,18 +626,21 @@ doneCheckOrder:
     }
     
     void QueryPlanSet::Runner::mayYield() {
-        if ( _plans._mayYield ) {
-            if ( _plans._yieldSometimesTracker.ping() ) {
-                int micros = ClientCursor::yieldSuggest();
-                if ( micros > 0 ) {
-                    if ( !prepareToYield() ) {
-                        return;   
-                    }
-                    ClientCursor::staticYield( micros , _plans._ns , 0 );
-                    recoverFromYield();
-                }
-            }
-        }
+        if ( ! _plans._mayYield ) 
+            return;
+        
+        if ( ! _plans._yieldSometimesTracker.ping() ) 
+            return;
+        
+        int micros = ClientCursor::yieldSuggest();
+        if ( micros <= 0 ) 
+            return;
+        
+        if ( !prepareToYield() ) 
+            return;   
+        
+        ClientCursor::staticYield( micros , _plans._ns , 0 );
+        recoverFromYield();
     }
 
     shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
