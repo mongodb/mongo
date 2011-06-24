@@ -1076,9 +1076,16 @@ namespace mongo {
         {
             dblock l;
             // local.me is an identifier for a server for getLastError w:2+
-            if ( ! Helpers::getSingleton( "local.me" , me ) ) {
+            if ( ! Helpers::getSingleton( "local.me" , me ) ||
+                 !me.hasField("host") ||
+                 me["host"].String() != theReplSet->selfFullName()) {
+                // clean out local.me
+                Helpers::emptyCollection("local.me");
+
+                // repopulate
                 BSONObjBuilder b;
                 b.appendOID( "_id" , 0 , true );
+                b.append( "host", theReplSet->selfFullName() );
                 me = b.obj();
                 Helpers::putSingleton( "local.me" , me );
             }
