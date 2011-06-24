@@ -205,5 +205,14 @@ namespace mongo {
             return false;
         return ProcessInfo::blockInMemory( data );
     }
+
+    Record* Record::accessed() {
+        const size_t page = (size_t)data >> 12;
+        const size_t region = page >> 6;
+        const size_t offset = page & 0x3f;
+
+        ps::rolling.access( region , offset );
+        return this;
+    }
     
 }

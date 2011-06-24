@@ -220,6 +220,10 @@ namespace mongo {
         };
         NP* np() { return (NP*) &nextOfs; }
 
+        // ---------------------
+        // memory cache
+        // ---------------------
+
         /** 
          * touches the data so that is in physical memory
          * @param entireRecrd if false, only the header and first byte is touched
@@ -232,6 +236,12 @@ namespace mongo {
          *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
          */
         bool likelyInPhysicalMemory();
+
+        /**
+         * tell the cache this Record was accessed
+         * @return this, for simple chaining
+         */
+        Record* accessed();
     };
 
     /* extents are datafile regions where all the records within the region
@@ -446,7 +456,7 @@ namespace mongo {
         return DataFileMgr::getRecord(*this);
     }
     inline BSONObj DiskLoc::obj() const {
-        return BSONObj(rec());
+        return BSONObj(rec()->accessed());
     }
     inline DeletedRecord* DiskLoc::drec() const {
         assert( _a != -1 );
