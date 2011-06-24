@@ -673,10 +673,13 @@ int _main(int argc, char* argv[]) {
         mongo::shellUtils::MongoProgramScope s;
 
         if (!norc) {
+            string rcLocation;
 #ifndef _WIN32
-            char *rcLocation = strcat( getenv("HOME"), "/.mongorc.js" );
+            if ( getenv("HOME") != NULL )
+                rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js" ;
 #else
-            char *rcLocation = strcat( strcat( getenv("HOMEDRIVE"), getenv("HOMEPATH")), "\\.mongorc.js");
+            if ( getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL )
+                rcLocation = str::stream() << getenv("HOMEDRIVE") << getenv("HOMEPATH") << "\\.mongorc.js";
 #endif
             if ( fileExists(rcLocation) ) {
                 if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
