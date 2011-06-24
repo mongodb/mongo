@@ -638,8 +638,8 @@ namespace mongo {
 
                 }
                 else if( fudge == 0 ){
-                	if( p._y == p1._y && p._x == p1._x ) return true;
-                	else if( p._y == p2._y && p._x == p2._x ) return true;
+                    if( p._y == p1._y && p._x == p1._x ) return true;
+                    else if( p._y == p2._y && p._x == p2._x ) return true;
                 }
 
                 // Normal intersection test.
@@ -756,38 +756,67 @@ namespace mongo {
 
     class GeoPoint {
     public:
-        GeoPoint() { }
+
+        GeoPoint() : _distance( -1 ), _exact( false )
+        {}
 
         //// Distance not used ////
 
         GeoPoint( const GeoKeyNode& node )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _exactDistance( -1 ) {
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( -1 ) , _exact( false ) {
         }
-        
-        //// Immediate initialization of exact distance ////
 
-        GeoPoint( const GeoKeyNode& node , double exactDistance )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _exactDistance( exactDistance ) {
+        //// Immediate initialization of distance ////
+
+        GeoPoint( const GeoKeyNode& node, double distance, bool exact )
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( distance ), _exact( exact ) {
+        }
+
+        GeoPoint( const GeoPoint& pt, double distance, bool exact )
+            : _key( pt.key() ) , _loc( pt.loc() ) , _o( pt.obj() ), _distance( distance ), _exact( exact ) {
         }
 
         bool operator<( const GeoPoint& other ) const {
-            return _exactDistance < other._exactDistance;
+            if( _distance != other._distance ) return _distance < other._distance;
+            if( _exact != other._exact ) return _exact < other._exact;
+            return _loc < other._loc;
         }
 
-        bool isEmpty() const {
+        double distance() const {
+            return _distance;
+        }
+
+        bool isExact() const {
+            return _exact;
+        }
+
+        BSONObj key() const {
+            return _key;
+        }
+
+        DiskLoc loc() const {
+            return _loc;
+        }
+
+        BSONObj obj() const {
+            return _o;
+        }
+
+        bool isEmpty() {
             return _o.isEmpty();
         }
 
         string toString() const {
-            return str::stream() << "Point from " << _o.toString() << " dist : " << _exactDistance ;
+            return str::stream() << "Point from " << _o << " dist : " << _distance << ( _exact ? " (ex)" : " (app)" );
         }
 
         BSONObj _key;
         DiskLoc _loc;
         BSONObj _o;
 
-        double _exactDistance;
-    }
+        double _distance;
+        bool _exact;
+    };
 
     // GeoBrowse subclasses this
     class GeoAccumulator {
@@ -830,7 +859,7 @@ namespace mongo {
             // Approximate distance check using key data
             ////
             double keyD = 0;
-            Point keyP( _g, GeoHash( node.key._firstElement(), _g->_bits ) );
+            Point keyP( _g, GeoHash( node._key.firstElement(), _g->_bits ) );
             KeyResult keyOk = approxKeyCheck( keyP, keyD );
             if ( keyOk == BAD ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << keyD );
@@ -889,7 +918,7 @@ namespace mongo {
             if( allPoints ) return;
 
             // Find the particular location we want
-            GeoHash keyHash( node.key._firstElement(), _g->_bits );
+            GeoHash keyHash( node._key.firstElement(), _g->_bits );
 
             // log() << "Hash: " << node.key << " and " << keyHash.getHash() << " unique " << _uniqueDocs << endl;
             for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
@@ -1206,7 +1235,6 @@ namespace mongo {
                 while ( true ) {
 
                     GEODEBUG( "box prefix [" << _prefix << "]" );
-
 #ifdef GEODEBUGGING
                     if( _prefix.constrains() ) {
                         log() << "current expand box : " << Box( _g, _prefix ).toString() << endl;
@@ -1230,7 +1258,7 @@ namespace mongo {
 
 #endif
 
-                    GEODEBUG( "finished expand, found : " << ( maxToCheck - ( maxFound - _found ) ) );
+                    GEODEBUG( "finished expand, found : " << ( maxToAdd - ( maxAdded - _found ) ) );
                     if( _foundInExp >= maxFound || _found >= maxAdded ) return;
 
                     // We've searched this prefix fully, remember
@@ -1512,67 +1540,29 @@ namespace mongo {
             double borderDist = ( _points.size() < _max ? _maxDistance : farthest() );
 
             if( d >= borderDist - 2 * _distError && d <= borderDist + 2 * _distError ) return BORDER;
-            else return d <= borderDist - 2 * _distError ? GOOD : BAD;
-
-        }
-
-        double exactDistances( const GeoKeyNode& node ) {
-
-            GEODEBUG( "Finding exact distance for " << node.key.toString() << " and " << node.recordLoc.obj().toString() );
-
-            // Find all the location objects from the keys
-            vector< BSONObj > locs;
-            _g->getKeys( node.recordLoc.obj(), locs );
-
-            double maxDistance = -1;
-
-            // Find the particular location we want
-            BSONObj loc;
-            GeoHash keyHash( node._key.firstElement(), _g->_bits );
-            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
-
-                loc = *i;
-
-                // Ignore all locations not hashed to the key's hash, since we may see
-                // those later
-                if( _g->_hash( loc ) != keyHash ) continue;
-
-                double exactDistance = -1;
-                bool exactWithin = false;
-
-                Point p( loc );
-
-                // Get the appropriate distance for the type
-                switch ( _type ) {
-                case GEO_PLAIN:
-                    exactDistance = _near.distance( p );
-                    exactWithin = _near.distanceWithin( p, _maxDistance );
-                    break;
-                case GEO_SPHERE:
-                    checkEarthBounds( p );
-                    exactDistance = spheredist_deg( _near, p );
-                    exactWithin = ( exactDistance <= _maxDistance );
-                    break;
-                default: assert( false );
-                }
-
-                assert( exactDistance >= 0 );
-                if( !exactWithin ) continue;
-
-                GEODEBUG( "Inserting exact point: " << GeoPoint( node , exactDistance ).toString() );
-
-                // Add a point for this location
-                _points.insert( GeoPoint( node , exactDistance ) );
-
-                if( exactDistance > maxDistance ) maxDistance = exactDistance;
-            }
-
-            return maxDistance;
+            else return d < borderDist ? GOOD : BAD;
 
         }
 
         virtual bool exactDocCheck( const Point& p, double& d ){
-            return true;
+
+            bool within = false;
+
+            // Get the appropriate distance for the type
+            switch ( _type ) {
+            case GEO_PLAIN:
+                d = _near.distance( p );
+                within = _near.distanceWithin( p, _maxDistance );
+                break;
+            case GEO_SPHERE:
+                checkEarthBounds( p );
+                d = spheredist_deg( _near, p );
+                within = ( d <= _maxDistance );
+                break;
+            default: assert( false );
+            }
+
+            return within;
         }
 
         // Always in distance units, whether radians or normal
@@ -1580,31 +1570,83 @@ namespace mongo {
             return _farthest;
         }
 
-        bool inErrorBounds( double approxD ) const {
-            return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
-        }
-
         virtual int addSpecific( const GeoKeyNode& node, const Point& keyP, bool onBounds, double keyD, bool newDoc ) {
 
-            GEODEBUG( "\t\t" << GeoHash( node.key._firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << keyD );
+            // Unique documents
+
+            GeoPoint newPoint( node, keyD, false );
 
             int prevSize = _points.size();
 
-            double maxDistance = exactDistances( node );
-            if( maxDistance >= 0 ){
+            // STEP 1 : Remove old duplicate points from the set if needed
+            if( _uniqueDocs ){
 
-               // Recalculate the current furthest point.
-               int numToErase = _points.size() - _max;
-               while( numToErase-- > 0 ){
-                   _points.erase( --_points.end() );
-               }
+                // Lookup old point with same doc
+                map< DiskLoc , Holder::iterator >::iterator oldPointIt = _seenPts.find( newPoint.loc() );
 
-               _farthest = boost::next( _points.end(), -1 )->_exactDistance;
-
+                if( oldPointIt != _seenPts.end() ){
+                    const GeoPoint& oldPoint = *(oldPointIt->second);
+                    // We don't need to care if we've already seen this same approx pt or better,
+                    // or we've already gone to disk once for the point
+                    if( oldPoint < newPoint ){
+                        GEODEBUG( "\t\tOld point closer than new point" );
+                        return 0;
+                    }
+                    GEODEBUG( "\t\tErasing old point " << oldPointIt->first.obj() );
+                    _points.erase( oldPointIt->second );
+                }
             }
 
-            assert( _points.size() - prevSize >= 0 );
+            Holder::iterator newIt = _points.insert( newPoint );
+            if( _uniqueDocs ) _seenPts[ newPoint.loc() ] = newIt;
+
+            GEODEBUG( "\t\tInserted new point " << newPoint.toString() << " approx : " << keyD );
+
+            if( _max >= 0 ){
+
+                // Erase all points from the set with a position >= _max *and*
+                // whose distance isn't close to the _max - 1 position distance
+
+                // TODO:  Don't necessarily need to run this *every* new point, though
+                // usually it'll just delete the last point... issue is when we have
+                // 10,000 of the *same* point at a boundary.  Maybe store iterator to
+                // last seen value, compare > or <?
+
+                int numToErase = _points.size() - _max;
+                if( numToErase < 0 ) numToErase = 0;
+
+                // Get the first point definitely in the _points array
+                Holder::iterator startErase = _points.end();
+                for( int i = 0; i < numToErase + 1; i++ ) startErase--;
+                _farthest = startErase->distance() + 2 * _distError;
+
+                GEODEBUG( "\t\tPotentially erasing " << numToErase << " points, " << " size : " << _points.size() << " max : " << _max << " dist : " << startErase->distance() << " farthest dist : " << _farthest << " from error : " << _distError );
+
+                startErase++;
+                while( numToErase > 0 && startErase->distance() <= _farthest ){
+                    GEODEBUG( "\t\tNot erasing point " << startErase->toString() );
+                    numToErase--;
+                    startErase++;
+                    assert( startErase != _points.end() || numToErase == 0 );
+                }
+
+                if( _uniqueDocs ){
+                    for( Holder::iterator i = startErase; i != _points.end(); ++i )
+                        _seenPts.erase( i->loc() );
+                }
+
+                _points.erase( startErase, _points.end() );
+
+            }
+            else {
+                _seenPts[ node.recordLoc ] = newIt;
+                _farthest = (--(_points.end()))->distance() + 2 * _distError;
+            }
+
+            // log() << "points : " << _points.size() << " prev : " << prevSize << " seen : " << _seenPts.size() << " farthest : " << _farthest << " newDist : " << newPoint.distance() << endl;
+
             return _points.size() - prevSize;
+
         }
 
         unsigned _max;
@@ -1615,6 +1657,8 @@ namespace mongo {
         double _distError;
         double _farthest;
 
+        map< DiskLoc , Holder::iterator > _seenPts;
+
     };
 
 
@@ -1624,8 +1668,9 @@ namespace mongo {
         GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool uniqueDocs = false, bool needDistance = false )
            : GeoHopper( g , numWanted , startPt , filter , maxDistance, type, uniqueDocs, needDistance ),
              _start( g->hash( startPt._x, startPt._y ) ),
-              _numWanted( numWanted ),
-              _type(type)
+             // TODO:  Remove numWanted...
+             _numWanted( numWanted ),
+             _type(type)
         {
 
            assert( g->getDetails() );
@@ -1675,7 +1720,10 @@ namespace mongo {
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
 
                // If we couldn't scan or scanned everything, we're done
-               if( _state == DONE ) return;
+               if( _state == DONE ){
+                   expandEndPoints();
+                   return;
+               }
 
            }
 
@@ -1711,6 +1759,8 @@ namespace mongo {
                 _want = Box( _near._x - farDist , _near._y - farDist , farDist * 2 );
                 GEODEBUGPRINT( _want.toString() );
 
+                // log() << "Found : " << found() << " wanted : " << _numWanted << " Far distance : " << farDist << " box : " << _want << endl;
+
                 // Remember the far distance for further scans
                 _scanDistance = farDist;
 
@@ -1734,8 +1784,186 @@ namespace mongo {
 
             }
 
-            GEODEBUG( "done near search" )
+            GEODEBUG( "done near search with " << _points.size() << " points " );
 
+            expandEndPoints();
+
+        }
+
+        void addExactPoints( const GeoPoint& pt, Holder& points, bool force ){
+            int before, after;
+            addExactPoints( pt, points, before, after, force );
+        }
+
+        void addExactPoints( const GeoPoint& pt, Holder& points, int& before, int& after, bool force ){
+
+            before = 0;
+            after = 0;
+
+            GEODEBUG( "Adding exact points for " << pt.toString() );
+
+            if( pt.isExact() ){
+                if( force ) points.insert( pt );
+                return;
+            }
+
+            vector<BSONObj> locs;
+            _g->getKeys( pt.obj() , locs );
+
+            GeoPoint nearestPt( pt, -1, true );
+            bool singlePoint = locs.size() == 1;
+
+            GeoHash h;
+            if( ! singlePoint && ! _uniqueDocs )
+                h = GeoHash( pt.key().firstElement(), _g->_bits );
+
+            for( vector<BSONObj>::iterator i = locs.begin(); i != locs.end(); i++ ){
+
+                Point loc( *i );
+                if( ! singlePoint && ! _uniqueDocs && h != _g->hash( loc ) ) continue;
+
+                double d;
+                if( ! exactDocCheck( loc, d ) ) continue;
+
+                if( _uniqueDocs && ( nearestPt.distance() < 0 || d < nearestPt.distance() ) ){
+                    nearestPt._distance = d;
+                    continue;
+                }
+                else if( ! _uniqueDocs ){
+                    GeoPoint exactPt( pt, d, true );
+                    GEODEBUG( "Inserting exact pt " << exactPt.toString() << " for " << pt.toString() << " exact : " << d << " is less? " << ( exactPt < pt ) << " bits : " << _g->_bits );
+                    points.insert( exactPt );
+                    exactPt < pt ? before++ : after++;
+                }
+
+            }
+
+            if( _uniqueDocs && nearestPt.distance() >= 0 ){
+                GEODEBUG( "Inserting unique exact pt " << nearestPt.toString() << " for " << pt.toString() << " exact : " << nearestPt.distance() << " is less? " << ( nearestPt < pt ) << " bits : " << _g->_bits );
+                points.insert( nearestPt );
+                if( nearestPt < pt ) before++;
+                else after++;
+            }
+
+        }
+
+        // TODO: Refactor this back into holder class, allow to run periodically when we are seeing a lot of pts
+        void expandEndPoints( bool finish = true ){
+
+            // All points in array *could* be in maxDistance
+
+            // Step 1 : Trim points to max size
+            if( _max >= 0 ){
+
+                int numToErase = _points.size() - _max;
+
+                if( numToErase > 0 ){
+
+                    Holder tested;
+
+                    // Work backward through all points we're not sure belong in the set
+                    Holder::iterator maybePointIt = _points.end();
+                    maybePointIt--;
+                    double approxMin = maybePointIt->distance() - 2 * _distError;
+
+                    GEODEBUG( "\t\tNeed to erase " << numToErase << " max : " << _max << " min dist " << approxMin << " error : " << _distError << " starting from : " << (*maybePointIt).toString() );
+
+                    // Insert all
+                    int erased = 0;
+                    while( _points.size() > 0 && ( maybePointIt->distance() >= approxMin || erased < numToErase ) ){
+
+                        Holder::iterator current = maybePointIt--;
+
+                         addExactPoints( *current, tested, true );
+                         _points.erase( current );
+                         erased++;
+                         approxMin = tested.begin()->distance() - 2 * _distError;
+
+                         if( _points.size() == 0 ) break;
+                    }
+
+                    GEODEBUG( "\t\tEnding search at point " << ( _points.size() == 0 ? "(beginning)" : maybePointIt->toString() ) );
+
+                    int numToAddBack = erased - numToErase;
+                    assert( numToAddBack >= 0 );
+
+                    GEODEBUG( "\t\tNum tested valid : " << tested.size() << " erased : " << erased << " added back : " << numToAddBack );
+
+#ifdef GEODEBUGGING
+                    for( Holder::iterator it = tested.begin(); it != tested.end(); it++ ){
+                        log() << "Tested Point: " << *it << endl;
+                    }
+#endif
+                    Holder::iterator testedIt = tested.begin();
+                    for( int i = 0; i < numToAddBack && testedIt != tested.end(); i++ ){
+                        _points.insert( *testedIt );
+                        testedIt++;
+                    }
+                }
+            }
+
+#ifdef GEODEBUGGING
+            for( Holder::iterator it = _points.begin(); it != _points.end(); it++ ){
+                log() << "Point: " << *it << endl;
+            }
+#endif
+            // We've now trimmed first set of unneeded points
+
+            GEODEBUG( "\t\t Start expanding, num points : " << _points.size() << " max : " << _max );
+
+            // Step 2: iterate through all points and add as needed
+
+            unsigned expandedPoints = 0;
+            Holder::iterator it = _points.begin();
+            double expandWindowEnd = -1;
+            while( it != _points.end() ){
+                const GeoPoint& currPt = *it;
+
+                // TODO: If one point is exact, maybe not 2 * _distError
+
+                // See if we're in an expand window
+                bool inWindow = currPt.distance() <= expandWindowEnd;
+                // If we're not, and we're done with points, break
+                if( ! inWindow && expandedPoints >= _max ) break;
+
+                bool expandApprox = ! currPt.isExact() && ( ! _uniqueDocs || ( finish && _needDistance ) || inWindow );
+
+                if( expandApprox ){
+
+                    // Add new point(s)
+                    // These will only be added in a radius of 2 * _distError around the current point,
+                    // so should not affect previously valid points.
+                    int before, after;
+                    addExactPoints( currPt, _points, before, after, false );
+                    expandedPoints += before;
+
+                    if( _max >= 0 && expandedPoints < _max )
+                        expandWindowEnd = currPt.distance() + 2 * _distError;
+
+                    // Iterate to the next point
+                    Holder::iterator current = it++;
+                    // Erase the current point
+                    _points.erase( current );
+
+                }
+                else{
+                    expandedPoints++;
+                    it++;
+                }
+            }
+
+            GEODEBUG( "\t\tFinished expanding, num points : " << _points.size() << " max : " << _max );
+
+            // Finish
+            // TODO:  Don't really need to trim?
+            for( ; expandedPoints > _max; expandedPoints-- ) it--;
+            _points.erase( it, _points.end() );
+
+#ifdef GEODEBUGGING
+            for( Holder::iterator it = _points.begin(); it != _points.end(); it++ ){
+                log() << "Point: " << *it << endl;
+            }
+#endif
         }
 
         virtual GeoHash expandStartHash(){
@@ -1770,7 +1998,7 @@ namespace mongo {
             : GeoCursorBase( s->_spec ) ,
               _s( s ) , _cur( s->_points.begin() ) , _end( s->_points.end() ), _nscanned() {
             if ( _cur != _end ) {
-            	++_nscanned;
+                ++_nscanned;
             }
         }
 
@@ -2239,6 +2467,9 @@ namespace mongo {
                 assert( numWanted >= 0 );
             }
 
+            bool uniqueDocs = false;
+            if( ! cmdObj["uniqueDocs"].eoo() ) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
+
             uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
             const Point n( cmdObj["near"] );
             result.append( "near" , g->_tohash( cmdObj["near"] ).toString() );
@@ -2255,7 +2486,7 @@ namespace mongo {
             if ( cmdObj["spherical"].trueValue() )
                 type = GEO_SPHERE;
 
-            GeoSearch gs( g , n , numWanted , filter , maxDistance , type );
+            GeoSearch gs( g , n , numWanted , filter , maxDistance , type, uniqueDocs, true );
 
             if ( cmdObj["start"].type() == String) {
                 GeoHash start ((string) cmdObj["start"].valuestr());
@@ -2275,7 +2506,7 @@ namespace mongo {
             for ( GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++ ) {
 
                 const GeoPoint& p = *i;
-                double dis = distanceMultiplier * p._exactDistance;
+                double dis = distanceMultiplier * p.distance();
                 totalDistance += dis;
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
@@ -2604,3 +2835,4 @@ namespace mongo {
 
 
 }
+

@@ -287,7 +287,7 @@ var locsArray = function( locs ){
 	}
 }
 
-var numTests = 300
+var numTests = 3000000
 
 // Our seed will change every time this is run, but 
 // each individual test will be reproducible given
@@ -297,14 +297,16 @@ var seed = Math.floor( Random.rand() * ( 10 ^ 30) )
 for ( var test = 0; test < numTests; test++ ) {
 	
 	Random.srand( seed + test );
+	//Random.srand( 195 )
 	var t = db.testAllGeo
 	t.drop()
 	
 	print( "Generating test environment #" + test )
 	var env = randEnvironment()
+	//env.bits = 11
 	var query = randQuery( env )
 	var data = randDataType()
-	// data.numDocs = 2; data.maxLocs = 2; 
+	//data.numDocs = 100; data.maxLocs = 3;
 	var results = {}
 	var totalPoints = 0
 	print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
@@ -345,7 +347,7 @@ for ( var test = 0; test < numTests; test++ ) {
 		randQueryAdditions( doc, indResults )
 		
 		//printjson( doc )
-		
+		doc._id = i
 		t.insert( doc )
 		
 	}
@@ -386,6 +388,7 @@ for ( var test = 0; test < numTests; test++ ) {
 	// $near
 	print( "Near query..." )
 	assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.find( { "locs.loc" : { $near : query.center, $maxDistance : query.radius } } ).count( true ) )
+
 	if( query.sphereRadius >= 0 ){
 		print( "Near sphere query...")
 		// $centerSphere
@@ -394,8 +397,16 @@ for ( var test = 0; test < numTests; test++ ) {
 	
 	
 	// geoNear
+	// results limited by size of objects
 	if( data.maxLocs < 100 ){
-		
+	    
+	    // GeoNear query
+	    print( "GeoNear query..." )
+	    assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius }).results.length )
+	    // GeoNear query
+        assert.eq( results.center.docsIn > 100 ? 100 : results.center.docsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius, uniqueDocs : true }).results.length )
+       
+	    
 		var num = 2 * results.center.locsIn;
 		if( num > 200 ) num = 200;
 		
