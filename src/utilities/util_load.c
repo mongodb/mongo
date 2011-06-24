@@ -29,7 +29,7 @@ util_load(int argc, char *argv[])
 	struct record_t record;
 	size_t len;
 	uint64_t insert_count;
-	int ch, debug, eof, ret, text_input, tret;
+	int ch, debug, eof, ret, printable, tret;
 	const char *table_config;
 	char cursor_config[100];
 	char *tablename;
@@ -37,7 +37,7 @@ util_load(int argc, char *argv[])
 	conn = NULL;
 	table_config = NULL;
 	tablename = NULL;
-	debug = text_input = 0;
+	debug = printable = 0;
 
 	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
 		switch (ch) {
@@ -55,7 +55,7 @@ util_load(int argc, char *argv[])
 			}
 			break;
 		case 'T':
-			text_input = 1;
+			printable = 1;
 			break;
 		case '?':
 		default:
@@ -68,7 +68,7 @@ util_load(int argc, char *argv[])
 	 * Right now, we only support text input -- require the T option to
 	 * match Berkeley DB's API.
 	 */
-	if (text_input == 0) {
+	if (printable == 0) {
 		fprintf(stderr,
 		    "%s: the -T option is currently required\n", progname);
 		return (EXIT_FAILURE);
@@ -96,8 +96,8 @@ util_load(int argc, char *argv[])
 	if ((ret = session->create(session, tablename, table_config)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config), "bulk,dump=%s%s",
-	    text_input ? "print" : "raw", debug ? ",debug" : "");
+	snprintf(cursor_config, sizeof(cursor_config), "dump%s%s",
+	    printable ? ",printable" : ",raw", debug ? ",debug" : "");
 
 	if ((ret = session->open_cursor(
 	    session, tablename, NULL, cursor_config, &cursor)) != 0) {

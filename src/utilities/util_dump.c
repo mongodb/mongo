@@ -76,7 +76,7 @@ util_dump(int argc, char *argv[])
 			break;
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			break;
-		if ((key.data != NULL && (
+		if ((key.size != 0 && (
 		    fwrite(key.data, 1, key.size, stdout) != key.size ||
 		    fwrite("\n", 1, 1, stdout) != 1)) ||
 		    fwrite(value.data, 1, value.size, stdout) != value.size ||
