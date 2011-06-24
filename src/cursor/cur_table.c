@@ -51,7 +51,7 @@ __curtable_get_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	ret = wiredtiger_struct_unpackv(
+	ret = __wt_struct_unpackv(session,
 	    primary->key.data, primary->key.size, fmt, ap);
 	va_end(ap);
 
@@ -66,23 +66,27 @@ __curtable_get_key(WT_CURSOR *cursor, ...)
 static int
 __curtable_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR *primary;
+	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
-	int ret;
+	int i, ret;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	primary = *ctable->cg_cursors;
 
 	/* XXX: need to walk all colgroups, extracting the columns from each. */
-	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
-	ret = wiredtiger_struct_unpackv(
-	    primary->value.data, primary->value.size, fmt, ap);
-	va_end(ap);
+	for (i = 0, cp = ctable->cg_cursors;
+	     ret == 0 && i < ctable->table->ncolgroups;
+	     i++, cp++) {
+		va_start(ap, cursor);
+		WT_TRET(__wt_struct_unpackv(session,
+		    (*cp)->value.data, (*cp)->value.size, fmt, ap));
+		va_end(ap);
+	}
 
 	API_END(session);
 	return (ret);
@@ -125,11 +129,11 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 		cursor->key.data = (void *)item->data;
 	} else {
 		buf = &cursor->key;
-		sz = wiredtiger_struct_sizev(cursor->key_format, ap);
+		sz = __wt_struct_sizev(session, cursor->key_format, ap);
 		va_end(ap);
 		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
-		    (ret = wiredtiger_struct_packv(buf->mem, sz,
+		    (ret = __wt_struct_packv(session, buf->mem, sz,
 		    cursor->key_format, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_KEY_SET);
 		else {
@@ -186,11 +190,11 @@ __curtable_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.data = item->data;
 	} else {
 		buf = &cursor->value;
-		sz = wiredtiger_struct_sizev(cursor->value_format, ap);
+		sz = __wt_struct_sizev(session, cursor->value_format, ap);
 		va_end(ap);
 		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
-		    (ret = wiredtiger_struct_packv(buf->mem, sz,
+		    (ret = __wt_struct_packv(session, buf->mem, sz,
 		    cursor->value_format, ap)) == 0)
 			F_SET(cursor, WT_CURSTD_VALUE_SET);
 		else {

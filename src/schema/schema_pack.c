@@ -43,13 +43,12 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 }
 
 /*
- * wiredtiger_struct_sizev --
+ * __wt_struct_sizev --
  *	Calculate the size of a packed byte string (va_list version).
  */
 size_t
-wiredtiger_struct_sizev(const char *fmt, va_list ap)
+__wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
-	WT_SESSION_IMPL *session;
 	WT_ITEM *item;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
@@ -57,7 +56,6 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 	size_t len, padding, total;
 	int ret;
 
-	session = NULL; /* XXX */
 	total = 0;
 
 	if (__pack_init(session, &pack, fmt) != 0)
@@ -124,23 +122,20 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 }
 
 /*
- * wiredtiger_struct_packv --
+ * __wt_struct_packv --
  *	Pack a byte string (va_list version).
  */
 int
-wiredtiger_struct_packv(
+__wt_struct_packv(WT_SESSION_IMPL *session,
     void *buffer, size_t size, const char *fmt, va_list ap)
 {
 	WT_ITEM *item;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	WT_SESSION_IMPL *session;
 	const char *s;
 	uint8_t *p, *end;
 	size_t len, padding;
 	int ret;
-
-	session = NULL;	/* XXX */
 
 	WT_RET(__pack_init(session, &pack, fmt));
 
@@ -233,25 +228,22 @@ wiredtiger_struct_packv(
 }
 
 /*
- * wiredtiger_struct_unpackv --
+ * __wt_struct_unpackv --
  *	Unpack a byte string (va_list version).
  */
 int
-wiredtiger_struct_unpackv(
+__wt_struct_unpackv(WT_SESSION_IMPL *session,
     const void *buffer, size_t size, const char *fmt, va_list ap)
 {
 	WT_ITEM *item;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	WT_SESSION_IMPL *session;
 	const uint8_t *p, *end;
 	const char **strp;
 	size_t len;
 	uint64_t u;
 	int64_t i;
 	int ret;
-
-	session = NULL;	/* XXX */
 
 	WT_RET(__pack_init(session, &pack, fmt));
 
@@ -349,55 +341,4 @@ wiredtiger_struct_unpackv(
 		return (ret);
 
 	return (0);
-}
-
-/*
- * wiredtiger_struct_size --
- *	Calculate the size of a packed byte string.
- */
-size_t
-wiredtiger_struct_size(const char *fmt, ...)
-{
-	va_list ap;
-	size_t size;
-
-	va_start(ap, fmt);
-	size = wiredtiger_struct_sizev(fmt, ap);
-	va_end(ap);
-
-	return (size);
-}
-
-/*
- * wiredtiger_struct_pack --
- *	Pack a byte string.
- */
-int
-wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
-{
-	va_list ap;
-	int ret;
-
-	va_start(ap, fmt);
-	ret = wiredtiger_struct_packv(buffer, size, fmt, ap);
-	va_end(ap);
-
-	return (ret);
-}
-
-/*
- * wiredtiger_struct_unpack --
- *	Unpack a byte string.
- */
-int
-wiredtiger_struct_unpack(const void *buffer, size_t size, const char *fmt, ...)
-{
-	va_list ap;
-	int ret;
-
-	va_start(ap, fmt);
-	ret = wiredtiger_struct_unpackv(buffer, size, fmt, ap);
-	va_end(ap);
-
-	return (ret);
 }

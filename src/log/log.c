@@ -34,7 +34,7 @@ __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	va_start(ap, recdesc);
-	WT_ERR(wiredtiger_struct_packv(buf->mem, size, recdesc->fmt, ap));
+	WT_ERR(__wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap));
 err:	va_end(ap);
 
 	return (ret);

@@ -1039,19 +1039,6 @@ struct wt_event_handler {
  */
 int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
 
-/*! Pack a structure into a buffer.
- *
- * stdarg version of ::wiredtiger_struct_pack.
- *
- * @param buffer a pointer to a packed byte array
- * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
- * @param ap the list of values to pack
- * @errors
- */
-int wiredtiger_struct_packv(void *buffer, size_t size,
-    const char *format, va_list ap);
-
 /*! Calculate the size required to pack a structure.
  *
  * Note that for variable-sized fields including variable-sized strings and
@@ -1068,17 +1055,6 @@ int wiredtiger_struct_packv(void *buffer, size_t size,
  */
 size_t wiredtiger_struct_size(const char *format, ...);
 
-/*! Calculate the size required to pack a structure.
- *
- * stdarg version of ::wiredtiger_struct_size.
- *
- * @param format the data format, see ::wiredtiger_struct_pack
- * @param ap the list of values to be packed
- * @returns the number of bytes needed for the matching call to
- * ::wiredtiger_struct_pack
- */
-size_t wiredtiger_struct_sizev(const char *format, va_list ap);
-
 /*! Unpack a structure from a buffer.
  *
  * Reverse of ::wiredtiger_struct_pack: gets values out of a packed byte string.
@@ -1094,19 +1070,6 @@ size_t wiredtiger_struct_sizev(const char *format, va_list ap);
  */
 int wiredtiger_struct_unpack(const void *buffer, size_t size,
     const char *format, ...);
-
-/*! Unpack a structure from a buffer.
- *
- * stdarg version of ::wiredtiger_struct_unpack.
- *
- * @param buffer a pointer to a packed byte array
- * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
- * @param ap the list of locations where values are unpacked
- * @errors
- */
-int wiredtiger_struct_unpackv(const void *buffer, size_t size,
-    const char *format, va_list ap);
 
 /*! Get version information.
  *
