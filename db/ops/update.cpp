@@ -1104,7 +1104,7 @@ namespace mongo {
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
                 }
 
-                if ( ! cc->yield() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::WillNeed ) ) {
                     cc.release();
                     break;
                 }
