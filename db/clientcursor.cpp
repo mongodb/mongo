@@ -357,6 +357,27 @@ namespace mongo {
         return it.next();
     }
 
+    BSONObj ClientCursor::extractFields(const BSONObj &pattern , bool fillWithNull ) {
+        BSONObjBuilder b( pattern.objsize() * 2 );
+     
+        BSONObjIterator i( pattern ); 
+        while ( i.more() ) {
+            BSONElement key = i.next();
+            BSONElement value = getFieldDotted( key.fieldName() );
+
+            if ( value.type() ) {
+                b.append( value );
+                continue;
+            }
+
+            if ( fillWithNull ) 
+                b.appendNull( key.fieldName() );            
+            
+        }
+
+        return b.obj();
+    }
+    
 
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only

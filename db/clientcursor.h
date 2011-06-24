@@ -256,8 +256,16 @@ namespace mongo {
          * if it can be retrieved from key, it is
          * @return if this was retrieved from key
          */
-        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 );
-
+        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 ) ;
+        
+        /** extract items from object which match a pattern object.
+         * e.g., if pattern is { x : 1, y : 1 }, builds an object with
+         * x and y elements of this object, if they are present.
+         * returns elements with original field names
+         * NOTE: copied from BSONObj::extractFields
+        */
+        BSONObj extractFields(const BSONObj &pattern , bool fillWithNull = false) ;
+        
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
 
         bool currentMatches() {
