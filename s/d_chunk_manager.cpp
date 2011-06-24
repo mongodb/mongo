@@ -21,6 +21,7 @@
 #include "../client/connpool.h"
 #include "../client/dbclientmockcursor.h"
 #include "../db/instance.h"
+#include "../db/clientcursor.h"
 
 #include "d_chunk_manager.h"
 
@@ -136,12 +137,22 @@ namespace mongo {
     static bool contains( const BSONObj& min , const BSONObj& max , const BSONObj& point ) {
         return point.woCompare( min ) >= 0 && point.woCompare( max ) < 0;
     }
+    
+    bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
+        if ( _rangesMap.size() == 0 )
+            return false;
+        
+        return _belongsToMe( cc->extractFields( _key ) );
+    }
 
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
-        BSONObj x = obj.extractFields(_key);
+        return _belongsToMe( obj.extractFields( _key ) );
+    }
+
+    bool ShardChunkManager::_belongsToMe( const BSONObj& x ) const {
 
         RangeMap::const_iterator it = _rangesMap.upper_bound( x );
         if ( it != _rangesMap.begin() )
