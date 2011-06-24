@@ -59,7 +59,7 @@ namespace mongo {
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
                 KeyOwned k(**i);
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
-                uassert( 11001 , "E11001 duplicate key on update", !dup);
+                uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
             }
         }
     };
