@@ -80,9 +80,9 @@ util_dump(int argc, char *argv[])
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			break;
 		if ((key.data != NULL && (
-		    fwrite(key.data, 1, key.size, stdout) != key.size ||
+		    fwrite(key.data, 1, key.size, stdout) != 1 ||
 		    fwrite("\n", 1, 1, stdout) != 1)) ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
+		    fwrite(value.data, 1, value.size, stdout) != 1 ||
 		    fwrite("\n", 1, 1, stdout) != 1) {
 			ret = errno;
 			break;
