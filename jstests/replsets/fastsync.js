@@ -85,13 +85,14 @@ admin.runCommand( {fsync:1,lock:1} );
 copyDbpath( basePath + "-p", basePath + "-s" );
 admin.$cmd.sys.unlock.findOne();
 
+var me1 = local.me.findOne();
 
 print("3");
 var sargs = new MongodRunner( ports[ 1 ], basePath + "-s", false, false,
                               ["--replSet", basename, "--fastsync",
                                "--oplogSize", 2], {no_bind : true} );
 var reuseData = true;
-sargs.start(reuseData);
+var conn2 = sargs.start(reuseData);
 
 config = local.system.replset.findOne();
 config.version++;
@@ -124,6 +125,11 @@ while (status.members[1].state != 2 && count < 200) {
 }
 
 assert.eq(status.members[1].state, 2);
+
+var me2 = conn2.getDB("local").me.findOne();
+
+print("me: "+me1._id+" " +me2._id);
+assert(me1._id != me2._id);
 
 print("restart member with a different port and make it a new set");
 try {

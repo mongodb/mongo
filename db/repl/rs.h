@@ -572,6 +572,12 @@ namespace mongo {
      * directly authorizes against AuthenticationInfo
      */
     void replLocalAuth();
+    /**
+     * Creates a new ObjectId in local.me every time the server is started,
+     * otherwise local.slaves can try to use the same _id for multiple hosts.
+     */
+    void createMe();
+
 
     /** inlines ----------------- */
 
