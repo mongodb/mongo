@@ -670,19 +670,6 @@ namespace mongo {
         }
     }
 
-    void createMe() {
-        dblock l;
-
-        // clean out local.me
-        Helpers::emptyCollection("local.me");
-
-        // repopulate
-        BSONObjBuilder b;
-        b.appendOID( "_id" , 0 , true );
-        BSONObj me = b.obj();
-        Helpers::putSingleton( "local.me" , me );
-    }
-
     /* forked as a thread during startup
        it can run quite a while looking for config.  but once found,
        a separate thread takes over as ReplSetImpl::Manager, and this thread
@@ -691,7 +678,6 @@ namespace mongo {
     void startReplSets(ReplSetCmdline *replSetCmdline) {
         Client::initThread("startReplSets");
         try {
-            createMe();
             assert( theReplSet == 0 );
             if( replSetCmdline == 0 ) {
                 assert(!replSet);
