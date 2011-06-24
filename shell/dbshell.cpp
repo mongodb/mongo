@@ -480,7 +480,6 @@ int _main(int argc, char* argv[]) {
 
     bool runShell = false;
     bool nodb = false;
-    bool norc = false;
 
     string script;
 
@@ -492,7 +491,6 @@ int _main(int argc, char* argv[]) {
     shell_options.add_options()
     ("shell", "run the shell after executing files")
     ("nodb", "don't connect to mongod on startup - no 'db address' arg expected")
-    ("norc", "will not run the \".mongorc.js\" file on start up")
     ("quiet", "be less chatty" )
     ("port", po::value<string>(&port), "port to connect to")
     ("host", po::value<string>(&dbhost), "server to connect to")
@@ -554,9 +552,6 @@ int _main(int argc, char* argv[]) {
     }
     if (params.count("nodb")) {
         nodb = true;
-    }
-    if (params.count("norc")) {
-        norc = true;
     }
     if (params.count("help")) {
         show_help_text(argv[0], shell_options);
@@ -671,20 +666,6 @@ int _main(int argc, char* argv[]) {
     if ( runShell ) {
 
         mongo::shellUtils::MongoProgramScope s;
-
-        if (!norc) {
-#ifndef _WIN32
-            char *rcLocation = strcat( getenv("HOME"), "/.mongorc.js" );
-#else
-            char *rcLocation = strcat( strcat( getenv("HOMEDRIVE"), getenv("HOMEPATH")), "\\.mongorc.js");
-#endif
-            if ( fileExists(rcLocation) ) {
-                if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
-                    cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
-                    return -5;
-                }
-            }
-        }
 
         shellHistoryInit();
 
