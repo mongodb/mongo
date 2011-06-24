@@ -157,11 +157,11 @@ __session_drop(
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, drop, config, cfg);
-	if (strncmp(name, "table:", 6) != 0) {
+	if (strncmp(name, "btree:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += sizeof("table:") - 1;
+	name += strlen("btree:");
 
 	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
@@ -192,11 +192,11 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "table:", 6) != 0) {
+	if (strncmp(name, "btree:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += sizeof("table:") - 1;
+	name += strlen("btree:");
 
 	/*
 	 * Open a btree handle.
@@ -235,11 +235,11 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, sync, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "table:", 6) != 0) {
+	if (strncmp(name, "btree:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += sizeof("table:") - 1;
+	name += strlen("btree:");
 
 	ret = __wt_session_get_btree(session,
 	    name, strlen(name), &btree_session);
@@ -291,11 +291,11 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "table:", 6) != 0) {
+	if (strncmp(name, "btree:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += sizeof("table:") - 1;
+	name += strlen("btree:");
 
 	/*
 	 * Open a btree handle.

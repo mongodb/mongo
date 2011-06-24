@@ -35,7 +35,7 @@
 
 #define	BDB_PREFIX	"bdb"
 #define	WT_PREFIX	"wt"
-#define	WT_TABLENAME	"table:__wt"
+#define	WT_TABLENAME	"btree:__wt"
 
 typedef struct {
 	char *progname;				/* Program name */
