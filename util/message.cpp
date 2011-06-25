@@ -551,7 +551,7 @@ again:
             if ( ret == -1 ) {
                 if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
                     log(_logLevel) << "MessagingPort " << context << " send() timed out " << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_TIMEOUT );
+                    throw SocketException( SocketException::SEND_TIMEOUT , remote() );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
@@ -559,7 +559,7 @@ again:
                     if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
 #endif
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException( t );
+                    throw SocketException( t , remote() );
                 }
             }
             else {
@@ -599,11 +599,11 @@ again:
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_ERROR );
+                    throw SocketException( SocketException::SEND_ERROR , remote() );
                 }
                 else {
                     log(_logLevel) << "MessagingPort " << context << " send() remote timeout " << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_TIMEOUT );
+                    throw SocketException( SocketException::SEND_TIMEOUT , remote() );
                 }
             }
             else {
@@ -638,7 +638,7 @@ again:
             }
             else if ( ret == 0 ) {
                 log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
-                throw SocketException( SocketException::CLOSED );
+                throw SocketException( SocketException::CLOSED , remote() );
             }
             else { /* ret < 0  */
                 int e = errno;
@@ -658,11 +658,11 @@ again:
                        ) && _timeout > 0 ) {
                     // this is a timeout
                     log(_logLevel) << "MessagingPort recv() timeout  " << farEnd.toString() <<endl;
-                    throw SocketException(SocketException::RECV_TIMEOUT);                    
+                    throw SocketException( SocketException::RECV_TIMEOUT, remote() );                    
                 }
 
                 log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
-                throw SocketException(SocketException::RECV_ERROR);
+                throw SocketException( SocketException::RECV_ERROR , remote() );
             }
         }
     }
