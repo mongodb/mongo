@@ -18,11 +18,14 @@
 
 #include "pch.h"
 #include "security.h"
+#include "security_common.h"
 #include "instance.h"
 #include "client.h"
 #include "curop-inl.h"
 #include "db.h"
 #include "dbhelpers.h"
+
+// this is the _mongod only_ implementation of security.h
 
 namespace mongo {
 
@@ -47,29 +50,6 @@ namespace mongo {
         return i->second.user;
     }
 
-    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
-        {
-            scoped_spinlock lk(_lock);
-            
-            if ( _isAuthorizedSingle_inlock( dbname , level ) )
-                return true;
-            
-            if ( noauth ) 
-                return true;
-            
-            if ( _isAuthorizedSingle_inlock( "admin" , level ) )
-                return true;
-            
-            if ( _isAuthorizedSingle_inlock( "local" , level ) )
-                return true;
-        }
-        return _isAuthorizedSpecialChecks( dbname );
-    }
-
-    bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, int level) const {
-        MA::const_iterator i = _dbs.find(dbname);
-        return i != _dbs.end() && i->second.level >= level;
-    }
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( cc().isGod() ) 
@@ -91,6 +71,46 @@ namespace mongo {
         }
 
         return false;
+    }
+
+    bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
+        if (user == internalSecurity.user) {
+            pwd = internalSecurity.pwd;
+        }
+        else {
+            static BSONObj userPattern = fromjson("{\"user\":1}");
+            string systemUsers = dbname + ".system.users";
+            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
+            {
+                BSONObjBuilder b;
+                b << "user" << user;
+                BSONObj query = b.done();
+                if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) {
+                    log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                    return false;
+                }
+            }
+
+            pwd = userObj.getStringField("pwd");
+        }
+        return true;
+    }
+
+    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
+        AuthenticationInfo *ai = cc().getAuthenticationInfo();
+
+        if ( readOnly ) {
+            ai->authorizeReadOnly( cc().database()->name.c_str() , user );
+        }
+        else {
+            ai->authorize( cc().database()->name.c_str() , user );
+        }
+    }
+
+    bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        AuthenticationInfo *ai = cc().getAuthenticationInfo();
+        ai->logout(dbname);
+        return true;
     }
 
 } // namespace mongo

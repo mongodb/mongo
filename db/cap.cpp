@@ -26,8 +26,8 @@
 #include "btree.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "json.h"
+#include "clientcursor.h"
 
 /*
  capped collection layout
@@ -130,7 +130,12 @@ namespace mongo {
     bool NamespaceDetails::inCapExtent( const DiskLoc &dl ) const {
         assert( !dl.isNull() );
         // We could have a rec or drec, doesn't matter.
-        return dl.drec()->myExtent( dl ) == capExtent.ext();
+        bool res = dl.drec()->myExtentLoc(dl) == capExtent;
+        DEV {
+            // old implementation. this check is temp to test works the same.  new impl should be a little faster.
+            assert( res == (dl.drec()->myExtent( dl ) == capExtent.ext()) );
+        }
+        return res;
     }
 
     bool NamespaceDetails::nextIsInCapExtent( const DiskLoc &dl ) const {

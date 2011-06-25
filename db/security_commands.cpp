@@ -39,12 +39,12 @@ namespace mongo {
 
        getnonce sends nonce to client
 
-       client then sends { authenticate:1, nonce:<nonce_str>, user:<username>, key:<key> }
+       client then sends { authenticate:1, nonce64:<nonce_str>, user:<username>, key:<key> }
 
        where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
     */
 
-    boost::thread_specific_ptr<nonce> lastNonce;
+    boost::thread_specific_ptr<nonce64> lastNonce;
 
     class CmdGetNonce : public Command {
     public:
@@ -57,7 +57,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
         bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            nonce *n = new nonce(security.getNonce());
+            nonce64 *n = new nonce64(Security::getNonce());
             stringstream ss;
             ss << hex << *n;
             result.append("nonce", ss.str() );
@@ -66,129 +66,78 @@ namespace mongo {
         }
     } cmdGetNonce;
 
-    class CmdLogout : public Command {
-    public:
-        virtual bool logTheOp() {
+    CmdLogout cmdLogout;
+
+    bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        log() << " authenticate: " << cmdObj << endl;
+
+        string user = cmdObj.getStringField("user");
+        string key = cmdObj.getStringField("key");
+        string received_nonce = cmdObj.getStringField("nonce");
+
+        if( user.empty() || key.empty() || received_nonce.empty() ) {
+            log() << "field missing/wrong type in received authenticate command "
+                  << dbname
+                  << endl;
+            errmsg = "auth fails";
+            sleepmillis(10);
             return false;
         }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        void help(stringstream& h) const { h << "de-authenticate"; }
-        virtual LockType locktype() const { return NONE; }
-        CmdLogout() : Command("logout") {}
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            ai->logout(dbname);
-            return true;
-        }
-    } cmdLogout;
 
-    class CmdAuthenticate : public Command {
-    public:
-        virtual bool requiresAuth() { return false; }
-        virtual bool logTheOp() {
+        stringstream digestBuilder;
+
+        {
+            bool reject = false;
+            nonce64 *ln = lastNonce.release();
+            if ( ln == 0 ) {
+                reject = true;
+                log(1) << "auth: no lastNonce" << endl;
+            }
+            else {
+                digestBuilder << hex << *ln;
+                reject = digestBuilder.str() != received_nonce;
+                if ( reject ) log(1) << "auth: different lastNonce" << endl;
+            }
+
+            if ( reject ) {
+                log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << dbname << endl;
+                errmsg = "auth fails";
+                sleepmillis(30);
+                return false;
+            }
+        }
+
+        BSONObj userObj;
+        string pwd;
+        if (!getUserObj(dbname, user, userObj, pwd)) {
+            errmsg = "auth fails";
             return false;
         }
-        virtual bool slaveOk() const {
-            return true;
+
+        md5digest d;
+        {
+            digestBuilder << user << pwd;
+            string done = digestBuilder.str();
+
+            md5_state_t st;
+            md5_init(&st);
+            md5_append(&st, (const md5_byte_t *) done.c_str(), done.size());
+            md5_finish(&st, d);
         }
-        virtual LockType locktype() const { return WRITE; }
-        virtual void help(stringstream& ss) const { ss << "internal"; }
-        CmdAuthenticate() : Command("authenticate") {}
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log(1) << " authenticate: " << cmdObj << endl;
 
-            string user = cmdObj.getStringField("user");
-            string key = cmdObj.getStringField("key");
-            string received_nonce = cmdObj.getStringField("nonce");
+        string computed = digestToString( d );
 
-            if( user.empty() || key.empty() || received_nonce.empty() ) {
-                log() << "field missing/wrong type in received authenticate command "
-                      << dbname
-                      << endl;
-                errmsg = "auth fails";
-                sleepmillis(10);
-                return false;
-            }
-
-            stringstream digestBuilder;
-
-            {
-                bool reject = false;
-                nonce *ln = lastNonce.release();
-                if ( ln == 0 ) {
-                    reject = true;
-                    log(1) << "auth: no lastNonce" << endl;
-                }
-                else {
-                    digestBuilder << hex << *ln;
-                    reject = digestBuilder.str() != received_nonce;
-                    if ( reject ) log(1) << "auth: different lastNonce" << endl;
-                }
-
-                if ( reject ) {
-                    log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << cc().database()->name << endl;
-                    errmsg = "auth fails";
-                    sleepmillis(30);
-                    return false;
-                }
-            }
-
-            BSONObj userObj;
-            string pwd;
-
-            if (user == internalSecurity.user) {
-                pwd = internalSecurity.pwd;
-            }
-            else {
-                static BSONObj userPattern = fromjson("{\"user\":1}");
-                string systemUsers = dbname + ".system.users";
-                OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
-                {
-                    BSONObjBuilder b;
-                    b << "user" << user;
-                    BSONObj query = b.done();
-                    if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) {
-                        log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
-                        errmsg = "auth fails";
-                        return false;
-                    }
-                }
-
-                pwd = userObj.getStringField("pwd");
-            }
-
-
-            md5digest d;
-            {
-                digestBuilder << user << pwd;
-                string done = digestBuilder.str();
-
-                md5_state_t st;
-                md5_init(&st);
-                md5_append(&st, (const md5_byte_t *) done.c_str(), done.size());
-                md5_finish(&st, d);
-            }
-
-            string computed = digestToString( d );
-
-            if ( key != computed ) {
-                log() << "auth: key mismatch " << user << ", ns:" << dbname << endl;
-                errmsg = "auth fails";
-                return false;
-            }
-
-            AuthenticationInfo *ai = cc().getAuthenticationInfo();
-
-            if ( userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean() ) {
-                ai->authorizeReadOnly( cc().database()->name.c_str() , user );
-            }
-            else {
-                ai->authorize( cc().database()->name.c_str() , user );
-            }
-            return true;
+        if ( key != computed ) {
+            log() << "auth: key mismatch " << user << ", ns:" << dbname << endl;
+            errmsg = "auth fails";
+            return false;
         }
-    } cmdAuthenticate;
+
+        authenticate(dbname, user, userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean());
+
+        return true;
+    }
+
+    CmdAuthenticate cmdAuthenticate;
 
 } // namespace mongo

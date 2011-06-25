@@ -22,6 +22,7 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "indexkey.h"
+#include "key.h"
 
 namespace mongo {
 
@@ -29,6 +30,7 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
         virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
@@ -150,6 +152,7 @@ namespace mongo {
             return v;
         }
 
+        /** @return true if index has unique constraint */
         bool unique() const {
             BSONObj io = info.obj();
             return io["unique"].trueValue() ||
@@ -157,13 +160,13 @@ namespace mongo {
                    isIdIndex();
         }
 
-        /* if set, when building index, if any duplicates, drop the duplicating object */
+        /** return true if dropDups was set when building index (if any duplicates, dropdups drops the duplicating objects) */
         bool dropDups() const {
             return info.obj().getBoolField( "dropDups" );
         }
 
-        /* delete this index.  does NOT clean up the system catalog
-           (system.indexes or system.namespaces) -- only NamespaceIndex.
+        /** delete this index.  does NOT clean up the system catalog
+            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill_idx();
 
@@ -177,15 +180,17 @@ namespace mongo {
                     it may not mean we can build the index version in question: we may not maintain building 
                     of indexes in old formats in the future.
         */
-        static bool isASupportedIndexVersionNumber(int v) { return v == 0 || v == 1; }
+        static bool isASupportedIndexVersionNumber(int v) { return (v&1)==v; } // v == 0 || v == 1
 
+        /** @return the interface for this interface, which varies with the index version.
+            used for backward compatibility of index versions/formats.
+        */
         IndexInterface& idxInterface() { 
             int v = version();
             dassert( isASupportedIndexVersionNumber(v) );
             return *iis[v&1];
         }
 
-    private:
         static IndexInterface *iis[];
     };
 

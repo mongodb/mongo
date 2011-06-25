@@ -1,4 +1,7 @@
-// bsoninlines.h
+/** @file bsoninlines.h
+          a goal here is that the most common bson methods can be used inline-only, a la boost.
+          thus some things are inline that wouldn't necessarily be otherwise.
+*/
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -18,12 +21,150 @@
 #pragma once
 
 #include <map>
-#include <limits.h>
-#include "util/atomic_int.h"
-#include "util/misc.h"
-#include "../util/hex.h"
+#include <limits>
+
+#if defined(_WIN32)
+#undef max
+#undef min
+#endif
 
 namespace mongo {
+
+    /* must be same type when called, unless both sides are #s 
+       this large function is in header to facilitate inline-only use of bson
+    */
+    inline int compareElementValues(const BSONElement& l, const BSONElement& r) {
+        int f;
+        double x;
+
+        switch ( l.type() ) {
+        case EOO:
+        case Undefined: // EOO and Undefined are same canonicalType
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+            f = l.canonicalType() - r.canonicalType();
+            if ( f<0 ) return -1;
+            return f==0 ? 0 : 1;
+        case Bool:
+            return *l.value() - *r.value();
+        case Timestamp:
+            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
+            if ( l.date() < r.date() )
+                return -1;
+            return l.date() == r.date() ? 0 : 1;
+        case Date:
+            {
+                long long a = (long long) l.Date().millis;
+                long long b = (long long) r.Date().millis;
+                if( a < b ) 
+                    return -1;
+                return a == b ? 0 : 1;
+            }
+        case NumberLong:
+            if( r.type() == NumberLong ) {
+                long long L = l._numberLong();
+                long long R = r._numberLong();
+                if( L < R ) return -1;
+                if( L == R ) return 0;
+                return 1;
+            }
+            // else fall through
+        case NumberInt:
+        case NumberDouble: {
+            double left = l.number();
+            double right = r.number();
+            bool lNan = !( left <= std::numeric_limits< double >::max() &&
+                           left >= -std::numeric_limits< double >::max() );
+            bool rNan = !( right <= numeric_limits< double >::max() &&
+                           right >= -numeric_limits< double >::max() );
+            if ( lNan ) {
+                if ( rNan ) {
+                    return 0;
+                }
+                else {
+                    return -1;
+                }
+            }
+            else if ( rNan ) {
+                return 1;
+            }
+            x = left - right;
+            if ( x < 0 ) return -1;
+            return x == 0 ? 0 : 1;
+        }
+        case jstOID:
+            return memcmp(l.value(), r.value(), 12);
+        case Code:
+        case Symbol:
+        case String:
+            /* todo: a utf sort order version one day... */
+            {
+                // we use memcmp as we allow zeros in UTF8 strings
+                int lsz = l.valuestrsize();
+                int rsz = r.valuestrsize();
+                int common = min(lsz, rsz);
+                int res = memcmp(l.valuestr(), r.valuestr(), common);
+                if( res ) 
+                    return res;
+                // longer string is the greater one
+                return lsz-rsz;
+            }
+        case Object:
+        case Array:
+            return l.embeddedObject().woCompare( r.embeddedObject() );
+        case DBRef: {
+            int lsz = l.valuesize();
+            int rsz = r.valuesize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value(), r.value(), lsz);
+        }
+        case BinData: {
+            int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
+            int rsz = r.objsize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value()+4, r.value()+4, lsz+1);
+        }
+        case RegEx: {
+            int c = strcmp(l.regex(), r.regex());
+            if ( c )
+                return c;
+            return strcmp(l.regexFlags(), r.regexFlags());
+        }
+        case CodeWScope : {
+            f = l.canonicalType() - r.canonicalType();
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            if ( f )
+                return f;
+            return 0;
+        }
+        default:
+            assert( false);
+        }
+        return -1;
+    }
+
+    /* wo = "well ordered" */
+    inline int BSONElement::woCompare( const BSONElement &e,
+                                bool considerFieldName ) const {
+        int lt = (int) canonicalType();
+        int rt = (int) e.canonicalType();
+        int x = lt - rt;
+        if( x != 0 && (!isNumber() || !e.isNumber()) )
+            return x;
+        if ( considerFieldName ) {
+            x = strcmp(fieldName(), e.fieldName());
+            if ( x != 0 )
+                return x;
+        }
+        x = compareElementValues(*this, e);
+        return x;
+    }
 
     inline BSONObjIterator BSONObj::begin() const {
         return BSONObjIterator(*this);
@@ -47,6 +188,21 @@ namespace mongo {
         assert( type() == CodeWScope );
         int strSizeWNull = *(int *)( value() + 4 );
         return BSONObj( value() + 4 + 4 + strSizeWNull );
+    }
+
+    // deep (full) equality
+    inline bool BSONObj::equal(const BSONObj &rhs) const {
+        BSONObjIterator i(*this);
+        BSONObjIterator j(rhs);
+        BSONElement l,r;
+        do {
+            // so far, equal...
+            l = i.next();
+            r = j.next();
+            if ( l.eoo() )
+                return r.eoo();
+        } while( l == r );
+        return false;
     }
 
     inline NOINLINE_DECL void BSONObj::_assertInvalid() const {
@@ -116,7 +272,7 @@ namespace mongo {
 
     inline int BSONObj::getIntField(const char *name) const {
         BSONElement e = getField(name);
-        return e.isNumber() ? (int) e.number() : INT_MIN;
+        return e.isNumber() ? (int) e.number() : std::numeric_limits< int >::min();
     }
 
     inline bool BSONObj::getBoolField(const char *name) const {
@@ -321,8 +477,6 @@ namespace mongo {
         s << ( isArray ? " ]" : " }" );
     }
 
-    extern unsigned getRandomNumber();
-
     inline void BSONElement::validate() const {
         const BSONType t = type();
 
@@ -523,7 +677,7 @@ namespace mongo {
             s << "EOO";
             break;
         case mongo::Date:
-            s << "new Date(" << date() << ')';
+            s << "new Date(" << (long long) date() << ')';
             break;
         case RegEx: {
             s << "/" << regex() << '/';

@@ -21,8 +21,10 @@
 #include "../db/queryoptimizer.h"
 #include "../db/querypattern.h"
 #include "../db/instance.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
+#include "../db/ops/delete.h"
 #include "dbtests.h"
+
 
 namespace mongo {
     extern BSONObj id_obj;
@@ -339,7 +341,7 @@ namespace QueryOptimizerTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                NamespaceDetailsTransient::_get( ns() ).clearQueryCache();
+                NamespaceDetailsTransient::get_inlock( ns() ).clearQueryCache();
                 dropCollection( ns() );
             }
             static void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
@@ -609,23 +611,28 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
+                // No best plan - all must be tried.
                 nPlans( 3 );
                 runQuery();
+                // Best plan selected by query.
                 nPlans( 1 );
                 nPlans( 1 );
                 Helpers::ensureIndex( ns(), BSON( "c" << 1 ), false, "c_1" );
+                // Best plan cleared when new index added.
                 nPlans( 3 );
                 runQuery();
+                // Best plan selected by query.
                 nPlans( 1 );
 
                 {
                     DBDirectClient client;
-                    for( int i = 0; i < 34; ++i ) {
+                    for( int i = 0; i < 334; ++i ) {
                         client.insert( ns(), BSON( "i" << i ) );
                         client.update( ns(), QUERY( "i" << i ), BSON( "i" << i + 1 ) );
                         client.remove( ns(), BSON( "i" << i + 1 ) );
                     }
                 }
+                // Best plan cleared by ~1000 writes.
                 nPlans( 3 );
 
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
@@ -633,6 +640,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 NoRecordTestOp original;
                 s.runOp( original );
+                // NoRecordTestOp doesn't record a best plan (test cases where mayRecordPlan() is false).
                 nPlans( 3 );
 
                 BSONObj hint = fromjson( "{hint:{$natural:1}}" );
@@ -642,6 +650,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ), &hintElt );
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
+                // No plan recorded when a hint is used.
                 nPlans( 3 );
 
                 auto_ptr< FieldRangeSetPair > frsp3( new FieldRangeSetPair( ns(), BSON( "a" << 4 ), true ) );
@@ -649,8 +658,10 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s3( ns(), frsp3, frspOrig3, BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) );
                 TestOp newerOriginal;
                 s3.runOp( newerOriginal );
+                // Plan recorded was for a different query pattern (different sort spec).
                 nPlans( 3 );
 
+                // Best plan still selected by query after all these other tests.
                 runQuery();
                 nPlans( 1 );
             }
@@ -758,8 +769,8 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 1 );
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 1, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) );
             }
         };
 
@@ -814,7 +825,7 @@ namespace QueryOptimizerTests {
                     QueryMessage q(d);
                     runQuery( m, q);
                 }
-                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
+                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
 
                 Message m2;
                 assembleRequest( ns(), QUERY( "b" << 99 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m2 );
@@ -823,8 +834,8 @@ namespace QueryOptimizerTests {
                     QueryMessage q(d);
                     runQuery( m2, q);
                 }
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 3, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 3, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) );
             }
         };
 
@@ -2211,6 +2222,43 @@ namespace QueryOptimizerTests {
                 }
             }
         };
+
+        /** Yield with BacicCursor takeover cursor. */
+        class YieldTakeoverBasic : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << BSON_ARRAY( i << i+1 ) ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                auto_ptr<ClientCursor> cc;
+                auto_ptr<ClientCursor::YieldData> data( new ClientCursor::YieldData() );
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "b" << NE << 0 << "a" << GTE << 0 ) );
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
+                    for( int i = 0; i < 120; ++i ) {
+                     	ASSERT( advance() );
+                    }
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 120, current().getIntField( "_id" ) );
+                    cc->prepareToYield( *data );
+                }                
+                _cli.remove( ns(), BSON( "_id" << 120 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT( ClientCursor::recoverFromYield( *data ) );
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 121, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 122, current().getIntField( "_id" ) );
+                }
+            }
+        };
         
         /** Yield with advance of inactive cursor. */
         class YieldInactiveCursorAdvance : public Base {
@@ -2637,6 +2685,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
             add<QueryOptimizerCursorTests::TryYieldGeo>();
             add<QueryOptimizerCursorTests::YieldTakeover>();
+            add<QueryOptimizerCursorTests::YieldTakeoverBasic>();
             add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
             add<QueryOptimizerCursorTests::OrderId>();
             add<QueryOptimizerCursorTests::OrderMultiIndex>();

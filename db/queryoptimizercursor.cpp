@@ -26,8 +26,15 @@ namespace mongo {
     
     static const int OutOfOrderDocumentsAssertionCode = 14810;
     
+    /**
+     * A QueryOp implementation utilized by the QueryOptimizerCursor
+     */
     class QueryOptimizerCursorOp : public QueryOp {
     public:
+        /**
+         * @param aggregateNscanned - shared int counting total nscanned for
+         * query ops for all cursors.
+         */
         QueryOptimizerCursorOp( long long &aggregateNscanned ) : _matchCount(), _mustAdvance(), _nscanned(), _aggregateNscanned( aggregateNscanned ) {}
         
         virtual void _init() {
@@ -126,6 +133,12 @@ namespace mongo {
         long long &_aggregateNscanned;
     };
     
+    /**
+     * This cursor runs a MultiPlanScanner iteratively and returns results from
+     * the scanner's cursors as they become available.  Once the scanner chooses
+     * a single plan, this cursor becomes a simple wrapper around that single
+     * plan's cursor (called the 'takeover' cursor).
+     */
     class QueryOptimizerCursor : public Cursor {
     public:
         QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps ) :
@@ -141,14 +154,24 @@ namespace mongo {
             }
         }
         
-        virtual bool ok() { return !currLoc().isNull(); }
-        virtual Record* _current() { assertOk(); return currLoc().rec(); }
-        virtual BSONObj current() { assertOk(); return currLoc().obj(); }
-        virtual DiskLoc currLoc() { return _currLoc(); }
-        DiskLoc _currLoc() const {
+        virtual bool ok() { return _takeover ? _takeover->ok() : !currLoc().isNull(); }
+        virtual Record* _current() {
             if ( _takeover ) {
-                return _takeover->currLoc();
+                return _takeover->_current();
             }
+            assertOk();
+            return currLoc().rec();
+        }
+        virtual BSONObj current() {
+            if ( _takeover ) {
+                return _takeover->current();
+            }
+            assertOk();
+            return currLoc().obj();
+        }
+        virtual DiskLoc currLoc() { return _takeover ? _takeover->currLoc() : _currLoc(); }
+        DiskLoc _currLoc() const {
+            verify( 14826, !_takeover );
             if ( _currOp ) {
                 return _currOp->currLoc();
             }
@@ -160,6 +183,7 @@ namespace mongo {
             }
             
             // Ok to advance if currOp in an error state due to failed yield recovery.
+            // This may be the case when advance() is called by recoverFromYield().
             if ( !( _currOp && _currOp->error() ) && !ok() ) {
                 return false;
             }
@@ -186,16 +210,27 @@ namespace mongo {
             return ok();
         }
         virtual BSONObj currKey() const {
+            if ( _takeover ) {
+             	return _takeover->currKey();   
+            }
             assertOk();
-            return _takeover ? _takeover->currKey() : _currOp->currKey();
+            return _currOp->currKey();
         }
         
         /** This cursor will be ignored for yielding by the client cursor implementation. */
-        virtual DiskLoc refLoc() { return DiskLoc(); }
+        virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
+        
+        virtual BSONObj indexKeyPattern() {
+            if ( _takeover ) {
+                return _takeover->indexKeyPattern();
+            }
+            assertOk();
+            return _currOp->cursor()->indexKeyPattern();
+        }
         
         virtual bool supportGetMore() { return false; }
 
-        virtual bool supportYields() { return true; }
+        virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
         virtual bool prepareToYield() {
             if ( _takeover ) {
                 return _takeover->prepareToYield();
@@ -210,8 +245,9 @@ namespace mongo {
         virtual void recoverFromYield() {
             if ( _takeover ) {
                 _takeover->recoverFromYield();
+                return;
             }
-            else if ( _currOp ) {
+            if ( _currOp ) {
                 _mps->recoverFromYield();
                 if ( _currOp->error() ) {
                     // See if we can advance to a non error op.
@@ -223,33 +259,45 @@ namespace mongo {
         virtual string toString() { return "QueryOptimizerCursor"; }
         
         virtual bool getsetdup(DiskLoc loc) {
+            if ( _takeover ) {
+                if ( getdupInternal( loc ) ) {
+                    return true;   
+                }
+             	return _takeover->getsetdup( loc );   
+            }
             assertOk();
-            if ( !_takeover ) {
-                return getsetdupInternal( loc );                
-            }
-            if ( getdupInternal( loc ) ) {
-                return true;   
-            }
-            return _takeover->getsetdup( loc );
+            return getsetdupInternal( loc );                
         }
         
+        /** Matcher needs to know if the the cursor being forwarded to is multikey. */
         virtual bool isMultiKey() const {
+            if ( _takeover ) {
+                return _takeover->isMultiKey();
+            }
             assertOk();
-            return _takeover ? _takeover->isMultiKey() : _currOp->cursor()->isMultiKey();
+            return _currOp->cursor()->isMultiKey();
         }
         
         virtual bool modifiedKeys() const { return true; }
         
         virtual long long nscanned() { return _takeover ? _takeover->nscanned() : _nscanned; }
 
+        /** @return the matcher for the takeover cursor or current active op. */
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
+            if ( _takeover ) {
+                return _takeover->matcherPtr();
+            }
             assertOk();
-            return _takeover ? _takeover->matcherPtr() : _currOp->matcher( _currOp->cursor() );
+            return _currOp->matcher( _currOp->cursor() );
         }
 
+        /** @return the matcher for the takeover cursor or current active op. */
         virtual CoveredIndexMatcher* matcher() const {
+            if ( _takeover ) {
+                return _takeover->matcher();
+            }
             assertOk();
-            return _takeover ? _takeover->matcher() : _currOp->matcher( _currOp->cursor() ).get();
+            return _currOp->matcher( _currOp->cursor() ).get();
         }
 
     private:
@@ -263,12 +311,14 @@ namespace mongo {
         void assertOk() const {
             massert( 14809, "Invalid access for cursor that is not ok()", !_currLoc().isNull() );
         }
-        
+
+        /** Insert and check for dups before takeover occurs */
         bool getsetdupInternal(const DiskLoc &loc) {
             pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
             return !p.second;
         }
 
+        /** Just check for dups - after takeover occurs */
         bool getdupInternal(const DiskLoc &loc) {
             return _dups.count( loc ) > 0;
         }
@@ -293,11 +343,6 @@ namespace mongo {
             throw;
         }
         return shared_ptr<Cursor>( new QueryOptimizerCursor( mps ) );
-    }
-    
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps );
     }
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
@@ -329,5 +374,11 @@ namespace mongo {
         }
         return newQueryOptimizerCursor( mps );
     }
-    
+
+    /** This interface just available for testing. */
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
+        return newQueryOptimizerCursor( mps );
+    }
+        
 } // namespace mongo;

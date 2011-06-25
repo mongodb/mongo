@@ -83,6 +83,31 @@ namespace mongo {
         DBClientBase * get( const string& addr , const string& ns ) {
             _check( ns );
 
+            // Determine if non-shard conn is RS member for warning
+            // All shards added to _hosts if not present in _check()
+            if( _hosts.find( addr ) == _hosts.end() ){
+
+                vector<Shard> all;
+                Shard::getAllShards( all );
+
+                bool isRSMember = false;
+                string parentShard;
+                for ( unsigned i = 0; i < all.size(); i++ ) {
+                    string connString = all[i].getConnString();
+                    if( connString.find( addr ) != string::npos && connString.find( '/' ) != string::npos ){
+                        isRSMember = true;
+                        parentShard = connString;
+                        break;
+                    }
+                }
+
+                if( isRSMember ){
+                    warning() << "adding shard sub-connection " << addr << " (parent " << parentShard << ") as sharded, this is safe but unexpected" << endl;
+                    printStackTrace();
+                }
+            }
+
+
             Status* &s = _hosts[addr];
             if ( ! s )
                 s = new Status();
@@ -119,22 +144,25 @@ namespace mongo {
         }
 
         void checkVersions( const string& ns ) {
+
             vector<Shard> all;
             Shard::getAllShards( all );
-            for ( unsigned i=0; i<all.size(); i++ ) {
-                Status* &s = _hosts[all[i].getConnString()];
-                if ( ! s )
-                    s = new Status();
-            }
 
-            for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
-                if ( ! Shard::isAShardNode( i->first ) )
-                    continue;
-                Status* ss = i->second;
-                assert( ss );
-                if ( ! ss->avail )
-                    ss->avail = shardConnectionPool.get( i->first );
-                checkShardVersionCB( *ss->avail , ns , false , 1 );
+            // Now only check top-level shard connections
+            for ( unsigned i=0; i<all.size(); i++ ) {
+
+                string sconnString = all[i].getConnString();
+                Status* &s = _hosts[sconnString];
+
+                if ( ! s ){
+                    s = new Status();
+                }
+
+                if( ! s->avail )
+                    s->avail = shardConnectionPool.get( sconnString );
+
+                checkShardVersionCB( *s->avail, ns, false, 1 );
+
             }
         }
 

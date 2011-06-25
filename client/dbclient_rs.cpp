@@ -611,25 +611,115 @@ namespace mongo {
         _slave.reset();
     }
 
-    DBClientBase* DBClientReplicaSet::callLazy( Message& toSend ) {
-        if ( toSend.operation() == dbQuery ) {
+    void DBClientReplicaSet::say( Message& toSend, bool isRetry ) {
+
+        if( ! isRetry )
+            _lazyState = LazyState();
+
+        int lastOp = -1;
+        bool slaveOk = false;
+
+        if ( ( lastOp = toSend.operation() ) == dbQuery ) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm( toSend );
             QueryMessage qm( dm );
-            if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<3; i++ ) {
+            if ( ( slaveOk = ( qm.queryOptions & QueryOption_SlaveOk ) ) ) {
+
+                for ( int i = _lazyState._retries; i < 3; i++ ) {
                     try {
-                        return checkSlave()->callLazy( toSend );
+                        DBClientConnection* slave = checkSlave();
+                        slave->say( toSend );
+
+                        _lazyState._lastOp = lastOp;
+                        _lazyState._slaveOk = slaveOk;
+                        _lazyState._retries = i;
+                        _lazyState._lastClient = slave;
+                        return;
                     }
                     catch ( DBException &e ) {
-                    	LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                       LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                     }
                 }
             }
         }
 
-        return checkMaster()->callLazy( toSend );
+        DBClientConnection* master = checkMaster();
+        master->say( toSend );
+
+        _lazyState._lastOp = lastOp;
+        _lazyState._slaveOk = slaveOk;
+        _lazyState._retries = 3;
+        _lazyState._lastClient = master;
+        return;
     }
+
+    bool DBClientReplicaSet::recv( Message& m ) {
+
+        assert( _lazyState._lastClient );
+
+        // TODO: It would be nice if we could easily wrap a conn error as a result error
+        try {
+            return _lazyState._lastClient->recv( m );
+        }
+        catch( DBException& e ){
+            log() << "could not receive data from " << _lazyState._lastClient << causedBy( e ) << endl;
+            return false;
+        }
+    }
+
+    void DBClientReplicaSet::checkResponse( const char* data, int nReturned, bool* retry, string* targetHost ){
+
+        // For now, do exactly as we did before, so as not to break things.  In general though, we
+        // should fix this so checkResponse has a more consistent contract.
+        if( ! retry ){
+            if( _lazyState._lastClient )
+                return _lazyState._lastClient->checkResponse( data, nReturned );
+            else
+                return checkMaster()->checkResponse( data, nReturned );
+        }
+
+        *retry = false;
+        if( targetHost && _lazyState._lastClient ) *targetHost = _lazyState._lastClient->getServerAddress();
+        else if (targetHost) *targetHost = "";
+
+        if( ! _lazyState._lastClient ) return;
+        if( nReturned != 1 && nReturned != -1 ) return;
+
+        BSONObj dataObj;
+        if( nReturned == 1 ) dataObj = BSONObj( data );
+
+        // Check if we should retry here
+        if( _lazyState._lastOp == dbQuery && _lazyState._slaveOk ){
+
+            // Check the error code for a slave not secondary error
+            if( nReturned == -1 ||
+                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ) ){
+
+                bool wasMaster = false;
+                if( _lazyState._lastClient == _slave.get() ){
+                    isntSecondary();
+                }
+                else if( _lazyState._lastClient == _master.get() ){
+                    wasMaster = true;
+                    isntMaster();
+                }
+                else
+                    warning() << "passed " << dataObj << " but last rs client " << _lazyState._lastClient->toString() << " is not master or secondary" << endl;
+
+                if( _lazyState._retries < 3 ){
+                    _lazyState._retries++;
+                    *retry = true;
+                }
+                else{
+                    (void)wasMaster; // silence set-but-not-used warning
+                    // assert( wasMaster );
+                    // printStackTrace();
+                    log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
+                }
+            }
+        }
+    }
+
 
     bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {

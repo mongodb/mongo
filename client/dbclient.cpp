@@ -64,15 +64,17 @@ namespace mongo {
     }
 
 
-    DBClientBase* ConnectionString::connect( string& errmsg ) const {
+    DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
         switch ( _type ) {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
+            c->setSoTimeout( socketTimeout );
             log(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
+            log(1) << "connected connection!" << endl;
             return c;
         }
 
@@ -93,7 +95,8 @@ namespace mongo {
             list<HostAndPort> l;
             for ( unsigned i=0; i<_servers.size(); i++ )
                 l.push_back( _servers[i] );
-            return new SyncClusterConnection( l );
+            SyncClusterConnection* c = new SyncClusterConnection( l, socketTimeout );
+            return c;
         }
 
         case INVALID:
@@ -391,6 +394,7 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
+        assert(!capped||size);
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
@@ -574,6 +578,10 @@ namespace mongo {
             return false;
         }
 
+        // if( _so_timeout == 0 ){
+        //    printStackTrace();
+        //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
+        // }
         if ( !p->connect(*server) ) {
             stringstream ss;
             ss << "couldn't connect to server " << _serverString;
@@ -765,10 +773,6 @@ namespace mongo {
     }
 
 
-    DBClientBase* DBClientBase::callLazy( Message& toSend ) {
-        say( toSend );
-        return this;
-    }
     
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
@@ -898,7 +902,7 @@ namespace mongo {
         toSend.setData(dbQuery, b.buf(), b.len());
     }
 
-    void DBClientConnection::say( Message &toSend ) {
+    void DBClientConnection::say( Message &toSend, bool isRetry ) {
         checkConnection();
         try {
             port().say( toSend );
@@ -960,11 +964,14 @@ namespace mongo {
         return ! getErrField( o ).eoo();
     }
 
-    void DBClientConnection::checkResponse( const char *data, int nReturned ) {
+    void DBClientConnection::checkResponse( const char *data, int nReturned, bool* retry, string* host ) {
         /* check for errors.  the only one we really care about at
          * this stage is "not master" 
         */
         
+        *retry = false;
+        *host = _serverString;
+
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);

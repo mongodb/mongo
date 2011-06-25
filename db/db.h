@@ -173,6 +173,33 @@ namespace mongo {
         }
     };
 
+    /** must be write locked
+        no assert (and no release) if nested write lock 
+        a lot like dbtempreleasecond but no malloc so should be a tiny bit faster
+    */
+    struct dbtempreleasewritelock {
+        Client::Context * _context;
+        int _locktype;
+        dbtempreleasewritelock() {
+            const Client& c = cc();
+            _context = c.getContext();
+            _locktype = dbMutex.getState();
+            assert( _locktype >= 1 );
+            if( _locktype > 1 ) 
+                return; // nested
+            if ( _context ) 
+                _context->unlocked();
+            dbMutex.unlock();
+            verify( 14845 , c.curop() );
+            c.curop()->yielded();            
+        }
+        ~dbtempreleasewritelock() {
+            if ( _locktype == 1 )
+                dbMutex.lock();
+            if ( _context ) 
+                _context->relocked();
+        }
+    };
 
     /**
        only does a temp release if we're not nested and have a lock

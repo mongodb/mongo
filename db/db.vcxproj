@@ -495,6 +495,9 @@
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
+    <ClCompile Include="ops\delete.cpp" />
+    <ClCompile Include="ops\query.cpp" />
+    <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="queryoptimizercursor.cpp" />
     <ClCompile Include="querypattern.cpp">
@@ -503,6 +506,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="record.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
@@ -552,13 +556,11 @@
     <ClCompile Include="nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
-    <ClCompile Include="query.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />
-    <ClCompile Include="security_key.cpp" />
+    <ClCompile Include="security_common.cpp" />
     <ClCompile Include="tests.cpp" />
-    <ClCompile Include="update.cpp" />
     <ClCompile Include="cmdline.cpp" />
     <ClCompile Include="queryutil.cpp" />
     <ClCompile Include="..\util\assert_util.cpp" />
@@ -675,6 +677,8 @@
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
+    <ClInclude Include="ops\delete.h" />
+    <ClInclude Include="ops\update.h" />
     <ClInclude Include="projection.h" />
     <ClInclude Include="queryutil.h" />
     <ClInclude Include="repl.h" />
@@ -720,7 +724,6 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
     <ClInclude Include="security.h" />
-    <ClInclude Include="update.h" />
     <ClInclude Include="..\util\allocator.h" />
     <ClInclude Include="..\util\array.h" />
     <ClInclude Include="..\util\assert_util.h" />

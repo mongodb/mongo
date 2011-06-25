@@ -31,6 +31,8 @@
 
 namespace JsobjTests {
 
+    IndexInterface& indexInterfaceForTheseTests = (time(0)%2) ? *IndexDetails::iis[0] : *IndexDetails::iis[1];
+
     void keyTest(const BSONObj& o, bool mustBeCompact = false) {
         static KeyV1Owned *kLast;
         static BSONObj last;
@@ -492,10 +494,36 @@ namespace JsobjTests {
                 keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
 
                 {
-                    // check signed dates with new key format
-                    KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
-                    KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
-                    ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                    {
+                        // check signed dates with new key format
+                        KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                    }
+                    {
+                        // backward compatibility
+                        KeyBson a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyBson b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                    }
+                    {
+                        // this is an uncompactible key:
+                        BSONObj uc1 = BSONObjBuilder().appendDate("", -50).appendCode("", "abc").obj();
+                        BSONObj uc2 = BSONObjBuilder().appendDate("", 55).appendCode("", "abc").obj();
+                        ASSERT( uc1.woCompare(uc2, Ordering::make(BSONObj())) < 0 );
+                        {
+                            KeyV1Owned a(uc1);
+                            KeyV1Owned b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                        }
+                        {
+                            KeyBson a(uc1);
+                            KeyBson b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                        }
+                    }
                 }
 
                 {
@@ -587,7 +615,7 @@ namespace JsobjTests {
                     b.append("field", x, 4);
                     b.append("z", true);
                     BSONObj B = b.obj();
-                    cout << B.toString() << endl;
+                    //cout << B.toString() << endl;
 
                     BSONObjBuilder a;
                     const char xx[] = {'a', 0, 'c', 0};
@@ -1270,11 +1298,10 @@ namespace JsobjTests {
                 stringstream ss;
                 ss << "type: " << t;
                 string s = ss.str();
-                massert( 10403 ,  s , min( t ).woCompare( max( t ) ) < 0 );
-                massert( 10404 ,  s , max( t ).woCompare( min( t ) ) > 0 );
-                massert( 10405 ,  s , min( t ).woCompare( min( t ) ) == 0 );
-                massert( 10406 ,  s , max( t ).woCompare( max( t ) ) == 0 );
-                massert( 10407 ,  s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
+                ASSERT( min( t ).woCompare( max( t ) ) <= 0 );
+                ASSERT( max( t ).woCompare( min( t ) ) >= 0 );
+                ASSERT( min( t ).woCompare( min( t ) ) == 0 );
+                ASSERT( max( t ).woCompare( max( t ) ) == 0 );
             }
         }
     };
@@ -1343,7 +1370,8 @@ namespace JsobjTests {
         class Basic1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
+
                 sorter.add( BSON( "x" << 10 ) , 5  , 1);
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1375,7 +1403,7 @@ namespace JsobjTests {
         class Basic2 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.add( BSON( "x" << 10 ) , 5  , 11 );
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1408,7 +1436,7 @@ namespace JsobjTests {
         class Basic3 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.sort();
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
@@ -1421,7 +1449,7 @@ namespace JsobjTests {
         class ByDiskLock {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add( BSON( "x" << 10 ) , 5  , 4);
                 sorter.add( BSON( "x" << 2 ) , 3 , 0 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 2 );
@@ -1455,7 +1483,7 @@ namespace JsobjTests {
         class Big1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 2000 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 2000 );
                 for ( int i=0; i<10000; i++ ) {
                     sorter.add( BSON( "x" << rand() % 10000 ) , 5  , i );
                 }
@@ -1480,7 +1508,7 @@ namespace JsobjTests {
         public:
             void run() {
                 const int total = 100000;
-                BSONObjExternalSorter sorter( BSONObj() , total * 2 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
                 for ( int i=0; i<total; i++ ) {
                     sorter.add( BSON( "a" << "b" ) , 5  , i );
                 }
@@ -1510,7 +1538,7 @@ namespace JsobjTests {
                 b.appendNull("");
                 BSONObj x = b.obj();
 
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add(x, DiskLoc(3,7));
                 sorter.add(x, DiskLoc(4,7));
                 sorter.add(x, DiskLoc(2,7));

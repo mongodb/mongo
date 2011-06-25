@@ -337,138 +337,6 @@ namespace mongo {
         return def;
     }
 
-    /* wo = "well ordered" */
-    int BSONElement::woCompare( const BSONElement &e,
-                                bool considerFieldName ) const {
-        int lt = (int) canonicalType();
-        int rt = (int) e.canonicalType();
-        int x = lt - rt;
-        if( x != 0 && (!isNumber() || !e.isNumber()) )
-            return x;
-        if ( considerFieldName ) {
-            x = strcmp(fieldName(), e.fieldName());
-            if ( x != 0 )
-                return x;
-        }
-        x = compareElementValues(*this, e);
-        return x;
-    }
-
-    /* must be same type when called, unless both sides are #s
-    */
-    int compareElementValues(const BSONElement& l, const BSONElement& r) {
-        int f;
-        double x;
-
-        switch ( l.type() ) {
-        case EOO:
-        case Undefined: // EOO and Undefined are same canonicalType
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            f = l.canonicalType() - r.canonicalType();
-            if ( f<0 ) return -1;
-            return f==0 ? 0 : 1;
-        case Bool:
-            return *l.value() - *r.value();
-        case Timestamp:
-            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
-            if ( l.date() < r.date() )
-                return -1;
-            return l.date() == r.date() ? 0 : 1;
-        case Date:
-            if ( l.date() < r.date() )
-                return -1;
-            return l.date() == r.date() ? 0 : 1;
-        case NumberLong:
-            if( r.type() == NumberLong ) {
-                long long L = l._numberLong();
-                long long R = r._numberLong();
-                if( L < R ) return -1;
-                if( L == R ) return 0;
-                return 1;
-            }
-            // else fall through
-        case NumberInt:
-        case NumberDouble: {
-            double left = l.number();
-            double right = r.number();
-            bool lNan = !( left <= numeric_limits< double >::max() &&
-                           left >= -numeric_limits< double >::max() );
-            bool rNan = !( right <= numeric_limits< double >::max() &&
-                           right >= -numeric_limits< double >::max() );
-            if ( lNan ) {
-                if ( rNan ) {
-                    return 0;
-                }
-                else {
-                    return -1;
-                }
-            }
-            else if ( rNan ) {
-                return 1;
-            }
-            x = left - right;
-            if ( x < 0 ) return -1;
-            return x == 0 ? 0 : 1;
-        }
-        case jstOID:
-            return memcmp(l.value(), r.value(), 12);
-        case Code:
-        case Symbol:
-        case String:
-            /* todo: a utf sort order version one day... */
-            {
-                // we use memcmp as we allow zeros in UTF8 strings
-                int lsz = l.valuestrsize();
-                int rsz = r.valuestrsize();
-                int common = min(lsz, rsz);
-                int res = memcmp(l.valuestr(), r.valuestr(), common);
-                if( res ) 
-                    return res;
-                // longer string is the greater one
-                return lsz-rsz;
-            }
-        case Object:
-        case Array:
-            return l.embeddedObject().woCompare( r.embeddedObject() );
-        case DBRef: {
-            int lsz = l.valuesize();
-            int rsz = r.valuesize();
-            if ( lsz - rsz != 0 ) return lsz - rsz;
-            return memcmp(l.value(), r.value(), lsz);
-        }
-        case BinData: {
-            int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
-            int rsz = r.objsize();
-            if ( lsz - rsz != 0 ) return lsz - rsz;
-            return memcmp(l.value()+4, r.value()+4, lsz+1);
-        }
-        case RegEx: {
-            int c = strcmp(l.regex(), r.regex());
-            if ( c )
-                return c;
-            return strcmp(l.regexFlags(), r.regexFlags());
-        }
-        case CodeWScope : {
-            f = l.canonicalType() - r.canonicalType();
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
-            if ( f )
-                return f;
-            return 0;
-        }
-        default:
-            out() << "compareElementValues: bad type " << (int) l.type() << endl;
-            assert(false);
-        }
-        return -1;
-    }
-
     /* Matcher --------------------------------------*/
 
 // If the element is something like:
@@ -634,21 +502,6 @@ namespace mongo {
             mask <<= 1;
         }
         return -1;
-    }
-
-    // deep (full) equality
-    bool BSONObj::equal(const BSONObj &rhs) const {
-        BSONObjIterator i(*this);
-        BSONObjIterator j(rhs);
-        BSONElement l,r;
-        do {
-            // so far, equal...
-            l = i.next();
-            r = j.next();
-            if ( l.eoo() )
-                return r.eoo();
-        } while( l == r );
-        return false;
     }
 
     /* well ordered compare */
@@ -1248,79 +1101,114 @@ namespace mongo {
 
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {
-        case MinKey: appendMinKey( fieldName ); return;
-        case MaxKey: appendMinKey( fieldName ); return;
+                
+        // Shared canonical types
         case NumberInt:
         case NumberDouble:
         case NumberLong:
             append( fieldName , - numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            append( fieldName , "" ); return;
+        case Date: 
+            // min varies with V0 and V1 indexes, so we go one type lower.
+            appendBool(fieldName, true);
+            //appendDate( fieldName , numeric_limits<long long>::min() ); 
+            return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            appendTimestamp( fieldName , 0 ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+                
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
         case jstOID: {
             OID o;
             memset(&o, 0, sizeof(o));
             appendOID( fieldName , &o);
             return;
         }
-        case Bool: appendBool( fieldName , false); return;
-        case Date: appendDate( fieldName , 0); return;
-        case jstNULL: appendNull( fieldName ); return;
-        case Symbol:
-        case String: append( fieldName , "" ); return;
-        case Object: append( fieldName , BSONObj() ); return;
+        case Bool:
+            appendBool( fieldName , false); return;
+        case jstNULL:
+            appendNull( fieldName ); return;
+        case Object:
+            append( fieldName , BSONObj() ); return;
         case Array:
             appendArray( fieldName , BSONObj() ); return;
         case BinData:
-            appendBinData( fieldName , 0 , Function , (const char *) 0 ); return;
-        case Undefined:
-            appendUndefined( fieldName ); return;
-        case RegEx: appendRegex( fieldName , "" ); return;
+            appendBinData( fieldName , 0 , BinDataGeneral , (const char *) 0 ); return;
+        case RegEx:
+            appendRegex( fieldName , "" ); return;
         case DBRef: {
             OID o;
             memset(&o, 0, sizeof(o));
             appendDBRef( fieldName , "" , o );
             return;
         }
-        case Code: appendCode( fieldName , "" ); return;
-        case CodeWScope: appendCodeWScope( fieldName , "" , BSONObj() ); return;
-        case Timestamp: appendTimestamp( fieldName , 0); return;
-
+        case Code:
+            appendCode( fieldName , "" ); return;
+        case CodeWScope:
+            appendCodeWScope( fieldName , "" , BSONObj() ); return;
         };
-        log() << "type not support for appendMinElementForType: " << t << endl;
+        log() << "type not supported for appendMinElementForType: " << t << endl;
         uassert( 10061 ,  "type not supported for appendMinElementForType" , false );
     }
 
     void BSONObjBuilder::appendMaxForType( const StringData& fieldName , int t ) {
         switch ( t ) {
-        case MinKey: appendMaxKey( fieldName );  break;
-        case MaxKey: appendMaxKey( fieldName ); break;
+                
+        // Shared canonical types
         case NumberInt:
         case NumberDouble:
         case NumberLong:
-            append( fieldName , numeric_limits<double>::max() );
-            break;
-        case BinData:
-            appendMinForType( fieldName , jstOID );
-            break;
+            append( fieldName , numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            appendMinForType( fieldName, Object ); return;
+        case Date:
+            appendDate( fieldName , numeric_limits<long long>::max() ); return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
         case jstOID: {
             OID o;
             memset(&o, 0xFF, sizeof(o));
             appendOID( fieldName , &o);
-            break;
+            return;
         }
-        case Undefined:
+        case Bool:
+            appendBool( fieldName , true ); return;
         case jstNULL:
-            appendMinForType( fieldName , NumberInt );
-        case Bool: appendBool( fieldName , true); break;
-        case Date: appendDate( fieldName , 0xFFFFFFFFFFFFFFFFLL ); break;
-        case Symbol:
-        case String: append( fieldName , BSONObj() ); break;
+            appendNull( fieldName ); return;
+        case Object:
+            appendMinForType( fieldName, Array ); return;
+        case Array:
+            appendMinForType( fieldName, BinData ); return;
+        case BinData:
+            appendMinForType( fieldName, jstOID ); return;
+        case RegEx:
+            appendMinForType( fieldName, DBRef ); return;
+        case DBRef:
+            appendMinForType( fieldName, Code ); return;                
         case Code:
+            appendMinForType( fieldName, CodeWScope ); return;
         case CodeWScope:
-            appendCodeWScope( fieldName , "ZZZ" , BSONObj() ); break;
-        case Timestamp:
-            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); break;
-        default:
-            appendMinForType( fieldName , t + 1 );
+            // This upper bound may change if a new bson type is added.
+            appendMinForType( fieldName , MaxKey ); return;
         }
+        log() << "type not supported for appendMaxElementForType: " << t << endl;
+        uassert( 14853 ,  "type not supported for appendMaxElementForType" , false );
     }
 
     const string BSONObjBuilder::numStrs[] = {
@@ -1442,6 +1330,23 @@ namespace mongo {
             catch(unsigned) { }
         }
         return v;
+    }
+
+    bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
+        BSONObjIterator l(lhs);
+        BSONObjIterator r(rhs);
+
+        while (l.more() && r.more()){
+            if (strcmp(l.next().fieldName(), r.next().fieldName())) {
+                PRINTFL;
+                return false;
+            }
+        }
+        PRINT(l.more());
+        PRINT(r.more());
+        PRINT(l.more() || r.more());
+
+        return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }
 
 } // namespace mongo

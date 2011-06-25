@@ -168,6 +168,7 @@ namespace mongo {
     inline string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline string causedBy( const string& e ){ return causedBy( e.c_str() ); }
 
+    /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
     inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
 
 #ifdef assert

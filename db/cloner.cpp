@@ -22,7 +22,7 @@
 #include "../client/dbclient.h"
 #include "../bson/util/builder.h"
 #include "jsobj.h"
-#include "query.h"
+#include "ops/query.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
@@ -106,6 +106,8 @@ namespace mongo {
     }
 
     struct Cloner::Fun {
+        Fun() : lastLog(0) { }
+        time_t lastLog;
         void operator()( DBClientCursorBatchIterator &i ) {
             mongolock l( true );
             if ( context ) {
@@ -114,6 +116,13 @@ namespace mongo {
 
             while( i.moreInCurrentBatch() ) {
                 if ( n % 128 == 127 /*yield some*/ ) {
+                    time_t now = time(0);
+                    if( now - lastLog >= 60 ) { 
+                        // report progress
+                        if( lastLog )
+                            log() << "clone " << to_collection << ' ' << n << endl;
+                        lastLog = now;
+                    }
                     mayInterrupt( _mayBeInterrupted );
                     dbtempreleaseif t( _mayYield );
                 }

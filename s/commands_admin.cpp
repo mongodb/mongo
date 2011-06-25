@@ -254,7 +254,7 @@ namespace mongo {
                 Shard s = Shard::make( to );
 
                 if ( config->getPrimary() == s.getConnString() ) {
-                    errmsg = "thats already the primary";
+                    errmsg = "it is already the primary";
                     return false;
                 }
 
@@ -408,7 +408,7 @@ namespace mongo {
 
                 // Sharding interacts with indexing in at least two ways:
                 //
-                // 1. A unique index must have the sharding key as its prefix. Otherwise maintainig uniqueness would
+                // 1. A unique index must have the sharding key as its prefix. Otherwise maintaining uniqueness would
                 // require coordinated access to all shards. Trying to shard a collection with such an index is not
                 // allowed.
                 //
@@ -519,7 +519,7 @@ namespace mongo {
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
-                    errmsg = "need to speciy fully namespace";
+                    errmsg = "need to specify fully namespace";
                     return false;
                 }
 
@@ -550,7 +550,7 @@ namespace mongo {
                         << " { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"
                         << " example: - split the shard that contains the key with this as the middle \n"
                         << " { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } }\n"
-                        << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
+                        << " NOTE: this does not move move the chunks, it merely creates a logical separation \n"
                         ;
             }
 
@@ -606,6 +606,11 @@ namespace mongo {
                         return false;
                     }
 
+                    if (!fieldsMatch(middle, info->getShardKey().key())){
+                        errmsg = "middle has different fields (or different order) than shard key";
+                        return false;
+                    }
+
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
                     worked = chunk->multiSplit( splitPoints , res );
@@ -645,7 +650,7 @@ namespace mongo {
                 if ( ! config->isSharded( ns ) ) {
                     config->reload();
                     if ( ! config->isSharded( ns ) ) {
-                        errmsg = "ns not sharded.  have to shard before can move a chunk";
+                        errmsg = "ns not sharded.  have to shard before we can move a chunk";
                         return false;
                     }
                 }
@@ -688,7 +693,7 @@ namespace mongo {
                     return false;
                 }
                 
-                // pre-emptively reload the config to get new version info
+                // preemptively reload the config to get new version info
                 config->getChunkManager( ns , true );
 
                 result.append( "millis" , t.millis() );
@@ -738,7 +743,7 @@ namespace mongo {
                     return false;
                 }
 
-                // using localhost in server names implies every other process must use locahost addresses too
+                // using localhost in server names implies every other process must use localhost addresses too
                 vector<HostAndPort> serverAddrs = servers.getServers();
                 for ( size_t i = 0 ; i < serverAddrs.size() ; i++ ) {
                     if ( serverAddrs[i].isLocalHost() != grid.allowLocalHost() ) {
@@ -1054,7 +1059,7 @@ namespace mongo {
 
                 if ( name == "local" ) {
                     // we don't return local
-                    // since all shards have their own independant local
+                    // since all shards have their own independent local
                     continue;
                 }
 
@@ -1134,5 +1139,16 @@ namespace mongo {
             return false;
         }
     } cmdReplSetGetStatus;
+
+    CmdShutdown cmdShutdown;
+
+    void CmdShutdown::help( stringstream& help ) const {
+        help << "shutdown the database.  must be ran against admin db and "
+             << "either (1) ran from localhost or (2) authenticated.";
+    }
+
+    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        return shutdownHelper();
+    }
 
 } // namespace mongo

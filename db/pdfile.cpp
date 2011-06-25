@@ -35,7 +35,6 @@ _ disallow system* manipulations from the database.
 #include "btreebuilder.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace-inl.h"
@@ -44,6 +43,8 @@ _ disallow system* manipulations from the database.
 #include "curop-inl.h"
 #include "background.h"
 #include "compact.h"
+#include "ops/delete.h"
+#include "instance.h"
 
 namespace mongo {
 
@@ -131,7 +132,6 @@ namespace mongo {
     DatabaseHolder dbHolder;
     int MAGIC = 0x1000;
 
-    extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
@@ -223,11 +223,11 @@ namespace mongo {
             }
         }
 
-        uassert( 10083 ,  "invalid size spec", size > 0 );
+        uassert( 10083 , "create collection invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
-        if( options.getBoolField("capped") ) {
+        if( options["capped"].trueValue() ) {
             newCapped = true;
             BSONElement e = options.getField("max");
             if ( e.isNumber() ) {
@@ -879,10 +879,6 @@ namespace mongo {
         IndexInterface& ii = id.idxInterface();
         for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
-            if ( otherTraceLevel >= 5 ) {
-                out() << "_unindexRecord() " << obj.toString() << endl;
-                out() << "  unindex:" << j.toString() << endl;
-            }
 
             bool ok = false;
             try {
@@ -1142,12 +1138,13 @@ namespace mongo {
         }
     }
 
+#if 0    
     void testSorting() {
         BSONObjBuilder b;
         b.appendNull("");
         BSONObj x = b.obj();
 
-        BSONObjExternalSorter sorter;
+        BSONObjExternalSorter sorter(*IndexDetails::iis[1]);
 
         sorter.add(x, DiskLoc(3,7));
         sorter.add(x, DiskLoc(4,7));
@@ -1165,6 +1162,7 @@ namespace mongo {
             cout<<"SORTER next:" << d.first.toString() << endl;*/
         }
     }
+#endif
 
     SortPhaseOne *precalced = 0;
 
@@ -1238,7 +1236,7 @@ namespace mongo {
             phase1 = &_ours;
             SortPhaseOne& p1 = *phase1;
             shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-            p1.sorter.reset( new BSONObjExternalSorter(order) );
+            p1.sorter.reset( new BSONObjExternalSorter(idx.idxInterface(), order) );
             p1.sorter->hintNumObjects( d->stats.nrecords );
             const IndexSpec& spec = idx.getSpec();
             while ( c->ok() ) {
@@ -1337,7 +1335,7 @@ namespace mongo {
 
                 getDur().commitIfNeeded();
 
-                if ( cc->yieldSometimes() ) {
+                if ( cc->yieldSometimes( ClientCursor::WillNeed ) ) {
                     progress.setTotalWhileRunning( d->stats.nrecords );
                 }
                 else {
@@ -1417,13 +1415,9 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
-        tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
+        tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
-
-        if( background ) {
-            log(2) << "buildAnIndex: background=true\n";
-        }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         assert( d->indexBuildInProgress == 0 );
@@ -1441,7 +1435,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
+        tlog() << "build index done " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1750,7 +1744,8 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
-            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
+            // we don't add _id for capped collections as they don't have an _id index
+            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && d->haveIdIndex() ) {
                 if( addedID )
                     *addedID = true;
                 addID = len;

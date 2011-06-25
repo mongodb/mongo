@@ -16,12 +16,47 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../pch.h"
-#include "jsobj.h"
-#include "../util/embedded_builder.h"
-#include "matcher.h"
+#include "../../pch.h"
+#include "../jsobj.h"
+#include "../../util/embedded_builder.h"
+#include "../matcher.h"
 
 namespace mongo {
+
+    // ---------- public -------------
+
+    struct UpdateResult {
+        bool existing; // if existing objects were modified
+        bool mod;      // was this a $ mod
+        long long num; // how many objects touched
+        OID upserted;  // if something was upserted, the new _id of the object
+
+        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
+            : existing(e) , mod(m), num(n) {
+            upserted.clear();
+
+            BSONElement id = upsertedObject["_id"];
+            if ( ! e && n == 1 && id.type() == jstOID ) {
+                upserted = id.OID();
+            }
+        }
+
+    };
+
+
+    class RemoveSaver;
+
+    /* returns true if an existing object was updated, false if no existing object was found.
+       multi - update multiple objects - mostly useful with things like $set
+       god - allow access to system namespaces
+    */
+    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
+    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
+                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
+
+
+
+    // ---------- private -------------
 
     class ModState;
     class ModSetState;

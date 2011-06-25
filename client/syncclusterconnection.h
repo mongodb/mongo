@@ -43,9 +43,9 @@ namespace mongo {
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */
-        SyncClusterConnection( const list<HostAndPort> & );
-        SyncClusterConnection( string commaSeparated );
-        SyncClusterConnection( string a , string b , string c );
+        SyncClusterConnection( const list<HostAndPort> &, double socketTimeout = 0);
+        SyncClusterConnection( string commaSeparated, double socketTimeout = 0);
+        SyncClusterConnection( string a , string b , string c, double socketTimeout = 0 );
         ~SyncClusterConnection();
 
         /**
@@ -76,7 +76,7 @@ namespace mongo {
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi );
 
         virtual bool call( Message &toSend, Message &response, bool assertOk , string * actualServer );
-        virtual void say( Message &toSend );
+        virtual void say( Message &toSend, bool isRetry = false );
         virtual void sayPiggyBack( Message &toSend );
 
         virtual void killCursor( long long cursorID );
@@ -91,8 +91,11 @@ namespace mongo {
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SYNC; }
 
+        void setAllSoTimeouts( double socketTimeout );
+        virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword);
+
     private:
-        SyncClusterConnection( SyncClusterConnection& prev );
+        SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout = 0 );
         string _toString() const;
         bool _commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
         auto_ptr<DBClientCursor> _queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
@@ -108,6 +111,8 @@ namespace mongo {
         mongo::mutex _mutex;
 
         vector<BSONObj> _lastErrors;
+
+        double _socketTimeout;
     };
 
     class UpdateNotTheSame : public UserException {

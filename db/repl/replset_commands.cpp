@@ -17,6 +17,7 @@
 #include "pch.h"
 #include "../cmdline.h"
 #include "../commands.h"
+#include "../repl.h"
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"
@@ -28,7 +29,7 @@ using namespace bson;
 
 namespace mongo {
 
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial);
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial);
 
     /* commands in other files:
          replSetHeartbeat - health.cpp
@@ -138,9 +139,23 @@ namespace mongo {
         }
     private:
         bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
+            if( cmdObj["replSetReconfig"].type() != Object ) {
+                errmsg = "no configuration specified";
                 return false;
-            if( !theReplSet->box.getState().primary() ) {
+            }
+
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+            if( force && !theReplSet ) {
+                replSettings.reconfig = cmdObj["replSetReconfig"].Obj().getOwned();
+                result.append("msg", "will try this config momentarily, try running rs.conf() again in a few seconds");
+                return true;
+            }
+
+            if ( !check(errmsg, result) ) {
+                return false;
+            }
+
+            if( !force && !theReplSet->box.getState().primary() ) {
                 errmsg = "replSetReconfig command must be sent to the current replica set primary.";
                 return false;
             }
@@ -157,18 +172,8 @@ namespace mongo {
                 }
             }
 
-            if( cmdObj["replSetReconfig"].type() != Object ) {
-                errmsg = "no configuration specified";
-                return false;
-            }
-
-            /** TODO
-                Support changes when a majority, but not all, members of a set are up.
-                Determine what changes should not be allowed as they would cause erroneous states.
-                What should be possible when a majority is not up?
-                */
             try {
-                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj());
+                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj(), force);
 
                 log() << "replSet replSetReconfig config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
@@ -176,7 +181,7 @@ namespace mongo {
                     return false;
                 }
 
-                checkMembersUpForConfigChange(newConfig,false);
+                checkMembersUpForConfigChange(newConfig, result, false);
 
                 log() << "replSet replSetReconfig [2]" << rsLog;
 

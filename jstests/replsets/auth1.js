@@ -4,9 +4,9 @@ load("jstests/replsets/rslib.js");
 
 var name = "rs_auth1";
 var port = allocatePorts(4);
-var path = "jstests/replsets/";
+var path = "jstests/libs/";
 
-    
+
 print("reset permissions");
 run("chmod", "644", path+"key1");
 run("chmod", "644", path+"key2");
@@ -125,7 +125,8 @@ master.auth("bar", "baz");
 for (var i=0; i<1000; i++) {
     master.foo.insert({x:i, foo : "bar"});
 }
-master.runCommand({getlasterror:1, w:3, wtimeout:60000});
+var result = master.runCommand({getlasterror:1, w:2, wtimeout:60000});
+printjson(result);
 
 
 print("resync");
@@ -177,9 +178,15 @@ conn = new MongodRunner(port[3], "/data/db/"+name+"-3", null, null, ["--replSet"
 conn.start();
 
 wait(function() {
+    try {
         var results = master.adminCommand({replSetGetStatus:1});
         printjson(results);
         return results.members[3].state == 2;
+    }
+    catch (e) {
+        print(e);
+    }
+    return false;
     });
 
 print("make sure it has the config, too");

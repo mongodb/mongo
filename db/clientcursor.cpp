@@ -23,7 +23,7 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "clientcursor.h"
 #include "introspect.h"
 #include <time.h>
 #include "db.h"
@@ -146,9 +146,17 @@ namespace mongo {
             i++;
             if( j->second->shouldTimeout( millis ) ) {
                 numberTimedOut++;
-                log(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
+                LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
+            }
+        }
+        unsigned sz = clientCursorsById.size();
+        static time_t last;
+        if( sz >= 100000 ) { 
+            if( time(0) - last > 300 ) {
+                last = time(0);
+                log() << "warning number of open cursors is very large: " << sz << endl;
             }
         }
     }
@@ -382,18 +390,53 @@ namespace mongo {
 
         return micros;
     }
+    
+    Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        if ( need == DontNeed ) {
+            return 0;
+        }
+        else if ( need == MaybeCovered ) {
+            // TODO
+            return 0;
+        }
+        else if ( need == WillNeed ) {
+            // no-op
+        }
+        else {
+            warning() << "don't understand RecordNeeds: " << (int)need << endl;
+            return 0;
+        }
 
-    bool ClientCursor::yieldSometimes() {
-        if ( ! _yieldSometimesTracker.ping() )
-            return true;
-
-        int micros = yieldSuggest();
-        return ( micros > 0 ) ? yield( micros ) : true;
+        DiskLoc l = currLoc();
+        if ( l.isNull() )
+            return 0;
+        
+        Record * rec = l.rec();
+        if ( rec->likelyInPhysicalMemory() ) 
+            return 0;
+        
+        return rec;
     }
 
-    void ClientCursor::staticYield( int micros , const StringData& ns ) {
+    bool ClientCursor::yieldSometimes( RecordNeeds need ) {
+        if ( ! _yieldSometimesTracker.ping() ) {
+            Record* rec = _recordForYield( need );
+            if ( rec ) 
+                return yield( yieldSuggest() , rec );
+            return true;
+        }
+
+        int micros = yieldSuggest();
+        return ( micros > 0 ) ? yield( micros , _recordForYield( need ) ) : true;
+    }
+
+    void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
         killCurrentOp.checkForInterrupt( false );
         {
+            auto_ptr<RWLockRecursive::Shared> lk;
+            if ( rec )
+                lk.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+            
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
                 if ( micros == -1 )
@@ -410,6 +453,11 @@ namespace mongo {
                           << " top: " << c->info()
                           << endl;
             }
+
+            if ( rec )
+                rec->touch();
+
+            lk.reset(0); // need to release this before dbtempreleasecond
         }
     }
 
@@ -463,36 +511,30 @@ namespace mongo {
         return true;
     }
 
-    bool ClientCursor::yield( int micros ) {
+    bool ClientCursor::yield( int micros , Record * recordToLoad ) {
         if ( ! _c->supportYields() )
             return true;
+
         YieldData data;
         prepareToYield( data );
 
-        staticYield( micros , _ns );
+        staticYield( micros , _ns , recordToLoad );
 
         return ClientCursor::recoverFromYield( data );
     }
 
-    int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
-        if( 0 ) {
-            static long long z;
-            ++z;
-            cout << "TEMP alloccursorid " << z << endl;
-            return z;
-        }
-
+        long long ctm = curTimeMillis64();
+        dassert( ctm );
         long long x;
-        int ctm = (int) curTimeMillis64();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
-            x = x | ctm | 0x80000000; // OR to make sure not zero
+            x = x ^ ctm;
             if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
         ctmLast = ctm;
-        //DEV tlog() << "  alloccursorid " << x << endl;
         return x;
     }
 
@@ -520,6 +562,19 @@ namespace mongo {
         result.appendNumber("totalOpen", clientCursorsById.size() );
         result.appendNumber("clientCursors_size", (int) numCursors());
         result.appendNumber("timedOut" , numberTimedOut);
+        unsigned pinned = 0;
+        unsigned notimeout = 0;
+        for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); i++ ) {
+            unsigned p = i->second->_pinValue;
+            if( p >= 100 )
+                pinned++;
+            else if( p > 0 )
+                notimeout++;
+        }
+        if( pinned ) 
+            result.append("pinned", pinned);
+        if( notimeout )
+            result.append("totalNoTimeout", notimeout);
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?
@@ -614,7 +669,6 @@ namespace mongo {
         return found;
 
     }
-
 
     ClientCursorMonitor clientCursorMonitor;
 

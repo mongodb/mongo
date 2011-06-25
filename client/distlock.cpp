@@ -110,11 +110,11 @@ namespace mongo {
                     // replace it for a quite a while)
                     // if the lock is taken, the take-over mechanism should handle the situation
                     auto_ptr<DBClientCursor> c = conn->query( DistributedLock::locksNS , BSONObj() );
-                    vector<string> pids;
+                    set<string> pids;
                     while ( c->more() ) {
                         BSONObj lock = c->next();
                         if ( ! lock["process"].eoo() ) {
-                            pids.push_back( lock["process"].valuestrsafe() );
+                            pids.insert( lock["process"].valuestrsafe() );
                         }
                     }
 
@@ -848,7 +848,7 @@ namespace mongo {
 
         // Log our lock results
         if(gotLock)
-            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, now : " << currLock << endl;
+            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
         else
             log( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 

@@ -138,6 +138,9 @@ namespace mongo {
                 if ( op == "findOne" ) {
                     conn->findOne( ns , fixQuery( e["query"].Obj() ) );
                 }
+                else if ( op == "remove" ) {
+                    conn->remove( ns , fixQuery( e["query"].Obj() ) );
+                }
                 else if ( op == "update" ) {
                     conn->update( ns , fixQuery( e["query"].Obj() ) , e["update"].Obj() );
                 }
@@ -210,8 +213,8 @@ namespace mongo {
 
         // compute actual ops/sec
 
-        before = before["opcounters"].Obj();
-        after = after["opcounters"].Obj();
+        before = before["opcounters"].Obj().copy();
+        after = after["opcounters"].Obj().copy();
         
         bool totals = args["totals"].trueValue();
 

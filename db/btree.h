@@ -66,7 +66,7 @@ namespace mongo {
     const int OldBucketSize = 8192;
 
     // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
-    const int KeyMax = OldBucketSize / 10;\
+    const int KeyMax = OldBucketSize / 10;
 
 #pragma pack(1)
     template< class Version > class BucketBasics;
@@ -76,19 +76,19 @@ namespace mongo {
      * bucket.  It contains an offset pointer to the variable width bson
      * data component.  A _KeyNode may be 'unused', please see below.
      */
-    struct _KeyNode {
+    template< class Loc >
+    struct __KeyNode {
         /** Signals that we are writing this _KeyNode and casts away const */
-        _KeyNode& writing() const;
+        __KeyNode<Loc> & writing() const;
         /**
          * The 'left' child bucket of this key.  If this is the i-th key, it
          * points to the i index child bucket.
          */
-        DiskLoc prevChildBucket;
+        Loc prevChildBucket;
         /** The location of the record associated with this key. */
-        DiskLoc recordLoc;
-        short keyDataOfs() const {
-            return (short) _kdo;
-        }
+        Loc recordLoc;
+        short keyDataOfs() const { return (short) _kdo; }
+
         /** Offset within current bucket of the variable width bson key for this _KeyNode. */
         unsigned short _kdo;
         void setKeyDataOfs(short s) {
@@ -175,17 +175,96 @@ namespace mongo {
         char data[4];
 
     public:
+        typedef __KeyNode<DiskLoc> _KeyNode;
+        typedef DiskLoc Loc;
         typedef KeyBson Key;
         typedef KeyBson KeyOwned;
         enum { BucketSize = 8192 };
     };
 
+    // a a a ofs ofs ofs ofs
+    class DiskLoc56Bit {
+        int ofs;
+        unsigned char _a[3];
+        unsigned long long Z() const { 
+            // endian
+            return *((unsigned long long*)this) & 0x00ffffffffffffffULL;
+        }
+        enum { 
+            // first bit of offsets used in _KeyNode we don't use -1 here.
+            OurNullOfs = -2
+        };
+    public:
+        template< class V >
+        const BtreeBucket<V> * btree() const { 
+            return DiskLoc(*this).btree<V>();
+        }
+        template< class V >
+        BtreeBucket<V> * btreemod() const { 
+            return DiskLoc(*this).btreemod<V>();
+        }
+        operator DiskLoc() const { 
+            // endian
+            if( isNull() ) return DiskLoc();
+            unsigned a = *((unsigned *) (_a-1));
+            return DiskLoc(a >> 8, ofs);
+        }
+        int& GETOFS()      { return ofs; }
+        int getOfs() const { return ofs; }
+        bool operator<(const DiskLoc56Bit& rhs) const {
+            // the orderering of dup keys in btrees isn't too critical, but we'd like to put items that are 
+            // close together on disk close together in the tree, so we do want the file # to be the most significant
+            // bytes
+            return Z() < rhs.Z();
+        }
+        int compare(const DiskLoc56Bit& rhs) const {
+            unsigned long long a = Z();
+            unsigned long long b = rhs.Z();
+            if( a < b ) return -1;
+            return a == b ? 0 : 1;
+        }
+        bool operator==(const DiskLoc56Bit& rhs) const { return Z() == rhs.Z(); }
+        bool operator!=(const DiskLoc56Bit& rhs) const { return Z() != rhs.Z(); }
+        bool operator==(const DiskLoc& rhs) const {
+            return DiskLoc(*this) == rhs;
+        }
+        bool operator!=(const DiskLoc& rhs) const { return !(*this==rhs); }
+        bool isNull() const { return ofs < 0; }
+        void Null() { 
+            ofs = OurNullOfs; 
+            _a[0] = _a[1] = _a[2] = 0;
+        }
+        string toString() const { return DiskLoc(*this).toString(); }
+        void operator=(const DiskLoc& loc) {
+            ofs = loc.getOfs();
+            int la = loc.a();
+            assert( la <= 0xffffff ); // must fit in 3 bytes
+            if( la < 0 ) {
+                assert( la == -1 );
+                la = 0;
+                ofs = OurNullOfs;
+            }
+            memcpy(_a, &la, 3); // endian
+            dassert( ofs != 0 );
+        }
+        DiskLoc56Bit& writing() const { 
+            return *((DiskLoc56Bit*) getDur().writingPtr((void*)this, 7));
+        }
+    };
+
     class BtreeData_V1 {
+    public:
+        typedef DiskLoc56Bit Loc;
+        //typedef DiskLoc Loc;
+        typedef __KeyNode<Loc> _KeyNode;
+        typedef KeyV1 Key;
+        typedef KeyV1Owned KeyOwned;
+        enum { BucketSize = 8192-16 }; // leave room for Record header
     protected:
         /** Parent bucket of this bucket, which isNull() for the root bucket. */
-        DiskLoc parent;
+        Loc parent;
         /** Given that there are n keys, this is the n index child. */
-        DiskLoc nextChild;
+        Loc nextChild;
 
         unsigned short flags;
 
@@ -202,11 +281,6 @@ namespace mongo {
         char data[4];
 
         void _init() { }
-
-    public:
-        typedef KeyV1 Key;
-        typedef KeyV1Owned KeyOwned;
-        enum { BucketSize = 8192-16 }; // leave room for Record header
     };
 
     typedef BtreeData_V0 V0;
@@ -244,6 +318,8 @@ namespace mongo {
     public:
         template <class U> friend class BtreeBuilder;
         typedef typename Version::Key Key;
+        typedef typename Version::_KeyNode _KeyNode;
+        typedef typename Version::Loc Loc;
 
         int getN() const { return this->n; }
 
@@ -256,8 +332,8 @@ namespace mongo {
         class KeyNode {
         public:
             KeyNode(const BucketBasics<Version>& bb, const _KeyNode &k);
-            const DiskLoc& prevChildBucket;
-            const DiskLoc& recordLoc;
+            const Loc& prevChildBucket;
+            const Loc& recordLoc;
             /* Points to the bson key storage for a _KeyNode */
             Key key;
         };
@@ -375,8 +451,8 @@ namespace mongo {
         enum Flags { Packed=1 };
 
         /** n == 0 is ok */
-        const DiskLoc& childForPos(int p) const { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
-        DiskLoc& childForPos(int p) { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
+        const Loc& childForPos(int p) const { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
+        Loc& childForPos(int p) { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
 
         /** Same as bodySize(). */
         int totalDataSize() const;
@@ -450,8 +526,8 @@ namespace mongo {
          * BtreeBuilder uses the parent var as a temp place to maintain a linked list chain.
          *   we use tempNext() when we do that to be less confusing. (one might have written a union in C)
          */
-        const DiskLoc& tempNext() const { return this->parent; }
-        DiskLoc& tempNext() { return this->parent; }
+        DiskLoc tempNext() const { return this->parent; }
+        void setTempNext(DiskLoc l) { this->parent = l; }
 
         void _shape(int level, stringstream&) const;
         int Size() const;
@@ -530,6 +606,8 @@ namespace mongo {
         typedef typename V::Key Key;
         typedef typename V::KeyOwned KeyOwned;
 	typedef typename BucketBasics<V>::KeyNode KeyNode;
+	typedef typename BucketBasics<V>::_KeyNode _KeyNode;
+	typedef typename BucketBasics<V>::Loc Loc;
         const _KeyNode& k(int i) const     { return static_cast< const BucketBasics<V> * >(this)->k(i); }
     protected:
         _KeyNode& k(int i)                 { return static_cast< BucketBasics<V> * >(this)->_k(i); }
@@ -915,7 +993,7 @@ namespace mongo {
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
         virtual void noteLocation(); // updates keyAtKeyOfs...
-        virtual void checkLocation();
+        virtual void checkLocation() = 0;
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
 
@@ -937,12 +1015,12 @@ namespace mongo {
         virtual bool modifiedKeys() const { return _multikey; }
         virtual bool isMultiKey() const { return _multikey; }
 
-        const _KeyNode& _currKeyNode() const {
+        /*const _KeyNode& _currKeyNode() const {
             assert( !bucket.isNull() );
             const _KeyNode& kn = keyNode(keyOfs);
             assert( kn.isUsed() );
             return kn;
-        }
+        }*/
 
         /** returns BSONObj() if ofs is out of range */
         virtual BSONObj keyAt(int ofs) const = 0;
@@ -979,12 +1057,16 @@ namespace mongo {
         /** for debugging only */
         const DiskLoc getBucket() const { return bucket; }
 
+        // just for unit tests
+        virtual bool curKeyHasChild() = 0;
+
     protected:
         /**
          * Our btrees may (rarely) have "unused" keys when items are deleted.
          * Skip past them.
          */
-        bool skipUnusedKeys( bool mayJump );
+        virtual bool skipUnusedKeys( bool mayJump ) = 0;
+
         bool skipOutOfRangeKeysAndCheckEnd();
         void skipAndCheck();
         void checkEnd();
@@ -994,7 +1076,6 @@ namespace mongo {
 
         virtual void _audit() = 0;
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) = 0;
-        virtual const _KeyNode& keyNode(int keyOfs) const = 0;
         virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
         virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) = 0;
 
@@ -1040,5 +1121,11 @@ namespace mongo {
         BtreeBucket<V> *b = const_cast< BtreeBucket<V> * >( btree<V>() );
         return static_cast< BtreeBucket<V>* >( getDur().writingPtr( b, V::BucketSize ) );
     }
+
+    template< class V >
+    BucketBasics<V>::KeyNode::KeyNode(const BucketBasics<V>& bb, const _KeyNode &k) :
+        prevChildBucket(k.prevChildBucket),
+        recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
+    { }
 
 } // namespace mongo;

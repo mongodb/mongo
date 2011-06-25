@@ -1,4 +1,4 @@
-// security_key.cpp
+// security_common.cpp
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -22,8 +22,12 @@
  */
 
 #include "pch.h"
-#include "security_key.h"
+#include "security.h"
+#include "security_common.h"
 #include "../client/dbclient.h"
+#include "commands.h"
+#include "nonce.h"
+#include "../util/md5.hpp"
 
 #include <sys/stat.h>
 
@@ -102,4 +106,29 @@ namespace mongo {
 
         return true;
     }
+
+    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
+        {
+            scoped_spinlock lk(_lock);
+
+            if ( _isAuthorizedSingle_inlock( dbname , level ) )
+                return true;
+
+            if ( noauth )
+                return true;
+
+            if ( _isAuthorizedSingle_inlock( "admin" , level ) )
+                return true;
+
+            if ( _isAuthorizedSingle_inlock( "local" , level ) )
+                return true;
+        }
+        return _isAuthorizedSpecialChecks( dbname );
+    }
+
+    bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, int level) const {
+        MA::const_iterator i = _dbs.find(dbname);
+        return i != _dbs.end() && i->second.level >= level;
+    }
+
 } // namespace mongo

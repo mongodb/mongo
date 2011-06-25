@@ -18,12 +18,12 @@
 
 #include "pch.h"
 #include "query.h"
-#include "pdfile.h"
-#include "jsobjmanipulator.h"
-#include "queryoptimizer.h"
-#include "repl.h"
+#include "../pdfile.h"
+#include "../jsobjmanipulator.h"
+#include "../queryoptimizer.h"
+#include "../repl.h"
+#include "../btree.h"
 #include "update.h"
-#include "btree.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -284,7 +284,7 @@ namespace mongo {
         case BIT: {
             uassert( 10136 ,  "$bit needs an array" , elt.type() == Object );
             uassert( 10137 ,  "$bit can only be applied to numbers" , in.isNumber() );
-            uassert( 10138 ,  "$bit can't use a double" , in.type() != NumberDouble );
+            uassert( 10138 ,  "$bit cannot update a value of type double" , in.type() != NumberDouble );
 
             int x = in.numberInt();
             long long y = in.numberLong();
@@ -293,23 +293,22 @@ namespace mongo {
             while ( it.more() ) {
                 BSONElement e = it.next();
                 uassert( 10139 ,  "$bit field must be number" , e.isNumber() );
-                if ( strcmp( e.fieldName() , "and" ) == 0 ) {
+                if ( str::equals(e.fieldName(), "and") ) {
                     switch( in.type() ) {
                     case NumberInt: x = x&e.numberInt(); break;
                     case NumberLong: y = y&e.numberLong(); break;
                     default: assert( 0 );
                     }
                 }
-                else if ( strcmp( e.fieldName() , "or" ) == 0 ) {
+                else if ( str::equals(e.fieldName(), "or") ) {
                     switch( in.type() ) {
                     case NumberInt: x = x|e.numberInt(); break;
                     case NumberLong: y = y|e.numberLong(); break;
                     default: assert( 0 );
                     }
                 }
-
                 else {
-                    throw UserException( 9016, (string)"unknown bit mod:" + e.fieldName() );
+                    uasserted(9016, str::stream() << "unknown $bit operation: " << e.fieldName());
                 }
             }
 
@@ -963,6 +962,7 @@ namespace mongo {
                                     NamespaceDetailsTransient *nsdt,
                                     bool god, const char *ns,
                                     const BSONObj& updateobj, BSONObj patternOrig, bool logop, OpDebug& debug) {
+
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
@@ -973,8 +973,30 @@ namespace mongo {
                 return UpdateResult(0, 0, 0);
             }
         }
-
         Record *r = loc.rec();
+
+        if ( ! r->likelyInPhysicalMemory() ) {
+            {
+                auto_ptr<RWLockRecursive::Shared> lk( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+                dbtempreleasewritelock t;
+                r->touch();
+                lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
+            }
+            
+            {
+                // we need to re-find in case something changed
+                
+                IndexDetails& i = d->idx(idIdxNo);
+                BSONObj key = i.getKeyFromQuery( patternOrig );            
+                loc = i.idxInterface().findSingle(i, i.head, key);
+                if( loc.isNull() ) {
+                    // no upsert support in _updateById yet, so we are done.
+                    return UpdateResult(0, 0, 0);
+                }
+                
+                r = loc.rec();
+            }
+        }
 
         /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
            regular ones at the moment. */
@@ -1075,6 +1097,21 @@ namespace mongo {
                 nscanned++;
 
                 bool atomic = c->matcher()->docMatcher().atomic();
+                
+                // *****************
+                if ( cc.get() == 0 ) {
+                    shared_ptr< Cursor > cPtr = c;
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                }
+
+                if ( ! cc->yield() ) {
+                    cc.release();
+                    break;
+                }
+                if ( !c->ok() ) {
+                    break;
+                }
+                // *****************
 
                 // May have already matched in UpdateOp, but do again to get details set correctly
                 if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
@@ -1145,8 +1182,8 @@ namespace mongo {
                     bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
-                    if ( details.elemMatchKey && mods->hasDynamicArray() ) {
-                        useMods = mods->fixDynamicArray( details.elemMatchKey );
+                    if ( details._elemMatchKey && mods->hasDynamicArray() ) {
+                        useMods = mods->fixDynamicArray( details._elemMatchKey );
                         mymodset.reset( useMods );
                         forceRewrite = true;
                     }

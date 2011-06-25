@@ -134,6 +134,10 @@ namespace mongo {
             s->getMore( *this );
         }
         else {
+            char cl[256];
+            nsToDatabase(getns(), cl);
+            uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
+
             s->writeOp( op, *this );
         }
 

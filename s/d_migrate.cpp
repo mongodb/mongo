@@ -29,13 +29,12 @@
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
 #include "../db/repl_block.h"
 #include "../db/dur.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -133,7 +132,7 @@ namespace mongo {
     };
 
     struct OldDataCleanup {
-        static AtomicUInt _numThreads; // how many threads are doing async cleanusp
+        static AtomicUInt _numThreads; // how many threads are doing async cleanup
 
         string ns;
         BSONObj min;
@@ -170,6 +169,9 @@ namespace mongo {
 
     void _cleanupOldData( OldDataCleanup cleanup ) {
         Client::initThread( cleanUpThreadName );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
 
         int loops = 0;
@@ -439,7 +441,7 @@ namespace mongo {
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
-            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
             const long long totalRecs = d->stats.nrecords;
@@ -467,7 +469,7 @@ namespace mongo {
 
                 // we can afford to yield here because any change to the base data that we might miss is already being
                 // queued and will be migrated in the 'transferMods' stage
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                     cc.release();
                     break;
                 }
@@ -478,7 +480,7 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
                           << " because maximum size allowed to move is " << maxChunkSize
                           << " ns: " << _ns << " " << _min << " -> " << _max
                           << migrateLog;
@@ -858,7 +860,7 @@ namespace mongo {
                 log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
-                    warning() << "moveChunk error transfering data caused migration abort: " << res << migrateLog;
+                    warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
                     errmsg = "data transfer error";
                     result.append( "cause" , res );
                     return false;
@@ -1526,6 +1528,10 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
+        if (!noauth) {
+            ShardedConnectionInfo::addHook();
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         migrateStatus.go();
         cc().shutdown();
     }

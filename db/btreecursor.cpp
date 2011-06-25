@@ -25,13 +25,12 @@
 
 namespace mongo {
 
-    extern int otherTraceLevel;
-
     template< class V >
     class BtreeCursorImpl : public BtreeCursor { 
     public:
         typedef typename BucketBasics<V>::KeyNode KeyNode;
         typedef typename V::Key Key;
+        typedef typename V::_KeyNode _KeyNode;
 
         BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
           BtreeCursor(a,b,c,d,e,f,g) { }
@@ -60,6 +59,87 @@ namespace mongo {
             return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
         }
 
+        virtual bool curKeyHasChild() { 
+            return !currKeyNode().prevChildBucket.isNull();
+        }
+
+        bool skipUnusedKeys( bool mayJump ) {
+            int u = 0;
+            while ( 1 ) {
+                if ( !ok() )
+                    break;
+                const _KeyNode& kn = keyNode(keyOfs);
+                if ( kn.isUsed() )
+                    break;
+                bucket = _advance(bucket, keyOfs, _direction, "skipUnusedKeys");
+                u++;
+                //don't include unused keys in nscanned
+                //++_nscanned;
+                if ( mayJump && ( u % 10 == 0 ) ) {
+                    skipOutOfRangeKeysAndCheckEnd();
+                }
+            }
+            if ( u > 10 )
+                OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
+            return u;
+        }
+
+        /* Since the last noteLocation(), our key may have moved around, and that old cached
+           information may thus be stale and wrong (although often it is right).  We check
+           that here; if we have moved, we have to search back for where we were at.
+
+           i.e., after operations on the index, the BtreeCursor's cached location info may
+           be invalid.  This function ensures validity, so you should call it before using
+           the cursor if other writers have used the database since the last noteLocation
+           call.
+        */
+        void checkLocation() {
+            if ( eof() )
+                return;
+
+            _multikey = d->isMultikey(idxNo);
+
+            if ( keyOfs >= 0 ) {
+                assert( !keyAtKeyOfs.isEmpty() );
+
+                // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
+                // which is possible as keys may have been deleted.
+                int x = 0;
+                while( 1 ) {
+                    //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+                    //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
+                    if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
+                        const _KeyNode& kn = keyNode(keyOfs);
+                        if( kn.recordLoc == locAtKeyOfs ) {
+                            if ( !kn.isUsed() ) {
+                                // we were deleted but still exist as an unused
+                                // marker key. advance.
+                                skipUnusedKeys( false );
+                            }
+                            return;
+                        }
+                    }
+
+                    // we check one key earlier too, in case a key was just deleted.  this is
+                    // important so that multi updates are reasonably fast.
+                    if( keyOfs == 0 || x++ )
+                        break;
+                    keyOfs--;
+                }
+            }
+
+            /* normally we don't get to here.  when we do, old position is no longer
+                valid and we must refind where we left off (which is expensive)
+            */
+
+            /* TODO: Switch to keep indexdetails and do idx.head! */
+            bucket = _locate(keyAtKeyOfs, locAtKeyOfs);
+            RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
+            if ( ! bucket.isNull() )
+                skipUnusedKeys( false );
+
+        }
+    
     protected:
         virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
             thisLoc.btree<V>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
@@ -68,14 +148,8 @@ namespace mongo {
             return thisLoc.btree<V>()->advance(thisLoc, keyOfs, direction, caller);
         }
         virtual void _audit() {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree<V>()->fullValidate(indexDetails.head, _order);
-            }
-            else {
-                out() << "BtreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree<V>()->dump();
-            }
+            out() << "BtreeCursor(). dumping head bucket" << endl;
+            indexDetails.head.btree<V>()->dump();
         }
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) {
             bool found;
@@ -133,14 +207,8 @@ namespace mongo {
             return thisLoc.btree<V1>()->advance(thisLoc, keyOfs, direction, caller);
         }
         virtual void _audit() {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree<V1>()->fullValidate(indexDetails.head, _order);
-            }
-            else {
-                out() << "BtreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree<V1>()->dump();
-            }
+            out() << "BtreeCursor(). dumping head bucket" << endl;
+            indexDetails.head.btree<V1>()->dump();
         }
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc);
         virtual const _KeyNode& keyNode(int keyOfs) { 
@@ -185,6 +253,10 @@ namespace mongo {
         if( v == 0 )
             return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,_direction);
         uasserted(14801, str::stream() << "unsupported index version " << v);
+
+        // just check we are in sync with this method
+        dassert( IndexDetails::isASupportedIndexVersionNumber(v) );
+
         return 0;
     }
 
@@ -233,9 +305,6 @@ namespace mongo {
     
     void BtreeCursor::audit() {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
-        if ( otherTraceLevel >= 12 ) {
-            _audit();
-        }
     }
 
     void BtreeCursor::init() {
@@ -280,28 +349,6 @@ namespace mongo {
         ++_nscanned;
         advanceTo( currKey(), ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
         return true;
-    }
-
-    /* skip unused keys. */
-    bool BtreeCursor::skipUnusedKeys( bool mayJump ) {
-        int u = 0;
-        while ( 1 ) {
-            if ( !ok() )
-                break;
-            const _KeyNode& kn = keyNode(keyOfs);
-            if ( kn.isUsed() )
-                break;
-            bucket = _advance(bucket, keyOfs, _direction, "skipUnusedKeys");
-            u++;
-            //don't include unused keys in nscanned
-            //++_nscanned;
-            if ( mayJump && ( u % 10 == 0 ) ) {
-                skipOutOfRangeKeysAndCheckEnd();
-            }
-        }
-        if ( u > 10 )
-            OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
-        return u;
     }
 
     // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.
@@ -355,62 +402,6 @@ namespace mongo {
         }
     }
 
-    /* Since the last noteLocation(), our key may have moved around, and that old cached
-       information may thus be stale and wrong (although often it is right).  We check
-       that here; if we have moved, we have to search back for where we were at.
-
-       i.e., after operations on the index, the BtreeCursor's cached location info may
-       be invalid.  This function ensures validity, so you should call it before using
-       the cursor if other writers have used the database since the last noteLocation
-       call.
-    */
-    void BtreeCursor::checkLocation() {
-        if ( eof() )
-            return;
-
-        _multikey = d->isMultikey(idxNo);
-
-        if ( keyOfs >= 0 ) {
-            assert( !keyAtKeyOfs.isEmpty() );
-
-            // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
-            // which is possible as keys may have been deleted.
-            int x = 0;
-            while( 1 ) {
-                //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-                //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
-                    const _KeyNode& kn = keyNode(keyOfs);
-                    if( kn.recordLoc == locAtKeyOfs ) {
-                        if ( !kn.isUsed() ) {
-                            // we were deleted but still exist as an unused
-                            // marker key. advance.
-                            skipUnusedKeys( false );
-                        }
-                        return;
-                    }
-                }
-
-                // we check one key earlier too, in case a key was just deleted.  this is
-                // important so that multi updates are reasonably fast.
-                if( keyOfs == 0 || x++ )
-                    break;
-                keyOfs--;
-            }
-        }
-
-        /* normally we don't get to here.  when we do, old position is no longer
-            valid and we must refind where we left off (which is expensive)
-        */
-
-        /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = _locate(keyAtKeyOfs, locAtKeyOfs);
-        RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
-        if ( ! bucket.isNull() )
-            skipUnusedKeys( false );
-
-    }
-    
     string BtreeCursor::toString() {
         string s = string("BtreeCursor ") + indexDetails.indexName();
         if ( _direction < 0 ) s += " reverse";

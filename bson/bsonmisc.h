@@ -198,4 +198,6 @@ namespace mongo {
         int _sizes[SIZE];
     };
 
+    // considers order
+    bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs);
 }

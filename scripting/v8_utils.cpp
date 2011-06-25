@@ -15,14 +15,20 @@
  *    limitations under the License.
  */
 
+#if defined(_WIN32)
+/** this is a hack - v8stdint.h defined uint16_t etc. on _WIN32 only, and that collides with 
+    our usage of boost */
+#include "boost/cstdint.hpp"
+using namespace boost;
+#define V8STDINT_H_
+#endif
+
 #include "v8_utils.h"
 #include "v8_db.h"
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <vector>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>

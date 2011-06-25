@@ -625,9 +625,11 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() )->writingWithExtra();
             }
-            static BSONObj bigObj() {
-                string as( 187, 'a' );
+            static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
+				if (bGenID)
+					b.appendOID("_id", 0, true);
+                string as( 187, 'a' );
                 b.append( "a", as );
                 return b.obj();
             }
@@ -660,12 +662,12 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObj b = bigObj();
 
                 const int N = 20;
                 const int Q = 16; // these constants depend on the size of the bson object, the extent size allocated by the system too
                 DiskLoc l[ N ];
                 for ( int i = 0; i < N; ++i ) {
+					BSONObj b = bigObj(true);
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
                     ASSERT( nRecords() <= Q );
@@ -717,7 +719,7 @@ namespace NamespaceTests {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
-                BSONObj b = bigObj();
+                BSONObj b = bigObj(true);
 
                 int N = MinExtentSize / b.objsize() * nExtents() + 5;
                 int T = N - 4;
@@ -725,7 +727,8 @@ namespace NamespaceTests {
                 DiskLoc truncAt;
                 //DiskLoc l[ 8 ];
                 for ( int i = 0; i < N; ++i ) {
-                    DiskLoc a = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+					BSONObj bb = bigObj(true);
+                    DiskLoc a = theDataFileMgr.insert( ns(), bb.objdata(), bb.objsize() );
                     if( T == i )
                         truncAt = a;
                     ASSERT( !a.isNull() );
@@ -765,6 +768,7 @@ namespace NamespaceTests {
 
                 // Too big
                 BSONObjBuilder bob;
+				bob.appendOID("_id", 0, true);
                 bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );

@@ -19,7 +19,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -39,6 +38,9 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
+#include "ops/update.h"
+#include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 
@@ -355,7 +357,7 @@ namespace mongo {
 
         //DEV log = true;
         if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
@@ -687,7 +689,7 @@ namespace mongo {
         return true;
     }
 
-    void DBDirectClient::say( Message &toSend ) {
+    void DBDirectClient::say( Message &toSend, bool isRetry ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;

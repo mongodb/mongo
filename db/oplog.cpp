@@ -26,6 +26,9 @@
 #include "../util/file.h"
 #include "../util/unittest.h"
 #include "queryoptimizer.h"
+#include "ops/update.h"
+#include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 
@@ -406,6 +409,7 @@ namespace mongo {
             return;
         }
         switch( _findingStartMode ) {
+            // Initial mode: scan backwards from end of collection
             case Initial: {
                 if ( !_matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStart = false; // found first record out of query range, so scan normally
@@ -416,19 +420,22 @@ namespace mongo {
                 _findingStartCursor->advance();
                 RARELY {
                     if ( _findingStartTimer.seconds() >= __findingStartInitialTimeout ) {
-                        createClientCursor( startLoc( _findingStartCursor->currLoc() ) );
+                        // If we've scanned enough, switch to find extent mode.
+                        createClientCursor( extentFirstLoc( _findingStartCursor->currLoc() ) );
                         _findingStartMode = FindExtent;
                         return;
                     }
                 }
                 return;
             }
+            // FindExtent mode: moving backwards through extents, check first
+            // document of each extent.
             case FindExtent: {
                 if ( !_matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStartMode = InExtent;
                     return;
                 }
-                DiskLoc prev = prevLoc( _findingStartCursor->currLoc() );
+                DiskLoc prev = prevExtentFirstLoc( _findingStartCursor->currLoc() );
                 if ( prev.isNull() ) { // hit beginning, so start scanning from here
                     createClientCursor();
                     _findingStartMode = InExtent;
@@ -439,6 +446,7 @@ namespace mongo {
                 createClientCursor( prev );
                 return;
             }
+            // InExtent mode: once an extent is chosen, find starting doc in the extent.
             case InExtent: {
                 if ( _matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStart = false; // found first record in query range, so scan normally
@@ -455,7 +463,7 @@ namespace mongo {
         }
     }
     
-    DiskLoc FindingStartCursor::startLoc( const DiskLoc &rec ) {
+    DiskLoc FindingStartCursor::extentFirstLoc( const DiskLoc &rec ) {
         Extent *e = rec.rec()->myExtent( rec );
         if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent ) )
             return e->firstRecord;
@@ -465,19 +473,29 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
-    DiskLoc FindingStartCursor::prevLoc( const DiskLoc &rec ) {
+    void assertExtentNonempty( const Extent *e ) {
+        // TODO ensure this requirement is clearly enforced, or fix.
+        massert( 14834, "empty extent found during finding start scan", !e->firstRecord.isNull() );
+    }
+    
+    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc &rec ) {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
-            if ( e->xprev.isNull() )
+            if ( e->xprev.isNull() ) {
                 e = _qp.nsd()->lastExtent.ext();
-            else
+            }
+            else {
                 e = e->xprev.ext();
-            if ( e->myLoc != _qp.nsd()->capExtent )
+            }
+            if ( e->myLoc != _qp.nsd()->capExtent ) {
+                assertExtentNonempty( e );
                 return e->firstRecord;
+            }
         }
         else {
             if ( !e->xprev.isNull() ) {
                 e = e->xprev.ext();
+                assertExtentNonempty( e );
                 return e->firstRecord;
             }
         }
@@ -673,7 +691,7 @@ namespace mongo {
             // no op
         }
         else {
-            throw MsgAssertionException( 13141 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
+            throw MsgAssertionException( 14825 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
 
     }

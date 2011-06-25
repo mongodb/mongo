@@ -106,8 +106,10 @@ namespace mongo {
             return ss.str();
         }
 
+        int getAgeOutJournalFiles();
         BSONObj Stats::S::_asObj() {
-            return BSON(
+            BSONObjBuilder b;
+            b << 
                        "commits" << _commits <<
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
@@ -119,8 +121,13 @@ namespace mongo {
                              "writeToJournal" << (unsigned) (_writeToJournalMicros/1000) <<
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
-                           )
-                   );
+                           );
+            int r = getAgeOutJournalFiles();
+            if( r == -1 )
+                b << "ageOutJournalFiles" << "mutex timeout";
+            if( r == 0 )
+                b << "ageOutJournalFiles" << false;
+            return b.obj();
         }
 
         BSONObj Stats::asObj() {

@@ -1,4 +1,4 @@
-// index.cpp
+/** @file index.cpp */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -20,9 +20,10 @@
 #include "namespace-inl.h"
 #include "index.h"
 #include "btree.h"
-#include "query.h"
 #include "background.h"
 #include "repl/rs.h"
+#include "ops/delete.h"
+
 
 namespace mongo {
 
@@ -35,6 +36,7 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -57,13 +59,26 @@ namespace mongo {
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
                 KeyOwned k(**i);
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
-                uassert( 11001 , "E11001 duplicate key on update", !dup);
+                uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
             }
         }
     };
 
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    template <>
+    int IndexInterfaceImpl< V0 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return oldCompare(l, r, ordering);
+    }
+
+    template <>
+    int IndexInterfaceImpl< V1 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return l.woCompare(r, ordering, /*considerfieldname*/false);
+    }
+
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;
+
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {

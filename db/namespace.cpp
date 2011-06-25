@@ -25,9 +25,11 @@
 #include "btree.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "queryutil.h"
 #include "json.h"
+#include "ops/delete.h"
+#include "ops/query.h"
+
 
 namespace mongo {
 

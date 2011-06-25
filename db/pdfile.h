@@ -160,6 +160,9 @@ namespace mongo {
         int lengthWithHeaders;
         int extentOfs;
         DiskLoc nextDeleted;
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+            return DiskLoc(myLoc.a(), extentOfs);
+        }
         Extent* myExtent(const DiskLoc& myLoc) {
             return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
         }
@@ -216,6 +219,19 @@ namespace mongo {
             int prevOfs;
         };
         NP* np() { return (NP*) &nextOfs; }
+
+        /** 
+         * touches the data so that is in physical memory
+         * @param entireRecrd if false, only the header and first byte is touched
+         *                    if true, the entire record is touched
+         * */
+        void touch( bool entireRecrd = false );
+
+        /**
+         * @return if this record is likely in physical memory
+         *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
+         */
+        bool likelyInPhysicalMemory();
     };
 
     /* extents are datafile regions where all the records within the region

@@ -41,6 +41,8 @@ namespace mongo {
 
     class AlignedBuilder;
 
+    unsigned goodRandomNumberSlow();
+
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
         // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
@@ -118,14 +120,12 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)getRandomNumber()) << 32;
+                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
             n1 = n2 = n3 = n4 = '\n';
         }
-
-        // class Journal
 
         Journal j;
 
@@ -133,6 +133,7 @@ namespace mongo {
 
         Journal::Journal() :
             _curLogFileMutex("JournalLfMutex") {
+            _ageOut = true;
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -579,6 +580,17 @@ namespace mongo {
 
                 _oldJournalFiles.pop_front();
             }
+        }
+
+        int getAgeOutJournalFiles() {
+            mutex::try_lock lk(j._curLogFileMutex, 4000);
+            if( !lk.ok )
+                return -1;
+            return j._ageOut ? 1 : 0;
+        }
+        void setAgeOutJournalFiles(bool a) {
+            scoped_lock lk(j._curLogFileMutex);
+            j._ageOut = a;
         }
 
         /** check if time to rotate files.  assure a file is open.

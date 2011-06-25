@@ -66,13 +66,7 @@ namespace mongo {
             ClusteredCursor * cursor = 0;
 
             BSONObj sort = query.getSort();
-
-            if ( sort.isEmpty() ) {
-                cursor = new SerialServerClusteredCursor( servers , q );
-            }
-            else {
-                cursor = new ParallelSortClusteredCursor( servers , q , sort );
-            }
+            cursor = new ParallelSortClusteredCursor( servers , q , sort );
 
             assert( cursor );
 
@@ -177,7 +171,7 @@ namespace mongo {
                             unsigned long long old = manager->getSequenceNumber();
                             manager = r.getChunkManager();
                             
-                            LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
                             if (!manager) {
                                 keepGoing = false;
@@ -197,6 +191,61 @@ namespace mongo {
             }
         }
 
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
+            ChunkManagerPtr manager = conf->getChunkManager(ns);
+            if ( ! manager->hasShardKey( o ) ) {
+
+                bool bad = true;
+
+                if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
+                    BSONObjBuilder b;
+                    b.appendOID( "_id" , 0 , true );
+                    b.appendElements( o );
+                    o = b.obj();
+                    bad = ! manager->hasShardKey( o );
+                }
+
+                if ( bad ) {
+                    log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
+                    uasserted( 14842 , "tried to insert object without shard key" );
+                }
+
+            }
+
+            // Many operations benefit from having the shard key early in the object
+            o = manager->getShardKey().moveToFront(o);
+
+            const int maxTries = 30;
+
+            for ( int i=0; i<maxTries; i++ ) {
+                try {
+                    ChunkPtr c = manager->findChunk( o );
+                    log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                    insert( c->getShard() , ns , o , flags);
+
+//                    r.gotInsert();
+//                    if ( r.getClientInfo()->autoSplitOk() )
+                        c->splitIfShould( o.objsize() );
+                    break;
+                }
+                catch ( StaleConfigException& e ) {
+                    int logLevel = i < ( maxTries / 2 );
+                    LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+//                    r.reset();
+
+                    unsigned long long old = manager->getSequenceNumber();
+                    manager = conf->getChunkManager(ns);
+
+                    LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
+
+                    if (!manager) {
+                        uasserted(14843, "collection no longer sharded");
+                    }
+                }
+                sleepmillis( i * 20 );
+            }
+        }
+
         void _update( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
             int flags = d.pullInt();
 
@@ -204,7 +253,6 @@ namespace mongo {
             uassert( 13506 ,  "$atomic not supported sharded" , query["$atomic"].eoo() );
             uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
-
             BSONObj chunkFinder = query;
 
             bool upsert = flags & UpdateOption_Upsert;
@@ -291,6 +339,99 @@ namespace mongo {
                         r.reset( false );
                         manager = r.getChunkManager();
                         uassert(14806, "collection no longer sharded", manager);
+                    }
+                }
+            }
+        }
+
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags ) {
+            ChunkManagerPtr manager = conf->getChunkManager(ns);
+            BSONObj chunkFinder = query;
+
+            bool upsert = flags & UpdateOption_Upsert;
+            bool multi = flags & UpdateOption_Multi;
+
+            if (upsert) {
+                uassert(14854, "can't upsert something without shard key",
+                        (manager->hasShardKey(toupdate) ||
+                         (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
+
+                BSONObj key = manager->getShardKey().extractKey(query);
+                BSONForEach(e, key) {
+                    uassert(14855, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
+                }
+            }
+
+            bool save = false;
+            if ( ! manager->hasShardKey( query ) ) {
+                if ( multi ) {
+                }
+                else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
+                    throw UserException( 14850 , "can't do non-multi update with query that doesn't have the shard key" );
+                }
+                else {
+                    save = true;
+                    chunkFinder = toupdate;
+                }
+            }
+
+
+            if ( ! save ) {
+                if ( toupdate.firstElementFieldName()[0] == '$' ) {
+                    BSONObjIterator ops(toupdate);
+                    while(ops.more()) {
+                        BSONElement op(ops.next());
+                        if (op.type() != Object)
+                            continue;
+                        BSONObjIterator fields(op.embeddedObject());
+                        while(fields.more()) {
+                            const string field = fields.next().fieldName();
+                            uassert(14851,
+                                    str::stream() << "Can't modify shard key's value field" << field
+                                    << " for collection: " << manager->getns(),
+                                    ! manager->getShardKey().partOfShardKey(field));
+                        }
+                    }
+                }
+                else if ( manager->hasShardKey( toupdate ) ) {
+                    uassert( 14856,
+                             str::stream() << "cannot modify shard key for collection: " << manager->getns(),
+                             manager->getShardKey().compare( query , toupdate ) == 0 );
+                }
+                else {
+                    uasserted(14857,
+                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
+                }
+            }
+
+            if ( multi ) {
+                set<Shard> shards;
+                manager->getShardsForQuery( shards , chunkFinder );
+//                int * x = (int*)(r.d().afterNS());
+//                x[0] |= UpdateOption_Broadcast;
+                for ( set<Shard>::iterator i=shards.begin(); i!=shards.end(); i++) {
+                    update(*i, ns, query, toupdate, flags);
+                }
+            }
+            else {
+                int left = 5;
+                while ( true ) {
+                    try {
+                        ChunkPtr c = manager->findChunk( chunkFinder );
+                        update(c->getShard(), ns, query, toupdate, flags);
+//                        if ( r.getClientInfo()->autoSplitOk() )
+                            c->splitIfShould( toupdate.objsize() );
+                        break;
+                    }
+                    catch ( StaleConfigException& e ) {
+                        if ( left <= 0 )
+                            throw e;
+                        left--;
+                        log() << "update will be retried b/c sharding config info is stale, "
+                              << " left:" << left << " ns: " << ns << " query: " << query << endl;
+//                        r.reset( false );
+                        manager = conf->getChunkManager(ns);
+                        uassert(14849, "collection no longer sharded", manager);
                     }
                 }
             }

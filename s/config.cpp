@@ -53,13 +53,19 @@ namespace mongo {
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
         _dropped = in["dropped"].trueValue();
-        if ( in["key"].isABSONObj() )
-            shard( in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
+        if ( in["key"].isABSONObj() ) {
+            _key = in["key"].Obj().getOwned();
+            _unqiue = in["unique"].trueValue();
+            shard( in["_id"].String() , _key , _unqiue );
+        }
+        _dirty = false;
     }
-
+    
 
     void DBConfig::CollectionInfo::shard( const string& ns , const ShardKeyPattern& key , bool unique ) {
         _cm.reset( new ChunkManager( ns , key , unique ) );
+        _key = key.key().getOwned();
+        _unqiue = unique;
         _dirty = true;
         _dropped = false;
     }
@@ -68,6 +74,7 @@ namespace mongo {
         _cm.reset();
         _dropped = true;
         _dirty = true;
+        _key = BSONObj();
     }
 
     void DBConfig::CollectionInfo::save( const string& ns , DBClientBase* conn ) {
@@ -174,18 +181,52 @@ namespace mongo {
             return false;
 
         ci.unshard();
-        _save();
+        _save( false, true );
         return true;
     }
 
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
+        BSONObj key;
+        bool unique;
+
+        {
+            scoped_lock lk( _lock );
+            
+            CollectionInfo& ci = _collections[ns];
+            
+            bool earlyReload = ! ci.isSharded() && shouldReload;
+            if ( earlyReload ) {
+                // this is to catch cases where there this is a new sharded collection
+                _reload();
+                ci = _collections[ns];
+            }
+            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
+            assert( ci.wasDropped() || ! ci.key().isEmpty() );
+            
+            if ( ! shouldReload || earlyReload )
+                return ci.getCM();
+
+            key = ci.key().copy();
+            unique = ci.unique();
+        }
+        
+        assert( ! key.isEmpty() );
+
+        // we are not locked now, and want to load a new ChunkManager
+        
+        auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
+        if ( temp->numChunks() == 0 ) {
+            // maybe we're not sharded any more
+            reload(); // this is a full reload
+            return getChunkManager( ns , false );
+        }
+
         scoped_lock lk( _lock );
-
-        if ( shouldReload )
-            _reload();
-
+        
         CollectionInfo& ci = _collections[ns];
-        massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
+        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
+        
+        ci.resetCM( temp.release() );
         return ci.getCM();
     }
 
@@ -222,7 +263,7 @@ namespace mongo {
     }
 
     bool DBConfig::_load() {
-        ScopedDbConnection conn( configServer.modelServer() );
+        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
 
         BSONObj o = conn->findOne( ShardNS::database , BSON( "_id" << _name ) );
 
@@ -248,24 +289,32 @@ namespace mongo {
         return true;
     }
 
-    void DBConfig::_save() {
-        ScopedDbConnection conn( configServer.modelServer() );
+    void DBConfig::_save( bool db, bool coll ) {
+        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
 
-        BSONObj n;
-        {
-            BSONObjBuilder b;
-            serialize(b);
-            n = b.obj();
+        if( db ){
+
+            BSONObj n;
+            {
+                BSONObjBuilder b;
+                serialize(b);
+                n = b.obj();
+            }
+
+            conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
+            string err = conn->getLastError();
+            uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+
         }
 
-        conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
-        string err = conn->getLastError();
-        uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+        if( coll ){
 
-        for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
-            if ( ! i->second.isDirty() )
-                continue;
-            i->second.save( i->first , conn.get() );
+            for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
+                if ( ! i->second.isDirty() )
+                    continue;
+                i->second.save( i->first , conn.get() );
+            }
+
         }
 
         conn.done();
@@ -302,7 +351,7 @@ namespace mongo {
         // 2
         grid.removeDB( _name );
         {
-            ScopedDbConnection conn( configServer.modelServer() );
+            ScopedDbConnection conn( configServer.modelServer(), 30.0 );
             conn->remove( ShardNS::database , BSON( "_id" << _name ) );
             errmsg = conn->getLastError();
             if ( ! errmsg.empty() ) {
@@ -334,7 +383,7 @@ namespace mongo {
 
         // 4
         {
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -345,7 +394,7 @@ namespace mongo {
 
         // 5
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
-            ScopedDbConnection conn( *i );
+            ScopedDbConnection conn( *i, 30.0 );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -469,7 +518,7 @@ namespace mongo {
         for ( unsigned i=0; i<_config.size(); i++ ) {
             BSONObj x;
             try {
-                ScopedDbConnection conn( _config[i] );
+                ScopedDbConnection conn( _config[i], 30.0 );
                 if ( ! conn->simpleCommand( "config" , &x , "dbhash" ) )
                     x = BSONObj();
                 else {
@@ -550,7 +599,7 @@ namespace mongo {
 
     bool ConfigServer::allUp( string& errmsg ) {
         try {
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
             conn->getLastError();
             conn.done();
             return true;
@@ -564,7 +613,7 @@ namespace mongo {
     }
 
     int ConfigServer::dbConfigVersion() {
-        ScopedDbConnection conn( _primary );
+        ScopedDbConnection conn( _primary, 30.0 );
         int version = dbConfigVersion( conn.conn() );
         conn.done();
         return version;
@@ -590,7 +639,7 @@ namespace mongo {
     void ConfigServer::reloadSettings() {
         set<string> got;
 
-        ScopedDbConnection conn( _primary );
+        ScopedDbConnection conn( _primary, 30.0 );
         auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
         assert( c.get() );
         while ( c->more() ) {
@@ -664,7 +713,7 @@ namespace mongo {
 
             assert( _primary.ok() );
 
-            ScopedDbConnection conn( _primary );
+            ScopedDbConnection conn( _primary, 30.0 );
 
             static bool createdCapped = false;
             if ( ! createdCapped ) {
@@ -692,7 +741,7 @@ namespace mongo {
 
     void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ) {
         try {
-            ScopedDbConnection conn( configServer.getConnectionString() );
+            ScopedDbConnection conn( configServer.getConnectionString(), 30.0 );
             conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
             conn.done();
         }

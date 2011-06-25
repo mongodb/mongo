@@ -22,10 +22,10 @@
 
 #include "../db/btree.h"
 #include "../db/commands.h"
-#include "../db/dbmessage.h"
 #include "../db/jsobj.h"
-#include "../db/query.h"
+#include "../db/instance.h"
 #include "../db/queryoptimizer.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -74,7 +74,7 @@ namespace mongo {
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
 
-            // only yielding on firt half for now
+            // only yielding on first half for now
             // after this it should be in ram, so 2nd should be fast
             {
                 shared_ptr<Cursor> c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
@@ -82,7 +82,7 @@ namespace mongo {
                 while ( c->ok() ) {
                     num++;
                     c->advance();
-                    if ( ! cc->yieldSometimes() ) {
+                    if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                         cc.release();
                         break;
                     }
@@ -220,7 +220,7 @@ namespace mongo {
                 }
                 cc->advance();
 
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                     cc.release();
                     break;
                 }
@@ -419,11 +419,11 @@ namespace mongo {
                             break;
                         }
                         
-                        if ( ! cc->yieldSometimes() ) {
+                        if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                             // we were near and and got pushed to the end
                             // i think returning the splits we've already found is fine
                             
-                            // don't use the btree cursor pointer to acces keys beyond this point but ok
+                            // don't use the btree cursor pointer to access keys beyond this point but ok
                             // to use it for format the keys we've got already
                             cc.release();
                             break;
@@ -544,13 +544,13 @@ namespace mongo {
 
             const BSONObj min = cmdObj["min"].Obj();
             if ( min.isEmpty() ) {
-                errmsg = "neet to specify the min key for the chunk";
+                errmsg = "need to specify the min key for the chunk";
                 return false;
             }
 
             const BSONObj max = cmdObj["max"].Obj();
             if ( max.isEmpty() ) {
-                errmsg = "neet to specify the max key for the chunk";
+                errmsg = "need to specify the max key for the chunk";
                 return false;
             }
 
@@ -709,7 +709,7 @@ namespace mongo {
                 op.appendBool( "b" , true );
                 op.append( "ns" , ShardNS::chunk );
 
-                // add the modified (new) chunk infomation as the update object
+                // add the modified (new) chunk information as the update object
                 BSONObjBuilder n( op.subobjStart( "o" ) );
                 n.append( "_id" , Chunk::genID( ns , startKey ) );
                 n.appendTimestamp( "lastmod" , myVersion );

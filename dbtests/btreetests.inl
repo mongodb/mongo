@@ -1,3 +1,5 @@
+    typedef BtreeBucket::_KeyNode _KeyNode;
+ 
     const char* ns() {
         return "unittests.btreetests";
     }
@@ -104,7 +106,7 @@
                 d = b->getNextChild();
             }
             else {
-                d = const_cast< DiskLoc& >( b->keyNode( i ).prevChildBucket );
+                d = b->keyNode( i ).prevChildBucket;
             }
             assert( !d.isNull() );
             return d.btree();
@@ -323,7 +325,7 @@
             end.appendMaxKey( "a" );
             auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
             while( c->ok() ) {
-                if ( !c->_currKeyNode().prevChildBucket.isNull() ) {
+                if ( c->curKeyHasChild() ) {
                     toDel.push_back( c->currKey().firstElement().valuestr() );
                 }
                 else {
@@ -388,8 +390,9 @@
             }
             // too much work to try to make this happen through inserts and deletes
             // we are intentionally manipulating the btree bucket directly here
-            getDur().writingDiskLoc( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket ) ) = DiskLoc();
-            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            BtreeBucket::Loc* L = const_cast< BtreeBucket::Loc* >( &bt()->keyNode( 1 ).prevChildBucket );
+            getDur().writing(L)->Null();
+            getDur().writingInt( const_cast< BtreeBucket::Loc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
             BSONObj k = BSON( "a" << toInsert );
             Base::insert( k );
         }
@@ -818,15 +821,13 @@
     public:
         void run() {
             ArtificialTree::setTree( "{h:{e:{b:{a:null},c:null,d:null},_:{f:null}},_:{i:null}}", id() );
-//            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
-
             BSONObj k = BSON( "" << "c" );
             assert( unindex( k ) );
-//            dump();
-            ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), 0, true ) );
+            long long keyCount = bt()->fullValidate( dl(), order(), 0, true );
+            ASSERT_EQUALS( 7, keyCount );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
             // no recursion currently in this case
             ArtificialTree::checkStructure( "{h:{b:{a:null},d:null,e:null,f:null},_:{i:null}}", id() );
@@ -1435,7 +1436,7 @@
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
-            getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            getDur().writingInt( const_cast< BtreeBucket::Loc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused
             long long unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );

@@ -52,9 +52,20 @@ function check() {
     assert.eq( 0, t.count( {$and:[{a:/^F/},{a:'foo'}]} ) );
     assert.eq( 1, t.count( {$and:[{a:/^F/i},{a:'foo'}]} ) );
     
-    // Check operators
+    
+    
+    // Check operator
     assert.eq( 1, t.count( {$and:[{a:{$gt:0}}]} ) );
     
+    // Check where
+    assert.eq( 1, t.count( {a:'foo',$where:'this.a=="foo"'} ) );
+    assert.eq( 1, t.count( {$and:[{a:'foo'}],$where:'this.a=="foo"'} ) );
+    assert.eq( 1, t.count( {$and:[{a:'foo'}],$where:'this.a=="foo"'} ) );
+    
+    // Nested where ok
+    assert.eq( 1, t.count({$and:[{$where:'this.a=="foo"'}]}) );
+    assert.eq( 1, t.count({$and:[{a:'foo'},{$where:'this.a=="foo"'}]}) );
+    assert.eq( 1, t.count({$and:[{$where:'this.a=="foo"'}],$where:'this.a=="foo"'}) );
 }
 
 check();
@@ -63,3 +74,13 @@ check();
 var e = t.find( {$and:[{a:1}]} ).explain();
 assert.eq( 'BtreeCursor a_1', e.cursor );
 assert.eq( [[1,1]], e.indexBounds.a );
+
+function checkBounds( query ) {
+    var e = t.find( query ).explain();
+    assert.eq( 1, e.n );
+    assert.eq( [[1,1]], e.indexBounds.a );
+}
+
+// Since this is a multikey index, we get the bounds from the first constraint scanned.
+checkBounds( {a:1,$and:[{a:2}]} );
+checkBounds( {$and:[{a:1},{a:2}]} );

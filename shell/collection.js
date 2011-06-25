@@ -120,7 +120,7 @@ DBCollection.prototype._validateObject = function( o ){
         throw "can't save a DBQuery object";
 }
 
-DBCollection._allowedFields = { $id : 1 , $ref : 1 };
+DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
 DBCollection.prototype._validateForStorage = function( o ){
     this._validateObject( o );

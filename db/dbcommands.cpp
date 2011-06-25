@@ -21,7 +21,7 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "../bson/util/builder.h"
@@ -50,7 +50,19 @@
 
 namespace mongo {
 
-    extern int otherTraceLevel;
+    namespace dur { 
+        void setAgeOutJournalFiles(bool rotate);
+    }
+    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) { 
+        BSONElement e = cmdObj["ageOutJournalFiles"];
+        if( !e.eoo() ) {
+            bool r = e.trueValue();
+            log() << "ageOutJournalFiles " << r << endl;
+            dur::setAgeOutJournalFiles(r);
+        }
+        return true;
+    }
+
     void flushDiagLog();
 
     /* reset any errors so that getlasterror comes back clean.
@@ -161,11 +173,9 @@ namespace mongo {
             }
 
             BSONElement e = cmdObj["w"];
-            if ( e.isNumber() ) {
+            if ( e.ok() ) {
                 int timeout = cmdObj["wtimeout"].numberInt();
                 Timer t;
-
-                int w = e.numberInt();
 
                 long long passes = 0;
                 char buf[32];
@@ -176,7 +186,7 @@ namespace mongo {
                         if ( anyReplEnabled() ) {
                             result.append( "wnote" , "no write has been done on this connection" );
                         }
-                        else if ( w <= 1 ) {
+                        else if ( e.isNumber() && e.numberInt() <= 1 ) {
                             // don't do anything
                             // w=1 and no repl, so this is fine
                         }
@@ -190,8 +200,9 @@ namespace mongo {
                     }
 
                     // check this first for w=0 or w=1
-                    if ( opReplicatedEnough( op, w ) )
+                    if ( opReplicatedEnough( op, e ) ) {
                         break;
+                    }
 
                     // if replication isn't enabled (e.g., config servers)
                     if ( ! anyReplEnabled() ) {
@@ -245,6 +256,65 @@ namespace mongo {
             return true;
         }
     } cmdGetPrevError;
+
+    CmdShutdown cmdShutdown;
+
+    void CmdShutdown::help( stringstream& help ) const {
+        help << "shutdown the database.  must be ran against admin db and "
+             << "either (1) ran from localhost or (2) authenticated. If "
+             << "this is a primary in a replica set and there is no member "
+             << "within 10 seconds of its optime, it will not shutdown "
+             << "without force : true.  You can also specify timeoutSecs : "
+             << "N to wait N seconds for other members to catch up.";
+    }
+
+    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+
+        if (!force && theReplSet && theReplSet->isPrimary()) {
+            int timeout, now, start;
+            timeout = now = start = curTimeMicros64()/1000000;
+            if (cmdObj.hasField("timeoutSecs")) {
+                timeout += cmdObj["timeoutSecs"].numberInt();
+            }
+
+            OpTime lastOp = theReplSet->lastOpTimeWritten;
+            OpTime closest = theReplSet->lastOtherOpTime();
+            long long int diff = lastOp.getSecs() - closest.getSecs();
+            while (now <= timeout && (diff < 0 || diff > 10)) {
+                sleepsecs(1);
+                now++;
+
+                lastOp = theReplSet->lastOpTimeWritten;
+                closest = theReplSet->lastOtherOpTime();
+                diff = lastOp.getSecs() - closest.getSecs();
+            }
+
+            if (diff < 0 || diff > 10) {
+                errmsg = "no secondaries within 10 seconds of my optime";
+                result.append("closest", closest.getSecs());
+                result.append("difference", diff);
+                return false;
+            }
+
+            // step down
+            theReplSet->stepDown(120);
+
+            log() << "waiting for secondaries to catch up" << endl;
+
+            lastOp = theReplSet->lastOpTimeWritten;
+            while (lastOp != closest && now - start < 60) {
+                closest = theReplSet->lastOtherOpTime();
+
+                now++;
+                sleepsecs(1);
+            }
+
+            // regardless of whether they caught up, we'll shut down
+        }
+
+        return shutdownHelper();
+    }
 
     class CmdDropDatabase : public Command {
     public:
@@ -768,11 +838,13 @@ namespace mongo {
         }
         virtual LockType locktype() const { return WRITE; }
         virtual void help( stringstream& help ) const {
-            help << "create a collection";
+            help << "create a collection explicitly\n"
+                "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
             string err;
+            uassert(14832, "specify size:<n> when capped is true", !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() || cmdObj.hasField("$nExtents"));
             bool ok = userCreateNS(ns.c_str(), cmdObj, err, ! fromRepl );
             if ( !ok && !err.empty() )
                 errmsg = err;

@@ -31,7 +31,6 @@ namespace mongo {
 
     bool replSet = false;
     ReplSet *theReplSet = 0;
-    extern string *discoveredSeed;
 
     bool isCurrentlyAReplSetPrimary() { 
         return theReplSet && theReplSet->isPrimary();
@@ -78,6 +77,7 @@ namespace mongo {
             const Member *temp = findById(*it);
             if (!temp) {
                 log() << "couldn't find member: " << *it << endl;
+                _electableSet.erase(*it);
                 continue;
             }
             if (!max || max->config().priority < temp->config().priority) {
@@ -233,6 +233,10 @@ namespace mongo {
             if( m )
                 b.append("primary", m->h().toString());
         }
+        else {
+            b.append("primary", _self->fullName());
+        }
+
         if( myConfig().arbiterOnly )
             b.append("arbiterOnly", true);
         if( myConfig().priority == 0 )
@@ -292,7 +296,8 @@ namespace mongo {
         _currentSyncTarget(0),
         _hbmsgTime(0),
         _self(0),
-        mgr( new Manager(this) ) {
+        mgr( new Manager(this) ),
+        ghost( new GhostSync(this) ) {
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         strcpy( _hbmsg , "initial startup" );
@@ -321,13 +326,13 @@ namespace mongo {
 
     void newReplUp();
 
-    void ReplSetImpl::loadLastOpTimeWritten() {
+    void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
-            uassert(13290, "bad replSet oplog entry?", !lastOpTimeWritten.isNull());
+            uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
         }
     }
 
@@ -412,14 +417,15 @@ namespace mongo {
                 }
             }
             if( me == 0 ) {
-                // initial startup with fastsync
-                if (!reconf && replSettings.fastsync) {
-                    return false;
-                }
-                // log() << "replSet config : " << _cfg->toString() << rsLog;
+                _members.orphanAll();
+                // hbs must continue to pick up new config
+                // stop sync thread
+                box.set(MemberState::RS_STARTUP, 0);
+
+                // go into holding pattern
                 log() << "replSet error self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
-                uasserted(13497, "replSet error self not present in the configuration");
+                return false;
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
@@ -548,12 +554,25 @@ namespace mongo {
                     }
                 }
 
-                if( discoveredSeed ) {
-                    try {
-                        configs.push_back( ReplSetConfig(HostAndPort(*discoveredSeed)) );
+                if( replSettings.discoveredSeeds.size() > 0 ) {
+                    for (set<string>::iterator i = replSettings.discoveredSeeds.begin(); i != replSettings.discoveredSeeds.end(); i++) {
+                        try {
+                            configs.push_back( ReplSetConfig(HostAndPort(*i)) );
+                        }
+                        catch( DBException& ) {
+                            log(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
+                            replSettings.discoveredSeeds.erase(*i);
+                        }
                     }
-                    catch( DBException& ) {
-                        log(1) << "replSet exception trying to load config from discovered seed " << *discoveredSeed << rsLog;
+                }
+
+                if (!replSettings.reconfig.isEmpty()) {
+                    try {
+                        configs.push_back(ReplSetConfig(replSettings.reconfig, true));
+                    }
+                    catch( DBException& re) {
+                        log() << "couldn't load reconfig: " << re.what() << endl;
+                        replSettings.reconfig = BSONObj();
                     }
                 }
 
@@ -619,10 +638,11 @@ namespace mongo {
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
 
         newConfig.saveConfigLocally(comment);
-        
+
         try {
-            initFromConfig(newConfig, true);
-            log() << "replSet replSetReconfig new config saved locally" << rsLog;
+            if (initFromConfig(newConfig, true)) {
+                log() << "replSet replSetReconfig new config saved locally" << rsLog;
+            }
         }
         catch(DBException& e) {
             if( e.getCode() == 13497 /* removed from set */ ) {

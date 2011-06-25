@@ -359,6 +359,10 @@ namespace mongo {
             return -1;
         }
 
+        bool haveIdIndex() { 
+            return (flags & NamespaceDetails::Flag_HaveIdIndex) || findIdIndex() >= 0;
+        }
+
         /* return which "deleted bucket" for this size object */
         static int bucket(int n) {
             for ( int i = 0; i < Buckets; i++ )
@@ -434,9 +438,12 @@ namespace mongo {
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
+    private:
         /* _get() is not threadsafe -- see get_inlock() comments */
         static NamespaceDetailsTransient& _get(const char *ns);
-        /* use get_w() when doing write operations */
+    public:
+        /* use get_w() when doing write operations. this is safe as there is only 1 write op and it's exclusive to everything else.  
+           for reads you must lock and then use get_inlock() instead. */
         static NamespaceDetailsTransient& get_w(const char *ns) {
             DEV assertInWriteLock();
             return _get(ns);
@@ -520,7 +527,7 @@ namespace mongo {
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
-            if ( ++_qcWriteCount >= 100 )
+            if ( ++_qcWriteCount >= 1000 )
                 clearQueryCache();
         }
         BSONObj indexForPattern( const QueryPattern &pattern ) {

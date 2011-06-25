@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     bool Grid::addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg ) {
-        // name can be NULL, so privide a dummy one here to avoid testing it elsewhere
+        // name can be NULL, so provide a dummy one here to avoid testing it elsewhere
         string nameInternal;
         if ( ! name ) {
             name = &nameInternal;
@@ -167,6 +167,13 @@ namespace mongo {
             if ( commandSetName.empty() && ! setName.empty() ) {
                 ostringstream ss;
                 ss << "host is part of set: " << setName << " use replica set url format <setname>/<server1>,<server2>,....";
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+            if ( !commandSetName.empty() && setName.empty() ) {
+                ostringstream ss;
+                ss << "host did not return a set name, is the replica set still initializing? " << resIsMaster;
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
@@ -382,10 +389,7 @@ namespace mongo {
         // check the 'stopped' marker maker
         // if present, it is a simple bool
         BSONElement stoppedElem = balancerDoc["stopped"];
-        if ( ! stoppedElem.eoo() && stoppedElem.isBoolean() ) {
-            return stoppedElem.boolean();
-        }
-        return false;
+        return stoppedElem.trueValue();
     }
 
     bool Grid::_inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now ) {
@@ -399,22 +403,30 @@ namespace mongo {
 
         // check if both 'start' and 'stop' are present
         if ( ! windowElem.isABSONObj() ) {
-            log(1) << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
+            warning() << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
             return true;
         }
         BSONObj intervalDoc = windowElem.Obj();
         const string start = intervalDoc["start"].str();
         const string stop = intervalDoc["stop"].str();
         if ( start.empty() || stop.empty() ) {
-            log(1) << "must specify both start and end of balancing window: " << intervalDoc << endl;
+            warning() << "must specify both start and end of balancing window: " << intervalDoc << endl;
             return true;
         }
 
         // check that both 'start' and 'stop' are valid time-of-day
         boost::posix_time::ptime startTime, stopTime;
         if ( ! toPointInTime( start , &startTime ) || ! toPointInTime( stop , &stopTime ) ) {
-            log(1) << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
+            warning() << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
             return true;
+        }
+
+        if ( logLevel ) {
+            stringstream ss;
+            ss << " now: " << now
+               << " startTime: " << startTime 
+               << " stopTime: " << stopTime;
+            log() << "_inBalancingWindow: " << ss.str() << endl;
         }
 
         // allow balancing if during the activeWindow

@@ -235,6 +235,7 @@ namespace mongo {
              * transfers in memory storage to temp collection
              */
             void dumpToInc();
+            void insertToInc( BSONObj& o );
             void _insertToInc( BSONObj& o );
 
             // ------ reduce stage -----------

@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SyncClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         {
             stringstream s;
             int n=0;
@@ -38,7 +38,7 @@ namespace mongo {
             _connect( i->toString() );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string commaSeperated )  : _mutex("SyncClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( string commaSeperated, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         _address = commaSeperated;
         string::size_type idx;
         while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ) {
@@ -50,7 +50,7 @@ namespace mongo {
         uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string a , string b , string c )  : _mutex("SyncClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( string a , string b , string c, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         _address = a + "," + b + "," + c;
         // connect to all even if not working
         _connect( a );
@@ -58,7 +58,7 @@ namespace mongo {
         _connect( c );
     }
 
-    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev ) : _mutex("SyncClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         assert(0);
     }
 
@@ -79,7 +79,7 @@ namespace mongo {
         for ( size_t i=0; i<_conns.size(); i++ ) {
             BSONObj res;
             try {
-                if ( _conns[i]->simpleCommand( "admin" , 0 , "fsync" ) )
+                if ( _conns[i]->simpleCommand( "admin" , &res , "fsync" ) )
                     continue;
             }
             catch ( DBException& e ) {
@@ -144,6 +144,7 @@ namespace mongo {
     void SyncClusterConnection::_connect( string host ) {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
+        c->setSoTimeout( _socketTimeout );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
             log() << "SyncClusterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
@@ -194,6 +195,16 @@ namespace mongo {
         return DBClientBase::findOne( ns , query , fieldsToReturn , queryOptions );
     }
 
+    bool SyncClusterConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
+        for (vector<DBClientConnection*>::iterator it = _conns.begin(); it < _conns.end(); it++) {
+            massert( 15848, "sync cluster of sync clusters?", (*it)->type() != ConnectionString::SYNC);
+
+            if (!(*it)->auth(dbname, username, password_text, errmsg, digestPassword)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
@@ -347,7 +358,7 @@ namespace mongo {
         throw UserException( 8008 , "all servers down!" );
     }
 
-    void SyncClusterConnection::say( Message &toSend ) {
+    void SyncClusterConnection::say( Message &toSend, bool isRetry ) {
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 13397 , (string)"SyncClusterConnection::say prepare failed: " + errmsg );
@@ -384,6 +395,13 @@ namespace mongo {
     void SyncClusterConnection::killCursor( long long cursorID ) {
         // should never need to do this
         assert(0);
+    }
+
+    void SyncClusterConnection::setAllSoTimeouts( double socketTimeout ){
+        _socketTimeout = socketTimeout;
+        for ( size_t i=0; i<_conns.size(); i++ )
+
+            if( _conns[i] ) _conns[i]->setSoTimeout( socketTimeout );
     }
 
 }

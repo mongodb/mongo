@@ -18,12 +18,12 @@
  */
 
 #include "pch.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
 #include "../db/db.h"
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
-#include "../db/update.h"
+#include "../db/ops/update.h"
 #include "../util/timer.h"
 #include "dbtests.h"
 
@@ -58,9 +58,9 @@ namespace DirectClientTests {
                 if( pass ) {
                     BSONObj info;
                     BSONObj cmd = BSON( "captrunc" << "b" << "n" << 1 << "inc" << true );
-                    cout << cmd.toString() << endl;
+                    //cout << cmd.toString() << endl;
                     bool ok = client().runCommand("a", cmd, info);
-                    cout << info.toString() << endl;
+                    //cout << info.toString() << endl;
                     assert(ok);
                 }
 

@@ -122,6 +122,11 @@ namespace mongo {
 
             Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
+
+            if (theReplSet && theReplSet->isPrimary()) {
+                theReplSet->ghost->updateSlave(rid, last);
+            }
+
             if ( i.loc ) {
                 if( i.owned )
                     i.loc[0] = last;
@@ -153,11 +158,34 @@ namespace mongo {
 
         }
 
-        bool opReplicatedEnough( OpTime op , int w ) {
+        bool opReplicatedEnough( OpTime op , BSONElement w ) {
             RARELY {
                 REPLDEBUG( "looking for : " << op << " w=" << w );
             }
 
+            if (w.isNumber()) {
+                return replicatedToNum(op, w.numberInt());
+            }
+
+            if (!theReplSet) {
+                return false;
+            }
+
+            string wStr = w.String();
+            if (wStr == "majority") {
+                // use the entire set, including arbiters, to prevent writing
+                // to a majority of the set but not a majority of voters
+                return replicatedToNum(op, theReplSet->config().members.size()/2+1);
+            }
+
+            map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
+            uassert(14830, str::stream() << "unrecognized getLastError mode: " << wStr,
+                    it != theReplSet->config().rules.end());
+
+            return op <= (*it).second->last;
+        }
+
+        bool replicatedToNum(OpTime& op, int w) {
             if ( w <= 1 || ! _isMaster() )
                 return true;
 
@@ -203,17 +231,21 @@ namespace mongo {
             return;
 
         slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
-        
+
         if (theReplSet && !theReplSet->isPrimary()) {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
             log(2) << "percolating " << lastOp.toString() << " from " << rid << endl;
-            theReplSet->mgr->send( boost::bind(&ReplSet::percolate, theReplSet, rid, lastOp) );
+            theReplSet->ghost->send( boost::bind(&GhostSync::percolate, theReplSet->ghost, rid, lastOp) );
         }
     }
 
-    bool opReplicatedEnough( OpTime op , int w ) {
+    bool opReplicatedEnough( OpTime op , BSONElement w ) {
         return slaveTracking.opReplicatedEnough( op , w );
+    }
+
+    bool opReplicatedEnough( OpTime op , int w ) {
+        return slaveTracking.replicatedToNum( op , w );
     }
 
     void resetSlaveCache() {

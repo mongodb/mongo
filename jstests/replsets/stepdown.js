@@ -49,6 +49,8 @@ var config = master.getDB("local").system.replset.findOne();
 config.version++;
 config.members[0].priority = 2;
 config.members[1].priority = 1;
+// make sure 1 can stay master once 0 is down
+config.members[0].votes = 0;
 try {
     master.getDB("admin").runCommand({replSetReconfig : config});
 }
@@ -75,5 +77,35 @@ assert.soon(function() {
         var secondMaster = replTest.getMaster();
         return firstMaster+"" != secondMaster+"";
     }, 'making sure '+firstMaster+' isn\'t still master', 60000);
+
+
+print("check shutdown command");
+master = replTest.liveNodes.master;
+var slave = replTest.liveNodes.slaves[0];
+var slaveId = replTest.getNodeId(slave);
+
+try {
+    slave.adminCommand({shutdown :1})
+}
+catch (e) {
+    print(e);
+}
+
+print("sleeping");
+sleep(2000);
+
+print("running shutdown on master: "+master);
+result = replTest.getMaster().getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3});
+assert.eq(result.ok, 0);
+
+var thrown = false;
+try {
+    replTest.getMaster().getDB("admin").runCommand({shutdown : 1, force : true});
+}
+catch (e) {
+    print(e);
+    thrown = true;
+}
+assert(thrown);
 
 replTest.stopSet();

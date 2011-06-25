@@ -183,7 +183,7 @@ namespace mongo {
 
         string toString() const { return _string; }
         
-        DBClientBase* connect( string& errmsg ) const;
+        DBClientBase* connect( string& errmsg, double socketTimeout = 0 ) const;
 
         string getSetName() const { return _setName; }
 
@@ -341,12 +341,14 @@ namespace mongo {
         virtual ~DBConnector() {}
         /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 ) = 0;
-        virtual void say( Message &toSend ) = 0;
+        virtual void say( Message &toSend, bool isRetry = false ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
-        virtual void checkResponse( const char* data, int nReturned ) {}
-
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
         virtual bool recv( Message& m ) { assert(false); return false; }
+        // In general, for lazy queries, we'll need to say, recv, then checkResponse
+        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL ) {
+            if( retry ) *retry = false; if( targetHost ) *targetHost = "";
+        }
     };
 
     /**
@@ -791,15 +793,6 @@ namespace mongo {
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
-        virtual void say( Message& toSend  ) = 0;
-
-        /**
-         * this sends the request but does not wait for the response
-         * we return a DBClientBase in case this connection points to many servers
-         * so we can call recv() on the right socket
-         * @return the actual connection to call recv on
-         */
-        virtual DBClientBase* callLazy( Message& toSend );
         
         virtual ConnectionString::ConnectionType type() const = 0;
 
@@ -914,10 +907,11 @@ namespace mongo {
 
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
-        virtual void say( Message &toSend );
+        virtual void say( Message &toSend, bool isRetry = false );
+        virtual bool recv( Message& m );
+        virtual void checkResponse( const char *data, int nReturned, bool* retry = NULL, string* host = NULL );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
-        virtual void checkResponse( const char *data, int nReturned );
         void setSoTimeout(double to) { _so_timeout = to; }
 
         static int getNumConnections() {
@@ -929,7 +923,6 @@ namespace mongo {
 
     protected:
         friend class SyncClusterConnection;
-        virtual bool recv( Message& m );
         virtual void sayPiggyBack( Message &toSend );
 
         DBClientReplicaSet *clientSet;
