@@ -248,7 +248,6 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
-extern void __wt_trk_dump(const char *l, void *ss_arg);
 extern int __wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg);
 extern int __wt_bt_sync(WT_SESSION_IMPL *session);
 extern int __wt_verify(WT_SESSION_IMPL *session,
