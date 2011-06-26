@@ -472,6 +472,10 @@ namespace mongo {
     class BalancingWindowUnitTest : public UnitTest {
     public:
         void run() {
+            
+            if ( ! cmdLine.isMongos() )
+                return;
+
             // T0 < T1 < now < T2 < T3 and Error
             const string T0 = "9:00";
             const string T1 = "11:00";
