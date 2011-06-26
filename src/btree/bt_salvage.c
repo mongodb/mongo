@@ -31,6 +31,7 @@ struct __wt_stuff {
 
 	int	   range_merge;			/* If merged key ranges */
 
+	int	   verbose;			/* If WT_VERB_SALVAGE set */
 	WT_BUF	  *vbuf;			/* Verbose print buffer */
 
 	uint64_t fcnt;				/* Progress counter */
@@ -133,8 +134,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	ss->page_type = WT_PAGE_INVALID;
 
 	/* Allocate a buffer for printing strings. */
-	if (FLD_ISSET(S2C(session)->verbose, WT_VERB_SALVAGE))
+	if (FLD_ISSET(S2C(session)->verbose, WT_VERB_SALVAGE)) {
+		ss->verbose = 1;
 		WT_ERR(__wt_scr_alloc(session, 0, &ss->vbuf));
+	}
 
 	if (btree->fh->file_size > WT_BTREE_DESC_SECTOR) {
 		/*
@@ -523,18 +526,20 @@ __slvg_trk_leaf(
 		    page, &page->u.row_leaf.d[page->entries - 1],
 		    &trk->u.row.range_stop));
 
-		WT_ERR(__wt_load_byte_string(session,
-		    trk->u.row.range_start.data, trk->u.row.range_start.size,
-		    ss->vbuf));
-		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
-		    "[%" PRIu32 "] start key %.*s",
-		    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
-		WT_ERR(__wt_load_byte_string(session,
-		    trk->u.row.range_stop.data, trk->u.row.range_stop.size,
-		    ss->vbuf));
-		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
-		    "[%" PRIu32 "] stop key %.*s",
-		    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
+		if (ss->verbose) {
+			WT_ERR(__wt_load_byte_string(session,
+			    trk->u.row.range_start.data,
+			    trk->u.row.range_start.size, ss->vbuf));
+			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "[%" PRIu32 "] start key %.*s",
+			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
+			WT_ERR(__wt_load_byte_string(session,
+			    trk->u.row.range_stop.data,
+			    trk->u.row.range_stop.size, ss->vbuf));
+			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
+			    "[%" PRIu32 "] stop key %.*s",
+			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
+		}
 
 		/* Row-store pages can contain overflow items. */
 		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
@@ -1545,12 +1550,16 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			if  (func(btree,
 			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
 				break;
-			WT_ERR(__wt_load_byte_string(session,
-			    item->data, item->size, ss->vbuf));
-			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
-			    "[%" PRIu32 "] merge discarding leading key %.*s",
-			    trk->addr,
-			    (int)ss->vbuf->size, (char *)ss->vbuf->data));
+			if (ss->verbose) {
+				WT_ERR(__wt_load_byte_string(session,
+				    item->data, item->size, ss->vbuf));
+				WT_VERBOSE(S2C(session), WT_VERB_SALVAGE,
+				    (session,
+				    "[%" PRIu32 "] merge discarding leading "
+				    "key %.*s",
+				    trk->addr, (int)ss->vbuf->size,
+				    (char *)ss->vbuf->data));
+			}
 			++skip_start;
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
@@ -1567,12 +1576,16 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			if  (func(btree,
 			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
 				break;
-			WT_ERR(__wt_load_byte_string(session,
-			    item->data, item->size, ss->vbuf));
-			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
-			    "[%" PRIu32 "] merge discarding trailing key %.*s",
-			    trk->addr,
-			    (int)ss->vbuf->size, (char *)ss->vbuf->data));
+			if (ss->verbose) {
+				WT_ERR(__wt_load_byte_string(session,
+				    item->data, item->size, ss->vbuf));
+				WT_VERBOSE(S2C(session), WT_VERB_SALVAGE,
+				    (session,
+				    "[%" PRIu32 "] merge discarding trailing "
+				    "key %.*s",
+				    trk->addr, (int)ss->vbuf->size,
+				    (char *)ss->vbuf->data));
+			}
 			++skip_stop;
 		}
 
