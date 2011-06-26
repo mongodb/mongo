@@ -41,6 +41,79 @@ namespace mongo {
         return string(copy);
     }
 
+    // for convenience, '{' is greater than anything and stops number parsing
+    inline int lexNumCmp( const char *s1, const char *s2 ) {
+        //cout << "START : " << s1 << "\t" << s2 << endl;
+        while( *s1 && *s2 ) {
+
+            bool p1 = ( *s1 == (char)255 );
+            bool p2 = ( *s2 == (char)255 );
+            //cout << "\t\t " << p1 << "\t" << p2 << endl;
+            if ( p1 && !p2 )
+                return 1;
+            if ( p2 && !p1 )
+                return -1;
+
+            bool n1 = isNumber( *s1 );
+            bool n2 = isNumber( *s2 );
+
+            if ( n1 && n2 ) {
+                // get rid of leading 0s
+                while ( *s1 == '0' ) s1++;
+                while ( *s2 == '0' ) s2++;
+
+                char * e1 = (char*)s1;
+                char * e2 = (char*)s2;
+
+                // find length
+                // if end of string, will break immediately ('\0')
+                while ( isNumber (*e1) ) e1++;
+                while ( isNumber (*e2) ) e2++;
+
+                int len1 = (int)(e1-s1);
+                int len2 = (int)(e2-s2);
+
+                int result;
+                // if one is longer than the other, return
+                if ( len1 > len2 ) {
+                    return 1;
+                }
+                else if ( len2 > len1 ) {
+                    return -1;
+                }
+                // if the lengths are equal, just strcmp
+                else if ( (result = strncmp(s1, s2, len1)) != 0 ) {
+                    return result;
+                }
+
+                // otherwise, the numbers are equal
+                s1 = e1;
+                s2 = e2;
+                continue;
+            }
+
+            if ( n1 )
+                return 1;
+
+            if ( n2 )
+                return -1;
+
+            if ( *s1 > *s2 )
+                return 1;
+
+            if ( *s2 > *s1 )
+                return -1;
+
+            s1++; s2++;
+        }
+
+        if ( *s1 )
+            return 1;
+        if ( *s2 )
+            return -1;
+        return 0;
+    }
+
 } // namespace mongo
 
 #endif // UTIL_STRING_UTILS_HEADER
