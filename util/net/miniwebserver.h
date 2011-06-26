@@ -19,6 +19,7 @@
 
 #include "../../pch.h"
 #include "message.h"
+#include "message_port.h"
 #include "../../db/jsobj.h"
 
 namespace mongo {

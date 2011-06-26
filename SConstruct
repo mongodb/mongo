@@ -325,7 +325,7 @@ coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/net/message_server_port.cpp" , 
                     "client/parallel.cpp" , "db/common.cpp", 
                     "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp" ]
 
 mmapFiles = [ "util/mmap.cpp" ]
 

@@ -20,6 +20,7 @@
 #ifndef USE_ASIO
 
 #include "message.h"
+#include "message_port.h"
 #include "message_server.h"
 
 #include "../../db/cmdline.h"

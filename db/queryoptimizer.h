@@ -23,12 +23,14 @@
 #include "queryutil.h"
 #include "matcher.h"
 #include "../util/net/message.h"
+#include "../util/net/message_port.h"
 #include <queue>
 
 namespace mongo {
 
     class IndexDetails;
     class IndexType;
+    class ElapsedTracker;
 
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {

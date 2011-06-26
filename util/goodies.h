@@ -493,6 +493,8 @@ namespace mongo {
         T* _p;
     };
 
+
+
     /** Hmmmm */
     using namespace boost;
 

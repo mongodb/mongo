@@ -25,6 +25,7 @@
 #include <time.h>
 
 #include "message.h"
+#include "message_port.h"
 #include "../goodies.h"
 #include "../background.h"
 #include "../time_support.h"
@@ -47,6 +48,19 @@
 #endif
 
 namespace mongo {
+
+
+    void Message::send( MessagingPort &p, const char *context ) {
+        if ( empty() ) {
+            return;
+        }
+        if ( _buf != 0 ) {
+            p.send( (char*)_buf, _buf->len, context );
+        }
+        else {
+            p.send( _data, context );
+        }
+    }
 
     bool objcheck = false;
 

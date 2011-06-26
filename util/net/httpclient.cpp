@@ -19,6 +19,7 @@
 #include "httpclient.h"
 #include "sock.h"
 #include "message.h"
+#include "message_port.h"
 #include "../..//bson/util/builder.h"
 
 namespace mongo {
