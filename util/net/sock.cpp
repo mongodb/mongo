@@ -227,4 +227,20 @@ namespace mongo {
         return _hostNameCached;
     }
 
+    string SocketException::toString() const {
+        stringstream ss;
+        ss << _ei.code << " socket exception [" << _type << "] ";
+        
+        if ( _server.size() )
+            ss << "server [" << _server << "] ";
+        
+        if ( _extra.size() )
+            ss << _extra;
+        
+        return ss.str();
+    }
+
+
+
+
 } // namespace mongo
