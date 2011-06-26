@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../util/sock.h"
+#include "../util/net/sock.h"
 #include "../bson/util/atomic_int.h"
 #include "net/hostandport.h"
 

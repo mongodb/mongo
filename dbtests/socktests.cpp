@@ -18,7 +18,7 @@
  */
 
 #include "pch.h"
-#include "../util/sock.h"
+#include "../util/net/sock.h"
 #include "dbtests.h"
 
 namespace SockTests {

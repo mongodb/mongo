@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 #include "sock.h"
 
 namespace mongo {

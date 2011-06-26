@@ -17,13 +17,13 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "../../pch.h"
 
 #include <stdio.h>
 #include <sstream>
-#include "goodies.h"
-#include "../db/jsobj.h"
-#include "../db/cmdline.h"
+#include "../goodies.h"
+#include "../../db/cmdline.h"
+#include "../mongoutils/str.h"
 
 #ifndef _WIN32
 
@@ -108,7 +108,7 @@ namespace mongo {
 #endif // _WIN32
 
     inline string makeUnixSockPath(int port) {
-        return cmdLine.socket + "/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
+        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
     }
 
     inline void setSockTimeouts(int sock, double secs) {
@@ -147,7 +147,7 @@ namespace mongo {
         string toString(bool includePort=true) const {
             string out = getAddr();
             if (includePort && getType() != AF_UNIX && getType() != AF_UNSPEC)
-                out += ':' + BSONObjBuilder::numStr(getPort());
+                out += mongoutils::str::stream() << ':' << getPort();
             return out;
         }
 

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../sock.h"
+#include "sock.h"
 #include "../../db/cmdline.h"
 #include "../mongoutils/str.h"
 

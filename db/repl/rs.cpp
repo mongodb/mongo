@@ -16,7 +16,7 @@
 
 #include "pch.h"
 #include "../cmdline.h"
-#include "../../util/sock.h"
+#include "../../util/net/sock.h"
 #include "../client.h"
 #include "../../client/dbclient.h"
 #include "../dbhelpers.h"
