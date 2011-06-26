@@ -494,6 +494,7 @@ namespace mongo {
         bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() {
+            assert( _self );
             return _self->fullName();
         }
 
