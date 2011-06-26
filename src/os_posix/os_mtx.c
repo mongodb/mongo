@@ -73,7 +73,7 @@ __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(S2C(session),
+	WT_VERBOSE(session,
 	    WT_VERB_MUTEX, (session, "lock %s mutex (%p)",  mtx->name, mtx));
 
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
@@ -114,7 +114,7 @@ __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(S2C(session),
+	WT_VERBOSE(session,
 	    WT_VERB_MUTEX, (session, "unlock %s mutex (%p)",  mtx->name, mtx));
 
 	ret = 0;

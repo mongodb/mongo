@@ -108,12 +108,12 @@ extern "C" {
 
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
-#define	WT_VERBOSE(conn, f, msg) do {					\
-	if (FLD_ISSET((conn)->verbose, (f)))				\
+#define	WT_VERBOSE(session, f, msg) do {				\
+	if (FLD_ISSET(S2C(session)->verbose, (f)))			\
 		__wt_msg msg;						\
 } while (0)
 #else
-#define	WT_VERBOSE(conn, f, msg)
+#define	WT_VERBOSE(session, f, msg)
 #endif
 
 /* Clear a structure. */

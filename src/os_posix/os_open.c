@@ -22,7 +22,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 	fh = NULL;
 
-	 WT_VERBOSE(conn, WT_VERB_FILEOPS,
+	 WT_VERBOSE(session, WT_VERB_FILEOPS,
 	    (session, "fileops: %s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
