@@ -80,9 +80,6 @@ namespace mongo {
 */
 
 
-
-    extern bool objcheck;
-
 #pragma pack(1)
     struct QueryResult : public MsgData {
         long long cursorId;
@@ -200,7 +197,7 @@ namespace mongo {
             massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
             massert( 10306 ,  "Client Error: Next object larger than space left in message",
                      js.objsize() < ( theEnd - data ) );
-            if ( objcheck && !js.valid() ) {
+            if ( cmdLine.objcheck && !js.valid() ) {
                 massert( 10307 , "Client Error: bad object in message", false);
             }
             nextjsobj += js.objsize();

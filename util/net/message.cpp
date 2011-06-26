@@ -30,8 +30,6 @@
 
 namespace mongo {
 
-    bool objcheck = false;
-
     void Message::send( MessagingPort &p, const char *context ) {
         if ( empty() ) {
             return;

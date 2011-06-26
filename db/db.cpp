@@ -583,7 +583,6 @@ int main(int argc, char* argv[]) {
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
     ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-    ("objcheck", "inspect client data for validity on receipt")
     ("profile",po::value<int>(), "0=off 1=slow, 2=all")
     ("quota", "limits each database to a certain number of files (8 default)")
     ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
@@ -748,9 +747,6 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("journalOptions")) {
             cmdLine.durOptions = params["journalOptions"].as<int>();
-        }
-        if (params.count("objcheck")) {
-            objcheck = true;
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
