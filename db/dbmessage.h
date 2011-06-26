@@ -19,7 +19,7 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "namespace-inl.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../client/constants.h"
 
 namespace mongo {

@@ -20,7 +20,7 @@
 #include "../db.h"
 #include "../instance.h"
 #include "../module.h"
-#include "../../util/httpclient.h"
+#include "../../util/net/httpclient.h"
 #include "../../util/background.h"
 #include "../commands.h"
 

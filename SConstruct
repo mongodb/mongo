@@ -310,12 +310,12 @@ if has_option( "full" ):
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
-commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" ,
-                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
+commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
+                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
                  "util/concurrency/synchronization.cpp" ]
-commonFiles += [ "util/net/sock.cpp" ]
+commonFiles += [ "util/net/sock.cpp" , "util/net/httpclient.cpp" , "util/net/message.cpp" ]
 commonFiles += Glob( "util/*.c" ) 
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
@@ -324,7 +324,7 @@ commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_r
 coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/net/message_server_port.cpp" , 
                     "client/parallel.cpp" , "db/common.cpp", 
-                    "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
+                    "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
 
 mmapFiles = [ "util/mmap.cpp" ]

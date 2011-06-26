@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "client/dbclient.h"
 #include "db/json.h"
-#include "../util/httpclient.h"
 #include "../util/text.h"
 #include "tool.h"
 #include <fstream>

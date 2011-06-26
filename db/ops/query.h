@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../../pch.h"
-#include "../../util/message.h"
+#include "../../util/net/message.h"
 #include "../dbmessage.h"
 #include "../jsobj.h"
 #include "../diskloc.h"

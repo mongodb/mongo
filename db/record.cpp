@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "pdfile.h"
 #include "../util/processinfo.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 
 namespace mongo {
     

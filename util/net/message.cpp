@@ -18,16 +18,19 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "message.h"
-#include <time.h>
-#include "../util/goodies.h"
-#include "../util/background.h"
+#include "../../pch.h"
+
 #include <fcntl.h>
 #include <errno.h>
-#include "../db/cmdline.h"
-#include "../client/dbclient.h"
-#include "../util/time_support.h"
+#include <time.h>
+
+#include "message.h"
+#include "../goodies.h"
+#include "../background.h"
+#include "../time_support.h"
+#include "../../db/cmdline.h"
+#include "../../client/dbclient.h"
+
 
 #ifndef _WIN32
 # ifndef __sunos__

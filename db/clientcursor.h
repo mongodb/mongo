@@ -27,7 +27,7 @@
 #include "../pch.h"
 #include "cursor.h"
 #include "jsobj.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/background.h"
 #include "diskloc.h"
 #include "dbhelpers.h"

@@ -35,7 +35,7 @@
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/background.h"
 #include "../client/dbclient.h"
 #include "../client/connpool.h"

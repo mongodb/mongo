@@ -16,7 +16,7 @@
  */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../scripting/engine.h"
 

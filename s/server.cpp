@@ -17,7 +17,7 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../util/net/message_server.h"

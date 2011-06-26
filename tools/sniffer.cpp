@@ -35,7 +35,7 @@
 #endif
 
 #include "../bson/util/builder.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/mmap.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"

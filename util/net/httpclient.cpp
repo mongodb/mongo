@@ -15,11 +15,11 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 #include "httpclient.h"
-#include "net/sock.h"
+#include "sock.h"
 #include "message.h"
-#include "../bson/util/builder.h"
+#include "../..//bson/util/builder.h"
 
 namespace mongo {
 

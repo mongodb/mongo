@@ -18,7 +18,7 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../client/parallel.h"
