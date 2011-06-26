@@ -406,7 +406,8 @@ namespace BasicTests {
             ASSERT_EQUALS( -1, lexNumCmp( "000a", "001a"));
             ASSERT_EQUALS( 0, lexNumCmp( "010a", "0010a"));
             
-            ASSERT_EQUALS( 1 , lexNumCmp( "a0" , "a00" ) );
+            ASSERT_EQUALS( -1 , lexNumCmp( "a0" , "a00" ) );
+            ASSERT_EQUALS( 0 , lexNumCmp( "a.0" , "a.00" ) );
         }
     };
 

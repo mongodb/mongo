@@ -44,6 +44,9 @@ namespace mongo {
     // for convenience, '{' is greater than anything and stops number parsing
     inline int lexNumCmp( const char *s1, const char *s2 ) {
         //cout << "START : " << s1 << "\t" << s2 << endl;
+
+        bool startWord = true;
+        
         while( *s1 && *s2 ) {
 
             bool p1 = ( *s1 == (char)255 );
@@ -59,8 +62,11 @@ namespace mongo {
 
             if ( n1 && n2 ) {
                 // get rid of leading 0s
-                while ( *s1 == '0' ) s1++;
-                while ( *s2 == '0' ) s2++;
+                if ( startWord ) {
+                    while ( *s1 == '0' ) s1++;
+                    while ( *s2 == '0' ) s2++;
+                    startWord = false;
+                }
 
                 char * e1 = (char*)s1;
                 char * e2 = (char*)s2;
@@ -91,7 +97,7 @@ namespace mongo {
                 s2 = e2;
                 continue;
             }
-
+            
             if ( n1 )
                 return 1;
 
@@ -103,7 +109,11 @@ namespace mongo {
 
             if ( *s2 > *s1 )
                 return -1;
-
+            
+            if ( *s1 == '.' )
+                startWord = true;
+            else
+                startWord = false;
             s1++; s2++;
         }
 
