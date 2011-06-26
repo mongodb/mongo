@@ -215,11 +215,6 @@ namespace mongo {
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
-    ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
-
-    ListeningSockets* ListeningSockets::get() {
-        return _instance;
-    }
 
     string _hostNameCached;
     static void _hostNameCachedInit() {

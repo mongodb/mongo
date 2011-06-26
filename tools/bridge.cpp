@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "../client/dbclient.h"
 #include "../db/dbmessage.h"
 

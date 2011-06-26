@@ -22,6 +22,7 @@
 #include "message.h"
 #include "message_port.h"
 #include "message_server.h"
+#include "listen.h"
 
 #include "../../db/cmdline.h"
 #include "../../db/lasterror.h"

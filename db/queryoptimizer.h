@@ -22,8 +22,7 @@
 #include "jsobj.h"
 #include "queryutil.h"
 #include "matcher.h"
-#include "../util/net/message.h"
-#include "../util/net/message_port.h"
+#include "../util/net/listen.h"
 #include <queue>
 
 namespace mongo {

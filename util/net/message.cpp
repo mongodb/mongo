@@ -26,6 +26,8 @@
 
 #include "message.h"
 #include "message_port.h"
+#include "listen.h"
+
 #include "../goodies.h"
 #include "../background.h"
 #include "../time_support.h"
