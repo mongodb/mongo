@@ -25,36 +25,7 @@
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
 
-namespace mongo {
-
-    const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
-    string getAddrInfoStrError(int code);
-
-#if defined(_WIN32)
-
-    typedef short sa_family_t;
-    typedef int socklen_t;
-    inline int getLastError() { return WSAGetLastError(); }
-    inline void disableNagle(int sock) {
-        int x = 1;
-        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            out() << "ERROR: disableNagle failed" << endl;
-        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            out() << "ERROR: SO_KEEPALIVE failed" << endl;
-    }
-    inline void prebindOptions( int sock ) { }
-
-    // This won't actually be used on windows
-    struct sockaddr_un {
-        short sun_family;
-        char sun_path[108]; // length from unix header
-    };
-
-#else
-
-    extern CmdLine cmdLine;
-    
-} // namespace mongo
+#ifndef _WIN32
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -73,7 +44,34 @@ namespace mongo {
 # define AI_ADDRCONFIG 0
 #endif
 
+#endif // _WIN32
+
 namespace mongo {
+
+    const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
+    string getAddrInfoStrError(int code);
+
+#if defined(_WIN32)
+
+    typedef short sa_family_t;
+    typedef int socklen_t;
+
+    inline void disableNagle(int sock) {
+        int x = 1;
+        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
+            out() << "ERROR: disableNagle failed" << endl;
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            out() << "ERROR: SO_KEEPALIVE failed" << endl;
+    }
+    inline void prebindOptions( int sock ) { }
+
+    // This won't actually be used on windows
+    struct sockaddr_un {
+        short sun_family;
+        char sun_path[108]; // length from unix header
+    };
+
+#else // _WIN32
 
     inline void closesocket(int s) {
         close(s);
@@ -107,7 +105,7 @@ namespace mongo {
     }
 
 
-#endif
+#endif // _WIN32
 
     inline string makeUnixSockPath(int port) {
         return cmdLine.socket + "/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
