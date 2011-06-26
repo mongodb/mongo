@@ -908,8 +908,8 @@ int main(int argc, char* argv[]) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
             }
-            if ( params.count( "diaglog" ) == 0 )
-                _diaglog.level = 1;
+            if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
+                cmdLine.dur = true;
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
         }
