@@ -19,7 +19,7 @@
 
 #include "../util/sock.h"
 #include "../bson/util/atomic_int.h"
-#include "hostandport.h"
+#include "net/hostandport.h"
 
 namespace mongo {
 

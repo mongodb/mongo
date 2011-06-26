@@ -20,7 +20,7 @@
 #include "rs.h"
 #include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "../dbhelpers.h"
 #include "connections.h"
 #include "../oplog.h"

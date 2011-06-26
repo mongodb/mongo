@@ -21,7 +21,7 @@
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/msg.h"
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "../commands.h"
 #include "../oplogreader.h"
 #include "rs_exception.h"

@@ -24,7 +24,7 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
-#include "../util/hostandport.h"
+#include "../util/net/hostandport.h"
 
 namespace mongo {
 
