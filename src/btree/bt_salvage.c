@@ -1539,7 +1539,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	else {
 		/*
 		 * Discard backing overflow pages for any items being discarded
-		 * that reference overfloww pages.
+		 * that reference overflow pages.
 		 */
 		WT_ERR(__slvg_row_merge_ovfl(session, page, 0, skip_start));
 		WT_ERR(__slvg_row_merge_ovfl(
