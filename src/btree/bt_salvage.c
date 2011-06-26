@@ -1005,7 +1005,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_VAR:
 		/*
 		 * Discard backing overflow pages for any items being discarded
-		 * that reference overfloww pages.
+		 * that reference overflow pages.
 		 */
 		WT_ERR(__slvg_col_merge_ovfl(session, page, 0, skip));
 		WT_ERR(__slvg_col_merge_ovfl(
