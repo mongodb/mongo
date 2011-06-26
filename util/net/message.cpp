@@ -48,8 +48,6 @@
 
 namespace mongo {
 
-    bool noUnixSocket = false;
-
     bool objcheck = false;
 
     void checkTicketNumbers();
@@ -123,7 +121,7 @@ namespace mongo {
 
     void Listener::initAndListen() {
         checkTicketNumbers();
-        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!noUnixSocket && useUnixSockets()));
+        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!cmdLine.noUnixSocket && useUnixSockets()));
         vector<int> socks;
         SOCKET maxfd = 0; // needed for select()
 

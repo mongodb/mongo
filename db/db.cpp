@@ -582,9 +582,6 @@ int main(int argc, char* argv[]) {
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
-#if !defined(_WIN32)
-    ("nounixsocket", "disable listening on unix sockets")
-#endif
     ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
     ("objcheck", "inspect client data for validity on receipt")
     ("profile",po::value<int>(), "0=off 1=slow, 2=all")
@@ -915,9 +912,6 @@ int main(int argc, char* argv[]) {
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
-        }
-        if (params.count("nounixsocket")) {
-            noUnixSocket = true;
         }
         if (params.count("ipv6")) {
             enableIPv6();

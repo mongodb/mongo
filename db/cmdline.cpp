@@ -58,6 +58,7 @@ namespace mongo {
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
+        ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
 #endif
@@ -188,6 +189,10 @@ namespace mongo {
                 cout << cmdLine.socket << " must be a directory" << endl;
                 ::exit(-1);
             }
+        }
+
+        if (params.count("nounixsocket")) {
+            cmdLine.noUnixSocket = true;
         }
 
         if (params.count("fork")) {

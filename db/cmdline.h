@@ -94,6 +94,7 @@ namespace mongo {
         bool moveParanoia;     // for move chunk paranoia
         double syncdelay;      // seconds between fsyncs
 
+        bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
@@ -117,7 +118,7 @@ namespace mongo {
         port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
         configsvr(false),
         quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-        syncdelay(60), socket("/tmp") 
+        syncdelay(60), noUnixSocket(false), socket("/tmp") 
     {
         // default may change for this later.
 #if defined(_DURABLEDEFAULTON)
