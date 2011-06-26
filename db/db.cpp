@@ -37,7 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"
-#include "../util/message_server.h"
+#include "../util/net/message_server.h"
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
