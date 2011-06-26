@@ -267,6 +267,5 @@ namespace mongo {
     /* helper to do a reply using a DbResponse object */
     void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj);
 
-    string debugString( Message& m );
 
 } // namespace mongo

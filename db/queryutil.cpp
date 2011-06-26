@@ -1539,36 +1539,5 @@ namespace mongo {
         return num;
     }
 
-    string debugString( Message& m ) {
-        stringstream ss;
-        ss << "op: " << opToString( m.operation() ) << " len: " << m.size();
-        if ( m.operation() >= 2000 && m.operation() < 2100 ) {
-            DbMessage d(m);
-            ss << " ns: " << d.getns();
-            switch ( m.operation() ) {
-            case dbUpdate: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                BSONObj o = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q << " update: " << o;
-                break;
-            }
-            case dbInsert:
-                ss << d.nextJsObj();
-                break;
-            case dbDelete: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q;
-                break;
-            }
-            default:
-                ss << " CANNOT HANDLE YET";
-            }
-
-
-        }
-        return ss.str();
-    }
 
 } // namespace mongo

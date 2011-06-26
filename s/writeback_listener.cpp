@@ -166,7 +166,7 @@ namespace mongo {
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
                            << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
 
-                    if ( logLevel ) log(1) << debugString( m ) << endl;
+                    if ( logLevel ) log(1) << m.toString() << endl;
 
                     if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ) {
                         // this means when the write went originally, the version was old

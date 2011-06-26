@@ -22,6 +22,39 @@
 
 namespace mongo {
 
+    string Message::toString() const {
+        stringstream ss;
+        ss << "op: " << opToString( operation() ) << " len: " << size();
+        if ( operation() >= 2000 && operation() < 2100 ) {
+            DbMessage d(*this);
+            ss << " ns: " << d.getns();
+            switch ( operation() ) {
+            case dbUpdate: {
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj();
+                BSONObj o = d.nextJsObj();
+                ss << " flags: " << flags << " query: " << q << " update: " << o;
+                break;
+            }
+            case dbInsert:
+                ss << d.nextJsObj();
+                break;
+            case dbDelete: {
+                int flags = d.pullInt();
+                BSONObj q = d.nextJsObj();
+                ss << " flags: " << flags << " query: " << q;
+                break;
+            }
+            default:
+                ss << " CANNOT HANDLE YET";
+            }
+
+
+        }
+        return ss.str();
+    }
+
+
     void replyToQuery(int queryResultFlags,
                       AbstractMessagingPort* p, Message& requestMsg,
                       void *data, int size,
