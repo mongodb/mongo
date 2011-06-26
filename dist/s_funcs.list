@@ -12,7 +12,6 @@ __wt_log_put
 __wt_nlpo2_round
 __wt_print_huffman_code
 __wt_session_dump
-__wt_trk_dump
 wiredtiger_open
 wiredtiger_struct_pack
 wiredtiger_struct_packv
