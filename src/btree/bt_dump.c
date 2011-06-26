@@ -385,6 +385,52 @@ __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
 }
 
 /*
+ * __wt_load_byte_string --
+ *	Load a single byte string into a buffer, in printable characters,
+ * where possible.
+ */
+int
+__wt_load_byte_string(
+    WT_SESSION_IMPL *session, const uint8_t *data, uint32_t size, WT_BUF *buf)
+{
+	uint32_t avail;
+	int ch, len;
+	char *p;
+
+	/*
+	 * The maximum size is the byte-string length, all hex characters, plus
+	 * a trailing nul byte.  Throw in a few extra bytes for fun.
+	 *
+	 * The underlying functions use type int, not uint32_t, check we're
+	 * not in trouble, just out of sheer, raving paranoia.
+	 */
+	if ((uint64_t)size * 4 + 20 >= UINT32_MAX)
+		return (ENOMEM);
+	avail = size * 4 + 20;
+	WT_RET(__wt_buf_init(session, buf, avail));
+
+	for (p = buf->mem; size > 0; --size, ++data) {
+		ch = data[0];
+		if (isprint(ch))
+			len = snprintf(p, avail, "%c", ch);
+		else
+			len = snprintf(p, avail, "%x%x",
+			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
+		/*
+		 * Be paranoid about buffer overflow: even if our calculation
+		 * is off, or snprintf(3) returns large length values, don't
+		 * overflow the end of the buffer.
+		 */
+		if ((u_int)len >= avail)
+			break;
+		p += len;
+		buf->size += (u_int)len;
+		avail -= (u_int)len;
+	}
+	return (0);
+}
+
+/*
  * __wt_print_byte_string_hex --
  *	Output a single byte string in hexadecimal characters.
  */

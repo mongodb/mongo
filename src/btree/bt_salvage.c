@@ -31,6 +31,8 @@ struct __wt_stuff {
 
 	int	   range_merge;			/* If merged key ranges */
 
+	WT_BUF	  *vbuf;			/* Verbose print buffer */
+
 	uint64_t fcnt;				/* Progress counter */
 };
 
@@ -91,8 +93,8 @@ static int __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
 static int __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int __slvg_row_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
-static int __slvg_row_build_leaf(
-		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_ROW_REF *, int *);
+static int __slvg_row_build_leaf(WT_SESSION_IMPL *,
+		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
 static int __slvg_row_merge_ovfl(
 		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint32_t, uint32_t);
 static int __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
@@ -126,9 +128,13 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	ret = 0;
 
 	WT_CLEAR(stuff);
-	stuff.btree = btree;
-	stuff.page_type = WT_PAGE_INVALID;
 	ss = &stuff;
+	ss->btree = btree;
+	ss->page_type = WT_PAGE_INVALID;
+
+	/* Allocate a buffer for printing strings. */
+	if (FLD_ISSET(S2C(session)->verbose, WT_VERB_SALVAGE))
+		WT_ERR(__wt_scr_alloc(session, 0, &ss->vbuf));
 
 	if (btree->fh->file_size > WT_BTREE_DESC_SECTOR) {
 		/*
@@ -258,6 +264,10 @@ err:		if (ret == 0)
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
+
+	/* Discard verbose print buffer. */
+	if (ss->vbuf != NULL)
+		__wt_scr_release(&ss->vbuf);
 
 	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);
@@ -441,13 +451,14 @@ __slvg_trk_leaf(
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_TRACK *trk;
+	int ret;
 	uint64_t stop_recno;
 	uint32_t i;
-	int ret;
 	uint8_t *p;
 
 	btree = session->btree;
 	page = NULL;
+	trk = NULL;
 	ret = 0;
 
 	/* Re-allocate the array of pages, as necessary. */
@@ -512,18 +523,18 @@ __slvg_trk_leaf(
 		    page, &page->u.row_leaf.d[page->entries - 1],
 		    &trk->u.row.range_stop));
 
-		/*
-		 * XXX
-		 * This assumes the keys are printable strings.
-		 */
+		WT_ERR(__wt_load_byte_string(session,
+		    trk->u.row.range_start.data, trk->u.row.range_start.size,
+		    ss->vbuf));
 		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
 		    "[%" PRIu32 "] start key %.*s",
-		    addr, trk->u.row.range_start.size,
-		    (char *)trk->u.row.range_start.data));
+		    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
+		WT_ERR(__wt_load_byte_string(session,
+		    trk->u.row.range_stop.data, trk->u.row.range_stop.size,
+		    ss->vbuf));
 		WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
 		    "[%" PRIu32 "] stop key %.*s",
-		    addr, trk->u.row.range_stop.size,
-		    (char *)trk->u.row.range_stop.data));
+		    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data));
 
 		/* Row-store pages can contain overflow items. */
 		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
@@ -1439,7 +1450,7 @@ __slvg_row_build_internal(
 		 */
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
 			WT_ERR(__slvg_row_build_leaf(
-			    session, trk, page, rref, &deleted));
+			    session, trk, page, rref, ss, &deleted));
 
 			/*
 			 * If we took none of the keys from the merged page,
@@ -1474,8 +1485,8 @@ err:	if (page->u.row_int.t != NULL)
  *	Build a row-store leaf page for a merged page.
  */
 static int
-__slvg_row_build_leaf(WT_SESSION_IMPL *session,
-    WT_TRACK *trk, WT_PAGE *parent, WT_ROW_REF *rref, int *deletedp)
+__slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
+    WT_PAGE *parent, WT_ROW_REF *rref, WT_STUFF *ss, int *deletedp)
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
@@ -1534,9 +1545,12 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			if  (func(btree,
 			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
 				break;
+			WT_ERR(__wt_load_byte_string(session,
+			    item->data, item->size, ss->vbuf));
 			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
 			    "[%" PRIu32 "] merge discarding leading key %.*s",
-			    trk->addr, (int)item->size, (char *)item->data));
+			    trk->addr,
+			    (int)ss->vbuf->size, (char *)ss->vbuf->data));
 			++skip_start;
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
@@ -1553,9 +1567,12 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			if  (func(btree,
 			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
 				break;
+			WT_ERR(__wt_load_byte_string(session,
+			    item->data, item->size, ss->vbuf));
 			WT_VERBOSE(S2C(session), WT_VERB_SALVAGE, (session,
 			    "[%" PRIu32 "] merge discarding trailing key %.*s",
-			    trk->addr, (int)item->size, (char *)item->data));
+			    trk->addr,
+			    (int)ss->vbuf->size, (char *)ss->vbuf->data));
 			++skip_stop;
 		}
 
