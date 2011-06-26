@@ -324,8 +324,6 @@ namespace mongo {
             }
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
-            if( o.hasElement("_id") ) 
-                b.append( o["_id"] );
             if( !o["v"].eoo() ) {
                 double vv = o["v"].Number();
                 // note (one day) we may be able to fresh build less versions than we can use
@@ -340,7 +338,18 @@ namespace mongo {
             if( o["unique"].trueValue() )
                 b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
             b.append(o["ns"]);
-            b.appendElementsUnique(o);
+
+            {
+                // stripping _id
+                BSONObjIterator i(o);
+                while ( i.more() ) {
+                    BSONElement e = i.next();
+                    string s = e.fieldName();
+                    if( s != "_id" && s != "v" && s != "ns" && s != "unique" && s != "key" )
+                        b.append(e);
+                }
+            }
+        
             fixedIndexObject = b.obj();
         }
 
