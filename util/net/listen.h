@@ -162,5 +162,6 @@ namespace mongo {
     };
 
 
+    extern TicketHolder connTicketHolder;
 
 }

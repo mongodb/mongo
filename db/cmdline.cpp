@@ -20,7 +20,7 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/processinfo.h"
-#include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "security_common.h"
 
 #ifdef _WIN32

@@ -308,6 +308,5 @@ namespace mongo {
 
     MSGID nextMessageId();
 
-    extern TicketHolder connTicketHolder;
 
 } // namespace mongo
