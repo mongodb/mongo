@@ -267,7 +267,7 @@ namespace mongo {
             }
 
             if ( outType != INMEMORY ) { // setup names
-                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
+                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << JOB_NUMBER++;
 
                 incLong = tempLong + "_inc";
 

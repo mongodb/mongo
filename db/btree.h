@@ -883,7 +883,7 @@ namespace mongo {
         Key keyAt(int i) const {
             if( i >= this->n ) 
                 return Key();
-            return Key(data + k(i).keyDataOfs());
+            return Key(this->data + k(i).keyDataOfs());
         }
     protected:
 
