@@ -18,9 +18,9 @@ __wt_read(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(fh->stats, read_io);
 	WT_STAT_INCR(S2C(session)->stats, total_read_io);
 
-	WT_VERBOSE(session, WT_VERB_FILEOPS, (session,
+	WT_VERBOSE(session, FILEOPS,
 	    "fileops: %s: read %" PRIu32 " bytes at offset %" PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset));
+	    fh->name, bytes, (uintmax_t)offset);
 
 	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
@@ -42,9 +42,9 @@ __wt_write(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(fh->stats, write_io);
 	WT_STAT_INCR(S2C(session)->stats, total_write_io);
 
-	WT_VERBOSE(session, WT_VERB_FILEOPS, (session,
+	WT_VERBOSE(session, FILEOPS,
 	    "fileops: %s: write %" PRIu32 " bytes at offset %" PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset));
+	    fh->name, bytes, (uintmax_t)offset);
 
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);

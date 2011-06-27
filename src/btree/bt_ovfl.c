@@ -28,9 +28,9 @@ __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 	 * WiredTiger supports large page sizes, and overflow items should be
 	 * rare.
 	 */
-	WT_VERBOSE(session, WT_VERB_READ, (session,
+	WT_VERBOSE(session, READ,
 	    "overflow read addr/size %" PRIu32 "/%" PRIu32,
-	    ovfl->addr, ovfl->size));
+	    ovfl->addr, ovfl->size);
 	WT_STAT_INCR(btree->stats, overflow_read);
 	WT_STAT_INCR(conn->cache->stats, cache_overflow_read);
 

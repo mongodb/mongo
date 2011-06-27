@@ -58,8 +58,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * of WT_REF_MEM).
 		 */
 		if (ref->state == WT_REF_MEM) {
-			WT_VERBOSE(session, WT_VERB_HAZARD, (session,
-			    "session %p hazard %p: set", session, ref->page));
+			WT_VERBOSE(session, HAZARD,
+			    "session %p hazard %p: set", session, ref->page);
 			return (1);
 		}
 
@@ -103,8 +103,8 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ASSERT(session, page != NULL);
 
-	WT_VERBOSE(session, WT_VERB_HAZARD, (session,
-	    "session %p hazard %p: clr", session, page));
+	WT_VERBOSE(session, HAZARD,
+	    "session %p hazard %p: clr", session, page);
 
 	/* Clear the caller's hazard pointer. */
 	for (hp = session->hazard;
