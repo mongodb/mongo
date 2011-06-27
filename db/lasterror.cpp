@@ -18,7 +18,7 @@
 #include "pch.h"
 
 #include "../util/unittest.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 
 
 #include "lasterror.h"

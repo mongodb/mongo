@@ -85,7 +85,7 @@ namespace mongo {
        not done (always use main for now).
     */
     class ReplSource {
-        auto_ptr<ThreadPool> tp;
+        shared_ptr<ThreadPool> tp;
 
         void resync(string db);
 

@@ -27,6 +27,7 @@
 #include <limits>
 #include "../util/unittest.h"
 #include "../util/embedded_builder.h"
+#include "../util/stringutils.h"
 #include "json.h"
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"

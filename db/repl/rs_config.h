@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "health.h"
 
 namespace mongo {

@@ -23,6 +23,7 @@
 #include <string>
 #include "unittest.h"
 #include "version.h"
+#include "stringutils.h"
 #include "../db/jsobj.h"
 #include "file.h"
 

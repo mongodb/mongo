@@ -25,7 +25,7 @@
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
-#include "../util/message.h" // getelapsedtimemillis
+#include "../util/net/listen.h" // getelapsedtimemillis
 #include "../util/concurrency/race.h"
 #include <boost/static_assert.hpp>
 #undef assert

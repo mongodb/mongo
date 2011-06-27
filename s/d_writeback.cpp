@@ -20,7 +20,7 @@
 
 #include "../db/commands.h"
 #include "../util/queue.h"
-#include "../util/message.h"
+#include "../util/net/listen.h"
 
 #include "d_writeback.h"
 

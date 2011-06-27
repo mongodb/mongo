@@ -148,8 +148,6 @@ namespace mongo {
                     willNeedRecord = true;
             }
             
-            log() << ns << "\t" << pattern << "\t" << willNeedRecord << endl;
-
             if ( canYield && ! cc->yieldSometimes( willNeedRecord ? ClientCursor::WillNeed : ClientCursor::MaybeCovered ) ) {
                 cc.release(); // has already been deleted elsewhere
                 // TODO should we assert or something?

@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 #include "sock.h"
 
 namespace mongo {
@@ -215,11 +215,6 @@ namespace mongo {
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
-    ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
-
-    ListeningSockets* ListeningSockets::get() {
-        return _instance;
-    }
 
     string _hostNameCached;
     static void _hostNameCachedInit() {
@@ -231,5 +226,21 @@ namespace mongo {
         boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
         return _hostNameCached;
     }
+
+    string SocketException::toString() const {
+        stringstream ss;
+        ss << _ei.code << " socket exception [" << _type << "] ";
+        
+        if ( _server.size() )
+            ss << "server [" << _server << "] ";
+        
+        if ( _extra.size() )
+            ss << _extra;
+        
+        return ss.str();
+    }
+
+
+
 
 } // namespace mongo

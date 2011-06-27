@@ -15,16 +15,18 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 
 #ifndef USE_ASIO
 
 #include "message.h"
+#include "message_port.h"
 #include "message_server.h"
+#include "listen.h"
 
-#include "../db/cmdline.h"
-#include "../db/lasterror.h"
-#include "../db/stats/counters.h"
+#include "../../db/cmdline.h"
+#include "../../db/lasterror.h"
+#include "../../db/stats/counters.h"
 
 namespace mongo {
 

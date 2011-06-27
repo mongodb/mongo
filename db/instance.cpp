@@ -809,7 +809,7 @@ namespace mongo {
                with acquirePathLock().  */
 #ifdef _WIN32
             if( _chsize( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << getLastError() << endl;
+                log() << "couldn't remove fs lock " << WSAGetLastError() << endl;
             CloseHandle(lockFileHandle);
 #else
             if( ftruncate( lockFile , 0 ) )

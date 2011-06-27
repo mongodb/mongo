@@ -21,7 +21,8 @@
 #pragma once
 
 #include "../pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/message_port.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
 #include <stack>

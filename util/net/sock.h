@@ -17,44 +17,15 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "../../pch.h"
 
 #include <stdio.h>
 #include <sstream>
-#include "goodies.h"
-#include "../db/jsobj.h"
-#include "../db/cmdline.h"
+#include "../goodies.h"
+#include "../../db/cmdline.h"
+#include "../mongoutils/str.h"
 
-namespace mongo {
-
-    const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
-    string getAddrInfoStrError(int code);
-
-#if defined(_WIN32)
-
-    typedef short sa_family_t;
-    typedef int socklen_t;
-    inline int getLastError() { return WSAGetLastError(); }
-    inline void disableNagle(int sock) {
-        int x = 1;
-        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            out() << "ERROR: disableNagle failed" << endl;
-        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            out() << "ERROR: SO_KEEPALIVE failed" << endl;
-    }
-    inline void prebindOptions( int sock ) { }
-
-    // This won't actually be used on windows
-    struct sockaddr_un {
-        short sun_family;
-        char sun_path[108]; // length from unix header
-    };
-
-#else
-
-    extern CmdLine cmdLine;
-    
-} // namespace mongo
+#ifndef _WIN32
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -73,7 +44,34 @@ namespace mongo {
 # define AI_ADDRCONFIG 0
 #endif
 
+#endif // _WIN32
+
 namespace mongo {
+
+    const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
+    string getAddrInfoStrError(int code);
+
+#if defined(_WIN32)
+
+    typedef short sa_family_t;
+    typedef int socklen_t;
+
+    inline void disableNagle(int sock) {
+        int x = 1;
+        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
+            out() << "ERROR: disableNagle failed" << endl;
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            out() << "ERROR: SO_KEEPALIVE failed" << endl;
+    }
+    inline void prebindOptions( int sock ) { }
+
+    // This won't actually be used on windows
+    struct sockaddr_un {
+        short sun_family;
+        char sun_path[108]; // length from unix header
+    };
+
+#else // _WIN32
 
     inline void closesocket(int s) {
         close(s);
@@ -107,10 +105,10 @@ namespace mongo {
     }
 
 
-#endif
+#endif // _WIN32
 
     inline string makeUnixSockPath(int port) {
-        return cmdLine.socket + "/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
+        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
     }
 
     inline void setSockTimeouts(int sock, double secs) {
@@ -149,7 +147,7 @@ namespace mongo {
         string toString(bool includePort=true) const {
             string out = getAddr();
             if (includePort && getType() != AF_UNIX && getType() != AF_UNSPEC)
-                out += ':' + BSONObjBuilder::numStr(getPort());
+                out += mongoutils::str::stream() << ':' << getPort();
             return out;
         }
 
@@ -249,55 +247,20 @@ namespace mongo {
 
     string getHostNameCached();
 
-    class ListeningSockets {
+    class SocketException : public DBException {
     public:
-        ListeningSockets()
-            : _mutex("ListeningSockets")
-            , _sockets( new set<int>() )
-            , _socketPaths( new set<string>() )
-        { }
-        void add( int sock ) {
-            scoped_lock lk( _mutex );
-            _sockets->insert( sock );
-        }
-        void addPath( string path ) {
-            scoped_lock lk( _mutex );
-            _socketPaths->insert( path );
-        }
-        void remove( int sock ) {
-            scoped_lock lk( _mutex );
-            _sockets->erase( sock );
-        }
-        void closeAll() {
-            set<int>* sockets;
-            set<string>* paths;
+        const enum Type { CLOSED , RECV_ERROR , SEND_ERROR, RECV_TIMEOUT, SEND_TIMEOUT, FAILED_STATE, CONNECT_ERROR } _type;
+        
+        SocketException( Type t , string server , int code = 9001 , string extra="" ) : DBException( "socket exception" , code ) , _type(t) , _server(server), _extra(extra){ }
+        virtual ~SocketException() throw() {}
 
-            {
-                scoped_lock lk( _mutex );
-                sockets = _sockets;
-                _sockets = new set<int>();
-                paths = _socketPaths;
-                _socketPaths = new set<string>();
-            }
+        bool shouldPrint() const { return _type != CLOSED; }
+        virtual string toString() const;
 
-            for ( set<int>::iterator i=sockets->begin(); i!=sockets->end(); i++ ) {
-                int sock = *i;
-                log() << "closing listening socket: " << sock << endl;
-                closesocket( sock );
-            }
-
-            for ( set<string>::iterator i=paths->begin(); i!=paths->end(); i++ ) {
-                string path = *i;
-                log() << "removing socket file: " << path << endl;
-                ::remove( path.c_str() );
-            }
-        }
-        static ListeningSockets* get();
     private:
-        mongo::mutex _mutex;
-        set<int>* _sockets;
-        set<string>* _socketPaths; // for unix domain sockets
-        static ListeningSockets* _instance;
+        string _server;
+        string _extra;
     };
+
 
 } // namespace mongo
