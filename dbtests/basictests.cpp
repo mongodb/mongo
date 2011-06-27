@@ -228,7 +228,7 @@ namespace BasicTests {
                 {
                     int x = t.millis();
                     if ( x < 1000 || x > 2500 ) {
-                        cout << "sleeptest x: " << x << endl;
+                        cout << "sleeptest finds sleep accuracy to be not great. x: " << x << endl;
                         ASSERT( x >= 1000 );
                         ASSERT( x <= 20000 );
                     }
