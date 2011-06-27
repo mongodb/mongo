@@ -877,11 +877,13 @@ namespace mongo {
          * Preconditions: thisLoc has a parent
          * @return parent's index of thisLoc.
          */
-        int indexInParent( const DiskLoc &thisLoc ) const;
-        
+        int indexInParent( const DiskLoc &thisLoc ) const;        
+
+    public:
         Key keyAt(int keyOfs) const {
             return keyOfs >= this->n ? Key() : this->keyNode(keyOfs).key;
         }
+    protected:
 
         /**
          * Allocate a temporary btree bucket in ram rather than in memory mapped

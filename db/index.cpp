@@ -37,6 +37,12 @@ namespace mongo {
     public:
         typedef typename V::KeyOwned KeyOwned;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
+
+/*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+            int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        */
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -61,6 +67,24 @@ namespace mongo {
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
                 uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
             }
+        }
+
+        // for geo:
+        virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
+        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
+            const BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            key = kn.key.toBson();
+            recordLoc = kn.recordLoc;
+        }
+        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) {
+            return thisLoc.btree<V>()->keyAt(pos).toBson();
+        }
+        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) { 
+            return thisLoc.btree<V>()->advance(thisLoc,keyOfs,direction,caller);
         }
     };
 

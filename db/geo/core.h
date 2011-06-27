@@ -72,6 +72,14 @@ namespace mongo {
             init( hash );
         }
 
+        static GeoHash makeFromBinData(const char *bindata, unsigned bits) {
+            GeoHash h;
+            h._bits = bits;
+            h._copy( (char*)&h._hash , bindata );
+            h._fix();
+            return h;
+        }
+
         explicit GeoHash( const BSONElement& e , unsigned bits=32 ) {
             _bits = bits;
             if ( e.type() == BinData ) {
@@ -335,7 +343,7 @@ namespace mongo {
 
     private:
 
-        void _copy( char * dst , const char * src ) const {
+        static void _copy( char * dst , const char * src ) {
             for ( unsigned a=0; a<8; a++ ) {
                 dst[a] = src[7-a];
             }
