@@ -1129,7 +1129,10 @@ namespace mongo {
         }
 
         bool hasPrefix( const GeoHash& hash ) {
+            BSONObj k = key();
+            cout << k.toString() << endl;
             BSONElement e = key().firstElement();
+            cout << e.toString() << endl;
             if ( e.eoo() )
                 return false;
             return GeoHash( e ).hasPrefix( hash );
@@ -1181,8 +1184,6 @@ namespace mongo {
                              BtreeLocation& min , BtreeLocation&  max ,
                              GeoHash start ,
                              int & found , GeoAccumulator * hopper ) {
-
-            assert( id.version() == 0 ); // see note at top of this file
 
             Ordering ordering = Ordering::make(spec->_order);
 

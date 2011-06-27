@@ -429,7 +429,7 @@ namespace mongo {
          *  - The last key of the bucket is removed, and its key and recLoc are
          *    returned.  As mentioned above, the key points to unallocated memory.
          */
-        void popBack(DiskLoc& recLoc, Key& key);
+        void popBack(DiskLoc& recLoc, const Key *&key);
 
         /**
          * Preconditions:
@@ -880,8 +880,10 @@ namespace mongo {
         int indexInParent( const DiskLoc &thisLoc ) const;        
 
     public:
-        Key keyAt(int keyOfs) const {
-            return keyOfs >= this->n ? Key() : this->keyNode(keyOfs).key;
+        Key keyAt(int i) const {
+            if( i >= this->n ) 
+                return Key();
+            return Key(data + k(i).keyDataOfs());
         }
     protected:
 

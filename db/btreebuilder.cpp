@@ -62,31 +62,31 @@ namespace mongo {
 
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
-        KeyOwned key(_key);
+        auto_ptr< KeyOwned > key( new KeyOwned(_key) );
 
-        if ( key.dataSize() > KeyMax ) {
+        if ( key->dataSize() > KeyMax ) {
             problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
-                      << ' ' << key.dataSize() << ' ' << key.toString() << endl;
+                      << ' ' << key->dataSize() << ' ' << key->toString() << endl;
             return;
         }
 
         if( !dupsAllowed ) {
             if( n > 0 ) {
-                int cmp = keyLast.woCompare(key, ordering);
+                int cmp = keyLast->woCompare(*key, ordering);
                 massert( 10288 ,  "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
                 if( cmp == 0 ) {
                     //if( !dupsAllowed )
-                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , keyLast ) );
+                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , *keyLast ) );
                 }
             }
-            keyLast = key;
         }
 
-        if ( ! b->_pushBack(loc, key, ordering, DiskLoc()) ) {
+        if ( ! b->_pushBack(loc, *key, ordering, DiskLoc()) ) {
             // bucket was full
             newBucket();
-            b->pushBack(loc, key, ordering, DiskLoc());
+            b->pushBack(loc, *key, ordering, DiskLoc());
         }
+        keyLast = key;
         n++;
         mayCommitProgressDurably();
     }
@@ -114,19 +114,19 @@ namespace mongo {
                 }
 
                 BtreeBucket<V> *x = xloc.btreemod<V>();
-                Key k;
+                const Key *k;
                 DiskLoc r;
                 x->popBack(r,k);
                 bool keepX = ( x->n != 0 );
                 DiskLoc keepLoc = keepX ? xloc : x->nextChild;
 
-                if ( ! up->_pushBack(r, k, ordering, keepLoc) ) {
+                if ( ! up->_pushBack(r, *k, ordering, keepLoc) ) {
                     // current bucket full
                     DiskLoc n = BtreeBucket<V>::addBucket(idx);
                     up->setTempNext(n);
                     upLoc = n;
                     up = upLoc.btreemod<V>();
-                    up->pushBack(r, k, ordering, keepLoc);
+                    up->pushBack(r, *k, ordering, keepLoc);
                 }
 
                 DiskLoc nextLoc = x->tempNext(); // get next in chain at current level

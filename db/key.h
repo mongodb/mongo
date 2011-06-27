@@ -45,16 +45,25 @@ namespace mongo {
         BSONObj _o;
     };
 
+    class KeyV1Owned;
+
     // corresponding to BtreeData_V1
     class KeyV1 { 
+        void operator=(const KeyV1&); // disallowed just to make people be careful as we don't own the buffer
+        KeyV1(const KeyV1Owned&);     // disallowed as this is not a great idea as KeyV1Owned likely will go out of scope
     public:
         KeyV1() { _keyData = 0; }
         ~KeyV1() { DEV _keyData = (const unsigned char *) 1; }
+
+        KeyV1(const KeyV1& rhs) : _keyData(rhs._keyData) { 
+            dassert( _keyData > (const unsigned char *) 1 );
+        }
 
         /** @param keyData can be a buffer containing data in either BSON format, OR in KeyV1 format. 
                    when BSON, we are just a wrapper
         */
         explicit KeyV1(const char *keyData) : _keyData((unsigned char *) keyData) { }
+
         int woCompare(const KeyV1& r, const Ordering &o) const;
         bool woEqual(const KeyV1& r) const;
         BSONObj toBson() const;
@@ -81,6 +90,8 @@ namespace mongo {
     };
 
     class KeyV1Owned : public KeyV1 { 
+        KeyV1Owned(const KeyV1Owned&); // not copyable -- StackBufBuilder is not copyable and that owns our buffer
+        void operator=(const KeyV1Owned&);
     public:
         /** @obj a BSON object to be translated to KeyV1 format.  If the object isn't 
                  representable in KeyV1 format (which happens, intentionally, at times)
@@ -88,7 +99,6 @@ namespace mongo {
         */
         KeyV1Owned(const BSONObj& obj);
     private:
-        KeyV1Owned(const KeyV1Owned&); //not copyable
         StackBufBuilder b;
         void traditional(const BSONObj& obj); // store as traditional bson not as compact format
     };
