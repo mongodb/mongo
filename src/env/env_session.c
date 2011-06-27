@@ -28,26 +28,25 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 
 	__wt_mb_add(&mb, "%s\n", conn->sep);
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
-		__wt_mb_add(&mb,
-		    "session: %p {\n\tworkq func: ", session);
+		__wt_mb_add(&mb, "session: %p {\n", session);
 		if (session->wq_func == NULL)
-			__wt_mb_add(&mb, "none");
+			__wt_mb_add(&mb, "\tworkq func: none\n");
 		else
-			__wt_mb_add(&mb, "%p", session->wq_func);
+			__wt_mb_add(
+			    &mb, "\tworkq func: %p\n", session->wq_func);
 
 		__wt_mb_add(&mb,
-		    " state: %s", __wt_session_print_state(session));
+		    "\tstate: %s\n", __wt_session_print_state(session));
 
-		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = session->hazard;
 		    hp < session->hazard + conn->hazard_size; ++hp) {
 			if (hp->page == NULL)
 				continue;
 #ifdef HAVE_DIAGNOSTIC
-			__wt_mb_add(&mb, "\t\t%lu: %s, line %d\n",
+			__wt_mb_add(&mb, "\thazard: %lu (%s, line %d)\n",
 			    WT_PADDR(hp->page), hp->file, hp->line);
 #else
-			__wt_mb_add(&mb, "\t\t%lu\n", WT_PADDR(hp->page));
+			__wt_mb_add(&mb, "\thazard: %lu\n", WT_PADDR(hp->page));
 #endif
 		}
 
