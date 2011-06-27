@@ -72,7 +72,7 @@ namespace mongo {
         // for geo:
         virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
         virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
-            const BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            typename BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
             key = kn.key.toBson();
             recordLoc = kn.recordLoc;
         }
