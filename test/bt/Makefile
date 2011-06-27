@@ -9,6 +9,8 @@ HDRS=	config.h wts.h
 SRCS=	bdb.c config.c t.c util.c wts.c
 OBJS=	bdb.o config.o t.o util.o wts.o 
 
+all: t tags
+
 t: ${OBJS} ${LIB}
 	cc ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
@@ -18,8 +20,8 @@ clean:
 distclean realclean: clean
 	rm -f __* tags
 
+tags: ${SRCS}
+	@type ctags > /dev/null 2>&1 && ctags -w $> || exit 0
+
 ${SRCS}: ${HDRS}
 ${OBJS}: ${SRCS}
-
-tags: ${HDRS} ${SRCS}
-	ctags -w $>
