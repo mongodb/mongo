@@ -1130,9 +1130,7 @@ namespace mongo {
 
         bool hasPrefix( const GeoHash& hash ) {
             BSONObj k = key();
-            cout << k.toString() << endl;
-            BSONElement e = key().firstElement();
-            cout << e.toString() << endl;
+            BSONElement e = k.firstElement();
             if ( e.eoo() )
                 return false;
             return GeoHash( e ).hasPrefix( hash );
