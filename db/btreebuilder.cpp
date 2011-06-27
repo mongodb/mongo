@@ -114,19 +114,19 @@ namespace mongo {
                 }
 
                 BtreeBucket<V> *x = xloc.btreemod<V>();
-                const Key *k;
+                Key k;
                 DiskLoc r;
                 x->popBack(r,k);
                 bool keepX = ( x->n != 0 );
                 DiskLoc keepLoc = keepX ? xloc : x->nextChild;
 
-                if ( ! up->_pushBack(r, *k, ordering, keepLoc) ) {
+                if ( ! up->_pushBack(r, k, ordering, keepLoc) ) {
                     // current bucket full
                     DiskLoc n = BtreeBucket<V>::addBucket(idx);
                     up->setTempNext(n);
                     upLoc = n;
                     up = upLoc.btreemod<V>();
-                    up->pushBack(r, *k, ordering, keepLoc);
+                    up->pushBack(r, k, ordering, keepLoc);
                 }
 
                 DiskLoc nextLoc = x->tempNext(); // get next in chain at current level

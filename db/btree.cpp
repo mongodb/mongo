@@ -309,12 +309,12 @@ namespace mongo {
      *  does not bother returning that value.
      */
     template< class V >
-    void BucketBasics<V>::popBack(DiskLoc& recLoc, const Key *&key) {
+    void BucketBasics<V>::popBack(DiskLoc& recLoc, Key &key) {
         massert( 10282 ,  "n==0 in btree popBack()", this->n > 0 );
         assert( k(this->n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
         KeyNode kn = keyNode(this->n-1);
         recLoc = kn.recordLoc;
-        key = &kn.key;
+        key.assign(kn.key);
         int keysize = kn.key.dataSize();
 
         massert( 10283 , "rchild not null in btree popBack()", this->nextChild.isNull());

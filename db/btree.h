@@ -429,7 +429,7 @@ namespace mongo {
          *  - The last key of the bucket is removed, and its key and recLoc are
          *    returned.  As mentioned above, the key points to unallocated memory.
          */
-        void popBack(DiskLoc& recLoc, const Key *&key);
+        void popBack(DiskLoc& recLoc, Key &key);
 
         /**
          * Preconditions:

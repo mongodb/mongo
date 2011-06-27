@@ -28,7 +28,7 @@ namespace mongo {
 
         KeyV1 is the new implementation.
     */
-    class KeyBson { 
+    class KeyBson /* "KeyV0" */ { 
     public:
         KeyBson() { }
         explicit KeyBson(const char *keyData) : _o(keyData) { }
@@ -41,6 +41,7 @@ namespace mongo {
         BSONElement _firstElement() const { return _o.firstElement(); }
         bool isCompactFormat() const { return false; }
         bool woEqual(const KeyBson& r) const;
+        void assign(const KeyBson& rhs) { *this = rhs; }
     private:
         BSONObj _o;
     };
@@ -57,6 +58,11 @@ namespace mongo {
 
         KeyV1(const KeyV1& rhs) : _keyData(rhs._keyData) { 
             dassert( _keyData > (const unsigned char *) 1 );
+        }
+
+        // explicit version of operator= to be safe
+        void assign(const KeyV1& rhs) { 
+            _keyData = rhs._keyData;
         }
 
         /** @param keyData can be a buffer containing data in either BSON format, OR in KeyV1 format. 
