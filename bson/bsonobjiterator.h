@@ -26,6 +26,8 @@ namespace mongo {
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
        object, although next().eoo() will be true.
 
+       The BSONObj must stay in scope for the duration of the iterator's execution.
+
        todo: we may want to make a more stl-like iterator interface for this
              with things like begin() and end()
     */

@@ -346,7 +346,8 @@ namespace mongo {
         
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        BSONObj ck = currKey();
+        BSONObjIterator it( ck );
         while ( x && it.more() ) {
             it.next();
             x--;
