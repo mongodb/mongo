@@ -187,6 +187,9 @@ namespace mongo {
 
             result.append("firstExtent", str::stream() << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
             result.append( "lastExtent", str::stream() <<  d->lastExtent.toString() << " ns:" <<  d->lastExtent.ext()->nsDiagnostic.toString());
+            
+            BSONArrayBuilder extentData;
+
             try {
                 d->firstExtent.ext()->assertOk();
                 d->lastExtent.ext()->assertOk();
@@ -198,6 +201,9 @@ namespace mongo {
                     e->assertOk();
                     el = e->xnext;
                     ne++;
+                    if ( full )
+                        extentData << e->dump();
+                    
                     killCurrentOp.checkForInterrupt();
                 }
                 result.append("extentCount", ne);
@@ -207,10 +213,15 @@ namespace mongo {
                 errors << "extent asserted";
             }
 
+            if ( full )
+                result.appendArray( "extents" , extentData.arr() );
+
+            
             result.appendNumber("datasize", d->stats.datasize);
             result.appendNumber("nrecords", d->stats.nrecords);
             result.appendNumber("lastExtentSize", d->lastExtentSize);
             result.appendNumber("padding", d->paddingFactor);
+            
 
             try {
 
