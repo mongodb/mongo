@@ -314,7 +314,7 @@ namespace mongo {
         }
     }
 
-    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret ) {
+    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret, BSONObj& holder ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
@@ -324,7 +324,8 @@ namespace mongo {
 
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
