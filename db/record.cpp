@@ -130,7 +130,7 @@ namespace mongo {
                 RARELY {
                     long long now = Listener::getElapsedTimeMillis();
                     OCCASIONALLY if ( now == 0 ) {
-                        warning() << "Listener::getElapsedTimeMillis returing 0" << endl;
+                        tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
                     }
                     
                     if ( now - _lastRotate > ( 1000 * RotateTimeSecs ) ) {

@@ -49,8 +49,12 @@ namespace mongo {
         // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
         // work.  (and should as-is)
         // --smallfiles makes the limit small.
+
 #if defined(_DEBUG)
         unsigned long long DataLimitPerJournalFile = 128 * 1024 * 1024;
+#elif defined(__APPLE__)
+        // assuming a developer box if OS X
+        unsigned long long DataLimitPerJournalFile = 256 * 1024 * 1024;
 #else
         unsigned long long DataLimitPerJournalFile = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
 #endif

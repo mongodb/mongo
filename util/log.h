@@ -328,7 +328,7 @@ namespace mongo {
         return Logstream::get();
     }
 
-    /** logging which we may not want during unit tests runs.
+    /** logging which we may not want during unit tests (dbtests) runs.
         set tlogLevel to -1 to suppress tlog() output in a test program. */
     inline Nullstream& tlog( int level = 0 ) {
         if ( level > tlogLevel || level > logLevel )
