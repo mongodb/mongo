@@ -1116,101 +1116,112 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
+                string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
+                bool postProcessOnly = !postProcessCollection.empty();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
+                if (postProcessOnly) {
+                    // the temp collection has been decided by mongos
+                    config.tempLong = dbname + "." + postProcessCollection;
+                }
+                // no need for incremental collection because records are already sorted
                 config.incLong = config.tempLong;
 
-                set<ServerAndQuery> servers;
-
+                State state(config);
                 BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
-                vector< auto_ptr<DBClientCursor> > shardCursors;
 
-                {
-                    // parse per shard results
-                    BSONObjIterator i( shards );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        string shard = e.fieldName();
-
-                        BSONObj res = e.embeddedObjectUserCheck();
-
-                        uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
-                        servers.insert( shard );
-
+                if (postProcessOnly) {
+                    // this is usually for reduce mode
+                    if (!state._db.exists(config.tempLong)) {
+                        // nothing to do
+                        return 1;
                     }
+                } else {
+                    set<ServerAndQuery> servers;
+                    vector< auto_ptr<DBClientCursor> > shardCursors;
 
-                }
+                    {
+                        // parse per shard results
+                        BSONObjIterator i( shards );
+                        while ( i.more() ) {
+                            BSONElement e = i.next();
+                            string shard = e.fieldName();
 
-                State state(config);
-                state.prepTempCollection();
+                            BSONObj res = e.embeddedObjectUserCheck();
 
-                {
-                    // reduce from each stream
+                            uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
+                            servers.insert( shard );
 
-                    BSONObj sortKey = BSON( "_id" << 1 );
-
-                    ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
-                                                        Query().sort( sortKey ) );
-                    cursor.init();
-                    state.init();
-
-                    BSONList values;
-                    if (!config.outDB.empty()) {
-                        BSONObjBuilder loc;
-                        if ( !config.outDB.empty())
-                            loc.append( "db" , config.outDB );
-                        if ( !config.finalShort.empty() )
-                            loc.append( "collection" , config.finalShort );
-                        result.append("result", loc.obj());
-                    }
-                    else {
-                        if ( !config.finalShort.empty() )
-                            result.append( "result" , config.finalShort );
-                    }
-
-                    while ( cursor.more() ) {
-                        BSONObj t = cursor.next().getOwned();
-
-                        if ( values.size() == 0 ) {
-                            values.push_back( t );
-                            continue;
                         }
 
-                        if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                            values.push_back( t );
-                            continue;
+                    }
+
+                    state.prepTempCollection();
+
+                    {
+                        // reduce from each stream
+
+                        BSONObj sortKey = BSON( "_id" << 1 );
+
+                        ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
+                                                            Query().sort( sortKey ) );
+                        cursor.init();
+                        state.init();
+
+                        BSONList values;
+                        if (!config.outDB.empty()) {
+                            BSONObjBuilder loc;
+                            if ( !config.outDB.empty())
+                                loc.append( "db" , config.outDB );
+                            if ( !config.finalShort.empty() )
+                                loc.append( "collection" , config.finalShort );
+                            result.append("result", loc.obj());
+                        }
+                        else {
+                            if ( !config.finalShort.empty() )
+                                result.append( "result" , config.finalShort );
                         }
 
-                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
-                        if (state.isOnDisk())
-                            state.insertToInc(res);
-                        else
-                            state.emit(res);
-                        values.clear();
-                        values.push_back( t );
+                        while ( cursor.more() || !values.empty() ) {
+                            BSONObj t;
+                            if (cursor.more()) {
+                                t = cursor.next().getOwned();
+
+                                if ( values.size() == 0 ) {
+                                    values.push_back( t );
+                                    continue;
+                                }
+
+                                if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
+                                    values.push_back( t );
+                                    continue;
+                                }
+                            }
+
+                            BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                            if (state.isOnDisk())
+                                state.insertToInc(res);
+                            else
+                                state.emit(res);
+                            values.clear();
+                            if (!t.isEmpty())
+                                values.push_back( t );
+                        }
                     }
 
-                    if ( values.size() ) {
-                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get() );
-                        if (state.isOnDisk())
-                            state.insertToInc(res);
-                        else
-                            state.emit(res);
+                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn( i->_server );
+                        conn->dropCollection( dbname + "." + shardedOutputCollection );
+                        conn.done();
                     }
+
+                    result.append( "shardCounts" , shardCounts );
                 }
 
                 long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
-
-                for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                    ScopedDbConnection conn( i->_server );
-                    conn->dropCollection( dbname + "." + shardedOutputCollection );
-                    conn.done();
-                }
-
-                result.append( "shardCounts" , shardCounts );
 
                 // fix the global counts
                 BSONObjBuilder countsB(32);

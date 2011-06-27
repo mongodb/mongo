@@ -191,8 +191,10 @@ namespace mongo {
             }
         }
 
-        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
-            ChunkManagerPtr manager = conf->getChunkManager(ns);
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags, bool safe, const char* nsChunkLookup ) {
+            if (!nsChunkLookup)
+                nsChunkLookup = ns;
+            ChunkManagerPtr manager = conf->getChunkManager(nsChunkLookup);
             if ( ! manager->hasShardKey( o ) ) {
 
                 bool bad = true;
@@ -206,7 +208,7 @@ namespace mongo {
                 }
 
                 if ( bad ) {
-                    log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
+                    log() << "tried to insert object without shard key: " << nsChunkLookup << "  " << o << endl;
                     uasserted( 14842 , "tried to insert object without shard key" );
                 }
 
@@ -221,7 +223,7 @@ namespace mongo {
                 try {
                     ChunkPtr c = manager->findChunk( o );
                     log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                    insert( c->getShard() , ns , o , flags);
+                    insert( c->getShard() , ns , o , flags, safe);
 
 //                    r.gotInsert();
 //                    if ( r.getClientInfo()->autoSplitOk() )
@@ -344,7 +346,7 @@ namespace mongo {
             }
         }
 
-        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags ) {
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags, bool safe ) {
             ChunkManagerPtr manager = conf->getChunkManager(ns);
             BSONObj chunkFinder = query;
 
@@ -410,7 +412,7 @@ namespace mongo {
 //                int * x = (int*)(r.d().afterNS());
 //                x[0] |= UpdateOption_Broadcast;
                 for ( set<Shard>::iterator i=shards.begin(); i!=shards.end(); i++) {
-                    update(*i, ns, query, toupdate, flags);
+                    update(*i, ns, query, toupdate, flags, safe);
                 }
             }
             else {

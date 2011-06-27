@@ -1003,9 +1003,7 @@ namespace mongo {
                     // so we allocate them in our thread
                     // and hand off
                     // Note: why not use pooled connections? This has been reported to create too many connections
-
                     vector< shared_ptr<ShardConnection> > shardConns;
-
                     list< shared_ptr<Future::CommandResult> > futures;
                     
                     for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
@@ -1100,9 +1098,7 @@ namespace mongo {
                     mr_shard::State state(config);
                     log(1) << "mr sharded output ns: " << config.ns << endl;
 
-                    // for now we only support replace output collection in sharded mode
-                    if (config.outType != mr_shard::Config::REPLACE &&
-                            config.outType != mr_shard::Config::MERGE) {
+                    if (config.outType == mr_shard::Config::INMEMORY) {
                         errmsg = "This Map Reduce mode is not supported with sharded output";
                         return false;
                     }
@@ -1111,18 +1107,22 @@ namespace mongo {
                         BSONObjBuilder loc;
                         if ( !config.outDB.empty())
                             loc.append( "db" , config.outDB );
-                        if ( !config.finalShort.empty() )
-                            loc.append( "collection" , config.finalShort );
+                        loc.append( "collection" , config.finalShort );
                         result.append("result", loc.obj());
                     }
                     else {
                         if ( !config.finalShort.empty() )
                             result.append( "result" , config.finalShort );
                     }
-                    string outns = config.finalLong;
 
-                    bool merge = (config.outType == mr_shard::Config::MERGE);
-                    if (!merge) {
+                    string outns = config.finalLong;
+                    string tempns;
+                    if (config.outType == mr_shard::Config::REDUCE) {
+                        // result will be inserted into a temp collection to post process
+                        const string postProcessCollection = getTmpName( collection );
+                        cout << "post process collection is " << postProcessCollection << endl;
+                        tempns = dbName + "." + postProcessCollection;
+                    } else if (config.outType == mr_shard::Config::REPLACE) {
                         // drop previous collection
                         BSONObj dropColCmd = BSON("drop" << config.finalShort);
                         BSONObjBuilder dropColResult(32);
@@ -1134,14 +1134,20 @@ namespace mongo {
                         }
                     }
 
-                    // create the sharded collection
                     BSONObj sortKey = BSON( "_id" << 1 );
-                    BSONObj shardColCmd = BSON("shardCollection" << outns << "key" << sortKey);
-                    BSONObjBuilder shardColResult(32);
-                    bool res = Command::runAgainstRegistered("admin.$cmd", shardColCmd, shardColResult);
-                    if (!res) {
-                        errmsg = str::stream() << "Could not create sharded output collection " << outns << ": " << shardColResult.obj().toString();
-                        return false;
+                    if (!conf->isSharded(outns)) {
+                        // create the sharded collection
+
+                        BSONObj shardColCmd = BSON("shardCollection" << outns << "key" << sortKey);
+                        BSONObjBuilder shardColResult(32);
+                        bool res = Command::runAgainstRegistered("admin.$cmd", shardColCmd, shardColResult);
+                        if (!res) {
+                            errmsg = str::stream() << "Could not create sharded output collection " << outns << ": " << shardColResult.obj().toString();
+                            return false;
+                        }
+
+                        // since it's new collection, use replace mode always
+                        config.outType = mr_shard::Config::REPLACE;
                     }
 
                     ParallelSortClusteredCursor cursor( servers , dbName + "." + shardedOutputCollection ,
@@ -1152,7 +1158,7 @@ namespace mongo {
                     mr_shard::BSONList values;
                     Strategy* s = SHARDED;
                     long long finalCount = 0;
-                    while ( cursor.more() || values.size() > 0 ) {
+                    while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
                         if ( cursor.more() ) {
                             t = cursor.next().getOwned();
@@ -1169,16 +1175,49 @@ namespace mongo {
                         }
 
                         BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
-                        if (merge) {
+                        if (config.outType == mr_shard::Config::MERGE) {
                             BSONObj id = final["_id"].wrap();
-                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert);
+                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
+                        } else if (config.outType == mr_shard::Config::REDUCE) {
+                            // insert into temp collection, but final collection's sharding
+                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
                         } else {
-                            s->insertSharded(conf, outns.c_str(), final, 0);
+                            s->insertSharded(conf, outns.c_str(), final, 0, true);
                         }
                         ++finalCount;
                         values.clear();
                         if (!t.isEmpty())
                             values.push_back( t );
+                    }
+
+                    if (config.outType == mr_shard::Config::REDUCE) {
+                        // results were written to temp collection, need final reduce
+                        vector< shared_ptr<ShardConnection> > shardConns;
+                        list< shared_ptr<Future::CommandResult> > futures;
+                        BSONObj finalCmdObj = finalCmd.obj();
+                        for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
+                            shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , outns ) );
+                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , temp->get() ) );
+                            shardConns.push_back( temp );
+                        }
+
+                        // now wait for the result of all shards
+                        bool failed = false;
+                        for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
+                            shared_ptr<Future::CommandResult> res = *i;
+                            if ( ! res->join() ) {
+                                error() << "final reduce on sharded output m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+                                result.append( "cause" , res->result() );
+                                errmsg = "mongod mr failed: ";
+                                errmsg += res->result().toString();
+                                failed = true;
+                                continue;
+                            }
+                            BSONObj result = res->result();
+                        }
+
+                        for ( unsigned i=0; i<shardConns.size(); i++ )
+                            shardConns[i]->done();
                     }
 
                     for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
