@@ -92,6 +92,10 @@ config_setup(void)
 			*cp->v = *cp->v == 1 ? 1 : 0;
 	}
 
+	/* Periodically, set the delete percentage to 0 so salvage gets run. */
+	if (!g.replay && g.run_cnt % 10 == 0)
+		g.c_delete_pct = 0;
+
 	/*
 	 * There are a couple of corrections the table doesn't handle, where
 	 * initialized values are relative to each other.
