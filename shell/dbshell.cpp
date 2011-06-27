@@ -403,6 +403,8 @@ string finishCode( string code ) {
             return "";
         if ( ! line )
             return "";
+        if ( code.find("\n\n") != string::npos ) // cancel multiline if two blank lines are entered
+            return ";";
 
         while (startsWith(line, "... "))
             line += 4;
