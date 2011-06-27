@@ -1310,29 +1310,6 @@ namespace mongo {
         _cur = 0;
     }
 
-    /** transform a BSON array into a vector of BSONElements.
-        we match array # positions with their vector position, and ignore
-        any fields with non-numeric field names.
-        */
-    vector<BSONElement> BSONElement::Array() const {
-        chk(mongo::Array);
-        vector<BSONElement> v;
-        BSONObjIterator i(Obj());
-        while( i.more() ) {
-            BSONElement e = i.next();
-            const char *f = e.fieldName();
-            try {
-                unsigned u = stringToNum(f);
-                assert( u < 1000000 );
-                if( u >= v.size() )
-                    v.resize(u+1);
-                v[u] = e;
-            }
-            catch(unsigned) { }
-        }
-        return v;
-    }
-
     bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
         BSONObjIterator l(lhs);
         BSONObjIterator r(rhs);
