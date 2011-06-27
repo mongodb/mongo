@@ -20,7 +20,7 @@ clean:
 distclean realclean: clean
 	rm -f __* tags
 
-tags: ${SRCS}
+tags: ${HDRS} ${SRCS}
 	@type ctags > /dev/null 2>&1 && ctags -w $> || exit 0
 
 ${SRCS}: ${HDRS}
