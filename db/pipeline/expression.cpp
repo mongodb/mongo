@@ -2035,15 +2035,23 @@ namespace mongo {
 
     shared_ptr<const Value> ExpressionSubtract::evaluate(
         const shared_ptr<Document> &pDocument) const {
+        BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
 
-        double right = pRight->coerceToDouble();
+        if (productType == NumberDouble) {
+            double right = pRight->coerceToDouble();
+            double left = pLeft->coerceToDouble();
+            return Value::createDouble(left - right);
+        } 
 
-        double left = pLeft->coerceToDouble();
-
-        return Value::createDouble(left - right);
+        long right = pRight->coerceToLong();
+        long left = pLeft->coerceToLong();
+        if (productType == NumberLong)
+            return Value::createLong(left - right);
+        return Value::createInt((int)(left - right));
     }
 
     const char *ExpressionSubtract::getOpName() const {
