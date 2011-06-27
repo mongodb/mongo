@@ -120,6 +120,7 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
+/* Standard error cases for switch statements. */
 #define	WT_ILLEGAL_FORMAT(session)					\
 	default:							\
 		return (__wt_file_format(session))
@@ -148,9 +149,8 @@ extern "C" {
 } while (0)
 
 /*
- * There are lots of places where we release a reference to a page, unless it's
- * the root page, which remains pinned for the life of the table handle.  It's
- * common enough to need a macro.
+ * Release a reference to a page, unless it's the root page, which remains
+ * pinned for the life of the table handle.
  */
 #define	WT_PAGE_OUT(session, p)						\
 	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
