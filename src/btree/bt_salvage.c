@@ -348,7 +348,18 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 */
 		checksum = dsk->checksum;
 		dsk->checksum = 0;
-		if (checksum != __wt_cksum(dsk, size)) {
+		if (checksum != __wt_cksum(dsk, size))
+			goto skip;
+
+		/*
+		 * Verify the page: it's vanishingly unlikely a page could pass
+		 * checksum and still be broken, but a degree of paranoia is
+		 * healthy in salvage.  Regardless, verify does return failure
+		 * here because it detects some failures we'd expect to see in
+		 * a corrupted file, like overflow references past the end of
+		 * the file.
+		 */
+		if (__wt_verify_dsk(session, dsk, addr, size, 1)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);

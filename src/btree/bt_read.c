@@ -271,7 +271,7 @@ __cache_read(
 
 	/* Verify the disk image on demand. */
 	if (dsk_verify)
-		WT_ERR(__wt_verify_dsk_page(session, dsk, addr, size));
+		WT_ERR(__wt_verify_dsk(session, dsk, addr, size, 0));
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));

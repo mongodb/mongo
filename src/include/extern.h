@@ -257,14 +257,16 @@ extern int __wt_bt_sync(WT_SESSION_IMPL *session);
 extern int __wt_verify(WT_SESSION_IMPL *session,
     FILE *stream,
     const char *config);
-extern int __wt_verify_dsk_page( WT_SESSION_IMPL *session,
+extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
-    uint32_t size);
-extern int __wt_verify_dsk_chunk( WT_SESSION_IMPL *session,
+    uint32_t size,
+    int quiet);
+extern int __wt_verify_dsk_chunk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
-    uint32_t size);
+    uint32_t size,
+    int quiet);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int (*work)(WT_SESSION_IMPL *,

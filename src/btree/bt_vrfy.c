@@ -485,7 +485,7 @@ __wt_verify_overflow_cell(
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_verify_dsk_chunk(session, dsk, addr, size));
+	WT_ERR(__wt_verify_dsk_chunk(session, dsk, addr, size, 0));
 
 	/* Add the fragments. */
 	WT_ERR(__wt_verify_addfrag(session, addr, size, vs));

@@ -77,7 +77,7 @@ __wt_disk_write(
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);
 
-	WT_ASSERT(session, __wt_verify_dsk_page(session, dsk, addr, size) == 0);
+	WT_ASSERT(session, __wt_verify_dsk(session, dsk, addr, size, 0) == 0);
 
 	WT_STAT_INCR(btree->stats, page_write);
 	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_write);
