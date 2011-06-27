@@ -107,6 +107,29 @@ namespace mongo {
         int _cur;
     };
 
+    /** transform a BSON array into a vector of BSONElements.
+        we match array # positions with their vector position, and ignore
+        any fields with non-numeric field names.
+        */
+    inline vector<BSONElement> BSONElement::Array() const {
+        chk(mongo::Array);
+        vector<BSONElement> v;
+        BSONObjIterator i(Obj());
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const char *f = e.fieldName();
+            try {
+                unsigned u = stringToNum(f);
+                assert( u < 1000000 );
+                if( u >= v.size() )
+                    v.resize(u+1);
+                v[u] = e;
+            }
+            catch(unsigned) { }
+        }
+        return v;
+    }
+
     /** Similar to BOOST_FOREACH
      *
      *  because the iterator is defined outside of the for, you must use {} around

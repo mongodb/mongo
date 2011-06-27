@@ -91,4 +91,23 @@ namespace mongo {
                 return i;
         return -1;
     }
+
+    inline bool isNumber( char c ) {
+        return c >= '0' && c <= '9';
+    }
+
+    inline unsigned stringToNum(const char *str) {
+        unsigned x = 0;
+        const char *p = str;
+        while( 1 ) {
+            if( !isNumber(*p) ) {
+                if( *p == 0 && p != str )
+                    break;
+                throw 0;
+            }
+            x = x * 10 + *p++ - '0';
+        }
+        return x;
+    }
+
 }
