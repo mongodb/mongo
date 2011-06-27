@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "../../pch.h"
+#include "pch.h"
 #include "miniwebserver.h"
 #include "../hex.h"
 

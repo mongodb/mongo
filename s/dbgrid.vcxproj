@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -192,6 +192,7 @@
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\common.cpp" />
+    <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">
@@ -210,7 +211,8 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\log.cpp" />
-    <ClCompile Include="..\util\miniwebserver.cpp" />
+    <ClCompile Include="..\util\net\miniwebserver.cpp" />
+    <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
@@ -519,8 +521,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\util\message.cpp" />
-    <ClCompile Include="..\util\message_server_port.cpp" />
+    <ClCompile Include="..\util\net\message.cpp" />
+    <ClCompile Include="..\util\net\message_port.cpp" />
+    <ClCompile Include="..\util\net\message_server_port.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="..\shell\mongo_vstudio.cpp">
@@ -536,7 +539,7 @@
     <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
-    <ClCompile Include="..\util\sock.cpp" />
+    <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="writeback_listener.cpp" />
