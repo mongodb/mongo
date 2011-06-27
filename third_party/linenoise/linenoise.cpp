@@ -237,6 +237,20 @@ static void output(const char* str, size_t len, int x, int y)
     DWORD count = 0;
     WriteConsoleOutputCharacterA(console_out, str, len, pos, &count);
 }
+#else
+static int highlightBlue(int fd, char c) {
+    if (write(fd, "\x1b[1;34m", 7) == -1) return -1; // bright blue (visible with both B&W bg)
+    if (write(fd, &c, 1) == -1) return -1;
+    if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
+    return 0;
+}
+
+static int highlightRed(int fd, char c) {
+    if (write(fd, "\x1b[1;31m", 7) == -1) return -1; // bright red (visible with both B&W bg)
+    if (write(fd, &c, 1) == -1) return -1;
+    if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
+    return 0;
+}
 #endif
 
 static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
@@ -296,20 +310,59 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
             }
         }
 
+        /* scans for unmatched {[( to be highlighted */
+        int mismatched = 0;
+        int mismatchpos[len];
+        int nomatch = -1;
+
+        for (unsigned i = 0; i <= len; i++) {
+            mismatchpos[i] = -1;
+        }
+
+        for (unsigned i = 0; i < len; i++) {
+            if (strchr("{[(", buf[i])) {
+                mismatched++;
+                mismatchpos[mismatched] = i;
+            } else if (strchr("}])", buf[i])) {
+                mismatched--;
+                if ( mismatched < 0 && mismatchpos[len + mismatched] == -1)
+                    mismatchpos[len + mismatched] = i;
+            }
+        }
+
+        if ( mismatched < 0 )
+            nomatch = mismatchpos[len + mismatched];
+        else
+            nomatch = mismatchpos[mismatched];
+
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
 
-        if (highlight == -1) {
+        if (highlight == -1 && nomatch == -1) {
             if (write(fd,buf,len) == -1) return;
+        } else if (highlight != -1 && nomatch == -1) {
+            if (write(fd,buf,highlight) == -1) return;
+            if (highlightBlue(fd, buf[highlight]) == -1) return;
+            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+        } else if (highlight == -1 && nomatch != -1) {
+            if (write(fd,buf,nomatch) == -1) return;
+            if (highlightRed(fd, buf[nomatch]) == -1) return;
+            if (write(fd,buf+nomatch+1,len-nomatch-1) == -1) return;
+        } else if (highlight > nomatch) {
+            if (write(fd,buf,nomatch) == -1) return;
+            if (highlightRed(fd, buf[nomatch]) == -1) return;
+            if (write(fd,buf+nomatch+1,highlight-nomatch-1) == -1) return;
+            if (highlightBlue(fd, buf[highlight]) == -1) return;
+            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
         } else {
             if (write(fd,buf,highlight) == -1) return;
-            if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
-            if (write(fd,&buf[highlight],1) == -1) return;
-            if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
-            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+            if (highlightBlue(fd, buf[highlight]) == -1) return;
+            if (write(fd,buf+highlight+1,nomatch-highlight-1) == -1) return;
+            if (highlightRed(fd, buf[nomatch]) == -1) return;
+            if (write(fd,buf+nomatch+1,len-nomatch-1) == -1) return;
         }
 
         /* Erase to right */
@@ -648,13 +701,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     pos++;
                     len++;
                     buf[len] = '\0';
-                    if (plen+len < cols) {
-                        /* Avoid a full update of the line in the
-                         * trivial case. */
-                        if (write(1,&c,1) == -1) return -1;
-                    } else {
-                        refreshLine(fd,prompt,buf,len,pos,cols);
-                    }
+                    refreshLine(fd,prompt,buf,len,pos,cols);
                 } else {
                     memmove(buf+pos+1,buf+pos,len-pos);
                     buf[pos] = c;
