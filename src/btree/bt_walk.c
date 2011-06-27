@@ -132,11 +132,17 @@ __wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk)
 {
 	WT_WALK_ENTRY *e;
 
+	if (walk->tree == NULL)
+		return;
+
 	/* Release any hazard references held in the stack. */
-	while (walk->tree_slot > 0) {
-		e = &walk->tree[--walk->tree_slot];
+	for (;;) {
+		e = &walk->tree[walk->tree_slot];
 		if (e->hazard != NULL)
 			__wt_hazard_clear(session, e->hazard);
+		if (walk->tree_slot == 0)
+			break;
+		--walk->tree_slot;
 	}
 
 	/* Discard/reset the walk structures. */
