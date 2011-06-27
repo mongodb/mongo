@@ -15,8 +15,7 @@
  *    limitations under the License.
  */
 
-#ifndef UTIL_STRING_UTILS_HEADER
-#define UTIL_STRING_UTILS_HEADER
+#pragma once
 
 namespace mongo {
 
@@ -125,5 +124,3 @@ namespace mongo {
     }
 
 } // namespace mongo
-
-#endif // UTIL_STRING_UTILS_HEADER
