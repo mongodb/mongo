@@ -36,7 +36,7 @@ for (var pass = 0; pass < 100; pass++) {
         d.runCommand({getLastError:1,j:1});
     d.getLastError();
     s = (s + 1) % 25;
-    print(pass);
+    //print(pass);
     if ((new Date()) - start > 60000) {
         print("stopping early");    
         break;
