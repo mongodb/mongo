@@ -731,6 +731,32 @@ var p16result = [
 assert(arrayEq(p16.result, p16result), 'p16 failed');
 
 
+// substr test
+var p17 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$substr: ["$author", 1, 2]},
+    }}
+]});
+
+var p17result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "author" : "ob"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "author" : "av"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "author" : "an"
+    }
+];
+
+assert(arrayEq(p17.result, p17result), 'p17 failed');
+
+
 
 
 

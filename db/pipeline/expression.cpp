@@ -193,6 +193,7 @@ namespace mongo {
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
         {"$tolower", ExpressionToLower::create},
         {"$toupper", ExpressionToUpper::create},
@@ -2015,6 +2016,43 @@ namespace mongo {
 	return "$or";
     }
 
+    /* ----------------------- ExpressionSubstr ---------------------------- */
+
+    ExpressionSubstr::~ExpressionSubstr() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSubstr::create() {
+        shared_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
+        return pExpression;
+    }
+
+    ExpressionSubstr::ExpressionSubstr():
+        ExpressionNary() {
+    }
+
+    void ExpressionSubstr::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 3); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSubstr::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 3); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
+        shared_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
+
+        string str = pString->coerceToString();
+        long lower = pLower->coerceToLong();
+        long length = pLength->coerceToLong();
+        return Value::createString( str.substr(lower, length) );
+    }
+
+    const char *ExpressionSubstr::getOpName() const {
+	return "$substr";
+    }
+
     /* ----------------------- ExpressionSubtract ---------------------------- */
 
     ExpressionSubtract::~ExpressionSubtract() {
@@ -2057,7 +2095,7 @@ namespace mongo {
     }
 
     const char *ExpressionSubtract::getOpName() const {
-	return "$divide";
+	return "$subtract";
     }
 
     /* ------------------------- ExpressionToLower ----------------------------- */
