@@ -76,6 +76,8 @@ __wt_debug_dump(WT_SESSION_IMPL *session, const char *ofile, FILE *fp)
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
+	__wt_session_dump(session);
+
 	/*
 	 * We use the verification code to do debugging dumps because if we're
 	 * dumping in debugging mode, we want to confirm the page is OK before

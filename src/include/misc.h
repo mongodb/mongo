@@ -57,6 +57,11 @@ extern "C" {
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
 /*
+ * Quiet compiler warnings about unused parameters.
+ */
+#define	WT_UNUSED(var)	(void)(var)
+
+/*
  * __wt_calloc_def --
  *	Simple calls don't need separate sizeof arguments.
  */
@@ -82,6 +87,14 @@ extern "C" {
 #define	__wt_page_in(a, b, c, d)					\
 	__wt_page_in_func(a, b, c, d)
 #endif
+
+/*
+ * Release a reference to a page, unless it's the root page, which remains
+ * pinned for the life of the table handle.
+ */
+#define	WT_PAGE_OUT(session, p)						\
+	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
+		__wt_hazard_clear((session), (p));
 
 /*
  * Flag set, clear and test.
@@ -147,14 +160,6 @@ extern "C" {
 	if ((__ret = (a)) != 0 && ret == 0)				\
 		ret = __ret;						\
 } while (0)
-
-/*
- * Release a reference to a page, unless it's the root page, which remains
- * pinned for the life of the table handle.
- */
-#define	WT_PAGE_OUT(session, p)						\
-	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
-		__wt_hazard_clear((session), (p));
 
 #if defined(__cplusplus)
 }

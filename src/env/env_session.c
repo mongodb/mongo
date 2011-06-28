@@ -20,43 +20,37 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL **tp;
 	WT_HAZARD *hp;
-	WT_MBUF mb;
 
 	conn = S2C(session);
 
-	__wt_mb_init(&conn->default_session, &mb);
-
-	__wt_mb_add(&mb, "%s\n", conn->sep);
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
-		__wt_mb_add(&mb, "session: %p {\n", session);
+		__wt_msg(session, "session: %s%s%p",
+		    session->name == NULL ? "" : session->name,
+		    session->name == NULL ? "" : " ",
+		    session);
 		if (session->wq_func == NULL)
-			__wt_mb_add(&mb, "\tworkq func: none\n");
+			__wt_msg(session, "\tworkq func: none");
 		else
-			__wt_mb_add(
-			    &mb, "\tworkq func: %p\n", session->wq_func);
+			__wt_msg(
+			    session, "\tworkq func: %p", session->wq_func);
 
-		__wt_mb_add(&mb,
-		    "\tstate: %s\n", __wt_session_print_state(session));
+		__wt_msg(session,
+		    "\tstate: %s", __wt_session_print_state(session));
 
 		for (hp = session->hazard;
 		    hp < session->hazard + conn->hazard_size; ++hp) {
 			if (hp->page == NULL)
 				continue;
 #ifdef HAVE_DIAGNOSTIC
-			__wt_mb_add(&mb, "\thazard: %lu (%s, line %d)\n",
+			__wt_msg(session,
+			    "\thazard: %" PRIu32 " (%s, line %d)",
 			    WT_PADDR(hp->page), hp->file, hp->line);
 #else
-			__wt_mb_add(&mb, "\thazard: %lu\n", WT_PADDR(hp->page));
+			__wt_msg(
+			    session, "\thazard: %" PRIu32, WT_PADDR(hp->page));
 #endif
 		}
-
-		__wt_mb_add(&mb, "}");
-		if (session->name != NULL)
-			__wt_mb_add(&mb, " %s", session->name);
-		__wt_mb_write(&mb);
 	}
-
-	__wt_mb_discard(&mb);
 }
 
 /*

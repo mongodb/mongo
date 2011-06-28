@@ -327,10 +327,6 @@ extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
 extern int __wt_connection_config(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
-extern void __wt_mb_init(WT_SESSION_IMPL *session, WT_MBUF *mbp);
-extern void __wt_mb_discard(WT_MBUF *mbp);
-extern void __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...);
-extern void __wt_mb_write(WT_MBUF *mbp);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
     const char *home,
     mode_t mode);

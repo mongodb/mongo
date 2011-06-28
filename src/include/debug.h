@@ -21,25 +21,6 @@ extern "C" {
 #define	WT_ASSERT(session, e)	do {} while (0)
 #endif
 
-/*
- * The __wt_msg interface appends a <newline> to each message (which is correct,
- * we don't want output messages interspersed in the application's log file.
- * The following structures and macros allow routines to build messages and then
- * dump them to the application's logging file/function.
- */
-typedef struct __wt_mbuf {
-	WT_SESSION_IMPL	 *session;		/* Enclosing environment */
-
-	char  *first;			/* Allocated message buffer */
-	char  *next;			/* Next available byte of the buffer */
-	uint32_t len;			/* Allocated length of the buffer */
-} WT_MBUF;
-
-/*
- * Quiet compiler warnings about unused parameters.
- */
-#define	WT_UNUSED(var)	(void)(var)
-
 #if defined(__cplusplus)
 }
 #endif
