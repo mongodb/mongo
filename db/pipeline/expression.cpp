@@ -193,6 +193,7 @@ namespace mongo {
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$strcmp", ExpressionStrcmp::create},
         {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
         {"$tolower", ExpressionToLower::create},
@@ -2014,6 +2015,43 @@ namespace mongo {
 
     const char *ExpressionOr::getOpName() const {
 	return "$or";
+    }
+
+    /* ----------------------- ExpressionStrcmp ---------------------------- */
+
+    ExpressionStrcmp::~ExpressionStrcmp() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionStrcmp::create() {
+        shared_ptr<ExpressionStrcmp> pExpression(new ExpressionStrcmp());
+        return pExpression;
+    }
+
+    ExpressionStrcmp::ExpressionStrcmp():
+        ExpressionNary() {
+    }
+
+    void ExpressionStrcmp::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionStrcmp::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
+
+        string str1 = boost::to_upper_copy( pString1->coerceToString() );
+        string str2 = boost::to_upper_copy( pString2->coerceToString() );
+        if ( !str1.compare(str2) )
+            return Value::getTrue();
+        return Value::getFalse();
+    }
+
+    const char *ExpressionStrcmp::getOpName() const {
+	return "$strcmp";
     }
 
     /* ----------------------- ExpressionSubstr ---------------------------- */

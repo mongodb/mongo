@@ -757,6 +757,47 @@ var p17result = [
 assert(arrayEq(p17.result, p17result), 'p17 failed');
 
 
+// strcmp test
+var p18 = db.runCommand(
+{aggregate : "article", pipeline : [
+    { $project : {
+        tags : 1,
+        thisisalametest : {$strcmp: ["foo","bar"]},
+        thisisalamepass : {$strcmp: ["foo","foo"]}
+    }}
+]});
+
+var p18result = [
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c996e"),
+        "tags" : [
+            "fun",
+            "good"
+        ],
+        "thisisalametest" : false,
+        "thisisalamepass" : true
+    },
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c996f"),
+        "tags" : [
+            "fun",
+            "nasty"
+        ],
+        "thisisalametest" : false,
+        "thisisalamepass" : true
+    },
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c9970"),
+        "tags" : [
+            "nasty",
+            "filthy"
+        ],
+        "thisisalametest" : false,
+        "thisisalamepass" : true
+    }
+];
+
+assert(arrayEq(p18.result, p18result), 'p18 failed');
 
 
 
