@@ -901,4 +901,76 @@ namespace mongo {
         b.append( q , t );
         return BSONFieldValue<BSONObj>( _name , b.obj() );
     }
+
+    // used by jsonString()
+    inline string escape( string s , bool escape_slash=false) {
+        StringBuilder ret;
+        for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
+            switch ( *i ) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << (escape_slash ? "\\/" : "/");
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if ( *i >= 0 && *i <= 0x1f ) {
+                    //TODO: these should be utf16 code-units not bytes
+                    char c = *i;
+                    ret << "\\u00" << toHexLower(&c, 1);
+                }
+                else {
+                    ret << *i;
+                }
+            }
+        }
+        return ret.str();
+    }
+
+    inline string BSONObj::hexDump() const {
+        stringstream ss;
+        const char *d = objdata();
+        int size = objsize();
+        for( int i = 0; i < size; ++i ) {
+            ss.width( 2 );
+            ss.fill( '0' );
+            ss << hex << (unsigned)(unsigned char)( d[ i ] ) << dec;
+            if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
+                ss << '\'' << d[ i ] << '\'';
+            if ( i != size - 1 )
+                ss << ' ';
+        }
+        return ss.str();
+    }
+
+    inline void BSONObjBuilder::appendKeys( const BSONObj& keyPattern , const BSONObj& values ) {
+        BSONObjIterator i(keyPattern);
+        BSONObjIterator j(values);
+
+        while ( i.more() && j.more() ) {
+            appendAs( j.next() , i.next().fieldName() );
+        }
+
+        assert( ! i.more() );
+        assert( ! j.more() );
+    }
+
 }

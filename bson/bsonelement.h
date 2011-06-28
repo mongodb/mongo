@@ -20,6 +20,14 @@
 #include <vector>
 #include <string.h>
 #include "util/builder.h"
+#include "bsontypes.h"
+
+namespace mongo {
+    class OpTime;
+    class BSONObj;
+    class BSONElement;
+    class BSONObjBuilder;
+}
 
 namespace bson {
     typedef mongo::BSONElement be;
@@ -28,9 +36,6 @@ namespace bson {
 }
 
 namespace mongo {
-
-    class OpTime;
-    class BSONElement;
 
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
