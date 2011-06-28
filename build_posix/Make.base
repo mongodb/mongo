@@ -3,8 +3,9 @@ wt_LIBRARIES = libwiredtiger.a
 LDADD = libwiredtiger.a -lpthread
 
 wt_PROGRAMS = wt
-wt_SOURCES = util_dump.c util_load.c util_main.c util_printlog.c \
-	util_salvage.c util_stat.c util_verify.c util_verbose.c
+wt_SOURCES = util_dump.c util_dumpfile.c util_load.c util_main.c \
+	util_printlog.c util_salvage.c util_stat.c util_verify.c \
+	util_verbose.c
 
 noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
 	ex_extending ex_hello ex_pack ex_process ex_schema ex_sequence \

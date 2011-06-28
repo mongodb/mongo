@@ -632,7 +632,7 @@ struct wt_session {
 
 	/*! Verify a table.
 	 *
-	 * @todo describe salvage
+	 * @todo describe verify
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->verify
@@ -734,6 +734,28 @@ struct wt_session {
 	 */
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
+	/*! @} */
+	/*! @name Debugging
+	 * @{
+	 */
+
+	/*! Dump a physical file in debugging mode.
+	 *
+	 * The specified file is displayed in a non-portable debugging mode to
+	 * the application's standard output.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->dumpfile
+	 *
+	 * @param session the session handle
+	 * @param name the uri of the table to verify
+	 * @configstart{session.dumpfile, see dist/api_data.py}
+	 * @configend
+	 * @errors
+	 */
+	int __F(dumpfile)(WT_SESSION *session,
+	    const char *name, const char *config);
+
 	/*! Send a string to the message handler for debugging.
 	 *
 	 * @dontinclude ex_all.c
@@ -744,6 +766,7 @@ struct wt_session {
 	 * @errors
 	 */
 	int __F(msg_printf)(WT_SESSION *session, const char *fmt, ...);
+
 	/*! @} */
 };
 

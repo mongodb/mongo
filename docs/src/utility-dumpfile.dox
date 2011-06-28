@@ -1,0 +1,33 @@
+/*! @page utility-verify Verify Utility Command Line Interface
+
+WiredTiger includes a command line tool, \c wt.  One of the commands for
+the \c wt tool is the \c dumpfile command.
+
+\section Synopsis
+<code>wt [-Vv] [-h directory] dumpfile file</code>
+
+\section Description
+The \c wt tool is a command-line tool that acts as a front-end to a set
+of commands supporting pieces of the WiredTiger functionality.  One of
+the commands for the \c wt tool is the \c dumpfile command.
+
+\section global Global Options
+The following are global options for the \c wt command:
+
+\par <code>-V</code>
+Display WiredTiger version and exit.
+\par <code>-v</code>
+Set verbose output.
+\par <code>-h directory</code>
+Specify a database home directory.
+
+\section Options
+The \c dumpfile command has no command-specific options.
+
+\section Description
+
+The \c dumpfile command dumps the specified physical file in a non-portable,
+debugging format, exiting success if the file is correct, and failure if the
+file is corrupted.
+
+*/

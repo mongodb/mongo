@@ -1,19 +1,4 @@
 # This file is a python script that describes the WiredTiger API.
-# This data is used by the scripts api.py, api_err.py, config.py
-#
-#	2: a string of comma-separated configuration key words
-#		extfunc  -- call an external function to do the work
-#		getter	 -- getter method
-#		connlock -- locks the connection mutex (implied by getter/setter)
-#		method	 -- method returns an int
-#		methodV  -- method returns void
-#		noauto	 -- don't auto-generate a stub at all
-#		rdonly	 -- not allowed if the database is read-only
-#		restart	 -- handle WT_RESTART in the API call
-#		rowonly	 -- row databases only
-#		session	 -- function takes a SESSION/BTREE argument pair
-#		setter	 -- setter method
-#		verify	 -- setter methods call validation function
 
 errors = [
 	('WT_DEADLOCK', 'conflict with concurrent operation'),
@@ -146,6 +131,7 @@ methods = {
 'session.sync' : Method([]),
 'session.truncate' : Method([]),
 'session.verify' : Method([]),
+'session.dumpfile' : Method([]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''
@@ -236,7 +222,7 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'bt_dump' : [ 'DEBUG', 'DUMP_PRINT' ],
+	'bt_dump' : [ 'DUMP_PRINT' ],
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],

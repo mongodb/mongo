@@ -19,18 +19,15 @@ util_dump(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	char cursor_config[100];
-	int ch, debug, printable, ret, tret;
+	int ch, printable, ret, tret;
 	char *tablename;
 
 	conn = NULL;
 	tablename = NULL;
-	debug = printable = 0;
+	printable = 0;
 
-	while ((ch = getopt(argc, argv, "df:p")) != EOF)
+	while ((ch = getopt(argc, argv, "f:p")) != EOF)
 		switch (ch) {
-		case 'd':
-			debug = 1;
-			break;
 		case 'f':			/* output file */
 			if (freopen(optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
@@ -64,8 +61,8 @@ util_dump(int argc, char *argv[])
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump%s%s",
-	    printable ? ",printable" : ",raw", debug ? ",debug" : "");
+	snprintf(cursor_config, sizeof(cursor_config),
+	    "dump,%s", printable ? "printable" : "raw");
 
 	if ((ret = session->open_cursor(
 	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
@@ -113,7 +110,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-dp] [-f output-file] file\n",
+	    "dump [-p] [-f output-file] file\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

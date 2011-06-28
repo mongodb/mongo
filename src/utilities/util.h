@@ -17,6 +17,7 @@
 #define	WT_UNUSED(var)	(void)(var)
 
 int util_dump(int, char *[]);
+int util_dumpfile(int, char *[]);
 int util_load(int, char *[]);
 int util_printlog(int, char *[]);
 int util_salvage(int, char *[]);

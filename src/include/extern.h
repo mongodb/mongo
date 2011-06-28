@@ -73,6 +73,8 @@ extern const char *__wt_confdfl_session_create;
 extern const char *__wt_confchk_session_create;
 extern const char *__wt_confdfl_session_drop;
 extern const char *__wt_confchk_session_drop;
+extern const char *__wt_confdfl_session_dumpfile;
+extern const char *__wt_confchk_session_dumpfile;
 extern const char *__wt_confdfl_session_log_printf;
 extern const char *__wt_confchk_session_log_printf;
 extern const char *__wt_confdfl_session_open_cursor;
@@ -159,9 +161,6 @@ extern int __wt_btcur_insert(CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(CURSOR_BTREE *cbt);
 extern int __wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
-extern int __wt_debug_dump(WT_SESSION_IMPL *session,
-    const char *ofile,
-    FILE *fp);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
@@ -254,9 +253,8 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg);
 extern int __wt_bt_sync(WT_SESSION_IMPL *session);
-extern int __wt_verify(WT_SESSION_IMPL *session,
-    FILE *stream,
-    const char *config);
+extern int __wt_verify(WT_SESSION_IMPL *session, const char *config);
+extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,

@@ -30,6 +30,7 @@ static int __wt_verify_addfrag(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
+static int __wt_verify_int(WT_SESSION_IMPL *, FILE *);
 static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_CELL *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
@@ -40,16 +41,50 @@ static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_verify --
- *	Verify a Btree, optionally dumping each page in debugging mode.
+ *	Verify a file.
  */
 int
-__wt_verify(WT_SESSION_IMPL *session, FILE *stream, const char *config)
+__wt_verify(WT_SESSION_IMPL *session, const char *config)
+{
+	WT_UNUSED(config);			/* XXX: unused for now */
+
+	return (__wt_verify_int(session, NULL));
+}
+
+/*
+ * __wt_dumpfile --
+ *	Dump a file in debugging mode.
+ */
+int
+__wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
+{
+	WT_UNUSED(config);			/* XXX: unused for now */
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * We use the verification code to do debugging dumps because if we're
+	 * dumping in debugging mode, we want to confirm the page is OK before
+	 * walking it.
+	 */
+	return (__wt_verify_int(session, stdout));
+#else
+	__wt_errx(session,
+	    "the WiredTiger library was not built in diagnostic mode");
+	return (EOPNOTSUPP);
+#endif
+}
+
+/*
+ * __wt_verify_int --
+ *	Internal version of verify: verify a Btree, optionally dumping each
+ * page in debugging mode.
+ */
+static int
+__wt_verify_int(WT_SESSION_IMPL *session, FILE *stream)
 {
 	WT_BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
 	int ret;
-
-	WT_UNUSED(config);			/* XXX: unused for now */
 
 	btree = session->btree;
 	ret = 0;

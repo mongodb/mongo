@@ -4,7 +4,6 @@ __wt_config_getone
 __wt_connection_stat_clear
 __wt_connection_stat_print
 __wt_debug_addr
-__wt_debug_dump
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_log_printf

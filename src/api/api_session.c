@@ -122,7 +122,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += 6;
+	name += sizeof("table:") - 1;
 
 	/*
 	 * Key / value formats.
@@ -209,7 +209,7 @@ __session_drop(
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("table:");
+	name += sizeof("table:") - 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
@@ -243,7 +243,7 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += 6;
+	name += sizeof("table:") - 1;
 
 	/*
 	 * Open a btree handle.
@@ -286,7 +286,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("table:");
+	name += sizeof("table:") - 1;
 
 	ret = __wt_session_get_btree(session,
 	    name, strlen(name), &btree_session);
@@ -342,7 +342,7 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += 6;
+	name += sizeof("table:") - 1;
 
 	/*
 	 * Open a btree handle.
@@ -359,7 +359,54 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	WT_RET(__wt_btree_open(
 	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
-	WT_TRET(__wt_verify(session, NULL, config));
+	WT_TRET(__wt_verify(session, config));
+
+	/* Close the file and discard the WT_BTREE structure. */
+	WT_TRET(__wt_btree_close(session));
+	API_END();
+
+	return (ret);
+}
+
+/*
+ * __session_dumpfile --
+ *	WT_SESSION->dumpfile method.
+ */
+static int
+__session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
+{
+	WT_SESSION_IMPL *session;
+	const char *treeconf;
+	int ret;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	ret = 0;
+
+	SESSION_API_CALL(session, dumpfile, config, cfg);
+	(void)cfg;
+
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += sizeof("table:") - 1;
+
+	/*
+	 * Open a btree handle.
+	 *
+	 * Tell the eviction thread to ignore this handle, we'll manage our own
+	 * pages (it would be possible for us to let the eviction thread handle
+	 * us, but there's no reason to do so, we can be more aggressive
+	 * because we know what pages are no longer needed, regardless of LRU).
+	 *
+	 * Also tell open that we're going to verify this handle, so it skips
+	 * loading metadata such as the free list, which could be corrupted.
+	 */
+	WT_RET(__wt_btconf_read(session, name, &treeconf));
+	WT_RET(__wt_btree_open(
+	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+
+	WT_TRET(__wt_dumpfile(session, config));
 
 	/* Close the file and discard the WT_BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
@@ -463,7 +510,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_msg_printf,
+		__session_dumpfile,
+		__session_msg_printf
 	};
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t slot;

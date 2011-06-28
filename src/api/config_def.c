@@ -134,6 +134,14 @@ __wt_confchk_session_drop =
     "force=(type=boolean)";
 
 const char *
+__wt_confdfl_session_dumpfile =
+    "";
+
+const char *
+__wt_confchk_session_dumpfile =
+    "";
+
+const char *
 __wt_confdfl_session_log_printf =
     "";
 

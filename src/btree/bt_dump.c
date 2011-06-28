@@ -33,15 +33,6 @@ __wt_btree_dump(WT_SESSION_IMPL *session, FILE *stream, uint32_t flags)
 	WT_DSTUFF dstuff;
 	int ret;
 
-	if (LF_ISSET(WT_DEBUG)) {
-		/*
-		 * We use the verification code to do debugging dumps because
-		 * if we're dumping in debugging mode, we want to confirm the
-		 * page is OK before blindly reading it.
-		 */
-		return (__wt_verify(session, stream, NULL));
-	}
-
 	dstuff.p = flags == WT_DUMP_PRINT ?
 	    __wt_print_byte_string_nl : __wt_print_byte_string_hex;
 	dstuff.stream = stream;

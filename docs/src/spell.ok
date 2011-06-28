@@ -54,6 +54,7 @@ dontinclude
 dontlock
 dp
 dsync
+dumpfile
 dup
 dups
 endcode

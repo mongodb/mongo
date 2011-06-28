@@ -177,6 +177,7 @@ dlopen
 dlsym
 dsk
 dumpable
+dumpfile
 dup
 encodings
 endian

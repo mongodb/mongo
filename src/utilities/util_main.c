@@ -76,6 +76,8 @@ main(int argc, char *argv[])
 	case 'd':
 		if (strcmp(cmd, "dump") == 0)
 			return (util_dump(argc, argv));
+		if (strcmp(cmd, "dumpfile") == 0)
+			return (util_dumpfile(argc, argv));
 		break;
 	case 'l':
 		if (strcmp(cmd, "load") == 0)
@@ -116,6 +118,7 @@ usage(void)
 	fprintf(stderr,
 	    "commands:\n"
 	    "\tdump\t  dump a table\n"
+	    "\tdumpfile  dump a physical file in debugging format\n"
 	    "\tload\t  load a table\n"
 	    "\tprintlog  display the database log\n"
 	    "\tsalvage\t  salvage a file\n"
