@@ -66,8 +66,7 @@ __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
 
 /*
  * __wt_debug_dump --
- *	Dump a file in debugging mode.  The btree handle should already be
- *	open.
+ *	Dump a file in debugging mode.
  */
 int
 __wt_debug_dump(WT_SESSION_IMPL *session, const char *ofile, FILE *fp)
@@ -76,9 +75,9 @@ __wt_debug_dump(WT_SESSION_IMPL *session, const char *ofile, FILE *fp)
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
-	__wt_session_dump(session);
-
 	/*
+	 * The btree handle should already be open.
+	 *
 	 * We use the verification code to do debugging dumps because if we're
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
