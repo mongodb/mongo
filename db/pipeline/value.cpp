@@ -221,6 +221,18 @@ namespace mongo {
         return pValue;
     }
 
+    Value::Value(string value):
+        type(String),
+        pDocumentValue(),
+        vpValue() {
+        stringValue = value;
+    }
+
+    shared_ptr<const Value> Value::createString(string value) {
+        shared_ptr<const Value> pValue(new Value(value));
+        return pValue;
+    }
+
     Value::Value(const shared_ptr<Document> &pDocument):
         type(Object),
         pDocumentValue(pDocument),
@@ -576,6 +588,35 @@ namespace mongo {
         } // switch(type)
 
         return (double)0;
+    }
+
+    string Value::coerceToString() const {
+        stringstream ss;
+        switch(type) {
+        case NumberDouble:
+            ss << simple.doubleValue;
+            return ss.str();
+
+        case NumberInt:
+            ss << simple.intValue;
+            return ss.str();
+
+        case NumberLong:
+            ss << simple.longValue;
+            return ss.str();
+
+        case String:
+            return stringValue;
+
+	case jstNULL:
+	case Undefined:
+	    break;
+
+        default:
+            assert(false); // CW TODO no conversion available
+        } // switch(type)
+
+        return "";
     }
 
     int Value::compare(const shared_ptr<const Value> &rL,

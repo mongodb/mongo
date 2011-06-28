@@ -94,6 +94,14 @@ namespace mongo {
         static shared_ptr<const Value> createDouble(double value);
 
         /*
+          Construct a string-valued Value.
+
+          @param value the value
+          @returns a Value with the given value
+        */
+        static shared_ptr<const Value> createString(string value);
+
+        /*
           Construct a document-valued Value.
 
           @param value the value
@@ -198,6 +206,13 @@ namespace mongo {
         double coerceToDouble() const;
 
         /*
+          Coerce (cast) a value to a string, using JSON rules.
+
+          @returns the double value
+        */
+        string coerceToString() const;
+
+        /*
           Compare two Values.
 
           @param rL left value
@@ -253,6 +268,7 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
+        Value(string boolValue);
         Value(const shared_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 

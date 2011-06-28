@@ -194,6 +194,7 @@ namespace mongo {
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
         {"$subtract", ExpressionSubtract::create},
+        {"$toupper", ExpressionToUpper::create},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -2056,5 +2057,37 @@ namespace mongo {
 
     const char *ExpressionSubtract::getOpName() const {
 	return "$divide";
+    }
+
+    /* ------------------------- ExpressionToUpper ----------------------------- */
+
+    ExpressionToUpper::~ExpressionToUpper() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionToUpper::create() {
+        shared_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
+        return pExpression;
+    }
+
+    ExpressionToUpper::ExpressionToUpper():
+        ExpressionNary() {
+    }
+
+    void ExpressionToUpper::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionToUpper::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        string str = pString->coerceToString();
+        boost::to_upper(str);
+        return Value::createString(str);
+    }
+
+    const char *ExpressionToUpper::getOpName() const {
+	return "$toupper";
     }
 }

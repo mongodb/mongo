@@ -638,6 +638,71 @@ var p13result = [
 assert(arrayEq(p13.result, p13result), 'p13 failed');
 
 
+// mod test
+var p14 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	theRemainder : { $mod:[
+	    { $ifnull:["$other.foo",
+		    "$other.bar"] },
+                "$pageViews", ] }
+    }}
+]});
+
+var p14result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce6"),
+        "theDifference" : 0
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "theDifference" : 0
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "theDifference" : 2
+    }
+];
+
+assert(arrayEq(p14.result, p14result), 'p14 failed');
+
+
+// toupper test
+var p15 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$toupper: "$author"},
+	pageViews : 1
+    }}
+]});
+
+var p15result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "pageViews" : 5,
+        "author" : "BOB"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "pageViews" : 7,
+        "author" : "DAVE"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "pageViews" : 6,
+        "author" : "JANE"
+    }
+];
+
+assert(arrayEq(p15.result, p15result), 'p15 failed');
+
+
+
+
+
+
+
+
 // simple matching
 var m1 = db.runCommand(
 { aggregate : "article", pipeline : [
