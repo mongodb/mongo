@@ -58,6 +58,8 @@ namespace mongo {
     }
 
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
+        dassert( key.isValid() );
+
         if ( details )
             details->reset();
 

@@ -1156,18 +1156,23 @@ namespace mongo {
                     mr_shard::BSONList values;
                     Strategy* s = SHARDED;
                     long long finalCount = 0;
+                    int currentSize = 0;
                     while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
                         if ( cursor.more() ) {
                             t = cursor.next().getOwned();
 
-                            if ( values.size() == 0 ) {
+                            if ( values.size() == 0 || t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
                                 values.push_back( t );
-                                continue;
-                            }
+                                currentSize += t.objsize();
 
-                            if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                                values.push_back( t );
+                                // check size and potentially reduce
+                                if (currentSize > config.maxInMemSize && values.size() > config.reduceTriggerRatio) {
+                                    BSONObj reduced = config.reducer->finalReduce(values, 0);
+                                    values.clear();
+                                    values.push_back( reduced );
+                                    currentSize = reduced.objsize();
+                                }
                                 continue;
                             }
                         }
@@ -1182,8 +1187,10 @@ namespace mongo {
                         }
                         ++finalCount;
                         values.clear();
-                        if (!t.isEmpty())
+                        if (!t.isEmpty()) {
                             values.push_back( t );
+                            currentSize = t.objsize();
+                        }
                     }
 
                     if (config.outType == mr_shard::Config::REDUCE || config.outType == mr_shard::Config::REPLACE) {

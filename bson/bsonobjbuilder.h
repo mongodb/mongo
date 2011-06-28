@@ -24,6 +24,10 @@
 
 #include <limits>
 #include <cmath>
+#include "bsonelement.h"
+#include "bsonobj.h"
+#include "bsonmisc.h"
+
 using namespace std;
 
 namespace mongo {

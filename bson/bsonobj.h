@@ -92,7 +92,9 @@ namespace mongo {
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
 
-        ~BSONObj() { /*defensive:*/ _objdata = 0; }
+        ~BSONObj() { 
+            _objdata = 0; // defensive
+        }
 
         /**
            A BSONObj can use a buffer it "owns" or one it does not.
@@ -255,7 +257,7 @@ namespace mongo {
         int objsize() const { return *(reinterpret_cast<const int*>(objdata())); }
 
         /** performs a cursory check on the object's size only. */
-        bool isValid();
+        bool isValid() const;
 
         /** @return if the user is a valid user doc
             criter: isValid() no . or $ field names
@@ -435,6 +437,11 @@ namespace mongo {
                 assert((int)h->refCount > 0); // make sure we haven't already freed the buffer
 #endif
                 if(--(h->refCount) == 0){
+#if defined(_DEBUG)
+                    unsigned sz = (unsigned&) *h->data;
+                    assert(sz < BSONObjMaxInternalSize * 3);
+                    memset(h->data, 0xdd, sz);
+#endif
                     free(h);
                 }
             }
