@@ -15,9 +15,11 @@ static void
 __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
-	WT_UNUSED(error);
 
-	fprintf(stderr, "%s\n", errmsg);
+	if (error != 0)
+		fprintf(stderr, "%s: %s\n", errmsg, wiredtiger_strerror(error));
+	else
+		fprintf(stderr, "%s\n", errmsg);
 }
 
 /*
@@ -28,7 +30,8 @@ static int
 __handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
 {
 	WT_UNUSED(handler);
-	WT_UNUSED(message);
+
+	printf("%s\n", message);
 
 	return (0);
 }
