@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static void __wt_block_discard(WT_SESSION_IMPL *);
-static void __wt_block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
+static int  __wt_block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
 static int  __wt_block_truncate(WT_SESSION_IMPL *);
 
 /*
@@ -70,31 +70,55 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	}
 
 	/* No segments large enough found, extend the file. */
-	__wt_block_extend(session, addrp, size);
-
-	return (0);
+	return (__wt_block_extend(session, addrp, size));
 }
 
 /*
  * __wt_block_extend --
  *	Extend the file to allocate space.
  */
-static void
+static int
 __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
+	uint32_t addr;
 
 	btree = session->btree;
 	fh = btree->fh;
 
 	/* We should never be allocating from an empty file. */
-	WT_ASSERT(session, fh->file_size >= WT_BTREE_DESC_SECTOR);
+	if (fh->file_size < WT_BTREE_DESC_SECTOR) {
+		__wt_errx(session,
+		    "attempt to allocate from a file with no description "
+		    "information");
+		return (WT_ERROR);
+	}
 
-	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
+	/*
+	 * Make sure we don't allocate past the "special" addresses.
+	 *
+	 * XXX
+	 * This isn't sufficient: if we grow the file to the end, there isn't
+	 * enough room to write the free-list out when we close the file.  It
+	 * is vanishingly unlikely to happen (we use free blocks where they're
+	 * available to write the free list), but if the free-list is a bunch
+	 * of small blocks, each group of which are insufficient to hole the
+	 * free list, and the file has been fully populated, file close will
+	 * fail because we can't write the free list.
+	 */
+	addr = WT_OFF_TO_ADDR(btree, fh->file_size);
+	if (!WT_ADDR_IS_VALID(addr)) {
+		__wt_errx(session,
+		    "block allocation failed, file cannot grow further");
+		return (WT_ERROR);
+	}
+
+	*addrp = addr;
 	fh->file_size += size;
 
 	WT_STAT_INCR(btree->stats, extend);
+	return (0);
 }
 
 /*
@@ -109,6 +133,13 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 
 	btree = session->btree;
 	new = NULL;
+
+	if (!WT_ADDR_IS_VALID(addr)) {
+		__wt_errx(session,
+		    "attempt to free an illegal file address (%" PRIu32 ")",
+		    addr);
+		return (WT_ERROR);
+	}
 
 	WT_ASSERT(session, addr != WT_ADDR_INVALID);
 	WT_ASSERT(session, size % btree->allocsize == 0);
@@ -291,16 +322,16 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	tmp = NULL;
 	ret = 0;
 
+	addr = WT_ADDR_INVALID;
+	size = 0;
+
 	/* If the free-list hasn't changed, there's nothing to write. */
 	if (btree->freelist_dirty == 0)
 		return (0);
 
 	/* If there aren't any free-list entries, we're done. */
-	if (btree->freelist_entries == 0) {
-		addr = WT_ADDR_INVALID;
-		size = 0;
+	if (btree->freelist_entries == 0)
 		goto done;
-	}
 
 	/* Truncate the file if possible. */
 	WT_RET(__wt_block_truncate(session));
@@ -313,11 +344,15 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	total_entries = btree->freelist_entries + 2;
 	size = WT_DISK_REQUIRED(session, total_entries * 2 * sizeof(uint32_t));
 
-	/* Allocate room at the end of the file. */
-	__wt_block_extend(session, &addr, size);
-
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
+
+	/*
+	 * Allocate room for the free-list, which may shrink the free-list by
+	 * an entry.  That's OK, we don't use size for anything other than
+	 * sizing file and memory allocations.
+	 */
+	WT_RET(__wt_block_alloc(session, &addr, size));
 
 	/* Clear the page's header and data, initialize the header. */
 	dsk = tmp->mem;
@@ -350,7 +385,11 @@ done:	/* Update the file's meta-data. */
 	/* Discard the in-memory free-list. */
 	__wt_block_discard(session);
 
-err:	if (tmp != NULL)
+	if (0) {
+err:		if (addr != WT_ADDR_INVALID)
+			(void)__wt_block_free(session, addr, size);
+	}
+	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);

@@ -19,16 +19,17 @@ extern "C" {
  * We use 32-bit unsigned integers to store file locations on file pages, and
  * all such file locations are counts of file allocation units.  In the code
  * these are called "addrs".  To simplify bookkeeping, page sizes must also be
- * a multiple of the allocation unit size.  There are two special addresses,
- * one for pages which don't exist, and one for pages that have been deleted.
+ * a multiple of the allocation unit size.
  *
- * XXX
- * The special address for deleted pages is not yet used -- the goal is to
- * use it to delete empty pages in column-store tables: the name space has
- * to exist, but we don't want to leave the pages around.
+ * There are two special addresses, one for pages which don't exist, and one
+ * for column-store pages that have been deleted (but are logically present in
+ * order to keep the name space in place).  I'm grabbing the top 5 addresses
+ * just to make sure I can have more if I ever need them.
  */
-#define	WT_ADDR_INVALID		UINT32_MAX	/* Invalid file address */
-#define	WT_ADDR_DELETED		(UINT32_MAX - 1)/* Deleted file address */
+#define	WT_ADDR_INVALID		(UINT32_MAX - 0)	/* Invalid address */
+#define	WT_ADDR_DELETED		(UINT32_MAX - 1)	/* Deleted address */
+#define	WT_ADDR_IS_VALID(addr)						\
+	((addr) < UINT32_MAX - 5 ? 1 : 0)
 
 /*
  * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
