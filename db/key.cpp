@@ -235,7 +235,6 @@ namespace mongo {
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
         BSONObj::iterator i(obj);
-        assert( i.more() );
         unsigned char bits = 0;
         while( 1 ) { 
             BSONElement e = i.next();
