@@ -58,12 +58,21 @@ struct __wt_track {
 
 	union {
 		struct {
-			WT_BUF   range_start;	/* Row-store start range */
-			WT_BUF   range_stop;	/* Row-store stop range */
+#undef	row_start
+#define	row_start	u.row._row_start
+#undef	row_stop
+#define	row_stop	u.row._row_stop
+			WT_BUF   _row_start;	/* Row-store start range */
+			WT_BUF   _row_stop;	/* Row-store stop range */
 		} row;
+
 		struct {
-			uint64_t range_start;	/* Col-store start range */
-			uint64_t range_stop;	/* Col-store stop range */
+#undef	col_start
+#define	col_start	u.col._col_start
+#undef	col_stop
+#define	col_stop	u.col._col_stop
+			uint64_t _col_start;	/* Col-store start range */
+			uint64_t _col_stop;	/* Col-store stop range */
 		} col;
 	} u;
 
@@ -496,12 +505,12 @@ __slvg_trk_leaf(
 		 * be taken from the WT_PAGE_DISK header, but they can contain
 		 * overflow items.
 		 */
-		trk->u.col.range_start = dsk->recno;
-		trk->u.col.range_stop = dsk->recno + (dsk->u.entries - 1);
+		trk->col_start = dsk->recno;
+		trk->col_stop = dsk->recno + (dsk->u.entries - 1);
 
 		WT_VERBOSE(session, SALVAGE,
 		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
-		    addr, trk->u.col.range_start, trk->u.col.range_stop);
+		    addr, trk->col_start, trk->col_stop);
 
 		if (dsk->type == WT_PAGE_COL_VAR)
 			WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
@@ -516,12 +525,12 @@ __slvg_trk_leaf(
 		WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
 			stop_recno += WT_RLE_REPEAT_COUNT(p);
 
-		trk->u.col.range_start = dsk->recno;
-		trk->u.col.range_stop = stop_recno - 1;
+		trk->col_start = dsk->recno;
+		trk->col_stop = stop_recno - 1;
 
 		WT_VERBOSE(session, SALVAGE,
 		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
-		    addr, trk->u.col.range_start, trk->u.col.range_stop);
+		    addr, trk->col_start, trk->col_stop);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -532,21 +541,21 @@ __slvg_trk_leaf(
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
 		WT_ERR(__wt_row_key(session,
-		    page, &page->u.row_leaf.d[0], &trk->u.row.range_start));
+		    page, &page->u.row_leaf.d[0], &trk->row_start));
 		WT_ERR(__wt_row_key(session,
 		    page, &page->u.row_leaf.d[page->entries - 1],
-		    &trk->u.row.range_stop));
+		    &trk->row_stop));
 
 		if (ss->verbose) {
 			WT_ERR(__wt_load_byte_string(session,
-			    trk->u.row.range_start.data,
-			    trk->u.row.range_start.size, ss->vbuf));
+			    trk->row_start.data,
+			    trk->row_start.size, ss->vbuf));
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] start key %.*s",
 			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data);
 			WT_ERR(__wt_load_byte_string(session,
-			    trk->u.row.range_stop.data,
-			    trk->u.row.range_stop.size, ss->vbuf));
+			    trk->row_stop.data,
+			    trk->row_stop.size, ss->vbuf));
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] stop key %.*s",
 			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data);
@@ -748,8 +757,8 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * We're done if this page starts after our stop, no
 			 * subsequent pages can overlap our page.
 			 */
-			if (ss->pages[j]->u.col.range_start >
-			    ss->pages[i]->u.col.range_stop)
+			if (ss->pages[j]->col_start >
+			    ss->pages[i]->col_stop)
 				break;
 
 			/* There's an overlap, fix it up. */
@@ -814,7 +823,7 @@ __slvg_col_range_overlap(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-	if (a_trk->u.col.range_start == b_trk->u.col.range_start) {
+	if (a_trk->col_start == b_trk->col_start) {
 		/*
 		 * Case #1, #4 and #9.
 		 *
@@ -825,7 +834,7 @@ __slvg_col_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		if (a_trk->u.col.range_stop >= b_trk->u.col.range_stop)
+		if (a_trk->col_stop >= b_trk->col_stop)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
@@ -837,12 +846,12 @@ __slvg_col_range_overlap(
 		 * desirable: keep both but delete a_trk's key range from
 		 * b_trk.
 		 */
-		b_trk->u.col.range_start = a_trk->u.col.range_stop + 1;
+		b_trk->col_start = a_trk->col_stop + 1;
 		F_SET(b_trk, WT_TRACK_MERGE);
 		goto merge;
 	}
 
-	if (a_trk->u.col.range_stop == b_trk->u.col.range_stop) {
+	if (a_trk->col_stop == b_trk->col_stop) {
 		/* Case #6. */
 		if (a_trk->lsn > b_trk->lsn)
 			/*
@@ -855,26 +864,26 @@ __slvg_col_range_overlap(
 		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
 		 * desirable: keep both but delete b_trk's key range from a_trk.
 		 */
-		a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+		a_trk->col_stop = b_trk->col_start - 1;
 		F_SET(a_trk, WT_TRACK_MERGE);
 		goto merge;
 	}
 
-	if  (a_trk->u.col.range_stop < b_trk->u.col.range_stop) {
+	if  (a_trk->col_stop < b_trk->col_stop) {
 		/* Case #3/8. */
 		if (a_trk->lsn > b_trk->lsn) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
-			b_trk->u.col.range_start = a_trk->u.col.range_stop + 1;
+			b_trk->col_start = a_trk->col_stop + 1;
 			F_SET(b_trk, WT_TRACK_MERGE);
 		} else {
 			/*
 			 * Case #3/8: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
-			a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+			a_trk->col_stop = b_trk->col_start - 1;
 			F_SET(a_trk, WT_TRACK_MERGE);
 		}
 
@@ -903,11 +912,11 @@ delete:		WT_RET(__slvg_trk_free(session,
 	WT_RET(__wt_calloc_def(session, 1, &new));
 	WT_TRACK_INIT(ss, new, a_trk->lsn, a_trk->addr, a_trk->size);
 
-	new->u.col.range_start = b_trk->u.col.range_stop + 1;
-	new->u.col.range_stop = a_trk->u.col.range_stop;
+	new->col_start = b_trk->col_stop + 1;
+	new->col_stop = a_trk->col_stop;
 	F_SET(new, WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
 
-	a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+	a_trk->col_stop = b_trk->col_start - 1;
 	F_SET(a_trk, WT_TRACK_MERGE);
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
@@ -977,7 +986,7 @@ __slvg_col_build_internal(
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
-		cref->recno = trk->u.col.range_start;
+		cref->recno = trk->col_start;
 		WT_COL_REF_ADDR(cref) = trk->addr;
 		WT_COL_REF_SIZE(cref) = trk->size;
 		WT_COL_REF_STATE(cref) = WT_REF_DISK;
@@ -1029,9 +1038,9 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	skip = (uint32_t)(trk->u.col.range_start - page->u.col_leaf.recno);
-	take = (uint32_t)(trk->u.col.range_stop - trk->u.col.range_start) + 1;
-	page->u.col_leaf.recno = trk->u.col.range_start;
+	skip = (uint32_t)(trk->col_start - page->u.col_leaf.recno);
+	take = (uint32_t)(trk->col_stop - trk->col_start) + 1;
+	page->u.col_leaf.recno = trk->col_start;
 
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] merge discarding first %" PRIu32 " records, "
@@ -1203,8 +1212,8 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * subsequent pages can overlap our page.
 			 */
 			if (func(btree,
-			    (WT_ITEM *)&ss->pages[j]->u.row.range_start,
-			    (WT_ITEM *)&ss->pages[i]->u.row.range_stop) > 0)
+			    (WT_ITEM *)&ss->pages[j]->row_start,
+			    (WT_ITEM *)&ss->pages[i]->row_stop) > 0)
 				break;
 
 			/* There's an overlap, fix it up. */
@@ -1274,13 +1283,13 @@ __slvg_row_range_overlap(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-#define	A_TRK_START	((WT_ITEM *)&a_trk->u.row.range_start)
-#define	A_TRK_STOP	((WT_ITEM *)&a_trk->u.row.range_stop)
-#define	B_TRK_START	((WT_ITEM *)&b_trk->u.row.range_start)
-#define	B_TRK_STOP	((WT_ITEM *)&b_trk->u.row.range_stop)
-#define	A_TRK_STOP_BUF	(&a_trk->u.row.range_stop)
-#define	B_TRK_START_BUF	(&b_trk->u.row.range_start)
-#define	B_TRK_STOP_BUF	(&b_trk->u.row.range_stop)
+#define	A_TRK_START	((WT_ITEM *)&a_trk->row_start)
+#define	A_TRK_STOP	((WT_ITEM *)&a_trk->row_stop)
+#define	B_TRK_START	((WT_ITEM *)&b_trk->row_start)
+#define	B_TRK_STOP	((WT_ITEM *)&b_trk->row_stop)
+#define	A_TRK_STOP_BUF	(&a_trk->row_stop)
+#define	B_TRK_START_BUF	(&b_trk->row_start)
+#define	B_TRK_STOP_BUF	(&b_trk->row_stop)
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
@@ -1377,9 +1386,9 @@ delete:		WT_RET(__slvg_trk_free(session,
 	WT_RET(__wt_calloc_def(session, 1, &new));
 	WT_TRACK_INIT(ss, new, a_trk->lsn, a_trk->addr, a_trk->size);
 	WT_RET(
-	    __slvg_key_copy(session, &new->u.row.range_start, B_TRK_STOP_BUF));
+	    __slvg_key_copy(session, &new->row_start, B_TRK_STOP_BUF));
 	WT_RET(
-	    __slvg_key_copy(session, &new->u.row.range_stop, A_TRK_STOP_BUF));
+	    __slvg_key_copy(session, &new->row_stop, A_TRK_STOP_BUF));
 	F_SET(new,
 	    WT_TRACK_CHECK_START | WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
 
@@ -1479,8 +1488,8 @@ __slvg_row_build_internal(
 			}
 		} else
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
-			    trk->u.row.range_start.data,
-			    trk->u.row.range_start.size,
+			    trk->row_start.data,
+			    trk->row_start.size,
 			    (WT_IKEY **)&rref->key));
 		++rref;
 	}
@@ -1559,7 +1568,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			}
 
 			if  (func(btree,
-			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
+			    item, (WT_ITEM *)&trk->row_start) > 0)
 				break;
 			if (ss->verbose) {
 				WT_ERR(__wt_load_byte_string(session,
@@ -1584,7 +1593,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 				item = (WT_ITEM *)key;
 			}
 			if  (func(btree,
-			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
+			    item, (WT_ITEM *)&trk->row_stop) < 0)
 				break;
 			if (ss->verbose) {
 				WT_ERR(__wt_load_byte_string(session,
@@ -1840,8 +1849,8 @@ __slvg_trk_compare_key(const void *a, const void *b)
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
-		a_recno = a_trk->u.col.range_start;
-		b_recno = b_trk->u.col.range_start;
+		a_recno = a_trk->col_start;
+		b_recno = b_trk->col_start;
 		if (a_recno == b_recno)
 			break;
 		if (a_recno > b_recno)
@@ -1852,8 +1861,8 @@ __slvg_trk_compare_key(const void *a, const void *b)
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
 		if ((cmp = btree->btree_compare(btree,
-		    (WT_ITEM *)&a_trk->u.row.range_start,
-		    (WT_ITEM *)&b_trk->u.row.range_start)) != 0)
+		    (WT_ITEM *)&a_trk->row_start,
+		    (WT_ITEM *)&b_trk->row_start)) != 0)
 			return (cmp);
 		break;
 	}
@@ -2005,8 +2014,8 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 		}
 
 	if (trk->ss->page_type == WT_PAGE_ROW_LEAF) {
-		__wt_buf_free(session, &trk->u.row.range_start);
-		__wt_buf_free(session, &trk->u.row.range_stop);
+		__wt_buf_free(session, &trk->row_start);
+		__wt_buf_free(session, &trk->row_stop);
 	}
 
 	__wt_free(session, trk->ovfl);
