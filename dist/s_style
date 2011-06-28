@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# General style correction and cleanup..
+# General style correction and cleanup.
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
