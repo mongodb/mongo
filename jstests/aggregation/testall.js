@@ -697,6 +697,40 @@ var p15result = [
 assert(arrayEq(p15.result, p15result), 'p15 failed');
 
 
+// tolower test
+var p16 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$toupper: "$author"},
+	pageViews : 1
+    }},
+    { $project : {
+    author : {$tolower: "$author"},
+    pageViews : 1
+    }}
+]});
+
+var p16result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "pageViews" : 5,
+        "author" : "bob"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "pageViews" : 7,
+        "author" : "dave"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "pageViews" : 6,
+        "author" : "jane"
+    }
+];
+
+assert(arrayEq(p16.result, p16result), 'p16 failed');
+
+
 
 
 

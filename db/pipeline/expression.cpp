@@ -194,6 +194,7 @@ namespace mongo {
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
         {"$subtract", ExpressionSubtract::create},
+        {"$tolower", ExpressionToLower::create},
         {"$toupper", ExpressionToUpper::create},
     };
 
@@ -2057,6 +2058,38 @@ namespace mongo {
 
     const char *ExpressionSubtract::getOpName() const {
 	return "$divide";
+    }
+
+    /* ------------------------- ExpressionToLower ----------------------------- */
+
+    ExpressionToLower::~ExpressionToLower() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionToLower::create() {
+        shared_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
+        return pExpression;
+    }
+
+    ExpressionToLower::ExpressionToLower():
+        ExpressionNary() {
+    }
+
+    void ExpressionToLower::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionToLower::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        string str = pString->coerceToString();
+        boost::to_lower(str);
+        return Value::createString(str);
+    }
+
+    const char *ExpressionToLower::getOpName() const {
+	return "$tolower";
     }
 
     /* ------------------------- ExpressionToUpper ----------------------------- */
