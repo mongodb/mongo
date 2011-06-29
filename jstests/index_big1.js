@@ -1,7 +1,7 @@
 
 t = db.index_big1;
 
-N = 2000;
+N = 4000;
 t.drop();
 
 for ( i=0; i<N; i++ ) {
@@ -32,4 +32,4 @@ for ( i=0; i<N; i++ ) {
     }
 }
 
-assert.eq( 798, flip , "flip changed" );
+assert.eq( 797, flip , "flip changed" );
