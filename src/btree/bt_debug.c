@@ -97,7 +97,7 @@ __wt_debug_event_config(
 
 /*
  * __wt_debug_event_reset --
- *	Unconfigure the event handler for debugging information.
+ *	Reset the event handlers to their original values.
  */
 static void
 __wt_debug_event_reset(WT_SESSION_IMPL *session, WT_DEBUG_EVENT *dbe)
