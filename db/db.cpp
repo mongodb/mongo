@@ -699,6 +699,7 @@ int main(int argc, char* argv[]) {
     ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
     ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
+    ("nojournal", "disable journaling (currently the default)")
     ("appsrvpath", po::value<string>(), "root directory for the babble app server")
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
@@ -798,6 +799,9 @@ int main(int argc, char* argv[]) {
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
         if( params.count("nodur") ) {
+            cmdLine.dur = false;
+        }
+        if( params.count("nojournal") ) {
             cmdLine.dur = false;
         }
         if( params.count("dur") || params.count( "journal" ) ) {
