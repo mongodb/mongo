@@ -66,6 +66,10 @@ struct __wt_col;
     typedef struct __wt_col WT_COL;
 struct __wt_col_ref;
     typedef struct __wt_col_ref WT_COL_REF;
+struct __wt_config;
+    typedef struct __wt_config WT_CONFIG;
+struct __wt_config_item;
+    typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_conn_stats;
     typedef struct __wt_conn_stats WT_CONN_STATS;
 struct __wt_connection_impl;
@@ -106,6 +110,8 @@ struct __wt_row;
     typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;
     typedef struct __wt_row_ref WT_ROW_REF;
+struct __wt_salvage_cookie;
+    typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
 struct __wt_session_buffer;
     typedef struct __wt_session_buffer WT_SESSION_BUFFER;
 struct __wt_session_impl;
@@ -126,12 +132,7 @@ struct __wt_walk_entry;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
-#include "walk.h"
 #include "btree.h"
-#include "api.h"
-
-#include "mutex.h"
-
 #include "cache.h"
 #include "config.h"
 #include "debug.h"
@@ -139,42 +140,14 @@ struct __wt_walk_entry;
 #include "fh.h"
 #include "log.h"
 #include "misc.h"
-#include "stat.h"
-
-/*******************************************
- * WT_SESSION_IMPL support.
- *******************************************/
-#define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
-
-/*
- * WT_SESSION_BUFFER --
- *	A structure to accumulate file changes on a per-thread basis.
- */
-struct __wt_session_buffer {
-	uint32_t len;				/* Buffer original size */
-	uint32_t space_avail;			/* Buffer's available memory */
-	uint8_t *first_free;			/* Buffer's first free byte */
-
-	uint32_t in;				/* Buffer chunks in use */
-	uint32_t out;				/* Buffer chunks not in use */
-};
-
-/*******************************************
- * File handle information that doesn't persist.
- *******************************************/
-/*
- * WT_FREE_ENTRY  --
- *	Encapsulation of an entry on the free lists.
- */
-struct __wt_free_entry {
-	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
-	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
-
-	uint32_t addr;				/* Disk offset */
-	uint32_t size;				/* Size */
-};
-
+#include "mutex.h"
+#include "salvage.h"
 #include "serial.h"
+#include "stat.h"
+#include "walk.h"
+
+#include "api.h"
+
 #include "extern.h"
 #include "verify_build.h"
 

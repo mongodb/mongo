@@ -777,6 +777,18 @@ struct __wt_off_record {
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
 		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
+/*
+ * WT_FREE_ENTRY  --
+ *	Encapsulation of an entry on the Btree free list.
+ */
+struct __wt_free_entry {
+	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
+	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
+
+	uint32_t addr;				/* Disk offset */
+	uint32_t size;				/* Size */
+};
+
 #if defined(__cplusplus)
 }
 #endif

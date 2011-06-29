@@ -131,6 +131,19 @@ struct __wt_btree_session {
 	TAILQ_ENTRY(__wt_btree_session) q;
 };
 
+/*
+ * WT_SESSION_BUFFER --
+ *	A structure to accumulate file changes on a per-thread basis.
+ */
+struct __wt_session_buffer {
+	uint32_t len;				/* Buffer original size */
+	uint32_t space_avail;			/* Buffer's available memory */
+	uint8_t *first_free;			/* Buffer's first free byte */
+
+	uint32_t in;				/* Buffer chunks in use */
+	uint32_t out;				/* Buffer chunks not in use */
+};
+
 typedef	enum {
 	WT_WORKQ_NONE=0,		/* No request */
 	WT_WORKQ_FUNC=1,		/* Function, then return */
@@ -147,6 +160,8 @@ struct __wt_hazard {
 	int	    line;
 #endif
 };
+
+#define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 struct __wt_session_impl {
 	WT_SESSION iface;
