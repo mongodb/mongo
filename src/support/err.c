@@ -9,7 +9,7 @@
 
 /*
  * __wt_errv --
- * 	Report an error (va_list version).
+ * 	Report an error to an event handler.
  */
 void
 __wt_errv(WT_SESSION_IMPL *session, int error,
@@ -83,7 +83,7 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 
 /*
  * __wt_msg_call --
- *	Pass a message to a callback function.
+ *	Pass a message to an event handler.
  */
 void
 __wt_msgv(WT_SESSION_IMPL *session, const char *prefix1, const char *prefix2,
@@ -128,7 +128,8 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 	va_start(ap, fmt);
 	__wt_msgv(session,
 	    (session->btree != NULL) ? session->btree->name : NULL,
-	    session->name, fmt, ap);
+	    session->name,
+	    fmt, ap);
 	va_end(ap);
 }
 
