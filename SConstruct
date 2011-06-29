@@ -22,6 +22,7 @@ import urllib
 import urllib2
 import buildscripts
 import buildscripts.bb
+import stat
 from buildscripts import utils
 
 buildscripts.bb.checkOk()
@@ -751,6 +752,11 @@ try:
     umask = os.umask(022)
 except OSError:
     pass
+
+if not windows:
+    for keysuffix in [ "1" , "2" ]:
+        keyfile = "jstests/libs/key%s" % keysuffix
+        os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
 # --- check system ---
 
