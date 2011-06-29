@@ -20,6 +20,8 @@
 #include "../util/message.h"
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
+#include "../util/timer.h"
+
 #include "../client/connpool.h"
 #include "../client/model.h"
 #include "../db/pdfile.h"
@@ -53,8 +55,14 @@ namespace mongo {
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
         _dropped = in["dropped"].trueValue();
-        if ( in["key"].isABSONObj() )
+        if ( in["key"].isABSONObj() ) {
+            Timer t;
             shard( in["_id"].String() , in["key"].Obj() , in["unique"].trueValue() );
+            log() << "creating ChunkManager ns: " << in["_id"] 
+                  << " took: " << t.millis() << "ms" 
+                  << " sequenceNumber: " << _cm->getSequenceNumber()
+                  << endl;
+        }
     }
 
 
@@ -238,7 +246,21 @@ namespace mongo {
         assert( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
-            _collections[o["_id"].String()] = CollectionInfo( o );
+            string ns = o["_id"].String();
+
+            Collections::iterator i = _collections.find( ns );
+            if ( i != _collections.end() ) {
+                BSONObj newest = conn->findOne( ShardNS::chunk , 
+                                                Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+                if ( ! newest.isEmpty() ) {
+                    ShardChunkVersion v = newest["lastmod"];
+                    if ( v == i->second.getCM()->getVersion() )
+                        continue;
+
+                }
+            }
+
+            _collections[ns] = CollectionInfo( o );
         }
 
         conn.done();
