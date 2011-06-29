@@ -1803,7 +1803,7 @@ const StringData _jscode_raw_db =
 "*/\n" 
 "DB.prototype.createCollection = function(name, opt) {\n" 
 "var options = opt || {};\n" 
-"var cmd = { create: name, capped: options.capped, size: options.size, max: options.max };\n" 
+"var cmd = { create: name, capped: options.capped, size: options.size, max: options.max, autoIndexId: options.autoIndexId };\n" 
 "var res = this._dbCommand(cmd);\n" 
 "return res;\n" 
 "}\n" 
