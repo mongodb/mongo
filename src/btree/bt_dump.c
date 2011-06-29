@@ -20,8 +20,8 @@ static void __wt_dump_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_DSTUFF *);
-static void __wt_print_byte_string_hex(const uint8_t *, uint32_t, FILE *);
-static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
+static void __wt_stream_byte_string_hex(const uint8_t *, uint32_t, FILE *);
+static void __wt_stream_byte_string_nl(const uint8_t *, uint32_t, FILE *);
 
 /*
  * __wt_btree_dump --
@@ -34,7 +34,7 @@ __wt_btree_dump(WT_SESSION_IMPL *session, FILE *stream, uint32_t flags)
 	int ret;
 
 	dstuff.p = flags == WT_DUMP_PRINT ?
-	    __wt_print_byte_string_nl : __wt_print_byte_string_hex;
+	    __wt_stream_byte_string_nl : __wt_stream_byte_string_hex;
 	dstuff.stream = stream;
 	dstuff.fcnt = 0;
 
@@ -342,26 +342,27 @@ err:	/* Discard any space allocated to hold off-page key/value items. */
 static const char hex[] = "0123456789abcdef";
 
 /*
- * __wt_print_byte_string_nl --
+ * __wt_stream_byte_string_nl --
  *	Output a single byte stringin printable characters, where possible.
  *	In addition, terminate with a <newline> character, unless the entry
  *	is itself terminated with a <newline> character.
  */
 static void
-__wt_print_byte_string_nl(const uint8_t *data, uint32_t size, FILE *stream)
+__wt_stream_byte_string_nl(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	if (size > 0 && data[size - 1] == '\n')
 		--size;
-	__wt_print_byte_string(data, size, stream);
+	__wt_stream_byte_string(data, size, stream);
 	fprintf(stream, "\n");
 }
 
 /*
- * __wt_print_byte_string --
- *	Output a single byte string in printable characters, where possible.
+ * __wt_stream_byte_string --
+ *	Output a single byte string in printable characters, where possible,
+ * to the specified stream.
  */
 void
-__wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
+__wt_stream_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	int ch;
 
@@ -371,6 +372,27 @@ __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
 			fprintf(stream, "%c", ch);
 		else
 			fprintf(stream, "%x%x",
+			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
+	}
+}
+
+/*
+ * __wt_msg_byte_string --
+ *	Output a single byte string in printable characters, where possible,
+ * to the standard message stream.
+ */
+void
+__wt_msg_byte_string(
+    WT_SESSION_IMPL *session, const uint8_t *data, uint32_t size)
+{
+	int ch;
+
+	for (; size > 0; --size, ++data) {
+		ch = data[0];
+		if (isprint(ch))
+			__wt_msg(session, "%c", ch);
+		else
+			__wt_msg(session, "%x%x",
 			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
 	}
 }
@@ -422,11 +444,11 @@ __wt_load_byte_string(
 }
 
 /*
- * __wt_print_byte_string_hex --
+ * __wt_stream_byte_string_hex --
  *	Output a single byte string in hexadecimal characters.
  */
 static void
-__wt_print_byte_string_hex(const uint8_t *data, uint32_t size, FILE *stream)
+__wt_stream_byte_string_hex(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	for (; size > 0; --size, ++data)
 		fprintf(stream, "%x%x",

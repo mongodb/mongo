@@ -480,7 +480,7 @@ __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	va_start(ap, fmt);
-	__wt_msgv(session, session->name, NULL, fmt, ap);
+	__wt_msgv(session, fmt, ap);
 	va_end(ap);
 
 	return (0);

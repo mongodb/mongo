@@ -86,11 +86,10 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
  *	Pass a message to an event handler.
  */
 void
-__wt_msgv(WT_SESSION_IMPL *session, const char *prefix1, const char *prefix2,
-    const char *fmt, va_list ap)
+__wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
-	char *end, *p;
+
 	/*
 	 * !!!
 	 * SECURITY:
@@ -98,18 +97,7 @@ __wt_msgv(WT_SESSION_IMPL *session, const char *prefix1, const char *prefix2,
 	 */
 	char s[2048];
 
-	p = s;
-	end = s + sizeof(s);
-
-	if (prefix1 != NULL && prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p),
-		    "%s [%s]: ", prefix1, prefix2);
-	else if (prefix1 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
-	else if (prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
-	if (p < end)
-		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
+	(void)vsnprintf(s, sizeof(s), fmt, ap);
 
 	handler = session->event_handler;
 	(void)handler->handle_message(handler, s);
@@ -126,10 +114,7 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	__wt_msgv(session,
-	    (session->btree != NULL) ? session->btree->name : NULL,
-	    session->name,
-	    fmt, ap);
+	__wt_msgv(session, fmt, ap);
 	va_end(ap);
 }
 

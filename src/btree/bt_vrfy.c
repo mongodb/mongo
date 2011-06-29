@@ -16,21 +16,21 @@ typedef struct {
 	uint32_t  frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
-	FILE	*stream;			/* Dump file stream */
-
-	uint64_t fcnt;				/* Progress counter */
-
 	uint64_t record_total;			/* Total record count */
 
 	WT_BUF  *max_key;			/* Largest key */
 	uint32_t max_addr;			/* Largest key page */
+
+	uint64_t fcnt;				/* Progress counter */
+
+	int	 dumpfile;			/* Dump file stream */
 } WT_VSTUFF;
 
 static int __wt_verify_addfrag(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
-static int __wt_verify_int(WT_SESSION_IMPL *, FILE *);
+static int __wt_verify_int(WT_SESSION_IMPL *, int);
 static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_CELL *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
@@ -48,7 +48,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_UNUSED(config);			/* XXX: unused for now */
 
-	return (__wt_verify_int(session, NULL));
+	return (__wt_verify_int(session, 0));
 }
 
 /*
@@ -66,7 +66,7 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	return (__wt_verify_int(session, stdout));
+	return (__wt_verify_int(session, 1));
 #else
 	__wt_errx(session,
 	    "the WiredTiger library was not built in diagnostic mode");
@@ -80,7 +80,7 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
  * page in debugging mode.
  */
 static int
-__wt_verify_int(WT_SESSION_IMPL *session, FILE *stream)
+__wt_verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
@@ -92,7 +92,7 @@ __wt_verify_int(WT_SESSION_IMPL *session, FILE *stream)
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
 
-	vs->stream = stream;
+	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	vs->max_addr = WT_ADDR_INVALID;
 
@@ -231,8 +231,8 @@ __wt_verify_tree(
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
-	if (vs->stream != NULL)
-		WT_RET(__wt_debug_page(session, page, NULL, vs->stream));
+	if (vs->dumpfile)
+		WT_RET(__wt_debug_page(session, page, NULL));
 #endif
 
 	/*

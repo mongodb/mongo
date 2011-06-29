@@ -161,31 +161,22 @@ extern int __wt_btcur_insert(CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(CURSOR_BTREE *cbt);
 extern int __wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
-extern int __wt_debug_addr(WT_SESSION_IMPL *session,
+extern int __wt_debug_addr( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
-    const char *ofile,
-    FILE *fp);
-extern int __wt_debug_disk( WT_SESSION_IMPL *session,
+    const char *ofile);
+extern int __wt_debug_disk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
-    const char *ofile,
-    FILE *fp);
-extern int __wt_debug_tree_all( WT_SESSION_IMPL *session,
+    const char *ofile);
+extern int __wt_debug_tree_all(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const char *ofile,
-    FILE *fp);
-extern int __wt_debug_tree( WT_SESSION_IMPL *session,
+    const char *ofile);
+extern int __wt_debug_tree(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const char *ofile,
-    FILE *fp);
-extern int __wt_debug_page( WT_SESSION_IMPL *session,
+    const char *ofile);
+extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const char *ofile,
-    FILE *fp);
-extern void __wt_debug_pair(const char *tag,
-    const void *data,
-    uint32_t size,
-    FILE *fp);
+    const char *ofile);
 extern int __wt_desc_read(WT_SESSION_IMPL *session);
 extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
@@ -195,9 +186,12 @@ extern void __wt_page_free(WT_SESSION_IMPL *session,
 extern int __wt_btree_dump(WT_SESSION_IMPL *session,
     FILE *stream,
     uint32_t flags);
-extern void __wt_print_byte_string(const uint8_t *data,
+extern void __wt_stream_byte_string(const uint8_t *data,
     uint32_t size,
     FILE *stream);
+extern void __wt_msg_byte_string( WT_SESSION_IMPL *session,
+    const uint8_t *data,
+    uint32_t size);
 extern int __wt_load_byte_string( WT_SESSION_IMPL *session,
     const uint8_t *data,
     uint32_t size,
@@ -414,11 +408,7 @@ extern void __wt_errx(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE ((format (printf,
     2,
     3)));
-extern void __wt_msgv(WT_SESSION_IMPL *session,
-    const char *prefix1,
-    const char *prefix2,
-    const char *fmt,
-    va_list ap);
+extern void __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
 extern void __wt_msg(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE ((format (printf,
