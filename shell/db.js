@@ -134,7 +134,7 @@ DB.prototype.auth = function( username , pass ){
 */
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
-    var cmd = { create: name, capped: options.capped, size: options.size, max: options.max };
+    var cmd = { create: name, capped: options.capped, size: options.size, max: options.max, autoIndexId: options.autoIndexId };
     var res = this._dbCommand(cmd);
     return res;
 }
