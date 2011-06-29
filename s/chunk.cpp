@@ -510,7 +510,9 @@ namespace mongo {
             {
                 int ms = t.millis();
                 log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms" 
-                      << " sequenceNumber: " << _sequenceNumber << endl;
+                      << " sequenceNumber: " << _sequenceNumber 
+                      << " version: " << _version.toString() 
+                      << endl;
             }
 
             if (_isValid(chunkMap)) {
@@ -545,7 +547,7 @@ namespace mongo {
         ScopedDbConnection conn( configServer.modelServer() );
 
         // TODO really need the sort?
-        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
+        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",-1), 0, 0, 0, 0,
                                           (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
         assert( cursor.get() );
         while ( cursor->more() ) {

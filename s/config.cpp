@@ -188,6 +188,7 @@ namespace mongo {
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
         BSONObj key;
         bool unique;
+        ShardChunkVersion oldVersion;
 
         {
             scoped_lock lk( _lock );
@@ -208,10 +209,26 @@ namespace mongo {
 
             key = ci.key().copy();
             unique = ci.unique();
+            if ( ci.getCM() )
+                oldVersion = ci.getCM()->getVersion();
         }
         
         assert( ! key.isEmpty() );
-
+        
+        if ( oldVersion > 0 ) {
+            ScopedDbConnection conn( configServer.modelServer() , 30.0 );
+            auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::chunk , 
+                                                           Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) , 
+                                                           1 /* nToReturn */ );
+            if ( cursor.get() ) {
+                BSONObj foo = cursor->next();
+                ShardChunkVersion v = foo["lastmod"];
+                if ( v == oldVersion )
+                    return getChunkManager( ns , false );
+            }
+            conn.done();
+            
+        }
         // we are not locked now, and want to load a new ChunkManager
         
         auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
