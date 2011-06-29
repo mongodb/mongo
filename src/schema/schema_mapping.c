@@ -16,7 +16,8 @@
  */
 int
 __wt_schema_mapping(WT_SESSION_IMPL *session,
-    const char *kcols, const char *vcols, const char *mcols, size_t mlen, int **mapping)
+    const char *kcols, const char *vcols,
+    const char *mcols, size_t mlen, int **mapping)
 {
 	WT_CONFIG kconf, mconf, vconf;		/* Used to walk column lists. */
 	WT_CONFIG_ITEM k, mk, v;

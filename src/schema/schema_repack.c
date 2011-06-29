@@ -88,8 +88,8 @@ __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest)
 				psrc->p += len;
 				break;
 			case 'U':
-				WT_RET(__wt_vunpack_uint(session,
-				     &psrc->p, (size_t)(psrc->end - psrc->p), &uval));
+				WT_RET(__wt_vunpack_uint(session, &psrc->p,
+				    (size_t)(psrc->end - psrc->p), &uval));
 				len = (size_t)uval;
 				/* FALLTHROUGH */
 			case 'u':
@@ -106,8 +106,8 @@ __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest)
 			case 'i':
 			case 'l':
 			case 'q':
-				WT_RET(__wt_vunpack_int(session,
-				     &psrc->p, (size_t)(psrc->end - psrc->p), &ival));
+				WT_RET(__wt_vunpack_int(session, &psrc->p,
+				    (size_t)(psrc->end - psrc->p), &ival));
 				break;
 			case 'r':
 				/*
@@ -126,8 +126,8 @@ __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest)
 			case 'I':
 			case 'L':
 			case 'Q':
-				WT_RET(__wt_vunpack_uint(session,
-				     &psrc->p, (size_t)(psrc->end - psrc->p), &uval));
+				WT_RET(__wt_vunpack_uint(session, &psrc->p,
+				    (size_t)(psrc->end - psrc->p), &uval));
 				break;
 			}
 			++psrc->col;
@@ -204,7 +204,8 @@ __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest)
  */
 int
 __wt_struct_reformat(WT_SESSION_IMPL *session,
-    const char *key_format, const char *value_format, int *mapping, char **result)
+    const char *key_format, const char *value_format, int *mapping,
+    char **result)
 {
 	WT_PACK_VALUE pv;
 	struct {

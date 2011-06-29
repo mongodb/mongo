@@ -36,7 +36,8 @@ __create_btree(
 }
 
 static int
-__create_colgroup(WT_SESSION_IMPL *session, const char *name, const char *config)
+__create_colgroup(
+    WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_TABLE *table;

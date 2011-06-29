@@ -27,7 +27,8 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 }
 
 static inline int
-__btcur_next_fix(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_fix(
+    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
@@ -67,7 +68,8 @@ __btcur_next_fix(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value
 }
 
 static inline int
-__btcur_next_rle(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_rle(
+    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
@@ -121,7 +123,8 @@ __btcur_next_rle(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value
 }
 
 static inline int
-__btcur_next_var(WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_var(
+    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_SESSION_IMPL *session;
 	WT_CELL *cell;

@@ -46,7 +46,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			WT_ERR(__wt_schema_table_cursor(session, &cursor));
 			cursor->set_key(cursor, namebuf);
 			if ((ret = cursor->search(cursor)) != 0) {
-				printf("open_colgroups: colgroup '%s' not created\n", namebuf);
 				/*
 				 * It's okay at this point if the table is not
 				 * yet complete.  Cursor opens will fail if
@@ -144,10 +143,14 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	table->ncolgroups = 1;
 
 	if (!table->is_simple) {
-		WT_ERR(__wt_config_getones(session, tconfig, "key_format", &cval));
-		WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-		WT_ERR(__wt_config_getones(session, tconfig, "value_format", &cval));
-		WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
+		WT_ERR(__wt_config_getones(session, tconfig,
+		    "key_format", &cval));
+		WT_ERR(__wt_strndup(session,
+		    cval.str, cval.len, &table->key_format));
+		WT_ERR(__wt_config_getones(session, tconfig,
+		    "value_format", &cval));
+		WT_ERR(__wt_strndup(session,
+		    cval.str, cval.len, &table->value_format));
 
 		WT_ERR(__wt_strdup(session, tconfig, &table->config));
 
@@ -163,7 +166,8 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 		table->cgconf_len = cval.len;
 
 		/* Count the number of column groups; */
-		WT_ERR(__wt_config_initn(session, &cparser, cval.str, cval.len));
+		WT_ERR(__wt_config_initn(session,
+		    &cparser, cval.str, cval.len));
 		while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 			++table->ncolgroups;
 		if (ret != WT_NOTFOUND)
