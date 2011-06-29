@@ -504,11 +504,13 @@ namespace mongo {
         while (tries--) {
             ChunkMap chunkMap;
             set<Shard> shards;
+            ShardVersionMap shardVersions;
             Timer t;
-            _load(chunkMap, shards);
+            _load(chunkMap, shards, shardVersions);
             {
                 int ms = t.millis();
-                log( ms < 100 ) << "time to load chunks for " << ns << ": " << ms << "ms" << endl;
+                log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms" 
+                      << " sequenceNumber: " << _sequenceNumber << endl;
             }
 
             if (_isValid(chunkMap)) {
@@ -517,6 +519,7 @@ namespace mongo {
                 // to worry about that here.
                 const_cast<ChunkMap&>(_chunkMap).swap(chunkMap);
                 const_cast<set<Shard>&>(_shards).swap(shards);
+                const_cast<ShardVersionMap&>(_shardVersions).swap(shardVersions);
                 const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
                 return;
             }
@@ -538,7 +541,7 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
-    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards) const {
+    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions) {
         ScopedDbConnection conn( configServer.modelServer() );
 
         // TODO really need the sort?
@@ -555,7 +558,16 @@ namespace mongo {
 
             chunkMap[c->getMax()] = c;
             shards.insert(c->getShard());
+            
 
+            // set global max
+            if ( c->getLastmod() > _version )
+                _version = c->getLastmod();
+            
+            // set shard max
+            ShardChunkVersion& shardMax = shardVersions[c->getShard()];
+            if ( c->getLastmod() > shardMax )
+                shardMax = c->getLastmod();
         }
         conn.done();
     }
@@ -841,31 +853,14 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
-        // TODO: cache or something?
-
-        ShardChunkVersion max = 0;
-
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
-            ChunkPtr c = i->second;
-            DEV assert( c );
-            if ( c->getShard() != shard )
-                continue;
-            if ( c->getLastmod() > max )
-                max = c->getLastmod();
-        }
-        return max;
+        ShardVersionMap::const_iterator i = _shardVersions.find( shard );
+        if ( i == _shardVersions.end() )
+            return 0;
+        return i->second;
     }
 
     ShardChunkVersion ChunkManager::getVersion() const {
-        ShardChunkVersion max = 0;
-
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
-            ChunkPtr c = i->second;
-            if ( c->getLastmod() > max )
-                max = c->getLastmod();
-        }
-
-        return max;
+        return _version;
     }
 
     string ChunkManager::toString() const {

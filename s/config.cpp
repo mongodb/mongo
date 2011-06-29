@@ -226,7 +226,12 @@ namespace mongo {
         CollectionInfo& ci = _collections[ns];
         massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
         
-        ci.resetCM( temp.release() );
+        if ( temp->getVersion() > ci.getCM()->getVersion() ) {
+            // we only want to reset if we're newer
+            // otherwise we go into a bad cycle
+            ci.resetCM( temp.release() );
+        }
+        
         return ci.getCM();
     }
 

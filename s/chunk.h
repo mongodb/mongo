@@ -283,6 +283,7 @@ namespace mongo {
     */
     class ChunkManager {
     public:
+        typedef map<Shard,ShardChunkVersion> ShardVersionMap;
 
         ChunkManager( string ns , ShardKeyPattern pattern , bool unique );
 
@@ -332,7 +333,7 @@ namespace mongo {
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
         // helpers for constructor
-        void _load(ChunkMap& chunks, set<Shard>& shards) const;
+        void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions);
         static bool _isValid(const ChunkMap& chunks);
 
         // All members should be const for thread-safety
@@ -344,6 +345,10 @@ namespace mongo {
         const ChunkRangeManager _chunkRanges;
 
         const set<Shard> _shards;
+
+        const ShardVersionMap _shardVersions; // max version per shard
+
+        ShardChunkVersion _version; // max version of any chunk
 
         mutable mutex _mutex; // only used with _nsLock
         mutable DistributedLock _nsLock;
