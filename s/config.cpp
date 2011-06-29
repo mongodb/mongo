@@ -217,19 +217,12 @@ namespace mongo {
         
         if ( oldVersion > 0 ) {
             ScopedDbConnection conn( configServer.modelServer() , 30.0 );
-            auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::chunk , 
-                                                           Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) , 
-                                                           1 /* nToReturn */ );
-            BSONObj newest;
-            if ( cursor.get() ) {
-                newest = cursor->next();
-            }
-            
+            BSONObj newest = conn->findOne( ShardNS::chunk , 
+                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
             conn.done();
             
             if ( ! newest.isEmpty() ) {
                 ShardChunkVersion v = newest["lastmod"];
-                log() << "v: " << v << " oldVersion: " << oldVersion << endl;
                 if ( v == oldVersion )
                     return getChunkManager( ns , false );
             }
