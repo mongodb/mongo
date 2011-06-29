@@ -14,7 +14,7 @@
 void
 __wt_abort(WT_SESSION_IMPL *session)
 {
-	__wt_msg(session, "aborting WiredTiger library");
+	__wt_errx(session, "aborting WiredTiger library");
 
 	__wt_attach(session);
 
