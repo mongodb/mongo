@@ -320,24 +320,24 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            // clear temp collections
-            _db.dropCollection( _config.tempLong );
-            _db.dropCollection( _config.incLong );
-
-            // create the inc collection and make sure we have index on "0" key
-            {
-                writelock l( _config.incLong );
-                Client::Context ctx( _config.incLong );
-                string err;
-                if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
-                    uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+            if (_config.incLong != _config.tempLong) {
+                // create the inc collection and make sure we have index on "0" key
+                _db.dropCollection( _config.incLong );
+                {
+                    writelock l( _config.incLong );
+                    Client::Context ctx( _config.incLong );
+                    string err;
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+                    }
                 }
+
+                BSONObj sortKey = BSON( "0" << 1 );
+                _db.ensureIndex( _config.incLong , sortKey );
             }
 
-            BSONObj sortKey = BSON( "0" << 1 );
-            _db.ensureIndex( _config.incLong , sortKey );
-
             // create temp collection
+            _db.dropCollection( _config.tempLong );
             {
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
