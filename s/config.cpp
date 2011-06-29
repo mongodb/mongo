@@ -220,15 +220,22 @@ namespace mongo {
             auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::chunk , 
                                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) , 
                                                            1 /* nToReturn */ );
+            BSONObj newest;
             if ( cursor.get() ) {
-                BSONObj foo = cursor->next();
-                ShardChunkVersion v = foo["lastmod"];
+                newest = cursor->next();
+            }
+            
+            conn.done();
+            
+            if ( ! newest.isEmpty() ) {
+                ShardChunkVersion v = newest["lastmod"];
+                log() << "v: " << v << " oldVersion: " << oldVersion << endl;
                 if ( v == oldVersion )
                     return getChunkManager( ns , false );
             }
-            conn.done();
             
         }
+
         // we are not locked now, and want to load a new ChunkManager
         
         auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
