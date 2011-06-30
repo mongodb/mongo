@@ -171,6 +171,17 @@ namespace mongo {
             s << "\" }";
             break;
         }
+        case mongo::Timestamp:
+            if ( format == Strict ){
+                s << "{ \"$timestamp\" : ";
+                s << " { "  << OpTime().getSecs() << " , " << OpTime().getInc() << " }";
+                s << " }";
+            } else {
+                s << "Timestamp( ";
+                s << OpTime().getSecs() << " , " << OpTime().getInc();
+                s << " )";
+            }
+            break;
         case mongo::Date:
             if ( format == Strict )
                 s << "{ \"$date\" : ";
@@ -221,10 +232,6 @@ namespace mongo {
 
         case Code:
             s << _asCode();
-            break;
-
-        case Timestamp:
-            s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
             break;
 
         case MinKey:
