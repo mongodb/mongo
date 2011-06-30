@@ -31,8 +31,6 @@ void copy(u_int, u_int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
-void table_create(const char *, WT_SESSION **, WT_CONNECTION **);
-void table_open(const char *, WT_SESSION **, WT_CONNECTION **);
 int  usage(void);
 
 u_int	 page_type;				/* Types of records */
@@ -409,9 +407,49 @@ build(int ikey, int ivalue, int cnt)
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	char kbuf[64], vbuf[64];
+	char config[256], kbuf[64], vbuf[64];
 
-	table_create(LOAD, &session, &conn);
+	(void)remove(LOAD);
+
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+	switch (page_type) {
+	case WT_PAGE_COL_FIX:
+		(void)snprintf(config, sizeof(config),
+		    "key_format=r,value_format=\"20u\","
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_COL_RLE:
+		(void)snprintf(config, sizeof(config),
+		    "key_format=r,value_format=\"20u\",runlength_encoding,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_COL_VAR:
+		(void)snprintf(config, sizeof(config),
+		    "key_format=r,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		(void)snprintf(config, sizeof(config),
+		    "key_format=u,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	default:
+		assert(0);
+	}
+	assert(session->create(session, "table:" LOAD, config) == 0);
 	assert(session->open_cursor(
 	    session, "table:" LOAD, NULL, "bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
@@ -504,21 +542,29 @@ process(void)
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	char config[200];
+	char config[100];
 
+	/* Salvage. */
+	config[0] = '\0';
 	if (verbose)
 		snprintf(config, sizeof(config),
 		    "error_prefix=\"%s\",verbose=[salvage]", progname);
-
-	assert(wiredtiger_open(NULL, NULL, verbose ? config : "", &conn) == 0);
+	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-
 	assert(session->salvage(session, "table:" SLVG, 0) == 0);
+	assert(conn->close(conn, 0) == 0);
 
+	/* Verify. */
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->verify(session, "table:" SLVG, 0) == 0);
+	assert(conn->close(conn, 0) == 0);
 
-	table_open(SLVG, &session, &conn);
+	/* Dump. */
 	assert((fp = fopen(DUMP, "w")) != NULL);
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+	assert(session->create(session, "table:" SLVG, NULL) == 0);
 	assert(session->open_cursor(
 	    session, "table:" SLVG, NULL, "dump,printable", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
@@ -531,90 +577,8 @@ process(void)
 		fwrite(value.data, 1, value.size, fp);
 		fwrite("\n", 1, 1, fp);
 	}
-	assert(cursor->close(cursor, NULL) == 0);
-	assert(fclose(fp) == 0);
-
 	assert(conn->close(conn, 0) == 0);
-}
-
-/*
- * table_create --
- *	Create a new table.
- */
-void
-table_create(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
-{
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	char config[512], table[512];
-
-	(void)remove(name);
-
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	
-	switch (page_type) {
-	case WT_PAGE_COL_FIX:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=\"20u\","
-		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
-		break;
-	case WT_PAGE_COL_RLE:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=\"20u\",runlength_encoding,"
-		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
-		break;
-	case WT_PAGE_COL_VAR:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,"
-		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=u,"
-		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
-		break;
-	default:
-		assert(0);
-	}
-
-	snprintf(table, sizeof(table), "table:%s", name);
-	assert(session->create(session, table, config) == 0);
-
-	*sessionp = session;
-	*connp = conn;
-}
-
-/*
- * table_open --
- *	Open an existing table.
- */
-void
-table_open(const char *name, WT_SESSION **sessionp, WT_CONNECTION **connp)
-{
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	char table[512];
-
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	snprintf(table, sizeof(table), "table:%s", name);
-	assert(session->create(session, table, NULL) == 0);
-
-	*sessionp = session;
-	*connp = conn;
+	assert(fclose(fp) == 0);
 }
 
 /*
