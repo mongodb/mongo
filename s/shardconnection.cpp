@@ -41,6 +41,9 @@ namespace mongo {
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 
+    // Only print the non-top-level-shard-conn warning once if not verbose
+    volatile bool printedShardConnWarning = false;
+
     /**
      * holds all the actual db connections for a client to various servers
      * 1 pre thread, so don't have to worry about thread safety
@@ -81,7 +84,7 @@ namespace mongo {
 
             // Determine if non-shard conn is RS member for warning
             // All shards added to _hosts if not present in _check()
-            if( logLevel >= 1 && _hosts.find( addr ) == _hosts.end() ){
+            if( ( logLevel >= 1 || ! printedShardConnWarning ) && _hosts.find( addr ) == _hosts.end() ){
 
                 vector<Shard> all;
                 Shard::getAllShards( all );
@@ -98,6 +101,7 @@ namespace mongo {
                 }
 
                 if( isRSMember ){
+                    printedShardConnWarning = true;
                     warning() << "adding shard sub-connection " << addr << " (parent " << parentShard << ") as sharded, this is safe but unexpected" << endl;
                     printStackTrace();
                 }
