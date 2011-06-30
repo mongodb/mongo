@@ -20,16 +20,8 @@ extern "C" {
  * all such file locations are counts of file allocation units.  In the code
  * these are called "addrs".  To simplify bookkeeping, page sizes must also be
  * a multiple of the allocation unit size.
- *
- * There are two special addresses, one for pages which don't exist, and one
- * for column-store pages that have been deleted (but are logically present in
- * order to keep the name space in place).  I'm grabbing the top 5 addresses
- * just to make sure I can have more if I ever need them.
  */
 #define	WT_ADDR_INVALID		(UINT32_MAX - 0)	/* Invalid address */
-#define	WT_ADDR_DELETED		(UINT32_MAX - 1)	/* Deleted address */
-#define	WT_ADDR_IS_VALID(addr)						\
-	((addr) < UINT32_MAX - 5 ? 1 : 0)
 
 /*
  * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
@@ -52,6 +44,9 @@ extern "C" {
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
+/* The file's description is written into the first 512B of the file. */
+#define	WT_BTREE_DESC_SECTOR		512
+
 /*
  * Limit the maximum size of a single object to 4GB - 512B: in some places we
  * allocate memory to store objects plus associated data structures, in other
@@ -72,13 +67,15 @@ extern "C" {
  */
 /* Convert a data address to/from a byte offset. */
 #define	WT_ADDR_TO_OFF(btree, addr)					\
-	(512 + (off_t)(addr) * (off_t)(btree)->allocsize)
+	(WT_BTREE_DESC_SECTOR + (off_t)(addr) * (off_t)(btree)->allocsize)
 #define	WT_OFF_TO_ADDR(btree, off)					\
-	((uint32_t)((off - 512) / (btree)->allocsize))
+	((uint32_t)((off - WT_BTREE_DESC_SECTOR) / (btree)->allocsize))
+#define	WT_FILE_OFF_MAX(btree)						\
+	WT_ADDR_TO_OFF(btree, UINT32_MAX - 1)
 
 /*
  * WT_BTREE_DESC --
- *	The file's description is written into the first 512B of the file.
+ *	The file's description.
  */
 struct __wt_btree_desc {
 #define	WT_BTREE_MAGIC		120897
@@ -103,8 +100,7 @@ struct __wt_btree_desc {
 	 * (where, instead of a log reference, the LSN is simply a counter),
 	 * as that's how salvage can determine the most recent page between
 	 * pages overlapping the same key range.  This non-transactional LSN
-	 * has to be semi-permanent, which means we include it in the file's
-	 * metadata.
+	 * has to be persistent, and so it's included in the file's metadata.
 	 */
 	uint64_t lsn;			/* 24-32: Non-transactional page LSN */
 };
@@ -113,9 +109,6 @@ struct __wt_btree_desc {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_BTREE_DESC_SIZE		32
-
-/* The file's description is written into the first 512B of the file. */
-#define	WT_BTREE_DESC_SECTOR		512
 
 /*
  * WT_DISK_REQUIRED--

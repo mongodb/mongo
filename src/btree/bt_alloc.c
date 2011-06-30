@@ -82,7 +82,6 @@ __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
-	uint32_t addr;
 
 	btree = session->btree;
 	fh = btree->fh;
@@ -96,7 +95,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	}
 
 	/*
-	 * Make sure we don't allocate past the "special" addresses.
+	 * Make sure we don't allocate past the maximum file size.
 	 *
 	 * XXX
 	 * This isn't sufficient: if we grow the file to the end, there isn't
@@ -107,14 +106,13 @@ __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	 * free list, and the file has been fully populated, file close will
 	 * fail because we can't write the free list.
 	 */
-	addr = WT_OFF_TO_ADDR(btree, fh->file_size);
-	if (!WT_ADDR_IS_VALID(addr)) {
+	if (fh->file_size > WT_FILE_OFF_MAX(btree)) {
 		__wt_errx(session,
 		    "block allocation failed, file cannot grow further");
 		return (WT_ERROR);
 	}
 
-	*addrp = addr;
+	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
 
 	WT_STAT_INCR(btree->stats, extend);
@@ -134,15 +132,14 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 	btree = session->btree;
 	new = NULL;
 
-	if (!WT_ADDR_IS_VALID(addr)) {
-		__wt_errx(session,
-		    "attempt to free an illegal file address (%" PRIu32 ")",
-		    addr);
+	if (addr == WT_ADDR_INVALID) {
+		__wt_errx(session, "attempt to free an invalid file address");
 		return (WT_ERROR);
 	}
-
-	WT_ASSERT(session, addr != WT_ADDR_INVALID);
-	WT_ASSERT(session, size % btree->allocsize == 0);
+	if (size % btree->allocsize != 0) {
+		__wt_errx(session, "attempt to free an invalid block size");
+		return (WT_ERROR);
+	}
 
 	btree->freelist_dirty = 1;
 
