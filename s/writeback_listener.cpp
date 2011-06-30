@@ -167,7 +167,9 @@ namespace mongo {
 
                     if ( logLevel ) log(1) << debugString( m ) << endl;
 
-                    if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ) {
+                    ShardChunkVersion start = db->getChunkManager( ns )->getVersion();
+
+                    if ( needVersion.isSet() && needVersion <= start ) {
                         // this means when the write went originally, the version was old
                         // if we're here, it means we've already updated the config, so don't need to do again
                         //db->getChunkManager( ns , true ); // SERVER-1349
@@ -176,7 +178,16 @@ namespace mongo {
                         // we received a writeback object that was sent to a previous version of a shard
                         // the actual shard may not have the object the writeback operation is for
                         // we need to reload the chunk manager and get the new shard versions
-                        db->getChunkManager( ns , true );
+                        bool good = false;
+                        for ( int i=0; i<100; i++ ) {
+                            if ( db->getChunkManager( ns , true )->getVersion() >= needVersion ) {
+                                good = true;
+                                break;
+                            }
+                            log() << "writeback getChunkManager didn't update?" << endl;
+                            sleepmillis(10);
+                        }
+                        assert( good );
                     }
 
                     // do request and then call getLastError

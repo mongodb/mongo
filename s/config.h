@@ -88,7 +88,8 @@ namespace mongo {
             bool wasDropped() const { return _dropped; }
 
             void save( const string& ns , DBClientBase* conn );
-
+            
+            bool needsReloading( DBClientBase * conn , const BSONObj& collectionInfo );
 
         private:
             ChunkManagerPtr _cm;

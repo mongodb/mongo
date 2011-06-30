@@ -62,6 +62,7 @@ namespace mongo {
                   << " took: " << t.millis() << "ms" 
                   << " sequenceNumber: " << _cm->getSequenceNumber()
                   << endl;
+            _dirty = false;
         }
     }
 
@@ -93,6 +94,32 @@ namespace mongo {
         uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
 
         _dirty = false;
+    }
+
+    bool DBConfig::CollectionInfo::needsReloading( DBClientBase * conn , const BSONObj& collectionInfo ) {
+        if ( ! _cm ) {
+            return true;
+        }
+
+        if ( _dirty || _dropped ) {
+            return true;
+        }
+
+        if ( collectionInfo["dropped"].trueValue() ) {
+            return true;
+        }
+        
+        BSONObj newest = conn->findOne( ShardNS::chunk , 
+                                        Query( BSON( "ns" << collectionInfo["_id"].String() ) ).sort( "lastmod" , -1 ) );
+        
+        if ( newest.isEmpty() ) {
+            // either a drop or something else weird
+            return true;
+        }
+        
+        ShardChunkVersion fromdb = newest["lastmod"];
+        ShardChunkVersion inmemory = _cm->getVersion();
+        return fromdb != inmemory;
     }
 
     bool DBConfig::isSharded( const string& ns ) {
@@ -249,15 +276,8 @@ namespace mongo {
             string ns = o["_id"].String();
 
             Collections::iterator i = _collections.find( ns );
-            if ( i != _collections.end() ) {
-                BSONObj newest = conn->findOne( ShardNS::chunk , 
-                                                Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
-                if ( ! newest.isEmpty() ) {
-                    ShardChunkVersion v = newest["lastmod"];
-                    if ( v == i->second.getCM()->getVersion() )
-                        continue;
-
-                }
+            if ( i != _collections.end() && ! i->second.needsReloading( conn.get() , o ) ) {
+                continue;
             }
 
             _collections[ns] = CollectionInfo( o );
