@@ -189,9 +189,6 @@ extern int __wt_btree_dump(WT_SESSION_IMPL *session,
 extern void __wt_stream_byte_string(const uint8_t *data,
     uint32_t size,
     FILE *stream);
-extern void __wt_msg_byte_string( WT_SESSION_IMPL *session,
-    const uint8_t *data,
-    uint32_t size);
 extern int __wt_load_byte_string( WT_SESSION_IMPL *session,
     const uint8_t *data,
     uint32_t size,

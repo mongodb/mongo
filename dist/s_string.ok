@@ -175,6 +175,7 @@ dlclose
 dlh
 dlopen
 dlsym
+dmsg
 dsk
 dumpable
 dumpfile

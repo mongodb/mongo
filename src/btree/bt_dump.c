@@ -377,27 +377,6 @@ __wt_stream_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
 }
 
 /*
- * __wt_msg_byte_string --
- *	Output a single byte string in printable characters, where possible,
- * to the standard message stream.
- */
-void
-__wt_msg_byte_string(
-    WT_SESSION_IMPL *session, const uint8_t *data, uint32_t size)
-{
-	int ch;
-
-	for (; size > 0; --size, ++data) {
-		ch = data[0];
-		if (isprint(ch))
-			__wt_msg(session, "%c", ch);
-		else
-			__wt_msg(session, "%x%x",
-			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
-	}
-}
-
-/*
  * __wt_load_byte_string --
  *	Load a single byte string into a buffer, in printable characters,
  * where possible.
