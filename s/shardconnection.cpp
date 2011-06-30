@@ -43,6 +43,9 @@ namespace mongo {
 
     DBConnectionPool shardConnectionPool;
 
+    // Only print the non-top-level-shard-conn warning once if not verbose
+    volatile bool printedShardConnWarning = false;
+
     /**
      * holds all the actual db connections for a client to various servers
      * 1 per thread, so doesn't have to be thread safe
@@ -85,7 +88,7 @@ namespace mongo {
 
             // Determine if non-shard conn is RS member for warning
             // All shards added to _hosts if not present in _check()
-            if( ! ignoreDirect && _hosts.find( addr ) == _hosts.end() ){
+            if( ( logLevel >= 1 || ! printedShardConnWarning ) && ! ignoreDirect && _hosts.find( addr ) == _hosts.end() ){
 
                 vector<Shard> all;
                 Shard::getAllShards( all );
@@ -102,6 +105,7 @@ namespace mongo {
                 }
 
                 if( isRSMember ){
+                    printedShardConnWarning = true;
                     warning() << "adding shard sub-connection " << addr << " (parent " << parentShard << ") as sharded, this is safe but unexpected" << endl;
                     printStackTrace();
                 }
