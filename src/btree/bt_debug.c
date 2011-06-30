@@ -781,11 +781,11 @@ __wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL *cell)
 		break;
 	case WT_CELL_DEL:
 		p = (uint8_t *)"deleted";
-		size = sizeof("deleted") - 1;
+		size = strlen("deleted");
 		break;
 	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";
-		size = sizeof("offpage") - 1;
+		size = strlen("offpage");
 		break;
 	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}

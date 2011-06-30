@@ -342,7 +342,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += sizeof("table:") - 1;
+	name += strlen("table:");
 
 	/*
 	 * Open a btree handle.
