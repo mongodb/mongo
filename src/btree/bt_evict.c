@@ -406,7 +406,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 */
 		if (!er->close_method && !WT_PAGE_IS_MODIFIED(page))
 			continue;
-		if (__wt_page_reconcile(session, page, 0, flags) == 0)
+		if (__wt_page_reconcile(session, page, flags) == 0)
 			continue;
 
 		/*
@@ -482,7 +482,7 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 			if (er->retry[i] == NULL)
 				continue;
 			if (__wt_page_reconcile(
-			    session, er->retry[i], 0, flags) == 0)
+			    session, er->retry[i], flags) == 0)
 				er->retry[i] = NULL;
 			else
 				pending_retry = 1;
@@ -712,7 +712,7 @@ __evict_page(WT_SESSION_IMPL *session)
 		 * page, but it might be we're out of disk space.   Regardless,
 		 * try not to pick the same page every time.
 		 */
-		if (__wt_page_reconcile(session, page, 0, WT_REC_EVICT) != 0)
+		if (__wt_page_reconcile(session, page, WT_REC_EVICT) != 0)
 			page->read_gen = __wt_cache_read_gen(session);
 	}
 }

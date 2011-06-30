@@ -77,26 +77,6 @@ extern "C" {
 #define	__wt_free(a, b)			__wt_free_int(a, &(b))
 
 /*
- * In diagnostic mode we track the locations from which hazard references
- * were acquired.
- */
-#ifdef HAVE_DIAGNOSTIC
-#define	__wt_page_in(a, b, c, d)					\
-	__wt_page_in_func(a, b, c, d, __FILE__, __LINE__)
-#else
-#define	__wt_page_in(a, b, c, d)					\
-	__wt_page_in_func(a, b, c, d)
-#endif
-
-/*
- * Release a reference to a page, unless it's the root page, which remains
- * pinned for the life of the table handle.
- */
-#define	WT_PAGE_OUT(session, p)						\
-	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
-		__wt_hazard_clear((session), (p));
-
-/*
  * Flag set, clear and test.
  *
  * They come in 3 flavors: F_XXX (handles a field named "flags" in the structure

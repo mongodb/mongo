@@ -110,8 +110,6 @@ struct __wt_row;
     typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;
     typedef struct __wt_row_ref WT_ROW_REF;
-struct __wt_salvage_cookie;
-    typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
 struct __wt_session_buffer;
     typedef struct __wt_session_buffer WT_SESSION_BUFFER;
 struct __wt_session_impl;
@@ -141,7 +139,6 @@ struct __wt_walk_entry;
 #include "log.h"
 #include "misc.h"
 #include "mutex.h"
-#include "salvage.h"
 #include "serial.h"
 #include "stat.h"
 #include "walk.h"

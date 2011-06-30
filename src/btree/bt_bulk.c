@@ -246,7 +246,7 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	root_page->page = page;
 
 	return (__wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 }
 
 /*
@@ -305,7 +305,7 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
 	return (__wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 }
 
 /*
@@ -362,5 +362,5 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
 	return (__wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 }

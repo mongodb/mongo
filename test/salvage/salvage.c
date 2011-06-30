@@ -35,9 +35,9 @@ void table_create(const char *, WT_SESSION **, WT_CONNECTION **);
 void table_open(const char *, WT_SESSION **, WT_CONNECTION **);
 int  usage(void);
 
-FILE *res_fp;					/* Results file */
-
-u_int page_type;				/* Types of records */
+u_int	 page_type;				/* Types of records */
+FILE	*res_fp;				/* Results file */
+int	 verbose;				/* -v flag */
 
 const char *progname;				/* Program name */
 
@@ -52,7 +52,7 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0;
-	while ((ch = getopt(argc, argv, "r:t:")) != EOF)
+	while ((ch = getopt(argc, argv, "r:t:v")) != EOF)
 		switch (ch) {
 		case 'r':
 			r = atoi(optarg);
@@ -71,6 +71,9 @@ main(int argc, char *argv[])
 			else
 				return (usage());
 			break;
+		case 'v':
+			verbose = 1;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -81,15 +84,15 @@ main(int argc, char *argv[])
 	printf("salvage test run started\n");
 	if (r == 0) {
 		page_type = WT_PAGE_COL_FIX;
-		for (r = 1; r <= 21; ++r)
+		for (r = 1; r <= 23; ++r)
 			run(r);
 
 		page_type = WT_PAGE_COL_RLE;
-		for (r = 1; r <= 21; ++r)
+		for (r = 1; r <= 23; ++r)
 			run(r);
 
 		page_type = WT_PAGE_COL_VAR;
-		for (r = 1; r <= 21; ++r)
+		for (r = 1; r <= 23; ++r)
 			run(r);
 
 		page_type = WT_PAGE_ROW_LEAF;
@@ -106,7 +109,7 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-r run] [-t fix|rle|var|row]\n", progname);
+	    "usage: %s [-v] [-r run] [-t fix|rle|var|row]\n", progname);
 	return (EXIT_FAILURE);
 }
 
@@ -360,6 +363,24 @@ run(int r)
 		build(100, 200, 40); copy(7, 1);
 		print_res(100, 200, 40);
 		break;
+	case 22:
+		/*
+		 * Column-store only: missing an initial key range of 99
+		 * records.
+		 */
+		build(100, 100, 10); copy(1, 100);
+		print_res(100, 100, 10);
+		break;
+	case 23:
+		/*
+		 * Column-store only: missing a middle key range of 37
+		 * records.
+		 */
+		build(100, 100, 10); copy(1, 1);
+		build(138, 138, 10); copy(1, 48);
+		print_res(100, 100, 10);
+		print_res(138, 138, 10);
+		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
 		exit (EXIT_FAILURE);
@@ -456,11 +477,16 @@ copy(u_int lsn, u_int recno)
 	dsk->checksum = __wt_cksum(dsk, PSIZE);
 	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 
-#if 0
-	/* Throw some random garbage into the file. */
+	/*
+	 * XXX
+	 * The open checks that the root page isn't past EOF, and for some of
+	 * these tests, it is.   We need a salvage force flag, but don't yet
+	 * have one.  For now, extend the file with random garbage that salvage
+	 * will ignore.
+	 */
 	memset(buf, 'a', sizeof(buf));
 	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-#endif
+	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 
 	assert(fclose(ifp) == 0);
 	assert(fclose(ofp) == 0);
@@ -478,8 +504,13 @@ process(void)
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
+	char config[200];
 
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	if (verbose)
+		snprintf(config, sizeof(config),
+		    "error_prefix=\"%s\",verbose=[salvage]", progname);
+
+	assert(wiredtiger_open(NULL, NULL, verbose ? config : "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 
 	assert(session->salvage(session, "table:" SLVG, 0) == 0);

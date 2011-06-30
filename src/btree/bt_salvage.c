@@ -60,19 +60,22 @@ struct __wt_track {
 		struct {
 #undef	row_start
 #define	row_start	u.row._row_start
+			WT_BUF   _row_start;	/* Row-store start range */
 #undef	row_stop
 #define	row_stop	u.row._row_stop
-			WT_BUF   _row_start;	/* Row-store start range */
 			WT_BUF   _row_stop;	/* Row-store stop range */
 		} row;
 
 		struct {
 #undef	col_start
 #define	col_start	u.col._col_start
+			uint64_t _col_start;	/* Col-store start range */
 #undef	col_stop
 #define	col_stop	u.col._col_stop
-			uint64_t _col_start;	/* Col-store start range */
 			uint64_t _col_stop;	/* Col-store stop range */
+#undef	col_missing
+#define	col_missing	u.col._col_missing
+			uint64_t _col_missing;	/* Col-store missing range */
 		} col;
 	} u;
 
@@ -88,35 +91,36 @@ struct __wt_track {
 #define	WT_TRK_FREE_BLOCKS	0x01		/* Free any blocks */
 #define	WT_TRK_FREE_OVFL	0x02		/* Free any overflow pages */
 
-static int __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
-static int __slvg_col_build_leaf(
+static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_col_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_col_build_leaf(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_COL_REF *);
-static int __slvg_col_merge_ovfl(
+static int  __slvg_col_merge_ovfl(
 		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint32_t, uint32_t);
-static int __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_col_range_overlap(
+static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
+static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
-static int __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_ovfl_compare(const void *, const void *);
-static int __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_row_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
-static int __slvg_row_build_leaf(WT_SESSION_IMPL *,
+static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_ovfl_compare(const void *, const void *);
+static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_row_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_row_build_leaf(WT_SESSION_IMPL *,
 		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
-static int __slvg_row_merge_ovfl(
+static int  __slvg_row_merge_ovfl(
 		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint32_t, uint32_t);
-static int __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
-static int __slvg_row_range_overlap(
+static int  __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_row_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
-static int __slvg_trk_compare_key(const void *, const void *);
-static int __slvg_trk_compare_lsn(const void *, const void *);
-static int __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
-static int __slvg_trk_leaf(
+static int  __slvg_trk_compare_key(const void *, const void *);
+static int  __slvg_trk_compare_lsn(const void *, const void *);
+static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
+static int  __slvg_trk_leaf(
 		WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
-static int __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
-static int __slvg_trk_ovfl(
+static int  __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *, WT_PAGE_DISK *, WT_TRACK *);
+static int  __slvg_trk_ovfl(
 		WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 
 /*
@@ -129,7 +133,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	off_t len;
-	uint32_t allocsize, i, leaf_cnt;
+	uint32_t allocsize;
 	int ret;
 
 	WT_UNUSED(config);
@@ -151,8 +155,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	if (btree->fh->file_size > WT_BTREE_DESC_SECTOR) {
 		/*
 		 * Truncate the file to an initial sector plus N allocation size
-		 * units (bytes after the last allocation size unit have to be
-		 * garbage).
+		 * units (bytes trailing the last multiple of an allocation size
+		 * unit must be garbage, by definition).
 		 */
 		allocsize = btree->allocsize;
 		len = btree->fh->file_size - WT_BTREE_DESC_SECTOR;
@@ -165,8 +169,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	/* If the file has no data pages, we're done. */
 	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
 		__wt_errx(session,
-		    "the file contains no data pages and is too small to "
-		    "salvage");
+		    "the file contains no data pages and cannot be salvaged");
 		goto err;
 	}
 
@@ -235,28 +238,37 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 
 	/*
 	 * Step 5:
-	 * Build an internal page that references all of the leaf pages, and
-	 * write it, as well as any merged pages to the file.
-	 *
-	 * Count how many internal page slots we need (we could track this
-	 * during the array shuffling/splitting, but that's a lot harder).
+	 * We may have lost key ranges in column-store databases, that is, some
+	 * part of the record number space is gone.   Look for missing ranges.
 	 */
-	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
-		if (ss->pages[i] != NULL)
-			++leaf_cnt;
 	switch (ss->page_type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__slvg_col_build_internal(session, leaf_cnt, ss));
+		__slvg_col_range_missing(session, ss);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__slvg_row_build_internal(session, leaf_cnt, ss));
 		break;
 	}
 
 	/*
 	 * Step 6:
+	 * Build an internal page that references all of the leaf pages, and
+	 * write it, as well as any merged pages, to the file.
+	 */
+	switch (ss->page_type) {
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
+		WT_ERR(__slvg_col_build_internal(session, ss));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		WT_ERR(__slvg_row_build_internal(session, ss));
+		break;
+	}
+
+	/*
+	 * Step 7:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -946,22 +958,62 @@ delete:		WT_RET(__slvg_trk_free(session,
 }
 
 /*
+ * __slvg_col_range_missing --
+ *	Detect missing ranges from column-store files.
+ */
+static void
+__slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
+{
+	WT_TRACK *trk;
+	uint64_t r;
+	uint32_t i;
+
+	for (i = 0, r = 0; i < ss->pages_next; ++i) {
+		if ((trk = ss->pages[i]) == NULL)
+			continue;
+		if (trk->col_start != r + 1) {
+			WT_VERBOSE(session, SALVAGE,
+			    "[%" PRIu32 "] column-store missing range from %"
+			    PRIu64 " to %" PRIu64 " inclusive",
+			    trk->addr, r + 1, trk->col_start - 1);
+
+			/*
+			 * We need to instantiate deleted items for the missing
+			 * record range.
+			 */
+			trk->col_missing = r + 1;
+
+			F_SET(trk, WT_TRACK_MERGE);
+			ss->range_merge = 1;
+		}
+		r = trk->col_stop;
+	}
+}
+
+/*
  * __slvg_col_build_internal --
  *	Build a column-store in-memory page that references all of the leaf
  *	pages we've found.
  */
 static int
-__slvg_col_build_internal(
-    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
+__slvg_col_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_REF *root_page;
 	WT_TRACK *trk;
-	uint32_t i;
+	uint32_t i, leaf_cnt;
 	int ret;
 
 	root_page = &session->btree->root_page;
+
+	/*
+	 * Count how many internal page slots we need (we could track this
+	 * during the array shuffling/splitting, but that's a lot harder).
+	 */
+	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
+		if ((trk = ss->pages[i]) != NULL)
+			++leaf_cnt;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1005,7 +1057,7 @@ __slvg_col_build_internal(
 
 	/* Write the internal page to disk. */
 	return (__wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 
 err:	if (page->u.col_int.t != NULL)
 		__wt_free(session, page->u.col_int.t);
@@ -1025,6 +1077,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
 	int ret;
+	uint64_t missing;
 	uint32_t i, n_repeat, skip, take, save_entries;
 	void *cipdata;
 
@@ -1040,7 +1093,6 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 */
 	skip = (uint32_t)(trk->col_start - page->u.col_leaf.recno);
 	take = (uint32_t)(trk->col_stop - trk->col_start) + 1;
-	page->u.col_leaf.recno = trk->col_start;
 
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] merge discarding first %" PRIu32 " records, "
@@ -1114,8 +1166,24 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Write the new version of the leaf page to disk.
-	 *
+	 * If we're missing some part of the range, the real start range is in
+	 * trk->col_missing, else, it's in trk->col_start.  Update the parent's
+	 * reference as well as the page itself.
+	 */
+	if (trk->col_missing == 0) {
+		page->u.col_leaf.recno = trk->col_start;
+		missing = 0;
+	} else {
+		page->u.col_leaf.recno = trk->col_missing;
+		missing = trk->col_start - trk->col_missing;
+
+		WT_VERBOSE(session, SALVAGE,
+		    "[%" PRIu32 "] merge inserting %" PRIu64 " missing records",
+		    trk->addr, missing);
+	}
+	cref->recno = page->u.col_leaf.recno;
+
+	/*
 	 * We can't discard the original blocks associated with this page now.
 	 * (The problem is we don't want to overwrite any original information
 	 * until the salvage run succeeds -- if we free the blocks now, the next
@@ -1124,11 +1192,13 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * would have been lost.)  Clear the reference addr so reconciliation
 	 * does not free the underlying blocks.
 	 */
-	WT_PAGE_SET_MODIFIED(page);
 	WT_COL_REF_ADDR(cref) = WT_ADDR_INVALID;
 	WT_COL_REF_SIZE(cref) = 0;
-	ret = __wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+
+	/* Write the new version of the leaf page to disk. */
+	WT_PAGE_SET_MODIFIED(page);
+	ret = __wt_page_reconcile_int(session,
+	    page, missing, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 
 err:	/*
 	 * Reset the page.  (Don't reset the record number or RLE counts -- it
@@ -1427,18 +1497,24 @@ delete:		WT_RET(__slvg_trk_free(session,
  *	pages we've found.
  */
 static int
-__slvg_row_build_internal(
-    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
+__slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
 	WT_REF *root_page;
+	WT_ROW_REF *rref;
 	WT_TRACK *trk;
-
-	uint32_t i;
+	uint32_t i, leaf_cnt;
 	int deleted, ret;
 
 	root_page = &session->btree->root_page;
+
+	/*
+	 * Count how many internal page slots we need (we could track this
+	 * during the array shuffling/splitting, but that's a lot harder).
+	 */
+	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
+		if (ss->pages[i] != NULL)
+			++leaf_cnt;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1496,7 +1572,7 @@ __slvg_row_build_internal(
 
 	/* Write the internal page to disk. */
 	return (__wt_page_reconcile(
-	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 
 err:	if (page->u.row_int.t != NULL)
 		__wt_free(session, page->u.row_int.t);
@@ -1648,8 +1724,6 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			F_CLR(trk, WT_TRACK_MERGE);
 		else {
 			/*
-			 * Write the new version of the leaf page to disk.
-			 *
 			 * We can't discard the original blocks associated with
 			 * this page now.  (The problem is we don't want to
 			 * overwrite any original information until the salvage
@@ -1660,11 +1734,13 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 			 * Clear the reference addr so reconciliation does not
 			 * free the underlying blocks.
 			 */
-			WT_PAGE_SET_MODIFIED(page);
 			WT_ROW_REF_ADDR(rref) = WT_ADDR_INVALID;
 			WT_ROW_REF_SIZE(rref) = 0;
-			ret = __wt_page_reconcile(session,
-			    page, skip_start,
+
+			/* Write the new version of the leaf page to disk. */
+			WT_PAGE_SET_MODIFIED(page);
+			ret = __wt_page_reconcile_int(
+			    session, page, (uint64_t)skip_start,
 			    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 			page->entries += skip_stop;
 			if (ret != 0)

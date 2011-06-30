@@ -121,3 +121,17 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	    p < (void *)page->dsk ||
 	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size) ? 1 : 0);
 }
+
+/*
+ * __wt_page_reconcile --
+ *	Standard version of page reconciliation.
+ */
+static inline int
+__wt_page_reconcile(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+{
+	/*
+	 * There's an internal version of page reconciliation that salvage uses,
+	 * everybody else just calls with a value of 0 as the 3rd argument.
+	 */
+	return (__wt_page_reconcile_int(session, page, (uint64_t)0, flags));
+}

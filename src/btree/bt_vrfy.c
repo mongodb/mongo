@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "btree.i"
 #include "cell.i"
 
 /*
@@ -97,9 +98,15 @@ __wt_verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	vs->max_addr = WT_ADDR_INVALID;
 
 	/*
+	 * If the file has no data pages, we're done.
 	 * The file size should be a multiple of the allocsize, offset by the
 	 * size of the descriptor sector, the first 512B of the file.
 	 */
+	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
+		__wt_errx(session,
+		    "the file contains no data pages and cannot be verified");
+		goto err;
+	}
 	if ((btree->fh->file_size -
 	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
 		__wt_errx(session,
@@ -146,6 +153,12 @@ __wt_verify_int(WT_SESSION_IMPL *session, int dumpfile)
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
+
+	/* Discard the root page from the tree. */
+	if (btree->root_page.page != NULL)
+		WT_TRET(__wt_page_reconcile(session,
+		    btree->root_page.page, WT_REC_EVICT | WT_REC_LOCKED));
+
 	if (vs != NULL) {
 		/* Wrap up reporting. */
 		__wt_progress(session, NULL, vs->fcnt);
@@ -156,11 +169,6 @@ err:		if (ret == 0)
 		if (vs->max_key != NULL)
 			__wt_scr_release(&vs->max_key);
 	}
-
-	/* Discard the root page from the tree. */
-	if (btree->root_page.page != NULL)
-		WT_TRET(__wt_page_reconcile(session,
-		    btree->root_page.page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 
 	return (ret);
 }
@@ -319,7 +327,7 @@ recno_chk:	if (parent_recno != recno) {
 			ret = __wt_verify_tree(session, ref, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
-			    ref->page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
 			if (ret != 0)
 				return (ret);
 		}
@@ -345,7 +353,7 @@ recno_chk:	if (parent_recno != recno) {
 			ret = __wt_verify_tree(session, ref, (uint64_t)0, vs);
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
-			    ref->page, 0, WT_REC_EVICT | WT_REC_LOCKED));
+			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
 			if (ret != 0)
 				return (ret);
 		}

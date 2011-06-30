@@ -778,6 +778,29 @@ struct __wt_off_record {
 		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
 /*
+ * General purpose macros for the Btree implementation.
+ */
+/*
+ * In diagnostic mode we track the locations from which hazard references
+ * were acquired.
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	__wt_page_in(a, b, c, d)					\
+	__wt_page_in_func(a, b, c, d, __FILE__, __LINE__)
+#else
+#define	__wt_page_in(a, b, c, d)					\
+	__wt_page_in_func(a, b, c, d)
+#endif
+
+/*
+ * Release a reference to a page, unless it's the root page, which remains
+ * pinned for the life of the table handle.
+ */
+#define	WT_PAGE_OUT(session, p)						\
+	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
+		__wt_hazard_clear((session), (p));
+
+/*
  * WT_FREE_ENTRY  --
  *	Encapsulation of an entry on the Btree free list.
  */
