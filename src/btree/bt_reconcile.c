@@ -1044,9 +1044,12 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	r->page_size = max;
 	if (r->btree_split_min)
 		r->split_size = min;
-	else
+	else {
 		r->split_size = WT_ALIGN(
 		    (max * r->btree_split_pct) / 100, btree->allocsize);
+		if (r->split_size < min)
+			r->split_size = min;
+	}
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
