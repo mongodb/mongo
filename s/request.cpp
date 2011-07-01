@@ -62,7 +62,10 @@ namespace mongo {
 
         _config = grid.getDBConfig( getns() );
         if ( reload ) {
-            _config->getChunkManager( getns() , true );
+            if ( _config->isSharded( getns() ) )
+                _config->getChunkManager( getns() , true );
+            else
+                _config->reload();
         }
 
         if ( _config->isSharded( getns() ) ) {

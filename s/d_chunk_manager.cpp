@@ -139,21 +139,21 @@ namespace mongo {
     }
     
     bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
+        verify( 15851 , cc );
         if ( _rangesMap.size() == 0 )
             return false;
         
-        return _belongsToMe( cc->extractFields( _key ) );
+        return _belongsToMe( cc->extractFields( _key , true ) );
     }
 
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
-        return _belongsToMe( obj.extractFields( _key ) );
+        return _belongsToMe( obj.extractFields( _key , true ) );
     }
 
     bool ShardChunkManager::_belongsToMe( const BSONObj& x ) const {
-
         RangeMap::const_iterator it = _rangesMap.upper_bound( x );
         if ( it != _rangesMap.begin() )
             it--;

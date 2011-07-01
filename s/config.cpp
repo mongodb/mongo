@@ -223,8 +223,11 @@ namespace mongo {
             
             if ( ! newest.isEmpty() ) {
                 ShardChunkVersion v = newest["lastmod"];
-                if ( v == oldVersion )
-                    return getChunkManager( ns , false );
+                if ( v == oldVersion ) {
+                    scoped_lock lk( _lock );
+                    CollectionInfo& ci = _collections[ns];
+                    return ci.getCM();
+                }
             }
             
         }
