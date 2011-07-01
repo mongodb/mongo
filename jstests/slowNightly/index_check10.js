@@ -5,7 +5,7 @@ Random.setRandomSeed();
 
 t = db.test_index_check10;
 
-function doIt() {
+function doIt( indexVersion ) {
 
     t.drop();
 
@@ -94,8 +94,11 @@ function doIt() {
                 for( var f in o ) {
              	    size -= f.length;
                 }
-                if ( size <= 819 /* KeyMax */ ) {
-	            assert.eq( c1, c3 );
+                
+                var max = indexVersion == 0 ? 819 : 818;
+                
+                if ( size <= max /* KeyMax */ ) {
+	            assert.eq( c1, c3 , "size: " + size );
                 }
             }
         }
@@ -105,7 +108,7 @@ function doIt() {
         t.save( obj() );
     }
     
-    t.ensureIndex( idx );
+    t.ensureIndex( idx , { v : indexVersion } );
     check();
 
     for( var i = 0; i < 10000; ++i ) {
@@ -125,5 +128,6 @@ function doIt() {
 }
 
 for( var z = 0; z < 5; ++z ) {
-    doIt();
+    var indexVersion = z % 2;
+    doIt( indexVersion );
 }
