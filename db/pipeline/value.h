@@ -210,6 +210,13 @@ namespace mongo {
 
           @returns the double value
         */
+        Date_t coerceToDate() const;
+
+        /*
+          Coerce (cast) a value to a string, using JSON rules.
+
+          @returns the double value
+        */
         string coerceToString() const;
 
         /*

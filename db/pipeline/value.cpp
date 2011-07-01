@@ -590,6 +590,23 @@ namespace mongo {
         return (double)0;
     }
 
+    Date_t Value::coerceToDate() const {
+        switch(type) {
+
+        case Date:
+            return dateValue; 
+
+	case jstNULL:
+	case Undefined:
+	    break;
+
+        default:
+            assert(false); // CW TODO no conversion available
+        } // switch(type)
+
+        return jstNULL; 
+    }
+
     string Value::coerceToString() const {
         stringstream ss;
         switch(type) {

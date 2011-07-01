@@ -198,6 +198,7 @@ namespace mongo {
         {"$subtract", ExpressionSubtract::create},
         {"$tolower", ExpressionToLower::create},
         {"$toupper", ExpressionToUpper::create},
+        {"$year", ExpressionYear::create},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -2198,5 +2199,37 @@ namespace mongo {
 
     const char *ExpressionToUpper::getOpName() const {
 	return "$toupper";
+    }
+
+    /* ------------------------- ExpressionYear ----------------------------- */
+
+    ExpressionYear::~ExpressionYear() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionYear::create() {
+        shared_ptr<ExpressionYear> pExpression(new ExpressionYear());
+        return pExpression;
+    }
+
+    ExpressionYear::ExpressionYear():
+        ExpressionNary() {
+    }
+
+    void ExpressionYear::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionYear::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string year = date.toString().substr(20,4);
+        return Value::createInt(atoi(year.c_str()));
+    }
+
+    const char *ExpressionYear::getOpName() const {
+	return "$year";
     }
 }
