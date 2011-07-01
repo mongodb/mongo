@@ -181,6 +181,7 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
+        {"$day", ExpressionDay::create},
         {"$dayofweek", ExpressionDayOfWeek::create},
         {"$divide", ExpressionDivide::create},
         {"$eq", ExpressionCompare::createEq},
@@ -756,6 +757,38 @@ namespace mongo {
     const char *ExpressionConstant::getOpName() const {
 	assert(false); // this has no name
 	return NULL;
+    }
+
+    /* ------------------------- ExpressionDay ----------------------------- */
+
+    ExpressionDay::~ExpressionDay() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDay::create() {
+        shared_ptr<ExpressionDay> pExpression(new ExpressionDay());
+        return pExpression;
+    }
+
+    ExpressionDay::ExpressionDay():
+        ExpressionNary() {
+    }
+
+    void ExpressionDay::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDay::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string day = date.toString().substr(8,2);
+        return Value::createInt(atoi(day.c_str()));
+    }
+
+    const char *ExpressionDay::getOpName() const {
+	return "$day";
     }
 
     /* ------------------------- ExpressionDayOfWeek ----------------------------- */

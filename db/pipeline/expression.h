@@ -410,6 +410,23 @@ namespace mongo {
     };
 
 
+    class ExpressionDay :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionDay();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionDay();
+    };
+
+
     class ExpressionDayOfWeek :
         public ExpressionNary {
     public:
