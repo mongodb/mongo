@@ -111,7 +111,6 @@ main(int argc, char *argv[])
 		track("shutting down BDB", 0ULL);
 		bdb_teardown();	
 
-#if 0
 		/*
 		 * If we don't delete any records, we can salvage the file.  The
 		 * problem with deleting records is that WiredTiger will restore
@@ -126,7 +125,6 @@ main(int argc, char *argv[])
 			    wts_salvage() || wts_verify() || wts_startup())
 				goto err;
 		}
-#endif
 
 		if (wts_dump())			/* Dump the file */
 			goto err;
