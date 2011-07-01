@@ -340,15 +340,17 @@ ShardingTest.prototype.normalize = function( x ){
 }
 
 ShardingTest.prototype.getOther = function( one ){
-    if ( this._connections.length != 2 )
+    if ( this._connections.length < 2 )
         throw "getOther only works with 2 servers";
 
     if ( one._mongo )
         one = one._mongo
-
-    if ( this._connections[0] == one )
-        return this._connections[1];
-    return this._connections[0];
+    
+    for( var i = 0; i < this._connections.length; i++ ){
+        if( this._connections[i] != one ) return this._connections[i]
+    }
+    
+    return null
 }
 
 ShardingTest.prototype.getAnother = function( one ){

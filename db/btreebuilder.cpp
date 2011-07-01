@@ -62,31 +62,30 @@ namespace mongo {
 
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
-        KeyOwned key(_key);
-
-        if ( key.dataSize() > KeyMax ) {
+        auto_ptr< KeyOwned > key( new KeyOwned(_key) );
+        if ( key->dataSize() > BtreeBucket<V>::KeyMax ) {
             problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
-                      << ' ' << key.dataSize() << ' ' << key.toString() << endl;
+                      << ' ' << key->dataSize() << ' ' << key->toString() << endl;
             return;
         }
 
         if( !dupsAllowed ) {
             if( n > 0 ) {
-                int cmp = keyLast.woCompare(key, ordering);
+                int cmp = keyLast->woCompare(*key, ordering);
                 massert( 10288 ,  "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
                 if( cmp == 0 ) {
                     //if( !dupsAllowed )
-                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , keyLast ) );
+                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , *keyLast ) );
                 }
             }
-            keyLast = key;
         }
 
-        if ( ! b->_pushBack(loc, key, ordering, DiskLoc()) ) {
+        if ( ! b->_pushBack(loc, *key, ordering, DiskLoc()) ) {
             // bucket was full
             newBucket();
-            b->pushBack(loc, key, ordering, DiskLoc());
+            b->pushBack(loc, *key, ordering, DiskLoc());
         }
+        keyLast = key;
         n++;
         mayCommitProgressDurably();
     }

@@ -54,49 +54,8 @@ namespace mongo {
     MinKeyLabeler MINKEY;
     MaxKeyLabeler MAXKEY;
 
-    string escape( string s , bool escape_slash=false) {
-        StringBuilder ret;
-        for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
-            switch ( *i ) {
-            case '"':
-                ret << "\\\"";
-                break;
-            case '\\':
-                ret << "\\\\";
-                break;
-            case '/':
-                ret << (escape_slash ? "\\/" : "/");
-                break;
-            case '\b':
-                ret << "\\b";
-                break;
-            case '\f':
-                ret << "\\f";
-                break;
-            case '\n':
-                ret << "\\n";
-                break;
-            case '\r':
-                ret << "\\r";
-                break;
-            case '\t':
-                ret << "\\t";
-                break;
-            default:
-                if ( *i >= 0 && *i <= 0x1f ) {
-                    //TODO: these should be utf16 code-units not bytes
-                    char c = *i;
-                    ret << "\\u00" << toHexLower(&c, 1);
-                }
-                else {
-                    ret << *i;
-                }
-            }
-        }
-        return ret.str();
-    }
-
-    string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
+    // need to move to bson/, but has dependency on base64 so move that to bson/util/ first.
+    inline string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         BSONType t = type();
         if ( t == Undefined )
             return "undefined";
@@ -259,7 +218,6 @@ namespace mongo {
                 break;
             }
         }
-
 
         case Code:
             s << _asCode();
@@ -882,22 +840,6 @@ namespace mongo {
         }
     }
 
-    string BSONObj::hexDump() const {
-        stringstream ss;
-        const char *d = objdata();
-        int size = objsize();
-        for( int i = 0; i < size; ++i ) {
-            ss.width( 2 );
-            ss.fill( '0' );
-            ss << hex << (unsigned)(unsigned char)( d[ i ] ) << dec;
-            if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
-                ss << '\'' << d[ i ] << '\'';
-            if ( i != size - 1 )
-                ss << ' ';
-        }
-        return ss.str();
-    }
-
     void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base) {
         BSONObjIterator it(obj);
         while (it.more()) {
@@ -1212,24 +1154,43 @@ namespace mongo {
         uassert( 14853 ,  "type not supported for appendMaxElementForType" , false );
     }
 
-    const string BSONObjBuilder::numStrs[] = {
-        "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",
-        "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-        "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
-        "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-        "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
-        "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
-        "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
-        "70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
-        "80", "81", "82", "83", "84", "85", "86", "87", "88", "89",
-        "90", "91", "92", "93", "94", "95", "96", "97", "98", "99",
-    };
+    int BSONElementFieldSorter( const void * a , const void * b ) {
+        const char * x = *((const char**)a);
+        const char * y = *((const char**)b);
+        x++; y++;
+        return lexNumCmp( x , y );
+    }
 
+    bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
+        BSONObjIterator l(lhs);
+        BSONObjIterator r(rhs);
 
-    // This is to ensure that BSONObjBuilder doesn't try to use numStrs before the strings have been constructed
-    // I've tested just making numStrs a char[][], but the overhead of constructing the strings each time was too high
-    // numStrsReady will be 0 until after numStrs is initialized because it is a static variable
-    bool BSONObjBuilder::numStrsReady = (numStrs[0].size() > 0);
+        while (l.more() && r.more()){
+            if (strcmp(l.next().fieldName(), r.next().fieldName())) {
+                PRINTFL;
+                return false;
+            }
+        }
+        PRINT(l.more());
+        PRINT(r.more());
+        PRINT(l.more() || r.more());
+
+        return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
+    }
+
+    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ) {
+        _nfields = o.nFields();
+        _fields = new const char*[_nfields];
+        int x = 0;
+        BSONObjIterator i( o );
+        while ( i.more() ) {
+            _fields[x++] = i.next().rawdata();
+            assert( _fields[x-1] );
+        }
+        assert( x == _nfields );
+        qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
+        _cur = 0;
+    }
 
     bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
         if ( data.size() == 0 || data == "-" || data == ".")
@@ -1274,57 +1235,6 @@ namespace mongo {
         catch(bad_lexical_cast &) {
             return false;
         }
-
-    }
-
-    void BSONObjBuilder::appendKeys( const BSONObj& keyPattern , const BSONObj& values ) {
-        BSONObjIterator i(keyPattern);
-        BSONObjIterator j(values);
-
-        while ( i.more() && j.more() ) {
-            appendAs( j.next() , i.next().fieldName() );
-        }
-
-        assert( ! i.more() );
-        assert( ! j.more() );
-    }
-
-    int BSONElementFieldSorter( const void * a , const void * b ) {
-        const char * x = *((const char**)a);
-        const char * y = *((const char**)b);
-        x++; y++;
-        return lexNumCmp( x , y );
-    }
-
-    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ) {
-        _nfields = o.nFields();
-        _fields = new const char*[_nfields];
-        int x = 0;
-        BSONObjIterator i( o );
-        while ( i.more() ) {
-            _fields[x++] = i.next().rawdata();
-            assert( _fields[x-1] );
-        }
-        assert( x == _nfields );
-        qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
-        _cur = 0;
-    }
-
-    bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
-        BSONObjIterator l(lhs);
-        BSONObjIterator r(rhs);
-
-        while (l.more() && r.more()){
-            if (strcmp(l.next().fieldName(), r.next().fieldName())) {
-                PRINTFL;
-                return false;
-            }
-        }
-        PRINT(l.more());
-        PRINT(r.more());
-        PRINT(l.more() || r.more());
-
-        return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }
 
 } // namespace mongo

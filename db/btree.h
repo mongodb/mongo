@@ -65,9 +65,6 @@ namespace mongo {
     
     const int OldBucketSize = 8192;
 
-    // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
-    const int KeyMax = OldBucketSize / 10;
-
 #pragma pack(1)
     template< class Version > class BucketBasics;
 
@@ -180,6 +177,9 @@ namespace mongo {
         typedef KeyBson Key;
         typedef KeyBson KeyOwned;
         enum { BucketSize = 8192 };
+
+        // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
+        static const int KeyMax = OldBucketSize / 10;
     };
 
     // a a a ofs ofs ofs ofs
@@ -260,6 +260,8 @@ namespace mongo {
         typedef KeyV1 Key;
         typedef KeyV1Owned KeyOwned;
         enum { BucketSize = 8192-16 }; // leave room for Record header
+        // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
+        static const int KeyMax = 3*1024;
     protected:
         /** Parent bucket of this bucket, which isNull() for the root bucket. */
         Loc parent;
@@ -362,7 +364,7 @@ namespace mongo {
             return (char*)&(d->data) - (char*)&(d->parent);
         }
         static int bodySize() { return Version::BucketSize - headerSize(); }
-        static int lowWaterMark() { return bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
+        static int lowWaterMark() { return bodySize() / 2 - Version::KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
 
         // for testing
         int nKeys() const { return this->n; }
@@ -429,7 +431,7 @@ namespace mongo {
          *  - The last key of the bucket is removed, and its key and recLoc are
          *    returned.  As mentioned above, the key points to unallocated memory.
          */
-        void popBack(DiskLoc& recLoc, Key& key);
+        void popBack(DiskLoc& recLoc, Key &key);
 
         /**
          * Preconditions:
@@ -880,8 +882,10 @@ namespace mongo {
         int indexInParent( const DiskLoc &thisLoc ) const;        
 
     public:
-        Key keyAt(int keyOfs) const {
-            return keyOfs >= this->n ? Key() : this->keyNode(keyOfs).key;
+        Key keyAt(int i) const {
+            if( i >= this->n ) 
+                return Key();
+            return Key(this->data + k(i).keyDataOfs());
         }
     protected:
 

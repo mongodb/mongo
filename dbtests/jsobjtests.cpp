@@ -245,6 +245,21 @@ namespace JsobjTests {
                 ASSERT( BSON( "" << "b" << "" << "b" ).woCompare( BSON( "" << "c" ) , key ) < 0 );
 
                 {
+                    // test a big key
+                    string x(2000, 'z');
+                    BSONObj o = BSON( "q" << x );
+                    keyTest(o, false);
+                }
+                {
+                    string y(200, 'w');                 
+                    BSONObjBuilder b;
+                    for( int i = 0; i < 10; i++ ) {
+                        b.append("x", y);
+                    }
+                    keyTest(b.obj(), true);
+                }
+
+                {
                     BSONObjBuilder b;
                     b.append( "" , "c" );
                     b.appendNull( "" );

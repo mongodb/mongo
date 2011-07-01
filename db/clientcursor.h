@@ -244,20 +244,21 @@ namespace mongo {
         DiskLoc currLoc() { return _c->currLoc(); }
         BSONObj currKey() const { return _c->currKey(); }
 
-
         /**
          * same as BSONObj::getFieldsDotted
          * if it can be retrieved from key, it is
+         * @param holder keeps the currKey in scope by keeping a reference to it here. generally you'll want 
+         *        holder and ret to destruct about the same time.
          * @return if this was retrieved from key
          */
-        bool getFieldsDotted( const string& name, BSONElementSet &ret );
+        bool getFieldsDotted( const string& name, BSONElementSet &ret, BSONObj& holder );
 
         /**
          * same as BSONObj::getFieldDotted
          * if it can be retrieved from key, it is
          * @return if this was retrieved from key
          */
-        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 ) ;
+        BSONElement getFieldDotted( const string& name , BSONObj& holder , bool * fromKey = 0 ) ;
         
         /** extract items from object which match a pattern object.
          * e.g., if pattern is { x : 1, y : 1 }, builds an object with

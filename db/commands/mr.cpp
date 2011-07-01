@@ -267,7 +267,7 @@ namespace mongo {
             }
 
             if ( outType != INMEMORY ) { // setup names
-                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
+                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << JOB_NUMBER++;
 
                 incLong = tempLong + "_inc";
 
@@ -320,10 +320,25 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            _db.dropCollection( _config.tempLong );
+            if (_config.incLong != _config.tempLong) {
+                // create the inc collection and make sure we have index on "0" key
+                _db.dropCollection( _config.incLong );
+                {
+                    writelock l( _config.incLong );
+                    Client::Context ctx( _config.incLong );
+                    string err;
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+                    }
+                }
 
+                BSONObj sortKey = BSON( "0" << 1 );
+                _db.ensureIndex( _config.incLong , sortKey );
+            }
+
+            // create temp collection
+            _db.dropCollection( _config.tempLong );
             {
-                // create
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
@@ -331,7 +346,6 @@ namespace mongo {
                     uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
                 }
             }
-
 
             {
                 // copy indexes
@@ -562,26 +576,6 @@ namespace mongo {
             _reduceAndEmit = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; } emit(key, ret); }; delete _mrMap;");
             _reduceAndFinalize = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
             _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } _nativeToTemp({_id: key, value: ret}); }");
-
-            if ( _onDisk ) {
-                // clear temp collections
-                _db.dropCollection( _config.tempLong );
-                _db.dropCollection( _config.incLong );
-
-                // create the inc collection and make sure we have index on "0" key
-                {
-                    writelock l( _config.incLong );
-                    Client::Context ctx( _config.incLong );
-                    string err;
-                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
-                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
-                    }
-                }
-
-                BSONObj sortKey = BSON( "0" << 1 );
-                _db.ensureIndex( _config.incLong , sortKey );
-
-            }
 
         }
 
@@ -964,6 +958,7 @@ namespace mongo {
 
                 try {
                     state.init();
+                    state.prepTempCollection();
 
                     {
                         State** s = new State*();
@@ -1056,7 +1051,6 @@ namespace mongo {
                     state.reduceInMemory();
                     // if not inline: dump the in memory map to inc collection, all data is on disk
                     state.dumpToInc();
-                    state.prepTempCollection();
                     // final reduce
                     state.finalReduce( op , pm );
                     inReduce += t.micros();
@@ -1117,9 +1111,11 @@ namespace mongo {
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
-                bool postProcessOnly = !postProcessCollection.empty();
+                bool postProcessOnly = !(postProcessCollection.empty());
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
+                State state(config);
+                state.init();
                 if (postProcessOnly) {
                     // the temp collection has been decided by mongos
                     config.tempLong = dbname + "." + postProcessCollection;
@@ -1127,13 +1123,11 @@ namespace mongo {
                 // no need for incremental collection because records are already sorted
                 config.incLong = config.tempLong;
 
-                State state(config);
                 BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
                 if (postProcessOnly) {
-                    // this is usually for reduce mode
                     if (!state._db.exists(config.tempLong)) {
                         // nothing to do
                         return 1;
@@ -1168,7 +1162,6 @@ namespace mongo {
                         ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
                                                             Query().sort( sortKey ) );
                         cursor.init();
-                        state.init();
 
                         BSONList values;
                         if (!config.outDB.empty()) {

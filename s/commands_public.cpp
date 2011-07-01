@@ -613,7 +613,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
-                massert( 13002 ,  "how could chunk manager be null!" , cm );
+                massert( 13002 ,  "shard internal error chunk manager should never be null" , cm );
 
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
@@ -1117,22 +1117,23 @@ namespace mongo {
 
                     string outns = config.finalLong;
                     string tempns;
-                    if (config.outType == mr_shard::Config::REDUCE) {
-                        // result will be inserted into a temp collection to post process
-                        const string postProcessCollection = getTmpName( collection );
-                        cout << "post process collection is " << postProcessCollection << endl;
-                        tempns = dbName + "." + postProcessCollection;
-                    } else if (config.outType == mr_shard::Config::REPLACE) {
-                        // drop previous collection
-                        BSONObj dropColCmd = BSON("drop" << config.finalShort);
-                        BSONObjBuilder dropColResult(32);
-                        string outdbCmd = outdb + ".$cmd";
-                        bool res = Command::runAgainstRegistered(outdbCmd.c_str(), dropColCmd, dropColResult);
-                        if (!res) {
-                            errmsg = str::stream() << "Could not drop sharded output collection " << outns << ": " << dropColResult.obj().toString();
-                            return false;
-                        }
-                    }
+
+                    // result will be inserted into a temp collection to post process
+                    const string postProcessCollection = getTmpName( collection );
+                    finalCmd.append("postProcessCollection", postProcessCollection);
+                    tempns = dbName + "." + postProcessCollection;
+
+//                    if (config.outType == mr_shard::Config::REPLACE) {
+//                        // drop previous collection
+//                        BSONObj dropColCmd = BSON("drop" << config.finalShort);
+//                        BSONObjBuilder dropColResult(32);
+//                        string outdbCmd = outdb + ".$cmd";
+//                        bool res = Command::runAgainstRegistered(outdbCmd.c_str(), dropColCmd, dropColResult);
+//                        if (!res) {
+//                            errmsg = str::stream() << "Could not drop sharded output collection " << outns << ": " << dropColResult.obj().toString();
+//                            return false;
+//                        }
+//                    }
 
                     BSONObj sortKey = BSON( "_id" << 1 );
                     if (!conf->isSharded(outns)) {
@@ -1145,9 +1146,6 @@ namespace mongo {
                             errmsg = str::stream() << "Could not create sharded output collection " << outns << ": " << shardColResult.obj().toString();
                             return false;
                         }
-
-                        // since it's new collection, use replace mode always
-                        config.outType = mr_shard::Config::REPLACE;
                     }
 
                     ParallelSortClusteredCursor cursor( servers , dbName + "." + shardedOutputCollection ,
@@ -1158,18 +1156,23 @@ namespace mongo {
                     mr_shard::BSONList values;
                     Strategy* s = SHARDED;
                     long long finalCount = 0;
+                    int currentSize = 0;
                     while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
                         if ( cursor.more() ) {
                             t = cursor.next().getOwned();
 
-                            if ( values.size() == 0 ) {
+                            if ( values.size() == 0 || t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
                                 values.push_back( t );
-                                continue;
-                            }
+                                currentSize += t.objsize();
 
-                            if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                                values.push_back( t );
+                                // check size and potentially reduce
+                                if (currentSize > config.maxInMemSize && values.size() > config.reduceTriggerRatio) {
+                                    BSONObj reduced = config.reducer->finalReduce(values, 0);
+                                    values.clear();
+                                    values.push_back( reduced );
+                                    currentSize = reduced.objsize();
+                                }
                                 continue;
                             }
                         }
@@ -1178,20 +1181,20 @@ namespace mongo {
                         if (config.outType == mr_shard::Config::MERGE) {
                             BSONObj id = final["_id"].wrap();
                             s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
-                        } else if (config.outType == mr_shard::Config::REDUCE) {
-                            // insert into temp collection, but final collection's sharding
-                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
                         } else {
-                            s->insertSharded(conf, outns.c_str(), final, 0, true);
+                            // insert into temp collection, but using final collection's shard chunks
+                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
                         }
                         ++finalCount;
                         values.clear();
-                        if (!t.isEmpty())
+                        if (!t.isEmpty()) {
                             values.push_back( t );
+                            currentSize = t.objsize();
+                        }
                     }
 
-                    if (config.outType == mr_shard::Config::REDUCE) {
-                        // results were written to temp collection, need final reduce
+                    if (config.outType == mr_shard::Config::REDUCE || config.outType == mr_shard::Config::REPLACE) {
+                        // results were written to temp collection, need post processing
                         vector< shared_ptr<ShardConnection> > shardConns;
                         list< shared_ptr<Future::CommandResult> > futures;
                         BSONObj finalCmdObj = finalCmd.obj();
@@ -1218,6 +1221,9 @@ namespace mongo {
 
                         for ( unsigned i=0; i<shardConns.size(); i++ )
                             shardConns[i]->done();
+
+                        if (failed)
+                            return 0;
                     }
 
                     for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {

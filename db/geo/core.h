@@ -89,7 +89,7 @@ namespace mongo {
                 _bits = bits;
             }
             else {
-                cout << "GeoHash cons e : " << e << endl;
+                cout << "GeoHash bad element: " << e << endl;
                 uassert(13047,"wrong type for geo index. if you're using a pre-release version, need to rebuild index",0);
             }
             _fix();

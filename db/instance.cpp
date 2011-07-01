@@ -830,7 +830,7 @@ namespace mongo {
     }
 
     /* not using log() herein in case we are already locked */
-    void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+    NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
         auto_ptr<writelocktry> wlt;
         if ( tryToGetLock ) {

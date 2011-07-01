@@ -224,16 +224,11 @@ namespace mongo {
                     ChunkPtr c = manager->findChunk( o );
                     log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                     insert( c->getShard() , ns , o , flags, safe);
-
-//                    r.gotInsert();
-//                    if ( r.getClientInfo()->autoSplitOk() )
-                        c->splitIfShould( o.objsize() );
                     break;
                 }
                 catch ( StaleConfigException& e ) {
                     int logLevel = i < ( maxTries / 2 );
                     LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
-//                    r.reset();
 
                     unsigned long long old = manager->getSequenceNumber();
                     manager = conf->getChunkManager(ns);
@@ -421,8 +416,6 @@ namespace mongo {
                     try {
                         ChunkPtr c = manager->findChunk( chunkFinder );
                         update(c->getShard(), ns, query, toupdate, flags);
-//                        if ( r.getClientInfo()->autoSplitOk() )
-                            c->splitIfShould( toupdate.objsize() );
                         break;
                     }
                     catch ( StaleConfigException& e ) {
@@ -431,7 +424,6 @@ namespace mongo {
                         left--;
                         log() << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << ns << " query: " << query << endl;
-//                        r.reset( false );
                         manager = conf->getChunkManager(ns);
                         uassert(14849, "collection no longer sharded", manager);
                     }

@@ -51,7 +51,12 @@ namespace mongo {
         virtual BSONObj keyAt(int ofs) const { 
             assert( !bucket.isNull() );
             const BtreeBucket<V> *b = bucket.btree<V>();
-            return ofs >= b->getN() ? BSONObj() : b->keyNode(ofs).key.toBson();
+            int n = b->getN();
+            if( n == 0xffff ) { 
+                throw UserException(15850, "keyAt bucket deleted");
+            }
+            dassert( n >= 0 && n < 10000 );
+            return ofs >= n ? BSONObj() : b->keyNode(ofs).key.toBson();
         }
 
         virtual BSONObj currKey() const { 
@@ -102,29 +107,37 @@ namespace mongo {
             if ( keyOfs >= 0 ) {
                 assert( !keyAtKeyOfs.isEmpty() );
 
-                // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
-                // which is possible as keys may have been deleted.
-                int x = 0;
-                while( 1 ) {
-                    //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-                    //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                    if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
-                        const _KeyNode& kn = keyNode(keyOfs);
-                        if( kn.recordLoc == locAtKeyOfs ) {
-                            if ( !kn.isUsed() ) {
-                                // we were deleted but still exist as an unused
-                                // marker key. advance.
-                                skipUnusedKeys( false );
+                try {
+                    // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
+                    // which is possible as keys may have been deleted.
+                    int x = 0;
+                    while( 1 ) {
+                        //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+                        //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
+                        if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
+                            const _KeyNode& kn = keyNode(keyOfs);
+                            if( kn.recordLoc == locAtKeyOfs ) {
+                                if ( !kn.isUsed() ) {
+                                    // we were deleted but still exist as an unused
+                                    // marker key. advance.
+                                    skipUnusedKeys( false );
+                                }
+                                return;
                             }
-                            return;
                         }
-                    }
 
-                    // we check one key earlier too, in case a key was just deleted.  this is
-                    // important so that multi updates are reasonably fast.
-                    if( keyOfs == 0 || x++ )
-                        break;
-                    keyOfs--;
+                        // we check one key earlier too, in case a key was just deleted.  this is
+                        // important so that multi updates are reasonably fast.
+                        if( keyOfs == 0 || x++ )
+                            break;
+                        keyOfs--;
+                    }
+                }
+                catch(UserException& e) { 
+                    if( e.getCode() != 15850 )
+                        throw;
+                    // hack: fall through if bucket was just deleted. should only happen under deleteObjects()
+                    DEV log() << "debug info: bucket was deleted" << endl;
                 }
             }
 

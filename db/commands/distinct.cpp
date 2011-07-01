@@ -102,8 +102,9 @@ namespace mongo {
                     !cursor->getsetdup( cursor->currLoc() ) ) {
                     n++;
 
+                    BSONObj holder;
                     BSONElementSet temp;
-                    loadedObject = ! cc->getFieldsDotted( key , temp );
+                    loadedObject = ! cc->getFieldsDotted( key , temp, holder );
 
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
                         BSONElement e = *i;

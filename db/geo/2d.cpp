@@ -1129,7 +1129,8 @@ namespace mongo {
         }
 
         bool hasPrefix( const GeoHash& hash ) {
-            BSONElement e = key().firstElement();
+            BSONObj k = key();
+            BSONElement e = k.firstElement();
             if ( e.eoo() )
                 return false;
             return GeoHash( e ).hasPrefix( hash );
@@ -1181,8 +1182,6 @@ namespace mongo {
                              BtreeLocation& min , BtreeLocation&  max ,
                              GeoHash start ,
                              int & found , GeoAccumulator * hopper ) {
-
-            assert( id.version() == 0 ); // see note at top of this file
 
             Ordering ordering = Ordering::make(spec->_order);
 
@@ -1329,7 +1328,6 @@ namespace mongo {
         virtual DiskLoc currLoc() { assert(ok()); return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
-
         virtual CoveredIndexMatcher* matcher() const {
             if( _matcher.get() ) return _matcher.get();
             else return GeoCursorBase::emptyMatcher.get();
@@ -1344,6 +1342,8 @@ namespace mongo {
         virtual bool moreToDo() {
             return _state != DONE;
         }
+
+        virtual bool supportGetMore() { return true; }
 
         // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
         // Further calls to this function will continue the expand/check neighbors algorithm.

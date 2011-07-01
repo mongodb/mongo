@@ -386,7 +386,8 @@ namespace JsonTests {
                 b.appendMaxKey( "u" );
 
                 BSONObj o = b.obj();
-                cout << o.jsonString() << endl;
+                o.jsonString();
+                //cout << o.jsonString() << endl;
             }
         };
 
