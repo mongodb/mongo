@@ -258,7 +258,7 @@ namespace mongo {
          * if it can be retrieved from key, it is
          * @return if this was retrieved from key
          */
-        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 ) ;
+        BSONElement getFieldDotted( const string& name , BSONObj& holder , bool * fromKey = 0 ) ;
         
         /** extract items from object which match a pattern object.
          * e.g., if pattern is { x : 1, y : 1 }, builds an object with

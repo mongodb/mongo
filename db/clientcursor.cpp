@@ -338,19 +338,20 @@ namespace mongo {
         return true;
     }
 
-    BSONElement ClientCursor::getFieldDotted( const string& name , bool * fromKey ) {
+    BSONElement ClientCursor::getFieldDotted( const string& name , BSONObj& holder , bool * fromKey ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
             if ( fromKey )
                 *fromKey = false;
-            return current().getFieldDotted( name );
+            holder = current();
+            return holder.getFieldDotted( name );
         }
         
         int x = i->second;
 
-        BSONObj ck = currKey();
-        BSONObjIterator it( ck );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
@@ -364,14 +365,16 @@ namespace mongo {
 
     BSONObj ClientCursor::extractFields(const BSONObj &pattern , bool fillWithNull ) {
         BSONObjBuilder b( pattern.objsize() * 2 );
+
+        BSONObj holder;
      
         BSONObjIterator i( pattern ); 
         while ( i.more() ) {
             BSONElement key = i.next();
-            BSONElement value = getFieldDotted( key.fieldName() );
+            BSONElement value = getFieldDotted( key.fieldName() , holder );
 
             if ( value.type() ) {
-                b.append( value );
+                b.appendAs( value , key.fieldName() );
                 continue;
             }
 
