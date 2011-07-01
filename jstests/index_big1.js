@@ -32,4 +32,4 @@ for ( i=0; i<N; i++ ) {
     }
 }
 
-assert.eq( 797, flip , "flip changed" );
+assert.eq( 3050, flip , "flip changed" );
