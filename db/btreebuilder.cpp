@@ -63,8 +63,7 @@ namespace mongo {
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
         auto_ptr< KeyOwned > key( new KeyOwned(_key) );
-
-        if ( key->dataSize() > KeyMax ) {
+        if ( key->dataSize() > BtreeBucket<V>::KeyMax ) {
             problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
                       << ' ' << key->dataSize() << ' ' << key->toString() << endl;
             return;

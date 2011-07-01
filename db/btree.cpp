@@ -1217,7 +1217,7 @@ namespace mongo {
         const Ordering ord = Ordering::make(id.keyPattern());
         DiskLoc loc = locate(id, thisLoc, key, ord, pos, found, recordLoc, 1);
         if ( found ) {
-            if ( key.objsize() > KeyMax ) {
+            if ( key.objsize() > this->KeyMax ) {
                 OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
             }            
             loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);            
@@ -1677,8 +1677,8 @@ namespace mongo {
     int BtreeBucket<V>::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
-        if ( key.dataSize() > KeyMax ) {
-            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
+        if ( key.dataSize() > this->KeyMax ) {
+            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << this->KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
             return 2;
         }
         assert( key.dataSize() > 0 );
@@ -1754,7 +1754,7 @@ namespace mongo {
         KeyOwned key(_key);
 
         if ( toplevel ) {
-            if ( key.dataSize() > KeyMax ) {
+            if ( key.dataSize() > this->KeyMax ) {
                 problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.dataSize() << ' ' << key.toString() << endl;
                 return 3;
             }
