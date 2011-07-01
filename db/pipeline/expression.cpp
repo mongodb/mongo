@@ -818,23 +818,24 @@ namespace mongo {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         Date_t date = pDate->coerceToDate();
-        string dayofweek = date.toString().substr(0,3);
-        if (!dayofweek.compare("Sun")) {
-            dayofweek = "Sunday";
-        } else if (!dayofweek.compare("Mon")) {
-            dayofweek = "Monday";
-        } else if (!dayofweek.compare("Tue")) {
-            dayofweek = "Tuesday";
-        } else if (!dayofweek.compare("Wed")) {
-            dayofweek = "Wednesday";
-        } else if (!dayofweek.compare("Thu")) {
-            dayofweek = "Thursday";
-        } else if (!dayofweek.compare("Fri")) {
-            dayofweek = "Friday";
-        } else if (!dayofweek.compare("Sat")) {
-            dayofweek = "Saturday";
+        string dayOfWeek = date.toString().substr(0,3);
+        int dayNum = -1;
+        if (!dayOfWeek.compare("Sun")) {
+            dayNum = 1;
+        } else if (!dayOfWeek.compare("Mon")) {
+            dayNum = 2;
+        } else if (!dayOfWeek.compare("Tue")) {
+            dayNum = 3;
+        } else if (!dayOfWeek.compare("Wed")) {
+            dayNum = 4;
+        } else if (!dayOfWeek.compare("Thu")) {
+            dayNum = 5;
+        } else if (!dayOfWeek.compare("Fri")) {
+            dayNum = 6;
+        } else if (!dayOfWeek.compare("Sat")) {
+            dayNum = 7;
         }
-        return Value::createString(dayofweek);
+        return Value::createInt(dayNum);
     }
 
     const char *ExpressionDayOfWeek::getOpName() const {
@@ -1789,28 +1790,31 @@ namespace mongo {
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         Date_t date = pDate->coerceToDate();
         string month = date.toString().substr(4,3);
+        int monthNum = -1;
         if (!month.compare("Jan")) {
-            month = "January";
+            monthNum = 1;
         } else if (!month.compare("Feb")) {
-            month = "February";
+            monthNum = 2;
         } else if (!month.compare("Mar")) {
-            month = "March";
+            monthNum = 3;
         } else if (!month.compare("Apr")) {
-            month = "April";
+            monthNum = 4;
+        } else if (!month.compare("May")) {
+            monthNum = 5;
         } else if (!month.compare("Jun")) {
-            month = "June";
+            monthNum = 6;
         } else if (!month.compare("Jul")) {
-            month = "July";
-        } else if (!month.compare("Aug")) {
-            month = "August";
+            monthNum = 7;
+        } else if (!month.compare("Jul")) {
+            monthNum = 8;
         } else if (!month.compare("Sep")) {
-            month = "September";
+            monthNum = 9;
         } else if (!month.compare("Oct")) {
-            month = "October";
+            monthNum = 10;
         } else if (!month.compare("Nov")) {
-            month = "November";
+            monthNum = 11;
         } else if (!month.compare("Dec")) {
-            month = "December";
+            monthNum = 12;
         }
         return Value::createString(month);
     }
@@ -2282,9 +2286,7 @@ namespace mongo {
 
         string str1 = boost::to_upper_copy( pString1->coerceToString() );
         string str2 = boost::to_upper_copy( pString2->coerceToString() );
-        if ( !str1.compare(str2) )
-            return Value::getTrue();
-        return Value::getFalse();
+        return Value::createInt(str1.compare(str2));
     }
 
     const char *ExpressionStrcmp::getOpName() const {
