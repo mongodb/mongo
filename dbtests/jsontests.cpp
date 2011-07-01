@@ -276,6 +276,18 @@ namespace JsonTests {
             }
         };
 
+        class Timestamp {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendTimestamp( "a", 0, 0 );
+                BSONObj built = b.done();
+                ASSERT_EQUALS( "{ \"a\" : { \"$timestamp\" : { 0, 0 } }", built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : Timestamp( 0, 0 ) }", built.jsonString( TenGen ) );
+                ASSERT_EQUALS( "{ \"a\" : Timestamp( 0, 0 ) }", built.jsonString( JS ) );
+            }
+        };
+
         class Date {
         public:
             void run() {
