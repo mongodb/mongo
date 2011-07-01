@@ -613,7 +613,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
-                massert( 13002 ,  "how could chunk manager be null!" , cm );
+                massert( 13002 ,  "shard internal error chunk manager should never be null" , cm );
 
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
