@@ -480,6 +480,7 @@
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
+    <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\group.cpp" />
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
