@@ -181,6 +181,7 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
+        {"$dayofweek", ExpressionDayOfWeek::create},
         {"$divide", ExpressionDivide::create},
         {"$eq", ExpressionCompare::createEq},
         {"$gt", ExpressionCompare::createGt},
@@ -755,6 +756,53 @@ namespace mongo {
     const char *ExpressionConstant::getOpName() const {
 	assert(false); // this has no name
 	return NULL;
+    }
+
+    /* ------------------------- ExpressionDayOfWeek ----------------------------- */
+
+    ExpressionDayOfWeek::~ExpressionDayOfWeek() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
+        shared_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
+        return pExpression;
+    }
+
+    ExpressionDayOfWeek::ExpressionDayOfWeek():
+        ExpressionNary() {
+    }
+
+    void ExpressionDayOfWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDayOfWeek::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string dayofweek = date.toString().substr(0,3);
+        if (!dayofweek.compare("Sun")) {
+            dayofweek = "Sunday";
+        } else if (!dayofweek.compare("Mon")) {
+            dayofweek = "Monday";
+        } else if (!dayofweek.compare("Tue")) {
+            dayofweek = "Tuesday";
+        } else if (!dayofweek.compare("Wed")) {
+            dayofweek = "Wednesday";
+        } else if (!dayofweek.compare("Thu")) {
+            dayofweek = "Thursday";
+        } else if (!dayofweek.compare("Fri")) {
+            dayofweek = "Friday";
+        } else if (!dayofweek.compare("Sat")) {
+            dayofweek = "Saturday";
+        }
+        return Value::createString(dayofweek);
+    }
+
+    const char *ExpressionDayOfWeek::getOpName() const {
+	return "$dayofweek";
     }
 
     /* ----------------------- ExpressionDivide ---------------------------- */
