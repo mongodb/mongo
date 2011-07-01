@@ -1296,6 +1296,7 @@ namespace mongo {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
+                checkNoMods( newObj );
                 debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
