@@ -1232,7 +1232,7 @@ namespace mongo {
     bool BSONObjBuilder::numStrsReady = (numStrs[0].size() > 0);
 
     bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
-        if ( data.size() == 0 || data == "-")
+        if ( data.size() == 0 || data == "-" || data == ".")
             return false;
 
         unsigned int pos=0;
