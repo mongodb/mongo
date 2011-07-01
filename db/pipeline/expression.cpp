@@ -181,14 +181,14 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
-        {"$day", ExpressionDay::create},
-        {"$dayofweek", ExpressionDayOfWeek::create},
+        {"$dayOfMonth", ExpressionDayOfMonth::create},
+        {"$dayOfWeek", ExpressionDayOfWeek::create},
         {"$divide", ExpressionDivide::create},
         {"$eq", ExpressionCompare::createEq},
         {"$gt", ExpressionCompare::createGt},
         {"$gte", ExpressionCompare::createGte},
         {"$hour", ExpressionHour::create},
-        {"$ifnull", ExpressionIfNull::create},
+        {"$ifNull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
         {"$minute", ExpressionMinute::create},
@@ -202,8 +202,8 @@ namespace mongo {
         {"$strcmp", ExpressionStrcmp::create},
         {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
-        {"$tolower", ExpressionToLower::create},
-        {"$toupper", ExpressionToUpper::create},
+        {"$toLower", ExpressionToLower::create},
+        {"$toUpper", ExpressionToUpper::create},
         {"$year", ExpressionYear::create},
     };
 
@@ -762,36 +762,36 @@ namespace mongo {
 	return NULL;
     }
 
-    /* ------------------------- ExpressionDay ----------------------------- */
+    /* ------------------------- ExpressionDayOfMonth ----------------------------- */
 
-    ExpressionDay::~ExpressionDay() {
+    ExpressionDayOfMonth::~ExpressionDayOfMonth() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionDay::create() {
-        shared_ptr<ExpressionDay> pExpression(new ExpressionDay());
+    shared_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
+        shared_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
         return pExpression;
     }
 
-    ExpressionDay::ExpressionDay():
+    ExpressionDayOfMonth::ExpressionDayOfMonth():
         ExpressionNary() {
     }
 
-    void ExpressionDay::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionDayOfMonth::addOperand(const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionDay::evaluate(
+    shared_ptr<const Value> ExpressionDayOfMonth::evaluate(
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         Date_t date = pDate->coerceToDate();
-        string day = date.toString().substr(8,2);
-        return Value::createInt(atoi(day.c_str()));
+        string dayOfMonth = date.toString().substr(8,2);
+        return Value::createInt(atoi(dayOfMonth.c_str()));
     }
 
-    const char *ExpressionDay::getOpName() const {
-	return "$day";
+    const char *ExpressionDayOfMonth::getOpName() const {
+	return "$dayOfMonth";
     }
 
     /* ------------------------- ExpressionDayOfWeek ----------------------------- */
@@ -1935,7 +1935,7 @@ namespace mongo {
     }
 
     const char *ExpressionIfNull::getOpName() const {
-	return "$ifnull";
+	return "$ifNull";
     }
 
     /* ------------------------ ExpressionNary ----------------------------- */
@@ -2402,7 +2402,7 @@ namespace mongo {
     }
 
     const char *ExpressionToLower::getOpName() const {
-	return "$tolower";
+	return "$toLower";
     }
 
     /* ------------------------- ExpressionToUpper ----------------------------- */
@@ -2434,7 +2434,7 @@ namespace mongo {
     }
 
     const char *ExpressionToUpper::getOpName() const {
-	return "$toupper";
+	return "$toUpper";
     }
 
     /* ------------------------- ExpressionYear ----------------------------- */
