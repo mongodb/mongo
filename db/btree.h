@@ -364,7 +364,7 @@ namespace mongo {
             return (char*)&(d->data) - (char*)&(d->parent);
         }
         static int bodySize() { return Version::BucketSize - headerSize(); }
-        static int lowWaterMark() { return bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
+        static int lowWaterMark() { return bodySize() / 2 - Version::KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
 
         // for testing
         int nKeys() const { return this->n; }
