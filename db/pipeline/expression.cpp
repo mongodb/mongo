@@ -187,15 +187,18 @@ namespace mongo {
         {"$eq", ExpressionCompare::createEq},
         {"$gt", ExpressionCompare::createGt},
         {"$gte", ExpressionCompare::createGte},
+        {"$hour", ExpressionHour::create},
         {"$ifnull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
+        {"$minute", ExpressionMinute::create},
         {"$mod", ExpressionMod::create},
         {"$month", ExpressionMonth::create},
         {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$second", ExpressionSecond::create},
         {"$strcmp", ExpressionStrcmp::create},
         {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
@@ -1686,6 +1689,38 @@ namespace mongo {
 	return true;
     }
 
+    /* ------------------------- ExpressionMinute ----------------------------- */
+
+    ExpressionMinute::~ExpressionMinute() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMinute::create() {
+        shared_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
+        return pExpression;
+    }
+
+    ExpressionMinute::ExpressionMinute():
+        ExpressionNary() {
+    }
+
+    void ExpressionMinute::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMinute::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string minute = date.toString().substr(14,2);
+        return Value::createInt(atoi(minute.c_str()));
+    }
+
+    const char *ExpressionMinute::getOpName() const {
+	return "$minute";
+    }
+
     /* ----------------------- ExpressionMod ---------------------------- */
 
     ExpressionMod::~ExpressionMod() {
@@ -1832,6 +1867,38 @@ namespace mongo {
 
     shared_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
     return ExpressionMultiply::create;
+    }
+
+    /* ------------------------- ExpressionHour ----------------------------- */
+
+    ExpressionHour::~ExpressionHour() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionHour::create() {
+        shared_ptr<ExpressionHour> pExpression(new ExpressionHour());
+        return pExpression;
+    }
+
+    ExpressionHour::ExpressionHour():
+        ExpressionNary() {
+    }
+
+    void ExpressionHour::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionHour::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string hour = date.toString().substr(11,2);
+        return Value::createInt(atoi(hour.c_str()));
+    }
+
+    const char *ExpressionHour::getOpName() const {
+	return "$hour";
     }
 
     /* ----------------------- ExpressionIfNull ---------------------------- */
@@ -2153,6 +2220,38 @@ namespace mongo {
 
     const char *ExpressionOr::getOpName() const {
 	return "$or";
+    }
+
+    /* ------------------------- ExpressionSecond ----------------------------- */
+
+    ExpressionSecond::~ExpressionSecond() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSecond::create() {
+        shared_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
+        return pExpression;
+    }
+
+    ExpressionSecond::ExpressionSecond():
+        ExpressionNary() {
+    }
+
+    void ExpressionSecond::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSecond::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string second = date.toString().substr(17,2);
+        return Value::createInt(atoi(second.c_str()));
+    }
+
+    const char *ExpressionSecond::getOpName() const {
+	return "$second";
     }
 
     /* ----------------------- ExpressionStrcmp ---------------------------- */

@@ -624,6 +624,23 @@ namespace mongo {
     };
 
 
+    class ExpressionHour :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionHour();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionHour();
+    };
+
+
     class ExpressionIfNull :
         public ExpressionNary {
     public:
@@ -638,6 +655,23 @@ namespace mongo {
 
     private:
         ExpressionIfNull();
+    };
+
+
+    class ExpressionMinute :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionMinute();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMinute();
     };
 
 
@@ -902,6 +936,23 @@ namespace mongo {
 
     private:
         ExpressionOr();
+    };
+
+
+    class ExpressionSecond :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionSecond();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSecond();
     };
 
 
