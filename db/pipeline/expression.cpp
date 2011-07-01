@@ -189,6 +189,7 @@ namespace mongo {
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
         {"$mod", ExpressionMod::create},
+        {"$month", ExpressionMonth::create},
         {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
@@ -1645,6 +1646,61 @@ namespace mongo {
 
     const char *ExpressionMod::getOpName() const {
 	return "$mod";
+    }
+
+    /* ------------------------- ExpressionMonth ----------------------------- */
+
+    ExpressionMonth::~ExpressionMonth() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMonth::create() {
+        shared_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
+        return pExpression;
+    }
+
+    ExpressionMonth::ExpressionMonth():
+        ExpressionNary() {
+    }
+
+    void ExpressionMonth::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMonth::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        Date_t date = pDate->coerceToDate();
+        string month = date.toString().substr(4,3);
+        if (!month.compare("Jan")) {
+            month = "January";
+        } else if (!month.compare("Feb")) {
+            month = "February";
+        } else if (!month.compare("Mar")) {
+            month = "March";
+        } else if (!month.compare("Apr")) {
+            month = "April";
+        } else if (!month.compare("Jun")) {
+            month = "June";
+        } else if (!month.compare("Jul")) {
+            month = "July";
+        } else if (!month.compare("Aug")) {
+            month = "August";
+        } else if (!month.compare("Sep")) {
+            month = "September";
+        } else if (!month.compare("Oct")) {
+            month = "October";
+        } else if (!month.compare("Nov")) {
+            month = "November";
+        } else if (!month.compare("Dec")) {
+            month = "December";
+        }
+        return Value::createString(month);
+    }
+
+    const char *ExpressionMonth::getOpName() const {
+	return "$month";
     }
 
     /* ------------------------- ExpressionMultiply ----------------------------- */

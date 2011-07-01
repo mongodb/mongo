@@ -648,6 +648,23 @@ namespace mongo {
     };
 
 
+    class ExpressionMonth :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionMonth();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMonth();
+    };
+
+
     class ExpressionNot :
         public ExpressionNary {
     public:
