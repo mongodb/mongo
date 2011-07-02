@@ -1,16 +1,17 @@
+// check where "key to big" happens
 
 t = db.index_big1;
 
-N = 4000;
+N = 3200;
 t.drop();
+
+var s = "";
 
 for ( i=0; i<N; i++ ) {
 
-    var s = "";
-    while ( s.length < i )
-        s += "x";
-
     t.insert( { a : i + .5 , x : s } )
+
+    s += "x";
 }
 
 t.ensureIndex( { a : 1 , x : 1 } )
@@ -26,10 +27,13 @@ for ( i=0; i<N; i++ ) {
     }
     else {
         if ( flip == -1 ) {
-            print( "flipped at: " + i );
+	    //            print( "state flipped at: " + i );
             flip = i;
         }
     }
 }
 
-assert.eq( 797, flip , "flip changed" );
+//print(flip);
+//print(flip/1024);
+
+assert.eq( /*v0 index : 797*/2538, flip , "flip changed" );

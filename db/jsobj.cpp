@@ -1193,7 +1193,7 @@ namespace mongo {
     }
 
     bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
-        if ( data.size() == 0 || data == "-")
+        if ( data.size() == 0 || data == "-" || data == ".")
             return false;
 
         unsigned int pos=0;

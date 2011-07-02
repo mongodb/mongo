@@ -1775,7 +1775,7 @@ namespace mongo {
 
     template< class V >
     int BtreeBucket<V>::getKeyMax() {
-        return KeyMax;
+        return V::KeyMax;
     }
 
     template< class V >
