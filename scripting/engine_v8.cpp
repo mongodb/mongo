@@ -311,6 +311,7 @@ namespace mongo {
         V8STR_MINKEY = getV8Str( "$MinKey" );
         V8STR_MAXKEY = getV8Str( "$MaxKey" );
         V8STR_NUMBERLONG = getV8Str( "__NumberLong" );
+        V8STR_NUMBERINT = getV8Str( "__NumberInt" );
         V8STR_DBPTR = getV8Str( "__DBPointer" );
         V8STR_BINDATA = getV8Str( "__BinData" );
         V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
@@ -949,9 +950,18 @@ namespace mongo {
             }
 
             case mongo::NumberDouble:
-            case mongo::NumberInt:
                 o->Set( name , v8::Number::New( f.number() ) );
                 break;
+
+            case mongo::NumberInt: {
+                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+                int val = f.numberInt();
+                v8::Function* numberInt = getNamedCons( "NumberInt" );
+                v8::Handle<v8::Value> argv[1];
+                argv[0] = v8::Int32::New( val );
+                o->Set( name, numberInt->NewInstance( 1, argv ) );
+                break;
+            }
 
             case mongo::Array:
                 sub = f.embeddedObject();
@@ -1140,7 +1150,6 @@ namespace mongo {
             return newId( f.__oid() );
 
         case mongo::NumberDouble:
-        case mongo::NumberInt:
             return v8::Number::New( f.number() );
 
         case mongo::Array:
@@ -1212,6 +1221,15 @@ namespace mongo {
                 argv[2] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
                 return numberLong->NewInstance( 3, argv );
             }
+        }
+
+        case mongo::NumberInt: {
+            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+            int val = f.numberInt();
+            v8::Function* numberInt = getNamedCons( "NumberInt" );
+            v8::Handle<v8::Value> argv[1];
+            argv[0] = v8::Int32::New(val);
+            return numberInt->NewInstance( 1, argv );
         }
 
         case mongo::MinKey: {
@@ -1342,6 +1360,10 @@ namespace mongo {
                 }
 
                 b.append( sname, val );
+            }
+            else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERINT ).IsEmpty() ) {
+                v8::Handle< v8::Object > it = value->ToObject();
+                b.append(sname, it->GetHiddenValue(V8STR_NUMBERINT)->Int32Value());
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_DBPTR ).IsEmpty() ) {
                 OID oid;

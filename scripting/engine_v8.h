@@ -144,6 +144,7 @@ namespace mongo {
         Handle<v8::String> V8STR_MINKEY;
         Handle<v8::String> V8STR_MAXKEY;
         Handle<v8::String> V8STR_NUMBERLONG;
+        Handle<v8::String> V8STR_NUMBERINT;
         Handle<v8::String> V8STR_DBPTR;
         Handle<v8::String> V8STR_BINDATA;
         Handle<v8::String> V8STR_WRAPPER;

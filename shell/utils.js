@@ -455,6 +455,14 @@ NumberLong.prototype.tojson = function() {
     return this.toString();
 }
 
+if ( ! NumberInt.prototype ) {
+    NumberInt.prototype = {}
+}
+
+NumberInt.prototype.tojson = function() {
+    return this.toString();
+}
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
@@ -962,7 +970,6 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
 
     builtinMethods[Mongo] = "find update insert remove".split(' ');
     builtinMethods[BinData] = "hex base64 length subtype".split(' ');
-    builtinMethods[NumberLong] = "toNumber".split(' ');
 
     var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
 
