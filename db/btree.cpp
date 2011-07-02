@@ -125,7 +125,7 @@ namespace mongo {
     }
 
     template< class V >
-    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict) const {
+    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict, unsigned depth) const {
         {
             bool f = false;
             assert( f = true );
@@ -136,8 +136,8 @@ namespace mongo {
         this->assertValid(order, true);
 
         if ( bt_dmp ) {
-            out() << thisLoc.toString() << ' ';
-            ((BtreeBucket *) this)->dump();
+            _log() << thisLoc.toString() << ' ';
+            ((BtreeBucket *) this)->dump(depth);
         }
 
         // keycount
@@ -163,7 +163,7 @@ namespace mongo {
                 else {
                     wassert( b->parent == thisLoc );
                 }
-                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict);
+                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict, depth+1);
             }
         }
         if ( !this->nextChild.isNull() ) {
@@ -175,7 +175,7 @@ namespace mongo {
             else {
                 wassert( b->parent == thisLoc );
             }
-            kc += b->fullValidate(this->nextChild, order, unusedCount, strict);
+            kc += b->fullValidate(this->nextChild, order, unusedCount, strict, depth+1);
         }
 
         return kc;
@@ -1731,18 +1731,20 @@ namespace mongo {
     }
 
     template< class V >
-    void BtreeBucket<V>::dump() const {
-        out() << "DUMP btreebucket this->n:" << this->n;
-        out() << " this->parent:" << hex << this->parent.getOfs() << dec;
+    void BtreeBucket<V>::dump(unsigned depth) const {
+        string indent = string(depth, ' ');
+        _log() << "BUCKET n:" << this->n;
+        _log() << " parent:" << hex << this->parent.getOfs() << dec;
         for ( int i = 0; i < this->n; i++ ) {
-            out() << '\n';
+            _log() << '\n' << indent;
             KeyNode k = keyNode(i);
-            out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
-                  k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.toString() << dec;
+            string ks = k.key.toString();
+            _log() << "  " << hex << k.prevChildBucket.getOfs() << '\n';
+            _log() << indent << "    " << i << ' ' << ks.substr(0, 30) << " Loc:" << k.recordLoc.toString() << dec;
             if ( this->k(i).isUnused() )
-                out() << " UNUSED";
+                _log() << " UNUSED";
         }
-        out() << " right:" << hex << this->nextChild.getOfs() << dec << endl;
+        _log() << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
     }
 
     /** todo: meaning of return code unclear clean up */

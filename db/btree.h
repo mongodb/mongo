@@ -618,11 +618,11 @@ namespace mongo {
 
         bool isHead() const { return this->parent.isNull(); }
         void dumpTree(const DiskLoc &thisLoc, const BSONObj &order) const;
-        long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount = 0, bool strict = false) const; /* traverses everything */
+        long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount = 0, bool strict = false, unsigned depth=0) const; /* traverses everything */
 
         bool isUsed( int i ) const { return this->k(i).isUsed(); }
         string bucketSummary() const;
-        void dump() const;
+        void dump(unsigned depth=0) const;
 
         /**
          * @return true if key exists in index
