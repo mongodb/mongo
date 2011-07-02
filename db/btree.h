@@ -261,7 +261,7 @@ namespace mongo {
         typedef KeyV1Owned KeyOwned;
         enum { BucketSize = 8192-16 }; // leave room for Record header
         // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
-        static const int KeyMax = 3*1024;
+        static const int KeyMax = 2560;
     protected:
         /** Parent bucket of this bucket, which isNull() for the root bucket. */
         Loc parent;
