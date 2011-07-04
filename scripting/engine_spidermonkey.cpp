@@ -242,6 +242,10 @@ namespace mongo {
             return val;
         }
 
+        int toNumberInt( JSObject *o ) {
+            return (boost::uint32_t)(boost::int32_t) getNumber( o, "floatApprox" );
+        }
+
         double toNumber( jsval v ) {
             double d;
             uassert( 10214 ,  "not a number" , JS_ValueToNumber( _context , v , &d ) );
@@ -566,6 +570,19 @@ namespace mongo {
             return OBJECT_TO_JSVAL( o );
         }
 
+        void makeIntObj( int n, JSObject * o ) {
+            boost::uint32_t val = (boost::uint32_t)n;
+            CHECKNEWOBJECT(o,_context,"NumberInt1");
+            double floatApprox = (double)(boost::int32_t)val;
+            setProperty( o , "floatApprox" , toval( floatApprox ) );
+        }
+
+        jsval toval( int n ) {
+            JSObject * o = JS_NewObject( _context , &numberint_class , 0 , 0 );
+            makeIntObj( n, o );
+            return OBJECT_TO_JSVAL( o );
+        }
+
         jsval toval( const BSONElement& e ) {
 
             switch( e.type() ) {
@@ -574,8 +591,9 @@ namespace mongo {
             case Undefined:
                 return JSVAL_NULL;
             case NumberDouble:
-            case NumberInt:
                 return toval( e.number() );
+            case NumberInt:
+                return toval( e.numberInt() );
             case Symbol: // TODO: should we make a special class for this
             case String:
                 return toval( e.valuestr() );

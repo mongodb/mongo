@@ -938,6 +938,73 @@ zzz
         { 0 }
     };
 
+    JSClass numberint_class = {
+        "NumberInt" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSBool numberint_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        smuassert( cx , "NumberInt needs 0 or 1 args" , argc == 0 || argc == 1 );
+
+        if ( ! JS_InstanceOf( cx , obj , &numberint_class , 0 ) ) {
+            obj = JS_NewObject( cx , &numberint_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "numberint_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        Convertor c( cx );
+        if ( argc == 0 ) {
+            c.setProperty( obj, "floatApprox", c.toval( 0.0 ) );
+        }
+        else if ( JSVAL_IS_NUMBER( argv[ 0 ] ) ) {
+            c.setProperty( obj, "floatApprox", argv[ 0 ] );
+        }
+        else {
+            string num = c.toString( argv[ 0 ] );
+            //PRINT(num);
+            const char *numStr = num.c_str();
+            int n;
+            try {
+                n = (int) parseLL( numStr );
+                //PRINT(n);
+            }
+            catch ( const AssertionException & ) {
+                smuassert( cx , "could not convert string to integer" , false );
+            }
+            c.makeIntObj( n, obj );
+        }
+
+        return JS_TRUE;
+    }
+
+    JSBool numberint_valueof(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        return *rval = c.toval( double( c.toNumberInt( obj ) ) );
+    }
+
+    JSBool numberint_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        return numberint_valueof( cx, obj, argc, argv, rval );
+    }
+
+    JSBool numberint_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        stringstream ss;
+        int val = c.toNumberInt( obj );
+        ss << "NumberInt(" << val << ")";
+
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    JSFunctionSpec numberint_functions[] = {
+        { "valueOf" , numberint_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "toNumber" , numberint_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "toString" , numberint_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
     JSClass minkey_class = {
         "MinKey" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -1044,6 +1111,7 @@ zzz
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &numberint_class , numberint_constructor , 0 , 0 , numberint_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
@@ -1085,6 +1153,11 @@ zzz
 
         if ( JS_InstanceOf( c->_context , o , &numberlong_class , 0 ) ) {
             b.append( name , c->toNumberLongUnsafe( o ) );
+            return true;
+        }
+
+        if ( JS_InstanceOf( c->_context , o , &numberint_class , 0 ) ) {
+            b.append( name , c->toNumberInt( o ) );
             return true;
         }
 

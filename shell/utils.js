@@ -455,13 +455,13 @@ NumberLong.prototype.tojson = function() {
     return this.toString();
 }
 
-//if ( ! NumberInt.prototype ) {
-//    NumberInt.prototype = {}
-//}
+if ( ! NumberInt.prototype ) {
+    NumberInt.prototype = {}
+}
 
-//NumberInt.prototype.tojson = function() {
-//    return this.toString();
-//}
+NumberInt.prototype.tojson = function() {
+    return this.toString();
+}
 
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
