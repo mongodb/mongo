@@ -9,8 +9,21 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
-    if ( tojson( a ) == tojson( b ) )
+    
+    a = tojson(a);
+    b = tojson(b);
+
+    if ( a == b )
         return true;
+
+    var clean = function( s ){
+        s = s.replace( /NumberInt\((\d+)\)/ , "$1" );
+        return s;
+    }
+    
+    if ( clean(a) == clean(b) )
+        return true;
+    
     return false;
 }
 
