@@ -19,7 +19,7 @@ for ( var indexVersion=0; indexVersion<=1; indexVersion++ ) {
             assert.eq( 821 , sz ); 
         }
         else if ( indexVersion == 1 ) { 
-            assert.eq( 2561 , sz );
+            assert.eq( 1026 , sz );
         }
         break;
     }

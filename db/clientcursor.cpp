@@ -172,7 +172,7 @@ namespace mongo {
             log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
         }
         if( bl.size() == 0 ) { 
-            DEV log() << "debug warning: no cursors found in informAboutToDeleteBucket()" << endl;
+            DEV tlog() << "debug warning: no cursors found in informAboutToDeleteBucket()" << endl;
         }
         for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
             i->second->_c->aboutToDeleteBucket(b);

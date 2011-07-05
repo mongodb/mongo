@@ -36,4 +36,4 @@ for ( i=0; i<N; i++ ) {
 //print(flip);
 //print(flip/1024);
 
-assert.eq( /*v0 index : 797*/2538, flip , "flip changed" );
+assert.eq( /*v0 index : 797*/1002, flip , "flip changed" );

@@ -44,8 +44,6 @@ namespace BtreeTests0 {
 #undef BTVERSION
 #define BTVERSION 1
 namespace BtreeTests1 {
-    // **************************************************************************
-    // nTODO btree1 IS COMMENTED OUT
-// #include "btreetests.inl"
+ #include "btreetests.inl"
 }
 
