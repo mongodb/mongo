@@ -301,12 +301,12 @@ var p6result = [
 assert(arrayEq(p6.result, p6result), 'p6 failed');
 
 
-// slightly more complex computed expression; $ifnull
+// slightly more complex computed expression; $ifNull
 var p7 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theSum : { $add:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -587,7 +587,7 @@ var p12 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theProduct : { $multiply:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -615,7 +615,7 @@ var p13 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theDifference : { $subtract:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -643,7 +643,7 @@ var p14 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theRemainder : { $mod:[
-	    { $ifnull:["$other.foo",
+	    { $ifNull:["$other.foo",
 		    "$other.bar"] },
                 "$pageViews", ] }
     }}
@@ -667,11 +667,11 @@ var p14result = [
 assert(arrayEq(p14.result, p14result), 'p14 failed');
 
 
-// toupper test
+// toUpper test
 var p15 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : {$toupper: "$author"},
+	author : {$toUpper: "$author"},
 	pageViews : 1
     }}
 ]});
@@ -697,15 +697,15 @@ var p15result = [
 assert(arrayEq(p15.result, p15result), 'p15 failed');
 
 
-// tolower test
+// toLower test
 var p16 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : {$toupper: "$author"},
+	author : {$toUpper: "$author"},
 	pageViews : 1
     }},
     { $project : {
-    author : {$tolower: "$author"},
+    author : {$toLower: "$author"},
     pageViews : 1
     }}
 ]});
