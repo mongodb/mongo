@@ -10,14 +10,14 @@ friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
     
-    a = tojson(a);
-    b = tojson(b);
+    a = tojson(a,false,true);
+    b = tojson(b,false,true);
 
     if ( a == b )
         return true;
 
     var clean = function( s ){
-        s = s.replace( /NumberInt\((\d+)\)/ , "$1" );
+        s = s.replace( /NumberInt\((\-?\d+)\)/g , "$1" );
         return s;
     }
     
