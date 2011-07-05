@@ -974,4 +974,15 @@ dodouble:
         assert( ! j.more() );
     }
 
+    inline BSONObj BSONObj::removeField(const StringData& name) const { 
+        BSONObjBuilder b;
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *fname = e.fieldName();
+            if( strcmp(name.data(), fname) )
+                b.append(e);
+        }
+        return b.obj();
+    }
 }

@@ -929,7 +929,7 @@ namespace mongo {
             auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
             BSONObjBuilder b;
             while ( i->more() ) {
-                BSONObj o = i->next().getOwned();
+                BSONObj o = i->next().removeField("v").getOwned();
                 b.append( BSONObjBuilder::numStr( all.size() ) , o );
                 all.push_back( o );
             }

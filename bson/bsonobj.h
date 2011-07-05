@@ -148,6 +148,11 @@ namespace mongo {
         /** note: addFields always adds _id even if not specified */
         int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
+        /** remove specified field and return a new object with the remaining fields.
+            slowish as builds a full new object
+         */
+        BSONObj removeField(const StringData& name) const;
+
         /** returns # of top level fields in the object
            note: iterates to count the fields
         */
