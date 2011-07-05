@@ -810,7 +810,7 @@ namespace mongo {
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
-            uassert( 15853 , "stopMongoByPid needs a number" , a.firstElement().isNumber() );
+            uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
