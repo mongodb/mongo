@@ -2469,7 +2469,23 @@ cout<<date<<endl<<dayOfMonth<<endl<<month<<year<<endl;
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        if (pLeft->getType() == Date) {
+            long right;
+            long left = pLeft->coerceToDate();
+            if (pRight->getType() == Date)
+                right = pRight->coerceToDate();
+            else 
+                right = pRight->coerceToDouble()*24*60*60*1000;
+            return Value::createDate(Date_t(left-right));
+        }
+            
+        if (pRight->getType() == Date){
+            assert(false); //CW TODO user error
+            return Value::getNull();
+        }
+
         productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+        
 
         if (productType == NumberDouble) {
             double right = pRight->coerceToDouble();
