@@ -814,7 +814,7 @@ namespace mongo {
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
-            return BSON( "" << code );
+            return BSON( "" << (double)code );
         }
 
         BSONObj StopMongoProgramByPid( const BSONObj &a, void* data ) {
@@ -823,7 +823,7 @@ namespace mongo {
             int pid = int( a.firstElement().number() );
             int code = killDb( 0, pid, getSignal( a ) );
             cout << "shell: stopped mongo program on pid " << pid << endl;
-            return BSON( "" << code );
+            return BSON( "" << (double)code );
         }
 
         void KillMongoProgramInstances() {
