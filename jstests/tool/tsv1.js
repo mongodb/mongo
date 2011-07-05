@@ -4,7 +4,7 @@ t = new ToolTest( "tsv1" )
 
 c = t.startDB( "foo" );
 
-base = { a : "", b : 1.1 , c : "foobar" , d: 5.1, e: -6.1 };
+base = { a : "", b : 1 , c : "foobar" , d: 5, e: -6 };
 
 t.runTool( "import" , "--file" , "jstests/tool/data/a.tsv" , "-d" , t.baseName , "-c" , "foo" , "--type" , "tsv" , "-f" , "a,b,c,d,e" );
 assert.soon( "2 == c.count()" , "restore 2" );
