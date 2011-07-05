@@ -9,8 +9,24 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
-    if ( tojson( a ) == tojson( b ) )
+    
+    a = tojson(a,false,true);
+    b = tojson(b,false,true);
+
+    if ( a == b )
         return true;
+
+    var clean = function( s ){
+        s = s.replace( /NumberInt\((\-?\d+)\)/g , "$1" );
+        return s;
+    }
+    
+    a = clean(a);
+    b = clean(b);
+
+    if ( a == b )
+        return true;
+    
     return false;
 }
 
@@ -366,20 +382,25 @@ Array.shuffle = function( arr ){
 }
 
 
-Array.tojson = function( a , indent ){
+Array.tojson = function( a , indent , nolint ){
+    var lineEnding = nolint ? " " : "\n";
+
     if (!indent) 
+        indent = "";
+    
+    if ( nolint )
         indent = "";
 
     if (a.length == 0) {
         return "[ ]";
     }
 
-    var s = "[\n";
+    var s = "[" + lineEnding;
     indent += "\t";
     for ( var i=0; i<a.length; i++){
-        s += indent + tojson( a[i], indent );
+        s += indent + tojson( a[i], indent , nolint );
         if ( i < a.length - 1 ){
-            s += ",\n";
+            s += "," + lineEnding;
         }
     }
     if ( a.length == 0 ) {
@@ -387,7 +408,7 @@ Array.tojson = function( a , indent ){
     }
 
     indent = indent.substring(1);
-    s += "\n"+indent+"]";
+    s += lineEnding+indent+"]";
     return s;
 }
 
