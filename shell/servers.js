@@ -1099,6 +1099,15 @@ ReplSetTest.prototype.getPort = function( n ){
             }
         }
     }
+    
+    if ( typeof(n) == "object" && n.floatApprox )
+        n = n.floatApprox
+    
+    // this is a hack for NumberInt
+    if ( n == 0 )
+        n = 0;
+    
+    print( "n: " + n + " ports: " + tojson( this.ports ) + "\t" + this.ports[n] + " " + typeof(n) );
     return this.ports[ n ];
 }
 
