@@ -444,6 +444,23 @@ namespace mongo {
     };
 
 
+    class ExpressionDayOfYear :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionDayOfYear();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionDayOfYear();
+    };
+
+
     class ExpressionDivide :
         public ExpressionNary {
     public:

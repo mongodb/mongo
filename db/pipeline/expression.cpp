@@ -183,6 +183,7 @@ namespace mongo {
         {"$cmp", ExpressionCompare::createCmp},
         {"$dayOfMonth", ExpressionDayOfMonth::create},
         {"$dayOfWeek", ExpressionDayOfWeek::create},
+        {"$dayOfYear", ExpressionDayOfYear::create},
         {"$divide", ExpressionDivide::create},
         {"$eq", ExpressionCompare::createEq},
         {"$gt", ExpressionCompare::createGt},
@@ -840,6 +841,76 @@ namespace mongo {
 
     const char *ExpressionDayOfWeek::getOpName() const {
 	return "$dayofweek";
+    }
+
+    /* ------------------------- ExpressionDayOfYear ----------------------------- */
+
+    ExpressionDayOfYear::~ExpressionDayOfYear() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDayOfYear::create() {
+        shared_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
+        return pExpression;
+    }
+
+    ExpressionDayOfYear::ExpressionDayOfYear():
+        ExpressionNary() {
+    }
+
+    void ExpressionDayOfYear::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDayOfYear::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        string date = (pDate->coerceToDate()).toString();
+
+        string month = date.substr(4,3);
+        int dayOfMonth = atoi(date.substr(8,2).c_str());
+        int year = atoi(date.substr(20,4).c_str());
+        bool leapYear = false;
+        int dayOfYear = 0;
+cout<<date<<endl<<dayOfMonth<<endl<<month<<year<<endl;
+        if ( year % 4 == 0 && year % 100 != 0 )
+            leapYear = true;
+        else if ( year % 400 == 0 )
+            leapYear = true;
+
+        if (!month.compare("Feb")) {
+            dayOfYear = 31;
+        } else if (!month.compare("Mar")) {
+            dayOfYear = 59;
+        } else if (!month.compare("Apr")) {
+            dayOfYear = 90;
+        } else if (!month.compare("May")) {
+            dayOfYear = 120;
+        } else if (!month.compare("Jun")) {
+            dayOfYear = 151;
+        } else if (!month.compare("Jul")) {
+            dayOfYear = 181;
+        } else if (!month.compare("Aug")) {
+            dayOfYear = 212;
+        } else if (!month.compare("Sep")) {
+            dayOfYear = 243;
+        } else if (!month.compare("Oct")) {
+            dayOfYear = 273;
+        } else if (!month.compare("Nov")) {
+            dayOfYear = 304;
+        } else if (!month.compare("Dec")) {
+            dayOfYear = 334;
+        }
+
+        if (leapYear && dayOfYear >= 59)
+            dayOfYear+=1;
+
+        return Value::createInt(dayOfYear + dayOfMonth);
+    }
+
+    const char *ExpressionDayOfYear::getOpName() const {
+	return "$dayOfYear";
     }
 
     /* ----------------------- ExpressionDivide ---------------------------- */

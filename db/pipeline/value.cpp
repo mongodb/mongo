@@ -604,6 +604,7 @@ namespace mongo {
             assert(false); // CW TODO no conversion available
         } // switch(type)
 
+            assert(false); // CW TODO no conversion available
         return jstNULL; 
     }
 
