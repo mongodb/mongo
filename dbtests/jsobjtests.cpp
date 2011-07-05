@@ -340,8 +340,6 @@ namespace JsobjTests {
                 ASSERT( isNaN(nan2) );
                 ASSERT( !isNaN(inf) );
 
-                bool x = nan == nan;
-
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << inf ) ) == 0 );
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) > 0 );
                 ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) < 0 );
