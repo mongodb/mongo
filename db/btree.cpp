@@ -341,8 +341,9 @@ namespace mongo {
             const KeyNode klast = keyNode(this->n-1);
             if(  klast.key.woCompare(key, order) > 0 ) { 
                 log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
-                //cout << keyNode(n-1).key.toString() << endl;
-                //cout << key.toString() << endl;
+                log() << "  klast: " << keyNode(n-1).key.toString() << endl;
+                log() << "  key:   " << key.toString() << endl;
+                klast.key.woCompare(key, order);
                 assert(false);
             }
         }

@@ -30,12 +30,15 @@
 
 namespace mongo {
 
+    inline bool isNaN(double d) { 
+        return d != d;
+    }
+
     /* must be same type when called, unless both sides are #s 
        this large function is in header to facilitate inline-only use of bson
     */
     inline int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
-        double x;
 
         switch ( l.type() ) {
         case EOO:
@@ -69,30 +72,28 @@ namespace mongo {
                 if( L == R ) return 0;
                 return 1;
             }
-            // else fall through
+            goto dodouble;
         case NumberInt:
-        case NumberDouble: {
-            double left = l.number();
-            double right = r.number();
-            bool lNan = !( left <= std::numeric_limits< double >::max() &&
-                           left >= -std::numeric_limits< double >::max() );
-            bool rNan = !( right <= numeric_limits< double >::max() &&
-                           right >= -numeric_limits< double >::max() );
-            if ( lNan ) {
-                if ( rNan ) {
-                    return 0;
-                }
-                else {
-                    return -1;
-                }
+            if( r.type() == NumberInt ) {
+                int L = l._numberInt();
+                int R = r._numberInt();
+                if( L < R ) return -1;
+                return L == R ? 0 : 1;
             }
-            else if ( rNan ) {
+            // else fall through
+        case NumberDouble: 
+dodouble:
+            {
+                double left = l.number();
+                double right = r.number();
+                if( left < right ) 
+                    return -1;
+                if( left == right )
+                    return 0;
+                if( isNaN(left) )
+                    return isNaN(right) ? 0 : -1;
                 return 1;
             }
-            x = left - right;
-            if ( x < 0 ) return -1;
-            return x == 0 ? 0 : 1;
-        }
         case jstOID:
             return memcmp(l.value(), r.value(), 12);
         case Code:

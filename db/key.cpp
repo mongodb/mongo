@@ -314,14 +314,13 @@ namespace mongo {
             case NumberDouble:
                 {
                     double d = e._numberDouble();
-                    bool nan = !( d <= numeric_limits< double >::max() &&
-                        d >= -numeric_limits< double >::max() );
-                    if( !nan ) { 
-                        b.appendUChar(cdouble|bits);
-                        b.appendNum(d);
-                        break;
+                    if( isNaN(d) ) {
+                        traditional(obj);
+                        return;
                     }
-                    // else fall through and return a traditional BSON obj so our compressed keys need not check for nan
+                    b.appendUChar(cdouble|bits);
+                    b.appendNum(d);
+                    break;
                 }
             default:
                 // if other types involved, store as traditional BSON
@@ -425,7 +424,7 @@ namespace mongo {
                 double R = *((double *) r);
                 if( L < R )
                     return -1;
-                if( L > R )
+                if( L != R )
                     return 1;
                 l += 8; r += 8;
                 break;
@@ -445,14 +444,6 @@ namespace mongo {
                 if( diff ) 
                     return diff;
                 l += lsz; r += lsz;
-                break;
-            }
-        case coid:
-            {
-                int res = memcmp(l, r, sizeof(OID));
-                if( res ) 
-                    return res;
-                l += 12; r += 12;
                 break;
             }
         case cbindata:
@@ -480,6 +471,14 @@ namespace mongo {
                 if( L > R )
                     return 1;
                 l += 8; r += 8;
+                break;
+            }
+        case coid:
+            {
+                int res = memcmp(l, r, sizeof(OID));
+                if( res ) 
+                    return res;
+                l += 12; r += 12;
                 break;
             }
         default:
