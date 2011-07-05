@@ -205,6 +205,7 @@ namespace mongo {
         {"$subtract", ExpressionSubtract::create},
         {"$toLower", ExpressionToLower::create},
         {"$toUpper", ExpressionToUpper::create},
+        {"$week", ExpressionWeek::create},
         {"$year", ExpressionYear::create},
     };
 
@@ -2508,6 +2509,103 @@ cout<<date<<endl<<dayOfMonth<<endl<<month<<year<<endl;
 
     const char *ExpressionToUpper::getOpName() const {
 	return "$toUpper";
+    }
+
+    /* ------------------------- ExpressionWeek ----------------------------- */
+
+    ExpressionWeek::~ExpressionWeek() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionWeek::create() {
+        shared_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
+        return pExpression;
+    }
+
+    ExpressionWeek::ExpressionWeek():
+        ExpressionNary() {
+    }
+
+    void ExpressionWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionWeek::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        string date = (pDate->coerceToDate()).toString();
+
+        string dayOfWeek = date.substr(0,3);
+        string month = date.substr(4,3);
+        int dayOfMonth = atoi(date.substr(8,2).c_str());
+        int year = atoi(date.substr(20,4).c_str());
+        bool leapYear = false;
+        int dayOfYear = 0;
+        int week = 0;
+        int dayNum = 0;
+        int janFirst = 0;
+        int offset = 0;
+cout<<date<<endl;
+        if ( year % 4 == 0 && year % 100 != 0 )
+            leapYear = true;
+        else if ( year % 400 == 0 )
+            leapYear = true;
+
+        if (!month.compare("Feb")) {
+            dayOfYear = 31;
+        } else if (!month.compare("Mar")) {
+            dayOfYear = 59;
+        } else if (!month.compare("Apr")) {
+            dayOfYear = 90;
+        } else if (!month.compare("May")) {
+            dayOfYear = 120;
+        } else if (!month.compare("Jun")) {
+            dayOfYear = 151;
+        } else if (!month.compare("Jul")) {
+            dayOfYear = 181;
+        } else if (!month.compare("Aug")) {
+            dayOfYear = 212;
+        } else if (!month.compare("Sep")) {
+            dayOfYear = 243;
+        } else if (!month.compare("Oct")) {
+            dayOfYear = 273;
+        } else if (!month.compare("Nov")) {
+            dayOfYear = 304;
+        } else if (!month.compare("Dec")) {
+            dayOfYear = 334;
+        }
+
+        if (leapYear && dayOfYear >= 59)
+            dayOfYear+=1;
+
+        dayOfYear += dayOfMonth;
+
+        if (!dayOfWeek.compare("Sun")) {
+            dayNum = 1;
+        } else if (!dayOfWeek.compare("Mon")) {
+            dayNum = 2;
+        } else if (!dayOfWeek.compare("Tue")) {
+            dayNum = 3;
+        } else if (!dayOfWeek.compare("Wed")) {
+            dayNum = 4;
+        } else if (!dayOfWeek.compare("Thu")) {
+            dayNum = 5;
+        } else if (!dayOfWeek.compare("Fri")) {
+            dayNum = 6;
+        } else if (!dayOfWeek.compare("Sat")) {
+            dayNum = 7;
+        }
+
+        janFirst = dayNum - dayOfYear % 7;
+        offset = (janFirst + 5) % 7;
+        week = (dayOfYear + offset) / 7;
+
+        return Value::createInt(week);
+    }
+
+    const char *ExpressionWeek::getOpName() const {
+	return "$week";
     }
 
     /* ------------------------- ExpressionYear ----------------------------- */
