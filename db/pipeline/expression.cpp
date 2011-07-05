@@ -324,11 +324,52 @@ namespace mongo {
           and integral types in parallel, tracking the current narrowest
           type.
          */
+        bool stringFlag = false;
+        bool dateFlag = false;
+        bool doubleDateFlag = false;
+        const size_t n = vpOperand.size();
+
+        for (size_t i = 0; i < n; ++i) {
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            if (pValue->getType() == String)
+                stringFlag = true;
+            if (pValue->getType() == Date) {
+                if (dateFlag)
+                    doubleDateFlag = true;
+                dateFlag = true;
+            }
+        }
+
+        if (doubleDateFlag && !stringFlag){
+            assert(false); // CW TODO user error
+            return Value::getNull();
+        }
+            
+        
+        if (stringFlag) {
+            string stringTotal = "";
+            for (size_t i = 0; i < n; ++i) {
+                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                stringTotal += pValue->coerceToString();
+            }
+            return Value::createString(stringTotal);
+        }
+
+        if (dateFlag) {
+            long long dateTotal = 0;
+            for (size_t i = 0; i < n; ++i) {
+                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                if (pValue->getType() == Date) 
+                    dateTotal += pValue->coerceToDate();
+                else 
+                    dateTotal += pValue->coerceToDouble()*24*60*60*1000;
+            }
+            return Value::createDate(Date_t(dateTotal));
+        }
+
         double doubleTotal = 0;
         long long longTotal = 0;
         BSONType totalType = NumberInt;
-
-        const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
 

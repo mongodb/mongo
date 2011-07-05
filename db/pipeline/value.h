@@ -102,6 +102,14 @@ namespace mongo {
         static shared_ptr<const Value> createString(string value);
 
         /*
+          Construct a date-valued Value.
+
+          @param value the value
+          @returns a Value with the given value
+        */
+        static shared_ptr<const Value> createDate(Date_t value);
+
+        /*
           Construct a document-valued Value.
 
           @param value the value
@@ -206,16 +214,16 @@ namespace mongo {
         double coerceToDouble() const;
 
         /*
-          Coerce (cast) a value to a string, using JSON rules.
+          Coerce (cast) a value to a date, using JSON rules.
 
-          @returns the double value
+          @returns the date value
         */
         Date_t coerceToDate() const;
 
         /*
           Coerce (cast) a value to a string, using JSON rules.
 
-          @returns the double value
+          @returns the date value
         */
         string coerceToString() const;
 
@@ -275,7 +283,8 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
-        Value(string boolValue);
+        Value(Date_t value);
+        Value(string value);
         Value(const shared_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 

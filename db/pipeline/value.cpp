@@ -221,6 +221,18 @@ namespace mongo {
         return pValue;
     }
 
+    Value::Value(Date_t value):
+        type(Date),
+        pDocumentValue(),
+        vpValue() {
+        dateValue = value;
+    }
+
+    shared_ptr<const Value> Value::createDate(Date_t value) {
+        shared_ptr<const Value> pValue(new Value(value));
+        return pValue;
+    }
+
     Value::Value(string value):
         type(String),
         pDocumentValue(),
@@ -625,6 +637,9 @@ namespace mongo {
 
         case String:
             return stringValue;
+
+        case Date:
+            return dateValue.toString();
 
 	case jstNULL:
 	case Undefined:
