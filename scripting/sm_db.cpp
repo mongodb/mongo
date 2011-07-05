@@ -990,18 +990,24 @@ zzz
 
     JSBool numberint_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         Convertor c(cx);
-        stringstream ss;
         int val = c.toNumberInt( obj );
-        ss << "NumberInt(" << val << ")";
-
-        string ret = ss.str();
+        string ret = str::stream() << "NumberInt(" << val << ")";
         return *rval = c.toval( ret.c_str() );
     }
+
+    JSBool numberint_tojson(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        int val = c.toNumberInt( obj );
+        string ret = str::stream() << val;
+        return *rval = c.toval( ret.c_str() );
+    }
+
 
     JSFunctionSpec numberint_functions[] = {
         { "valueOf" , numberint_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toNumber" , numberint_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toString" , numberint_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "tojson" , numberint_tojson , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
 
