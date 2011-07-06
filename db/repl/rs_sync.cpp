@@ -63,7 +63,7 @@ namespace mongo {
                 return false;
             }
 
-            r.queryGTE( rsoplog, applyGTE );
+            r.tailingQueryGTE( rsoplog, applyGTE );
             if ( !r.haveCursor() ) {
                 log() << "replSet initial sync oplog query error" << rsLog;
                 return false;
@@ -161,7 +161,7 @@ namespace mongo {
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
                     r.resetCursor();
-                    r.queryGTE(rsoplog, ts);
+                    r.tailingQueryGTE(rsoplog, ts);
                     if( r.haveCursor() ) {
                         continue;
                     }
