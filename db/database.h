@@ -46,8 +46,6 @@ namespace mongo {
 
         void openAllFiles();
 
-        void finishInit();
-
         /**
          * tries to make sure that this hasn't been deleted
          */
@@ -82,9 +80,9 @@ namespace mongo {
          */
         void preallocateAFile() { getFile( numFiles() , 0, true ); }
 
-        MongoDataFile* suitableFile( int sizeNeeded, bool preallocate );
+        MongoDataFile* suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota );
 
-        Extent* allocExtent( const char *ns, int size, bool capped );
+        Extent* allocExtent( const char *ns, int size, bool capped, bool enforceQuota );
 
         MongoDataFile* newestFile();
 
@@ -92,7 +90,6 @@ namespace mongo {
          * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
-
 
         void flushFiles( bool sync ) const;
 
@@ -107,7 +104,20 @@ namespace mongo {
         }
 
         static bool validDBName( const string& ns );
+        
+        /**
+         * @throws DatabaseDifferCaseCode if the name is a duplicate based on
+         * case insensitive matching.
+         */
+        void checkDuplicateUncasedNames() const;
 
+        /**
+         * @return name of an existing database with same text name but different
+         * casing, if one exists.  Otherwise the empty string is returned.  If
+         * 'duplicates' is specified, it is filled with all duplicate names.
+         */
+        static string duplicateUncasedName( const string &name, const string &path, set< string > *duplicates = 0 );
+        
     public: // this should be private later
 
         vector<MongoDataFile*> files;

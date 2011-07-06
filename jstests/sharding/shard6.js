@@ -103,4 +103,7 @@ assert.eq( 16 , o.x , "x1 - did save fail? " + tojson(o) );
 poolStats( "at end" )
 
 print( summary )
+
+assert.throws( function(){ s.adminCommand( { enablesharding : "admin" } ) } ) 
+
 s.stop();

@@ -97,11 +97,13 @@ namespace mongo {
         const bool isSharded = conf->isSharded( ns );
         if ( isSharded ) {
             manager = conf->getChunkManager( ns , authoritative );
-            officialSequenceNumber = manager->getSequenceNumber();
+            // It's possible the chunk manager was reset since we checked whether sharded was true,
+            // so must check this here.
+            if( manager ) officialSequenceNumber = manager->getSequenceNumber();
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
-        // (ie, last time we issued the setShardVersions below)
+        // (ie., last time we issued the setShardVersions below)
         unsigned long long sequenceNumber = connectionShardStatus.getSequence(&conn,ns);
         if ( sequenceNumber == officialSequenceNumber ) {
             return false;
@@ -109,11 +111,11 @@ namespace mongo {
 
 
         ShardChunkVersion version = 0;
-        if ( isSharded ) {
+        if ( isSharded && manager ) {
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
-        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
+        LOG(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
@@ -126,25 +128,33 @@ namespace mongo {
             return true;
         }
 
-        log(1) << "       setShardVersion failed!\n" << result << endl;
+        LOG(1) << "       setShardVersion failed!\n" << result << endl;
 
-        if ( result.getBoolField( "need_authoritative" ) )
+        if ( result["need_authoritative"].trueValue() )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
         }
-
-        if ( tryNumber < 4 ) {
-            log(1) << "going to retry checkShardVersion" << endl;
-            sleepmillis( 10 );
-            checkShardVersion( conn , ns , 1 , tryNumber + 1 );
-            return true;
+        
+        if ( result["reloadConfig"].trueValue() ) {
+            // reload config
+            conf->getChunkManager( ns , true );
         }
 
-        log() << "     setShardVersion failed: " << result << endl;
-        massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
+        const int maxNumTries = 7;
+        if ( tryNumber < maxNumTries ) {
+            LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
+                << "going to retry checkShardVersion host: " << conn.getServerAddress() << " " << result << endl;
+            sleepmillis( 10 * tryNumber );
+            checkShardVersion( conn , ns , true , tryNumber + 1 );
+            return true;
+        }
+        
+        string errmsg = str::stream() << "setShardVersion failed host: " << conn.getServerAddress() << " " << result;
+        log() << "     " << errmsg << endl;
+        massert( 10429 , errmsg , 0 );
         return true;
     }
 

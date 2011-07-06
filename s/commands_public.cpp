@@ -18,19 +18,27 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
-#include "../db/query.h"
+#include "../db/queryutil.h"
+#include "../scripting/engine.h"
 
 #include "config.h"
 #include "chunk.h"
 #include "strategy.h"
 #include "grid.h"
+#include "mr_shard.h"
+#include "client.h"
 
 namespace mongo {
+
+    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl )
+    { 
+        return true;
+    }
 
     namespace dbgrid_pub_cmds {
 
@@ -61,6 +69,10 @@ namespace mongo {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res );
+                if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
+                    conn.done();
+                    throw StaleConfigException("foo","command failed because of stale config");
+                }
                 result.appendElements( res );
                 conn.done();
                 return ok;
@@ -175,6 +187,28 @@ namespace mongo {
         class ValidateCmd : public AllShardsCollectionCommand {
         public:
             ValidateCmd() :  AllShardsCollectionCommand("validate") {}
+            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
+                for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it!=end; it++){
+                    const BSONObj& result = *it;
+                    const BSONElement valid = result["valid"];
+                    if (!valid.eoo()){
+                        if (!valid.trueValue()) {
+                            output.appendBool("valid", false);
+                            return;
+                        }
+                    }
+                    else {
+                        // Support pre-1.9.0 output with everything in a big string
+                        const char* s = result["result"].valuestrsafe();
+                        if (strstr(s, "exception") ||  strstr(s, "corrupt")){
+                            output.appendBool("valid", false);
+                            return;
+                        }
+                    }
+                }
+
+                output.appendBool("valid", true);
+            }
         } validateCmd;
 
         class RepairDatabaseCmd : public RunOnAllShardsCommand {
@@ -463,9 +497,13 @@ namespace mongo {
                 cm->getAllShards(servers);
 
                 BSONObjBuilder shardStats;
+                map<string,long long> counts;
+                map<string,long long> indexSizes;
+                /*
                 long long count=0;
                 long long size=0;
                 long long storageSize=0;
+                */
                 int nindexes=0;
                 bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
@@ -476,39 +514,82 @@ namespace mongo {
                         return false;
                     }
                     conn.done();
+                    
+                    BSONObjIterator j( res );
+                    while ( j.more() ) {
+                        BSONElement e = j.next();
 
-                    count += res["count"].numberLong();
-                    size += res["size"].numberLong();
-                    storageSize += res["storageSize"].numberLong();
-
-                    int myIndexes = res["nindexes"].numberInt();
-
-                    if ( nindexes == 0 ) {
-                        nindexes = myIndexes;
-                    }
-                    else if ( nindexes == myIndexes ) {
-                        // no-op
-                    }
-                    else {
-                        // hopefully this means we're building an index
-
-                        if ( myIndexes > nindexes )
-                            nindexes = myIndexes;
-
-                        if ( ! warnedAboutIndexes ) {
-                            result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
-                            warnedAboutIndexes = true;
+                        if ( str::equals( e.fieldName() , "ns" ) || 
+                             str::equals( e.fieldName() , "ok" ) || 
+                             str::equals( e.fieldName() , "avgObjSize" ) ||
+                             str::equals( e.fieldName() , "lastExtentSize" ) ||
+                             str::equals( e.fieldName() , "paddingFactor" ) ) {
+                            continue;
                         }
+                        else if ( str::equals( e.fieldName() , "count" ) ||
+                                  str::equals( e.fieldName() , "size" ) ||
+                                  str::equals( e.fieldName() , "storageSize" ) ||
+                                  str::equals( e.fieldName() , "numExtents" ) ||
+                                  str::equals( e.fieldName() , "totalIndexSize" ) ) {
+                            counts[e.fieldName()] += e.numberLong();
+                        }
+                        else if ( str::equals( e.fieldName() , "indexSizes" ) ) {
+                            BSONObjIterator k( e.Obj() );
+                            while ( k.more() ) {
+                                BSONElement temp = k.next();
+                                indexSizes[temp.fieldName()] += temp.numberLong();
+                            }
+                        }
+                        else if ( str::equals( e.fieldName() , "flags" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        else if ( str::equals( e.fieldName() , "nindexes" ) ) {
+                            int myIndexes = e.numberInt();
+                            
+                            if ( nindexes == 0 ) {
+                                nindexes = myIndexes;
+                            }
+                            else if ( nindexes == myIndexes ) {
+                                // no-op
+                            }
+                            else {
+                                // hopefully this means we're building an index
+                                
+                                if ( myIndexes > nindexes )
+                                    nindexes = myIndexes;
+                                
+                                if ( ! warnedAboutIndexes ) {
+                                    result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
+                                    warnedAboutIndexes = true;
+                                }
+                            }
+                        }
+                        else {
+                            warning() << "mongos collstats doesn't know about: " << e.fieldName() << endl;
+                        }
+                        
                     }
-
                     shardStats.append(i->getName(), res);
                 }
 
                 result.append("ns", fullns);
-                result.appendNumber("count", count);
-                result.appendNumber("size", size);
-                result.append      ("avgObjSize", double(size) / double(count));
-                result.appendNumber("storageSize", storageSize);
+                
+                for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); ++i )
+                    result.appendNumber( i->first , i->second );
+                
+                {
+                    BSONObjBuilder ib( result.subobjStart( "indexSizes" ) );
+                    for ( map<string,long long>::iterator i=indexSizes.begin(); i!=indexSizes.end(); ++i )
+                        ib.appendNumber( i->first , i->second );
+                    ib.done();
+                }
+
+                if ( counts["count"] > 0 )
+                    result.append("avgObjSize", (double)counts["size"] / (double)counts["count"] );
+                else
+                    result.append( "avgObjSize", 0.0 );
+                
                 result.append("nindexes", nindexes);
 
                 result.append("nchunks", cm->numChunks());
@@ -532,7 +613,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
-                massert( 13002 ,  "how could chunk manager be null!" , cm );
+                massert( 13002 ,  "shard internal error chunk manager should never be null" , cm );
 
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
@@ -544,6 +625,10 @@ namespace mongo {
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
+
+                if (!ok && res.getIntField("code") == 9996) { // code for StaleConfigException
+                    throw StaleConfigException(fullns, "FindAndModify"); // Command code traps this and re-runs
+                }
 
                 result.appendElements(res);
                 return ok;
@@ -816,12 +901,13 @@ namespace mongo {
 
         class MRCmd : public PublicGridCommand {
         public:
+            AtomicUInt JOB_NUMBER;
+
             MRCmd() : PublicGridCommand( "mapreduce" ) {}
 
             string getTmpName( const string& coll ) {
-                static int inc = 1;
                 stringstream ss;
-                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << inc++;
+                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER++;
                 return ss.str();
             }
 
@@ -847,8 +933,8 @@ namespace mongo {
                     	if (fn == "out" && e.type() == Object) {
                     		// check if there is a custom output
                     		BSONObj out = e.embeddedObject();
-                    		if (out.hasField("db"))
-                    			customOut = out;
+//                    		if (out.hasField("db"))
+                    	    customOut = out;
                     	}
                     }
                     else {
@@ -872,7 +958,7 @@ namespace mongo {
                 BSONObj customOut;
                 BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut , badShardedField );
 
-                bool customOutDB = ! customOut.isEmpty() && customOut.hasField( "db" );
+                bool customOutDB = customOut.hasField( "db" );
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
@@ -907,14 +993,17 @@ namespace mongo {
                 finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
                 
                 
+                set<ServerAndQuery> servers;
+                BSONObj shardCounts;
+                BSONObj aggCounts;
+                map<string,long long> countsMap;
                 {
                     // we need to use our connections to the shard
                     // so filtering is done correctly for un-owned docs
                     // so we allocate them in our thread
                     // and hand off
-
+                    // Note: why not use pooled connections? This has been reported to create too many connections
                     vector< shared_ptr<ShardConnection> > shardConns;
-
                     list< shared_ptr<Future::CommandResult> > futures;
                     
                     for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
@@ -925,8 +1014,11 @@ namespace mongo {
                     }
                     
                     bool failed = false;
-                    
-                    BSONObjBuilder shardresults;
+
+                    // now wait for the result of all shards
+                    BSONObjBuilder shardResultsB;
+                    BSONObjBuilder shardCountsB;
+                    BSONObjBuilder aggCountsB;
                     for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                         shared_ptr<Future::CommandResult> res = *i;
                         if ( ! res->join() ) {
@@ -937,7 +1029,19 @@ namespace mongo {
                             failed = true;
                             continue;
                         }
-                        shardresults.append( res->getServer() , res->result() );
+                        BSONObj result = res->result();
+                        shardResultsB.append( res->getServer() , result );
+                        BSONObj counts = result["counts"].embeddedObjectUserCheck();
+                        shardCountsB.append( res->getServer() , counts );
+                        servers.insert(res->getServer());
+
+                        // add up the counts for each shard
+                        // some of them will be fixed later like output and reduce
+                        BSONObjIterator j( counts );
+                        while ( j.more() ) {
+                            BSONElement temp = j.next();
+                            countsMap[temp.fieldName()] += temp.numberLong();
+                        }
                     }
 
                     for ( unsigned i=0; i<shardConns.size(); i++ )
@@ -946,28 +1050,205 @@ namespace mongo {
                     if ( failed )
                         return 0;
 
-                    finalCmd.append( "shards" , shardresults.obj() );
+                    finalCmd.append( "shards" , shardResultsB.obj() );
+                    shardCounts = shardCountsB.obj();
+                    finalCmd.append( "shardCounts" , shardCounts );
                     timingBuilder.append( "shards" , t.millis() );
+
+                    for ( map<string,long long>::iterator i=countsMap.begin(); i!=countsMap.end(); i++ ) {
+                        aggCountsB.append( i->first , i->second );
+                    }
+                    aggCounts = aggCountsB.obj();
+                    finalCmd.append( "counts" , aggCounts );
                 }
 
                 Timer t2;
-                // by default the target database is same as input
-                Shard outServer = conf->getPrimary();
-                string outns = fullns;
-                if ( customOutDB ) {
-                	// have to figure out shard for the output DB
-                	BSONElement elmt = customOut.getField("db");
-                	string outdb = elmt.valuestrsafe();
-                	outns = outdb + "." + collection;
-                    DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
-                	outServer = conf2->getPrimary();
-                }
-                log() << "customOut: " << customOut << " outServer: " << outServer << endl;
-                        
-                ShardConnection conn( outServer , outns );
                 BSONObj finalResult;
-                bool ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
-                conn.done();
+                bool ok = false;
+                string outdb = dbName;
+                if (customOutDB) {
+                    BSONElement elmt = customOut.getField("db");
+                    outdb = elmt.valuestrsafe();
+                }
+
+                if (!customOut.getBoolField("sharded")) {
+                    // non-sharded, use the MRFinish command on target server
+                    // This will save some data transfer
+
+                    // by default the target database is same as input
+                    Shard outServer = conf->getPrimary();
+                    string outns = fullns;
+                    if ( customOutDB ) {
+                        // have to figure out shard for the output DB
+                        DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
+                        outServer = conf2->getPrimary();
+                        outns = outdb + "." + collection;
+                    }
+                    log() << "customOut: " << customOut << " outServer: " << outServer << endl;
+
+                    ShardConnection conn( outServer , outns );
+                    ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
+                    conn.done();
+                } else {
+                    // grab records from each shard and insert back in correct shard in "temp" collection
+                    // we do the final reduce in mongos since records are ordered and already reduced on each shard
+//                    string shardedIncLong = str::stream() << outdb << ".tmp.mr." << collection << "_" << "shardedTemp" << "_" << time(0) << "_" << JOB_NUMBER++;
+
+                    mr_shard::Config config( dbName , cmdObj );
+                    mr_shard::State state(config);
+                    log(1) << "mr sharded output ns: " << config.ns << endl;
+
+                    if (config.outType == mr_shard::Config::INMEMORY) {
+                        errmsg = "This Map Reduce mode is not supported with sharded output";
+                        return false;
+                    }
+
+                    if (!config.outDB.empty()) {
+                        BSONObjBuilder loc;
+                        if ( !config.outDB.empty())
+                            loc.append( "db" , config.outDB );
+                        loc.append( "collection" , config.finalShort );
+                        result.append("result", loc.obj());
+                    }
+                    else {
+                        if ( !config.finalShort.empty() )
+                            result.append( "result" , config.finalShort );
+                    }
+
+                    string outns = config.finalLong;
+                    string tempns;
+
+                    // result will be inserted into a temp collection to post process
+                    const string postProcessCollection = getTmpName( collection );
+                    finalCmd.append("postProcessCollection", postProcessCollection);
+                    tempns = dbName + "." + postProcessCollection;
+
+//                    if (config.outType == mr_shard::Config::REPLACE) {
+//                        // drop previous collection
+//                        BSONObj dropColCmd = BSON("drop" << config.finalShort);
+//                        BSONObjBuilder dropColResult(32);
+//                        string outdbCmd = outdb + ".$cmd";
+//                        bool res = Command::runAgainstRegistered(outdbCmd.c_str(), dropColCmd, dropColResult);
+//                        if (!res) {
+//                            errmsg = str::stream() << "Could not drop sharded output collection " << outns << ": " << dropColResult.obj().toString();
+//                            return false;
+//                        }
+//                    }
+
+                    BSONObj sortKey = BSON( "_id" << 1 );
+                    if (!conf->isSharded(outns)) {
+                        // create the sharded collection
+
+                        BSONObj shardColCmd = BSON("shardCollection" << outns << "key" << sortKey);
+                        BSONObjBuilder shardColResult(32);
+                        bool res = Command::runAgainstRegistered("admin.$cmd", shardColCmd, shardColResult);
+                        if (!res) {
+                            errmsg = str::stream() << "Could not create sharded output collection " << outns << ": " << shardColResult.obj().toString();
+                            return false;
+                        }
+                    }
+
+                    ParallelSortClusteredCursor cursor( servers , dbName + "." + shardedOutputCollection ,
+                                                        Query().sort( sortKey ) );
+                    cursor.init();
+                    state.init();
+
+                    mr_shard::BSONList values;
+                    Strategy* s = SHARDED;
+                    long long finalCount = 0;
+                    int currentSize = 0;
+                    while ( cursor.more() || !values.empty() ) {
+                        BSONObj t;
+                        if ( cursor.more() ) {
+                            t = cursor.next().getOwned();
+
+                            if ( values.size() == 0 || t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
+                                values.push_back( t );
+                                currentSize += t.objsize();
+
+                                // check size and potentially reduce
+                                if (currentSize > config.maxInMemSize && values.size() > config.reduceTriggerRatio) {
+                                    BSONObj reduced = config.reducer->finalReduce(values, 0);
+                                    values.clear();
+                                    values.push_back( reduced );
+                                    currentSize = reduced.objsize();
+                                }
+                                continue;
+                            }
+                        }
+
+                        BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
+                        if (config.outType == mr_shard::Config::MERGE) {
+                            BSONObj id = final["_id"].wrap();
+                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
+                        } else {
+                            // insert into temp collection, but using final collection's shard chunks
+                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
+                        }
+                        ++finalCount;
+                        values.clear();
+                        if (!t.isEmpty()) {
+                            values.push_back( t );
+                            currentSize = t.objsize();
+                        }
+                    }
+
+                    if (config.outType == mr_shard::Config::REDUCE || config.outType == mr_shard::Config::REPLACE) {
+                        // results were written to temp collection, need post processing
+                        vector< shared_ptr<ShardConnection> > shardConns;
+                        list< shared_ptr<Future::CommandResult> > futures;
+                        BSONObj finalCmdObj = finalCmd.obj();
+                        for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
+                            shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , outns ) );
+                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , temp->get() ) );
+                            shardConns.push_back( temp );
+                        }
+
+                        // now wait for the result of all shards
+                        bool failed = false;
+                        for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
+                            shared_ptr<Future::CommandResult> res = *i;
+                            if ( ! res->join() ) {
+                                error() << "final reduce on sharded output m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+                                result.append( "cause" , res->result() );
+                                errmsg = "mongod mr failed: ";
+                                errmsg += res->result().toString();
+                                failed = true;
+                                continue;
+                            }
+                            BSONObj result = res->result();
+                        }
+
+                        for ( unsigned i=0; i<shardConns.size(); i++ )
+                            shardConns[i]->done();
+
+                        if (failed)
+                            return 0;
+                    }
+
+                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn( i->_server );
+                        conn->dropCollection( dbName + "." + shardedOutputCollection );
+                        conn.done();
+                    }
+
+                    result.append("shardCounts", shardCounts);
+
+                    // fix the global counts
+                    BSONObjBuilder countsB(32);
+                    BSONObjIterator j(aggCounts);
+                    while (j.more()) {
+                        BSONElement elmt = j.next();
+                        if (!strcmp(elmt.fieldName(), "reduce"))
+                            countsB.append("reduce", elmt.numberLong() + state.numReduces());
+                        else if (!strcmp(elmt.fieldName(), "output"))
+                            countsB.append("output", finalCount);
+                        else
+                            countsB.append(elmt);
+                    }
+                    result.append( "counts" , countsB.obj() );
+                    ok = true;
+                }
 
                 if ( ! ok ) {
                     errmsg = "final reduce failed: ";
@@ -987,14 +1268,81 @@ namespace mongo {
         class ApplyOpsCmd : public PublicGridCommand {
         public:
             ApplyOpsCmd() : PublicGridCommand( "applyOps" ) {}
-
             virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
             }
-
         } applyOpsCmd;
+
+        class CompactCmd : public PublicGridCommand {
+        public:
+            CompactCmd() : PublicGridCommand( "compact" ) {}
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg = "compact not allowed through mongos";
+                return false;
+            }
+        } compactCmd;
 
     }
 
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+        const char *p = strchr(ns, '.');
+        if ( !p ) return false;
+        if ( strcmp(p, ".$cmd") != 0 ) return false;
+
+        bool ok = false;
+
+        BSONElement e = jsobj.firstElement();
+        map<string,Command*>::iterator i;
+
+        if ( e.eoo() )
+            ;
+        // check for properly registered command objects.
+        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
+            string errmsg;
+            Command *c = i->second;
+            ClientInfo *client = ClientInfo::get();
+            AuthenticationInfo *ai = client->getAuthenticationInfo();
+
+            char cl[256];
+            nsToDatabase(ns, cl);
+            if( c->requiresAuth() && !ai->isAuthorized(cl)) {
+                ok = false;
+                errmsg = "unauthorized";
+            }
+            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost ) {
+                ok = false;
+                errmsg = "unauthorized: this command must run from localhost when running db without auth";
+                log() << "command denied: " << jsobj.toString() << endl;
+            }
+            else if ( c->adminOnly() && !startsWith(ns, "admin.") ) {
+                ok = false;
+                errmsg = "access denied - use admin db";
+            }
+            else if ( jsobj.getBoolField( "help" ) ) {
+                stringstream help;
+                help << "help for: " << e.fieldName() << " ";
+                c->help( help );
+                anObjBuilder.append( "help" , help.str() );
+            }
+            else {
+                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
+            }
+
+            BSONObj tmp = anObjBuilder.asTempObj();
+            bool have_ok = tmp.hasField("ok");
+            bool have_errmsg = tmp.hasField("errmsg");
+
+            if (!have_ok)
+                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
+
+            if ( !ok && !have_errmsg) {
+                anObjBuilder.append("errmsg", errmsg);
+                uassert_nothrow(errmsg.c_str());
+            }
+            return true;
+        }
+
+        return false;
+    }
 }

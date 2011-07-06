@@ -48,10 +48,11 @@ namespace mongo {
         */
 
         void WRITETODATAFILES_Impl1() {
+            RWLockRecursive::Shared lk(MongoFile::mmmutex);
             RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len());
         }
 
-        // the old implementation
+        // the old implementation.  doesn't work with groupCommitWithLimitedLocks()
         void WRITETODATAFILES_Impl2() {
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
             for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
@@ -63,6 +64,7 @@ namespace mongo {
         }
 
 #if defined(_EXPERIMENTAL)
+        // doesn't work with groupCommitWithLimitedLocks()
         void WRITETODATAFILES_Impl3() {
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
             for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {

@@ -155,7 +155,29 @@ assert.eq( before.query + 10 , after.query , "E3" )
 assert.eq( 100 , ts.count() , "E4" )
 assert.eq( 100 , ts.find().itcount() , "E5" )
 printjson( ts.find().batchSize(5).explain() )
+
+before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+// Careful, mongos can poll the masters here too unrelated to the query, 
+// resulting in this test failing sporadically if/when there's a delay here.
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "E6" )
+after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+assert.eq( before.query + before.getmore , after.query + after.getmore , "E6.1" )
+
+assert.eq( 100 , ts.find().batchSize(5).itcount() , "F1" )
+
+for ( i=0; i<10; i++ ) {
+    m = new Mongo( s.s.name );
+    m.setSlaveOk();
+    ts = m.getDB( "test" ).foo
+    assert.eq( 100 , ts.find().batchSize(5).itcount() , "F2." + i )
+}
+
+for ( i=0; i<10; i++ ) {
+    m = new Mongo( s.s.name );
+    ts = m.getDB( "test" ).foo
+    assert.eq( 100 , ts.find().batchSize(5).itcount() , "F3." + i )
+}
+
 
 printjson( db.adminCommand( "getShardMap" ) );
 

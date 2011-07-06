@@ -21,6 +21,7 @@
 #include "../client/connpool.h"
 #include "../client/dbclientmockcursor.h"
 #include "../db/instance.h"
+#include "../db/clientcursor.h"
 
 #include "d_chunk_manager.h"
 
@@ -29,7 +30,7 @@ namespace mongo {
     ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) {
 
         // have to get a connection to the config db
-        // special case if i'm the configdb since i'm locked and if i connect to myself
+        // special case if I'm the configdb since I'm locked and if I connect to myself
         // its a deadlock
         scoped_ptr<ScopedDbConnection> scoped;
         scoped_ptr<DBDirectClient> direct;
@@ -112,7 +113,7 @@ namespace mongo {
             BSONObj currMax = it->second;
             ++it;
 
-            // coallesce the chunk's bounds in ranges if they are adjacent chunks
+            // coalesce the chunk's bounds in ranges if they are adjacent chunks
             if ( min.isEmpty() ) {
                 min = currMin;
                 max = currMax;
@@ -136,13 +137,23 @@ namespace mongo {
     static bool contains( const BSONObj& min , const BSONObj& max , const BSONObj& point ) {
         return point.woCompare( min ) >= 0 && point.woCompare( max ) < 0;
     }
+    
+    bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
+        verify( 15851 , cc );
+        if ( _rangesMap.size() == 0 )
+            return false;
+        
+        return _belongsToMe( cc->extractFields( _key , true ) );
+    }
 
     bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
-        BSONObj x = obj.extractFields(_key);
+        return _belongsToMe( obj.extractFields( _key , true ) );
+    }
 
+    bool ShardChunkManager::_belongsToMe( const BSONObj& x ) const {
         RangeMap::const_iterator it = _rangesMap.upper_bound( x );
         if ( it != _rangesMap.begin() )
             it--;
@@ -206,7 +217,7 @@ namespace mongo {
 
     ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
 
-        // check that we have the exact chunk that'll be subtracted
+        // check that we have the exact chunk that will be subtracted
         _assertChunkExists( min , max );
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
@@ -282,14 +293,14 @@ namespace mongo {
         //
         // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
         if ( version <= _version ) {
-            uasserted( 13592 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
+            uasserted( 14039 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
         }
 
-        // check that we have the exact chunk that'll be split and that the split point is valid
+        // check that we have the exact chunk that will be split and that the split point is valid
         _assertChunkExists( min , max );
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
             if ( ! contains( min , max , *it ) ) {
-                uasserted( 13593 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
+                uasserted( 14040 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
             }
         }
 

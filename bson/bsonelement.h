@@ -20,6 +20,14 @@
 #include <vector>
 #include <string.h>
 #include "util/builder.h"
+#include "bsontypes.h"
+
+namespace mongo {
+    class OpTime;
+    class BSONObj;
+    class BSONElement;
+    class BSONObjBuilder;
+}
 
 namespace bson {
     typedef mongo::BSONElement be;
@@ -28,9 +36,6 @@ namespace bson {
 }
 
 namespace mongo {
-
-    class OpTime;
-    class BSONElement;
 
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
@@ -120,7 +125,8 @@ namespace mongo {
         /** Size of the element.
             @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size.
         */
-        int size( int maxLen = -1 ) const;
+        int size( int maxLen ) const;
+        int size() const;
 
         /** Wrap this element up as a singleton object. */
         BSONObj wrap() const;
@@ -155,15 +161,18 @@ namespace mongo {
             return *value() ? true : false;
         }
 
+        bool booleanSafe() const { return isBoolean() && boolean(); }
+
         /** Retrieve a java style date value from the element.
             Ensure element is of type Date before calling.
+            @see Bool(), trueValue()
         */
         Date_t date() const {
             return *reinterpret_cast< const Date_t* >( value() );
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
-            (i.e., treat zero and null as false).
+            (i.e., treats zero and null and eoo as false).
         */
         bool trueValue() const;
 
@@ -203,7 +212,9 @@ namespace mongo {
         }
 
         /** Size (length) of a string element.
-            You must assure of type String first.  */
+            You must assure of type String first.  
+            @return string size including terminating null
+        */
         int valuestrsize() const {
             return *reinterpret_cast< const int* >( value() );
         }
@@ -359,6 +370,7 @@ namespace mongo {
             return *reinterpret_cast< const mongo::OID* >( start );
         }
 
+        /** this does not use fieldName in the comparison, just the value */
         bool operator<( const BSONElement& other ) const {
             int x = (int)canonicalType() - (int)other.canonicalType();
             if ( x < 0 ) return true;
@@ -366,19 +378,30 @@ namespace mongo {
             return compareElementValues(*this,other) < 0;
         }
 
-        // If maxLen is specified, don't scan more than maxLen bytes.
-        explicit BSONElement(const char *d, int maxLen = -1) : data(d) {
-            fieldNameSize_ = -1;
-            if ( eoo() )
+        // @param maxLen don't scan more than maxLen bytes
+        explicit BSONElement(const char *d, int maxLen) : data(d) {
+            if ( eoo() ) {
+                totalSize = 1;
                 fieldNameSize_ = 0;
+            }
             else {
+                totalSize = -1;
+                fieldNameSize_ = -1;
                 if ( maxLen != -1 ) {
                     int size = (int) strnlen( fieldName(), maxLen - 1 );
                     massert( 10333 ,  "Invalid field name", size != -1 );
                     fieldNameSize_ = size + 1;
                 }
             }
+        }
+
+        explicit BSONElement(const char *d) : data(d) {
+            fieldNameSize_ = -1;
             totalSize = -1;
+            if ( eoo() ) {
+                fieldNameSize_ = 0;
+                totalSize = 1;
+            }
         }
 
         string _asCode() const;
@@ -399,7 +422,10 @@ namespace mongo {
         const BSONElement& chk(int t) const {
             if ( t != type() ) {
                 StringBuilder ss;
-                ss << "wrong type for BSONElement (" << fieldName() << ") " << type() << " != " << t;
+                if( eoo() )
+                    ss << "field not found, expected type " << t;
+                else
+                    ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
                 uasserted(13111, ss.str() );
             }
             return *this;
@@ -477,7 +503,7 @@ namespace mongo {
         return true;
     }
 
-    /** True if element is of a numeric type. */
+    /** @return true if element is of a numeric type. */
     inline bool BSONElement::isNumber() const {
         switch( type() ) {
         case NumberLong:

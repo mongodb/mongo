@@ -29,8 +29,6 @@ doTest = function( index ) {
     assert.throws( function() { t.find( { x:0,$nor:"a" } ).toArray(); } );
     assert.throws( function() { t.find( { x:0,$nor:[] } ).toArray(); } );
     assert.throws( function() { t.find( { x:0,$nor:[ "a" ] } ).toArray(); } );
-    assert.throws( function() { t.find( { x:0,$nor:[ {x:0,$or:[{x:0}]} ] } ).toArray(); } );
-    assert.throws( function() { t.find( { x:0,$nor:[ {x:0,$nor:[{x:0}]} ] } ).toArray(); } );
 
     an1 = t.find( { $nor: [ { a : 1 } ] } ).toArray();
     checkArrs( t.find( {a:{$ne:1}} ).toArray(), an1 );

@@ -48,3 +48,13 @@ x = d( "b" , { a : { $gt : 5 } } );
 assert.eq( 398 , x.stats.n , "BC1" )
 assert.eq( 398 , x.stats.nscanned , "BC2" )
 assert.eq( 398 , x.stats.nscannedObjects , "BC3" )
+
+// Check proper nscannedObjects count when using a query optimizer cursor.
+t.dropIndexes();
+t.ensureIndex( { a : 1, b : 1 } );
+x = d( "b" , { a : { $gt : 5 }, b : { $gt : 5 } } );
+assert.eq( "QueryOptimizerCursor", x.stats.cursor );
+assert.eq( 171 , x.stats.n )
+assert.eq( 275 , x.stats.nscanned )
+// Disable temporarily - exact value doesn't matter.
+// assert.eq( 266 , x.stats.nscannedObjects )

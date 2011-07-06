@@ -23,17 +23,18 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "clientcursor.h"
 #include "introspect.h"
 #include <time.h>
 #include "db.h"
 #include "commands.h"
 #include "repl_block.h"
+#include "../util/processinfo.h"
 
 namespace mongo {
 
     CCById ClientCursor::clientCursorsById;
-    boost::recursive_mutex ClientCursor::ccmutex;
+    boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
 
     void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ); // from s/d_logic.h
@@ -73,31 +74,39 @@ namespace mongo {
     //void removedKey(const DiskLoc& btreeLoc, int keyPos) {
     //}
 
-    /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
-             works fine as the prefix will end with '.'.  however, when used with drop and
-             dropIndexes, this could take out cursors that belong to something else -- if you
-             drop "foo", currently, this will kill cursors for "foobar".
-    */
-    void ClientCursor::invalidate(const char *nsPrefix) {
-        vector<ClientCursor*> toDelete;
+    // ns is either a full namespace or "dbname." when invalidating for a whole db
+    void ClientCursor::invalidate(const char *ns) {
+        dbMutex.assertWriteLocked();
+        int len = strlen(ns);
+        const char* dot = strchr(ns, '.');
+        assert( len > 0 && dot);
 
-        int len = strlen(nsPrefix);
-        assert( len > 0 && strchr(nsPrefix, '.') );
+        bool isDB = (dot == &ns[len-1]); // first (and only) dot is the last char
 
         {
-            //cout << "\nTEMP invalidate " << nsPrefix << endl;
+            //cout << "\nTEMP invalidate " << ns << endl;
             recursive_scoped_lock lock(ccmutex);
 
             Database *db = cc().database();
             assert(db);
-            assert( str::startsWith(nsPrefix, db->name) );
+            assert( str::startsWith(ns, db->name) );
 
-            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
+            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); /*++i*/ ) {
                 ClientCursor *cc = i->second;
+
+                ++i; // we may be removing this node
+
                 if( cc->_db != db )
                     continue;
-                if ( strncmp(nsPrefix, cc->_ns.c_str(), len) == 0 ) {
-                    toDelete.push_back(i->second);
+
+                if (isDB) {
+                    // already checked that db matched above
+                    dassert( str::startsWith(cc->_ns.c_str(), ns) );
+                    delete cc; //removes self from ccByID
+                }
+                else {
+                    if ( str::equals(cc->_ns.c_str(), ns) )
+                        delete cc; //removes self from ccByID
                 }
             }
 
@@ -109,14 +118,11 @@ namespace mongo {
             CCByLoc& bl = db->ccByLoc;
             for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); ++i ) {
                 ClientCursor *cc = i->second;
-                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 ) {
+                if ( strncmp(ns, cc->ns.c_str(), len) == 0 ) {
                     assert( cc->_db == db );
                     toDelete.push_back(i->second);
                 }
             }*/
-
-            for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-                delete (*i);
 
             /*cout << "TEMP after invalidate " << endl;
             for( auto i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
@@ -140,9 +146,17 @@ namespace mongo {
             i++;
             if( j->second->shouldTimeout( millis ) ) {
                 numberTimedOut++;
-                log(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
+                LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
+            }
+        }
+        unsigned sz = clientCursorsById.size();
+        static time_t last;
+        if( sz >= 100000 ) { 
+            if( time(0) - last > 300 ) {
+                last = time(0);
+                log() << "warning number of open cursors is very large: " << sz << endl;
             }
         }
     }
@@ -156,6 +170,9 @@ namespace mongo {
         CCByLoc& bl = db->ccByLoc;
         RARELY if ( bl.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
+        }
+        if( bl.size() == 0 ) { 
+            DEV tlog() << "debug warning: no cursors found in informAboutToDeleteBucket()" << endl;
         }
         for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
             i->second->_c->aboutToDeleteBucket(b);
@@ -225,10 +242,13 @@ namespace mongo {
             c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
-                /* this might indicate a failure to call ClientCursor::updateLocation() */
+                // This might indicate a failure to call ClientCursor::updateLocation() but it can
+                // also happen during correct operation, see SERVER-2009.
                 problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
-            c->advance();
+            else {
+                c->advance();
+            }
             if ( c->eof() ) {
                 // advanced to end
                 // leave ClientCursor in place so next getMore doesn't fail
@@ -249,6 +269,9 @@ namespace mongo {
         _query(query),  _queryOptions(queryOptions),
         _idleAgeMillis(0), _pinValue(0),
         _doingDeletes(false), _yieldSometimesTracker(128,10) {
+
+        dbMutex.assertAtLeastReadLocked();
+
         assert( _db );
         assert( str::startsWith(_ns, _db->name) );
         if( queryOptions & QueryOption_NoCursorTimeout )
@@ -277,7 +300,11 @@ namespace mongo {
 
 
     ClientCursor::~ClientCursor() {
-        assert( _pos != -2 );
+        if( _pos == -2 ) {
+            // defensive: destructor called twice
+            wassert(false);
+            return;
+        }
 
         {
             recursive_scoped_lock lock(ccmutex);
@@ -290,7 +317,7 @@ namespace mongo {
         }
     }
 
-    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret ) {
+    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret, BSONObj& holder ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
@@ -300,7 +327,8 @@ namespace mongo {
 
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
@@ -310,18 +338,20 @@ namespace mongo {
         return true;
     }
 
-    BSONElement ClientCursor::getFieldDotted( const string& name , bool * fromKey ) {
+    BSONElement ClientCursor::getFieldDotted( const string& name , BSONObj& holder , bool * fromKey ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
             if ( fromKey )
                 *fromKey = false;
-            return current().getFieldDotted( name );
+            holder = current();
+            return holder.getFieldDotted( name );
         }
         
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
@@ -333,6 +363,29 @@ namespace mongo {
         return it.next();
     }
 
+    BSONObj ClientCursor::extractFields(const BSONObj &pattern , bool fillWithNull ) {
+        BSONObjBuilder b( pattern.objsize() * 2 );
+
+        BSONObj holder;
+     
+        BSONObjIterator i( pattern ); 
+        while ( i.more() ) {
+            BSONElement key = i.next();
+            BSONElement value = getFieldDotted( key.fieldName() , holder );
+
+            if ( value.type() ) {
+                b.appendAs( value , key.fieldName() );
+                continue;
+            }
+
+            if ( fillWithNull ) 
+                b.appendNull( key.fieldName() );            
+            
+        }
+
+        return b.obj();
+    }
+    
 
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only
@@ -366,18 +419,53 @@ namespace mongo {
 
         return micros;
     }
+    
+    Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        if ( need == DontNeed ) {
+            return 0;
+        }
+        else if ( need == MaybeCovered ) {
+            // TODO
+            return 0;
+        }
+        else if ( need == WillNeed ) {
+            // no-op
+        }
+        else {
+            warning() << "don't understand RecordNeeds: " << (int)need << endl;
+            return 0;
+        }
 
-    bool ClientCursor::yieldSometimes() {
-        if ( ! _yieldSometimesTracker.ping() )
-            return true;
-
-        int micros = yieldSuggest();
-        return ( micros > 0 ) ? yield( micros ) : true;
+        DiskLoc l = currLoc();
+        if ( l.isNull() )
+            return 0;
+        
+        Record * rec = l.rec();
+        if ( rec->likelyInPhysicalMemory() ) 
+            return 0;
+        
+        return rec;
     }
 
-    void ClientCursor::staticYield( int micros , const StringData& ns ) {
+    bool ClientCursor::yieldSometimes( RecordNeeds need ) {
+        if ( ! _yieldSometimesTracker.ping() ) {
+            Record* rec = _recordForYield( need );
+            if ( rec ) 
+                return yield( yieldSuggest() , rec );
+            return true;
+        }
+
+        int micros = yieldSuggest();
+        return ( micros > 0 ) ? yield( micros , _recordForYield( need ) ) : true;
+    }
+
+    void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
         killCurrentOp.checkForInterrupt( false );
         {
+            auto_ptr<RWLockRecursive::Shared> lk;
+            if ( rec )
+                lk.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+            
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
                 if ( micros == -1 )
@@ -394,12 +482,20 @@ namespace mongo {
                           << " top: " << c->info()
                           << endl;
             }
+
+            if ( rec )
+                rec->touch();
+
+            lk.reset(0); // need to release this before dbtempreleasecond
         }
     }
 
     bool ClientCursor::prepareToYield( YieldData &data ) {
         if ( ! _c->supportYields() )
             return false;
+        if ( ! _c->prepareToYield() ) {
+            return false;   
+        }
         // need to store in case 'this' gets deleted
         data._id = _cursorid;
 
@@ -440,40 +536,34 @@ namespace mongo {
         }
 
         cc->_doingDeletes = data._doingDeletes;
-        cc->_c->checkLocation();
+        cc->_c->recoverFromYield();
         return true;
     }
 
-    bool ClientCursor::yield( int micros ) {
+    bool ClientCursor::yield( int micros , Record * recordToLoad ) {
         if ( ! _c->supportYields() )
             return true;
+
         YieldData data;
         prepareToYield( data );
 
-        staticYield( micros , _ns );
+        staticYield( micros , _ns , recordToLoad );
 
         return ClientCursor::recoverFromYield( data );
     }
 
-    int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
-        if( 0 ) {
-            static long long z;
-            ++z;
-            cout << "TEMP alloccursorid " << z << endl;
-            return z;
-        }
-
+        long long ctm = curTimeMillis64();
+        dassert( ctm );
         long long x;
-        int ctm = (int) curTimeMillis();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
-            x = x | ctm | 0x80000000; // OR to make sure not zero
+            x = x ^ ctm;
             if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
         ctmLast = ctm;
-        //DEV tlog() << "  alloccursorid " << x << endl;
         return x;
     }
 
@@ -501,6 +591,19 @@ namespace mongo {
         result.appendNumber("totalOpen", clientCursorsById.size() );
         result.appendNumber("clientCursors_size", (int) numCursors());
         result.appendNumber("timedOut" , numberTimedOut);
+        unsigned pinned = 0;
+        unsigned notimeout = 0;
+        for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); i++ ) {
+            unsigned p = i->second->_pinValue;
+            if( p >= 100 )
+                pinned++;
+            else if( p > 0 )
+                notimeout++;
+        }
+        if( pinned ) 
+            result.append("pinned", pinned);
+        if( notimeout )
+            result.append("totalNoTimeout", notimeout);
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?
@@ -519,19 +622,58 @@ namespace mongo {
         }
     } cmdCursorInfo;
 
+    struct Mem { 
+        Mem() { res = virt = mapped = 0; }
+        int res;
+        int virt;
+        int mapped;
+        bool grew(const Mem& r) { 
+            return (r.res && (((double)res)/r.res)>1.1 ) ||
+              (r.virt && (((double)virt)/r.virt)>1.1 ) ||
+              (r.mapped && (((double)mapped)/r.mapped)>1.1 );
+        }
+    };
+
+    /** called once a minute from killcursors thread */
+    void sayMemoryStatus() { 
+        static time_t last;
+        static Mem mlast;
+        try {
+            ProcessInfo p;
+            if ( !cmdLine.quiet && p.supported() ) {
+                Mem m;
+                m.res = p.getResidentSize();
+                m.virt = p.getVirtualMemorySize();
+                m.mapped = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
+                if( time(0)-last >= 300 || m.grew(mlast) ) { 
+                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt << " mapped:" << m.mapped << endl;
+                    if( m.virt - (cmdLine.dur?2:1)*m.mapped > 5000 ) { 
+                        ONCE log() << "warning virtual/mapped memory differential is large. journaling:" << cmdLine.dur << endl;
+                    }
+                    last = time(0);
+                    mlast = m;
+                }
+            }
+        }
+        catch(...) {
+            log() << "ProcessInfo exception" << endl;
+        }
+    }
+
+    /** thread for timing out old cursors */
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
-
-        unsigned old = curTimeMillis();
-
+        Timer t;
+        const int Secs = 4;
+        unsigned n = 0;
         while ( ! inShutdown() ) {
-            unsigned now = curTimeMillis();
-            ClientCursor::idleTimeReport( now - old );
-            old = now;
-            sleepsecs(4);
+            ClientCursor::idleTimeReport( t.millisReset() );
+            sleepsecs(Secs);
+            if( ++n % (60/4) == 0 /*once a minute*/ ) { 
+                sayMemoryStatus();
+            }
         }
-
         client.shutdown();
     }
 
@@ -556,7 +698,6 @@ namespace mongo {
         return found;
 
     }
-
 
     ClientCursorMonitor clientCursorMonitor;
 

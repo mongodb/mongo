@@ -20,11 +20,14 @@
 #include "shard.h"
 #include "config.h"
 #include "request.h"
+#include "client.h"
 #include "../db/commands.h"
 #include <set>
 
 namespace mongo {
 
+    typedef shared_ptr<Shard> ShardPtr;
+    
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo") { }
@@ -48,9 +51,9 @@ namespace mongo {
             // the config state intact. The rationale is that this way we could drop shards that
             // were removed without reinitializing the config DB information.
 
-            map<string,Shard>::iterator i = _lookup.find( "config" );
+            ShardMap::iterator i = _lookup.find( "config" );
             if ( i != _lookup.end() ) {
-                Shard config = i->second;
+                ShardPtr config = i->second;
                 _lookup.clear();
                 _lookup[ "config" ] = config;
             }
@@ -75,14 +78,14 @@ namespace mongo {
                     isDraining = isDrainingElem.Bool();
                 }
 
-                Shard s( name , host , maxSize , isDraining );
+                ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
                 _lookup[name] = s;
                 _installHost( host , s );
             }
 
         }
         
-        const Shard& find( const string& ident ) {
+        ShardPtr find( const string& ident ) {
             string mykey = ident;
 
             {
@@ -94,7 +97,7 @@ namespace mongo {
 
             {
                 scoped_lock lk( _mutex );
-                map<string,Shard>::iterator i = _lookup.find( mykey );
+                ShardMap::iterator i = _lookup.find( mykey );
 
                 if ( i != _lookup.end() )
                     return i->second;
@@ -104,23 +107,32 @@ namespace mongo {
             reload();
 
             scoped_lock lk( _mutex );
-            map<string,Shard>::iterator i = _lookup.find( mykey );
+            ShardMap::iterator i = _lookup.find( mykey );
             massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;
         }
 
-        void set( const string& name , const Shard& s , bool setName = true , bool setAddr = true ) {
+        // Useful for ensuring our shard data will not be modified while we use it
+        Shard findCopy( const string& ident ){
+            ShardPtr found = find( ident );
             scoped_lock lk( _mutex );
-            if ( setName )
-                _lookup[name] = s;
-            if ( setAddr )
-                _installHost( s.getConnString() , s );
+            massert( 13128 , (string)"can't find shard for: " + ident , found.get() );
+            return *found.get();
         }
 
-        void _installHost( const string& host , const Shard& s ) {
+        void set( const string& name , const Shard& s , bool setName = true , bool setAddr = true ) {
+            scoped_lock lk( _mutex );
+            ShardPtr ss( new Shard( s ) );
+            if ( setName )
+                _lookup[name] = ss;
+            if ( setAddr )
+                _installHost( s.getConnString() , ss );
+        }
+
+        void _installHost( const string& host , const ShardPtr& s ) {
             _lookup[host] = s;
             
-            const ConnectionString& cs = s.getAddress();
+            const ConnectionString& cs = s->getAddress();
             if ( cs.type() == ConnectionString::SET ) {
                 if ( cs.getSetName().size() )
                     _lookup[ cs.getSetName() ] = s;
@@ -134,9 +146,9 @@ namespace mongo {
         
         void remove( const string& name ) {
             scoped_lock lk( _mutex );
-            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
-                Shard s = i->second;
-                if ( s.getName() == name ) {
+            for ( ShardMap::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
+                ShardPtr s = i->second;
+                if ( s->getName() == name ) {
                     _lookup.erase(i++);
                 }
                 else {
@@ -145,35 +157,49 @@ namespace mongo {
             }
         }
         
-        void getAllShards( vector<Shard>& all ) const {
+        void getAllShards( vector<ShardPtr>& all ) const {
             scoped_lock lk( _mutex );
             std::set<string> seen;
-            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
-                const Shard& s = i->second;
-                if ( s.getName() == "config" )
+            for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                const ShardPtr& s = i->second;
+                if ( s->getName() == "config" )
                     continue;
-                if ( seen.count( s.getName() ) )
+                if ( seen.count( s->getName() ) )
                     continue;
-                seen.insert( s.getName() );
+                seen.insert( s->getName() );
                 all.push_back( s );
             }
         }
+
+        void getAllShards( vector<Shard>& all ) const {
+            scoped_lock lk( _mutex );
+            std::set<string> seen;
+            for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                const ShardPtr& s = i->second;
+                if ( s->getName() == "config" )
+                    continue;
+                if ( seen.count( s->getName() ) )
+                    continue;
+                seen.insert( s->getName() );
+                all.push_back( *s );
+            }
+        }
+
         
         bool isAShardNode( const string& addr ) const {
             scoped_lock lk( _mutex );      
             
             // check direct nods or set names
-            map<string,Shard>::const_iterator i = _lookup.find( addr );
+            ShardMap::const_iterator i = _lookup.find( addr );
             if ( i != _lookup.end() )
                 return true;
             
             // check for set nodes
-            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+            for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 if ( i->first == "config" )
                     continue;
 
-                const Shard& s = i->second;     
-                if ( s.containsNode( addr ) )
+                if ( i->second->containsNode( addr ) )
                     return true;
             }
 
@@ -185,8 +211,8 @@ namespace mongo {
 
             BSONObjBuilder b( _lookup.size() + 50 );
 
-            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
-                b.append( i->first , i->second.getConnString() );
+            for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                b.append( i->first , i->second->getConnString() );
             }
             
             result.append( "map" , b.obj() );
@@ -195,7 +221,8 @@ namespace mongo {
         }
 
     private:
-        map<string,Shard> _lookup;
+        typedef map<string,ShardPtr> ShardMap;
+        ShardMap _lookup;
         mutable mongo::mutex _mutex;
     } staticShardInfo;
 
@@ -225,10 +252,7 @@ namespace mongo {
     void Shard::_rsInit() {
         if ( _cs.type() == ConnectionString::SET ) {
             string x = _cs.getSetName();
-            if ( x.size() == 0 ) {
-                warning() << "no set name for shard: " << _name << " " << _cs.toString() << endl;
-            }
-            assert( x.size() );
+            massert( 14807 , str::stream() << "no set name for shard: " << _name << " " << _cs.toString() , x.size() );
             _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
         }
     }
@@ -242,14 +266,9 @@ namespace mongo {
     }
 
     void Shard::reset( const string& ident ) {
-        const Shard& s = staticShardInfo.find( ident );
-        massert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
-        _name = s._name;
-        _addr = s._addr;
-        _cs = s._cs;
+        *this = staticShardInfo.findCopy( ident );
+        _rs.reset();
         _rsInit();
-        _maxSize = s._maxSize;
-        _isDraining = s._isDraining;
     }
 
     bool Shard::containsNode( const string& node ) const {
@@ -272,7 +291,7 @@ namespace mongo {
 
     void Shard::printShardInfo( ostream& out ) {
         vector<Shard> all;
-        getAllShards( all );
+        staticShardInfo.getAllShards( all );
         for ( unsigned i=0; i<all.size(); i++ )
             out << all[i].toString() << "\n";
         out.flush();
@@ -338,4 +357,20 @@ namespace mongo {
         _writeLock = 0; // TODO
     }
 
+    void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
+        if( !noauth ) {
+            string err;
+            log(2) << "calling onCreate auth for " << conn->toString() << endl;
+            uassert( 15847, "can't authenticate to shard server",
+                    conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
+        }
+
+        if ( _shardedConnections ) {
+            conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+        }
+    }
+
+    void ShardingConnectionHook::onDestory( DBClientBase * conn ) {
+        resetShardVersionCB( conn );
+    }
 }

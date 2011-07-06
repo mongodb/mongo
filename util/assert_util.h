@@ -60,9 +60,26 @@ namespace mongo {
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
         string toString() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
         bool empty() const { return msg.empty(); }
+        
+        void reset(){ msg = ""; code=-1; }
 
         string msg;
         int code;
+    };
+
+    /** helper class that builds error strings.  lighter weight than a StringBuilder, albeit less flexible.
+        NOINLINE_DECL used in the constructor implementations as we are assuming this is a cold code path when used.
+
+        example: 
+          throw UserException(123, ErrorMsg("blah", num_val));
+    */
+    class ErrorMsg { 
+    public:
+        ErrorMsg(const char *msg, char ch);
+        ErrorMsg(const char *msg, unsigned val);
+        operator string() const { return buf; }
+    private:
+        char buf[256];
     };
 
     class DBException : public std::exception {
@@ -126,9 +143,10 @@ namespace mongo {
 
     void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
     void wasserted(const char *msg, const char *file, unsigned line);
-
+    void verifyFailed( int msgid );
+    
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
-       could cause, such as dupliate key, disk full, etc.
+        could cause, such as duplicate key, disk full, etc.
     */
     void uasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
@@ -144,6 +162,15 @@ namespace mongo {
     void msgasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
 
+    /* convert various types of exceptions to strings */
+    inline string causedBy( const char* e ){ return (string)" :: caused by :: " + e; }
+    inline string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
+    inline string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
+    inline string causedBy( const string& e ){ return causedBy( e.c_str() ); }
+
+    /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
+    inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
+
 #ifdef assert
 #undef assert
 #endif
@@ -154,10 +181,6 @@ namespace mongo {
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
 #define uassert MONGO_uassert
-
-    /* user assert with helpful message handling */
-#define MONGO_uassert_msg(msgid, msg, expr) { if(!(expr)){ stringstream ss; ss << msg; mongo::uasserted(msgid, ss.str()); } }
-#define uassert_msg MONGO_uassert_msg
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -205,10 +228,21 @@ namespace mongo {
         expression; \
     } catch ( const std::exception &e ) { \
         stringstream ss; \
-        ss << "caught boost exception: " << e.what();   \
-        msgasserted( 13294 , ss.str() );        \
+        ss << "caught boost exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
+        msgasserted( 13294 , ss.str() ); \
     } catch ( ... ) { \
-        massert( 10437 ,  "unknown boost failed" , false );   \
+        massert( 10437 ,  "unknown boost failed" , false ); \
+    }
+
+#define MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( expression, msg ) \
+    try { \
+        expression; \
+    } catch ( const std::exception &e ) { \
+        stringstream ss; \
+        ss << msg << " caught boost exception: " << e.what();   \
+        msgasserted( 14043 , ss.str() );        \
+    } catch ( ... ) { \
+        msgasserted( 14044 , string("unknown boost failed ") + msg );   \
     }
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
@@ -220,18 +254,5 @@ namespace mongo {
     } catch ( ... ) { \
         problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
     }
-
-    /* Some useful utility defines, allowing more concise exception handling */
-#define MONGO_throw_exception(code, type, msg) { stringstream ss; ss << msg; throw type(ss.str().c_str(), code); }
-#define m_throw_exception MONGO_throw_exception
-
-#define MONGO_caused_by(e) ( string("\n  caused by : ") + e.toString() )
-#define m_caused_by MONGO_caused_by
-
-#define MONGO_error_message(e) ( string("\n  error message : ") + e )
-#define m_error_message MONGO_error_message
-
-#define MONGO_chain_exception(code, e, type, msg) { stringstream ss; ss << msg; ss << MONGO_caused_by(e); throw type(ss.str().c_str(), code); }
-#define m_chain_exception MONGO_chain_exception
 
 #undef MONGO_NORETURN

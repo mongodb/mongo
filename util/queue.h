@@ -43,6 +43,12 @@ namespace mongo {
             return _queue.empty();
         }
 
+        size_t size() const {
+            scoped_lock l( _lock );
+            return _queue.size();
+        }
+
+
         bool tryPop( T & t ) {
             scoped_lock l( _lock );
             if ( _queue.empty() )

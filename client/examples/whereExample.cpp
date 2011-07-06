@@ -1,4 +1,5 @@
-// whereExample.cpp
+// @file whereExample.cpp
+// @see http://www.mongodb.org/display/DOCS/Server-side+Code+Execution
 
 /*    Copyright 2009 10gen Inc.
  *

@@ -27,13 +27,15 @@
 #include "../pch.h"
 #include "cursor.h"
 #include "jsobj.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "../util/background.h"
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
 #include "../client/dbclient.h"
 #include "projection.h"
+#include "s/d_chunk_manager.h"
 
 namespace mongo {
 
@@ -158,14 +160,15 @@ namespace mongo {
 
         DiskLoc lastLoc() const { return _lastLoc; }
 
-        /* Get rid of cursors for namespaces that begin with nsprefix.
+        /* Get rid of cursors for namespaces 'ns'. When dropping a db, ns is "dbname."
            Used by drop, dropIndexes, dropDatabase.
         */
-        static void invalidate(const char *nsPrefix);
+        static void invalidate(const char *ns);
 
         /**
          * @param microsToSleep -1 : ask client
          *                     >=0 : sleep for that amount
+         * @param recordToLoad after yielding lock, load this record with only mmutex
          * do a dbtemprelease
          * note: caller should check matcher.docMatcher().atomic() first and not yield if atomic -
          *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
@@ -174,15 +177,21 @@ namespace mongo {
          *         if false is returned, then this ClientCursor should be considered deleted -
          *         in fact, the whole database could be gone.
          */
-        bool yield( int microsToSleep = -1 );
+        bool yield( int microsToSleep = -1 , Record * recordToLoad = 0 );
 
+        enum RecordNeeds {
+            DontNeed = -1 , MaybeCovered = 0 , WillNeed = 100
+        };
+            
         /**
+         * @param needRecord whether or not the next record has to be read from disk for sure
+         *                   if this is true, will yield of next record isn't in memory
          * @return same as yield()
          */
-        bool yieldSometimes();
+        bool yieldSometimes( RecordNeeds need );
 
         static int yieldSuggest();
-        static void staticYield( int micros , const StringData& ns );
+        static void staticYield( int micros , const StringData& ns , Record * rec );
 
         struct YieldData { CursorId _id; bool _doingDeletes; };
         bool prepareToYield( YieldData &data );
@@ -235,21 +244,30 @@ namespace mongo {
         DiskLoc currLoc() { return _c->currLoc(); }
         BSONObj currKey() const { return _c->currKey(); }
 
-
         /**
          * same as BSONObj::getFieldsDotted
          * if it can be retrieved from key, it is
+         * @param holder keeps the currKey in scope by keeping a reference to it here. generally you'll want 
+         *        holder and ret to destruct about the same time.
          * @return if this was retrieved from key
          */
-        bool getFieldsDotted( const string& name, BSONElementSet &ret );
+        bool getFieldsDotted( const string& name, BSONElementSet &ret, BSONObj& holder );
 
         /**
          * same as BSONObj::getFieldDotted
          * if it can be retrieved from key, it is
          * @return if this was retrieved from key
          */
-        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 );
-
+        BSONElement getFieldDotted( const string& name , BSONObj& holder , bool * fromKey = 0 ) ;
+        
+        /** extract items from object which match a pattern object.
+         * e.g., if pattern is { x : 1, y : 1 }, builds an object with
+         * x and y elements of this object, if they are present.
+         * returns elements with original field names
+         * NOTE: copied from BSONObj::extractFields
+        */
+        BSONObj extractFields(const BSONObj &pattern , bool fillWithNull = false) ;
+        
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
 
         bool currentMatches() {
@@ -257,6 +275,9 @@ namespace mongo {
                 return true;
             return _c->matcher()->matchesCurrent( _c.get() );
         }
+
+        void setChunkManager( ShardChunkManagerPtr manager ){ _chunkManager = manager; }
+        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
 
     private:
         void setLastLoc_inlock(DiskLoc);
@@ -342,6 +363,8 @@ namespace mongo {
         void noTimeout() { _pinValue++; }
 
         CCByLoc& byLoc() { return _db->ccByLoc; }
+        
+        Record* _recordForYield( RecordNeeds need );
 
     private:
 
@@ -371,6 +394,8 @@ namespace mongo {
         bool _doingDeletes;
         ElapsedTracker _yieldSometimesTracker;
 
+        ShardChunkManagerPtr _chunkManager;
+
     public:
         shared_ptr<ParsedQuery> pq;
         shared_ptr<Projection> fields; // which fields query wants returned
@@ -382,7 +407,7 @@ namespace mongo {
 
         static CCById clientCursorsById;
         static long long numberTimedOut;
-        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
+        static boost::recursive_mutex& ccmutex;   // must use this for all statics above!
         static CursorId allocCursorId_inlock();
 
     };
@@ -396,3 +421,11 @@ namespace mongo {
     extern ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo
+
+// ClientCursor should only be used with auto_ptr because it needs to be
+// release()ed after a yield if stillOk() returns false and these pointer types
+// do not support releasing. This will prevent them from being used accidentally
+namespace boost{
+    template<> class scoped_ptr<mongo::ClientCursor> {};
+    template<> class shared_ptr<mongo::ClientCursor> {};
+}

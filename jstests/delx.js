@@ -23,6 +23,7 @@ x.next();
 y.next();
 
 a.foo.remove( { _id : { $gt : 50 } } );
+db.getLastError();
 
 assert.eq( 51 , a.foo.find().itcount() , "B1" )
 assert.eq( 100 , b.foo.find().itcount() , "B2" )

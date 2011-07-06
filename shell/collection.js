@@ -60,7 +60,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
-    print("\tdb." + shortName + ".validate() - SLOW");
+    print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     return __magicNoPrint;
 }
@@ -120,7 +120,7 @@ DBCollection.prototype._validateObject = function( o ){
         throw "can't save a DBQuery object";
 }
 
-DBCollection._allowedFields = { $id : 1 , $ref : 1 };
+DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
 DBCollection.prototype._validateForStorage = function( o ){
     this._validateObject( o );
@@ -374,21 +374,32 @@ DBCollection.prototype.renameCollection = function( newName , dropTarget ){
                                      dropTarget : dropTarget } )
 }
 
-DBCollection.prototype.validate = function() {
-    var res = this._db.runCommand( { validate: this.getName() } );
+DBCollection.prototype.validate = function(full) {
+    var cmd = { validate: this.getName() };
 
-    res.valid = false;
+    if (typeof(full) == 'object') // support arbitrary options here
+        Object.extend(cmd, full);
+    else
+        cmd.full = full;
 
-    var raw = res.result || res.raw;
+    var res = this._db.runCommand( cmd );
 
-    if ( raw ){
-        var str = "-" + tojson( raw );
-        res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+    if (typeof(res.valid) == 'undefined') {
+        // old-style format just put everything in a string. Now using proper fields
 
-        var p = /lastExtentSize:(\d+)/;
-        var r = p.exec( str );
-        if ( r ){
-            res.lastExtentSize = Number( r[1] );
+        res.valid = false;
+
+        var raw = res.result || res.raw;
+
+        if ( raw ){
+            var str = "-" + tojson( raw );
+            res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+
+            var p = /lastExtentSize:(\d+)/;
+            var r = p.exec( str );
+            if ( r ){
+                res.lastExtentSize = Number( r[1] );
+            }
         }
     }
 

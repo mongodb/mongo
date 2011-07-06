@@ -17,7 +17,8 @@
  */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "../client/dbclient.h"
 #include "../db/dbmessage.h"
 
@@ -108,7 +109,7 @@ void cleanup( int sig ) {
 void myterminate() {
     rawOut( "bridge terminate() called, printing stack:" );
     printStackTrace();
-    abort();
+    ::abort();
 }
 
 void setupSignals() {

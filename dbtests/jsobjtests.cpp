@@ -18,23 +18,93 @@
  */
 
 #include "pch.h"
+#include "../bson/util/builder.h"
 #include "../db/jsobj.h"
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
 #include "../db/repl.h"
 #include "../db/extsort.h"
-
 #include "dbtests.h"
 #include "../util/mongoutils/checksum.h"
+#include "../db/key.h"
+#include "../db/btree.h"
 
 namespace JsobjTests {
+
+    IndexInterface& indexInterfaceForTheseTests = (time(0)%2) ? *IndexDetails::iis[0] : *IndexDetails::iis[1];
+
+    void keyTest(const BSONObj& o, bool mustBeCompact = false) {
+        static KeyV1Owned *kLast;
+        static BSONObj last;
+
+        KeyV1Owned *key = new KeyV1Owned(o);
+        KeyV1Owned& k = *key;
+
+        ASSERT( !mustBeCompact || k.isCompactFormat() );
+
+        BSONObj x = k.toBson();
+        int res = o.woCompare(x, BSONObj(), /*considerfieldname*/false);
+        if( res ) {
+            cout << o.toString() << endl;
+            k.toBson();
+            cout << x.toString() << endl;
+            o.woCompare(x, BSONObj(), /*considerfieldname*/false);
+            ASSERT( res == 0 );
+        }
+        ASSERT( k.woEqual(k) );
+        ASSERT( !k.isCompactFormat() || k.dataSize() < o.objsize() );
+
+        {
+            // check BSONObj::equal.  this part not a KeyV1 test.
+            int res = o.woCompare(last);
+            ASSERT( (res==0) == o.equal(last) );
+        }
+
+        if( kLast ) {
+            int r1 = o.woCompare(last, BSONObj(), false);
+            int r2 = k.woCompare(*kLast, Ordering::make(BSONObj()));
+            bool ok = (r1<0 && r2<0) || (r1>0&&r2>0) || r1==r2;
+            if( !ok ) { 
+                cout << "r1r2 " << r1 << ' ' << r2 << endl;
+                cout << "o:" << o.toString() << endl;
+                cout << "last:" << last.toString() << endl;
+                cout << "k:" << k.toString() << endl;
+                cout << "kLast:" << kLast->toString() << endl;
+                int r3 = k.woCompare(*kLast, Ordering::make(BSONObj()));
+                cout << r3 << endl;
+            }
+            ASSERT(ok);
+            if( k.isCompactFormat() && kLast->isCompactFormat() ) { // only check if not bson as bson woEqual is broken! (or was may2011)
+                if( k.woEqual(*kLast) != (r2 == 0) ) { // check woEqual matches
+                    cout << r2 << endl;
+                    cout << k.toString() << endl;
+                    cout << kLast->toString() << endl;
+                    k.woEqual(*kLast);
+                    ASSERT(false);
+                }
+            }
+        }
+
+        delete kLast;
+        kLast = key;
+        last = o.getOwned();
+    }
+
     class BufBuilderBasic {
     public:
         void run() {
-            BufBuilder b( 0 );
-            b.appendStr( "foo" );
-            ASSERT_EQUALS( 4, b.len() );
-            ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            {
+                BufBuilder b( 0 );
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
+            {
+                mongo::StackBufBuilder b;
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
         }
     };
 
@@ -42,6 +112,9 @@ namespace JsobjTests {
     public:
         void run() {
             ASSERT_EQUALS( 1, BSONElement().size() );
+
+            BSONObj x;
+            ASSERT_EQUALS( 1, x.firstElement().size() );
         }
     };
 
@@ -172,15 +245,35 @@ namespace JsobjTests {
                 ASSERT( BSON( "" << "b" << "" << "b" ).woCompare( BSON( "" << "c" ) , key ) < 0 );
 
                 {
+                    // test a big key
+                    string x(2000, 'z');
+                    BSONObj o = BSON( "q" << x );
+                    keyTest(o, false);
+                }
+                {
+                    string y(200, 'w');                 
+                    BSONObjBuilder b;
+                    for( int i = 0; i < 10; i++ ) {
+                        b.append("x", y);
+                    }
+                    keyTest(b.obj(), true);
+                }
+                {
+                    double nan = numeric_limits<double>::quiet_NaN();
+                    BSONObj o = BSON( "y" << nan );
+                    keyTest(o);
+                }
+
+                {
                     BSONObjBuilder b;
                     b.append( "" , "c" );
                     b.appendNull( "" );
                     BSONObj o = b.obj();
+                    keyTest(o);
                     ASSERT( o.woSortOrder( BSON( "" << "b" << "" << "h" ) , key ) > 0 );
                     ASSERT( BSON( "" << "b" << "" << "h" ).woSortOrder( o , key ) < 0 );
 
                 }
-
 
                 ASSERT( BSON( "" << "a" ).woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 );
                 {
@@ -196,6 +289,13 @@ namespace JsobjTests {
         class TimestampTest : public Base {
         public:
             void run() {
+                Client *c = currentClient.get();
+                if( c == 0 ) {
+                    Client::initThread("pretouchN");
+                    c = &cc();
+                }
+                writelock lk(""); // for initTimestamp
+        
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
                 BSONObj o = b.done();
@@ -236,21 +336,34 @@ namespace JsobjTests {
                 double inf = numeric_limits< double >::infinity();
                 double nan = numeric_limits< double >::quiet_NaN();
                 double nan2 = numeric_limits< double >::signaling_NaN();
+                ASSERT( isNaN(nan) );
+                ASSERT( isNaN(nan2) );
+                ASSERT( !isNaN(inf) );
 
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << inf ) ) == 0 );
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) < 0 );
-                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) > 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) > 0 );
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) < 0 );
 
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan ) ) == 0 );
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << 1 ) ) < 0 );
+
+                ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << 5000000000LL ) ) < 0 );
+
+                {
+                    KeyV1Owned a( BSON( "a" << nan ) );
+                    KeyV1Owned b( BSON( "a" << 1 ) );
+                    Ordering o = Ordering::make(BSON("a"<<1));
+                    ASSERT( a.woCompare(b, o) < 0 );
+                }
+
                 ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan ) ) > 0 );
 
                 ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << nan2 ) ) == 0 );
                 ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << 1 ) ) < 0 );
                 ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan2 ) ) > 0 );
 
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan ) ) == 0 );
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan2 ) ) == 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan ) ) > 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan2 ) ) > 0 );
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan2 ) ) == 0 );
             }
         };
@@ -322,6 +435,14 @@ namespace JsobjTests {
         struct AppendIntOrLL {
             void run() {
                 const long long billion = 1000*1000*1000;
+
+                {
+                    BSONObjBuilder b;
+                    b.appendIntOrLL("L4", -4*billion);
+                    keyTest(b.obj());
+                    keyTest( BSON("" << billion) );
+                }
+
                 BSONObjBuilder b;
                 b.appendIntOrLL("i1",  1);
                 b.appendIntOrLL("i2", -1);
@@ -336,6 +457,7 @@ namespace JsobjTests {
                 b.appendIntOrLL("L6", -16*billion);
 
                 BSONObj o = b.obj();
+                keyTest(o);
 
                 ASSERT(o["i1"].type() == NumberInt);
                 ASSERT(o["i1"].number() == 1);
@@ -371,6 +493,7 @@ namespace JsobjTests {
                 b.appendNumber( "e" , 1024LL*1024*1024*1024*1024*1024 );
 
                 BSONObj o = b.obj();
+                keyTest(o);
 
                 ASSERT( o["a"].type() == NumberInt );
                 ASSERT( o["b"].type() == NumberDouble );
@@ -386,7 +509,103 @@ namespace JsobjTests {
             void run() {
                 string spec = "{ a: [ \"a\", \"b\" ] }";
                 ASSERT_EQUALS( spec, fromjson( spec ).toString() );
-            }
+
+                BSONObj x = BSON( "a" << "astring" << "b" << "str" );
+                keyTest(x);
+                keyTest(x);
+                BSONObj y = BSON( "a" << "astring" << "b" << "stra" );
+                keyTest(y);
+                y = BSON( "a" << "" );
+                keyTest(y);
+
+                keyTest( BSON("abc" << true ) );
+                keyTest( BSON("abc" << false ) );
+                keyTest( BSON("abc" << false << "b" << true ) );
+
+                Date_t now = jsTime();
+                keyTest( BSON("" << now << "" << 3 << "" << jstNULL << "" << true) );
+                keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
+
+                {
+                    {
+                        // check signed dates with new key format
+                        KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                    }
+                    {
+                        // backward compatibility
+                        KeyBson a( BSONObjBuilder().appendDate("", -50).obj() );
+                        KeyBson b( BSONObjBuilder().appendDate("", 50).obj() );
+                        ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                    }
+                    {
+                        // this is an uncompactible key:
+                        BSONObj uc1 = BSONObjBuilder().appendDate("", -50).appendCode("", "abc").obj();
+                        BSONObj uc2 = BSONObjBuilder().appendDate("", 55).appendCode("", "abc").obj();
+                        ASSERT( uc1.woCompare(uc2, Ordering::make(BSONObj())) < 0 );
+                        {
+                            KeyV1Owned a(uc1);
+                            KeyV1Owned b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                        }
+                        {
+                            KeyBson a(uc1);
+                            KeyBson b(uc2);
+                            ASSERT( !a.isCompactFormat() );
+                            ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
+                        }
+                    }
+                }
+
+                {
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 8, (BinDataType) 1, "aaaabbbb");
+                    b.appendBinData("e", 3, (BinDataType) 1, "aaa");
+                    b.appendBinData("b", 1, (BinDataType) 1, "x");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    for( int i = 1; i <= 3; i++ ) {
+                        for( int j = 1; j <= 3; j++ ) {
+                            BSONObjBuilder b;
+                            b.appendBinData("f", i, (BinDataType) j, "abc");
+                            BSONObj o = b.obj();
+                            keyTest( o, j != ByteArrayDeprecated );
+                        }
+                    }
+                }
+
+                {
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 1, (BinDataType) 133, "a");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    BSONObjBuilder b;
+                    b.append("AA", 3);
+                    b.appendBinData("f", 0, (BinDataType) 0, "");
+                    b.appendBinData("e", 3, (BinDataType) 7, "aaa");
+                    b.appendBinData("b", 1, (BinDataType) 128, "x");
+                    b.append("z", 3);
+                    b.appendBinData("bb", 0, (BinDataType) 129, "x");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    // 9 is not supported in compact format. so test a non-compact case here.
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 9, (BinDataType) 0, "aaaabbbbc");
+                    BSONObj o = b.obj();
+                    keyTest( o );
+                }
+          }
         };
 
         class ToStringNumber {
@@ -405,6 +624,8 @@ namespace JsobjTests {
                 b.append( "g" , -123.456 );
 
                 BSONObj x = b.obj();
+                keyTest(x);
+
                 ASSERT_EQUALS( "4", x["a"].toString( false , true ) );
                 ASSERT_EQUALS( "5.0", x["b"].toString( false , true ) );
                 ASSERT_EQUALS( "6", x["c"].toString( false , true ) );
@@ -421,11 +642,44 @@ namespace JsobjTests {
         class NullString {
         public:
             void run() {
+                {
+                    BSONObjBuilder b;
+                    const char x[] = {'a', 0, 'b', 0};
+                    b.append("field", x, 4);
+                    b.append("z", true);
+                    BSONObj B = b.obj();
+                    //cout << B.toString() << endl;
+
+                    BSONObjBuilder a;
+                    const char xx[] = {'a', 0, 'c', 0};
+                    a.append("field", xx, 4);
+                    a.append("z", true);
+                    BSONObj A = a.obj();
+
+                    BSONObjBuilder c;
+                    const char xxx[] = {'a', 0, 'c', 0, 0};
+                    c.append("field", xxx, 5);
+                    c.append("z", true);
+                    BSONObj C = c.obj();
+
+                    // test that nulls are ok within bson strings
+                    ASSERT( !(A == B) );
+                    ASSERT( A > B );
+
+                    ASSERT( !(B == C) );
+                    ASSERT( C > B );
+
+                    // check iteration is ok
+                    ASSERT( B["z"].Bool() && A["z"].Bool() && C["z"].Bool() );
+                }
+
                 BSONObjBuilder b;
                 b.append("a", "a\0b", 4);
-                b.append("b", string("a\0b", 3));
+                string z("a\0b", 3);
+                b.append("b", z);
                 b.appendAs(b.asTempObj()["a"], "c");
                 BSONObj o = b.obj();
+                keyTest(o);
 
                 stringstream ss;
                 ss << 'a' << '\0' << 'b';
@@ -438,6 +692,7 @@ namespace JsobjTests {
 
                 ASSERT_EQUALS(o["c"].valuestrsize(), 3+1);
                 ASSERT_EQUALS(o["c"].str(), ss.str());
+
             }
 
         };
@@ -479,6 +734,7 @@ namespace JsobjTests {
                 ASSERT_EQUALS( 2 , o.getFieldDotted( "b.a" ).numberInt() );
                 ASSERT_EQUALS( 3 , o.getFieldDotted( "c.0.a" ).numberInt() );
                 ASSERT_EQUALS( 4 , o.getFieldDotted( "c.1.a" ).numberInt() );
+                keyTest(o);
             }
         };
 
@@ -796,6 +1052,7 @@ namespace JsobjTests {
                 b.appendOID( "b" , 0 , false );
                 b.appendOID( "c" , 0 , true );
                 BSONObj o = b.obj();
+                keyTest(o);
 
                 ASSERT( o["a"].__oid().str() == "000000000000000000000000" );
                 ASSERT( o["b"].__oid().str() == "000000000000000000000000" );
@@ -1074,11 +1331,10 @@ namespace JsobjTests {
                 stringstream ss;
                 ss << "type: " << t;
                 string s = ss.str();
-                massert( 10403 ,  s , min( t ).woCompare( max( t ) ) < 0 );
-                massert( 10404 ,  s , max( t ).woCompare( min( t ) ) > 0 );
-                massert( 10405 ,  s , min( t ).woCompare( min( t ) ) == 0 );
-                massert( 10406 ,  s , max( t ).woCompare( max( t ) ) == 0 );
-                massert( 10407 ,  s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
+                ASSERT( min( t ).woCompare( max( t ) ) <= 0 );
+                ASSERT( max( t ).woCompare( min( t ) ) >= 0 );
+                ASSERT( min( t ).woCompare( min( t ) ) == 0 );
+                ASSERT( max( t ).woCompare( max( t ) ) == 0 );
             }
         }
     };
@@ -1091,7 +1347,7 @@ namespace JsobjTests {
             assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
             assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
 
-            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElement().fieldName() );
+            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
         }
     };
 
@@ -1147,7 +1403,8 @@ namespace JsobjTests {
         class Basic1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
+
                 sorter.add( BSON( "x" << 10 ) , 5  , 1);
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1179,7 +1436,7 @@ namespace JsobjTests {
         class Basic2 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.add( BSON( "x" << 10 ) , 5  , 11 );
                 sorter.add( BSON( "x" << 2 ) , 3 , 1 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 1 );
@@ -1212,7 +1469,7 @@ namespace JsobjTests {
         class Basic3 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
                 sorter.sort();
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
@@ -1225,7 +1482,7 @@ namespace JsobjTests {
         class ByDiskLock {
         public:
             void run() {
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add( BSON( "x" << 10 ) , 5  , 4);
                 sorter.add( BSON( "x" << 2 ) , 3 , 0 );
                 sorter.add( BSON( "x" << 5 ) , 6 , 2 );
@@ -1259,7 +1516,7 @@ namespace JsobjTests {
         class Big1 {
         public:
             void run() {
-                BSONObjExternalSorter sorter( BSONObj() , 2000 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 2000 );
                 for ( int i=0; i<10000; i++ ) {
                     sorter.add( BSON( "x" << rand() % 10000 ) , 5  , i );
                 }
@@ -1284,7 +1541,7 @@ namespace JsobjTests {
         public:
             void run() {
                 const int total = 100000;
-                BSONObjExternalSorter sorter( BSONObj() , total * 2 );
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
                 for ( int i=0; i<total; i++ ) {
                     sorter.add( BSON( "a" << "b" ) , 5  , i );
                 }
@@ -1314,7 +1571,7 @@ namespace JsobjTests {
                 b.appendNull("");
                 BSONObj x = b.obj();
 
-                BSONObjExternalSorter sorter;
+                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
                 sorter.add(x, DiskLoc(3,7));
                 sorter.add(x, DiskLoc(4,7));
                 sorter.add(x, DiskLoc(2,7));
@@ -1422,6 +1679,8 @@ namespace JsobjTests {
             ASSERT_EQUALS(obj, arr);
 
             BSONObj o = BSON( "obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) );
+            keyTest(o);
+
             ASSERT_EQUALS(o["obj"].type(), Object);
             ASSERT_EQUALS(o["arr"].type(), Array);
             ASSERT_EQUALS(o["arr2"].type(), Array);
@@ -1488,8 +1747,8 @@ namespace JsobjTests {
                     while ( j.more() )
                         l += strlen( j.next().fieldName() );
                 }
-                unsigned long long tm = t.micros();
-                cout << "time: " << tm << endl;
+                //unsigned long long tm = t.micros();
+                //cout << "time: " << tm << endl;
             }
         }
 
@@ -1528,7 +1787,7 @@ namespace JsobjTests {
             {
                 char * crap = (char*)malloc( x.objsize() );
                 memcpy( crap , x.objdata() , x.objsize() );
-                BSONObj y( crap , false );
+                BSONObj y( crap );
                 ASSERT_EQUALS( x , y );
                 free( crap );
             }
@@ -1540,7 +1799,7 @@ namespace JsobjTests {
                 foo[0] = 123123123;
                 int state = 0;
                 try {
-                    BSONObj y( crap , false );
+                    BSONObj y( crap );
                     state = 1;
                 }
                 catch ( std::exception& e ) {
@@ -1562,7 +1821,7 @@ namespace JsobjTests {
             BSONElement a = x["a"];
             BSONElement b = x["b"];
             BSONElement c = x["c"];
-            cout << "c: " << c << endl;
+            //cout << "c: " << c << endl;
             ASSERT( a.woCompare( b ) != 0 );
             ASSERT( a.woCompare( b , false ) == 0 );
 
@@ -1607,6 +1866,7 @@ namespace JsobjTests {
         void run() {
             BSONObj x = BSON( "a" << BSON( "b" << 1 ) );
             BSONObj y = BSON( "a" << BSON( "b" << 1.0 ) );
+            keyTest(x); keyTest(y);
             ASSERT_EQUALS( x , y );
             ASSERT_EQUALS( 0 , x.woCompare( y ) );
         }
@@ -1736,27 +1996,27 @@ namespace JsobjTests {
                               << "asdasdasdas" << "asldkasldjasldjasldjlasjdlasjdlasdasdasdasdasdasdasd" );
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.md5();
-                int millis = t.millis();
-                cout << "md5 : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "md5 : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     x.toString();
-                int millis = t.millis();
-                cout << "toString : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "toString : " << millis << endl;
             }
 
             {
-                Timer t;
+	        //Timer t;
                 for ( int i=0; i<N; i++ )
                     checksum( x.objdata() , x.objsize() );
-                int millis = t.millis();
-                cout << "checksum : " << millis << endl;
+                //int millis = t.millis();
+                //cout << "checksum : " << millis << endl;
             }
 
         }
@@ -1770,6 +2030,7 @@ namespace JsobjTests {
         void setupTests() {
             add< BufBuilderBasic >();
             add< BSONElementBasic >();
+            add< BSONObjTests::NullString >();
             add< BSONObjTests::Create >();
             add< BSONObjTests::WoCompareBasic >();
             add< BSONObjTests::NumericCompareBasic >();
@@ -1786,7 +2047,6 @@ namespace JsobjTests {
             add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::ToStringArray >();
             add< BSONObjTests::ToStringNumber >();
-            add< BSONObjTests::NullString >();
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();

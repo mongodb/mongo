@@ -103,7 +103,7 @@ namespace mongo {
         ~DbResponse() { delete response; }
     };
 
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort &client );
 
     void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
 
@@ -130,7 +130,7 @@ namespace mongo {
             return "localhost"; // TODO: should this have the port?
         }
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend );
+        virtual void say( Message &toSend, bool isRetry = false );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
             return say( toSend );
@@ -145,13 +145,16 @@ namespace mongo {
         virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
+
+    private:
+        static HostAndPort _clientHost;
     };
 
     extern int lockFile;
-#ifdef WIN32
+#ifdef _WIN32
     extern HANDLE lockFileHandle;
 #endif
-    void acquirePathLock();
+    void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
 
 } // namespace mongo

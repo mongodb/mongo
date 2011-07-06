@@ -1,3 +1,9 @@
+mongodb (1.9.0) unstable; urgency=low
+
+  * see http://jira.mongodb.org/browse/SERVER/fixforversion/10232
+
+ -- Richard Kreuter <richard@10gen.com>  Sun, 01 May 2011 16:56:28 -0500
+
 mongodb (1.8.0-rc0) unstable; urgency=low
 
   * see http://jira.mongodb.org/browse/SERVER/fixforversion/10245

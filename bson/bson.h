@@ -1,11 +1,9 @@
-/* NOTE: Standalone bson header for when not using MongoDB.
-   See also: bsondemo.
-
-   MongoDB includes ../db/jsobj.h instead. This file, however, pulls in much less code / dependencies.
-*/
-
 /** @file bson.h
-    BSON classes
+
+    Main bson include file for mongodb c++ clients. MongoDB includes ../db/jsobj.h instead. 
+    This file, however, pulls in much less code / dependencies.
+
+    @see bsondemo
 */
 
 /*
@@ -25,7 +23,7 @@
  */
 
 /**
-   bo and its helpers
+   Main include file for C++ BSON module when using standalone (sans MongoDB client).
 
    "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
    represented in JSON (plus a few extensions useful for databases & other languages).
@@ -42,10 +40,11 @@
    */
 #endif
 
+#include <cstdlib>
+#include <memory>
 #include <iostream>
 #include <sstream>
 #include <boost/utility.hpp>
-#include "util/builder.h"
 
 namespace bson {
 
@@ -56,7 +55,7 @@ namespace bson {
     public:
         assertion( unsigned u , const string& s )
             : id( u ) , msg( s ) {
-            mongo::StringBuilder ss;
+            stringstream ss;
             ss << "BsonAssertion id: " << u << " " << s;
             full = ss.str();
         }
@@ -101,23 +100,12 @@ namespace mongo {
 #endif
 }
 
-#include "../bson/bsontypes.h"
-#include "../bson/oid.h"
-#include "../bson/bsonelement.h"
-#include "../bson/bsonobj.h"
-#include "../bson/bsonmisc.h"
-#include "../bson/bsonobjbuilder.h"
-#include "../bson/bsonobjiterator.h"
-#include "../bson/bson-inl.h"
+#include "util/builder.h"
+#include "bsontypes.h"
+#include "oid.h"
+#include "bsonelement.h"
+#include "bsonobj.h"
 
-namespace mongo {
-
-    inline unsigned getRandomNumber() {
-#if defined(_WIN32)
-        return rand();
-#else
-        return random();
-#endif
-    }
-
-}
+#include "bsonobjbuilder.h"
+#include "bsonobjiterator.h"
+#include "bson-inl.h"

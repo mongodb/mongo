@@ -113,9 +113,6 @@ wait(function() {
   });
 
 
-/**
- * TODO: this fails on buildbot
- * see SERVER-2550
 print("10. Insert some stuff");
 master = replTest.getMaster();
 for (var i=0; i<10000; i++) {
@@ -124,5 +121,5 @@ for (var i=0; i<10000; i++) {
 
 
 print("11. Everyone happy eventually");
-replTest.awaitReplication();
-*/
+replTest.awaitReplication(60000);
+

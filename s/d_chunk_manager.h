@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    class ClientCursor;
+
     /**
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      *
@@ -102,6 +104,14 @@ namespace mongo {
         bool belongsToMe( const BSONObj& obj ) const;
 
         /**
+         * Checks whether a document belongs to this shard.
+         *
+         * @param obj document containing sharding keys (and, optionally, other attributes)
+         * @return true if shards hold the object
+         */
+        bool belongsToMe( ClientCursor* cc ) const;
+        
+        /**
          * Given a chunk's min key (or empty doc), gets the boundary of the chunk following that one (the first).
          *
          * @param lookupKey is the min key for a previously obtained chunk or the empty document
@@ -119,6 +129,13 @@ namespace mongo {
 
         string toString() const;
     private:
+
+        /**
+         * @same as belongsToMe to but key has to be the shard key
+         */
+        bool _belongsToMe( const BSONObj& key ) const;
+
+        
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
         ShardChunkVersion _version;
 

@@ -161,56 +161,52 @@ namespace mongo {
     }
 #endif
 
-    // note this wraps
-    inline int tdiff(unsigned told, unsigned tnew) {
-        return WrappingInt::diff(tnew, told);
-    }
-
-    /** curTimeMillis will overflow - use curTimeMicros64 instead if you care about that. */
-    inline unsigned curTimeMillis() {
-        boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
-        unsigned t = xt.nsec / 1000000;
-        return (xt.sec & 0xfffff) * 1000 + t;
-    }
-
     extern long long jsTime_virtual_skew;
     extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
 
     // DO NOT TOUCH except for testing
     inline void jsTimeVirtualSkew( long long skew ){
-	jsTime_virtual_skew = skew;
+        jsTime_virtual_skew = skew;
     }
     inline long long getJSTimeVirtualSkew(){
-	return jsTime_virtual_skew;
+        return jsTime_virtual_skew;
     }
 
     inline void jsTimeVirtualThreadSkew( long long skew ){
-	jsTime_virtual_thread_skew.reset(new long long(skew));
+        jsTime_virtual_thread_skew.reset(new long long(skew));
     }
     inline long long getJSTimeVirtualThreadSkew(){
-	if(jsTime_virtual_thread_skew.get()){
-	    return *(jsTime_virtual_thread_skew.get());
-	}
-	else return 0;
+        if(jsTime_virtual_thread_skew.get()){
+            return *(jsTime_virtual_thread_skew.get());
+        }
+        else return 0;
     }
 
     /** Date_t is milliseconds since epoch */
+    inline Date_t jsTime();
+
+    /** warning this will wrap */
+    inline unsigned curTimeMicros();
+
+    inline unsigned long long curTimeMicros64();
+#ifdef _WIN32 // no gettimeofday on windows
+    inline unsigned long long curTimeMillis64() {
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        return ((unsigned long long)xt.sec) * 1000 + xt.nsec / 1000000;
+    }
     inline Date_t jsTime() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         unsigned long long t = xt.nsec / 1000000;
         return ((unsigned long long) xt.sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
     }
-
     inline unsigned long long curTimeMicros64() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         unsigned long long t = xt.nsec / 1000;
         return (((unsigned long long) xt.sec) * 1000000) + t;
-    }
-
-    // measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
+    }    
     inline unsigned curTimeMicros() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -218,5 +214,30 @@ namespace mongo {
         unsigned secs = xt.sec % 1024;
         return secs*1000000 + t;
     }
+#else
+#  include <sys/time.h>
+    inline unsigned long long curTimeMillis64() {
+        timeval tv;
+        gettimeofday(&tv, NULL);
+        return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
+    }
+    inline Date_t jsTime() {
+        timeval tv;
+        gettimeofday(&tv, NULL);
+        unsigned long long t = tv.tv_usec / 1000;
+        return ((unsigned long long) tv.tv_sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
+    }
+    inline unsigned long long curTimeMicros64() {
+        timeval tv;
+        gettimeofday(&tv, NULL);
+        return (((unsigned long long) tv.tv_sec) * 1000*1000) + tv.tv_usec;
+    }
+    inline unsigned curTimeMicros() {
+        timeval tv;
+        gettimeofday(&tv, NULL);
+        unsigned secs = tv.tv_sec % 1024;
+        return secs*1000*1000 + tv.tv_usec;
+    }
+#endif
 
 }  // namespace mongo

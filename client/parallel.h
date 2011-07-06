@@ -89,8 +89,14 @@ namespace mongo {
 
         virtual void _init() = 0;
 
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 );
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 , bool lazy=false );
         BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
+
+        /**
+         * checks the cursor for any errors
+         * will throw an exceptionif an error is encountered
+         */
+        void _checkCursor( DBClientCursor * cursor );
 
         static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
 
@@ -111,15 +117,20 @@ namespace mongo {
     class FilteringClientCursor {
     public:
         FilteringClientCursor( const BSONObj filter = BSONObj() );
+        FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
         FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
         ~FilteringClientCursor();
 
         void reset( auto_ptr<DBClientCursor> cursor );
+        void reset( DBClientCursor* cursor );
 
         bool more();
         BSONObj next();
 
         BSONObj peek();
+
+        DBClientCursor* raw() { return _cursor.get(); }
+
     private:
         void _advance();
 
@@ -275,8 +286,9 @@ namespace mongo {
             string _db;
             BSONObj _cmd;
             DBClientBase * _conn;
+            scoped_ptr<ScopedDbConnection> _connHolder; // used if not provided a connection
 
-            scoped_ptr<boost::thread> _thr;
+            scoped_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
             bool _ok;
@@ -285,7 +297,6 @@ namespace mongo {
             friend class Future;
         };
 
-        static void commandThread(shared_ptr<CommandResult> res);
         
         /**
          * @param server server name

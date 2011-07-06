@@ -38,3 +38,20 @@ pass = "a" + Math.random();
 db2.addUser( "eliot" , pass );
 
 assert.commandFailed( db2.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
+
+// check sanity check SERVER-3003
+
+before = db2.system.users.count()
+
+assert.throws( function(){
+    db2.addUser( "" , "abc" )
+} , null , "C1" )
+
+assert.throws( function(){
+    db2.addUser( "abc" , "" )
+} , null , "C2" )
+
+
+after = db2.system.users.count()
+assert( before > 0 , "C3" )
+assert.eq( before , after , "C4" )

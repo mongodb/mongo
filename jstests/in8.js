@@ -11,7 +11,7 @@ function doTest() {
     assert.eq( 1, t.count( {key:[1]} ) );
     assert.eq( 1, t.count( {key:{$in:[[1]]}} ) );
     assert.eq( 1, t.count( {key:{$in:[[1]],$ne:[2]}} ) );
-    assert.eq( 1, t.count( {key:{$in:[[1]],$type:1}} ) );
+    assert.eq( 1, t.count( {key:{$in:[['1']],$type:2}} ) );
     assert.eq( 1, t.count( {key:['1']} ) );
     assert.eq( 1, t.count( {key:{$in:[['1']]}} ) );
     assert.eq( 1, t.count( {key:[2]} ) );

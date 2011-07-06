@@ -19,7 +19,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -27,7 +26,7 @@
 #include "lasterror.h"
 #include "security.h"
 #include "json.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"
@@ -39,6 +38,9 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
+#include "ops/update.h"
+#include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 
@@ -71,7 +73,7 @@ namespace mongo {
     KillCurrentOp killCurrentOp;
 
     int lockFile = 0;
-#ifdef WIN32
+#ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
 
@@ -178,7 +180,7 @@ namespace mongo {
         }
         catch ( AssertionException& e ) {
             ok = false;
-            op.debug().str << " exception ";
+            op.debug().exceptionInfo = e.getInfo();
             LOGSOME {
                 log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
@@ -210,9 +212,7 @@ namespace mongo {
             resp->setData( msgdata, true );
         }
 
-        if ( op.shouldDBProfile( 0 ) ) {
-            op.debug().str << " bytes:" << resp->header()->dataLen();
-        }
+        op.debug().responseLength = resp->header()->dataLen();
 
         dbresponse.response = resp.release();
         dbresponse.responseTo = responseTo;
@@ -220,8 +220,17 @@ namespace mongo {
         return ok;
     }
 
+    void (*reportEventToSystem)(const char *msg) = 0;
+
+    void mongoAbort(const char *msg) { 
+        if( reportEventToSystem ) 
+            reportEventToSystem(msg);
+        rawOut(msg);
+        ::abort();
+    }
+
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -268,11 +277,10 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client,op);
+        currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();
-        StringBuilder& ss = debug.str;
-        ss << opToString( op ) << " ";
+        debug.op = op;
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
@@ -291,7 +299,7 @@ namespace mongo {
             char *p = m.singleData()->_data;
             int len = strlen(p);
             if ( len > 400 )
-                out() << curTimeMillis() % 10000 <<
+                out() << curTimeMillis64() % 10000 <<
                       " long msg received, len:" << len << endl;
 
             Message *resp = new Message();
@@ -324,7 +332,6 @@ namespace mongo {
                     else if ( op == dbKillCursors ) {
                         currentOp.ensureStarted();
                         logThreshold = 10;
-                        ss << "killcursors ";
                         receivedKillCursors(m);
                     }
                     else {
@@ -335,11 +342,11 @@ namespace mongo {
                 }
                 catch ( UserException& ue ) {
                     tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << ue.toString() << endl;
-                    ss << " exception " << ue.toString();
+                    debug.exceptionInfo = ue.getInfo();
                 }
                 catch ( AssertionException& e ) {
                     tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << e.toString() << endl;
-                    ss << " exception " << e.toString();
+                    debug.exceptionInfo = e.getInfo();
                     log = true;
                 }
             }
@@ -350,12 +357,12 @@ namespace mongo {
 
         //DEV log = true;
         if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
-                ss << ' ' << ms << "ms";
-                mongo::tlog() << ss.str() << endl;
+                debug.executionTime = ms;
+                mongo::tlog() << debug << endl;
             }
         }
 
@@ -367,15 +374,16 @@ namespace mongo {
             else {
                 writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context c( currentOp.getNS() );
-                    profile(ss.str().c_str(), ms);
+                    Client::Context cx( currentOp.getNS() );
+                    profile(c , currentOp );
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
                 }
             }
         }
-
+        
+        debug.reset();
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
@@ -383,9 +391,10 @@ namespace mongo {
         x++; // reserved
         int n = *x++;
 
-        assert( m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13659 , "sent 0 cursors to kill" , n != 0 );
+        massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
-        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
@@ -432,9 +441,7 @@ namespace mongo {
     void receivedUpdate(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        uassert( 10054 ,  "not master", isMasterNs( ns ) );
-        op.debug().str << ns << ' ';
+        op.debug().ns = ns;
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -447,18 +454,15 @@ namespace mongo {
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
-        {
-            string s = query.toString();
-            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down.
-               instead, let's just story the query BSON in the debug object, and it can toString()
-               lazily
-            */
-            op.debug().str << " query: " << s;
-            op.setQuery(query);
-        }
+        
+        op.debug().query = query;
+        op.setQuery(query);
 
         writelock lk;
 
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10054 ,  "not master", isMasterNs( ns ) );
+        
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
             return;
@@ -472,23 +476,23 @@ namespace mongo {
     void receivedDelete(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        uassert( 10056 ,  "not master", isMasterNs( ns ) );
-        op.debug().str << ns << ' ';
+        op.debug().ns = ns;
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        {
-            string s = pattern.toString();
-            op.debug().str << " query: " << s;
-            op.setQuery(pattern);
-        }
+        
+        op.debug().query = pattern;
+        op.setQuery(pattern);
 
         writelock lk(ns);
+
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10056 ,  "not master", isMasterNs( ns ) );
+
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast & handlePossibleShardedMessage( m , 0 ) )
+        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
             return;
 
         Client::Context ctx(ns);
@@ -500,7 +504,6 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
-        StringBuilder& ss = curop.debug().str;
         bool ok = true;
 
         DbMessage d(m);
@@ -509,9 +512,9 @@ namespace mongo {
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
 
-        ss << ns << " cid:" << cursorid;
-        if( ntoreturn )
-            ss << " ntoreturn:" << ntoreturn;
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = ntoreturn;
+        curop.debug().cursorid = cursorid;
 
         time_t start = 0;
         int pass = 0;
@@ -546,7 +549,7 @@ namespace mongo {
             }
             catch ( AssertionException& e ) {
                 exhaust = false;
-                ss << " exception " << e.toString();
+                curop.debug().exceptionInfo = e.getInfo();
                 msgdata = emptyMoreResult(cursorid);
                 ok = false;
             }
@@ -555,56 +558,83 @@ namespace mongo {
 
         Message *resp = new Message();
         resp->setData(msgdata, true);
-        ss << " bytes:" << resp->header()->dataLen();
-        ss << " nreturned:" << msgdata->nReturned;
+        curop.debug().responseLength = resp->header()->dataLen();
+        curop.debug().nreturned = msgdata->nReturned;
+
         dbresponse.response = resp;
         dbresponse.responseTo = m.header()->id;
+        
         if( exhaust ) {
-            ss << " exhaust ";
+            curop.debug().exhaust = true;
             dbresponse.exhaust = ns;
         }
+
         return ok;
+    }
+
+    void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
+        uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        {
+            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
+            BSONObjIterator i( js );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
+            }
+        }
+        theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
+        logOp("i", ns, js);
+    }
+
+    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
+        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
+        int n = 0;
+        BSONObj js(_js);
+        while( 1 ) {
+            try {
+                checkAndInsert(ns, js);
+                ++n;
+                getDur().commitIfNeeded();
+            } catch (const UserException&) {
+                if (!keepGoing || !d.moreJSObjs()){
+                    globalOpCounters.incInsertInWriteLock(n);
+                    throw;
+                }
+                // otherwise ignore and keep going
+            }
+            if( !d.moreJSObjs() )
+                break;
+            js = d.nextJsObj();
+        }
     }
 
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        uassert( 10058 ,  "not master", isMasterNs( ns ) );
-        op.debug().str << ns;
+        op.debug().ns = ns;
 
         writelock lk(ns);
+
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10058 , "not master", isMasterNs(ns) );
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
         Client::Context ctx(ns);
-        if( d.moreJSObjs() ) { 
-            int n = 0;
-            while ( 1 ) {
-                BSONObj js = d.nextJsObj();
-                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-                {
-                    // check no $ modifiers
-                    BSONObjIterator i( js );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
-                    }
-                }
-
-                theDataFileMgr.insertWithObjMod(ns, js, false);
-                logOp("i", ns, js);
-                ++n;
-
-                if( !d.moreJSObjs() )
-                    break;
-
-                getDur().commitIfNeeded();
-            }
-            globalOpCounters.incInsertInWriteLock(n);
+        if( !d.moreJSObjs() ) { 
+            // strange.  should we complain?
+            return;
         }
+        BSONObj js = d.nextJsObj();
+        if( d.moreJSObjs() ) { 
+            insertMulti(d, ns, js);
+            return;
+        }
+
+        checkAndInsert(ns, js);
+        globalOpCounters.incInsertInWriteLock(1);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
@@ -651,7 +681,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         assert( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
@@ -659,11 +689,11 @@ namespace mongo {
         return true;
     }
 
-    void DBDirectClient::say( Message &toSend ) {
+    void DBDirectClient::say( Message &toSend, bool isRetry ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         getDur().commitIfNeeded();
     }
 
@@ -680,6 +710,8 @@ namespace mongo {
     void DBDirectClient::killCursor( long long id ) {
         ClientCursor::erase( id );
     }
+
+    HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
         readlock lk( ns );
@@ -752,7 +784,7 @@ namespace mongo {
                     }
                     if( --n <= 0 ) {
                         log() << "shutdown: couldn't acquire write lock, aborting" << endl;
-                        abort();
+                        mongoAbort("couldn't acquire write lock");
                     }
                     log() << "shutdown: waiting for write lock..." << endl;
                 }
@@ -763,7 +795,7 @@ namespace mongo {
         log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
-        rawOut( ss3.str() );
+        log() << ss3.str() << endl;
 
         if( cmdLine.dur ) {
             dur::journalCleanup(true);
@@ -775,9 +807,9 @@ namespace mongo {
             /* This ought to be an unlink(), but Eliot says the last
                time that was attempted, there was a race condition
                with acquirePathLock().  */
-#ifdef WIN32
+#ifdef _WIN32
             if( _chsize( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << getLastError() << endl;
+                log() << "couldn't remove fs lock " << WSAGetLastError() << endl;
             CloseHandle(lockFileHandle);
 #else
             if( ftruncate( lockFile , 0 ) )
@@ -788,8 +820,17 @@ namespace mongo {
 #endif
     }
 
+    void exitCleanly( ExitCode code ) {
+        killCurrentOp.killAll();
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( code );
+        }
+    }
+
     /* not using log() herein in case we are already locked */
-    void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+    NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
         auto_ptr<writelocktry> wlt;
         if ( tryToGetLock ) {
@@ -842,14 +883,14 @@ namespace mongo {
         ss << getpid() << endl;
         string s = ss.str();
         const char * data = s.c_str();
-#ifdef WIN32
+#ifdef _WIN32
         assert ( _write( fd, data, strlen( data ) ) );
 #else
         assert ( write( fd, data, strlen( data ) ) );
 #endif
     }
 
-    void acquirePathLock() {
+    void acquirePathLock(bool doingRepair) {
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
@@ -858,7 +899,7 @@ namespace mongo {
             oldFile = true;
         }
 
-#ifdef WIN32
+#ifdef _WIN32
         lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE,
             0 /* do not allow anyone else access */, NULL, 
             OPEN_ALWAYS /* success if fh can open */, 0, NULL );
@@ -869,13 +910,15 @@ namespace mongo {
             FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
                 NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                 (LPSTR)&msg, 0, NULL);
-            uasserted( 13627 , msg );
+            string m = msg;
+            str::stripTrailing(m, "\r\n");
+            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?" );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
         lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
         if( lockFile <= 0 ) {
-            uasserted( 10309 , str::stream() << "Unable to create / open lock file for lockfilepath: " << name << ' ' << errnoWithDescription());
+            uasserted( 10309 , str::stream() << "Unable to create/open lock file: " << name << ' ' << errnoWithDescription() << " Is a mongod instance already running?" );
         }
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
@@ -915,7 +958,7 @@ namespace mongo {
                 }
             }
             else {
-                if (!dur::haveJournalFiles()) {
+                if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
                              << "old lock file: " << name << ".  probably means unclean shutdown\n"
@@ -927,7 +970,7 @@ namespace mongo {
 
             if (!errmsg.empty()) {
                 cout << errmsg << endl;
-#ifdef WIN32
+#ifdef _WIN32
                 CloseHandle( lockFileHandle );
 #else
                 close ( lockFile );
@@ -946,7 +989,7 @@ namespace mongo {
             uasserted(13597, "can't start without --journal enabled when journal/ files are present");
         }
 
-#ifdef WIN32
+#ifdef _WIN32
         uassert( 13625, "Unable to truncate lock file", _chsize(lockFile, 0) == 0);
         writePid( lockFile );
         _commit( lockFile );
@@ -958,17 +1001,17 @@ namespace mongo {
 #endif
     }
 #else
-    void acquirePathLock() {
+    void acquirePathLock(bool) {
         // TODO - this is very bad that the code above not running here.
 
         // Not related to lock file, but this is where we handle unclean shutdown
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
-            cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
+            cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
-            uasserted(13618, "can't start without --dur enabled when journal/ files are present");
+            uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
 #endif

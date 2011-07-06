@@ -157,7 +157,7 @@ namespace mongo {
 
                 if( !_hasWritten ) {
                     // you can't be writing if one of these is pending, so this is a verification.
-                    assert( !dbMutex._remapPrivateViewRequested );
+                    assert( !dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
 
                     // we don't bother doing a group commit when nothing is written, so we have a var to track that
                     _hasWritten = true;
@@ -191,7 +191,7 @@ namespace mongo {
                 // remember intent. we will journal it in a bit
                 _wi.insertWriteIntent(p, len);
                 wassert( _wi._writes.size() <  2000000 );
-                assert(  _wi._writes.size() < 20000000 );
+                //assert(  _wi._writes.size() < 20000000 );
 
                 {
                     // a bit over conservative in counting pagebytes used
@@ -204,14 +204,26 @@ namespace mongo {
 #if defined(_DEBUG)
                         _nSinceCommitIfNeededCall++;
                         if( _nSinceCommitIfNeededCall >= 80 ) {
- 			  if( _nSinceCommitIfNeededCall % 40 == 0 ) {
-			    log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-			    if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
-			      printStackTrace();
-			  }
+                            if( _nSinceCommitIfNeededCall % 40 == 0 ) {
+                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
+                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
+                                    printStackTrace();
+                            }
                         }
 #endif
-                        massert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
+                        if (_bytes > UncommittedBytesLimit * 3) {
+                            static time_t lastComplain;
+                            static unsigned nComplains;
+                            // throttle logging
+                            if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
+                                lastComplain = time(0);
+                                warning() << "DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
+                                if( nComplains < 10 || nComplains % 10 == 0 ) {
+                                    // wassert makes getLastError show an error, so we just print stack trace
+                                    printStackTrace();
+                                }
+                            }
+                        }
                     }
                 }
             }

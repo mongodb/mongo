@@ -52,13 +52,17 @@ namespace mongo {
         }
     protected:
         void run() {
+            log() << "starting" << endl;
             while ( ! inShutdown() ) {
                 sleepsecs( 20 );
                 try {
                     ReplicaSetMonitor::checkAll();
                 }
                 catch ( std::exception& e ) {
-                    error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+                    error() << "check failed: " << e.what() << endl;
+                }
+                catch ( ... ) {
+                    error() << "unkown error" << endl;
                 }
             }
         }
@@ -70,7 +74,7 @@ namespace mongo {
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1), _nextSlave(0) {
         
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 
@@ -81,6 +85,12 @@ namespace mongo {
         string errmsg;
 
         for ( unsigned i=0; i<servers.size(); i++ ) {
+
+            bool haveAlready = false;
+            for ( unsigned n = 0; n < _nodes.size() && ! haveAlready; n++ )
+                haveAlready = ( _nodes[n].addr == servers[i] );
+            if( haveAlready ) continue;
+
             auto_ptr<DBClientConnection> conn( new DBClientConnection( true , 0, 5.0 ) );
             if (!conn->connect( servers[i] , errmsg ) ) {
                 log(1) << "error connecting to seed " << servers[i] << ": " << errmsg << endl;
@@ -121,6 +131,7 @@ namespace mongo {
         while ( true ) {
             ReplicaSetMonitorPtr m;
             {
+                scoped_lock lk( _setsLock );
                 for ( map<string,ReplicaSetMonitorPtr>::iterator i=_sets.begin(); i!=_sets.end(); ++i ) {
                     string name = i->first;
                     if ( seen.count( name ) )
@@ -175,8 +186,10 @@ namespace mongo {
     void ReplicaSetMonitor::notifyFailure( const HostAndPort& server ) {
         scoped_lock lk( _lock );
         if ( _master >= 0 && _master < (int)_nodes.size() ) {
-            if ( server == _nodes[_master].addr )
+            if ( server == _nodes[_master].addr ) {
+                _nodes[_master].ok = false; 
                 _master = -1;
+            }
         }
     }
 
@@ -190,7 +203,7 @@ namespace mongo {
         }
         
         _check();
-        
+
         scoped_lock lk( _lock );
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
         return _nodes[_master].addr;
@@ -214,19 +227,17 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        int x = rand() % _nodes.size();
-        {
-            scoped_lock lk( _lock );
-            for ( unsigned i=0; i<_nodes.size(); i++ ) {
-                int p = ( i + x ) % _nodes.size();
-                if ( p == _master )
-                    continue;
-                if ( _nodes[p].ok )
-                    return _nodes[p].addr;
-            }
+
+        scoped_lock lk( _lock );
+        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+            _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+            if ( _nextSlave == _master )
+                continue;
+            if ( _nodes[ _nextSlave ].ok )
+                return _nodes[ _nextSlave ].addr;
         }
 
-        return _nodes[0].addr;
+        return _nodes[ 0 ].addr;
     }
 
     /**
@@ -285,6 +296,10 @@ namespace mongo {
             newConn->connect( h , temp );
             {
                 scoped_lock lk( _lock );
+                if ( _find_inlock( toCheck ) >= 0 ) {
+                    // we need this check inside the lock so there isn't thread contention on adding to vector
+                    continue;
+                }
                 _nodes.push_back( Node( h , newConn ) );
             }
             log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
@@ -302,10 +317,9 @@ namespace mongo {
             BSONObj o;
             c->isMaster(isMaster, &o);
 
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << '\n';
+            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << endl;
 
             // add other nodes
-            string maybePrimary;
             if ( o["hosts"].type() == Array ) {
                 if ( o["primary"].type() == String )
                     maybePrimary = o["primary"].String();
@@ -387,11 +401,16 @@ namespace mongo {
 
     int ReplicaSetMonitor::_find( const string& server ) const {
         scoped_lock lk( _lock );
+        return _find_inlock( server );
+    }
+
+    int ReplicaSetMonitor::_find_inlock( const string& server ) const {
         for ( unsigned i=0; i<_nodes.size(); i++ )
             if ( _nodes[i].addr == server )
                 return i;
         return -1;
     }
+
 
     int ReplicaSetMonitor::_find( const HostAndPort& server ) const {
         scoped_lock lk( _lock );
@@ -419,7 +438,7 @@ namespace mongo {
     DBClientConnection * DBClientReplicaSet::checkMaster() {
         HostAndPort h = _monitor->getMaster();
 
-        if ( h == _masterHost ) {
+        if ( h == _masterHost && _master ) {
             // a master is selected.  let's just make sure connection didn't die
             if ( ! _master->isFailed() )
                 return _master.get();
@@ -427,7 +446,7 @@ namespace mongo {
         }
 
         _masterHost = _monitor->getMaster();
-        _master.reset( new DBClientConnection( true ) );
+        _master.reset( new DBClientConnection( true , this ) );
         string errmsg;
         if ( ! _master->connect( _masterHost , errmsg ) ) {
             _monitor->notifyFailure( _masterHost );
@@ -440,14 +459,14 @@ namespace mongo {
     DBClientConnection * DBClientReplicaSet::checkSlave() {
         HostAndPort h = _monitor->getSlave( _slaveHost );
 
-        if ( h == _slaveHost ) {
+        if ( h == _slaveHost && _slave ) {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
         }
         
         _slaveHost = _monitor->getSlave();
-        _slave.reset( new DBClientConnection( true ) );
+        _slave.reset( new DBClientConnection( true , this ) );
         _slave->connect( _slaveHost );
         _auth( _slave.get() );
         return _slave.get();
@@ -500,12 +519,12 @@ namespace mongo {
 
     // ------------- simple functions -----------------
 
-    void DBClientReplicaSet::insert( const string &ns , BSONObj obj ) {
-        checkMaster()->insert(ns, obj);
+    void DBClientReplicaSet::insert( const string &ns , BSONObj obj , int flags) {
+        checkMaster()->insert(ns, obj, flags);
     }
 
-    void DBClientReplicaSet::insert( const string &ns, const vector< BSONObj >& v ) {
-        checkMaster()->insert(ns, v);
+    void DBClientReplicaSet::insert( const string &ns, const vector< BSONObj >& v , int flags) {
+        checkMaster()->insert(ns, v, flags);
     }
 
     void DBClientReplicaSet::remove( const string &ns , Query obj , bool justOne ) {
@@ -523,12 +542,12 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
-                    return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
+                    return checkSlaveQueryResult( checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize) );
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -541,12 +560,12 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -562,6 +581,145 @@ namespace mongo {
         assert(0);
     }
 
+    void DBClientReplicaSet::isntMaster() { 
+        log() << "got not master for: " << _masterHost << endl;
+        _monitor->notifyFailure( _masterHost );
+        _master.reset(); 
+    }
+
+    auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
+        BSONObj error;
+        bool isError = result->peekError( &error );
+        if( ! isError ) return result;
+
+        // We only check for "not master or secondary" errors here
+
+        // If the error code here ever changes, we need to change this code also
+        BSONElement code = error["code"];
+        if( code.isNumber() && code.Int() == 13436 /* not master or secondary */ ){
+            isntSecondary();
+            throw DBException( str::stream() << "slave " << _slaveHost.toString() << " is no longer secondary", 14812 );
+        }
+
+        return result;
+    }
+
+    void DBClientReplicaSet::isntSecondary() {
+        log() << "slave no longer has secondary status: " << _slaveHost << endl;
+        // Failover to next slave
+        _monitor->notifySlaveFailure( _slaveHost );
+        _slave.reset();
+    }
+
+    void DBClientReplicaSet::say( Message& toSend, bool isRetry ) {
+
+        if( ! isRetry )
+            _lazyState = LazyState();
+
+        int lastOp = -1;
+        bool slaveOk = false;
+
+        if ( ( lastOp = toSend.operation() ) == dbQuery ) {
+            // TODO: might be possible to do this faster by changing api
+            DbMessage dm( toSend );
+            QueryMessage qm( dm );
+            if ( ( slaveOk = ( qm.queryOptions & QueryOption_SlaveOk ) ) ) {
+
+                for ( int i = _lazyState._retries; i < 3; i++ ) {
+                    try {
+                        DBClientConnection* slave = checkSlave();
+                        slave->say( toSend );
+
+                        _lazyState._lastOp = lastOp;
+                        _lazyState._slaveOk = slaveOk;
+                        _lazyState._retries = i;
+                        _lazyState._lastClient = slave;
+                        return;
+                    }
+                    catch ( DBException &e ) {
+                       LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                    }
+                }
+            }
+        }
+
+        DBClientConnection* master = checkMaster();
+        master->say( toSend );
+
+        _lazyState._lastOp = lastOp;
+        _lazyState._slaveOk = slaveOk;
+        _lazyState._retries = 3;
+        _lazyState._lastClient = master;
+        return;
+    }
+
+    bool DBClientReplicaSet::recv( Message& m ) {
+
+        assert( _lazyState._lastClient );
+
+        // TODO: It would be nice if we could easily wrap a conn error as a result error
+        try {
+            return _lazyState._lastClient->recv( m );
+        }
+        catch( DBException& e ){
+            log() << "could not receive data from " << _lazyState._lastClient << causedBy( e ) << endl;
+            return false;
+        }
+    }
+
+    void DBClientReplicaSet::checkResponse( const char* data, int nReturned, bool* retry, string* targetHost ){
+
+        // For now, do exactly as we did before, so as not to break things.  In general though, we
+        // should fix this so checkResponse has a more consistent contract.
+        if( ! retry ){
+            if( _lazyState._lastClient )
+                return _lazyState._lastClient->checkResponse( data, nReturned );
+            else
+                return checkMaster()->checkResponse( data, nReturned );
+        }
+
+        *retry = false;
+        if( targetHost && _lazyState._lastClient ) *targetHost = _lazyState._lastClient->getServerAddress();
+        else if (targetHost) *targetHost = "";
+
+        if( ! _lazyState._lastClient ) return;
+        if( nReturned != 1 && nReturned != -1 ) return;
+
+        BSONObj dataObj;
+        if( nReturned == 1 ) dataObj = BSONObj( data );
+
+        // Check if we should retry here
+        if( _lazyState._lastOp == dbQuery && _lazyState._slaveOk ){
+
+            // Check the error code for a slave not secondary error
+            if( nReturned == -1 ||
+                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ) ){
+
+                bool wasMaster = false;
+                if( _lazyState._lastClient == _slave.get() ){
+                    isntSecondary();
+                }
+                else if( _lazyState._lastClient == _master.get() ){
+                    wasMaster = true;
+                    isntMaster();
+                }
+                else
+                    warning() << "passed " << dataObj << " but last rs client " << _lazyState._lastClient->toString() << " is not master or secondary" << endl;
+
+                if( _lazyState._retries < 3 ){
+                    _lazyState._retries++;
+                    *retry = true;
+                }
+                else{
+                    (void)wasMaster; // silence set-but-not-used warning
+                    // assert( wasMaster );
+                    // printStackTrace();
+                    log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
+                }
+            }
+        }
+    }
+
 
     bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {
@@ -569,15 +727,15 @@ namespace mongo {
             DbMessage dm( toSend );
             QueryMessage qm( dm );
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<2; i++ ) {
+                for ( int i=0; i<3; i++ ) {
                     try {
                         DBClientConnection* s = checkSlave();
                         if ( actualServer )
                             *actualServer = s->getServerAddress();
                         return s->call( toSend , response , assertOk );
                     }
-                    catch ( DBException & ) {
-                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    catch ( DBException &e ) {
+                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                         if ( actualServer )
                             *actualServer = "";
                     }

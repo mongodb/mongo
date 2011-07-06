@@ -47,12 +47,14 @@ namespace mongo {
         void allocateAsap( const string &name, unsigned long long &size );
 
         void waitUntilFinished() const;
+        
+        bool hasFailed() const;
 
         static void ensureLength(int fd , long size);
 
         /** @return the singletone */
         static FileAllocator * get();
-
+        
     private:
 
         FileAllocator();

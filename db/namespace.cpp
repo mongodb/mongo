@@ -25,9 +25,11 @@
 #include "btree.h"
 #include <algorithm>
 #include <list>
-#include "query.h"
 #include "queryutil.h"
 #include "json.h"
+#include "ops/delete.h"
+#include "ops/query.h"
+
 
 namespace mongo {
 
@@ -91,7 +93,7 @@ namespace mongo {
         boost::filesystem::path dir( dir_ );
         dir /= database_;
         if ( !boost::filesystem::exists( dir ) )
-            BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( dir ) );
+            MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
     unsigned lenForNewNsFiles = 16 * 1024 * 1024;
@@ -99,7 +101,7 @@ namespace mongo {
 #if defined(_DEBUG)
     void NamespaceDetails::dump(const Namespace& k) {
         if( !cmdLine.dur )
-            cout << "ns offsets which follow will not display correctly with --dur disabled" << endl;
+            cout << "ns offsets which follow will not display correctly with --journal disabled" << endl;
 
         size_t ofs = 1; // 1 is sentinel that the find call below failed
         privateViews.find(this, /*out*/ofs);
@@ -253,7 +255,11 @@ namespace mongo {
         }
     }
 
-    // lenToAlloc is WITH header
+    /** allocate space for a new record from deleted lists.
+        @param lenToAlloc is WITH header
+        @param extentLoc OUT returns the extent location
+        @return null diskloc if no room - allocate a new extent then
+    */
     DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
         lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         DiskLoc loc = _alloc(ns, lenToAlloc);
@@ -568,8 +574,8 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    mongo::mutex NamespaceDetailsTransient::_qcMutex("qc");
-    mongo::mutex NamespaceDetailsTransient::_isMutex("is");
+    SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
+    SimpleMutex NamespaceDetailsTransient::_isMutex("is");
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
@@ -616,7 +622,7 @@ namespace mongo {
        options: { capped : ..., size : ... }
     */
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0) {
-        log(1) << "New namespace: " << ns << '\n';
+        LOG(1) << "New namespace: " << ns << endl;
         if ( strstr(ns, "system.namespaces") ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
             // TODO: fix above should not be strstr!
@@ -632,6 +638,9 @@ namespace mongo {
             char database[256];
             nsToDatabase(ns, database);
             string s = database;
+            if( cmdLine.configsvr && (s != "config" && s != "admin") ) { 
+                uasserted(14037, "can't create user databases on a --configsvr instance");
+            }
             s += ".system.namespaces";
             theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
         }
@@ -700,14 +709,14 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();
             indexDetails.info = newIndexSpecLoc;
             string newIndexNs = indexDetails.indexNamespace();
 
-            BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
+            renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
             deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
         }
     }

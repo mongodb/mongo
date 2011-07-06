@@ -29,8 +29,9 @@ namespace mongo {
     class Record;
     class DeletedRecord;
     class Extent;
-    class BtreeBucket;
     class MongoDataFile;
+
+    template< class Version > class BtreeBucket;
 
 #pragma pack(1)
     /** represents a disk location/offset on disk in a database.  64 bits.
@@ -38,17 +39,18 @@ namespace mongo {
         (such as adding a virtual function)
      */
     class DiskLoc {
-        int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
+        int _a;     // this will be volume, file #, etsc. but is a logical value could be anything depending on storage engine
         int ofs;
 
     public:
 
         enum SentinelValues {
+            /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
             NullOfs = -1,
             MaxFiles=16000 // thus a limit of about 32TB of data per db
         };
 
-        DiskLoc(int a, int b) : _a(a), ofs(b) { }
+        DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
         DiskLoc() { Null(); }
         DiskLoc(const DiskLoc& l) {
             _a=l._a;
@@ -139,9 +141,13 @@ namespace mongo {
         Record* rec() const;
         DeletedRecord* drec() const;
         Extent* ext() const;
-        const BtreeBucket* btree() const;
+
+        template< class V >
+        const BtreeBucket<V> * btree() const;
+
         // Explicitly signals we are writing and casts away const
-        BtreeBucket* btreemod() const;
+        template< class V >
+        BtreeBucket<V> * btreemod() const;
 
         /*MongoDataFile& pdf() const;*/
     };

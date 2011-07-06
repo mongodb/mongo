@@ -21,9 +21,12 @@
 #include "dbclient.h"
 #include "redef_macros.h"
 
+#include "../util/background.h"
+
 namespace mongo {
 
     class Shard;
+    class DBConnectionPool;
 
     /**
      * not thread safe
@@ -44,7 +47,7 @@ namespace mongo {
 
         int numAvailable() const { return (int)_pool.size(); }
 
-        void createdOne( DBClientBase * base);
+        void createdOne( DBClientBase * base );
         long long numCreated() const { return _created; }
 
         ConnectionString::ConnectionType type() const { assert(_created); return _type; }
@@ -52,11 +55,13 @@ namespace mongo {
         /**
          * gets a connection or return NULL
          */
-        DBClientBase * get();
+        DBClientBase * get( DBConnectionPool * pool);
 
-        void done( DBClientBase * c );
+        void done( DBConnectionPool * pool , DBClientBase * c );
 
         void flush();
+        
+        void getStaleConnections( vector<DBClientBase*>& stale );
 
         static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
         static unsigned getMaxPerHost() { return _maxPerHost; }
@@ -83,6 +88,7 @@ namespace mongo {
         virtual ~DBConnectionHook() {}
         virtual void onCreate( DBClientBase * conn ) {}
         virtual void onHandedOut( DBClientBase * conn ) {}
+        virtual void onDestory( DBClientBase * conn ) {}
     };
 
     /** Database connection pool.
@@ -100,7 +106,7 @@ namespace mongo {
            c.conn()...
         }
     */
-    class DBConnectionPool : boost::noncopyable {
+    class DBConnectionPool : public PeriodicTask {
         
     public:
 
@@ -112,20 +118,15 @@ namespace mongo {
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
+        void onDestory( DBClientBase * conn );
 
         void flush();
 
-        DBClientBase *get(const string& host);
-        DBClientBase *get(const ConnectionString& host);
+        DBClientBase *get(const string& host, double socketTimeout = 0);
+        DBClientBase *get(const ConnectionString& host, double socketTimeout = 0);
 
-        void release(const string& host, DBClientBase *c) {
-            if ( c->isFailed() ) {
-                delete c;
-                return;
-            }
-            scoped_lock L(_mutex);
-            _pools[host].done(c);
-        }
+        void release(const string& host, DBClientBase *c);
+
         void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
 
@@ -134,8 +135,12 @@ namespace mongo {
             bool operator()( const string& a , const string& b ) const;
         };
 
-    private:
+        virtual string taskName() const { return "DBConnectionPool-cleaner"; }
+        virtual void taskDoWork();        
 
+    private:
+        DBConnectionPool( DBConnectionPool& p );
+        
         DBClientBase* _get( const string& ident );
 
         DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
@@ -150,6 +155,7 @@ namespace mongo {
         // pointers owned by me, right now they leak on shutdown
         // _hooks itself also leaks because it creates a shutdown race condition
         list<DBConnectionHook*> * _hooks; 
+
     };
 
     extern DBConnectionPool pool;
@@ -158,9 +164,15 @@ namespace mongo {
     public:
         AScopedConnection() { _numConnections++; }
         virtual ~AScopedConnection() { _numConnections--; }
+        
         virtual DBClientBase* get() = 0;
         virtual void done() = 0;
         virtual string getHost() const = 0;
+        
+        /** 
+         * @return true iff this has a connection to the db
+         */
+        virtual bool ok() const = 0;
 
         /**
          * @return total number of current instances of AScopedConnection
@@ -180,19 +192,25 @@ namespace mongo {
         /** the main constructor you want to use
             throws UserException if can't connect
             */
-        explicit ScopedDbConnection(const string& host) : _host(host), _conn( pool.get(host) ) {}
+        explicit ScopedDbConnection(const string& host, double socketTimeout = 0) : _host(host), _conn( pool.get(host, socketTimeout) ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
-        ScopedDbConnection() : _host( "" ) , _conn(0) {}
+        ScopedDbConnection() : _host( "" ) , _conn(0), _socketTimeout( 0 ) {}
 
         /* @param conn - bind to an existing connection */
-        ScopedDbConnection(const string& host, DBClientBase* conn ) : _host( host ) , _conn( conn ) {}
+        ScopedDbConnection(const string& host, DBClientBase* conn, double socketTimeout = 0 ) : _host( host ) , _conn( conn ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
         /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const ConnectionString& url ) : _host(url.toString()), _conn( pool.get(url) ) {}
+        explicit ScopedDbConnection(const ConnectionString& url, double socketTimeout = 0 ) : _host(url.toString()), _conn( pool.get(url, socketTimeout) ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
 
         /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const Shard& shard );
-        explicit ScopedDbConnection(const Shard* shard );
+        explicit ScopedDbConnection(const Shard& shard, double socketTimeout = 0 );
+        explicit ScopedDbConnection(const Shard* shard, double socketTimeout = 0 );
 
         ~ScopedDbConnection();
 
@@ -213,6 +231,8 @@ namespace mongo {
             uassert( 13102 ,  "connection was returned to the pool already" , _conn );
             return _conn;
         }
+
+        bool ok() const { return _conn > 0; }
 
         string getHost() const { return _host; }
 
@@ -246,8 +266,12 @@ namespace mongo {
         ScopedDbConnection * steal();
 
     private:
+
+        void _setSocketTimeout();
+
         const string _host;
         DBClientBase *_conn;
+        const double _socketTimeout;
 
     };
 

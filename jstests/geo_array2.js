@@ -77,7 +77,7 @@ for( var i = -1; i < 2; i++ ){
 			assert.eq( objCount , objsFound[q] )
 		}
 		
-		
+				
 		// Do nearSphere check
 		
 		// Earth Radius
@@ -102,6 +102,11 @@ for( var i = -1; i < 2; i++ ){
 		}
 		
 		
+		
+		// Within results do not return duplicate documents
+		
+		var count = i == 0 && j == 0 ? 9 : 1
+		var objCount = i == 0 && j == 0 ? 1 : 1
 		
 		// Do within check
 		objsFound = {}

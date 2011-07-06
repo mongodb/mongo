@@ -25,7 +25,7 @@ namespace mongo {
 
     void installBenchmarkSystem( Scope& scope );
 
-    BSONObj jsmd5( const BSONObj &a ) {
+    BSONObj jsmd5( const BSONObj &a, void* data ) {
         uassert( 10261 ,  "js md5 needs a string" , a.firstElement().type() == String );
         const char * s = a.firstElement().valuestrsafe();
 
@@ -38,7 +38,7 @@ namespace mongo {
         return BSON( "" << digestToString( d ) );
     }
 
-    BSONObj JSVersion( const BSONObj& args ) {
+    BSONObj JSVersion( const BSONObj& args, void* data ) {
         cout << "version: " << versionString << endl;
         if ( strstr( versionString , "+" ) )
             printGitVersion();
@@ -46,6 +46,20 @@ namespace mongo {
     }
 
 
+    BSONObj JSSleep(const mongo::BSONObj &args, void* data) {
+        assert( args.nFields() == 1 );
+        assert( args.firstElement().isNumber() );
+        int ms = int( args.firstElement().number() );
+        {
+            auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
+            sleepmillis( ms );
+        }
+
+        BSONObjBuilder b;
+        b.appendUndefined( "" );
+        return b.obj();
+    }
+    
     // ---------------------------------
     // ---- installer           --------
     // ---------------------------------
@@ -53,6 +67,7 @@ namespace mongo {
     void installGlobalUtils( Scope& scope ) {
         scope.injectNative( "hex_md5" , jsmd5 );
         scope.injectNative( "version" , JSVersion );
+        scope.injectNative( "sleep" , JSSleep );
 
         installBenchmarkSystem( scope );
     }

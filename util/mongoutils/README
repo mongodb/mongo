@@ -11,3 +11,5 @@
 
     So basically, easy to use, general purpose stuff, with no arduous dependencies to drop into 
     any new project.
+
+    *** PLACE UNIT TESTS IN mongoutils/test.cpp ***

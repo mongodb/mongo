@@ -1,3 +1,5 @@
+// dbmessage.h
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -19,8 +21,9 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "namespace-inl.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../client/constants.h"
+#include "instance.h"
 
 namespace mongo {
 
@@ -34,7 +37,48 @@ namespace mongo {
           list of marshalled JSObjects;
     */
 
-    extern bool objcheck;
+/* db request message format
+
+   unsigned opid;         // arbitary; will be echoed back
+   byte operation;
+   int options;
+
+   then for:
+
+   dbInsert:
+      string collection;
+      a series of JSObjects
+   dbDelete:
+      string collection;
+      int flags=0; // 1=DeleteSingle
+      JSObject query;
+   dbUpdate:
+      string collection;
+      int flags; // 1=upsert
+      JSObject query;
+      JSObject objectToUpdate;
+        objectToUpdate may include { $inc: <field> } or { $set: ... }, see struct Mod.
+   dbQuery:
+      string collection;
+      int nToSkip;
+      int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
+                     // greater than zero is simply a hint on how many objects to send back per "cursor batch".
+                     // a negative number indicates a hard limit.
+      JSObject query;
+      [JSObject fieldsToReturn]
+   dbGetMore:
+      string collection; // redundant, might use for security.
+      int nToReturn;
+      int64 cursorID;
+   dbKillCursors=2007:
+      int n;
+      int64 cursorIDs[n];
+
+   Note that on Update, there is only one object, which is different
+   from insert where you can pass a list of objects to insert in the db.
+   Note that the update field layout is very similar layout to Query.
+*/
+
 
 #pragma pack(1)
     struct QueryResult : public MsgData {
@@ -153,7 +197,7 @@ namespace mongo {
             massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
             massert( 10306 ,  "Client Error: Next object larger than space left in message",
                      js.objsize() < ( theEnd - data ) );
-            if ( objcheck && !js.valid() ) {
+            if ( cmdLine.objcheck && !js.valid() ) {
                 massert( 10307 , "Client Error: bad object in message", false);
             }
             nextjsobj += js.objsize();
@@ -207,70 +251,21 @@ namespace mongo {
         }
     };
 
-} // namespace mongo
+    void replyToQuery(int queryResultFlags,
+                      AbstractMessagingPort* p, Message& requestMsg,
+                      void *data, int size,
+                      int nReturned, int startingFrom = 0,
+                      long long cursorId = 0
+                      );
 
-#include "../client/dbclient.h"
-
-namespace mongo {
-
-    inline void replyToQuery(int queryResultFlags,
-                             AbstractMessagingPort* p, Message& requestMsg,
-                             void *data, int size,
-                             int nReturned, int startingFrom = 0,
-                             long long cursorId = 0
-                            ) {
-        BufBuilder b(32768);
-        b.skip(sizeof(QueryResult));
-        b.appendBuf(data, size);
-        QueryResult *qr = (QueryResult *) b.buf();
-        qr->_resultFlags() = queryResultFlags;
-        qr->len = b.len();
-        qr->setOperation(opReply);
-        qr->cursorId = cursorId;
-        qr->startingFrom = startingFrom;
-        qr->nReturned = nReturned;
-        b.decouple();
-        Message resp(qr, true);
-        p->reply(requestMsg, resp, requestMsg.header()->id);
-    }
-
-} // namespace mongo
-
-//#include "bsonobj.h"
-
-#include "instance.h"
-
-namespace mongo {
 
     /* object reply helper. */
-    inline void replyToQuery(int queryResultFlags,
-                             AbstractMessagingPort* p, Message& requestMsg,
-                             BSONObj& responseObj) {
-        replyToQuery(queryResultFlags,
-                     p, requestMsg,
-                     (void *) responseObj.objdata(), responseObj.objsize(), 1);
-    }
+    void replyToQuery(int queryResultFlags,
+                      AbstractMessagingPort* p, Message& requestMsg,
+                      BSONObj& responseObj);
 
     /* helper to do a reply using a DbResponse object */
-    inline void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj) {
-        BufBuilder b;
-        b.skip(sizeof(QueryResult));
-        b.appendBuf((void*) obj.objdata(), obj.objsize());
-        QueryResult* msgdata = (QueryResult *) b.buf();
-        b.decouple();
-        QueryResult *qr = msgdata;
-        qr->_resultFlags() = queryResultFlags;
-        qr->len = b.len();
-        qr->setOperation(opReply);
-        qr->cursorId = 0;
-        qr->startingFrom = 0;
-        qr->nReturned = 1;
-        Message *resp = new Message();
-        resp->setData(msgdata, true); // transport will free
-        dbresponse.response = resp;
-        dbresponse.responseTo = m.header()->id;
-    }
+    void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj);
 
-    string debugString( Message& m );
 
 } // namespace mongo

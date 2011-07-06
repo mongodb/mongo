@@ -31,22 +31,57 @@ def assignErrorCodes():
 
 codes = []
 
-def readErrorCodes( callback ):
-    ps = [ re.compile( "([um]asser(t|ted)) *\( *(\d+)" ) ,
-           re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" )
+def readErrorCodes( callback, replaceZero = False ):
+    ps = [ re.compile( "(([umsg]asser(t|ted))) *\( *(\d+)" ) ,
+           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\( *(\d+)" ) ,
+           re.compile( "(((verify))) *\( *(\d+)" )
            ]
+    
     for x in utils.getAllSourceFiles():
+        
+        needReplace = [False]
+        lines = []
+        lastCodes = [0]
         lineNum = 1
+        
         for line in open( x ):
-            for p in ps:               
-                for m in p.findall( line ):
-                    codes.append( ( x , lineNum , line , m[2] ) )
-                    callback( x , lineNum , line , m[2] )
-            lineNum = lineNum + 1
             
+            for p in ps:               
+                
+                def repl( m ):
+                    m = m.groups()
+                    
+                    start = m[0]
+                    code = m[3]
+                    if code == '0' and replaceZero :
+                        code = getNextCode( lastCodes )
+                        lastCodes.append( code )
+                        code = str( code )
+                        needReplace[0] = True
+                                            
+                        print( "Adding code " + code + " to line " + x + ":" + str( lineNum ) )
+                        
+                    else :
+                        codes.append( ( x , lineNum , line , code ) )
+                        callback( x , lineNum , line , code )
+                    
+                    return start + "( " + code
+                
+                line = re.sub( p, repl, line )
+            
+            if replaceZero : lines.append( line )
+            lineNum = lineNum + 1
+        
+        if replaceZero and needReplace[0] :
+            print( "Replacing file " + x )
+            of = open( x + ".tmp", 'w' )
+            of.write( "".join( lines ) )
+            of.close()
+            os.rename( x + ".tmp", x )
+        
 
-def getNextCode():
-    highest = [0]
+def getNextCode( lastCodes = [0] ):
+    highest = [max(lastCodes)]
     def check( fileName , lineNum , line , code ):
         code = int( code )
         if code > highest[0]:
@@ -64,7 +99,7 @@ def checkErrorCodes():
             print( "%s:%d:%s %s" % seen[code] )
             errors.append( seen[code] )
         seen[code] = ( fileName , lineNum , line , code )
-    readErrorCodes( checkDups )
+    readErrorCodes( checkDups, True )
     return len( errors ) == 0 
 
 def getBestMessage( err , start ):
@@ -81,13 +116,11 @@ def getBestMessage( err , start ):
     
 def genErrorOutput():
     
-    g = utils.getGitVersion()
-    
     if os.path.exists( "docs/errors.md" ):
         i = open( "docs/errors.md" , "r" )
         
         
-    out = open( "docs/errors.md" , 'w' )
+    out = open( "docs/errors.md" , 'wb' )
     out.write( "MongoDB Error Codes\n==========\n\n\n" )
 
     prev = ""
@@ -107,7 +140,7 @@ def genErrorOutput():
             out.write( f + "\n----\n" )
             prev = f
 
-        url = "http://github.com/mongodb/mongo/blob/" + g + "/" + f + "#L" + str(l)
+        url = "http://github.com/mongodb/mongo/blob/master/" + f + "#L" + str(l)
         
         out.write( "* " + str(num) + " [code](" + url + ") " + getBestMessage( line , str(num) ) + "\n" )
         

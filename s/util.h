@@ -105,7 +105,7 @@ namespace mongo {
                 _combined = 0;
                 break;
             default:
-                assert(0);
+                massert( 13657 , str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
             }
             return *this;
         }
@@ -129,7 +129,7 @@ namespace mongo {
 
         virtual ~StaleConfigException() throw() {}
 
-        virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
+        virtual void appendPrefix( stringstream& ss ) const { ss << "stale sharding config exception: "; }
 
         bool justConnection() const { return _justConnection; }
 

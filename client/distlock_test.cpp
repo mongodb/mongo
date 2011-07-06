@@ -70,7 +70,7 @@ namespace mongo {
 
         static void runThread() {
             while (keepGoing) {
-                if (current->lock_try("test")) {
+                if (current->lock_try( "test" )) {
                     count++;
                     int before = count;
                     sleepmillis(3);
@@ -90,7 +90,7 @@ namespace mongo {
                  BSONObjBuilder& result, bool) {
             Timer t;
             DistributedLock lk(ConnectionString(cmdObj["host"].String(),
-                                                ConnectionString::SYNC), "testdistlockwithsync", 0, 0, true);
+                                                ConnectionString::SYNC), "testdistlockwithsync", 0, 0);
             current = &lk;
             count = 0;
             gotit = 0;
@@ -183,9 +183,6 @@ namespace mongo {
             int threadSleep = (int) number_field(cmdObj, "threadSleep", 30);
             if(threadSleep <= 0) threadSleep = 1;
 
-            // (Legacy) how long until the lock is forced in mins, measured locally
-            int takeoverMins = (int) number_field(cmdObj, "takeoverMins", 0);
-
             // How long until the lock is forced in ms, only compared locally
             unsigned long long takeoverMS = (unsigned long long) number_field(cmdObj, "takeoverMS", 0);
 
@@ -201,7 +198,6 @@ namespace mongo {
 
 
             int skew = 0;
-            bool legacy = (takeoverMins > 0);
             if (!lock.get()) {
 
                 // Pick a skew, but the first two threads skew the whole range
@@ -216,23 +212,36 @@ namespace mongo {
 
                 log() << "Initializing lock with skew of " << skew << " for thread " << threadId << endl;
 
-                lock.reset(new DistributedLock(hostConn, lockName, legacy ? (unsigned long long)takeoverMins : takeoverMS, true, legacy));
+                lock.reset(new DistributedLock(hostConn, lockName, takeoverMS, true ));
 
                 log() << "Skewed time " << jsTime() << "  for thread " << threadId << endl
                       << "  max wait (with lock: " << threadWait << ", after lock: " << threadSleep << ")" << endl
-                      << "  takeover in " << (legacy ? (unsigned long long)takeoverMins : takeoverMS) << (legacy ? " (mins local)" : "(ms remote)") << endl;
+                      << "  takeover in " << takeoverMS << "(ms remote)" << endl;
 
             }
 
             DistributedLock* myLock = lock.get();
 
             bool errors = false;
+            BSONObj lockObj;
             while (keepGoing) {
                 try {
 
-                    if (myLock->lock_try("Testing distributed lock with skew.")) {
+                    if (myLock->lock_try("Testing distributed lock with skew.", false, &lockObj )) {
 
-                        log() << "**** Locked for thread " << threadId << endl;
+                        log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"] << endl;
+
+                        if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
+                            errors = true;
+                            log() << "**** !Could not re-enter lock already held" << endl;
+                            break;
+                        }
+
+                        if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
+                            errors = true;
+                            log() << "**** !Invalid lock re-entry" << endl;
+                            break;
+                        }
 
                         count++;
                         int before = count;
@@ -248,8 +257,8 @@ namespace mongo {
 
                         // Unlock only half the time...
                         if(hangThreads == 0 || threadId % hangThreads != 0) {
-                            log() << "**** Unlocking for thread " << threadId << endl;
-                            myLock->unlock();
+                            log() << "**** Unlocking for thread " << threadId << " with ts " << lockObj["ts"] << endl;
+                            myLock->unlock( &lockObj );
                         }
                         else {
                             log() << "**** Not unlocking for thread " << threadId << endl;
@@ -261,7 +270,7 @@ namespace mongo {
 
                 }
                 catch( LockException& e ) {
-                    log() << "*** !Could not try distributed lock." << m_caused_by(e) << endl;
+                    log() << "*** !Could not try distributed lock." << causedBy( e ) << endl;
                     break;
                 }
 
@@ -270,7 +279,7 @@ namespace mongo {
 
             result << "errors" << errors
                    << "skew" << skew
-                   << "takeover" << (long long) (legacy ? takeoverMS : (unsigned long long)takeoverMins)
+                   << "takeover" << (long long) takeoverMS
                    << "localTimeout" << (takeoverMS > 0);
 
         }
@@ -301,7 +310,7 @@ namespace mongo {
                 skewClocks( hostConn, cmdObj );
             }
             catch( DBException e ) {
-                errmsg = "Clocks could not be skewed." + m_caused_by(e);
+                errmsg = str::stream() << "Clocks could not be skewed." << causedBy( e );
                 return false;
             }
 
@@ -361,8 +370,8 @@ namespace mongo {
                 BSONObj result;
                 try {
                     bool success = conn->runCommand( string("admin"), BSON( "_skewClockCommand" << 1 << "skew" << *i ), result );
-                    // TODO:  Better error code
-                    uassert_msg(13678, "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
+
+                    uassert(13678, str::stream() << "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
 
                     log( logLvl + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
                 }

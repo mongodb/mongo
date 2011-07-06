@@ -25,7 +25,7 @@
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
-#include "../util/message.h" // getelapsedtimemillis
+#include "../util/net/listen.h" // getelapsedtimemillis
 #include "../util/concurrency/race.h"
 #include <boost/static_assert.hpp>
 #undef assert
@@ -41,7 +41,24 @@ namespace mongo {
 
     class AlignedBuilder;
 
+    unsigned goodRandomNumberSlow();
+
     namespace dur {
+        // Rotate after reaching this data size in a journal (j._<n>) file
+        // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
+        // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
+        // work.  (and should as-is)
+        // --smallfiles makes the limit small.
+
+#if defined(_DEBUG)
+        unsigned long long DataLimitPerJournalFile = 128 * 1024 * 1024;
+#elif defined(__APPLE__)
+        // assuming a developer box if OS X
+        unsigned long long DataLimitPerJournalFile = 256 * 1024 * 1024;
+#else
+        unsigned long long DataLimitPerJournalFile = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
+#endif
+
         BOOST_STATIC_ASSERT( sizeof(Checksum) == 16 );
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 20 );
@@ -93,7 +110,7 @@ namespace mongo {
             DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(c.bytes, 16) << endl;
             if( memcmp(hash, c.bytes, sizeof(hash)) == 0 ) 
                 return true;
-            log() << "dur checkHash mismatch, got: " << toHex(c.bytes, 16) << " expected: " << toHex(hash,16) << endl;
+            log() << "journal checkHash mismatch, got: " << toHex(c.bytes, 16) << " expected: " << toHex(hash,16) << endl;
             return false;
         }
 
@@ -107,14 +124,12 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)getRandomNumber()) << 32;
+                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
             n1 = n2 = n3 = n4 = '\n';
         }
-
-        // class Journal
 
         Journal j;
 
@@ -122,6 +137,7 @@ namespace mongo {
 
         Journal::Journal() :
             _curLogFileMutex("JournalLfMutex") {
+            _ageOut = true;
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -289,7 +305,7 @@ namespace mongo {
                 string fn = str::stream() << "prealloc." << i;
                 filesystem::path filepath = getJournalDir() / fn;
 
-                unsigned long long limit = Journal::DataLimit;
+                unsigned long long limit = DataLimitPerJournalFile;
                 if( debug && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
                     // case, so we force exercising here when _DEBUG is set by arbitrarily stopping prealloc at a low 
@@ -446,7 +462,7 @@ namespace mongo {
             if something highly surprising, throws to abort
         */
         unsigned long long LSNFile::get() {
-            uassert(13614, "unexpected version number of lsn file in journal/ directory", ver == 0);
+            uassert(13614, str::stream() << "unexpected version number of lsn file in journal/ directory got: " << ver , ver == 0);
             if( ~lsn != checkbytes ) {
                 log() << "lsnfile not valid. recovery will be from log start. lsn: " << hex << lsn << " checkbytes: " << hex << checkbytes << endl;
                 return 0;
@@ -475,6 +491,11 @@ namespace mongo {
                 File f;
                 f.open(lsnPath().string().c_str());
                 assert(f.is_open());
+                if( f.len() == 0 ) { 
+                    // this could be 'normal' if we crashed at the right moment
+                    log() << "info lsn file is zero bytes long" << endl;
+                    return 0;
+                }
                 f.read(0,(char*)&L, sizeof(L));
                 unsigned long long lsn = L.get();
                 return lsn;
@@ -507,10 +528,12 @@ namespace mongo {
                     log() << "warning: open of lsn file failed" << endl;
                     return;
                 }
-                log() << "lsn set " << _lastFlushTime << endl;
+                LOG(1) << "lsn set " << _lastFlushTime << endl;
                 LSNFile lsnf;
                 lsnf.set(_lastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));
+				// do we want to fsync here? if we do it probably needs to be async so the durthread
+				// is not delayed.
             }
             catch(std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;
@@ -563,6 +586,17 @@ namespace mongo {
             }
         }
 
+        int getAgeOutJournalFiles() {
+            mutex::try_lock lk(j._curLogFileMutex, 4000);
+            if( !lk.ok )
+                return -1;
+            return j._ageOut ? 1 : 0;
+        }
+        void setAgeOutJournalFiles(bool a) {
+            scoped_lock lk(j._curLogFileMutex);
+            j._ageOut = a;
+        }
+
         /** check if time to rotate files.  assure a file is open.
             done separately from the journal() call as we can do this part
             outside of lock.
@@ -582,13 +616,11 @@ namespace mongo {
 
             j.updateLSNFile();
 
-            if( _curLogFile && _written < DataLimit )
+            if( _curLogFile && _written < DataLimitPerJournalFile )
                 return;
 
             if( _curLogFile ) {
-
                 closeCurrentJournalFile();
-
                 removeUnneededJournalFiles();
             }
 

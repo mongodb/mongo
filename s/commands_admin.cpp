@@ -26,7 +26,8 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "../util/processinfo.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
@@ -87,6 +88,20 @@ namespace mongo {
                 return true;
             }
         } netstat;
+
+        class FlushRouterConfigCmd : public GridAdminCmd {
+        public:
+            FlushRouterConfigCmd() : GridAdminCmd("flushRouterConfig") { }
+            virtual void help( stringstream& help ) const {
+                help << "flush all router config";
+            }
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                grid.flushConfig();
+                result.appendBool( "flushed" , true );
+                return true;
+            }
+        } flushRouterConfigCmd;
+
 
         class ServerStatusCmd : public Command {
         public:
@@ -240,7 +255,7 @@ namespace mongo {
                 Shard s = Shard::make( to );
 
                 if ( config->getPrimary() == s.getConnString() ) {
-                    errmsg = "thats already the primary";
+                    errmsg = "it is already the primary";
                     return false;
                 }
 
@@ -261,7 +276,7 @@ namespace mongo {
                     dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
                 }
                 catch( LockException& e ){
-	                errmsg = string("error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
+	                errmsg = str::stream() << "error locking distributed lock to move primary shard of " << dbname << causedBy( e );
 	                warning() << errmsg << endl;
 	                return false;
                 }
@@ -314,16 +329,25 @@ namespace mongo {
                     errmsg = "no db";
                     return false;
                 }
+                
+                if ( dbname == "admin" ) {
+                    errmsg = "can't shard the admin db";
+                    return false;
+                }
+                if ( dbname == "local" ) {
+                    errmsg = "can't shard the local db";
+                    return false;
+                }
 
                 DBConfigPtr config = grid.getDBConfig( dbname );
                 if ( config->isShardingEnabled() ) {
                     errmsg = "already enabled";
                     return false;
                 }
-
+                
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
-
+                
                 log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
@@ -385,7 +409,7 @@ namespace mongo {
 
                 // Sharding interacts with indexing in at least two ways:
                 //
-                // 1. A unique index must have the sharding key as its prefix. Otherwise maintainig uniqueness would
+                // 1. A unique index must have the sharding key as its prefix. Otherwise maintaining uniqueness would
                 // require coordinated access to all shards. Trying to shard a collection with such an index is not
                 // allowed.
                 //
@@ -397,25 +421,38 @@ namespace mongo {
                 //
                 // We enforce both these conditions in what comes next.
 
+                bool careAboutUnique = cmdObj["unique"].trueValue();
+
                 {
                     ShardKeyPattern proposedKey( key );
                     bool hasShardIndex = false;
+                    bool hasUniqueShardIndex = false;
 
                     ScopedDbConnection conn( config->getPrimary() );
                     BSONObjBuilder b;
                     b.append( "ns" , ns );
 
+                    BSONArrayBuilder allIndexes;
+
                     auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
 
+                        allIndexes.append( idx );
+
+                        bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
+                        bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
+                        		           idIndex;
+
                         // Is index key over the sharding key? Remember that.
                         if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ) {
                             hasShardIndex = true;
+                            hasUniqueShardIndex = uniqueIndex;
+                            continue;
                         }
 
                         // Not a unique index? Move on.
-                        if ( idx["unique"].eoo() || ! idx["unique"].trueValue() )
+                        if ( ! uniqueIndex || idIndex )
                             continue;
 
                         // Shard key is prefix of unique index? Move on.
@@ -423,6 +460,12 @@ namespace mongo {
                             continue;
 
                         errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
+                        conn.done();
+                        return false;
+                    }
+                    
+                    if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
+                        errmsg = (string)"can't shard collection " + ns + ", index not unique";
                         conn.done();
                         return false;
                     }
@@ -449,6 +492,8 @@ namespace mongo {
 
                     if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ) {
                         errmsg = "please create an index over the sharding key before sharding.";
+                        result.append( "proposedKey" , key );
+                        result.appendArray( "curIndexes" , allIndexes.done() );
                         conn.done();
                         return false;
                     }
@@ -458,7 +503,7 @@ namespace mongo {
 
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
-                config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
+                config->shardCollection( ns , key , careAboutUnique );
 
                 result << "collectionsharded" << ns;
                 return true;
@@ -475,7 +520,7 @@ namespace mongo {
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
-                    errmsg = "need to speciy fully namespace";
+                    errmsg = "need to specify fully namespace";
                     return false;
                 }
 
@@ -506,7 +551,7 @@ namespace mongo {
                         << " { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"
                         << " example: - split the shard that contains the key with this as the middle \n"
                         << " { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } }\n"
-                        << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
+                        << " NOTE: this does not move move the chunks, it merely creates a logical separation \n"
                         ;
             }
 
@@ -525,8 +570,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can split";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before can split";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );
@@ -547,10 +595,10 @@ namespace mongo {
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 BSONObj res;
-                ChunkPtr p;
+                bool worked;
                 if ( middle.isEmpty() ) {
-                    p = chunk->singleSplit( true /* force a split even if not enough data */ , res );
-
+                    BSONObj ret = chunk->singleSplit( true /* force a split even if not enough data */ , res );
+                    worked = !ret.isEmpty();
                 }
                 else {
                     // sanity check if the key provided is a valid split point
@@ -559,12 +607,17 @@ namespace mongo {
                         return false;
                     }
 
+                    if (!fieldsMatch(middle, info->getShardKey().key())){
+                        errmsg = "middle has different fields (or different order) than shard key";
+                        return false;
+                    }
+
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    p = chunk->multiSplit( splitPoints , res );
+                    worked = chunk->multiSplit( splitPoints , res );
                 }
 
-                if ( p.get() == NULL ) {
+                if ( !worked ) {
                     errmsg = "split failed";
                     result.append( "cause" , res );
                     return false;
@@ -596,8 +649,11 @@ namespace mongo {
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
-                    errmsg = "ns not sharded.  have to shard before can move a chunk";
-                    return false;
+                    config->reload();
+                    if ( ! config->isSharded( ns ) ) {
+                        errmsg = "ns not sharded.  have to shard before we can move a chunk";
+                        return false;
+                    }
                 }
 
                 BSONObj find = cmdObj.getObjectField( "find" );
@@ -638,7 +694,7 @@ namespace mongo {
                     return false;
                 }
                 
-                // pre-emptively reload the config to get new version info
+                // preemptively reload the config to get new version info
                 config->getChunkManager( ns , true );
 
                 result.append( "millis" , t.millis() );
@@ -688,12 +744,15 @@ namespace mongo {
                     return false;
                 }
 
-                // using localhost in server names implies every other process must use locahost addresses too
+                // using localhost in server names implies every other process must use localhost addresses too
                 vector<HostAndPort> serverAddrs = servers.getServers();
                 for ( size_t i = 0 ; i < serverAddrs.size() ; i++ ) {
                     if ( serverAddrs[i].isLocalHost() != grid.allowLocalHost() ) {
-                        errmsg = "can't use localhost as a shard since all shards need to communicate. "
-                                 "either use all shards and configdbs in localhost or all in actual IPs " ;
+                        errmsg = str::stream() << 
+                            "can't use localhost as a shard since all shards need to communicate. " <<
+                            "either use all shards and configdbs in localhost or all in actual IPs " << 
+                            " host: " << serverAddrs[i].toString() << " isLocalHost:" << serverAddrs[i].isLocalHost();
+                        
                         log() << "addshard request " << cmdObj << " failed: attempt to mix localhosts and IPs" << endl;
                         return false;
                     }
@@ -1001,7 +1060,7 @@ namespace mongo {
 
                 if ( name == "local" ) {
                     // we don't return local
-                    // since all shards have their own independant local
+                    // since all shards have their own independent local
                     continue;
                 }
 
@@ -1072,13 +1131,25 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
 
-        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {        
+        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {        
             if ( jsobj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
             errmsg = "replSetGetStatus is not supported through mongos";
+            result.append("info", "mongos"); // see sayReplSetMemberState
             return false;
         }
     } cmdReplSetGetStatus;
+
+    CmdShutdown cmdShutdown;
+
+    void CmdShutdown::help( stringstream& help ) const {
+        help << "shutdown the database.  must be ran against admin db and "
+             << "either (1) ran from localhost or (2) authenticated.";
+    }
+
+    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        return shutdownHelper();
+    }
 
 } // namespace mongo

@@ -47,7 +47,15 @@ namespace mongo {
                 while ( true ) {
                     BSONObjBuilder builder;
                     try {
-                        bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
+                        BSONObj cmdObj = q.query;
+                        {
+                            BSONElement e = cmdObj.firstElement();
+                            if ( e.type() == Object && (e.fieldName()[0] == '$'
+                                                         ? str::equals("query", e.fieldName()+1)
+                                                         : str::equals("query", e.fieldName())))
+                                cmdObj = e.embeddedObject();
+                        }
+                        bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder);
                         if ( ok ) {
                             BSONObj x = builder.done();
                             replyToQuery(0, r.p(), r.m(), x);
@@ -73,7 +81,7 @@ namespace mongo {
                     }
                 }
 
-                string commandName = q.query.firstElement().fieldName();
+                string commandName = q.query.firstElementFieldName();
 
                 uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
             }
@@ -87,8 +95,11 @@ namespace mongo {
             LOG(3) << "single getmore: " << ns << endl;
 
             long long id = r.d().getInt64( 4 );
-
-            ShardConnection conn( cursorCache.getRef( id ) , ns );
+            
+            // we used ScopedDbConnection because we don't get about config versions
+            // not deleting data is handled elsewhere
+            // and we don't want to call setShardVersion
+            ScopedDbConnection conn( cursorCache.getRef( id ) );
 
             Message response;
             bool ok = conn->callRead( r.m() , response);
@@ -249,6 +260,14 @@ namespace mongo {
             BSONObj x = b.done();
             replyToQuery(0, r.p(), r.m(), x);
             return true;
+        }
+
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags, bool safe, const char* nsChunkLookup ) {
+            // only useful for shards
+        }
+
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags, bool safe ) {
+            // only useful for shards
         }
 
         set<string> _commandsSafeToPass;

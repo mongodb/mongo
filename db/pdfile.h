@@ -52,9 +52,6 @@ namespace mongo {
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
     shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
-    // -1 if library unavailable.
-    boost::intmax_t freeSpace( const string &path = dbpath );
-
     bool isValidNS( const StringData& ns );
 
     /*---------------------------------------------------------------------*/
@@ -123,13 +120,16 @@ namespace mongo {
         // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 
-        /** @param obj both and in and out param -- insert can sometimes modify an object (such as add _id). */
-        DiskLoc insertWithObjMod(const char *ns, BSONObj &o, bool god = false);
+        /** insert will add an _id to the object if not present.  if you would like to see the final object
+            after such an addition, use this method.
+            @param o both and in and out param 
+            */
+        DiskLoc insertWithObjMod(const char *ns, BSONObj & /*out*/o, bool god = false);
 
         /** @param obj in value only for this version. */
         void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
 
-        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement(), bool mayAddIndex = true);
+        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, bool mayAddIndex = true, bool *addedID = 0);
         static shared_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
@@ -160,6 +160,9 @@ namespace mongo {
         int lengthWithHeaders;
         int extentOfs;
         DiskLoc nextDeleted;
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+            return DiskLoc(myLoc.a(), extentOfs);
+        }
         Extent* myExtent(const DiskLoc& myLoc) {
             return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
         }
@@ -174,7 +177,7 @@ namespace mongo {
     (11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
     (11:04:33 AM) dm10gen: see class DiskLoc for more info
     (11:04:43 AM) dm10gen: so that is how Record::myExtent() works
-    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must popular its extentOfs then
+    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must populate its extentOfs then
     */
     class Record {
     public:
@@ -216,6 +219,29 @@ namespace mongo {
             int prevOfs;
         };
         NP* np() { return (NP*) &nextOfs; }
+
+        // ---------------------
+        // memory cache
+        // ---------------------
+
+        /** 
+         * touches the data so that is in physical memory
+         * @param entireRecrd if false, only the header and first byte is touched
+         *                    if true, the entire record is touched
+         * */
+        void touch( bool entireRecrd = false );
+
+        /**
+         * @return if this record is likely in physical memory
+         *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
+         */
+        bool likelyInPhysicalMemory();
+
+        /**
+         * tell the cache this Record was accessed
+         * @return this, for simple chaining
+         */
+        Record* accessed();
     };
 
     /* extents are datafile regions where all the records within the region
@@ -247,6 +273,12 @@ namespace mongo {
                    length >= 0 && !myLoc.isNull();
         }
 
+        BSONObj dump() {
+            return BSON( "loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev" << xprev.toString()
+                      << "nsdiag" << nsDiagnostic.toString()
+                      << "size" << length << "firstRecord" << firstRecord.toString() << "lastRecord" << lastRecord.toString());
+        }
+
         void dump(iostream& s) {
             s << "    loc:" << myLoc.toString() << " xnext:" << xnext.toString() << " xprev:" << xprev.toString() << '\n';
             s << "    nsdiag:" << nsDiagnostic.toString() << '\n';
@@ -257,10 +289,10 @@ namespace mongo {
         Returns a DeletedRecord location which is the data in the extent ready for us.
         Caller will need to add that to the freelist structure in namespacedetail.
         */
-        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset);
+        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset, bool capped);
 
         /* like init(), but for a reuse case */
-        DiskLoc reuse(const char *nsname);
+        DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
 
         bool isOk() const { return magic == 0x41424344; }
         void assertOk() const { assert(isOk()); }
@@ -286,8 +318,8 @@ namespace mongo {
          */
         static int followupSize(int len, int lastExtentLen);
 
-        /**
-         * @param len lengt of record we need
+        /** get a suggested size for the first extent in a namespace
+         *  @param len length of record we need to insert
          */
         static int initialSize(int len);
 
@@ -299,8 +331,11 @@ namespace mongo {
             this helper is for that -- for use with getDur().writing() method
         */
         FL* fl() { return (FL*) &firstRecord; }
+
+        /** caller must declare write intent first */
+        void markEmpty();
     private:
-        DiskLoc _reuse(const char *nsname); // recycle an extent and reuse it for a different ns
+        DiskLoc _reuse(const char *nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 
     /*  a datafile - i.e. the "dbname.<#>" files :
@@ -325,7 +360,7 @@ namespace mongo {
         int unusedLength;
         char reserved[8192 - 4*4 - 8];
 
-        char data[4];
+        char data[4]; // first extent starts here
 
         enum { HeaderSize = 8192 };
 
@@ -421,7 +456,7 @@ namespace mongo {
         return DataFileMgr::getRecord(*this);
     }
     inline BSONObj DiskLoc::obj() const {
-        return BSONObj(rec());
+        return BSONObj(rec()->accessed());
     }
     inline DeletedRecord* DiskLoc::drec() const {
         assert( _a != -1 );
@@ -430,9 +465,12 @@ namespace mongo {
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
-    inline const BtreeBucket* DiskLoc::btree() const {
+
+    template< class V >
+    inline 
+    const BtreeBucket<V> * DiskLoc::btree() const {
         assert( _a != -1 );
-        return (const BtreeBucket *) rec()->data;
+        return (const BtreeBucket<V> *) rec()->data;
     }
 
 } // namespace mongo
@@ -485,19 +523,8 @@ namespace mongo {
 
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
-
-    /**
-     * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
-     * special case for the local.oplog.$main ns -- naming it as such was a mistake.
-     */
-    inline bool isANormalNSName( const char* ns ) {
-        if ( strchr( ns , '$' ) == 0 )
-            return true;
-        return strcmp( ns, "local.oplog.$main" ) == 0;
-    }
-
     inline BSONObj::BSONObj(const Record *r) {
-        init(r->data, false);
+        init(r->data);
     }
 
 } // namespace mongo

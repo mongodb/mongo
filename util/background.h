@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "concurrency/spin_lock.h"
+
 namespace mongo {
 
     /**
@@ -102,5 +104,52 @@ namespace mongo {
         void jobBody( boost::shared_ptr<JobStatus> status );
 
     };
+    
+    /**
+     * these run "roughly" every minute
+     * instantiate statically
+     * class MyTask : public PeriodicTask {
+     * public:
+     *   virtual string name() const { return "MyTask; " }
+     *   virtual void doWork() { log() << "hi" << endl; }
+     * } myTask;
+     */
+    class PeriodicTask {
+    public:
+        PeriodicTask();
+        virtual ~PeriodicTask();
+
+        virtual void taskDoWork() = 0;
+        virtual string taskName() const = 0;
+
+        class Runner : public BackgroundJob {
+        public:
+            virtual ~Runner(){}
+
+            virtual string name() const { return "PeriodicTask::Runner"; }
+            
+            virtual void run();
+            
+            void add( PeriodicTask* task );
+            void remove( PeriodicTask* task );
+
+        private:
+            
+            SpinLock _lock;
+            
+            // these are NOT owned by Runner
+            // Runner will not delete these
+            // this never gets smaller
+            // only fields replaced with nulls
+            vector<PeriodicTask*> _tasks;
+
+        };
+
+        static Runner* theRunner;
+
+    };
+
+
+
 
 } // namespace mongo

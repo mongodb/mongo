@@ -95,6 +95,7 @@ namespace mongo {
     extern JSClass bindata_class;
     extern JSClass timestamp_class;
     extern JSClass numberlong_class;
+    extern JSClass numberint_class;
     extern JSClass uuid_class;
     extern JSClass ip_addr_class;
     extern JSClass mac_addr_class;

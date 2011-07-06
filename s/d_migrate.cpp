@@ -29,13 +29,12 @@
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
 #include "../db/repl_block.h"
 #include "../db/dur.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -43,6 +42,7 @@
 #include "../util/queue.h"
 #include "../util/unittest.h"
 #include "../util/processinfo.h"
+#include "../util/ramlog.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -52,6 +52,8 @@
 using namespace std;
 
 namespace mongo {
+
+    Tee* migrateLog = new RamLog( "migrate" );
 
     class MoveTimingHelper {
     public:
@@ -72,7 +74,7 @@ namespace mongo {
                 configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
             }
             catch ( const std::exception& e ) {
-                log( LL_WARNING ) << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << endl;
+                warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << migrateLog;
             }
         }
 
@@ -88,7 +90,7 @@ namespace mongo {
             if ( op )
                 op->setMessage( s.c_str() );
             else
-                log( LL_WARNING ) << "op is null in MoveTimingHelper::done" << endl;
+                warning() << "op is null in MoveTimingHelper::done" << migrateLog;
 
             _b.appendNumber( s , _t.millis() );
             _t.reset();
@@ -98,7 +100,7 @@ namespace mongo {
             ProcessInfo pi;
             ss << " v:" << pi.getVirtualMemorySize()
                << " r:" << pi.getResidentSize();
-            log() << ss.str() << endl;
+            log() << ss.str() << migrateLog;
 #endif
         }
 
@@ -130,7 +132,7 @@ namespace mongo {
     };
 
     struct OldDataCleanup {
-        static AtomicUInt _numThreads; // how many threads are doing async cleanusp
+        static AtomicUInt _numThreads; // how many threads are doing async cleanup
 
         string ns;
         BSONObj min;
@@ -156,7 +158,7 @@ namespace mongo {
             writelock lk(ns);
             RemoveSaver rs("moveChunk",ns,"post-cleanup");
             long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
-            log() << "moveChunk deleted: " << num << endl;
+            log() << "moveChunk deleted: " << num << migrateLog;
         }
 
     };
@@ -165,59 +167,6 @@ namespace mongo {
 
     static const char * const cleanUpThreadName = "cleanupOldData";
 
-    void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
-        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
-
-        int loops = 0;
-        Timer t;
-        while ( t.seconds() < 900 ) { // 15 minutes
-            assert( dbMutex.getState() == 0 );
-            sleepmillis( 20 );
-
-            set<CursorId> now;
-            ClientCursor::find( cleanup.ns , now );
-
-            set<CursorId> left;
-            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                CursorId id = *i;
-                if ( now.count(id) )
-                    left.insert( id );
-            }
-
-            if ( left.size() == 0 )
-                break;
-            cleanup.initial = left;
-
-            if ( ( loops++ % 200 ) == 0 ) {
-                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << endl;
-
-                stringstream ss;
-                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                    CursorId id = *i;
-                    ss << id << " ";
-                }
-                log() << " cursors: " << ss.str() << endl;
-            }
-        }
-
-        cleanup.doRemove();
-
-        cc().shutdown();
-    }
-
-    void cleanupOldData( OldDataCleanup cleanup ) {
-        try {
-            _cleanupOldData( cleanup );
-        }
-        catch ( std::exception& e ) {
-            log() << " error cleaning old data:" << e.what() << endl;
-        }
-        catch ( ... ) {
-            log() << " unknown error cleaning old data" << endl;
-        }
-    }
-
     class ChunkCommandHelper : public Command {
     public:
         ChunkCommandHelper( const char * name )
@@ -225,7 +174,7 @@ namespace mongo {
         }
 
         virtual void help( stringstream& help ) const {
-            help << "internal - should not be called directly" << endl;
+            help << "internal - should not be called directly" << migrateLog;
         }
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
@@ -273,9 +222,12 @@ namespace mongo {
         void done() {
             readlock lk( _ns );
 
-            _deleted.clear();
-            _reload.clear();
-            _cloneLocs.clear();
+            {
+                scoped_spinlock lk( _trackerLocks );
+                _deleted.clear();
+                _reload.clear();
+                _cloneLocs.clear();
+            }
             _memoryUsed = 0;
 
             scoped_lock l(_m);
@@ -304,7 +256,7 @@ namespace mongo {
                 ide = obj["_id"];
 
             if ( ide.eoo() ) {
-                log( LL_WARNING ) << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << endl;
+                warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << migrateLog;
                 return;
             }
 
@@ -333,7 +285,7 @@ namespace mongo {
 
             case 'u':
                 if ( ! Helpers::findById( cc() , _ns.c_str() , ide.wrap() , it ) ) {
-                    log( LL_WARNING ) << "logOpForSharding couldn't find: " << ide << " even though should have" << endl;
+                    warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
                     return;
                 }
                 break;
@@ -427,13 +379,13 @@ namespace mongo {
                 return false;
             }
 
-            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
-                                         shared_ptr<Cursor>( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
-                                         _ns ) );
+            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
+                                                         shared_ptr<Cursor>( BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
+                                                         _ns ) );
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
-            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
             const long long totalRecs = d->stats.nrecords;
@@ -454,13 +406,15 @@ namespace mongo {
             while ( cc->ok() ) {
                 DiskLoc dl = cc->currLoc();
                 if ( ! isLargeChunk ) {
+                    scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
                 }
                 cc->advance();
 
                 // we can afford to yield here because any change to the base data that we might miss is already being
                 // queued and will be migrated in the 'transferMods' stage
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
+                    cc.release();
                     break;
                 }
 
@@ -470,17 +424,20 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
                           << " because maximum size allowed to move is " << maxChunkSize
                           << " ns: " << _ns << " " << _min << " -> " << _max
-                          << endl;
+                          << migrateLog;
                 result.appendBool( "chunkTooBig" , true );
-                result.appendNumber( "chunkSize" , (long long)(recCount * avgRecSize) );
+                result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
                 return false;
             }
 
-            log() << "moveChunk number of documents: " << _cloneLocs.size() << endl;
+            {
+                scoped_spinlock lk( _trackerLocks );
+                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            }
             return true;
         }
 
@@ -490,29 +447,50 @@ namespace mongo {
                 return false;
             }
 
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            ElapsedTracker tracker (128, 10); // same as ClientCursor::_yieldSometimesTracker
 
-            NamespaceDetails *d = nsdetails( _ns.c_str() );
-            assert( d );
+            int allocSize;
+            {
+                readlock l(_ns);
+                Client::Context ctx( _ns );
+                NamespaceDetails *d = nsdetails( _ns.c_str() );
+                assert( d );
+                scoped_spinlock lk( _trackerLocks );
+                allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
+            }
+            BSONArrayBuilder a (allocSize);
+            
+            while ( 1 ) {
+                bool filledBuffer = false;
+                
+                readlock l( _ns );
+                Client::Context ctx( _ns );
+                scoped_spinlock lk( _trackerLocks );
+                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                for ( ; i!=_cloneLocs.end(); ++i ) {
+                    if (tracker.ping()) // should I yield?
+                        break;
 
-            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
+                    DiskLoc dl = *i;
+                    BSONObj o = dl.obj();
 
-            set<DiskLoc>::iterator i = _cloneLocs.begin();
-            for ( ; i!=_cloneLocs.end(); ++i ) {
-                DiskLoc dl = *i;
-                BSONObj o = dl.obj();
+                    // use the builder size instead of accumulating 'o's size so that we take into consideration
+                    // the overhead of BSONArray indices
+                    if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        filledBuffer = true; // break out of outer while loop
+                        break;
+                    }
 
-                // use the builder size instead of accumulating 'o's size so that we take into consideration
-                // the overhead of BSONArray indices
-                if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                    break;
+                    a.append( o );
                 }
-                a.append( o );
+
+                _cloneLocs.erase( _cloneLocs.begin() , i );
+
+                if ( _cloneLocs.empty() || filledBuffer )
+                    break;
             }
 
             result.appendArray( "objects" , a.arr() );
-            _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
 
@@ -525,6 +503,11 @@ namespace mongo {
             if ( ! db->ownsNS( _ns ) )
                 return;
 
+            
+            // not needed right now
+            // but trying to prevent a future bug
+            scoped_spinlock lk( _trackerLocks ); 
+
             _cloneLocs.erase( dl );
         }
 
@@ -535,6 +518,18 @@ namespace mongo {
 
         bool isActive() const { return _getActive(); }
 
+        void doRemove( OldDataCleanup& cleanup ) {
+            while ( true ) { 
+                {
+                    scoped_lock lk( _m );
+                    if ( ! _active ) {
+                        cleanup.doRemove();
+                    }
+                }
+                sleepmillis( 100 );
+            }
+        }
+
     private:
         mutable mongo::mutex _m; // protect _inCriticalSection and _active
         bool _inCriticalSection;
@@ -544,9 +539,13 @@ namespace mongo {
         BSONObj _min;
         BSONObj _max;
 
+        // we need the lock in case there is a malicious _migrateClone for example
+        // even though it shouldn't be needed under normal operation
+        SpinLock _trackerLocks;
+
         // disk locs yet to be transferred from here to the other side
-        // no locking needed because build by 1 thread in a read lock
-        // depleted by 1 thread in a read lock
+        // no locking needed because built initially by 1 thread in a read lock
+        // emptied by 1 thread in a read lock
         // updates applied by 1 thread in a write lock
         set<DiskLoc> _cloneLocs;
 
@@ -567,6 +566,62 @@ namespace mongo {
             migrateFromStatus.done();
         }
     };
+
+    void _cleanupOldData( OldDataCleanup cleanup ) {
+        Client::initThread( cleanUpThreadName );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
+        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+        int loops = 0;
+        Timer t;
+        while ( t.seconds() < 900 ) { // 15 minutes
+            assert( dbMutex.getState() == 0 );
+            sleepmillis( 20 );
+
+            set<CursorId> now;
+            ClientCursor::find( cleanup.ns , now );
+
+            set<CursorId> left;
+            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                CursorId id = *i;
+                if ( now.count(id) )
+                    left.insert( id );
+            }
+
+            if ( left.size() == 0 )
+                break;
+            cleanup.initial = left;
+
+            if ( ( loops++ % 200 ) == 0 ) {
+                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+                stringstream ss;
+                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                    CursorId id = *i;
+                    ss << id << " ";
+                }
+                log() << " cursors: " << ss.str() << migrateLog;
+            }
+        }
+
+        migrateFromStatus.doRemove( cleanup );
+
+        cc().shutdown();
+    }
+
+    void cleanupOldData( OldDataCleanup cleanup ) {
+        try {
+            _cleanupOldData( cleanup );
+        }
+        catch ( std::exception& e ) {
+            log() << " error cleaning old data:" << e.what() << migrateLog;
+        }
+        catch ( ... ) {
+            log() << " unknown error cleaning old data" << migrateLog;
+        }
+    }
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
         migrateFromStatus.logOp( opstr , ns , obj , patt );
@@ -606,7 +661,7 @@ namespace mongo {
     public:
         MoveChunkCommand() : Command( "moveChunk" ) {}
         virtual void help( stringstream& help ) const {
-            help << "should not be calling this directly" << endl;
+            help << "should not be calling this directly" << migrateLog;
         }
 
         virtual bool slaveOk() const { return false; }
@@ -690,7 +745,7 @@ namespace mongo {
             Shard fromShard( from );
             Shard toShard( to );
 
-            log() << "received moveChunk request: " << cmdObj << endl;
+            log() << "received moveChunk request: " << cmdObj << migrateLog;
 
             timing.done(1);
 
@@ -702,12 +757,12 @@ namespace mongo {
                 dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
             }
             catch( LockException& e ){
-                errmsg = (string)"error locking distributed lock for migration " + "migrate-" + min.toString() + m_caused_by(e);
+                errmsg = str::stream() << "error locking distributed lock for migration " << "migrate-" << min.toString() << causedBy( e );
                 return false;
             }
 
             if ( ! dlk.got() ) {
-                errmsg = (string)"the collection metadata could not be locked with lock " + "migrate-" + min.toString();
+                errmsg = str::stream() << "the collection metadata could not be locked with lock " << "migrate-" << min.toString();
                 result.append( "who" , dlk.other() );
                 return false;
             }
@@ -739,8 +794,8 @@ namespace mongo {
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    log( LL_WARNING ) << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max
-                                      << " is now " << currMin << "->" << currMax << endl;
+                    warning() << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max
+                                      << " is now " << currMin << "->" << currMax << migrateLog;
                     return false;
                 }
 
@@ -749,8 +804,8 @@ namespace mongo {
                     result.append( "from" , fromShard.getName() );
                     result.append( "official" , myOldShard );
 
-                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard
-                                      << " and not at " << fromShard.getName() << endl;
+                    warning() << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard
+                                      << " and not at " << fromShard.getName() << migrateLog;
                     return false;
                 }
 
@@ -759,8 +814,8 @@ namespace mongo {
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
 
-                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": official " << maxVersion
-                                      << " mine: " << shardingState.getVersion(ns) << endl;
+                    warning() << "aborted moveChunk because " << errmsg << ": official " << maxVersion
+                                      << " mine: " << shardingState.getVersion(ns) << migrateLog;
                     return false;
                 }
 
@@ -769,7 +824,7 @@ namespace mongo {
                 ShardChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
-                log() << "moveChunk request accepted at version " << shardVersion << endl;
+                log() << "moveChunk request accepted at version " << shardVersion << migrateLog;
             }
 
             timing.done(2);
@@ -814,10 +869,10 @@ namespace mongo {
                 res = res.getOwned();
                 conn.done();
 
-                log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << endl;
+                log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
-                    log( LL_WARNING ) << "moveChunk error transfering data caused migration abort: " << res << endl;
+                    warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
                     errmsg = "data transfer error";
                     result.append( "cause" , res );
                     return false;
@@ -834,7 +889,7 @@ namespace mongo {
                     conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
                     res = res.getOwned();
                     conn.done();
-                    error() << "aborting migrate because too much memory used res: " << res << endl;
+                    error() << "aborting migrate because too much memory used res: " << res << migrateLog;
                     errmsg = "aborting migrate because too much memory used";
                     result.appendBool( "split" , true );
                     return false;
@@ -862,7 +917,7 @@ namespace mongo {
                     shardingState.donateChunk( ns , min , max , myVersion );
                 }
 
-                log() << "moveChunk setting version to: " << myVersion << endl;
+                log() << "moveChunk setting version to: " << myVersion << migrateLog;
 
                 // 5.b
                 // we're under the collection lock here, too, so we can undo the chunk donation because no other state change
@@ -883,15 +938,15 @@ namespace mongo {
                             shardingState.undoDonateChunk( ns , min , max , currVersion );
                         }
 
-                        log() << "movChunk migrate commit not accepted by TO-shard: " << res
-                              << " resetting shard version to: " << currVersion << endl;
+                        log() << "moveChunk migrate commit not accepted by TO-shard: " << res
+                              << " resetting shard version to: " << currVersion << migrateLog;
 
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
                         return false;
                     }
 
-                    log() << "moveChunk migrate commit accepted by TO-shard: " << res << endl;
+                    log() << "moveChunk migrate commit accepted by TO-shard: " << res << migrateLog;
                 }
 
                 // 5.c
@@ -972,12 +1027,12 @@ namespace mongo {
                     updates.append( op.obj() );
 
                     log() << "moveChunk updating self version to: " << nextVersion << " through "
-                          << bumpMin << " -> " << bumpMax << " for collection '" << ns << "'" << endl;
+                          << bumpMin << " -> " << bumpMax << " for collection '" << ns << "'" << migrateLog;
 
                 }
                 else {
 
-                    log() << "moveChunk moved last chunk out for collection '" << ns << "'" << endl;
+                    log() << "moveChunk moved last chunk out for collection '" << ns << "'" << migrateLog;
                 }
 
                 updates.done();
@@ -998,7 +1053,7 @@ namespace mongo {
                 preCond.done();
 
                 BSONObj cmd = cmdBuilder.obj();
-                log(7) << "moveChunk update: " << cmd << endl;
+                log(7) << "moveChunk update: " << cmd << migrateLog;
 
                 bool ok = false;
                 BSONObj cmdResult;
@@ -1008,6 +1063,7 @@ namespace mongo {
                     conn.done();
                 }
                 catch ( DBException& e ) {
+                    warning() << e << migrateLog;
                     ok = false;
                     BSONObjBuilder b;
                     e.getInfo().append( b );
@@ -1023,7 +1079,7 @@ namespace mongo {
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
                     // that the old state (before migrating) be brought in
 
-                    warning() << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
+                    warning() << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << migrateLog;
                     sleepsecs( 10 );
 
                     try {
@@ -1035,13 +1091,13 @@ namespace mongo {
                         ShardChunkVersion checkVersion = doc["lastmod"];
 
                         if ( checkVersion == nextVersion ) {
-                            log() << "moveChunk commit confirmed" << endl;
+                            log() << "moveChunk commit confirmed" << migrateLog;
 
                         }
                         else {
                             error() << "moveChunk commit failed: version is at"
-                                            << checkVersion << " instead of " << nextVersion << endl;
-                            error() << "TERMINATING" << endl;
+                                            << checkVersion << " instead of " << nextVersion << migrateLog;
+                            error() << "TERMINATING" << migrateLog;
                             dbexit( EXIT_SHARDING_ERROR );
                         }
 
@@ -1049,8 +1105,8 @@ namespace mongo {
 
                     }
                     catch ( ... ) {
-                        error() << "moveChunk failed to get confirmation of commit" << endl;
-                        error() << "TERMINATING" << endl;
+                        error() << "moveChunk failed to get confirmation of commit" << migrateLog;
+                        error() << "TERMINATING" << migrateLog;
                         dbexit( EXIT_SHARDING_ERROR );
                     }
                 }
@@ -1072,11 +1128,11 @@ namespace mongo {
                 c.max = max.getOwned();
                 ClientCursor::find( ns , c.initial );
                 if ( c.initial.size() ) {
-                    log() << "forking for cleaning up chunk data" << endl;
+                    log() << "forking for cleaning up chunk data" << migrateLog;
                     boost::thread t( boost::bind( &cleanupOldData , c ) );
                 }
                 else {
-                    log() << "doing delete inline" << endl;
+                    log() << "doing delete inline" << migrateLog;
                     // 7.
                     c.doRemove();
                 }
@@ -1135,12 +1191,12 @@ namespace mongo {
             catch ( std::exception& e ) {
                 state = FAIL;
                 errmsg = e.what();
-                log( LL_ERROR ) << "migrate failed: " << e.what() << endl;
+                error() << "migrate failed: " << e.what() << migrateLog;
             }
             catch ( ... ) {
                 state = FAIL;
                 errmsg = "UNKNOWN ERROR";
-                log( LL_ERROR ) << "migrate failed with unknown exception" << endl;
+                error() << "migrate failed with unknown exception" << migrateLog;
             }
             setActive( false );
         }
@@ -1150,6 +1206,8 @@ namespace mongo {
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+            
+            slaveCount = ( getSlaveCount() / 2 ) + 1;
 
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ );
 
@@ -1182,7 +1240,7 @@ namespace mongo {
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
                 long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
                 if ( num )
-                    log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
+                    warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
                 timing.done(2);
             }
@@ -1198,7 +1256,7 @@ namespace mongo {
                         state = FAIL;
                         errmsg = "_migrateClone failed: ";
                         errmsg += res.toString();
-                        error() << errmsg << endl;
+                        error() << errmsg << migrateLog;
                         conn.done();
                         return;
                     }
@@ -1237,7 +1295,7 @@ namespace mongo {
                         state = FAIL;
                         errmsg = "_transferMods failed: ";
                         errmsg += res.toString();
-                        log( LL_ERROR ) << "_transferMods failed: " << res << endl;
+                        error() << "_transferMods failed: " << res << migrateLog;
                         conn.done();
                         return;
                     }
@@ -1245,11 +1303,32 @@ namespace mongo {
                         break;
 
                     apply( res , &lastOpApplied );
+                    
+                    const int maxIterations = 3600*50;
+                    int i;
+                    for ( i=0;i<maxIterations; i++) {
+                        if ( state == ABORT ) {
+                            timing.note( "aborted" );
+                            return;
+                        }
+                        
+                        if ( opReplicatedEnough( lastOpApplied ) )
+                            break;
+                        
+                        if ( i > 100 ) {
+                            warning() << "secondaries having hard time keeping up with migrate" << migrateLog;
+                        }
 
-                    if ( state == ABORT ) {
-                        timing.note( "aborted" );
-                        return;
+                        sleepmillis( 20 );
                     }
+
+                    if ( i == maxIterations ) {
+                        errmsg = "secondary can't keep up with migrate";
+                        error() << errmsg << migrateLog;
+                        conn.done();
+                        state = FAIL;
+                        return;
+                    } 
                 }
 
                 timing.done(4);
@@ -1263,7 +1342,7 @@ namespace mongo {
                 while ( state == STEADY || state == COMMIT_START ) {
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ) {
-                        log() << "_transferMods failed in STEADY state: " << res << endl;
+                        log() << "_transferMods failed in STEADY state: " << res << migrateLog;
                         errmsg = res.toString();
                         state = FAIL;
                         conn.done();
@@ -1342,7 +1421,7 @@ namespace mongo {
                     BSONObj fullObj;
                     if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
                         if ( ! isInRange( fullObj , min , max ) ) {
-                            log() << "not applying out of range deletion: " << fullObj << endl;
+                            log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
                             continue;
                         }
@@ -1373,24 +1452,27 @@ namespace mongo {
             return didAnything;
         }
 
-        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+        bool opReplicatedEnough( const ReplTime& lastOpApplied ) {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            const int slaveCount = getSlaveCount() / 2 + 1;
-            if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
-                log( LL_WARNING ) << "migrate commit attempt timed out contacting " << slaveCount
-                                  << " slaves for '" << ns << "' " << min << " -> " << max << endl;
+            return mongo::opReplicatedEnough( lastOpApplied , slaveCount );
+        }
+
+        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+            if ( ! opReplicatedEnough( lastOpApplied ) ) {
+                warning() << "migrate commit attempt timed out contacting " << slaveCount
+                          << " slaves for '" << ns << "' " << min << " -> " << max << migrateLog;
                 return false;
             }
-            log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
+            log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
                 readlock lk(ns);  // commitNow() currently requires it
 
                 // if durability is on, force a write to journal
                 if ( getDur().commitNow() ) {
-                    log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
+                    log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << migrateLog;
                 }
             }
 
@@ -1416,13 +1498,14 @@ namespace mongo {
             if ( state != STEADY )
                 return false;
             state = COMMIT_START;
-
-            for ( int i=0; i<86400; i++ ) {
+            
+            // we wait 5 minutes for the commit to succeed before giving up
+            for ( int i=0; i<5*60*1000; i++ ) {
                 sleepmillis(1);
                 if ( state == DONE )
                     return true;
             }
-            log() << "startCommit never finished!" << endl;
+            log() << "startCommit never finished!" << migrateLog;
             return false;
         }
 
@@ -1447,6 +1530,8 @@ namespace mongo {
         long long clonedBytes;
         long long numCatchup;
         long long numSteady;
+        
+        int slaveCount;
 
         enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
         string errmsg;
@@ -1455,6 +1540,10 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
+        if (!noauth) {
+            ShardedConnectionInfo::addHook();
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         migrateStatus.go();
         cc().shutdown();
     }
@@ -1547,7 +1636,7 @@ namespace mongo {
             assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
 
-            log(1) << "isInRangeTest passed" << endl;
+            log(1) << "isInRangeTest passed" << migrateLog;
         }
     } isInRangeTest;
 }

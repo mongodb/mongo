@@ -17,6 +17,8 @@
  */
 
 #include "../pch.h"
+#include "writeback_listener.h"
+#include "../db/security.h"
 
 namespace mongo {
 
@@ -26,11 +28,8 @@ namespace mongo {
      * currently implemented with a thread local
      */
     class ClientInfo {
-
-        typedef map<int,ClientInfo*> Cache;
-
     public:
-        ClientInfo( int clientId );
+        ClientInfo();
         ~ClientInfo();
 
         /** new request from client, adjusts internal state */
@@ -54,7 +53,7 @@ namespace mongo {
          * gets shards used on the previous request
          */
         set<string> * getPrev() const { return _prev; };
-
+        
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
          */
@@ -64,6 +63,12 @@ namespace mongo {
          * clears list of shards we've talked to
          */
         void clearSinceLastGetError() { _sinceLastGetError.clear(); }
+
+
+        /**
+         * resets the list of shards using to process the current request
+         */
+        void clearCurrentShards(){ _cur->clear(); }
 
         /**
          * calls getLastError
@@ -77,14 +82,14 @@ namespace mongo {
         
         void noAutoSplit() { _autoSplitOk = false; }
 
-        static ClientInfo * get( int clientId = 0 , bool create = true );
-        static void disconnect( int clientId );
-
+        static ClientInfo * get();
+        AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
+        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
     private:
-
+        AuthenticationInfo _ai;
         struct WBInfo {
-            WBInfo( ConnectionId c , OID o ) : connectionId( c ) , id( o ) {}
-            ConnectionId connectionId;
+            WBInfo( const WriteBackListener::ConnectionIdent& c , OID o ) : ident( c ) , id( o ) {}
+            WriteBackListener::ConnectionIdent ident;
             OID id;
         };
 
@@ -111,8 +116,6 @@ namespace mongo {
         int _lastAccess;
         bool _autoSplitOk; 
 
-        static mongo::mutex _clientsLock;
-        static Cache& _clients;
         static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };
 

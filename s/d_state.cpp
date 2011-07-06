@@ -28,8 +28,7 @@
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
+#include "../db/db.h"
 
 #include "../client/connpool.h"
 
@@ -75,7 +74,7 @@ namespace mongo {
            << " before [" << _shardName << "] "
            << " got [" << name << "] "
            ;
-        uasserted( 13298 , ss.str() );
+        msgasserted( 13298 , ss.str() );
     }
 
     void ShardingState::gotShardHost( string host ) {
@@ -97,7 +96,7 @@ namespace mongo {
            << " before [" << _shardHost << "] "
            << " got [" << host << "] "
            ;
-        uasserted( 13299 , ss.str() );
+        msgasserted( 13299 , ss.str() );
     }
 
     void ShardingState::resetShardingState() {
@@ -314,6 +313,15 @@ namespace mongo {
         _versions[ns] = version;
     }
 
+    void ShardedConnectionInfo::addHook() {
+        static bool done = false;
+        if (!done) {
+            log(1) << "adding sharding hook" << endl;
+            pool.addHook(new ShardingConnectionHook(false));
+            done = true;
+        }
+    }
+
     void ShardedConnectionInfo::setID( const OID& id ) {
         _id = id;
     }
@@ -412,6 +420,7 @@ namespace mongo {
             }
             
             if ( locked ) {
+                ShardedConnectionInfo::addHook();
                 shardingState.enable( configdb );
                 configServer.init( configdb );
                 return true;
@@ -476,7 +485,7 @@ namespace mongo {
             
             string ns = cmdObj["setShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
-                errmsg = "need to speciy namespace";
+                errmsg = "need to specify namespace";
                 return false;
             }
 
@@ -493,7 +502,7 @@ namespace mongo {
             
             if ( globalVersion > 0 && version > 0 ) {
                 // this means there is no reset going on an either side
-                // so its safe to make some assuptions
+                // so its safe to make some assumptions
 
                 if ( version == globalVersion ) {
                     // mongos and mongod agree!
@@ -542,7 +551,7 @@ namespace mongo {
             }
 
             if ( version < oldVersion ) {
-                errmsg = "you already have a newer version of collection '" + ns + "'";
+                errmsg = "this connection already had a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "newVersion" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
@@ -555,10 +564,11 @@ namespace mongo {
                     sleepmillis(2);
                     OCCASIONALLY log() << "waiting till out of critical section" << endl;
                 }
-                errmsg = "going to older version for global for collection '" + ns + "'";
+                errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
+                result.appendBool( "reloadConfig" , true );
                 return false;
             }
 
@@ -576,7 +586,7 @@ namespace mongo {
 
                 ShardChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
-                    errmsg = str::stream() << "client version differs from config's for colleciton '" << ns << "'";
+                    errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );
                     result.appendTimestamp( "version" , version );
                     result.appendTimestamp( "globalVersion" , currVersion );
@@ -615,6 +625,7 @@ namespace mongo {
             result.appendTimestamp( "global" , shardingState.getVersion(ns) );
 
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
+            result.appendBool( "inShardedMode" , info != 0 );
             if ( info )
                 result.appendTimestamp( "mine" , info->getVersion(ns) );
             else
@@ -672,7 +683,7 @@ namespace mongo {
 
         if ( version == 0 && clientVersion > 0 ) {
             stringstream ss;
-            ss << "collection was dropped or this shard no longer valied version: " << version << " clientVersion: " << clientVersion;
+            ss << "collection was dropped or this shard no longer valid version: " << version << " clientVersion: " << clientVersion;
             errmsg = ss.str();
             return false;
         }
@@ -701,4 +712,7 @@ namespace mongo {
         return false;
     }
 
+    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
+        // no-op for mongod
+    }
 }

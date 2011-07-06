@@ -46,22 +46,24 @@ namespace mongo {
     void CoveredIndexMatcher::init( bool alwaysUseRecord ) {
         _needRecord =
             alwaysUseRecord ||
-            ! ( _docMatcher->keyMatch() &&
-                _keyMatcher.sameCriteriaCount( *_docMatcher ) );
-
-        _needRecordReject = _keyMatcher.hasType( BSONObj::opEXISTS );
+	        !_keyMatcher.keyMatch( *_docMatcher );
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
         // bool keyUsable = ! cursor->isMultiKey() && check for $orish like conditions in matcher SERVER-1264
-        return matches( cursor->currKey() , cursor->currLoc() , details  );
+        return matches( cursor->currKey() , cursor->currLoc() , details ,
+                       !cursor->indexKeyPattern().isEmpty() // unindexed cursor
+                       && !cursor->isMultiKey() // multikey cursor
+                       );
     }
 
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
+        dassert( key.isValid() );
+
         if ( details )
             details->reset();
 
-        if ( _needRecordReject == false && keyUsable ) {
+        if ( keyUsable ) {
 
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;
@@ -74,10 +76,24 @@ namespace mongo {
         }
 
         if ( details )
-            details->loadedObject = true;
+            details->_loadedObject = true;
 
         return _docMatcher->matches(recLoc.obj() , details );
     }
 
-
+    string CoveredIndexMatcher::toString() const {
+        StringBuilder buf;
+        buf << "(CoveredIndexMatcher ";
+        
+        if ( _needRecord )
+            buf << "needRecord ";
+        
+        buf << "keyMatcher: " << _keyMatcher.toString() << " ";
+        
+        if ( _docMatcher )
+            buf << "docMatcher: " << _docMatcher->toString() << " ";
+        
+        buf << ")";
+        return buf.str();
+    }
 }

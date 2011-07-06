@@ -43,8 +43,9 @@ namespace mongo {
      */
     class LockException : public DBException {
     public:
-	LockException( const char * msg , int code ) : DBException(msg, code) {}
-	virtual ~LockException() throw() { }
+    	LockException( const char * msg , int code ) : DBException( msg, code ) {}
+    	LockException( const string& msg, int code ) : DBException( msg, code ) {}
+    	virtual ~LockException() throw() { }
     };
 
     /**
@@ -52,7 +53,8 @@ namespace mongo {
      */
     class TimeNotFoundException : public LockException {
     public:
-        TimeNotFoundException( const char * msg , int code ) : LockException(msg, code) {}
+        TimeNotFoundException( const char * msg , int code ) : LockException( msg, code ) {}
+        TimeNotFoundException( const string& msg, int code ) : LockException( msg, code ) {}
         virtual ~TimeNotFoundException() throw() { }
     };
 
@@ -80,24 +82,25 @@ namespace mongo {
          * @param legacy use legacy logic
          *
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false, bool legacy = false);
+        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
         ~DistributedLock(){};
 
         /**
-         * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
+         * Attempts to acquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
          *
          * @param why human readable description of why the lock is being taken (used to log)
-         * @param other configdb's lock document that is currently holding the lock, if lock is taken
+         * @param whether this is a lock re-entry or a new lock
+         * @param other configdb's lock document that is currently holding the lock, if lock is taken, or our own lock
+         * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( string why , BSONObj * other = 0 );
+        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0 );
 
         /**
          * Releases a previously taken lock.
          */
-        void unlock();
-
+        void unlock( BSONObj* oldLockPtr = NULL );
 
         Date_t getRemoteTime();
 
@@ -129,26 +132,28 @@ namespace mongo {
          */
         static const string locksNS;
 
-    private:
-        ConnectionString _conn;
-        string _name;
-        // TODO:  This shouldn't be a field, just constant?
-        string _ns;
-        BSONObj _id;
+        const ConnectionString _conn;
+        const string _name;
+        const BSONObj _id;
+        const string _processId;
 
         // Timeout for lock, usually LOCK_TIMEOUT
-        unsigned long long _lockTimeout;
-        // Deprecated
-        unsigned _takeoverMinutes;
-        unsigned long long _maxClockSkew;
-        unsigned long long _maxNetSkew;
-        unsigned long long _lockPing;
+        const unsigned long long _lockTimeout;
+        const unsigned long long _maxClockSkew;
+        const unsigned long long _maxNetSkew;
+        const unsigned long long _lockPing;
+
+    private:
+
+        void resetLastPing(){
+            scoped_lock lk( _mutex );
+            _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>();
+        }
+
+        mongo::mutex _mutex;
 
         // Data from last check of process with ping time
-        boost::tuple<string, Date_t, Date_t> _lastPingCheck;
-
-        // Process id, in case we need to customize this
-        string _processId;
+        boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
         // May or may not exist, depending on startup
         string _threadId;
 
@@ -166,6 +171,7 @@ namespace mongo {
     		// so we only unlock once.
     		((dist_lock_try&) that)._got = false;
     		((dist_lock_try&) that)._lock = NULL;
+    		((dist_lock_try&) that)._other = BSONObj();
     	}
 
     	// Needed so we can handle lock exceptions in context of lock try.
@@ -177,24 +183,39 @@ namespace mongo {
     	    _got = that._got;
     	    _other = that._other;
     	    _other.getOwned();
+    	    _why = that._why;
 
     	    // Make sure the lock ownership passes to this object,
     	    // so we only unlock once.
     	    ((dist_lock_try&) that)._got = false;
     	    ((dist_lock_try&) that)._lock = NULL;
+    	    ((dist_lock_try&) that)._other = BSONObj();
 
     	    return *this;
     	}
 
         dist_lock_try( DistributedLock * lock , string why )
-            : _lock(lock) {
-            _got = _lock->lock_try( why , &_other );
+            : _lock(lock), _why(why) {
+            _got = _lock->lock_try( why , false , &_other );
         }
 
         ~dist_lock_try() {
             if ( _got ) {
-                _lock->unlock();
+                assert( ! _other.isEmpty() );
+                _lock->unlock( &_other );
             }
+        }
+
+        bool reestablish(){
+            return retry();
+        }
+
+        bool retry() {
+            assert( _lock );
+            assert( _got );
+            assert( ! _other.isEmpty() );
+
+            return _got = _lock->lock_try( _why , true, &_other );
         }
 
         bool got() const { return _got; }
@@ -204,6 +225,7 @@ namespace mongo {
         DistributedLock * _lock;
         bool _got;
         BSONObj _other;
+        string _why;
     };
 
 }

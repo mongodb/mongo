@@ -29,7 +29,7 @@
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
-#include "../db/query.h"
+#include "../db/ops/query.h"
 
 #include "../client/connpool.h"
 
@@ -96,13 +96,14 @@ namespace mongo {
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
 
         log(1) << "got write with an old config - writing back ns: " << ns << endl;
-        if ( logLevel ) log(1) << debugString( m ) << endl;
+        if ( logLevel ) log(1) << m.toString() << endl;
 
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
         b.append( "id" , writebackID );
         b.append( "connectionId" , cc().getConnectionId() );
+        b.append( "instanceIdent" , prettyHostName() );
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );

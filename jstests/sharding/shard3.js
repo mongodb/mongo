@@ -4,8 +4,17 @@ s = new ShardingTest( "shard3" , 2 , 1 , 2 );
 
 s2 = s._mongos[1];
 
+db = s.getDB( "test" )
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
+
+assert( sh.getBalancerState() , "A1" )
+sh.setBalancerState( false ) 
+assert( ! sh.getBalancerState() , "A2" )
+sh.setBalancerState( true ) 
+assert( sh.getBalancerState() , "A3" )
+sh.setBalancerState( false )
+assert( ! sh.getBalancerState() , "A4" )
 
 s.config.databases.find().forEach( printjson )
 
@@ -127,7 +136,7 @@ print( "*** ready to call dropDatabase" )
 res = s.getDB( "test" ).dropDatabase();
 assert.eq( 1 , res.ok , "dropDatabase failed : " + tojson( res ) );
 // Waiting for SERVER-2253
-// assert.eq( 0 , s.config.databases.count( { _id: "test" } ) , "database 'test' was dropped but still appears in configDB" );
+assert.eq( 0 , s.config.databases.count( { _id: "test" } ) , "database 'test' was dropped but still appears in configDB" );
 
 s.printShardingStatus();
 s.printCollectionInfo( "test.foo" , "after dropDatabase call 1" );

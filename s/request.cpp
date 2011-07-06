@@ -41,8 +41,7 @@ namespace mongo {
         assert( _d.getns() );
         _id = _m.header()->id;
 
-        _clientId = p ? p->getClientId() : 0;
-        _clientInfo = ClientInfo::get( _clientId );
+        _clientInfo = ClientInfo::get();
         _clientInfo->newRequest( p );
 
     }
@@ -62,8 +61,12 @@ namespace mongo {
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
         _config = grid.getDBConfig( getns() );
-        if ( reload )
-            uassert( 10192 ,  "db config reload failed!" , _config->reload() );
+        if ( reload ) {
+            if ( _config->isSharded( getns() ) )
+                _config->getChunkManager( getns() , true );
+            else
+                _config->reload();
+        }
 
         if ( _config->isSharded( getns() ) ) {
             _chunkManager = _config->getChunkManager( getns() , reload );
@@ -74,7 +77,7 @@ namespace mongo {
         }
 
         _m.header()->id = _id;
-
+        _clientInfo->clearCurrentShards();
     }
 
     Shard Request::primaryShard() const {
@@ -135,6 +138,10 @@ namespace mongo {
             s->getMore( *this );
         }
         else {
+            char cl[256];
+            nsToDatabase(getns(), cl);
+            uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
+
             s->writeOp( op, *this );
         }
 

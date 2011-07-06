@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    ClientInfo::ClientInfo( int clientId ) : _id( clientId ) {
+    ClientInfo::ClientInfo() {
         _cur = &_a;
         _prev = &_b;
         _autoSplitOk = true;
@@ -44,13 +44,6 @@ namespace mongo {
     }
 
     ClientInfo::~ClientInfo() {
-        if ( _lastAccess ) {
-            scoped_lock lk( _clientsLock );
-            Cache::iterator i = _clients.find( _id );
-            if ( i != _clients.end() ) {
-                _clients.erase( i );
-            }
-        }
     }
 
     void ClientInfo::addShard( const string& shard ) {
@@ -62,7 +55,7 @@ namespace mongo {
 
         if ( p ) {
             HostAndPort r = p->remote();
-            if ( _remote.port() == -1 )
+            if ( ! _remote.hasPort() )
                 _remote = r;
             else if ( _remote != r ) {
                 stringstream ss;
@@ -79,49 +72,19 @@ namespace mongo {
         _cur->clear();
     }
 
-    void ClientInfo::disconnect() {
-        _lastAccess = 0;
-    }
-
-    ClientInfo * ClientInfo::get( int clientId , bool create ) {
-
-        if ( ! clientId )
-            clientId = getClientId();
-
-        if ( ! clientId ) {
-            ClientInfo * info = _tlInfo.get();
-            if ( ! info ) {
-                info = new ClientInfo( 0 );
-                _tlInfo.reset( info );
-            }
+    ClientInfo * ClientInfo::get() {
+        ClientInfo * info = _tlInfo.get();
+        if ( ! info ) {
+            info = new ClientInfo();
+            _tlInfo.reset( info );
             info->newRequest();
-            return info;
         }
-
-        scoped_lock lk( _clientsLock );
-        Cache::iterator i = _clients.find( clientId );
-        if ( i != _clients.end() )
-            return i->second;
-        if ( ! create )
-            return 0;
-        ClientInfo * info = new ClientInfo( clientId );
-        _clients[clientId] = info;
         return info;
     }
 
-    void ClientInfo::disconnect( int clientId ) {
-        if ( ! clientId )
-            return;
-
-        scoped_lock lk( _clientsLock );
-        Cache::iterator i = _clients.find( clientId );
-        if ( i == _clients.end() )
-            return;
-
-        ClientInfo* ci = i->second;
-        ci->disconnect();
-        delete ci;
-        _clients.erase( i );
+    void ClientInfo::disconnect() {
+        // should be handled by TL cleanup
+        _lastAccess = 0;
     }
 
     void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& gle ) {
@@ -133,26 +96,30 @@ namespace mongo {
         BSONElement cid = gle["connectionId"];
 
         if ( cid.eoo() ) {
-            error() << "getLastError writeback can't work because of version mis-match" << endl;
+            error() << "getLastError writeback can't work because of version mismatch" << endl;
             return;
         }
 
-        all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
+        string ident = "";
+        if ( gle["instanceIdent"].type() == String )
+            ident = gle["instanceIdent"].String();
+
+        all.push_back( WBInfo( WriteBackListener::ConnectionIdent( ident , cid.numberLong() ) , w.OID() ) );
     }
 
     vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
         vector<BSONObj> res;
-        
-        if ( fromWriteBackListener ) {
-            LOG(1) << "not doing recusrive writeback" << endl;
-            return res;
-        }
 
         if ( all.size() == 0 )
             return res;
         
+        if ( fromWriteBackListener ) {
+            LOG(1) << "not doing recursive writeback" << endl;
+            return res;
+        }
+        
         for ( unsigned i=0; i<all.size(); i++ ) {
-            res.push_back( WriteBackListener::waitFor( all[i].connectionId , all[i].id ) );
+            res.push_back( WriteBackListener::waitFor( all[i].ident , all[i].id ) );
         }
 
         return res;
@@ -182,16 +149,16 @@ namespace mongo {
             	ok = conn->runCommand( "admin" , options , res );
             }
             catch( std::exception &e ){
-
-        	warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
-
-        	// Catch everything that happens here, since we need to ensure we return our connection when we're
+                
+                warning() << "could not get last error." << causedBy( e ) << endl;
+                
+                // Catch everything that happens here, since we need to ensure we return our connection when we're
             	// finished.
             	conn.done();
-
+                
             	return false;
             }
-
+            
             res = res.getOwned();
             conn.done();
             
@@ -219,6 +186,7 @@ namespace mongo {
                     assert( v.size() == 1 );
                     result.appendElements( v[0] );
                     result.appendElementsUnique( res );
+                    result.append( "writebackGLE" , v[0] );
                     result.append( "initialGLEHost" , theShard );
                 }
             }
@@ -231,8 +199,11 @@ namespace mongo {
         }
 
         BSONArrayBuilder bbb( result.subarrayStart( "shards" ) );
+        BSONObjBuilder shardRawGLE;
 
         long long n = 0;
+        
+        int updatedExistingStat = 0; // 0 is none, -1 has but false, 1 has true
 
         // hit each shard
         vector<string> errors;
@@ -243,20 +214,21 @@ namespace mongo {
             ShardConnection conn( theShard , "" );
             BSONObj res;
             bool ok = false;
-            try{
-        	ok = conn->runCommand( "admin" , options , res );
+            try {
+                ok = conn->runCommand( "admin" , options , res );
+                shardRawGLE.append( theShard , res );
             }
             catch( std::exception &e ){
 
         	    // Safe to return here, since we haven't started any extra processing yet, just collecting
         	    // responses.
-
-        	    warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
-		    conn.done();
-
-		    return false;
-	    }
-
+                
+        	    warning() << "could not get last error." << causedBy( e ) << endl;
+                conn.done();
+                
+                return false;
+            }
+            
             _addWriteBack( writebacks, res );
             
             string temp = DBClientWithCommands::getLastErrorString( res );
@@ -264,13 +236,24 @@ namespace mongo {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }
+
             n += res["n"].numberLong();
+            if ( res["updatedExisting"].type() ) {
+                if ( res["updatedExisting"].trueValue() )
+                    updatedExistingStat = 1;
+                else if ( updatedExistingStat == 0 )
+                    updatedExistingStat = -1;
+            }
+
             conn.done();
         }
 
         bbb.done();
+        result.append( "shardRawGLE" , shardRawGLE.obj() );
 
         result.appendNumber( "n" , n );
+        if ( updatedExistingStat )
+            result.appendBool( "updatedExisting" , updatedExistingStat > 0 );
 
         // hit other machines just to block
         for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ) {
@@ -313,8 +296,6 @@ namespace mongo {
         return true;
     }
 
-    ClientInfo::Cache& ClientInfo::_clients = *(new ClientInfo::Cache());
-    mongo::mutex ClientInfo::_clientsLock("_clientsLock");
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 
 } // namespace mongo

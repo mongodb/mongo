@@ -21,6 +21,15 @@
 
 namespace mongo {
 
+    class MAdvise { 
+        void *_p;
+        unsigned _len;
+    public:
+        enum Advice { Sequential=1 };
+        MAdvise(void *p, unsigned len, Advice a); 
+        ~MAdvise(); // destructor resets the range to MADV_NORMAL
+    };
+
     /* the administrative-ish stuff here */
     class MongoFile : boost::noncopyable {
     public:
@@ -44,7 +53,8 @@ namespace mongo {
         template < class F >
         static void forEach( F fun );
 
-        /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. */
+        /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. 
+*/
         static set<MongoFile*>& getAllFiles()  { return mmfiles; }
 
         // callbacks if you need them
@@ -100,6 +110,8 @@ namespace mongo {
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
+
+        // lock order: lock dbMutex before this if you lock both
         static RWLockRecursive mmmutex;
     };
 
@@ -146,7 +158,7 @@ namespace mongo {
         MemoryMappedFile();
 
         virtual ~MemoryMappedFile() {
-            destroyed(); // cleans up from the master list of mmaps
+            RWLockRecursive::Exclusive lk(mmmutex);
             close();
         }
 

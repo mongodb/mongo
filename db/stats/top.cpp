@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "top.h"
-#include "../../util/message.h"
+#include "../../util/net/message.h"
 #include "../commands.h"
 
 namespace mongo {

@@ -26,6 +26,7 @@
 #include "framework.h"
 #include "../util/file_allocator.h"
 #include "../db/dur.h"
+#include "../util/background.h"
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -78,7 +79,12 @@ namespace mongo {
 
         Result * Result::cur = 0;
 
+        int minutesRunning = 0; // reset to 0 each time a new test starts
+        mutex minutesRunningMutex("minutesRunningMutex");
+        string currentTestName;
+
         Result * Suite::run( const string& filter ) {
+            // set tlogLevel to -1 to suppress tlog() output in a test program
             tlogLevel = -1;
 
             log(1) << "\t about to setupTests" << endl;
@@ -106,6 +112,12 @@ namespace mongo {
 
                 stringstream err;
                 err << tc->getName() << "\t";
+
+                {
+                    scoped_lock lk(minutesRunningMutex);
+                    minutesRunning = 0;
+                    currentTestName = tc->getName();
+                }
 
                 try {
                     tc->run();
@@ -146,6 +158,30 @@ namespace mongo {
                  << options << "suite: run the specified test suite(s) only" << endl;
         }
 
+        class TestWatchDog : public BackgroundJob {
+        public:
+            virtual string name() const { return "TestWatchDog"; }
+            virtual void run(){
+
+                while (true) {
+                    sleepsecs(60);
+
+                    scoped_lock lk(minutesRunningMutex);
+                    minutesRunning++; //reset to 0 when new test starts
+
+                    if (minutesRunning > 30){
+                        log() << currentTestName << " has been running for more than 30 minutes. aborting." << endl;
+                        ::abort();
+                    }
+                    else if (minutesRunning > 1){
+                        warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
+                    }
+                }
+            }
+        };
+
+        unsigned perfHist = 1;
+
         int Suite::run( int argc , char** argv , string default_dbpath ) {
             unsigned long long seed = time( 0 );
             string dbpathSpec;
@@ -168,6 +204,7 @@ namespace mongo {
             ("dur", "enable journaling")
             ("nodur", "disable journaling (currently the default)")
             ("seed", po::value<unsigned long long>(&seed), "random number seed")
+            ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
             ;
 
             hidden_options.add_options()
@@ -201,7 +238,9 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
+            bool nodur = false;
             if( params.count("nodur") ) {
+                nodur = true;
                 cmdLine.dur = false;
             }
             if( params.count("dur") || cmdLine.dur ) {
@@ -255,7 +294,17 @@ namespace mongo {
             srand( (unsigned) seed );
             printGitVersion();
             printSysInfo();
+            DEV log() << "_DEBUG build" << endl;
+            if( sizeof(void*)==4 )
+                log() << "32bit" << endl;
             log() << "random seed: " << seed << endl;
+
+            if( time(0) % 3 == 0 && !nodur ) {
+                cmdLine.dur = true;
+                log() << "****************" << endl;
+                log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
+                log() << "****************" << endl;
+            }
 
             FileAllocator::get()->start();
 
@@ -272,9 +321,13 @@ namespace mongo {
             dur::startup();
 
             if( debug && cmdLine.dur ) {
-                cout << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
-//                cmdLine.durOptions |= 8;
+                log() << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
+                // this was commented out.  why too slow or something? : 
+                cmdLine.durOptions |= 8;
             }
+
+            TestWatchDog twd;
+            twd.go();
 
             int ret = run(suites,filter);
 
@@ -314,8 +367,6 @@ namespace mongo {
 
             Logstream::get().flush();
 
-            cout << "**************************************************" << endl;
-            cout << "**************************************************" << endl;
             cout << "**************************************************" << endl;
 
             int rc = 0;
@@ -386,4 +437,5 @@ namespace mongo {
     }
 
     void setupSignals( bool inFork ) {}
+
 }

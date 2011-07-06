@@ -29,7 +29,7 @@ doTest = function (signal) {
 
     // Step down master.  Note: this may close our connection!
     try {
-        master.getDB("admin").runCommand({ replSetStepDown: true });
+        master.getDB("admin").runCommand({ replSetStepDown: true, force: 1 });
     } catch (err) {
         print("caught: " + err + " on stepdown");
     }

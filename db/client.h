@@ -38,7 +38,7 @@ namespace mongo {
     class CurOp;
     class Command;
     class Client;
-    class MessagingPort;
+    class AbstractMessagingPort;
 
     extern boost::thread_specific_ptr<Client> currentClient;
 
@@ -58,7 +58,7 @@ namespace mongo {
         /* each thread which does db operations has a Client object in TLS.
            call this when your thread starts.
         */
-        static Client& initThread(const char *desc, MessagingPort *mp = 0);
+        static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
         ~Client();
 
@@ -68,12 +68,16 @@ namespace mongo {
          */
         bool shutdown();
 
+        /**  set so isSyncThread() works */
         void iAmSyncThread() {
             wassert( syncThread == 0 );
             syncThread = this;
         }
-        bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
+        /** @return true if this client is the replication secondary pull thread.  not used much, is used in create index sync code. */
+        bool isSyncThread() const { return this == syncThread; }
+
         string clientAddress(bool includePort=false) const;
+        const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }
         AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
         CurOp* curop() const { return _curOp; }
@@ -92,11 +96,12 @@ namespace mongo {
         void gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
-        MessagingPort * port() const { return _mp; }
+        AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
 
     private:
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
+        string _threadId; // "" on non support systems
         CurOp * _curOp;
         Context * _context;
         bool _shutdown;
@@ -106,9 +111,9 @@ namespace mongo {
         ReplTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
-        MessagingPort * const _mp;
+        AbstractMessagingPort * const _mp;
 
-        Client(const char *desc, MessagingPort *p = 0);
+        Client(const char *desc, AbstractMessagingPort *p = 0);
 
         friend class CurOp;
 

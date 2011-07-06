@@ -1,4 +1,4 @@
-// restore.cpp
+// @file restore.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -168,7 +168,7 @@ public:
 
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
-            cerr << "don't know what to do with [" << root.string() << "]" << endl;
+            cerr << "don't know what to do with file [" << root.string() << "]" << endl;
             return;
         }
 
@@ -257,7 +257,7 @@ public:
                 cerr << "Error creating index " << o["ns"].String();
                 cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
                 cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
-                abort();
+                ::abort();
             }
         }
         else {

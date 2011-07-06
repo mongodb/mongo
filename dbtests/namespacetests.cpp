@@ -27,6 +27,9 @@
 #include "dbtests.h"
 
 namespace NamespaceTests {
+
+    const int MinExtentSize = 4096;
+
     namespace IndexDetailsTests {
         class Base {
             dblock lk;
@@ -87,8 +90,8 @@ namespace NamespaceTests {
                 b.append( "c", 4 );
                 return b.obj();
             }
-            static void checkSize( int expected, const BSONObjSetDefaultOrder  &objs ) {
-                ASSERT_EQUALS( BSONObjSetDefaultOrder::size_type( expected ), objs.size() );
+            static void checkSize( int expected, const BSONObjSet  &objs ) {
+                ASSERT_EQUALS( BSONObjSet::size_type( expected ), objs.size() );
             }
             static void assertEquals( const BSONObj &a, const BSONObj &b ) {
                 if ( a.woCompare( b ) != 0 ) {
@@ -125,7 +128,7 @@ namespace NamespaceTests {
                 b.append( "b", 4 );
                 b.append( "a", 5 );
                 e.append( "", 5 );
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 1, keys );
                 assertEquals( e.obj(), *keys.begin() );
@@ -141,7 +144,7 @@ namespace NamespaceTests {
                 a.append( "a", b.done() );
                 a.append( "c", "foo" );
                 e.append( "", 4 );
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( a.done(), keys );
                 checkSize( 1, keys );
                 ASSERT_EQUALS( e.obj(), *keys.begin() );
@@ -159,11 +162,11 @@ namespace NamespaceTests {
                 BSONObjBuilder b;
                 b.append( "a", shortArray()) ;
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
@@ -179,11 +182,11 @@ namespace NamespaceTests {
                 b.append( "a", shortArray() );
                 b.append( "b", 2 );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     b.append( "", 2 );
@@ -204,11 +207,11 @@ namespace NamespaceTests {
                 b.append( "first", 5 );
                 b.append( "a", shortArray()) ;
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", 5 );
                     b.append( "", j );
@@ -233,11 +236,11 @@ namespace NamespaceTests {
                 BSONObjBuilder a;
                 a.append( "a", b.done() );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( a.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
@@ -257,7 +260,7 @@ namespace NamespaceTests {
                 b.append( "a", shortArray() );
                 b.append( "b", shortArray() );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 ASSERT_EXCEPTION( id().getKeysFromObject( b.done(), keys ),
                                   UserException );
             }
@@ -277,11 +280,11 @@ namespace NamespaceTests {
                 BSONObjBuilder b;
                 b.append( "a", elts );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
@@ -304,11 +307,11 @@ namespace NamespaceTests {
                 b.append( "a", elts );
                 b.append( "d", 99 );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 3, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+                for ( BSONObjSet::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder c;
                     c.append( "", j );
                     c.append( "", 99 );
@@ -337,10 +340,10 @@ namespace NamespaceTests {
                 BSONObjBuilder b;
                 b.append( "a", elts );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 4, keys );
-                BSONObjSetDefaultOrder::iterator i = keys.begin();
+                BSONObjSet::iterator i = keys.begin();
                 assertEquals( nullObj(), *i++ );
                 for ( int j = 1; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
@@ -366,7 +369,7 @@ namespace NamespaceTests {
                 BSONObjBuilder b;
                 b.append( "a", elts );
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 1, keys );
                 assertEquals( nullObj(), *keys.begin() );
@@ -381,7 +384,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( BSON( "b" << 1 ), keys );
                 checkSize( 1, keys );
                 assertEquals( nullObj(), *keys.begin() );
@@ -396,7 +399,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
                 checkSize( 1, keys );
                 assertEquals( nullObj(), *keys.begin() );
@@ -413,14 +416,14 @@ namespace NamespaceTests {
                 create();
 
                 {
-                    BSONObjSetDefaultOrder keys;
+                    BSONObjSet keys;
                     id().getKeysFromObject( fromjson( "{x:'a',y:'b'}" ) , keys );
                     checkSize( 1 , keys );
                     assertEquals( BSON( "" << "a" << "" << "b" ) , *keys.begin() );
                 }
 
                 {
-                    BSONObjSetDefaultOrder keys;
+                    BSONObjSet keys;
                     id().getKeysFromObject( fromjson( "{x:'a'}" ) , keys );
                     checkSize( 1 , keys );
                     BSONObjBuilder b;
@@ -442,7 +445,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:[{b:[2]}]}" ), keys );
                 checkSize( 1, keys );
                 assertEquals( BSON( "" << 2 ), *keys.begin() );
@@ -457,7 +460,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[{b:[1],c:[2]}]}" ), keys ),
                                   UserException );
             }
@@ -471,10 +474,10 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:[{b:1},{c:2}]}" ), keys );
                 checkSize( 2, keys );
-                BSONObjSetDefaultOrder::iterator i = keys.begin();
+                BSONObjSet::iterator i = keys.begin();
                 {
                     BSONObjBuilder e;
                     e.appendNull( "" );
@@ -499,7 +502,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:[{b:1},{b:[1,2,3]}]}" ), keys );
                 checkSize( 3, keys );
             }
@@ -514,7 +517,7 @@ namespace NamespaceTests {
             void run() {
                 create();
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
                 checkSize(2, keys );
                 keys.clear();
@@ -538,7 +541,7 @@ namespace NamespaceTests {
             void run() {
                 create();
 
-                BSONObjSetDefaultOrder keys;
+                BSONObjSet keys;
                 id().getKeysFromObject( fromjson( "{a:1,b:[1,2]}" ), keys );
                 checkSize(2, keys );
                 keys.clear();
@@ -622,9 +625,11 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() )->writingWithExtra();
             }
-            static BSONObj bigObj() {
-                string as( 187, 'a' );
+            static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
+				if (bGenID)
+					b.appendOID("_id", 0, true);
+                string as( 187, 'a' );
                 b.append( "a", as );
                 return b.obj();
             }
@@ -657,15 +662,18 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                BSONObj b = bigObj();
 
-                DiskLoc l[ 6 ];
-                for ( int i = 0; i < 6; ++i ) {
+                const int N = 20;
+                const int Q = 16; // these constants depend on the size of the bson object, the extent size allocated by the system too
+                DiskLoc l[ N ];
+                for ( int i = 0; i < N; ++i ) {
+					BSONObj b = bigObj(true);
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( 1 + i % 2, nRecords() );
-                    if ( i > 1 )
-                        ASSERT( l[ i ] == l[ i - 2 ] );
+                    ASSERT( nRecords() <= Q );
+                    //ASSERT_EQUALS( 1 + i % 2, nRecords() );
+                    if ( i >= 16 )
+                        ASSERT( l[ i ] == l[ i - Q] );
                 }
             }
         };
@@ -682,14 +690,15 @@ namespace NamespaceTests {
                 for ( int i = 0; i < 8; ++i ) {
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                    if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );
+                    //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                    //if ( i > 3 )
+                    //    ASSERT( l[ i ] == l[ i - 4 ] );
                 }
+                ASSERT( nRecords() == 8 );
 
                 // Too big
                 BSONObjBuilder bob;
-                bob.append( "a", string( 787, 'a' ) );
+                bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );
@@ -710,16 +719,24 @@ namespace NamespaceTests {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
-                BSONObj b = bigObj();
+                BSONObj b = bigObj(true);
 
-                DiskLoc l[ 8 ];
-                for ( int i = 0; i < 8; ++i ) {
-                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
-                    ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                int N = MinExtentSize / b.objsize() * nExtents() + 5;
+                int T = N - 4;
+
+                DiskLoc truncAt;
+                //DiskLoc l[ 8 ];
+                for ( int i = 0; i < N; ++i ) {
+					BSONObj bb = bigObj(true);
+                    DiskLoc a = theDataFileMgr.insert( ns(), bb.objdata(), bb.objsize() );
+                    if( T == i )
+                        truncAt = a;
+                    ASSERT( !a.isNull() );
+                    /*ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );
+                        ASSERT( l[ i ] == l[ i - 4 ] );*/
                 }
+                ASSERT( nRecords() < N );
 
                 NamespaceDetails *nsd = nsdetails(ns());
 
@@ -736,10 +753,8 @@ namespace NamespaceTests {
                     ASSERT( first != last ) ;
                 }
 
-                DiskLoc d = l[6];
-                long long n = nsd->stats.nrecords;
-                nsd->cappedTruncateAfter(ns(), d, false);
-                ASSERT_EQUALS( nsd->stats.nrecords , n-1 );
+                nsd->cappedTruncateAfter(ns(), truncAt, false);
+                ASSERT_EQUALS( nsd->stats.nrecords , 28 );
 
                 {
                     ForwardCappedCursor c(nsd);
@@ -753,7 +768,8 @@ namespace NamespaceTests {
 
                 // Too big
                 BSONObjBuilder bob;
-                bob.append( "a", string( 787, 'a' ) );
+				bob.appendOID("_id", 0, true);
+                bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );

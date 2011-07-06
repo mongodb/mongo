@@ -24,12 +24,25 @@ namespace mongo {
     /**
      *  simple scoped timer
      */
-    class Timer {
+    class Timer /*copyable*/ {
     public:
         Timer() { reset(); }
-        Timer( unsigned long long start ) { old = start; }
+        Timer( unsigned long long startMicros ) { old = startMicros; }
         int seconds() const { return (int)(micros() / 1000000); }
-        int millis() const { return (long)(micros() / 1000); }
+        int millis() const { return (int)(micros() / 1000); }
+
+        /** gets time interval and resets at the same time.  this way we can call curTimeMicros
+              once instead of twice if one wanted millis() and then reset().
+            @return time in millis
+        */
+        int millisReset() { 
+            unsigned long long now = curTimeMicros64();
+            int m = (int)((now-old)/1000);
+            old = now;
+            return m;
+        }
+
+        // note: dubious that the resolution is as anywhere near as high as ethod name implies!
         unsigned long long micros() const {
             unsigned long long n = curTimeMicros64();
             return n - old;
@@ -38,7 +51,8 @@ namespace mongo {
             n = curTimeMicros64();
             return n - old;
         }
-        unsigned long long startTime() { return old; }
+
+        unsigned long long startTime() const { return old; }
         void reset() { old = curTimeMicros64(); }
     private:
         unsigned long long old;

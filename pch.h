@@ -31,13 +31,6 @@
 # define _CRT_SECURE_NO_WARNINGS
 #endif
 
-// [dm] i am not sure why we need this.
-#if defined(WIN32)
-# ifndef _WIN32
-# define _WIN32
-# endif
-#endif
-
 #if defined(_WIN32)
 // for rand_s() usage:
 # define _CRT_RAND_S
@@ -69,9 +62,9 @@
 #include "string.h"
 #include "limits.h"
 
-#include <boost/any.hpp>
+//#include <boost/any.hpp>
 #include "boost/thread/once.hpp"
-#include <boost/archive/iterators/transform_width.hpp>
+//#include <boost/archive/iterators/transform_width.hpp>
 #define BOOST_FILESYSTEM_VERSION 2
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/exception.hpp>
@@ -161,6 +154,11 @@ namespace mongo {
 
     using boost::uint32_t;
     using boost::uint64_t;
+
+    /** called by mongos, mongod, test. do not call from clients and such. 
+        invoked before about everything except global var construction.
+     */
+    void doPreServerStatupInits();
 
 } // namespace mongo
 

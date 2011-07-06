@@ -37,8 +37,8 @@ namespace mongo {
        throws
        @param initial true when initiating
     */
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
-        int failures = 0;
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial) {
+        int failures = 0, allVotes = 0, allowableFailures = 0;
         int me = 0;
         stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
@@ -51,7 +51,10 @@ namespace mongo {
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
             }
+            allVotes += i->votes;
         }
+        allowableFailures = allVotes - (allVotes/2 + 1);
+
         uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
@@ -61,6 +64,7 @@ namespace mongo {
             uasserted(13279, ss.str());
         }
 
+        vector<string> down;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             // we know we're up
             if (i->h.isSelf()) {
@@ -100,27 +104,27 @@ namespace mongo {
                     }
                 }
                 if( !ok && !res["rs"].trueValue() ) {
+                    down.push_back(i->h.toString());
+
                     if( !res.isEmpty() ) {
                         /* strange.  got a response, but not "ok". log it. */
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
                     }
 
                     bool allowFailure = false;
-                    failures++;
-                    if( res.isEmpty() && !initial && failures == 1 ) {
-                        /* for now we are only allowing 1 node to be down on a reconfig.  this can be made to be a minority
-                           trying to keep change small as release is near.
-                           */
+                    failures += i->votes;
+                    if( res.isEmpty() && !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
-                            // ok, so this was an existing member (wouldn't make sense to add to config a new member that is down)
                             assert( m->h().toString() == i->h.toString() );
-                            allowFailure = true;
                         }
+                        // it's okay if the down member isn't part of the config,
+                        // we might be adding a new member that isn't up yet
+                        allowFailure = true;
                     }
 
                     if( !allowFailure ) {
-                        string msg = string("need members up to initiate, not ok : ") + i->h.toString();
+                        string msg = string("need all members up to initiate, not ok : ") + i->h.toString();
                         if( !initial )
                             msg = string("need most members up to reconfigure, not ok : ") + i->h.toString();
                         uasserted(13144, msg);
@@ -132,6 +136,9 @@ namespace mongo {
                 uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.",
                         !hasData || i->h.isSelf());
             }
+        }
+        if (down.size() > 0) {
+            result.append("down", down);
         }
     }
 
@@ -179,7 +186,7 @@ namespace mongo {
 
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
                 errmsg = "server already in BADCONFIG state (check logs); not initiating";
-                result.append("info", ReplSet::startupStatusMsg);
+                result.append("info", ReplSet::startupStatusMsg.get());
                 return false;
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
@@ -204,6 +211,7 @@ namespace mongo {
                 b.append("_id", name);
                 bob members;
                 members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::Me().toString() ));
+                result.append("me", HostAndPort::Me().toString());
                 for( unsigned i = 0; i < seeds.size(); i++ )
                     members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
                 b.appendArray("members", members.obj());
@@ -226,7 +234,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkMembersUpForConfigChange(newConfig, true);
+                checkMembersUpForConfigChange(newConfig, result, true);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
@@ -238,7 +246,7 @@ namespace mongo {
                 log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
                 result.append("info", "Config now saved locally.  Should come online in about a minute.");
                 ReplSet::startupStatus = ReplSet::SOON;
-                ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
+                ReplSet::startupStatusMsg.set("Received replSetInitiate - should come online shortly.");
             }
             catch( DBException& e ) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
@@ -246,6 +254,11 @@ namespace mongo {
                     errmsg = string("couldn't parse cfg object ") + e.what();
                 else
                     errmsg = string("couldn't initiate : ") + e.what();
+                return false;
+            }
+            catch( string& e2 ) {
+                log() << e2 << rsLog;
+                errmsg = e2;
                 return false;
             }
 

@@ -67,13 +67,31 @@ namespace mongo {
         dbcon.done();
     }
 
-    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ) {
+    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags, bool safe ) {
         ShardConnection dbcon( shard , ns );
         if ( dbcon.setVersion() ) {
             dbcon.done();
             throw StaleConfigException( ns , "for insert" );
         }
-        dbcon->insert( ns , obj );
+        dbcon->insert( ns , obj , flags);
+        if (safe)
+            dbcon->getLastError();
         dbcon.done();
     }
+
+    void Strategy::update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags, bool safe ) {
+        bool upsert = flags & UpdateOption_Upsert;
+        bool multi = flags & UpdateOption_Multi;
+
+        ShardConnection dbcon( shard , ns );
+        if ( dbcon.setVersion() ) {
+            dbcon.done();
+            throw StaleConfigException( ns , "for insert" );
+        }
+        dbcon->update( ns , query , toupdate, upsert, multi);
+        if (safe)
+            dbcon->getLastError();
+        dbcon.done();
+    }
+
 }

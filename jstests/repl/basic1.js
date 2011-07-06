@@ -148,6 +148,21 @@ x = { _id : 1 , x : 1 }
 assert.eq( x , am.mu1.findOne() , "mu1" );
 assert.soon( function(){ z = as.mu1.findOne(); printjson( z ); return friendlyEqual( x , z ); } , "mu2" )
 
+// profiling - this sould be last
+
+am.setProfilingLevel( 2 )
+am.foo.insert( { x : 1 } )
+am.foo.findOne()
+block();
+assert.eq( 2 , am.system.profile.count() , "P1" )
+assert.eq( 0 , as.system.profile.count() , "P2" )
+
+assert.eq( 1 , as.foo.findOne().x , "P3" );
+assert.eq( 0 , as.system.profile.count() , "P4" )
+
+as.setProfilingLevel(2)
+as.foo.findOne();
+assert.eq( 1 , as.system.profile.count() , "P5" )
 
 
 rt.stop();

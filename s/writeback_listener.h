@@ -31,14 +31,35 @@ namespace mongo {
      * (Wrong here in the sense that the target chunk moved before this mongos had a chance to
      * learn so.) It is responsible for reapplying these writes to the correct shard.
      *
-     * Currently, there is one listener per shard.
+     * Runs (instantiated) on mongos.
+     * Currently, there is one writebacklistener per shard.
      */
     class WriteBackListener : public BackgroundJob {
     public:
+        
+        class ConnectionIdent {
+        public:
+            ConnectionIdent( const string& ii , ConnectionId id ) 
+                : instanceIdent( ii ) , connectionId( id ) {
+            }
+            
+            bool operator<(const ConnectionIdent& other) const {
+                if ( instanceIdent == other.instanceIdent )
+                    return connectionId < other.connectionId;
+                
+                return instanceIdent < other.instanceIdent;
+            }
+
+            string toString() const { return str::stream() << instanceIdent << ":" << connectionId; }
+
+            string instanceIdent;
+            ConnectionId connectionId;
+        };
+
         static void init( DBClientBase& conn );
         static void init( const string& host );
 
-        static BSONObj waitFor( ConnectionId connectionId, const OID& oid );
+        static BSONObj waitFor( const ConnectionIdent& ident, const OID& oid );
 
     protected:
         WriteBackListener( const string& addr );
@@ -59,7 +80,7 @@ namespace mongo {
         };
 
         static mongo::mutex _seenWritebacksLock;  // protects _seenWritbacks
-        static map<ConnectionId,WBStatus> _seenWritebacks; // connectionId -> last write back GLE
+        static map<ConnectionIdent,WBStatus> _seenWritebacks; // connectionId -> last write back GLE
     };
 
     void waitForWriteback( const OID& oid );

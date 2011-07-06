@@ -20,7 +20,7 @@
 */
 
 #include "pch.h"
-#include "../util/miniwebserver.h"
+#include "../util/net/miniwebserver.h"
 #include "../util/mongoutils/html.h"
 #include "../util/md5.hpp"
 #include "db.h"
@@ -148,7 +148,7 @@ namespace mongo {
 
                 if ( ! allowed( rq , headers, from ) ) {
                     responseCode = 401;
-                    headers.push_back( "Content-Type: text/plain" );
+                    headers.push_back( "Content-Type: text/plain;charset=utf-8" );
                     responseMsg = "not allowed\n";
                     return;
                 }
@@ -187,7 +187,7 @@ namespace mongo {
                 }
 
                 responseCode = 404;
-                headers.push_back( "Content-Type: text/html" );
+                headers.push_back( "Content-Type: text/html;charset=utf-8" );
                 responseMsg = "<html><body>unknown url</body></html>\n";
                 return;
             }
@@ -196,6 +196,7 @@ namespace mongo {
 
             if ( ! allowed( rq , headers, from ) ) {
                 responseCode = 401;
+                headers.push_back( "Content-Type: text/plain;charset=utf-8" );
                 responseMsg = "not allowed\n";
                 return;
             }
@@ -248,6 +249,7 @@ namespace mongo {
 
             ss << "</body></html>\n";
             responseMsg = ss.str();
+            headers.push_back( "Content-Type: text/html;charset=utf-8" );
         }
 
         void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ) {
@@ -256,7 +258,7 @@ namespace mongo {
             ss << "REST is not enabled.  use --rest to turn on.\n";
             ss << "check that port " << _port << " is secured for the network too.\n";
             responseMsg = ss.str();
-            headers.push_back( "Content-Type: text/plain" );
+            headers.push_back( "Content-Type: text/plain;charset=utf-8" );
         }
 
     };
@@ -312,9 +314,11 @@ namespace mongo {
         }
 
         virtual void init() {
-            assert( ! _log );
-            _log = new RamLog();
-            Logstream::get().addGlobalTee( _log );
+            _log = RamLog::get( "global" );
+            if ( ! _log ) {
+                _log = new RamLog("global");
+                Logstream::get().addGlobalTee( _log );
+            }
         }
 
         virtual void run( stringstream& ss ) {
@@ -374,7 +378,7 @@ namespace mongo {
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
             responseCode = 404;
-            headers.push_back( "Content-Type: text/plain" );
+            headers.push_back( "Content-Type: text/plain;charset=utf-8" );
             responseMsg = "no favicon\n";
         }
 
@@ -387,7 +391,7 @@ namespace mongo {
         virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
-            headers.push_back( "Content-Type: application/json" );
+            headers.push_back( "Content-Type: application/json;charset=utf-8" );
             responseCode = 200;
 
             static vector<string> commands;
@@ -439,7 +443,7 @@ namespace mongo {
         virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
-            headers.push_back( "Content-Type: text/html" );
+            headers.push_back( "Content-Type: text/html;charset=utf-8" );
             responseCode = 200;
 
             stringstream ss;
@@ -509,11 +513,11 @@ namespace mongo {
             responseMsg = j;
 
             if( text ) {
-                headers.push_back( "Content-Type: text/plain" );
+                headers.push_back( "Content-Type: text/plain;charset=utf-8" );
                 responseMsg += '\n';
             }
             else {
-                headers.push_back( "Content-Type: application/json" );
+                headers.push_back( "Content-Type: application/json;charset=utf-8" );
             }
 
         }

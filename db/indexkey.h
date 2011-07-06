@@ -44,7 +44,7 @@ namespace mongo {
         IndexType( const IndexPlugin * plugin , const IndexSpec * spec );
         virtual ~IndexType();
 
-        virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
+        virtual void getKeys( const BSONObj &obj, BSONObjSet &keys ) const = 0;
         virtual shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
 
         /** optional op : changes query to match what's in the index */
@@ -135,10 +135,11 @@ namespace mongo {
             reset( loc );
         }
 
-        void reset( const DiskLoc& loc );
+        void reset( const BSONObj& info );
+        void reset( const DiskLoc& infoLoc ) { reset(infoLoc.obj()); }
         void reset( const IndexDetails * details );
 
-        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
+        void getKeys( const BSONObj &obj, BSONObjSet &keys ) const;
 
         BSONElement missingField() const { return _nullElt; }
 
@@ -162,31 +163,24 @@ namespace mongo {
 
         IndexSuitability _suitability( const BSONObj& query , const BSONObj& order ) const ;
 
-        void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
+        void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSet &keys ) const;
 
         BSONSizeTracker _sizeTracker;
-
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
-
         BSONObj _nullKey; // a full key with all fields null
-
         BSONObj _nullObj; // only used for _nullElt
         BSONElement _nullElt; // jstNull
-
         int _nFields; // number of fields in the index
         bool _sparse; // if the index is sparse
-
         shared_ptr<IndexType> _indexType;
-
         const IndexDetails * _details;
 
         void _init();
 
+        friend class IndexType;
     public:
         bool _finishedInit;
-
-        friend class IndexType;
     };
 
 

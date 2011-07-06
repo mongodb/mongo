@@ -18,7 +18,6 @@
 #pragma once
 
 #include "../pch.h"
-
 #include "jsobj.h"
 #include "../util/timer.h"
 
@@ -26,7 +25,6 @@ namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
-    class BufBuilder;
     class Client;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
@@ -70,7 +68,7 @@ namespace mongo {
         */
         virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return false; }
 
-        /* Return true if slaves of a replication pair are allowed to execute the command
+        /* Return true if slaves are allowed to execute the command
            (the command directly from a client -- if fromRepl, always allowed).
         */
         virtual bool slaveOk() const = 0;
@@ -127,7 +125,25 @@ namespace mongo {
         static Command * findCommand( const string& name );
     };
 
-    bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
+    class CmdShutdown : public Command {
+    public:
+        virtual bool requiresAuth() { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream& help ) const;
+        CmdShutdown() : Command("shutdown") {}
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+    private:
+        bool shutdownHelper();
+    };
 
+    bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
 
 } // namespace mongo

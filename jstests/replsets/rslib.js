@@ -2,7 +2,7 @@
 var count = 0;
 var w = 0;
 
-var wait = function(f) {
+var wait = function(f,msg) {
     w++;
     var n = 0;
     while (!f()) {
@@ -11,7 +11,7 @@ var wait = function(f) {
         if (++n == 4) {
             print("" + f);
         }
-        assert(n < 200, 'tried 200 times, giving up');
+        assert(n < 200, 'tried 200 times, giving up on ' + msg );
         sleep(1000);
     }
 };
@@ -65,20 +65,24 @@ var getLatestOp = function(server) {
 
 var waitForAllMembers = function(master) {
   var ready = false;
-
+  var count = 0;
+  
   outer:
-  while (true) {
+  while (count < 60) {
+    count++;
     var state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
-    printjson(state);
+    occasionally(function() { printjson(state); }, 10);
 
     for (var m in state.members) {
       if (state.members[m].state != 2 && state.members[m].state != 1) {
-        sleep(10000);
+        sleep(1000);
         continue outer;
       }
     }
     return;
   }
+
+  assert(false, "all members not ready");
 };
 
 var reconfig = function(rs, config) {

@@ -26,7 +26,7 @@
     killcursors
 
  */
-
+#include "../pch.h"
 #include <pcap.h>
 
 #ifdef _WIN32
@@ -35,7 +35,7 @@
 #endif
 
 #include "../bson/util/builder.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/mmap.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
@@ -104,6 +104,9 @@ struct sniff_ip {
 #define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* TCP header */
+#ifdef _WIN32
+typedef unsigned __int32 uint32_t;
+#endif
 typedef uint32_t tcp_seq;
 
 struct sniff_tcp {
@@ -276,7 +279,7 @@ void processMessage( Connection& c , Message& m ) {
 
     if ( m.operation() == mongo::opReply )
         out() << " - " << (unsigned)m.header()->responseTo;
-    out() << endl;
+    out() << '\n';
 
     try {
         switch( m.operation() ) {
@@ -284,14 +287,23 @@ void processMessage( Connection& c , Message& m ) {
             mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
             out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
             if ( r->nReturned ) {
-                mongo::BSONObj o( r->data() , 0 );
+                mongo::BSONObj o( r->data() );
                 out() << "\t" << o << endl;
             }
             break;
         }
         case mongo::dbQuery: {
             mongo::QueryMessage q(d);
-            out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
+            out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip;
+            if( !q.fields.isEmpty() )
+                out() << " hasfields";
+            if( q.queryOptions & mongo::QueryOption_SlaveOk )
+                out() << " SlaveOk";
+            if( q.queryOptions & mongo::QueryOption_NoCursorTimeout )
+                out() << " NoCursorTimeout";
+            if( q.queryOptions & ~(mongo::QueryOption_SlaveOk | mongo::QueryOption_NoCursorTimeout) )
+                out() << " queryOptions:" << hex << q.queryOptions;
+            out() << endl;
             break;
         }
         case mongo::dbUpdate: {
@@ -328,6 +340,7 @@ void processMessage( Connection& c , Message& m ) {
             break;
         }
         default:
+            out() << "\tunknown opcode " << m.operation() << endl;
             cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
         }
     }

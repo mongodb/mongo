@@ -17,15 +17,18 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
 #include <set>
 #include <list>
 #include <vector>
+#include "util/atomic_int.h"
 #include "util/builder.h"
 #include "stringdata.h"
 
 namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
+    typedef multiset< BSONElement, BSONElementCmpWithoutField > BSONElementMSet;
 
     /**
        C++ representation of a "BSON" object -- that is, an extended JSON-style
@@ -69,11 +72,19 @@ namespace mongo {
     public:
 
         /** Construct a BSONObj from data in the proper format.
-            @param ifree true if the BSONObj should free() the msgdata when
-            it destructs.
+         *  Use this constructor when something else owns msgdata's buffer
         */
-        explicit BSONObj(const char *msgdata, bool ifree = false) {
-            init(msgdata, ifree);
+        explicit BSONObj(const char *msgdata) {
+            init(msgdata);
+        }
+
+        /** Construct a BSONObj from data in the proper format.
+         *  Use this constructor when you want BSONObj to free(holder) when it is no longer needed
+         *  BSONObj::Holder has an extra 4 bytes for a ref-count before the start of the object
+        */
+        class Holder;
+        explicit BSONObj(Holder* holder) {
+            init(holder);
         }
 
         explicit BSONObj(const Record *r);
@@ -81,7 +92,9 @@ namespace mongo {
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
 
-        ~BSONObj() { /*defensive:*/ _objdata = 0; }
+        ~BSONObj() { 
+            _objdata = 0; // defensive
+        }
 
         /**
            A BSONObj can use a buffer it "owns" or one it does not.
@@ -113,7 +126,9 @@ namespace mongo {
         */
         bool isOwned() const { return _holder.get() != 0; }
 
-        /* make sure the data buffer is under the control of this BSONObj and not a remote buffer */
+        /** assure the data buffer is under the control of this BSONObj and not a remote buffer 
+            @see isOwned()
+        */
         BSONObj getOwned() const;
 
         /** @return a new full (and owned) copy of the object. */
@@ -133,6 +148,11 @@ namespace mongo {
         /** note: addFields always adds _id even if not specified */
         int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
+        /** remove specified field and return a new object with the remaining fields.
+            slowish as builds a full new object
+         */
+        BSONObj removeField(const StringData& name) const;
+
         /** returns # of top level fields in the object
            note: iterates to count the fields
         */
@@ -141,20 +161,26 @@ namespace mongo {
         /** adds the field names to the fields set.  does NOT clear it (appends). */
         int getFieldNames(set<string>& fields) const;
 
-        /** return has eoo() true if no match
-           supports "." notation to reach into embedded objects
+        /** @return the specified element.  element.eoo() will be true if not found.
+            @param name field to find. supports dot (".") notation to reach into embedded objects.
+             for example "x.y" means "in the nested object in field x, retrieve field y"
         */
         BSONElement getFieldDotted(const char *name) const;
-        /** return has eoo() true if no match
-           supports "." notation to reach into embedded objects
+        /** @return the specified element.  element.eoo() will be true if not found.
+            @param name field to find. supports dot (".") notation to reach into embedded objects.
+             for example "x.y" means "in the nested object in field x, retrieve field y"
         */
         BSONElement getFieldDotted(const string& name) const {
             return getFieldDotted( name.c_str() );
         }
 
-        /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
+        /** Like getFieldDotted(), but expands arrays and returns all matching objects.
+         *  Turning off expandLastArray allows you to retrieve nested array objects instead of
+         *  their contents.
          */
-        void getFieldsDotted(const StringData& name, BSONElementSet &ret ) const;
+        void getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray = true ) const;
+        void getFieldsDotted(const StringData& name, BSONElementMSet &ret, bool expandLastArray = true ) const;
+
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */
@@ -164,6 +190,14 @@ namespace mongo {
             element if not found.
         */
         BSONElement getField(const StringData& name) const;
+
+        /** Get several fields at once. This is faster than separate getField() calls as the size of 
+            elements iterated can then be calculated only once each.
+            @param n number of fieldNames, and number of elements in the fields array
+            @param fields if a field is found its element is stored in its corresponding position in this array.
+                   if not found the array element is unchanged.
+         */
+        void getFields(unsigned n, const char **fieldNames, BSONElement *fields) const;
 
         /** Get the field of the specified name. eoo() is true on the returned
             element if not found.
@@ -184,7 +218,9 @@ namespace mongo {
         }
 
         /** @return true if field exists */
-        bool hasField( const char * name ) const { return ! getField( name ).eoo(); }
+        bool hasField( const char * name ) const { return !getField(name).eoo(); }
+        /** @return true if field exists */
+        bool hasElement(const char *name) const { return hasField(name); }
 
         /** @return "" if DNE or wrong type */
         const char * getStringField(const char *name) const;
@@ -195,7 +231,9 @@ namespace mongo {
         /** @return INT_MIN if not present - does some type conversions */
         int getIntField(const char *name) const;
 
-        /** @return false if not present */
+        /** @return false if not present 
+            @see BSONElement::trueValue()
+         */
         bool getBoolField(const char *name) const;
 
         /**
@@ -224,7 +262,7 @@ namespace mongo {
         int objsize() const { return *(reinterpret_cast<const int*>(objdata())); }
 
         /** performs a cursory check on the object's size only. */
-        bool isValid();
+        bool isValid() const;
 
         /** @return if the user is a valid user doc
             criter: isValid() no . or $ field names
@@ -255,7 +293,6 @@ namespace mongo {
         int woCompare(const BSONObj& r, const BSONObj &ordering = BSONObj(),
                       bool considerFieldName=true) const;
 
-
         bool operator<( const BSONObj& other ) const { return woCompare( other ) < 0; }
         bool operator<=( const BSONObj& other ) const { return woCompare( other ) <= 0; }
         bool operator>( const BSONObj& other ) const { return woCompare( other ) > 0; }
@@ -266,10 +303,12 @@ namespace mongo {
          */
         int woSortOrder( const BSONObj& r , const BSONObj& sortKey , bool useDotted=false ) const;
 
+        bool equal(const BSONObj& r) const;
+
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */
-        bool woEqual(const BSONObj& r) const {
+        bool shallowEqual(const BSONObj& r) const {
             int os = objsize();
             if ( os == r.objsize() ) {
                 return (os == 0 || memcmp(objdata(),r.objdata(),os)==0);
@@ -280,8 +319,13 @@ namespace mongo {
         /** @return first field of the object */
         BSONElement firstElement() const { return BSONElement(objdata() + 4); }
 
-        /** @return true if field exists in the object */
-        bool hasElement(const char *name) const;
+        /** faster than firstElement().fieldName() - for the first element we can easily find the fieldname without 
+            computing the element size.
+        */
+        const char * firstElementFieldName() const { 
+            const char *p = objdata() + 4;
+            return *p == EOO ? "" : p+1;
+        }
 
         /** Get the _id field from the object.  For good performance drivers should
             assure that _id is the first element of the object; however, correct operation
@@ -315,9 +359,7 @@ namespace mongo {
         /** @return an md5 value for this object. */
         string md5() const;
 
-        bool operator==( const BSONObj& other ) const {
-            return woCompare( other ) == 0;
-        }
+        bool operator==( const BSONObj& other ) const { return equal( other ); }
 
         enum MatchType {
             Equality = 0,
@@ -376,34 +418,52 @@ namespace mongo {
                 ...
             }
         */
-        BSONObjIterator begin();
+        BSONObjIterator begin() const;
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
-    private:
-        class Holder {
-        public:
-            Holder( const char *objdata ) :
-                _objdata( objdata ) {
-            }
-            ~Holder() {
-                free((void *)_objdata);
-                _objdata = 0;
-            }
+#pragma pack(1)
+        class Holder : boost::noncopyable {
         private:
-            const char *_objdata;
-        };
+            Holder(); // this class should never be explicitly created
+            AtomicUInt refCount;
+        public:
+            char data[4]; // start of object
 
+            void zero() { refCount.zero(); }
+
+            // these are called automatically by boost::intrusive_ptr
+            friend void intrusive_ptr_add_ref(Holder* h) { h->refCount++; }
+            friend void intrusive_ptr_release(Holder* h) {
+#if defined(_DEBUG) // cant use dassert or DEV here
+                assert((int)h->refCount > 0); // make sure we haven't already freed the buffer
+#endif
+                if(--(h->refCount) == 0){
+#if defined(_DEBUG)
+                    unsigned sz = (unsigned&) *h->data;
+                    assert(sz < BSONObjMaxInternalSize * 3);
+                    memset(h->data, 0xdd, sz);
+#endif
+                    free(h);
+                }
+            }
+        };
+#pragma pack()
+
+    private:
         const char *_objdata;
-        boost::shared_ptr< Holder > _holder;
+        boost::intrusive_ptr< Holder > _holder;
 
         void _assertInvalid() const;
-        void init(const char *data, bool ifree) {
-            if ( ifree )
-                _holder.reset( new Holder( data ) );
+
+        void init(Holder *holder) {
+            _holder = holder; // holder is now managed by intrusive_ptr
+            init(holder->data);
+        }
+        void init(const char *data) {
             _objdata = data;
             if ( !isValid() )
                 _assertInvalid();

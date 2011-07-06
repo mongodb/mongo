@@ -100,14 +100,14 @@ namespace mongo {
 
     extern class LastErrorHolder {
     public:
-        LastErrorHolder() : _id( 0 ) {}
+        LastErrorHolder(){}
         ~LastErrorHolder();
 
         LastError * get( bool create = false );
         LastError * getSafe() {
             LastError * le = get(false);
             if ( ! le ) {
-                log( LL_ERROR ) << " no LastError!  id: " << getID() << endl;
+                error() << " no LastError!" << endl;
                 assert( le );
             }
             return le;
@@ -120,18 +120,12 @@ namespace mongo {
         /** ok to call more than once. */
         void initThread();
 
-        /**
-         * id of 0 means should use thread local management
-         */
-        void setID( int id );
         int getID();
-
-        void remove( int id );
+        
         void release();
 
         /** when db receives a message/request, call this */
-        void startRequest( Message& m , LastError * connectionOwned );
-        LastError * startRequest( Message& m , int clientId );
+        LastError * startRequest( Message& m , LastError * connectionOwned );
 
         void disconnect( int clientId );
 
@@ -139,17 +133,12 @@ namespace mongo {
         // disable causes get() to return 0.
         LastError *disableForCommand(); // only call once per command invocation!
     private:
-        ThreadLocalValue<int> _id;
         boost::thread_specific_ptr<LastError> _tl;
 
         struct Status {
             time_t time;
             LastError *lerr;
         };
-        typedef map<int,Status> IDMap;
-
-        static mongo::mutex _idsmutex;
-        IDMap _ids;
     } lastError;
 
     void raiseError(int code , const char *msg);

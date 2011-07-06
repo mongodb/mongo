@@ -64,15 +64,17 @@ namespace mongo {
     }
 
 
-    DBClientBase* ConnectionString::connect( string& errmsg ) const {
+    DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
         switch ( _type ) {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
+            c->setSoTimeout( socketTimeout );
             log(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
+            log(1) << "connected connection!" << endl;
             return c;
         }
 
@@ -93,7 +95,8 @@ namespace mongo {
             list<HostAndPort> l;
             for ( unsigned i=0; i<_servers.size(); i++ )
                 l.push_back( _servers[i] );
-            return new SyncClusterConnection( l );
+            SyncClusterConnection* c = new SyncClusterConnection( l, socketTimeout );
+            return c;
         }
 
         case INVALID:
@@ -294,7 +297,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
+    const BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
     BSONObj DBClientWithCommands::getLastErrorDetailed() {
         BSONObj info;
@@ -314,7 +317,7 @@ namespace mongo {
         return e.str();
     }
 
-    BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
+    const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
     BSONObj DBClientWithCommands::getPrevError() {
         BSONObj info;
@@ -391,6 +394,7 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
+        assert(!capped||size);
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
@@ -442,15 +446,16 @@ namespace mongo {
         return false;
     }
 
-    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) {
+    DBClientWithCommands::MROutput DBClientWithCommands::MRInline (BSON("inline" << 1));
+
+    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, MROutput output) {
         BSONObjBuilder b;
         b.append("mapreduce", nsGetCollection(ns));
         b.appendCode("map", jsmapf);
         b.appendCode("reduce", jsreducef);
         if( !query.isEmpty() )
             b.append("query", query);
-        if( !outputcolname.empty() )
-            b.append("out", outputcolname);
+        b.append("out", output.out);
         BSONObj info;
         runCommand(nsGetDB(ns), b.done(), info);
         return info;
@@ -528,19 +533,31 @@ namespace mongo {
         return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
     }
 
-    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
-        auto_ptr<DBClientCursor> c =
-            this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
+    /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
+        query() and iterate the cursor. 
+     */
+    void DBClientInterface::findN(vector<BSONObj>& out, const string& ns, Query query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) { 
+        out.reserve(nToReturn);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findOne: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
+        auto_ptr<DBClientCursor> c =
+            this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+
+        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw StaleConfigException( ns , "findOne has stale config" );
+            throw StaleConfigException( ns , "findN stale config" );
 
-        if ( !c->more() )
-            return BSONObj();
+        for( int i = 0; i < nToReturn; i++ ) {
+            if ( !c->more() )
+                break;
+            out.push_back( c->nextSafe().copy() );
+        }
+    }
 
-        return c->nextSafe().copy();
+    BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
+        vector<BSONObj> v;
+        findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions);
+        return v.empty() ? BSONObj() : v[0];
     }
 
     bool DBClientConnection::connect(const HostAndPort& server, string& errmsg) {
@@ -557,39 +574,43 @@ namespace mongo {
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
         if (server->getAddr() == "0.0.0.0") {
-            failed = true;
+            _failed = true;
             return false;
         }
 
+        // if( _so_timeout == 0 ){
+        //    printStackTrace();
+        //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
+        // }
         if ( !p->connect(*server) ) {
             stringstream ss;
             ss << "couldn't connect to server " << _serverString;
             errmsg = ss.str();
-            failed = true;
+            _failed = true;
             return false;
         }
         return true;
     }
 
     void DBClientConnection::_checkConnection() {
-        if ( !failed )
+        if ( !_failed )
             return;
         if ( lastReconnectTry && time(0)-lastReconnectTry < 2 ) {
             // we wait a little before reconnect attempt to avoid constant hammering.
             // but we throw we don't want to try to use a connection in a bad state
-            throw SocketException(SocketException::FAILED_STATE);
+            throw SocketException( SocketException::FAILED_STATE , toString() );
         }
         if ( !autoReconnect )
-            throw SocketException(SocketException::FAILED_STATE);
+            throw SocketException( SocketException::FAILED_STATE , toString() );
 
         lastReconnectTry = time(0);
         log(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
-        failed = false;
+        _failed = false;
         if ( ! _connect(errmsg) ) {
-            failed = true;
+            _failed = true;
             log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
-            throw SocketException(SocketException::CONNECT_ERROR);
+            throw SocketException( SocketException::CONNECT_ERROR , toString() );
         }
 
         log(_logLevel) << "reconnect " << _serverString << " ok" << endl;
@@ -674,7 +695,7 @@ namespace mongo {
             /* connection CANNOT be used anymore as more data may be on the way from the server.
                we have to reconnect.
                */
-            failed = true;
+            _failed = true;
             p->shutdown();
             throw;
         }
@@ -682,12 +703,11 @@ namespace mongo {
         return n;
     }
 
-    void DBClientBase::insert( const string & ns , BSONObj obj ) {
+    void DBClientBase::insert( const string & ns , BSONObj obj , int flags) {
         Message toSend;
 
         BufBuilder b;
-        int opts = 0;
-        b.appendNum( opts );
+        b.appendNum( flags );
         b.appendStr( ns );
         obj.appendSelfToBufBuilder( b );
 
@@ -696,12 +716,11 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::insert( const string & ns , const vector< BSONObj > &v ) {
+    void DBClientBase::insert( const string & ns , const vector< BSONObj > &v , int flags) {
         Message toSend;
 
         BufBuilder b;
-        int opts = 0;
-        b.appendNum( opts );
+        b.appendNum( flags );
         b.appendStr( ns );
         for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
             i->appendSelfToBufBuilder( b );
@@ -749,8 +768,12 @@ namespace mongo {
         toSend.setData( dbUpdate , b.buf() , b.len() );
 
         say( toSend );
+
+
     }
 
+
+    
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
     }
@@ -815,7 +838,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background ) {
+    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background, int version ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -832,6 +855,9 @@ namespace mongo {
             toSave.append( "name" , nn );
             cacheKey += nn;
         }
+
+        if( version >= 0 ) 
+            toSave.append("v", version);
 
         if ( unique )
             toSave.appendBool( "unique", unique );
@@ -876,13 +902,13 @@ namespace mongo {
         toSend.setData(dbQuery, b.buf(), b.len());
     }
 
-    void DBClientConnection::say( Message &toSend ) {
+    void DBClientConnection::say( Message &toSend, bool isRetry ) {
         checkConnection();
         try {
             port().say( toSend );
         }
         catch( SocketException & ) {
-            failed = true;
+            _failed = true;
             throw;
         }
     }
@@ -891,8 +917,8 @@ namespace mongo {
         port().piggyBack( toSend );
     }
 
-    void DBClientConnection::recv( Message &m ) {
-        port().recv(m);
+    bool DBClientConnection::recv( Message &m ) {
+        return port().recv(m);
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
@@ -902,7 +928,7 @@ namespace mongo {
         */
         try {
             if ( !port().call(toSend, response) ) {
-                failed = true;
+                _failed = true;
                 if ( assertOk )
                     uasserted( 10278 , str::stream() << "dbclient error communicating with server: " << getServerAddress() );
 
@@ -910,28 +936,54 @@ namespace mongo {
             }
         }
         catch( SocketException & ) {
-            failed = true;
+            _failed = true;
             throw;
         }
         return true;
     }
 
-    void DBClientConnection::checkResponse( const char *data, int nReturned ) {
+    BSONElement getErrField(const BSONObj& o) {
+        BSONElement first = o.firstElement();
+        if( strcmp(first.fieldName(), "$err") == 0 )
+            return first;
+
+        // temp - will be DEV only later
+        /*DEV*/ 
+        if( 1 ) {
+            BSONElement e = o["$err"];
+            if( !e.eoo() ) { 
+                wassert(false);
+            }
+            return e;
+        }
+
+        return BSONElement();
+    }
+
+    bool hasErrField( const BSONObj& o ){
+        return ! getErrField( o ).eoo();
+    }
+
+    void DBClientConnection::checkResponse( const char *data, int nReturned, bool* retry, string* host ) {
         /* check for errors.  the only one we really care about at
-         this stage is "not master" */
+         * this stage is "not master" 
+        */
+        
+        *retry = false;
+        *host = _serverString;
+
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = o.firstElement();
-            if ( strcmp(e.fieldName(), "$err") == 0 &&
-                    e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
+            BSONElement e = getErrField(o);
+            if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
                 clientSet->isntMaster();
             }
         }
     }
 
     void DBClientConnection::killCursor( long long cursorId ) {
-        BufBuilder b;
+        StackBufBuilder b;
         b.appendNum( (int)0 ); // reserved
         b.appendNum( (int)1 ); // number
         b.appendNum( cursorId );

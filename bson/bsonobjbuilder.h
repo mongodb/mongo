@@ -24,8 +24,12 @@
 
 #include <limits>
 #include <cmath>
+#include "bsonelement.h"
+#include "bsonobj.h"
+#include "bsonmisc.h"
 #include "../util/ip_addr.h"
 #include "../util/mac_addr.h"
+
 using namespace std;
 
 namespace mongo {
@@ -83,18 +87,21 @@ namespace mongo {
     class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize), _offset( 0 ), _s( this ) , _tracker(0) , _doneCalled(false) {
-            _b.skip(4); /*leave room for size field*/
+        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4); /*leave room for size field and ref-count*/
         }
 
-        /* dm why do we have this/need this? not clear to me, comment please tx. */
-        /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder */
+        /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
+         *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for example.
+         */
         BSONObjBuilder( BufBuilder &baseBuilder ) : _b( baseBuilder ), _buf( 0 ), _offset( baseBuilder.len() ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.skip( 4 );
         }
 
-        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() ), _offset(0), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
-            _b.skip( 4 );
+        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() + sizeof(unsigned) ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4);
         }
 
         ~BSONObjBuilder() {
@@ -148,9 +155,17 @@ namespace mongo {
             return *this;
         }
 
-
         /** add header for a new subobject and return bufbuilder for writing to
-            the subobject's body */
+         *  the subobject's body
+         *
+         *  example:
+         *
+         *  BSONObjBuilder b;
+         *  BSONObjBuilder sub (b.subobjStart("fieldName"));
+         *  // use sub
+         *  sub.done()
+         *  // use b and convert to object
+         */
         BufBuilder &subobjStart(const StringData& fieldName) {
             _b.appendNum((char) Object);
             _b.appendStr(fieldName);
@@ -220,7 +235,7 @@ namespace mongo {
             long long x = n;
             if ( x < 0 )
                 x = x * -1;
-            if ( x < ( numeric_limits<int>::max() / 2 ) )
+            if ( x < ( (numeric_limits<int>::max)() / 2 ) ) // extra () to avoid max macro on windows
                 append( fieldName , (int)n );
             else
                 append( fieldName , n );
@@ -249,14 +264,13 @@ namespace mongo {
             return *this;
         }
 
-
         BSONObjBuilder& appendNumber( const StringData& fieldName , long long l ) {
             static long long maxInt = (int)pow( 2.0 , 30.0 );
             static long long maxDouble = (long long)pow( 2.0 , 40.0 );
-
-            if ( l < maxInt )
+            long long x = l >= 0 ? l : -l;
+            if ( x < maxInt )
                 append( fieldName , (int)l );
-            else if ( l < maxDouble )
+            else if ( x < maxDouble )
                 append( fieldName , (double)l );
             else
                 append( fieldName , l );
@@ -368,12 +382,13 @@ namespace mongo {
             return *this;
         }
 
-        /** Append a string element. len DOES include terminating nul */
-        BSONObjBuilder& append(const StringData& fieldName, const char *str, int len) {
+        /** Append a string element. 
+            @param sz size includes terminating null character */
+        BSONObjBuilder& append(const StringData& fieldName, const char *str, int sz) {
             _b.appendNum((char) String);
             _b.appendStr(fieldName);
-            _b.appendNum((int)len);
-            _b.appendBuf(str, len);
+            _b.appendNum((int)sz);
+            _b.appendBuf(str, sz);
             return *this;
         }
         /** Append a string element */
@@ -552,6 +567,10 @@ namespace mongo {
         template < class T >
         BSONObjBuilder& append( const StringData& fieldName, const list< T >& vals );
 
+        /** Append a set of values. */
+        template < class T >
+        BSONObjBuilder& append( const StringData& fieldName, const set< T >& vals );
+
         /**
          * destructive
          * The returned BSONObj will free the buffer when it is finished.
@@ -560,8 +579,10 @@ namespace mongo {
         BSONObj obj() {
             bool own = owned();
             massert( 10335 , "builder does not own memory", own );
-            int l;
-            return BSONObj(decouple(l), true);
+            doneFast();
+            BSONObj::Holder* h = (BSONObj::Holder*)_b.buf();
+            decouple(); // sets _b.buf() to NULL
+            return BSONObj(h);
         }
 
         /** Fetch the object we have built.
@@ -570,7 +591,7 @@ namespace mongo {
             would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
-            return BSONObj(_done(), /*ifree*/false);
+            return BSONObj(_done());
         }
 
         // Like 'done' above, but does not construct a BSONObj to return to the caller.
@@ -604,7 +625,7 @@ namespace mongo {
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
         static string numStr( int i ) {
-            if (i>=0 && i<100)
+            if (i>=0 && i<100 && numStrsReady)
                 return numStrs[i];
             StringBuilder o;
             o << i;
@@ -658,6 +679,8 @@ namespace mongo {
 
         int len() const { return _b.len(); }
 
+        BufBuilder& bb() { return _b; }
+
     private:
         char* _done() {
             if ( _doneCalled )
@@ -682,6 +705,7 @@ namespace mongo {
         bool _doneCalled;
 
         static const string numStrs[100]; // cache of 0 to 99 inclusive
+        static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
     };
 
     class BSONArrayBuilder : boost::noncopyable {
@@ -727,7 +751,23 @@ namespace mongo {
             return *this;
         }
 
-        BufBuilder &subobjStart( const StringData& name = "0" ) {
+        // These two just use next position
+        BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
+        BufBuilder &subarrayStart() { return _b.subarrayStart( num() ); }
+
+        // These fill missing entries up to pos. if pos is < next pos is ignored
+        BufBuilder &subobjStart(int pos) {
+            fill(pos);
+            return _b.subobjStart( num() );
+        }
+        BufBuilder &subarrayStart(int pos) {
+            fill(pos);
+            return _b.subarrayStart( num() );
+        }
+
+        // These should only be used where you really need interface compatability with BSONObjBuilder
+        // Currently they are only used by update.cpp and it should probably stay that way
+        BufBuilder &subobjStart( const StringData& name ) {
             fill( name );
             return _b.subobjStart( num() );
         }
@@ -755,7 +795,11 @@ namespace mongo {
             long int n = strtol( name.data(), &r, 10 );
             if ( *r )
                 uasserted( 13048, (string)"can't append to array using string field name [" + name.data() + "]" );
-            while( _i < n )
+            fill(n);
+        }
+
+        void fill (int upTo){
+            while( _i < upTo )
                 append( nullElt() );
         }
 
@@ -784,15 +828,26 @@ namespace mongo {
         return *this;
     }
 
-    template < class T >
-    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const list< T >& vals ) {
+    template < class L >
+    inline BSONObjBuilder& _appendIt( BSONObjBuilder& _this, const StringData& fieldName, const L& vals ) {
         BSONObjBuilder arrBuilder;
         int n = 0;
-        for( typename list< T >::const_iterator i = vals.begin(); i != vals.end(); i++ )
-            arrBuilder.append( numStr(n++), *i );
-        appendArray( fieldName, arrBuilder.done() );
-        return *this;
+        for( typename L::const_iterator i = vals.begin(); i != vals.end(); i++ )
+            arrBuilder.append( BSONObjBuilder::numStr(n++), *i );
+        _this.appendArray( fieldName, arrBuilder.done() );
+        return _this;
     }
+
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const list< T >& vals ) {
+        return _appendIt< list< T > >( *this, fieldName, vals );
+    }
+
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const set< T >& vals ) {
+        return _appendIt< set< T > >( *this, fieldName, vals );
+    }
+
 
     // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT 6));
     inline BSONObj OR(const BSONObj& a, const BSONObj& b)

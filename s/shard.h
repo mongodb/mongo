@@ -255,6 +255,8 @@ namespace mongo {
             _setVersion = false;
             _finishedInit = true;
         }
+        
+        bool ok() const { return _conn > 0; }
 
         /**
            this just passes through excpet it checks for stale configs
@@ -274,5 +276,22 @@ namespace mongo {
         string _ns;
         DBClientBase* _conn;
         bool _setVersion;
+    };
+
+
+    extern DBConnectionPool shardConnectionPool;
+
+    class ShardingConnectionHook : public DBConnectionHook {
+    public:
+
+        ShardingConnectionHook( bool shardedConnections )
+            : _shardedConnections( shardedConnections ) {
+        }
+
+        virtual void onCreate( DBClientBase * conn );
+        virtual void onHandedOut( DBClientBase * conn );
+        virtual void onDestory( DBClientBase * conn );
+
+        bool _shardedConnections;
     };
 }

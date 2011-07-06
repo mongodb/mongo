@@ -22,6 +22,7 @@ import urllib
 import urllib2
 import buildscripts
 import buildscripts.bb
+import stat
 from buildscripts import utils
 
 buildscripts.bb.checkOk()
@@ -30,8 +31,6 @@ def findSettingsSetup():
     sys.path.append( "." )
     sys.path.append( ".." )
     sys.path.append( "../../" )
-
-
 
 # --- options ----
 
@@ -312,23 +311,24 @@ if has_option( "full" ):
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp  db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/projection.cpp shell/mongo.cpp db/security_key.cpp" )
-commonFiles += [ "util/background.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
-                 "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
+commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
+commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
+                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
                  "util/concurrency/synchronization.cpp", "util/ip_addr.cpp" ]
-commonFiles += Glob( "util/*.c" )
+commonFiles += [ "util/net/sock.cpp" , "util/net/httpclient.cpp" , "util/net/message.cpp" , "util/net/message_port.cpp" , "util/net/listen.cpp" ]
+commonFiles += Glob( "util/*.c" ) 
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
 
 #mmap stuff
 
 coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/message_server_port.cpp" , 
-                    "client/parallel.cpp" ,  
-                    "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+coreServerFiles = [ "util/net/message_server_port.cpp" , 
+                    "client/parallel.cpp" , "db/common.cpp", 
+                    "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
+                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp" ]
 
 mmapFiles = [ "util/mmap.cpp" ]
 
@@ -353,11 +353,12 @@ coreServerFiles += processInfoFiles
 
 
 if has_option( "asio" ):
-    coreServerFiles += [ "util/message_server_asio.cpp" ]
+    coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp" )
+# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
+serverOnlyFiles = Split( "db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
 
-serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" )
+serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
 serverOnlyFiles += Glob( "db/commands/*.cpp" )
@@ -376,7 +377,7 @@ else:
 coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp", "s/mr_shard.cpp", "s/security.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" , "client/distlock_test.cpp" , "s/d_chunk_manager.cpp" ]
 
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
@@ -577,12 +578,16 @@ elif "win32" == os.sys.platform:
     # some warnings we don't like:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
-    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
+    # PSAPI_VERSION relates to process api dll Psapi.dll.
+    # HAVE_CONFIG_H for pcre
+    # SUPPORT_UTF8 and SUPPORT_UCP are for pcre.  not sure if SUPPORT_UCP is needed - that is for unicode.
+    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
 
-    #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
+    # this would be for pre-compiled headers, could play with it later  
+    #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
 
-    # docs say don't use /FD from command line
-    # /Gy funtion level linking
+    # docs say don't use /FD from command line (minimal rebuild)
+    # /Gy function level linking
     # /Gm is minimal rebuild, but may not work in parallel mode.
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
@@ -593,7 +598,6 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
     else:
-
         # /Od disable optimization
         # /ZI debug info w/edit & continue 
         # /TP it's a c++ file
@@ -676,6 +680,7 @@ if nix:
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
         
+    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used. 
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     cppflags = GetOption("cppflags")
     if cppflags:
@@ -742,9 +747,8 @@ if nix:
         os.unlink('pch.h.gch') # gcc uses the file if it exists
 
 if usev8:
-    env.Append( CPPPATH=["../v8/include/"] )
-    env.Append( LIBPATH=["../v8/"] )
-
+    env.Prepend( CPPPATH=["../v8/include/"] )
+    env.Prepend( LIBPATH=["../v8/"] )
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -755,6 +759,11 @@ try:
     umask = os.umask(022)
 except OSError:
     pass
+
+if not windows:
+    for keysuffix in [ "1" , "2" ]:
+        keyfile = "jstests/libs/key%s" % keysuffix
+        os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
 # --- check system ---
 
@@ -1079,6 +1088,13 @@ l = clientEnv[ "LIBS" ]
 removeIfInList( l , "pcre" )
 removeIfInList( l , "pcrecpp" )
 
+# profile guided
+#if windows:
+#    if release:
+#        env.Append( LINKFLAGS="/PGD:test.pgd" )
+#        env.Append( LINKFLAGS="/LTCG:PGINSTRUMENT" )
+#        env.Append( LINKFLAGS="/LTCG:PGOPTIMIZE" )
+
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
 testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
@@ -1095,7 +1111,7 @@ def checkErrorCodes():
 checkErrorCodes()
 
 # main db target
-mongodOnlyFiles = [ "db/db.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
 if windows:
     mongodOnlyFiles.append( "util/ntservice.cpp" ) 
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )
@@ -1133,7 +1149,7 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" ] ) ]
 
-# testing
+# dbtests test binary
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
@@ -1159,7 +1175,8 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-env.JSHeader( "shell/mongo.cpp"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
+# note, if you add a file here, need to add in engine.cpp currently
+env.JSHeader( "shell/mongo.cpp"  , Glob( "shell/utils*.js" ) + [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
 env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
 
@@ -1185,10 +1202,7 @@ elif not onlyServer:
 
     coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
 
-    if not windows:
-        coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
-    else:
-        coreShellFiles.append( "third_party/linenoise/linenoise_win32.cpp" )
+    coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
 
     shellEnv.Prepend( LIBPATH=[ "." ] )
         
@@ -1242,7 +1256,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeClone", [ "mongo", "mongod" ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ] )
     addSmoketest( "smokeReplSets", [ "mongo", "mongod", "mongobridge" ] )
-    addSmoketest( "smokeDur", [ add_exe( "mongo" ) , add_exe( "mongod" ) ] )
+    addSmoketest( "smokeDur", [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe('mongorestore') ] )
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongodump" ), add_exe( "mongorestore" ) ] )
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )

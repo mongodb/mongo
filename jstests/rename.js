@@ -31,17 +31,24 @@ a.drop();
 b.drop();
 c.drop();
 
-db.createCollection( "jstests_rename_a", {capped:true,size:100} );
-for( i = 0; i < 10; ++i ) {
+// TODO: too many numbers hard coded here
+// this test depends precisely on record size and hence may not be very reliable
+// note we use floats to make sure numbers are represented as doubles for both SM and v8, since test relies on record size
+db.createCollection( "jstests_rename_a", {capped:true,size:10000} );
+for( i = 0.1; i < 10; ++i ) {
     a.save( { i: i } );
 }
 assert.commandWorked( admin.runCommand( {renameCollection:"test.jstests_rename_a", to:"test.jstests_rename_b"} ) );
-assert.eq( 1, b.count( {i:9} ) );
-for( i = 10; i < 20; ++i ) {
+assert.eq( 1, b.count( {i:9.1} ) );
+for( i = 10.1; i < 250; ++i ) {
     b.save( { i: i } );
 }
-assert.eq( 0, b.count( {i:9} ) );
-assert.eq( 1, b.count( {i:19} ) );
+
+//res = b.find().sort({i:1});
+//while (res.hasNext()) printjson(res.next());
+
+assert.eq( 0, b.count( {i:9.1} ) );
+assert.eq( 1, b.count( {i:19.1} ) );
 
 assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
 assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );

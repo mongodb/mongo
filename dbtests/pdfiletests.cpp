@@ -360,7 +360,7 @@ namespace PdfileTests {
                 if( n == 5 && sizeof(void*)==4 )
                     break;
                 MongoDataFile * f = d->addAFile( big , false );
-                cout << f->length() << ' ' << n << endl;
+                //cout << f->length() << ' ' << n << endl;
                 if ( f->length() == l )
                     break;
                 l = f->length();
@@ -368,7 +368,7 @@ namespace PdfileTests {
 
             int start = d->numFiles();
             for ( int i=0; i<start; i++ )
-                d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false );
+                d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false, false );
             ASSERT_EQUALS( start , d->numFiles() );
 
             {

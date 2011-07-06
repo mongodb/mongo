@@ -1,4 +1,4 @@
-// test --repairpath on aother partition
+// test --repairpath on another partition
 
 var baseName = "jstests_disk_repair3";
 var repairbase = "/data/db/repairpartitiontest"

@@ -59,6 +59,7 @@ namespace mongo {
 
     class GeoHash {
     public:
+
         GeoHash()
             : _hash(0),_bits(0) {
         }
@@ -71,6 +72,14 @@ namespace mongo {
             init( hash );
         }
 
+        static GeoHash makeFromBinData(const char *bindata, unsigned bits) {
+            GeoHash h;
+            h._bits = bits;
+            h._copy( (char*)&h._hash , bindata );
+            h._fix();
+            return h;
+        }
+
         explicit GeoHash( const BSONElement& e , unsigned bits=32 ) {
             _bits = bits;
             if ( e.type() == BinData ) {
@@ -80,7 +89,7 @@ namespace mongo {
                 _bits = bits;
             }
             else {
-                cout << "GeoHash cons e : " << e << endl;
+                cout << "GeoHash bad element: " << e << endl;
                 uassert(13047,"wrong type for geo index. if you're using a pre-release version, need to rebuild index",0);
             }
             _fix();
@@ -214,6 +223,10 @@ namespace mongo {
             return _bits > 0;
         }
 
+        bool canRefine() const {
+           return _bits < 32;
+        }
+
         void move( int x , int y ) {
             assert( _bits );
             _move( 0 , x );
@@ -269,6 +282,10 @@ namespace mongo {
             return _hash == h._hash && _bits == h._bits;
         }
 
+        bool operator!=(const GeoHash& h ) {
+            return !( *this == h );
+        }
+
         GeoHash& operator+=( const char * s ) {
             unsigned pos = _bits * 2;
             _bits += strlen(s) / 2;
@@ -287,6 +304,10 @@ namespace mongo {
             GeoHash n = *this;
             n+=s;
             return n;
+        }
+
+        GeoHash operator+( string s ) const {
+           return operator+( s.c_str() );
         }
 
         void _fix() {
@@ -322,7 +343,7 @@ namespace mongo {
 
     private:
 
-        void _copy( char * dst , const char * src ) const {
+        static void _copy( char * dst , const char * src ) {
             for ( unsigned a=0; a<8; a++ ) {
                 dst[a] = src[7-a];
             }
@@ -378,7 +399,59 @@ namespace mongo {
         double distance( const Point& p ) const {
             double a = _x - p._x;
             double b = _y - p._y;
+
+            // Avoid numerical error if possible...
+            if( a == 0 ) return abs( _y - p._y );
+            if( b == 0 ) return abs( _x - p._x );
+
             return sqrt( ( a * a ) + ( b * b ) );
+        }
+
+        /**
+         * Distance method that compares x or y coords when other direction is zero,
+         * avoids numerical error when distances are very close to radius but axis-aligned.
+         *
+         * An example of the problem is:
+         * (52.0 - 51.9999) - 0.0001 = 3.31965e-15 and 52.0 - 51.9999 > 0.0001 in double arithmetic
+         * but:
+         * 51.9999 + 0.0001 <= 52.0
+         *
+         * This avoids some (but not all!) suprising results in $center queries where points are
+         * ( radius + center.x, center.y ) or vice-versa.
+         */
+        bool distanceWithin( const Point& p, double radius ) const {
+            double a = _x - p._x;
+            double b = _y - p._y;
+
+            if( a == 0 ) {
+                //
+                // Note:  For some, unknown reason, when a 32-bit g++ optimizes this call, the sum is
+                // calculated imprecisely.  We need to force the compiler to always evaluate it correctly,
+                // hence the weirdness.
+                //
+                // On some 32-bit linux machines, removing the volatile keyword or calculating the sum inline
+                // will make certain geo tests fail.  Of course this check will force volatile for all 32-bit systems,
+                // not just affected systems.
+                if( sizeof(void*) <= 4 ){
+                    volatile double sum = _y > p._y ? p._y + radius : _y + radius;
+                    return _y > p._y ? sum >= _y : sum >= p._y;
+                }
+                else {
+                    // Original math, correct for most systems
+                    return _y > p._y ? p._y + radius >= _y : _y + radius >= p._y;
+                }
+            }
+            if( b == 0 ) {
+                if( sizeof(void*) <= 4 ){
+                    volatile double sum = _x > p._x ? p._x + radius : _x + radius;
+                    return _x > p._x ? sum >= _x : sum >= p._x;
+                }
+                else {
+                    return _x > p._x ? p._x + radius >= _x : _x + radius >= p._x;
+                }
+            }
+
+            return sqrt( ( a * a ) + ( b * b ) ) <= radius;
         }
 
         string toString() const {
@@ -395,6 +468,12 @@ namespace mongo {
 
     extern const double EARTH_RADIUS_KM;
     extern const double EARTH_RADIUS_MILES;
+
+    // Technically lat/long bounds, not really tied to earth radius.
+    inline void checkEarthBounds( Point p ) {
+        uassert( 14808, str::stream() << "point " << p.toString() << " must be in earth-like bounds of long : [-180, 180), lat : [-90, 90] ",
+                 p._x >= -180 && p._x < 180 && p._y >= -90 && p._y <= 90 );
+    }
 
     inline double deg2rad(double deg) { return deg * (M_PI/180); }
     inline double rad2deg(double rad) { return rad * (180/M_PI); }

@@ -8,7 +8,9 @@ function f() {
     var ourdb = "closealltest";
 
     print("closeall.js start mongod variant:" + variant);
-    var options = (new Date()-0)%2==0 ? 8 : 0;
+    var R = (new Date()-0)%2;
+    var QuickCommits = (new Date()-0)%3 == 0;
+    var options = R==0 ? 8 : 0; // 8 is DurParanoid
     print("closeall.js --durOptions " + options);
     var N = 1000;
     if (options) 
@@ -23,6 +25,10 @@ function f() {
     // we'll use two connections to make a little parallelism
     var db1 = conn.getDB(ourdb);
     var db2 = new Mongo(db1.getMongo().host).getDB(ourdb);
+    if( QuickCommits ) {
+	print("closeall.js QuickCommits variant (using a small syncdelay)");
+	assert( db2.adminCommand({setParameter:1, syncdelay:5}).ok );
+    }
 
     print("closeall.js run test");
 

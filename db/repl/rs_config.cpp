@@ -20,10 +20,11 @@
 #include "rs.h"
 #include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "../dbhelpers.h"
 #include "connections.h"
 #include "../oplog.h"
+#include "../instance.h"
 
 using namespace bson;
 
@@ -63,26 +64,13 @@ namespace mongo {
             //rather than above, do a logOp()? probably
             BSONObj o = asBson();
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
-            if( !comment.isEmpty() )
+            if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(comment);
 
             cx.db()->flushFiles(true);
         }
-        DEV log() << "replSet saveConfigLocally done" << rsLog;
+        log() << "replSet saveConfigLocally done" << rsLog;
     }
-
-    /*static*/
-    /*void ReplSetConfig::receivedNewConfig(BSONObj cfg) {
-        if( theReplSet )
-            return; // this is for initial setup only, so far. todo
-
-        ReplSetConfig c(cfg);
-
-        writelock lk("admin.");
-        if( theReplSet )
-            return;
-        c.saveConfigLocally(bo());
-    }*/
 
     bo ReplSetConfig::MemberCfg::asBson() const {
         bob b;
@@ -100,30 +88,36 @@ namespace mongo {
                 a.append(*i);
             b.appendArray("tags", a.done());
         }
-        if( !initialSync.isEmpty() ) {
-            b << "initialSync" << initialSync;
-        }
         return b.obj();
     }
 
     bo ReplSetConfig::asBson() const {
         bob b;
         b.append("_id", _id).append("version", version);
-        if( !ho.isDefault() || !getLastErrorDefaults.isEmpty() ) {
-            bob settings;
-            if( !ho.isDefault() )
-                settings << "heartbeatConnRetries " << ho.heartbeatConnRetries  <<
-                         "heartbeatSleep" << ho.heartbeatSleepMillis / 1000.0 <<
-                         "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000.0;
-            if( !getLastErrorDefaults.isEmpty() )
-                settings << "getLastErrorDefaults" << getLastErrorDefaults;
-            b << "settings" << settings.obj();
-        }
 
         BSONArrayBuilder a;
         for( unsigned i = 0; i < members.size(); i++ )
             a.append( members[i].asBson() );
         b.append("members", a.arr());
+
+        if( !ho.isDefault() || !getLastErrorDefaults.isEmpty() || !rules.empty()) {
+            bob settings;
+            if( !rules.empty() ) {
+                bob modes;
+                for (map<string,TagRule*>::const_iterator it = rules.begin(); it != rules.end(); it++) {
+                    bob clauses;
+                    vector<TagClause*> r = (*it).second->clauses;
+                    for (vector<TagClause*>::iterator it2 = r.begin(); it2 < r.end(); it2++) {
+                        clauses << (*it2)->name << (*it2)->target;
+                    }
+                    modes << (*it).first << clauses.obj();
+                }
+                settings << "getLastErrorModes" << modes.obj();
+            }
+            if( !getLastErrorDefaults.isEmpty() )
+                settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            b << "settings" << settings.obj();
+        }
 
         return b.obj();
     }
@@ -136,37 +130,85 @@ namespace mongo {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes <= 100); // votes >= 0 because it is unsigned
-        uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
+        uassert(13419, "priorities must be between 0.0 and 100.0", priority >= 0.0 && priority <= 100.0);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
+    }
 
-        if (!initialSync.isEmpty()) {
-            static const string legal[] = {"state", "name", "_id","optime"};
-            static const set<string> legals(legal, legal + 4);
-            assertOnlyHas(initialSync, legals);
+    string ReplSetConfig::TagSubgroup::toString() const {
+        bool first = true;
+        string result = "\""+name+"\": [";
+        for (set<MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
+            if (!first) {
+                result += ", ";
+            }
+            first = false;
+            result += (*i)->h.toString();
+        }
+        return result+"]";
+    }
 
-            if (initialSync.hasElement("state")) {
-                uassert(13525, "initialSync source state must be 1 or 2",
-                        initialSync["state"].isNumber() &&
-                        (initialSync["state"].Number() == 1 ||
-                         initialSync["state"].Number() == 2));
-            }
-            if (initialSync.hasElement("name")) {
-                uassert(13526, "initialSync source name must be a string",
-                        initialSync["name"].type() == mongo::String);
-            }
-            if (initialSync.hasElement("_id")) {
-                uassert(13527, "initialSync source _id must be a number",
-                        initialSync["_id"].isNumber());
-            }
-            if (initialSync.hasElement("optime")) {
-                uassert(13528, "initialSync source optime must be a timestamp",
-                        initialSync["optime"].type() == mongo::Timestamp ||
-                        initialSync["optime"].type() == mongo::Date);
+    string ReplSetConfig::TagClause::toString() const {
+        string result = name+": {";
+        for (map<string,TagSubgroup*>::const_iterator i = subgroups.begin(); i != subgroups.end(); i++) {
+            result += (*i).second->toString()+", ";
+        }
+        return result + "}";
+    }
+
+    string ReplSetConfig::TagRule::toString() const {
+        string result = "{";
+        for (vector<TagClause*>::const_iterator it = clauses.begin(); it < clauses.end(); it++) {
+            result += ((TagClause*)(*it))->toString()+",";
+        }
+        return result+"}";
+    }
+
+    void ReplSetConfig::TagSubgroup::updateLast(const OpTime& op) {
+        if (last < op) {
+            last = op;
+
+            for (vector<TagClause*>::iterator it = clauses.begin(); it < clauses.end(); it++) {
+                (*it)->updateLast(op);
             }
         }
+    }
+
+    void ReplSetConfig::TagClause::updateLast(const OpTime& op) {
+        if (last >= op) {
+            return;
+        }
+
+        // check at least n subgroups greater than clause.last
+        int count = 0;
+        map<string,TagSubgroup*>::iterator it;
+        for (it = subgroups.begin(); it != subgroups.end(); it++) {
+            if ((*it).second->last >= op) {
+                count++;
+            }
+        }
+
+        if (count >= actualTarget) {
+            last = op;
+            rule->updateLast(op);
+        }
+    }
+
+    void ReplSetConfig::TagRule::updateLast(const OpTime& op) {
+        OpTime *earliest = (OpTime*)&op;
+        vector<TagClause*>::iterator it;
+
+        for (it = clauses.begin(); it < clauses.end(); it++) {
+            if ((*it)->last < *earliest) {
+                earliest = &(*it)->last;
+            }
+        }
+
+        // rules are simply and-ed clauses, so whatever the most-behind
+        // clause is at is what the rule is at
+        last = *earliest;
     }
 
     /** @param o old config
@@ -184,8 +226,9 @@ namespace mongo {
                   if someone had some intermediate config this node doesnt have, that could be
                   necessary.  but then how did we become primary?  so perhaps we are fine as-is.
                   */
-        if( o.version + 1 != n.version ) {
-            errmsg = "version number wrong";
+        if( o.version >= n.version ) {
+            errmsg = str::stream() << "version number must increase, old: "
+                                   << o.version << " new: " << n.version;
             return false;
         }
 
@@ -200,9 +243,10 @@ namespace mongo {
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
-            if ( isLocalHost && !m.h.isLocalHost() ) {
-                log() << "reconfig error: " << m.h.toString() << " cannot be used from localhost replset" << rsLog;
-                uasserted(13645, "hosts cannot change from localhost to hostname");
+            if ( (isLocalHost && !m.h.isLocalHost()) || (!isLocalHost && m.h.isLocalHost())) {
+                log() << "reconfig error, cannot switch between localhost and hostnames: "
+                      << m.h.toString() << rsLog;
+                uasserted(13645, "hosts cannot switch between localhost and hostname");
             }
             if( old.count(m.h) ) {
                 const ReplSetConfig::MemberCfg& oldCfg = *old[m.h];
@@ -220,6 +264,7 @@ namespace mongo {
                     log() << "replSet reconfig error with member: " << m.h.toString() << " arbiterOnly cannot change. remove and readd the member instead " << rsLog;
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
+                uassert(14827, "arbiters cannot have tags", !m.arbiterOnly || m.tags.size() == 0 );
             }
             if( m.h.isSelf() )
                 me++;
@@ -258,6 +303,168 @@ namespace mongo {
         }
     }
 
+    void ReplSetConfig::_populateTagMap(map<string,TagClause> &tagMap) {
+        // stage 1: create subgroups for each server corresponding to each of
+        // its tags. If a server has three tags, we want it to end up in three
+        // subgroups, e.g.: A is tagged with ["A", "dc.ny", "m"].  At the end of
+        // this step, tagMap will contain:
+        // "A" => {"A.A" : A}
+        // "dc.ny" => {"dc.ny.A" : A}
+        // "m" => {"m.A" : A}
+        // If we have more than one server with the same tag, we end up with
+        // something like "x.y.z" => [{"x.y.z.A" : A},{"x.y.z.B" : B}] (if A
+        // and B were tagged with "x.y.z").
+        for (unsigned i=0; i<members.size(); i++) {
+            MemberCfg member = members[i];
+
+            for (set<string>::iterator tag = member.tags.begin(); tag != member.tags.end(); tag++) {
+                TagClause& clause = tagMap[*tag];
+                clause.name = *tag;
+
+                // we also populate the map, to be used by step 2... I think
+                // this is correct, as step 2 condenses the groups anyway
+                string perServerName = *tag+"."+members[i].h.toString();
+
+                TagSubgroup* subgroup;
+                if (clause.subgroups.find(perServerName) == clause.subgroups.end()) {
+                    clause.subgroups[perServerName] = subgroup = new TagSubgroup();
+                    subgroup->name = perServerName;
+                }
+                else {
+                    subgroup = clause.subgroups[perServerName];
+                }
+
+                subgroup->m.insert(&members[i]);
+            }
+        }
+
+        // stage 2: generate all parent tags.  If we have "x.y.z", this
+        // generates "x.y" and "x" and creates a map for each clause, e.g.,
+        // "x"'s clause might have a map that looks like:
+        // "x.y" => {A, B} {C}
+        // "x.w" => {D} {E, F}
+        for (map<string,TagClause>::iterator baseClause = tagMap.begin(); baseClause != tagMap.end(); baseClause++) {
+            string prevPrefix = (*baseClause).first;
+            char *dot = strrchr((char*)prevPrefix.c_str(), '.');
+
+            while (dot) {
+                // get x.y
+                string xyTag = string(prevPrefix.c_str(), dot - prevPrefix.c_str());
+                log(1) << "generating tag " << xyTag << rsLog;
+                TagClause& xyClause = tagMap[xyTag];
+                xyClause.name = xyTag;
+
+                // get all of x.y.z's subgroups, add them as a single subgroup of x.y
+                TagSubgroup* condensedSubgroup;;
+                if (xyClause.subgroups.find(prevPrefix) == xyClause.subgroups.end()) {
+                    condensedSubgroup = new TagSubgroup();
+                    xyClause.subgroups[prevPrefix] = condensedSubgroup;
+                }
+                else {
+                    condensedSubgroup = xyClause.subgroups[prevPrefix];
+                }
+
+                TagClause& xyzClause = tagMap[prevPrefix];
+
+                for (map<string,TagSubgroup*>::iterator xyzSubgroup = xyzClause.subgroups.begin();
+                     xyzSubgroup != xyzClause.subgroups.end(); xyzSubgroup++) {
+                    for (set<MemberCfg*>::const_iterator xyzMember = (*xyzSubgroup).second->m.begin();
+                         xyzMember != (*xyzSubgroup).second->m.end(); xyzMember++) {
+                        condensedSubgroup->m.insert(*xyzMember);
+                        // we'll link the member back with the group later, to
+                        // avoid creating extra link-backs
+                    }
+                }
+
+                // label this subgroup one higher than the current, e.g.,
+                // "x.y.z" if we're creating the "x.y" clause
+                condensedSubgroup->name = prevPrefix;
+
+                // advance: if we were handling "x.y", now do "x"
+                prevPrefix = xyTag;
+                dot = strrchr((char*)prevPrefix.c_str(), '.');
+            }
+        }
+    }
+
+    void ReplSetConfig::parseRules(const BSONObj& modes) {
+        map<string,TagClause> tagMap;
+        _populateTagMap(tagMap);
+
+        for (BSONObj::iterator i = modes.begin(); i.more(); ) {
+            unsigned int primaryOnly = 0;
+
+            // ruleName : {dc : 2, m : 3}
+            BSONElement rule = i.next();
+            uassert(14046, "getLastErrorMode rules must be objects", rule.type() == mongo::Object);
+
+            TagRule* r = new TagRule();
+
+            BSONObj clauseObj = rule.Obj();
+            for (BSONObj::iterator c = clauseObj.begin(); c.more(); ) {
+                BSONElement clauseElem = c.next();
+                uassert(14829, "getLastErrorMode criteria must be numeric", clauseElem.isNumber());
+
+                // get the clause, e.g., "x.y" : 3
+                const char *criteria = clauseElem.fieldName();
+                int value = clauseElem.numberInt();
+                uassert(14828, str::stream() << "getLastErrorMode criteria must be greater than 0: " << clauseElem, value > 0);
+
+                TagClause* node = new TagClause(tagMap[criteria]);
+
+                int numGroups = node->subgroups.size();
+                uassert(14831, str::stream() << "mode " << clauseObj << " requires "
+                        << value << " tagged with " << criteria << ", but only "
+                        << numGroups << " with this tag were found", numGroups >= value);
+
+                node->name = criteria;
+                node->target = value;
+                // if any subgroups contain "me", we can decrease the target
+                node->actualTarget = node->target;
+
+                // then we want to add pointers between clause & subgroup
+                for (map<string,TagSubgroup*>::iterator sgs = node->subgroups.begin();
+                     sgs != node->subgroups.end(); sgs++) {
+                    bool foundMe = false;
+                    (*sgs).second->clauses.push_back(node);
+
+                    // if this subgroup contains the primary, it's automatically always up-to-date
+                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
+                         cfg != (*sgs).second->m.end(); cfg++) {
+                        if ((*cfg)->h.isSelf()) {
+                            node->actualTarget--;
+                            foundMe = true;
+                        }
+                    }
+
+                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
+                         !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
+                        (*cfg)->groups.insert((*sgs).second);
+                    }
+                }
+
+                // if all of the members of this clause involve the primary, it's always up-to-date
+                if (node->actualTarget == 0) {
+                    node->last = OpTime(INT_MAX, INT_MAX);
+                    primaryOnly++;
+                }
+
+                // this is a valid clause, so we want to add it to its rule
+                node->rule = r;
+                r->clauses.push_back(node);
+            }
+
+            // if all of the clauses are satisfied by the primary, this rule is trivially true
+            if (primaryOnly == r->clauses.size()) {
+                r->last = OpTime(INT_MAX, INT_MAX);
+            }
+
+            // if we got here, this is a valid rule
+            log(1) << "new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
+            rules[rule.fieldName()] = r;
+        }
+    }
+
     void ReplSetConfig::from(BSONObj o) {
         static const string legal[] = {"_id","version", "members","settings"};
         static const set<string> legals(legal, legal + 4);
@@ -268,19 +475,6 @@ namespace mongo {
         if( o["version"].ok() ) {
             version = o["version"].numberInt();
             uassert(13115, "bad " + rsConfigNs + " config: version", version > 0);
-        }
-
-        if( o["settings"].ok() ) {
-            BSONObj settings = o["settings"].Obj();
-            if( settings["heartbeatConnRetries "].ok() )
-                ho.heartbeatConnRetries  = settings["heartbeatConnRetries "].numberInt();
-            if( settings["heartbeatSleep"].ok() )
-                ho.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].Number() * 1000);
-            if( settings["heartbeatTimeout"].ok() )
-                ho.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
-            ho.check();
-            try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
-            catch(...) { }
         }
 
         set<string> hosts;
@@ -300,7 +494,7 @@ namespace mongo {
             try {
                 static const string legal[] = {
                     "_id","votes","priority","host", "hidden","slaveDelay",
-                    "arbiterOnly","buildIndexes","tags","initialSync"
+                    "arbiterOnly","buildIndexes","tags","initialSync" // deprecated
                 };
                 static const set<string> legals(legal, legal + 10);
                 assertOnlyHas(mobj, legals);
@@ -312,10 +506,12 @@ namespace mongo {
                     /* TODO: use of string exceptions may be problematic for reconfig case! */
                     throw "_id must be numeric";
                 }
-                string s;
                 try {
-                    s = mobj["host"].String();
+                    string s = mobj["host"].String();
                     m.h = HostAndPort(s);
+                    if (!m.h.hasPort()) {
+                        m.h.setPort(m.h.port());
+                    }
                 }
                 catch(...) {
                     throw string("bad or missing host field? ") + mobj.toString();
@@ -336,9 +532,6 @@ namespace mongo {
                     vector<BSONElement> v = mobj["tags"].Array();
                     for( unsigned i = 0; i < v.size(); i++ )
                         m.tags.insert( v[i].String() );
-                }
-                if( mobj.hasElement("initialSync")) {
-                    m.initialSync = mobj["initialSync"].Obj().getOwned();
                 }
                 m.check();
             }
@@ -364,16 +557,29 @@ namespace mongo {
         }
         uassert(13393, "can't use localhost in repl set member names except when using it for all members", localhosts == 0 || localhosts == members.size());
         uassert(13117, "bad " + rsConfigNs + " config", !_id.empty());
+
+        if( o["settings"].ok() ) {
+            BSONObj settings = o["settings"].Obj();
+            if( settings["getLastErrorModes"].ok() ) {
+                parseRules(settings["getLastErrorModes"].Obj());
+            }
+            ho.check();
+            try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
+            catch(...) { }
+        }
     }
 
     static inline void configAssert(bool expr) {
         uassert(13122, "bad repl set config?", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(BSONObj cfg) {
+    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) {
         clear();
         from(cfg);
-        configAssert( version < 0 /*unspecified*/ || (version >= 1 && version <= 5000) );
+        if( force ) {
+            version += rand() % 100000 + 10000;
+        }
+        configAssert( version < 0 /*unspecified*/ || (version >= 1) );
         if( version < 1 )
             version = 1;
         _ok = true;

@@ -42,11 +42,10 @@ files.forEach(function (file) {
     }
     else {
         nfiles++;
-        assert(!(/j\._[01]/.test(file.name)), "Old journal file still exists: " + file.name);
     }
 })
 
-assert.eq(2, nfiles); // j._2 and lsn
+assert.eq(2, nfiles); // latest journal file and lsn
 
 stopMongod(30001);
 

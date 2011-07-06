@@ -18,29 +18,42 @@
 
 #include "pch.h"
 #include "security.h"
+#include "security_common.h"
 #include "instance.h"
 #include "client.h"
 #include "curop-inl.h"
 #include "db.h"
 #include "dbhelpers.h"
 
+// this is the _mongod only_ implementation of security.h
+
 namespace mongo {
 
-    int AuthenticationInfo::warned = 0;
+    bool AuthenticationInfo::_warned = false;
 
-    void AuthenticationInfo::print() {
+    void AuthenticationInfo::print() const {
         cout << "AuthenticationInfo: " << this << '\n';
-        for ( map<string,Auth>::iterator i=m.begin(); i!=m.end(); i++ ) {
+        for ( MA::const_iterator i=_dbs.begin(); i!=_dbs.end(); i++ ) {
             cout << "\t" << i->first << "\t" << i->second.level << '\n';
         }
         cout << "END" << endl;
     }
 
 
-    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) {
-        if ( cc().isGod() ) {
+    string AuthenticationInfo::getUser( const string& dbname ) const {
+        scoped_spinlock lk(_lock);
+
+        MA::const_iterator i = _dbs.find(dbname);
+        if ( i == _dbs.end() )
+            return "";
+
+        return i->second.user;
+    }
+
+
+    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
+        if ( cc().isGod() ) 
             return true;
-        }
 
         if ( isLocalHost ) {
             atleastreadlock l("");
@@ -48,14 +61,56 @@ namespace mongo {
             Client::Context c("admin.system.users");
             BSONObj result;
             if( ! Helpers::getSingleton("admin.system.users", result) ) {
-                if( warned == 0 ) {
-                    warned++;
+                if( ! _warned ) {
+                    // you could get a few of these in a race, but that's ok
+                    _warned = true;
                     log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
                 }
                 return true;
             }
         }
+
         return false;
+    }
+
+    bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
+        if (user == internalSecurity.user) {
+            pwd = internalSecurity.pwd;
+        }
+        else {
+            static BSONObj userPattern = fromjson("{\"user\":1}");
+            string systemUsers = dbname + ".system.users";
+            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
+            {
+                BSONObjBuilder b;
+                b << "user" << user;
+                BSONObj query = b.done();
+                if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) {
+                    log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                    return false;
+                }
+            }
+
+            pwd = userObj.getStringField("pwd");
+        }
+        return true;
+    }
+
+    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
+        AuthenticationInfo *ai = cc().getAuthenticationInfo();
+
+        if ( readOnly ) {
+            ai->authorizeReadOnly( cc().database()->name.c_str() , user );
+        }
+        else {
+            ai->authorize( cc().database()->name.c_str() , user );
+        }
+    }
+
+    bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        AuthenticationInfo *ai = cc().getAuthenticationInfo();
+        ai->logout(dbname);
+        return true;
     }
 
 } // namespace mongo

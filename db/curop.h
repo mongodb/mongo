@@ -24,16 +24,54 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
-#include "db.h"
-#include "../scripting/engine.h"
+#include "../util/net/hostandport.h"
 
 namespace mongo {
 
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
-        StringBuilder str;
-        void reset() { str.reset(); }
+        OpDebug() : ns(""){ reset(); }
+
+        void reset();
+        
+        string toString() const;
+        void append( BSONObjBuilder& b ) const;
+
+        // -------------------
+        
+        StringBuilder extra; // weird things we need to fix later
+        
+        // basic options
+        int op;
+        bool iscommand;
+        Namespace ns;
+        BSONObj query;
+        BSONObj updateobj;
+        
+        // detailed options
+        long long cursorid;
+        int ntoreturn;
+        int ntoskip;
+        bool exhaust;
+
+        // debugging/profile info
+        int nscanned;
+        bool idhack;
+        bool scanAndOrder;
+        bool moved;
+        bool fastmod;
+        bool fastmodinsert;
+        bool upsert;
+        unsigned keyUpdates;
+
+        // error handling
+        ExceptionInfo exceptionInfo;
+        
+        // response info
+        int executionTime;
+        int nreturned;
+        int responseLength;
     };
 
     /**
@@ -144,30 +182,21 @@ namespace mongo {
         }
         bool isStarted() const { return _start > 0; }
 
-        void enter( Client::Context * context ) {
-            ensureStarted();
-            setNS( context->ns() );
-            if ( context->_db && context->_db->profile > _dbprofile )
-                _dbprofile = context->_db->profile;
-        }
+        void enter( Client::Context * context );
 
-        void leave( Client::Context * context ) {
-            unsigned long long now = curTimeMicros64();
-            Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
-            _checkpoint = now;
-        }
+        void leave( Client::Context * context );
 
         void reset() {
             _reset();
             _start = _checkpoint = 0;
-            _active = true;
             _opNum = _nextOpNum++;
-            _ns[0] = '?'; // just in case not set later
+            _ns[0] = 0;
             _debug.reset();
             _query.reset();
+            _active = true; // this should be last for ui clarity
         }
 
-        void reset( const SockAddr & remote, int op ) {
+        void reset( const HostAndPort& remote, int op ) {
             reset();
             _remote = remote;
             _op = op;
@@ -267,6 +296,7 @@ namespace mongo {
         CurOp *parent() const { return _wrapped; }
         void kill() { _killed = true; }
         bool killed() const { return _killed; }
+        void yielded() { _numYields++; }
         void setNS(const char *ns) {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
@@ -288,12 +318,13 @@ namespace mongo {
         int _dbprofile; // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
-        struct SockAddr _remote;
+        HostAndPort _remote;
         CachedBSONObj _query;
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
         volatile bool _killed;
+        int _numYields;
 
         void _reset() {
             _command = false;
@@ -304,6 +335,7 @@ namespace mongo {
             _message = "";
             _progressMeter.finished();
             _killed = false;
+            _numYields = 0;
         }
     };
 

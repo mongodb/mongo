@@ -19,16 +19,18 @@
 #include "pch.h"
 #include "assert_util.h"
 #include "assert.h"
-//#include "file.h"
 #include <cmath>
+#include "time_support.h"
 using namespace std;
 
-#ifndef _WIN32
-#include <cxxabi.h>
-#include <sys/file.h>
+#ifdef _WIN32
+# include <io.h>
+#else
+# include <cxxabi.h>
+# include <sys/file.h>
 #endif
 
-#include "../db/jsobj.h"
+//#include "../db/jsobj.h"
 
 namespace mongo {
 
@@ -47,6 +49,8 @@ namespace mongo {
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
             _append = append;
 
+            bool exists = boost::filesystem::exists(lp);
+
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ) {
@@ -59,6 +63,14 @@ namespace mongo {
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
+
+            if (append && exists){
+                // two blank lines before and after
+                const string msg = "\n\n***** SERVER RESTARTED *****\n\n\n";
+                massert(14036, errnoWithPrefix("couldn't write to log file"),
+                        fwrite(msg.data(), 1, msg.size(), test) == msg.size());
+            }
+
             fclose( test );
 
             _path = lp;
@@ -74,7 +86,7 @@ namespace mongo {
 
             if ( _file ) {
 #ifdef _WIN32
-                cout << "log rotation doesn't work on windows" << endl;
+                cout << "log rotation net yet supported on windows" << endl;
                 return;
 #else
                 struct tm t;
@@ -95,7 +107,20 @@ namespace mongo {
                 assert(0);
             }
 
+#ifdef _WIN32 // windows has these functions it just gives them a funny name
+# define dup2 _dup2
+# define fileno _fileno
+#endif
+            // redirect stderr to log file
+            dup2(fileno(tmp), 2);
+
             Logstream::setLogFile(tmp); // after this point no thread will be using old file
+
+#if 0 // enable to test redirection
+            cout << "written to cout" << endl;
+            cerr << "written to cerr" << endl;
+            log() << "written to log()" << endl;
+#endif
 
             _file = tmp;
             _opened = time(0);
@@ -125,4 +150,3 @@ namespace mongo {
     FILE* Logstream::logfile = stdout;
 
 }
-

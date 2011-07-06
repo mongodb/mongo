@@ -21,9 +21,6 @@ doTest = function (signal) {
 
     var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
     var nodes = replTest.startSet({ oplogSize: "40" });
-
-    sleep(5000);
-
     print("\nsync1.js ********************************************************************** part 0");
     replTest.initiate();
 
@@ -61,10 +58,27 @@ doTest = function (signal) {
     }
 
     var status;
+    var secondaries = 0;
+    var count = 0;
     do {
         sleep(1000);
         status = dbs[0].getSisterDB("admin").runCommand({ replSetGetStatus: 1 });
-    } while (status.members[1].state != 2 || status.members[2].state != 2);
+
+        occasionally(function() {
+                printjson(status);
+            }, 30);
+        
+        secondaries = 0;
+        secondaries += status.members[0].state == 2 ? 1 : 0;
+        secondaries += status.members[1].state == 2 ? 1 : 0;
+        secondaries += status.members[2].state == 2 ? 1 : 0;
+        count++;
+    } while (secondaries < 2 && count < 300);
+
+    assert(count < 300);
+    
+    // Need to be careful here, allocating datafiles for the slaves can take a *long* time on slow systems
+    sleep(7000);
 
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
@@ -72,6 +86,8 @@ doTest = function (signal) {
     print("\nsync1.js ********************************************************************** part 7");
 
     sleep(5000);
+    // If we start getting error hasNext: false with done alloc datafile msgs - may need to up the sleep again in part 5
+
 
     var max1;
     var max2;

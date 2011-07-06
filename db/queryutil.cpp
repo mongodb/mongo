@@ -1,4 +1,4 @@
-// queryutil.cpp
+// @file queryutil.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -24,6 +24,7 @@
 #include "../util/unittest.h"
 #include "dbmessage.h"
 #include "indexkey.h"
+#include "../util/mongoutils/str.h"
 
 namespace mongo {
     extern BSONObj staticNull;
@@ -79,16 +80,30 @@ namespace mongo {
                 return r; //breaking here fails with /^a?/
             }
             else if (c == '\\') {
-                // slash followed by non-alphanumeric represents the following char
                 c = *(regex++);
-                if ((c >= 'A' && c <= 'Z') ||
+                if (c == 'Q'){
+                    // \Q...\E quotes everything inside
+                    while (*regex) {
+                        c = (*regex++);
+                        if (c == '\\' && (*regex == 'E')){
+                            regex++; //skip the 'E'
+                            break; // go back to start of outer loop
+                        }
+                        else {
+                            ss << c; // character should match itself
+                        }
+                    }
+                }
+                else if ((c >= 'A' && c <= 'Z') ||
                         (c >= 'a' && c <= 'z') ||
                         (c >= '0' && c <= '0') ||
                         (c == '\0')) {
+                    // don't know what to do with these
                     r = ss.str();
                     break;
                 }
                 else {
+                    // slash followed by non-alphanumeric represents the following char
                     ss << c;
                 }
             }
@@ -136,17 +151,18 @@ namespace mongo {
     }
 
 
-    FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) {
+    FieldRange::FieldRange( const BSONElement &e, bool singleKey, bool isNot, bool optimize )
+    : _singleKey( singleKey ) {
         // NOTE with $not, we could potentially form a complementary set of intervals.
         if ( !isNot && !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
-            set< BSONElement, element_lt > vals;
-            vector< FieldRange > regexes;
+            set<BSONElement,element_lt> vals;
+            vector<FieldRange> regexes;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() ) {
                 BSONElement ie = i.next();
                 if ( ie.type() == RegEx ) {
-                    regexes.push_back( FieldRange( ie, false, optimize ) );
+                    regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
                 }
                 else {
                     // A document array may be indexed by its first element, or
@@ -160,10 +176,10 @@ namespace mongo {
                 }
             }
 
-            for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i )
+            for( set<BSONElement,element_lt>::const_iterator i = vals.begin(); i != vals.end(); ++i )
                 _intervals.push_back( FieldInterval(*i) );
 
-            for( vector< FieldRange >::const_iterator i = regexes.begin(); i != regexes.end(); ++i )
+            for( vector<FieldRange>::const_iterator i = regexes.begin(); i != regexes.end(); ++i )
                 *this |= *i;
 
             return;
@@ -198,7 +214,14 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
+
         int op = e.getGtLtOp();
+
+        bool existsSpec = false;
+        if ( op == BSONObj::opEXISTS ) {
+            existsSpec = e.trueValue();
+        }
+        
         if ( e.type() == RegEx
                 || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
            ) {
@@ -262,6 +285,9 @@ namespace mongo {
             case BSONObj::GTE:
                 op = BSONObj::LT;
                 break;
+            case BSONObj::opEXISTS:
+                existsSpec = !existsSpec;
+                break;
             default: // otherwise doesn't matter
                 break;
             }
@@ -294,7 +320,7 @@ namespace mongo {
             lower = e;
             break;
         case BSONObj::opALL: {
-            massert( 10370 ,  "$all requires array", e.type() == Array );
+            uassert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
             bool bound = false;
             while ( i.more() ) {
@@ -364,6 +390,13 @@ namespace mongo {
         case BSONObj::opWITHIN:
             _special = "2d";
             break;
+        case BSONObj::opEXISTS: {
+            if ( !existsSpec ) {
+                lower = upper = staticNull.firstElement();
+            }
+            optimize = false;
+            break;
+        }
         default:
             break;
         }
@@ -375,6 +408,8 @@ namespace mongo {
                 upper = addObj( b.obj() ).firstElement();
             }
             else if ( lower.type() == MinKey && upper.type() != MaxKey && upper.isSimpleType() ) { // TODO: get rid of isSimpleType
+                if( upper.type() == Date ) 
+                    lowerInclusive = false;
                 BSONObjBuilder b;
                 b.appendMinForType( upper.fieldName() , upper.type() );
                 lower = addObj( b.obj() ).firstElement();
@@ -383,9 +418,9 @@ namespace mongo {
 
     }
 
-    void FieldRange::finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other ) {
+    void FieldRange::finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other ) {
         _intervals = newIntervals;
-        for( vector< BSONObj >::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
+        for( vector<BSONObj>::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
             _objData.push_back( *i );
         if ( _special.size() == 0 && other._special.size() )
             _special = other._special;
@@ -415,9 +450,15 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        if ( !_singleKey && nontrivial() ) {
+            if ( other <= *this ) {
+             	*this = other;
+            }
+            return *this;
+        }
+        vector<FieldInterval> newIntervals;
+        vector<FieldInterval>::const_iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             FieldInterval overlap;
             if ( fieldIntervalOverlap( *i, *j, overlap ) ) {
@@ -434,7 +475,7 @@ namespace mongo {
         return *this;
     }
 
-    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector< FieldInterval > &newIntervals ) {
+    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector<FieldInterval> &newIntervals ) {
         if ( low._bound.eoo() ) {
             low = lower._lower; high = lower._upper;
         }
@@ -454,11 +495,11 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator|=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
+        vector<FieldInterval> newIntervals;
         FieldBound low;
         FieldBound high;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        vector<FieldInterval>::const_iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
             if ( ( cmp == 0 && i->_lower._inclusive ) || cmp < 0 ) {
@@ -487,9 +528,9 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        vector<FieldInterval> newIntervals;
+        vector<FieldInterval>::iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
             if ( cmp < 0 ||
@@ -551,12 +592,31 @@ namespace mongo {
     }
 
     // TODO write a proper implementation that doesn't do a full copy
-    bool FieldRange::operator<=( const FieldRange &other ) {
+    bool FieldRange::operator<=( const FieldRange &other ) const {
         FieldRange temp = *this;
         temp -= other;
         return temp.empty();
     }
 
+    void FieldRange::setExclusiveBounds() {
+        for( vector<FieldInterval>::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+            i->_lower._inclusive = false;
+            i->_upper._inclusive = false;
+        }
+    }
+
+    void FieldRange::reverse( FieldRange &ret ) const {
+        assert( _special.empty() );
+        ret._intervals.clear();
+        ret._objData = _objData;
+        for( vector<FieldInterval>::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
+            FieldInterval fi;
+            fi._lower = i->_upper;
+            fi._upper = i->_lower;
+            ret._intervals.push_back( fi );
+        }
+    }
+    
     BSONObj FieldRange::addObj( const BSONObj &o ) {
         _objData.push_back( o );
         return o;
@@ -564,7 +624,7 @@ namespace mongo {
 
     string FieldRangeSet::getSpecial() const {
         string s = "";
-        for ( map<string,FieldRange>::iterator i=_ranges.begin(); i!=_ranges.end(); i++ ) {
+        for ( map<string,FieldRange>::const_iterator i=_ranges.begin(); i!=_ranges.end(); i++ ) {
             if ( i->second.getSpecial().size() == 0 )
                 continue;
             uassert( 13033 , "can't have 2 special fields" , s.size() == 0 );
@@ -573,12 +633,111 @@ namespace mongo {
         return s;
     }
 
+    /**
+     * Btree scanning for a multidimentional key range will yield a
+     * multidimensional box.  The idea here is that if an 'other'
+     * multidimensional box contains the current box we don't have to scan
+     * the current box.  If the 'other' box contains the current box in
+     * all dimensions but one, we can safely subtract the values of 'other'
+     * along that one dimension from the values for the current box on the
+     * same dimension.  In other situations, subtracting the 'other'
+     * box from the current box yields a result that is not a box (but
+     * rather can be expressed as a union of boxes).  We don't support
+     * such splitting currently in calculating index ranges.  Note that
+     * where I have said 'box' above, I actually mean sets of boxes because
+     * a field range can consist of multiple intervals.
+     */    
+    const FieldRangeSet &FieldRangeSet::operator-=( const FieldRangeSet &other ) {
+        int nUnincluded = 0;
+        string unincludedKey;
+        map<string,FieldRange>::iterator i = _ranges.begin();
+        map<string,FieldRange>::const_iterator j = other._ranges.begin();
+        while( nUnincluded < 2 && i != _ranges.end() && j != other._ranges.end() ) {
+            int cmp = i->first.compare( j->first );
+            if ( cmp == 0 ) {
+                if ( i->second <= j->second ) {
+                    // nothing
+                }
+                else {
+                    ++nUnincluded;
+                    unincludedKey = i->first;
+                }
+                ++i;
+                ++j;
+            }
+            else if ( cmp < 0 ) {
+                ++i;
+            }
+            else {
+                // other has a bound we don't, nothing can be done
+                return *this;
+            }
+        }
+        if ( j != other._ranges.end() ) {
+            // other has a bound we don't, nothing can be done
+            return *this;
+        }
+        if ( nUnincluded > 1 ) {
+            return *this;
+        }
+        if ( nUnincluded == 0 ) {
+            makeEmpty();
+            return *this;
+        }
+        // nUnincluded == 1
+        range( unincludedKey.c_str() ) -= other.range( unincludedKey.c_str() );
+        appendQueries( other );
+        return *this;
+    }
+    
+    const FieldRangeSet &FieldRangeSet::operator&=( const FieldRangeSet &other ) {
+        map<string,FieldRange>::iterator i = _ranges.begin();
+        map<string,FieldRange>::const_iterator j = other._ranges.begin();
+        while( i != _ranges.end() && j != other._ranges.end() ) {
+            int cmp = i->first.compare( j->first );
+            if ( cmp == 0 ) {
+                // Same field name, so find range intersection.
+                i->second &= j->second;
+                ++i;
+                ++j;
+            }
+            else if ( cmp < 0 ) {
+                // Field present in *this.
+                ++i;
+            }
+            else {
+                // Field not present in *this, so add it.
+                range( j->first.c_str() ) = j->second;
+                ++j;
+            }
+        }
+        while( j != other._ranges.end() ) {
+            // Field not present in *this, add it.
+            range( j->first.c_str() ) = j->second;
+            ++j;
+        }
+        appendQueries( other );
+        return *this;
+    }    
+    
+    void FieldRangeSet::appendQueries( const FieldRangeSet &other ) {
+        for( vector<BSONObj>::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
+            _queries.push_back( *i );
+        }
+    }
+    
+    void FieldRangeSet::makeEmpty() {
+        for( map<string,FieldRange>::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            i->second.makeEmpty();
+        }
+    }    
+    
     void FieldRangeSet::processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize ) {
         BSONElement g = f;
         int op2 = g.getGtLtOp();
         if ( op2 == BSONObj::opALL ) {
             BSONElement h = g;
-            massert( 13050 ,  "$all requires array", h.type() == Array );
+            uassert( 13050 ,  "$all requires array", h.type() == Array );
             BSONObjIterator i( h.embeddedObject() );
             if( i.more() ) {
                 BSONElement x = i.next();
@@ -598,29 +757,54 @@ namespace mongo {
 
                 int op3 = getGtLtOp( h );
                 if ( op3 == BSONObj::Equality ) {
-                    _ranges[ fullname ] &= FieldRange( h , isNot , optimize );
+                    range( fullname.c_str() ) &= FieldRange( h , _singleKey , isNot , optimize );
                 }
                 else {
                     BSONObjIterator l( h.embeddedObject() );
                     while ( l.more() ) {
-                        _ranges[ fullname ] &= FieldRange( l.next() , isNot , optimize );
+                        range( fullname.c_str() ) &= FieldRange( l.next() , _singleKey , isNot , optimize );
                     }
                 }
             }
         }
         else {
-            _ranges[ fieldName ] &= FieldRange( f , isNot , optimize );
+            range( fieldName ) &= FieldRange( f , _singleKey , isNot , optimize );
         }
     }
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
+        if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
+            uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+            BSONObjIterator i( e.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 14817 , "$and elements must be objects" , e.type() == Object );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    processQueryField( j.next(), optimize );
+                }
+            }            
+        }
+        
+        if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+            return;
+        }
+        
+        if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+            return;
+        }        
+        
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
-            equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
+            equality = ( strcmp( e.embeddedObject().firstElementFieldName(), "$not" ) != 0 );
         }
 
         if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
-            _ranges[ e.fieldName() ] &= FieldRange( e , false , optimize );
+            range( e.fieldName() ) &= FieldRange( e , _singleKey , false , optimize );
         }
         if ( !equality ) {
             BSONObjIterator j( e.embeddedObject() );
@@ -651,93 +835,97 @@ namespace mongo {
         }
     }
 
-    FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query , bool optimize )
-        : _ns( ns ), _queries( 1, query.getOwned() ) {
+    FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query, bool singleKey, bool optimize )
+        : _ns( ns ), _queries( 1, query.getOwned() ), _singleKey( singleKey ) {
         BSONObjIterator i( _queries[ 0 ] );
 
         while( i.more() ) {
-            BSONElement e = i.next();
-            // e could be x:1 or x:{$gt:1}
-
-            if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                continue;
-            }
-
-            if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-                continue;
-            }
-
-            processQueryField( e, optimize );
+            processQueryField( i.next(), optimize );
         }
     }
-
-    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
-        : _baseSet( ns, query, optimize ), _orFound() {
-
-        BSONObjIterator i( _baseSet._queries[ 0 ] );
-
+    
+    FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction )
+    :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
+        _queries = frs._queries;
+        BSONObjIterator i( _indexSpec.keyPattern );
+        set< string > baseObjectNontrivialPrefixes;
         while( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-                BSONObjIterator j( e.embeddedObject() );
-                while( j.more() ) {
-                    BSONElement f = j.next();
-                    massert( 13263, "$or array must contain objects", f.type() == Object );
-                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
-                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
-                    _originalOrSets.push_back( _orSets.back() );
+            const FieldRange *range = &frs.range( e.fieldName() );
+            if ( !frs.singleKey() ) {
+                string prefix = str::before( e.fieldName(), '.' );
+                if ( baseObjectNontrivialPrefixes.count( prefix ) > 0 ) {
+                    // A field with the same parent field has already been
+                    // constrainted, and with a multikey index we cannot
+                    // constrain this field.
+                    range = &frs.trivialRange();
+                } else {
+                    if ( range->nontrivial() ) {
+                        baseObjectNontrivialPrefixes.insert( prefix );
+                    }
                 }
-                _orFound = true;
-                continue;
             }
-        }
-    }
-
-    void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
-        massert( 13274, "no or clause to pop", !orFinished() );
-        auto_ptr< FieldRangeSet > holder;
-        FieldRangeSet *toDiff = &_originalOrSets.front();
-        if ( toDiff->matchPossible() && !indexSpec.isEmpty() ) {
-            holder.reset( toDiff->subset( indexSpec ) );
-            toDiff = holder.get();
-        }
-        list< FieldRangeSet >::iterator i = _orSets.begin();
-        list< FieldRangeSet >::iterator j = _originalOrSets.begin();
-        ++i;
-        ++j;
-        while( i != _orSets.end() ) {
-            *i -= *toDiff;
-            if( !i->matchPossible() ) {
-                i = _orSets.erase( i );
-                j = _originalOrSets.erase( j );
+            int number = (int) e.number(); // returns 0.0 if not numeric
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
+            if ( forward ) {
+                _ranges.push_back( *range );
             }
             else {
-                ++i;
-                ++j;
+                _ranges.push_back( FieldRange( BSONObj().firstElement(), frs.singleKey(), false, true ) );
+                range->reverse( _ranges.back() );
             }
+            assert( !_ranges.back().empty() );
         }
-        _oldOrSets.push_front( _orSets.front() );
-        _orSets.pop_front();
-        _originalOrSets.pop_front();
+        uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
+    }    
+
+    BSONObj FieldRangeVector::startKey() const {
+        BSONObjBuilder b;
+        for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            const FieldInterval &fi = i->intervals().front();
+            b.appendAs( fi._lower._bound, "" );
+        }
+        return b.obj();
     }
 
-    FieldRange *FieldRangeSet::trivialRange_ = 0;
-    FieldRange &FieldRangeSet::trivialRange() {
-        if ( trivialRange_ == 0 )
-            trivialRange_ = new FieldRange();
-        return *trivialRange_;
+    BSONObj FieldRangeVector::endKey() const {
+        BSONObjBuilder b;
+        for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            const FieldInterval &fi = i->intervals().back();
+            b.appendAs( fi._upper._bound, "" );
+        }
+        return b.obj();
+    }
+
+    BSONObj FieldRangeVector::obj() const {
+        BSONObjBuilder b;
+        BSONObjIterator k( _indexSpec.keyPattern );
+        for( int i = 0; i < (int)_ranges.size(); ++i ) {
+            BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
+            for( vector<FieldInterval>::const_iterator j = _ranges[ i ].intervals().begin();
+                j != _ranges[ i ].intervals().end(); ++j ) {
+                a << BSONArray( BSON_ARRAY( j->_lower._bound << j->_upper._bound ).clientReadable() );
+            }
+            a.done();
+        }
+        return b.obj();
+    }
+    
+    FieldRange *FieldRangeSet::__singleKeyTrivialRange = 0;
+    FieldRange *FieldRangeSet::__multiKeyTrivialRange = 0;
+    const FieldRange &FieldRangeSet::trivialRange() const {
+        FieldRange *&ret = _singleKey ? __singleKeyTrivialRange : __multiKeyTrivialRange;
+        if ( ret == 0 ) {
+            ret = new FieldRange( BSONObj().firstElement(), _singleKey, false, true );
+        }
+        return *ret;
     }
 
     BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields ) const {
         BSONObj fields = _fields;
         if ( fields.isEmpty() ) {
             BSONObjBuilder b;
-            for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
                 b.append( i->first, 1 );
             }
             fields = b.obj();
@@ -747,17 +935,17 @@ namespace mongo {
         while( i.more() ) {
             BSONElement e = i.next();
             const char *name = e.fieldName();
-            const FieldRange &range = _ranges[ name ];
-            assert( !range.empty() );
-            if ( range.equality() )
-                b.appendAs( range.min(), name );
-            else if ( range.nontrivial() ) {
+            const FieldRange &eRange = range( name );
+            assert( !eRange.empty() );
+            if ( eRange.equality() )
+                b.appendAs( eRange.min(), name );
+            else if ( eRange.nontrivial() ) {
                 BSONObj o;
                 BSONObjBuilder c;
-                if ( range.min().type() != MinKey )
-                    c.appendAs( range.min(), range.minInclusive() ? "$gte" : "$gt" );
-                if ( range.max().type() != MaxKey )
-                    c.appendAs( range.max(), range.maxInclusive() ? "$lte" : "$lt" );
+                if ( eRange.min().type() != MinKey )
+                    c.appendAs( eRange.min(), eRange.minInclusive() ? "$gte" : "$gt" );
+                if ( eRange.max().type() != MaxKey )
+                    c.appendAs( eRange.max(), eRange.maxInclusive() ? "$lte" : "$lt" );
                 o = c.obj();
                 b.append( name, o );
             }
@@ -767,7 +955,7 @@ namespace mongo {
 
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         QueryPattern qp;
-        for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             assert( !i->second.empty() );
             if ( i->second.equality() ) {
                 qp._fieldTypes[ i->first ] = QueryPattern::Equality;
@@ -789,9 +977,9 @@ namespace mongo {
 
     // TODO get rid of this
     BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
-        typedef vector< pair< shared_ptr< BSONObjBuilder >, shared_ptr< BSONObjBuilder > > > BoundBuilders;
+        typedef vector<pair<shared_ptr<BSONObjBuilder>, shared_ptr<BSONObjBuilder> > > BoundBuilders;
         BoundBuilders builders;
-        builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+        builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
         BSONObjIterator i( keyPattern );
         bool ineq = false; // until ineq is true, we are just dealing with equality and $in bounds
         while( i.more() ) {
@@ -811,16 +999,16 @@ namespace mongo {
                         ineq = true;
                     }
                     BoundBuilders newBuilders;
-                    const vector< FieldInterval > &intervals = fr.intervals();
+                    const vector<FieldInterval> &intervals = fr.intervals();
                     for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
                         BSONObj first = i->first->obj();
                         BSONObj second = i->second->obj();
 
                         const unsigned maxCombinations = 4000000;
                         if ( forward ) {
-                            for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
+                            for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
                                 uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
                                 newBuilders.back().first->appendAs( j->_lower._bound, "" );
@@ -828,9 +1016,9 @@ namespace mongo {
                             }
                         }
                         else {
-                            for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
+                            for( vector<FieldInterval>::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
                                 uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
                                 newBuilders.back().first->appendAs( j->_upper._bound, "" );
@@ -855,18 +1043,71 @@ namespace mongo {
     }
 
     FieldRangeSet *FieldRangeSet::subset( const BSONObj &fields ) const {
-        FieldRangeSet *ret = new FieldRangeSet( _ns, BSONObj() );
+        FieldRangeSet *ret = new FieldRangeSet( _ns, BSONObj(), _singleKey, true );
         BSONObjIterator i( fields );
         while( i.more() ) {
             BSONElement e = i.next();
-            if ( _ranges[ e.fieldName() ].nontrivial() ) {
-                ret->_ranges[ e.fieldName() ] = _ranges[ e.fieldName() ];
+            if ( range( e.fieldName() ).nontrivial() ) {
+                ret->range( e.fieldName() ) = range( e.fieldName() );
             }
         }
         ret->_queries = _queries;
         return ret;
     }
+    
+    const FieldRangeSet &FieldRangeSetPair::frsForIndex( const NamespaceDetails* nsd, int idxNo ) const {
+        assertValidIndexOrNoIndex( nsd, idxNo );
+        if ( idxNo < 0 ) {
+            // An unindexed cursor cannot have a "single key" constraint.
+            return _multiKey;
+        }
+        return nsd->isMultikey( idxNo ) ? _multiKey : _singleKey;
+    }    
 
+    bool FieldRangeSetPair::noNontrivialRanges() const {
+        return _singleKey.matchPossible() && _singleKey.nNontrivialRanges() == 0 &&
+                 _multiKey.matchPossible() && _multiKey.nNontrivialRanges() == 0;
+    }
+    
+    bool FieldRangeSetPair::matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
+        assertValidIndexOrNoIndex( d, idxNo );
+        if ( !matchPossible() ) {
+            return false;
+        }
+        if ( idxNo < 0 ) {
+            // multi key matchPossible() is true, so return true.
+            return true;   
+        }
+        return frsForIndex( d, idxNo ).matchPossibleForIndex( keyPattern );
+    }
+    
+    FieldRangeSetPair &FieldRangeSetPair::operator&=( const FieldRangeSetPair &other ) {
+        _singleKey &= other._singleKey;
+        _multiKey &= other._multiKey;
+        return *this;
+    }
+
+    FieldRangeSetPair &FieldRangeSetPair::operator-=( const FieldRangeSet &scanned ) {
+        _singleKey -= scanned;
+        _multiKey -= scanned;
+        return *this;            
+    }    
+    
+    void FieldRangeSetPair::assertValidIndex( const NamespaceDetails *d, int idxNo ) const {
+        massert( 14048, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
+    }
+    
+    void FieldRangeSetPair::assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const {
+        massert( 14049, "FieldRangeSetPair invalid index specified", idxNo >= -1 );
+        if ( idxNo >= 0 ) {
+            assertValidIndex( d, idxNo );   
+        }
+    }    
+    
+    BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
+        return frsForIndex( d, idxNo ).simplifiedQuery( keyPattern );
+    }    
+    
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
         bool eq;
         int l = matchingLowElement( e, i, forward, eq );
@@ -921,36 +1162,50 @@ namespace mongo {
         return l;
     }
 
+    bool FieldRangeVector::matchesKey( const BSONObj &key ) const {
+        BSONObjIterator j( key );
+        BSONObjIterator k( _indexSpec.keyPattern );
+        for( int l = 0; l < (int)_ranges.size(); ++l ) {
+            int number = (int) k.next().number();
+            bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
+            if ( !matchesElement( j.next(), l, forward ) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
         // fields individually instead of constructing several bson objects using
         // multikey arrays.)  But getKeys() canonically defines the key set for a
         // given object and for now we are using it as is.
-        BSONObjSetDefaultOrder keys;
+        BSONObjSet keys;
         _indexSpec.getKeys( obj, keys );
-        for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
-            BSONObjIterator j( *i );
-            BSONObjIterator k( _indexSpec.keyPattern );
-            bool match = true;
-            for( int l = 0; l < (int)_ranges.size(); ++l ) {
-                int number = (int) k.next().number();
-                bool forward = ( number >= 0 ? 1 : -1 ) * ( _direction >= 0 ? 1 : -1 ) > 0;
-                if ( !matchesElement( j.next(), l, forward ) ) {
-                    match = false;
-                    break;
-                }
-            }
-            if ( match ) {
-                // The *i key matched a valid range for every element.
-                return true;
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            if ( matchesKey( *i ) ) {
+                return true;   
             }
         }
         return false;
     }
 
+    BSONObj FieldRangeVector::firstMatch( const BSONObj &obj ) const {
+        // NOTE Only works in forward direction.
+        assert( _direction >= 0 );
+        BSONObjSet keys( BSONObjCmp( _indexSpec.keyPattern ) );
+        _indexSpec.getKeys( obj, keys );
+        for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+            if ( matchesKey( *i ) ) {
+                return *i;
+            }
+        }
+        return BSONObj();
+    }
+    
     // TODO optimize more
-    int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
+    int FieldRangeVectorIterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
         BSONObjIterator o( _v._indexSpec.keyPattern );
         // track first field for which we are not at the end of the valid values,
@@ -1090,13 +1345,109 @@ namespace mongo {
         return -1;
     }
 
-    void FieldRangeVector::Iterator::prepDive() {
+    void FieldRangeVectorIterator::prepDive() {
         for( int j = 0; j < (int)_i.size(); ++j ) {
             _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
             _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
         }
     }
 
+    BSONObj FieldRangeVectorIterator::startKey() {
+        BSONObjBuilder b;
+        for( int unsigned i = 0; i < _i.size(); ++i ) {
+            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+            b.appendAs( fi._lower._bound, "" );
+        }
+        return b.obj();
+    }
+
+    // temp
+    BSONObj FieldRangeVectorIterator::endKey() {
+        BSONObjBuilder b;
+        for( int unsigned i = 0; i < _i.size(); ++i ) {
+            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+            b.appendAs( fi._upper._bound, "" );
+        }
+        return b.obj();
+    }
+    
+    OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
+    : _baseSet( ns, query, optimize ), _orFound() {
+        
+        BSONObjIterator i( _baseSet.originalQuery() );
+        
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+                uassert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    BSONElement f = j.next();
+                    uassert( 13263, "$or array must contain objects", f.type() == Object );
+                    _orSets.push_back( FieldRangeSetPair( ns, f.embeddedObject(), optimize ) );
+                    uassert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
+                    _originalOrSets.push_back( _orSets.back() );
+                }
+                _orFound = true;
+                continue;
+            }
+        }
+    }
+
+    void OrRangeGenerator::assertMayPopOrClause() {
+        massert( 13274, "no or clause to pop", !orFinished() );        
+    }
+    
+    void OrRangeGenerator::popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern ) {
+        assertMayPopOrClause();
+        auto_ptr<FieldRangeSet> holder;
+        const FieldRangeSet *toDiff = &_originalOrSets.front().frsForIndex( nsd, idxNo );
+        BSONObj indexSpec = keyPattern;
+        if ( !indexSpec.isEmpty() && toDiff->matchPossibleForIndex( indexSpec ) ) {
+            holder.reset( toDiff->subset( indexSpec ) );
+            toDiff = holder.get();
+        }
+        popOrClause( toDiff, nsd, idxNo, keyPattern );
+    }
+    
+    void OrRangeGenerator::popOrClauseSingleKey() {
+        assertMayPopOrClause();
+        FieldRangeSet *toDiff = &_originalOrSets.front()._singleKey;
+        popOrClause( toDiff );
+    }
+    
+    /**
+     * Removes the top or clause, which would have been recently scanned, and
+     * removes the field ranges it covers from all subsequent or clauses.  As a
+     * side effect, this function may invalidate the return values of topFrs()
+     * calls made before this function was called.
+     * @param indexSpec - Keys of the index that was used to satisfy the last or
+     * clause.  Used to determine the range of keys that were scanned.  If
+     * empty we do not constrain the previous clause's ranges using index keys,
+     * which may reduce opportunities for range elimination.
+     */
+    void OrRangeGenerator::popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) {
+        list<FieldRangeSetPair>::iterator i = _orSets.begin();
+        list<FieldRangeSetPair>::iterator j = _originalOrSets.begin();
+        ++i;
+        ++j;
+        while( i != _orSets.end() ) {
+            *i -= *toDiff;
+            // Check if match is possible at all, and if it is possible for the recently scanned index.
+            if( !i->matchPossible() || ( d && !i->matchPossibleForIndex( d, idxNo, keyPattern ) ) ) {
+                i = _orSets.erase( i );
+                j = _originalOrSets.erase( j );
+            }
+            else {
+                ++i;
+                ++j;
+            }
+        }
+        _oldOrSets.push_front( _orSets.front() );
+        _orSets.pop_front();
+        _originalOrSets.pop_front();
+    }
+    
     struct SimpleRegexUnitTest : UnitTest {
         void run() {
             {
@@ -1153,6 +1504,16 @@ namespace mongo {
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "foo #" );
             }
+            {
+                assert( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
+                assert( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
+                assert( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
+                assert( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
+                assert( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
+            }
+
         }
     } simple_regex_unittest;
 
@@ -1178,36 +1539,5 @@ namespace mongo {
         return num;
     }
 
-    string debugString( Message& m ) {
-        stringstream ss;
-        ss << "op: " << opToString( m.operation() ) << " len: " << m.size();
-        if ( m.operation() >= 2000 && m.operation() < 2100 ) {
-            DbMessage d(m);
-            ss << " ns: " << d.getns();
-            switch ( m.operation() ) {
-            case dbUpdate: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                BSONObj o = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q << " update: " << o;
-                break;
-            }
-            case dbInsert:
-                ss << d.nextJsObj();
-                break;
-            case dbDelete: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q;
-                break;
-            }
-            default:
-                ss << " CANNOT HANDLE YET";
-            }
-
-
-        }
-        return ss.str();
-    }
 
 } // namespace mongo

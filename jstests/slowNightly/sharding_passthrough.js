@@ -1,6 +1,6 @@
-s = new ShardingTest( "sharding_passthrough" , 2 , 1 , 1 );
-s.adminCommand( { enablesharding : "test" } );
-db=s.getDB("test");
+myShardingTest = new ShardingTest( "sharding_passthrough" , 2 , 1 , 1 );
+myShardingTest.adminCommand( { enablesharding : "test" } );
+db=myShardingTest.getDB("test");
 
 var files = listFiles("jstests");
 
@@ -9,7 +9,6 @@ var runnerStart = new Date()
 files.forEach(
     function(x) {
         
-// /(basic|update).*\.js$/
         if ( /[\/\\]_/.test(x.name) ||
              ! /\.js$/.test(x.name ) ){ 
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
@@ -63,17 +62,17 @@ files.forEach(
      * clean (apitest_dbcollection)
      * logout and getnonce
      */
-	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|unix_socket\d*)\.js$/.test(x.name)) {
+	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|dropdb_race|unix_socket\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These are bugs (some might be fixed now):
-	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4)\.js$/.test(x.name)) {
+	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4|profile1)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact.*|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}
@@ -89,6 +88,9 @@ files.forEach(
 );
 
 
+myShardingTest.stop()
+
 var runnerEnd = new Date()
 
 print( "total runner time: " + ( ( runnerEnd.getTime() - runnerStart.getTime() ) / 1000 ) + "secs" )
+

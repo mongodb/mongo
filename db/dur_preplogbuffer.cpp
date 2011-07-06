@@ -93,7 +93,7 @@ namespace mongo {
             bb.appendBuf(i->start(), e.len);
 
             if (e.len != (unsigned)i->length()) {
-                log() << "dur info splitting prepBasicWrite at boundary" << endl;
+                log() << "journal info splitting prepBasicWrite at boundary" << endl;
 
                 // This only happens if we write to the last byte in a file and
                 // the fist byte in another file that is mapped adjacently. I

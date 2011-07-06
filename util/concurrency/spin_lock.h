@@ -35,11 +35,15 @@ namespace mongo {
         void lock();
         void unlock();
 
+        static bool isfast();
+
     private:
-#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-        volatile bool _locked;
-#elif defined(_WIN32)
+#if defined(_WIN32)
         CRITICAL_SECTION _cs;
+#elif defined(__USE_XOPEN2K)
+        pthread_spinlock_t _lock;
+#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+        volatile bool _locked;
 #else
         // default to a scoped mutex if not implemented
         RWLock _mutex;
@@ -48,6 +52,16 @@ namespace mongo {
         // Non-copyable, non-assignable
         SpinLock(SpinLock&);
         SpinLock& operator=(SpinLock&);
+    };
+    
+    struct scoped_spinlock {
+        scoped_spinlock( SpinLock& l ) : _l(l){
+            _l.lock();
+        }
+        ~scoped_spinlock() {
+            _l.unlock();
+        }
+        SpinLock& _l;
     };
 
 }  // namespace mongo

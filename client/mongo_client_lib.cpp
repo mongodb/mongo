@@ -49,17 +49,19 @@
 #include "../pch.h"
 
 #include "../util/assert_util.cpp"
-#include "../util/message.cpp"
+#include "../util/net/message.cpp"
 #include "../util/util.cpp"
 #include "../util/background.cpp"
 #include "../util/base64.cpp"
-#include "../util/sock.cpp"
+#include "../util/net/sock.cpp"
 #include "../util/log.cpp"
 #include "../util/password.cpp"
+#include "../util/net/message_port.cpp"
 
 #include "../util/concurrency/thread_pool.cpp"
 #include "../util/concurrency/vars.cpp"
 #include "../util/concurrency/task.cpp"
+#include "../util/concurrency/spin_lock.cpp"
 
 #include "connpool.cpp"
 #include "syncclusterconnection.cpp"
@@ -75,7 +77,7 @@
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
-#include "../db/common.cpp"
+//#include "../db/common.cpp"
 #include "../db/nonce.cpp"
 #include "../db/commands.cpp"
 

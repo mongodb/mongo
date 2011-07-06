@@ -25,6 +25,8 @@
 #include "../util/text.h"
 #include "../util/queue.h"
 #include "../util/paths.h"
+#include "../util/stringutils.h"
+#include "../db/db.h"
 
 namespace BasicTests {
 
@@ -195,12 +197,16 @@ namespace BasicTests {
             int matches = 0;
             for( int p = 0; p < 3; p++ ) {
                 sleepsecs( 1 );
-                int sec = t.seconds();
+                int sec = (t.millis() + 2)/1000;
                 if( sec == 1 ) 
                     matches++;
+                else
+                    log() << "temp millis: " << t.millis() << endl;
                 ASSERT( sec >= 0 && sec <= 2 );
                 t.reset();
             }
+            if ( matches < 2 )
+                log() << "matches:" << matches << endl;
             ASSERT( matches >= 2 );
 
             sleepmicros( 1527123 );
@@ -222,7 +228,7 @@ namespace BasicTests {
                 {
                     int x = t.millis();
                     if ( x < 1000 || x > 2500 ) {
-                        cout << "sleeptest x: " << x << endl;
+                        cout << "sleeptest finds sleep accuracy to be not great. x: " << x << endl;
                         ASSERT( x >= 1000 );
                         ASSERT( x <= 20000 );
                     }
@@ -399,6 +405,12 @@ namespace BasicTests {
             ASSERT_EQUALS( -1, lexNumCmp( "a", "0a"));
             ASSERT_EQUALS( -1, lexNumCmp( "000a", "001a"));
             ASSERT_EQUALS( 0, lexNumCmp( "010a", "0010a"));
+            
+            ASSERT_EQUALS( -1 , lexNumCmp( "a0" , "a00" ) );
+            ASSERT_EQUALS( 0 , lexNumCmp( "a.0" , "a.00" ) );
+            ASSERT_EQUALS( -1 , lexNumCmp( "a.b.c.d0" , "a.b.c.d00" ) );
+            ASSERT_EQUALS( 1 , lexNumCmp( "a.b.c.0.y" , "a.b.c.00.x" ) );
+            
         }
     };
 
@@ -409,16 +421,16 @@ namespace BasicTests {
             ASSERT( ! Database::validDBName( "foo/bar" ) );
             ASSERT( ! Database::validDBName( "foo.bar" ) );
 
-            ASSERT( isANormalNSName( "asdads" ) );
-            ASSERT( ! isANormalNSName( "asda$ds" ) );
-            ASSERT( isANormalNSName( "local.oplog.$main" ) );
+            ASSERT( NamespaceString::normal( "asdads" ) );
+            ASSERT( ! NamespaceString::normal( "asda$ds" ) );
+            ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
         }
     };
 
     class DatabaseOwnsNS {
     public:
         void run() {
-
+            dblock lk;
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack

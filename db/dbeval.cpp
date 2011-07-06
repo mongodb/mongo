@@ -18,7 +18,7 @@
 */
 
 #include "pch.h"
-#include "query.h"
+#include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "../bson/util/builder.h"
@@ -86,7 +86,7 @@ namespace mongo {
         int res;
         {
             Timer t;
-            res = s->invoke(f,args, cmdLine.quota ? 10 * 60 * 1000 : 0 );
+            res = s->invoke(f, &args, 0, cmdLine.quota ? 10 * 60 * 1000 : 0 );
             int m = t.millis();
             if ( m > cmdLine.slowMS ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;

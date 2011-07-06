@@ -137,6 +137,9 @@ namespace mongo {
         virtual Nullstream& operator<<(unsigned) {
             return *this;
         }
+        virtual Nullstream& operator<<(unsigned short) {
+            return *this;
+        }
         virtual Nullstream& operator<<(double) {
             return *this;
         }
@@ -242,6 +245,7 @@ namespace mongo {
         Logstream& operator<<(long x)          { ss << x; return *this; }
         Logstream& operator<<(unsigned long x) { ss << x; return *this; }
         Logstream& operator<<(unsigned x)      { ss << x; return *this; }
+        Logstream& operator<<(unsigned short x){ ss << x; return *this; }
         Logstream& operator<<(double x)        { ss << x; return *this; }
         Logstream& operator<<(void *x)         { ss << x; return *this; }
         Logstream& operator<<(const void *x)   { ss << x; return *this; }
@@ -324,7 +328,7 @@ namespace mongo {
         return Logstream::get();
     }
 
-    /** logging which we may not want during unit tests runs.
+    /** logging which we may not want during unit tests (dbtests) runs.
         set tlogLevel to -1 to suppress tlog() output in a test program. */
     inline Nullstream& tlog( int level = 0 ) {
         if ( level > tlogLevel || level > logLevel )
@@ -431,7 +435,6 @@ namespace mongo {
     string errnoWithPrefix( const char * prefix );
 
     void Logstream::logLockless( const StringData& s ) {
-
         if ( s.size() == 0 )
             return;
 

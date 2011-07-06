@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/statvfs.h>
 #else
 #include <windows.h>
 #endif
@@ -37,6 +38,8 @@ namespace mongo {
     typedef boost::uint64_t fileofs;
 #endif
 
+    /* NOTE: not thread-safe. (at least the windows implementation isn't. */
+
     class FileInterface {
     public:
         void open(const char *fn) {}
@@ -46,6 +49,9 @@ namespace mongo {
         bool is_open() {return false;}
         fileofs len() { return 0; }
         void fsync() { assert(false); }
+
+        /** @return  -1 if error or unavailable */
+        static boost::intmax_t freeSpace(const string &path) { assert(false); return -1; }
     };
 
 #if defined(_WIN32)
@@ -80,6 +86,15 @@ namespace mongo {
             }
             else
                 _bad = false;
+        }
+        static boost::intmax_t freeSpace(const string &path) {
+            ULARGE_INTEGER avail;
+            if( GetDiskFreeSpaceEx(toNativeString(path.c_str()).c_str(), &avail, NULL, NULL) ) { 
+                return avail.QuadPart;
+            }
+            DWORD e = GetLastError();
+            log() << "GetDiskFreeSpaceEx fails errno: " << e << endl;
+            return -1;
         }
         void write(fileofs o, const char *data, unsigned len) {
             LARGE_INTEGER li;
@@ -158,14 +173,30 @@ namespace mongo {
             err( ::pwrite(fd, data, len, o) == (int) len );
         }
         void read(fileofs o, char *data, unsigned len) {
-            err( ::pread(fd, data, len, o) == (int) len );
+            ssize_t s = ::pread(fd, data, len, o);
+            if( s == -1 ) {
+                err(false);
+            }
+            else if( s != (int) len ) { 
+                _bad = true;
+                log() << "File error read:" << s << " bytes, wanted:" << len << " ofs:" << o << endl;
+            }
         }
         bool bad() { return _bad; }
         bool is_open() { return fd > 0; }
         fileofs len() {
-            return lseek(fd, 0, SEEK_END);
+            off_t o = lseek(fd, 0, SEEK_END);
+            if( o != (off_t) -1 )
+                return o;
+            err(false);
+            return 0;
         }
         void fsync() { ::fsync(fd); }
+        static boost::intmax_t freeSpace ( const string &path ) {
+            struct statvfs info;
+            assert( !statvfs( path.c_str() , &info ) );
+            return boost::intmax_t( info.f_bavail ) * info.f_frsize;
+        }
     };
 
 

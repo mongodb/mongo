@@ -7,7 +7,8 @@ debug: FORCE
 	scons --d -j `cat /proc/cpuinfo | grep processor | wc -l` all
 
 install: FORCE # as root
-	scons --full --sharedclient --prefix=/usr/local install
+	#scons --full --sharedclient --prefix=/usr/local install
+	scons --prefix=/usr/local install
 	echo "/usr/local/lib64" > /etc/ld.so.conf.d/mongodb.conf
 	/sbin/ldconfig
 

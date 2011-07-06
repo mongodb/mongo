@@ -22,10 +22,10 @@
 
 #include "../db/btree.h"
 #include "../db/commands.h"
-#include "../db/dbmessage.h"
 #include "../db/jsobj.h"
-#include "../db/query.h"
+#include "../db/instance.h"
 #include "../db/queryoptimizer.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -74,22 +74,25 @@ namespace mongo {
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
 
-            // only yielding on firt half for now
+            // only yielding on first half for now
             // after this it should be in ram, so 2nd should be fast
             {
-                shared_ptr<Cursor> c( new BtreeCursor( d, idxNo, *id, min, max, false, 1 ) );
-                scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                shared_ptr<Cursor> c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
+                auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 while ( c->ok() ) {
                     num++;
                     c->advance();
-                    if ( ! cc->yieldSometimes() )
+                    if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
+                        cc.release();
                         break;
+                    }
                 }
             }
 
             num /= 2;
 
-            BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
+            auto_ptr<BtreeCursor> _c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
+            BtreeCursor& c = *_c;
             for( ; num; c.advance(), --num );
 
             ostringstream os;
@@ -138,6 +141,11 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "checkShardingIndex" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElementFieldName() ) ) {
+                result.appendBool( "idskip" , true );
+                return true;
+            }
+
             // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
@@ -169,9 +177,9 @@ namespace mongo {
                 return false;
             }
 
-            BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
-            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
             if ( ! cc->ok() ) {
                 // range is empty
                 return true;
@@ -211,6 +219,11 @@ namespace mongo {
                     return false;
                 }
                 cc->advance();
+
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
+                    cc.release();
+                    break;
+                }
             }
 
             return true;
@@ -360,9 +373,9 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
                 shared_ptr<Cursor> c( bc );
-                scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 if ( ! cc->ok() ) {
                     errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                     return false;
@@ -406,13 +419,13 @@ namespace mongo {
                             break;
                         }
                         
-                        if ( ! cc->yieldSometimes() ) {
+                        if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                             // we were near and and got pushed to the end
                             // i think returning the splits we've already found is fine
                             
-                            // don't use the btree cursor pointer to acces keys beyond this point but ok
+                            // don't use the btree cursor pointer to access keys beyond this point but ok
                             // to use it for format the keys we've got already
-                            
+                            cc.release();
                             break;
                         }
                     }
@@ -425,7 +438,7 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
                     
-                    bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                    bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
                     c.reset( bc );
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 }
@@ -523,31 +536,31 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj keyPattern = cmdObj["keyPattern"].Obj();
+            const BSONObj keyPattern = cmdObj["keyPattern"].Obj();
             if ( keyPattern.isEmpty() ) {
                 errmsg = "need to specify the key pattern the collection is sharded over";
                 return false;
             }
 
-            BSONObj min = cmdObj["min"].Obj();
+            const BSONObj min = cmdObj["min"].Obj();
             if ( min.isEmpty() ) {
-                errmsg = "neet to specify the min key for the chunk";
+                errmsg = "need to specify the min key for the chunk";
                 return false;
             }
 
-            BSONObj max = cmdObj["max"].Obj();
+            const BSONObj max = cmdObj["max"].Obj();
             if ( max.isEmpty() ) {
-                errmsg = "neet to specify the max key for the chunk";
+                errmsg = "need to specify the max key for the chunk";
                 return false;
             }
 
-            string from = cmdObj["from"].str();
+            const string from = cmdObj["from"].str();
             if ( from.empty() ) {
                 errmsg = "need specify server to split chunk at";
                 return false;
             }
 
-            BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
+            const BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
             if ( splitKeysElem.isEmpty() ) {
                 errmsg = "need to provide the split points to chunk over";
                 return false;
@@ -558,7 +571,7 @@ namespace mongo {
                 splitKeys.push_back( it.next().Obj().getOwned() );
             }
 
-            BSONElement shardId = cmdObj["shardId"];
+            const BSONElement shardId = cmdObj["shardId"];
             if ( shardId.eoo() ) {
                 errmsg = "need to provide shardId";
                 return false;
@@ -592,7 +605,7 @@ namespace mongo {
             	dlk = dist_lock_try( &lockSetup, string("split-") + min.toString() );
             }
             catch( LockException& e ){
-            	errmsg = string("Error locking distributed lock for split.") + m_caused_by(e);
+            	errmsg = str::stream() << "Error locking distributed lock for split." << causedBy( e );
             	return false;
             }
 
@@ -696,7 +709,7 @@ namespace mongo {
                 op.appendBool( "b" , true );
                 op.append( "ns" , ShardNS::chunk );
 
-                // add the modified (new) chunk infomation as the update object
+                // add the modified (new) chunk information as the update object
                 BSONObjBuilder n( op.subobjStart( "o" ) );
                 n.append( "_id" , Chunk::genID( ns , startKey ) );
                 n.appendTimestamp( "lastmod" , myVersion );
@@ -782,10 +795,25 @@ namespace mongo {
                 for ( int i=0; i < newChunksSize; i++ ) {
                     BSONObjBuilder chunkDetail;
                     chunkDetail.appendElements( beforeDetailObj );
-                    chunkDetail.append( "number", i );
+                    chunkDetail.append( "number", i+1 );
                     chunkDetail.append( "of" , newChunksSize );
                     newChunks[i].appendShortVersion( "chunk" , chunkDetail );
                     configServer.logChange( "multi-split" , ns , chunkDetail.obj() );
+                }
+            }
+
+            if (newChunks.size() == 2){
+                // If one of the chunks has only one object in it we should move it
+                static const BSONObj fields = BSON("_id" << 1 );
+                DBDirectClient conn;
+                for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
+                    ChunkInfo chunk = newChunks[i];
+                    Query q = Query().minKey(chunk.min).maxKey(chunk.max);
+                    scoped_ptr<DBClientCursor> c (conn.query(ns, q, /*limit*/-2, 0, &fields));
+                    if (c && c->itcount() == 1) {
+                        result.append("shouldMigrate", BSON("min" << chunk.min << "max" << chunk.max));
+                        break;
+                    }
                 }
             }
 

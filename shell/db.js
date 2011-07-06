@@ -22,8 +22,8 @@ DB.prototype.getName = function(){
     return this._name;
 }
 
-DB.prototype.stats = function(){
-    return this.runCommand( { dbstats : 1 } );
+DB.prototype.stats = function(scale){
+    return this.runCommand( { dbstats : 1 , scale : scale } );
 }
 
 DB.prototype.getCollection = function( name ){
@@ -60,15 +60,26 @@ DB.prototype.adminCommand = function( obj ){
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
 DB.prototype.addUser = function( username , pass, readOnly ){
+    if ( pass == null || pass.length == 0 )
+        throw "password can't be empty";
+
     readOnly = readOnly || false;
     var c = this.getCollection( "system.users" );
     
     var u = c.findOne( { user : username } ) || { user : username };
     u.readOnly = readOnly;
     u.pwd = hex_md5( username + ":mongo:" + pass );
-    print( tojson( u ) );
 
     c.save( u );
+    var le = this.getLastErrorObj();
+    printjson( le )
+    if ( le.err )
+        throw "couldn't add user: " + le.err
+    print( tojson( u ) );
+}
+
+DB.prototype.logout = function(){
+    return this.runCommand({logout : 1});
 }
 
 DB.prototype.removeUser = function( username ){
@@ -133,7 +144,7 @@ DB.prototype.createCollection = function(name, opt) {
  *  Returns the current profiling level of this database
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingLevel  = function() { 
+DB.prototype.getProfilingLevel  = function() {
     var res = this._dbCommand( { profile: -1 } );
     return res ? res.was : null;
 }
@@ -143,7 +154,7 @@ DB.prototype.getProfilingLevel  = function() {
  *  example { was : 0, slowms : 100 }
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingStatus  = function() { 
+DB.prototype.getProfilingStatus  = function() {
     var res = this._dbCommand( { profile: -1 } );
     if ( ! res.ok )
         throw "profile command failed: " + tojson( res );
@@ -154,24 +165,37 @@ DB.prototype.getProfilingStatus  = function() {
 
 /**
   Erase the entire database.  (!)
- 
+
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
 */
-DB.prototype.dropDatabase = function() { 	
+DB.prototype.dropDatabase = function() {
     if ( arguments.length )
         throw "dropDatabase doesn't take arguments";
     return this._dbCommand( { dropDatabase: 1 } );
 }
 
-
-DB.prototype.shutdownServer = function() { 
+/**
+ * Shuts down the database.  Must be run while using the admin database.
+ * @param opts Options for shutdown. Possible options are:
+ *   - force: (boolean) if the server should shut down, even if there is no
+ *     up-to-date slave
+ *   - timeoutSecs: (number) the server will continue checking over timeoutSecs
+ *     if any other servers have caught up enough for it to shut down.
+ */
+DB.prototype.shutdownServer = function(opts) {
     if( "admin" != this._name ){
 	return "shutdown command only works with the admin database; try 'use admin'";
     }
 
+    cmd = {"shutdown" : 1};
+    opts = opts || {};
+    for (var o in opts) {
+        cmd[o] = opts[o];
+    }
+
     try {
-        var res = this._dbCommand("shutdown");
-	if( res ) 
+        var res = this.runCommand(cmd);
+	if( res )
 	    throw "shutdownServer failed: " + res.errmsg;
 	throw "shutdownServer failed";
     }
@@ -298,6 +322,7 @@ DB.prototype.help = function() {
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
+    print("\tdb.logout()");
     print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
