@@ -47,9 +47,9 @@ namespace mongo {
 
     };
 
-    class MessagingPort : public AbstractMessagingPort {
+    class MessagingPort : public AbstractMessagingPort , public Socket {
     public:
-        MessagingPort(int sock, const SockAddr& farEnd);
+        MessagingPort(int fd, const SockAddr& remote);
 
         // in some cases the timeout will actually be 2x this value - eg we do a partial send,
         // then the timeout fires, then we try to send again, then the timeout fires again with
@@ -59,8 +59,6 @@ namespace mongo {
         virtual ~MessagingPort();
 
         void shutdown();
-
-        bool connect(SockAddr& farEnd);
 
         /* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
            also, the Message data will go out of scope on the subsequent recv call.
@@ -85,37 +83,19 @@ namespace mongo {
 
         void piggyBack( Message& toSend , int responseTo = -1 );
 
-        virtual unsigned remotePort() const;
+        unsigned remotePort() const { return Socket::remotePort(); }
         virtual HostAndPort remote() const;
 
-        // send len or throw SocketException
-        void send( const char * data , int len, const char *context );
-        void send( const vector< pair< char *, int > > &data, const char *context );
 
-        // recv len or throw SocketException
-        void recv( char * data , int len );
-
-        int unsafe_recv( char *buf, int max );
-
-        void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
-        long long getBytesIn() const { return _bytesIn; }
-        long long getBytesOut() const { return _bytesOut; }
     private:
-        int sock;
-        PiggyBackData * piggyBackData;
-
-        long long _bytesIn;
-        long long _bytesOut;
         
-        // this is the parsed version of farEnd
+        PiggyBackData * piggyBackData;
+        
+        // this is the parsed version of remote
         // mutable because its initialized only on call to remote()
-        mutable HostAndPort _farEndParsed; 
+        mutable HostAndPort _remoteParsed; 
 
     public:
-        SockAddr farEnd;
-        double _timeout;
-        int _logLevel; // passed to log() when logging errors
-
         static void closeAllSockets(unsigned tagMask = 0xffffffff);
 
         friend class PiggyBackData;

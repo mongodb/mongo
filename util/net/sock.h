@@ -192,5 +192,48 @@ namespace mongo {
         string _extra;
     };
 
+    class Socket {
+    public:
+        Socket(int sock, const SockAddr& farEnd);
+
+        // in some cases the timeout will actually be 2x this value - eg we do a partial send,
+        // then the timeout fires, then we try to send again, then the timeout fires again with
+        // no data sent, then we detect that the other side is down
+        Socket(double so_timeout = 0, int logLevel = 0 );
+
+        bool connect(SockAddr& farEnd);
+        void close();
+        
+        void send( const char * data , int len, const char *context );
+        void send( const vector< pair< char *, int > > &data, const char *context );
+
+        // recv len or throw SocketException
+        void recv( char * data , int len );
+        int unsafe_recv( char *buf, int max );
+        
+        int getLogLevel() const { return _logLevel; }
+        void setLogLevel( int ll ) { _logLevel = ll; }
+
+        SockAddr remoteAddr() const { return _remote; }
+        string remoteString() const { return _remote.toString(); }
+        unsigned remotePort() const { return _remote.getPort(); }
+
+        void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
+        long long getBytesIn() const { return _bytesIn; }
+        long long getBytesOut() const { return _bytesOut; }
+
+    private:
+        int _fd;
+        SockAddr _remote;
+        double _timeout;
+
+        long long _bytesIn;
+        long long _bytesOut;
+
+    protected:
+        int _logLevel; // passed to log() when logging errors
+
+    };
+
 
 } // namespace mongo

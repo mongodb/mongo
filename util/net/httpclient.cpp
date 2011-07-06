@@ -89,18 +89,18 @@ namespace mongo {
         SockAddr addr( server.c_str() , port );
         HD( "addr: " << addr.toString() );
 
-        MessagingPort p;
-        if ( ! p.connect( addr ) )
+        Socket sock;
+        if ( ! sock.connect( addr ) )
             return -1;
 
         {
             const char * out = req.c_str();
             int toSend = req.size();
-            p.send( out , toSend, "_go" );
+            sock.send( out , toSend, "_go" );
         }
 
         char buf[4096];
-        int got = p.unsafe_recv( buf , 4096 );
+        int got = sock.unsafe_recv( buf , 4096 );
         buf[got] = 0;
 
         int rc;
@@ -112,7 +112,7 @@ namespace mongo {
         if ( result )
             sb << buf;
 
-        while ( ( got = p.unsafe_recv( buf , 4096 ) ) > 0) {
+        while ( ( got = sock.unsafe_recv( buf , 4096 ) ) > 0) {
             if ( result )
                 sb << buf;
         }

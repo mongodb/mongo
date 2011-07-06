@@ -40,7 +40,7 @@ namespace mongo {
             setThreadName( "conn" );
             
             assert( inPort );
-            inPort->_logLevel = 1;
+            inPort->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
             string otherSide;
@@ -50,7 +50,7 @@ namespace mongo {
                 LastError * le = new LastError();
                 lastError.reset( le ); // lastError now has ownership
 
-                otherSide = p->farEnd.toString();
+                otherSide = p->remoteString();
 
                 handler->connected( p.get() );
 

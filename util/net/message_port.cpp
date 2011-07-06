@@ -52,15 +52,6 @@ namespace mongo {
 // if you want trace output:
 #define mmm(x)
 
-#ifdef MSG_NOSIGNAL
-    const int portSendFlags = MSG_NOSIGNAL;
-    const int portRecvFlags = MSG_NOSIGNAL;
-#else
-    const int portSendFlags = 0;
-    const int portRecvFlags = 0;
-#endif
-
-
     /* messagingport -------------------------------------------------------------- */
 
     class PiggyBackData {
@@ -135,24 +126,19 @@ namespace mongo {
         ports.closeAll(mask);
     }
 
-    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), _bytesIn(0), _bytesOut(0), farEnd(_far), _timeout() {
-        _logLevel = 0;
+    MessagingPort::MessagingPort(int fd, const SockAddr& remote) 
+        : Socket( fd , remote ) , piggyBackData(0) {
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( double timeout, int ll ) : _bytesIn(0), _bytesOut(0) {
-        _logLevel = ll;
+    MessagingPort::MessagingPort( double timeout, int ll ) 
+        : Socket( timeout, ll ) {
         ports.insert(this);
-        sock = -1;
         piggyBackData = 0;
-        _timeout = timeout;
     }
 
     void MessagingPort::shutdown() {
-        if ( sock >= 0 ) {
-            closesocket(sock);
-            sock = -1;
-        }
+        close();
     }
 
     MessagingPort::~MessagingPort() {
@@ -160,71 +146,6 @@ namespace mongo {
             delete( piggyBackData );
         shutdown();
         ports.erase(this);
-    }
-
-    class ConnectBG : public BackgroundJob {
-    public:
-        ConnectBG(int sock, SockAddr farEnd) : _sock(sock), _farEnd(farEnd) { }
-
-        void run() { _res = ::connect(_sock, _farEnd.raw(), _farEnd.addressSize); }
-        string name() const { return "ConnectBG"; }
-        int inError() const { return _res; }
-
-    private:
-        int _sock;
-        int _res;
-        SockAddr _farEnd;
-    };
-
-    bool MessagingPort::connect(SockAddr& _far) {
-        farEnd = _far;
-
-        sock = socket(farEnd.getType(), SOCK_STREAM, 0);
-        if ( sock == INVALID_SOCKET ) {
-            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
-            return false;
-        }
-
-        if ( _timeout > 0 ) {
-            setSockTimeouts( sock, _timeout );
-        }
-
-        ConnectBG bg(sock, farEnd);
-        bg.go();
-        if ( bg.wait(5000) ) {
-            if ( bg.inError() ) {
-                closesocket(sock);
-                sock = -1;
-                return false;
-            }
-        }
-        else {
-            // time out the connect
-            closesocket(sock);
-            sock = -1;
-            bg.wait(); // so bg stays in scope until bg thread terminates
-            return false;
-        }
-
-        if (farEnd.getType() != AF_UNIX)
-            disableNagle(sock);
-
-#ifdef SO_NOSIGPIPE
-        // osx
-        const int one = 1;
-        setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
-#endif
-
-        /*
-          // SO_LINGER is bad
-        #ifdef SO_LINGER
-        struct linger ling;
-        ling.l_onoff = 1;
-        ling.l_linger = 0;
-        setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *) &ling, sizeof(ling));
-        #endif
-        */
-        return true;
     }
 
     bool MessagingPort::recv(Message& m) {
@@ -235,7 +156,7 @@ again:
 
             char *lenbuf = (char *) &len;
             int lft = 4;
-            recv( lenbuf, lft );
+            Socket::recv( lenbuf, lft );
 
             if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
                 if ( len == -1 ) {
@@ -269,14 +190,13 @@ again:
             int left = len -4;
 
             try {
-                recv( p, left );
+                Socket::recv( p, left );
             }
             catch (...) {
                 free(md);
                 throw;
             }
 
-            _bytesIn += len;
             m.setData(md, true);
             return true;
 
@@ -316,7 +236,7 @@ again:
                     << "  response msgid:" << (unsigned)response.header()->id << '\n'
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
-                    << "  farEnd: " << farEnd << endl;
+                    << "  remote: " << remoteString() << endl;
             assert(false);
             response.reset();
         }
@@ -346,134 +266,6 @@ again:
         toSend.send( *this, "say" );
     }
 
-    // sends all data or throws an exception
-    void MessagingPort::send( const char * data , int len, const char *context ) {
-        _bytesOut += len;
-        while( len > 0 ) {
-            int ret = ::send( sock , data , len , portSendFlags );
-            if ( ret == -1 ) {
-                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
-                    log(_logLevel) << "MessagingPort " << context << " send() timed out " << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_TIMEOUT , remote() );
-                }
-                else {
-                    SocketException::Type t = SocketException::SEND_ERROR;
-#if defined(_WINDOWS)
-                    if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
-#endif
-                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException( t , remote() );
-                }
-            }
-            else {
-                assert( ret <= len );
-                len -= ret;
-                data += ret;
-            }
-        }
-    }
-
-    // sends all data or throws an exception
-    void MessagingPort::send( const vector< pair< char *, int > > &data, const char *context ) {
-#if defined(_WIN32)
-        // TODO use scatter/gather api
-        for( vector< pair< char *, int > >::const_iterator i = data.begin(); i != data.end(); ++i ) {
-            char * data = i->first;
-            int len = i->second;
-            send( data, len, context );
-        }
-#else
-        vector< struct iovec > d( data.size() );
-        int i = 0;
-        for( vector< pair< char *, int > >::const_iterator j = data.begin(); j != data.end(); ++j ) {
-            if ( j->second > 0 ) {
-                d[ i ].iov_base = j->first;
-                d[ i ].iov_len = j->second;
-                ++i;
-            }
-        }
-        struct msghdr meta;
-        memset( &meta, 0, sizeof( meta ) );
-        meta.msg_iov = &d[ 0 ];
-        meta.msg_iovlen = d.size();
-
-        while( meta.msg_iovlen > 0 ) {
-            int ret = ::sendmsg( sock , &meta , portSendFlags );
-            if ( ret == -1 ) {
-                if ( errno != EAGAIN || _timeout == 0 ) {
-                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_ERROR , remote() );
-                }
-                else {
-                    log(_logLevel) << "MessagingPort " << context << " send() remote timeout " << farEnd.toString() << endl;
-                    throw SocketException( SocketException::SEND_TIMEOUT , remote() );
-                }
-            }
-            else {
-                struct iovec *& i = meta.msg_iov;
-                while( ret > 0 ) {
-                    if ( i->iov_len > unsigned( ret ) ) {
-                        i->iov_len -= ret;
-                        i->iov_base = (char*)(i->iov_base) + ret;
-                        ret = 0;
-                    }
-                    else {
-                        ret -= i->iov_len;
-                        ++i;
-                        --(meta.msg_iovlen);
-                    }
-                }
-            }
-        }
-#endif
-    }
-
-    void MessagingPort::recv( char * buf , int len ) {
-        unsigned retries = 0;
-        while( len > 0 ) {
-            int ret = ::recv( sock , buf , len , portRecvFlags );
-            if ( ret > 0 ) {
-                if ( len <= 4 && ret != len )
-                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
-                assert( ret <= len );
-                len -= ret;
-                buf += ret;
-            }
-            else if ( ret == 0 ) {
-                log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
-                throw SocketException( SocketException::CLOSED , remote() );
-            }
-            else { /* ret < 0  */
-                int e = errno;
-                
-#if defined(EINTR) && !defined(_WIN32)
-                if( e == EINTR ) {
-                    if( ++retries == 1 ) {
-                        log() << "EINTR retry" << endl;
-                        continue;
-                    }
-                }
-#endif
-                if ( ( e == EAGAIN 
-#ifdef _WINDOWS
-                       || e == WSAETIMEDOUT
-#endif
-                       ) && _timeout > 0 ) {
-                    // this is a timeout
-                    log(_logLevel) << "MessagingPort recv() timeout  " << farEnd.toString() <<endl;
-                    throw SocketException( SocketException::RECV_TIMEOUT, remote() );                    
-                }
-
-                log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
-                throw SocketException( SocketException::RECV_ERROR , remote() );
-            }
-        }
-    }
-
-    int MessagingPort::unsafe_recv( char *buf, int max ) {
-        return ::recv( sock , buf , max , portRecvFlags );
-    }
-
     void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
 
         if ( toSend.header()->len > 1300 ) {
@@ -492,14 +284,10 @@ again:
         piggyBackData->append( toSend );
     }
 
-    unsigned MessagingPort::remotePort() const {
-        return farEnd.getPort();
-    }
-
     HostAndPort MessagingPort::remote() const {
-        if ( ! _farEndParsed.hasPort() )
-            _farEndParsed = HostAndPort( farEnd );
-        return _farEndParsed;
+        if ( ! _remoteParsed.hasPort() )
+            _remoteParsed = HostAndPort( remoteAddr() );
+        return _remoteParsed;
     }
 
 

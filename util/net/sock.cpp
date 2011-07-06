@@ -15,8 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 #include "sock.h"
+#include "../background.h"
 
 namespace mongo {
 
@@ -215,6 +216,15 @@ namespace mongo {
 
     // --------- SocketException ----------
 
+#ifdef MSG_NOSIGNAL
+    const int portSendFlags = MSG_NOSIGNAL;
+    const int portRecvFlags = MSG_NOSIGNAL;
+#else
+    const int portSendFlags = 0;
+    const int portRecvFlags = 0;
+#endif
+
+
     string SocketException::toString() const {
         stringstream ss;
         ss << _ei.code << " socket exception [" << _type << "] ";
@@ -226,6 +236,219 @@ namespace mongo {
             ss << _extra;
         
         return ss.str();
+    }
+
+
+    // ------------ Socket -----------------
+    
+    Socket::Socket(int fd , const SockAddr& remote) : 
+        _fd(fd), _remote(remote), _timeout(0) {
+        _logLevel = 0;
+        _bytesOut = 0;
+        _bytesIn = 0;
+    }
+
+    Socket::Socket( double timeout, int ll ) {
+        _logLevel = ll;
+        _fd = -1;
+        _timeout = timeout;
+        _bytesOut = 0;
+        _bytesIn = 0;
+    }
+
+    void Socket::close() {
+        if ( _fd >= 0 ) {
+            closesocket( _fd );
+            _fd = -1;
+        }
+    }
+
+    class ConnectBG : public BackgroundJob {
+    public:
+        ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) { }
+
+        void run() { _res = ::connect(_sock, _remote.raw(), _remote.addressSize); }
+        string name() const { return "ConnectBG"; }
+        int inError() const { return _res; }
+
+    private:
+        int _sock;
+        int _res;
+        SockAddr _remote;
+    };
+
+    bool Socket::connect(SockAddr& remote) {
+        _remote = remote;
+
+        _fd = socket(remote.getType(), SOCK_STREAM, 0);
+        if ( _fd == INVALID_SOCKET ) {
+            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
+            return false;
+        }
+
+        if ( _timeout > 0 ) {
+            setSockTimeouts( _fd, _timeout );
+        }
+
+        ConnectBG bg(_fd, remote);
+        bg.go();
+        if ( bg.wait(5000) ) {
+            if ( bg.inError() ) {
+                close();
+                return false;
+            }
+        }
+        else {
+            // time out the connect
+            close();
+            bg.wait(); // so bg stays in scope until bg thread terminates
+            return false;
+        }
+
+        if (remote.getType() != AF_UNIX)
+            disableNagle(_fd);
+
+#ifdef SO_NOSIGPIPE
+        // osx
+        const int one = 1;
+        setsockopt( _fd , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
+
+        return true;
+    }
+
+
+    // sends all data or throws an exception
+    void Socket::send( const char * data , int len, const char *context ) {
+        while( len > 0 ) {
+            int ret = ::send( _fd , data , len , portSendFlags );
+            if ( ret == -1 ) {
+                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                    log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
+                }
+                else {
+                    SocketException::Type t = SocketException::SEND_ERROR;
+#if defined(_WINDOWS)
+                    if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
+#endif
+                    log(_logLevel) << "Socket " << context << " send() " 
+                                   << errnoWithDescription() << ' ' << remoteString() << endl;
+                    throw SocketException( t , remoteString() );
+                }
+            }
+            else {
+                _bytesOut += ret;
+
+                assert( ret <= len );
+                len -= ret;
+                data += ret;
+            }
+        }
+    }
+
+    // sends all data or throws an exception
+    void Socket::send( const vector< pair< char *, int > > &data, const char *context ) {
+#if defined(_WIN32)
+        // TODO use scatter/gather api
+        for( vector< pair< char *, int > >::const_iterator i = data.begin(); i != data.end(); ++i ) {
+            char * data = i->first;
+            int len = i->second;
+            send( data, len, context );
+        }
+#else
+        vector< struct iovec > d( data.size() );
+        int i = 0;
+        for( vector< pair< char *, int > >::const_iterator j = data.begin(); j != data.end(); ++j ) {
+            if ( j->second > 0 ) {
+                d[ i ].iov_base = j->first;
+                d[ i ].iov_len = j->second;
+                ++i;
+                _bytesOut += j->second;
+            }
+        }
+        struct msghdr meta;
+        memset( &meta, 0, sizeof( meta ) );
+        meta.msg_iov = &d[ 0 ];
+        meta.msg_iovlen = d.size();
+
+        while( meta.msg_iovlen > 0 ) {
+            int ret = ::sendmsg( _fd , &meta , portSendFlags );
+            if ( ret == -1 ) {
+                if ( errno != EAGAIN || _timeout == 0 ) {
+                    log(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
+                    throw SocketException( SocketException::SEND_ERROR , remoteString() );
+                }
+                else {
+                    log(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
+                }
+            }
+            else {
+                struct iovec *& i = meta.msg_iov;
+                while( ret > 0 ) {
+                    if ( i->iov_len > unsigned( ret ) ) {
+                        i->iov_len -= ret;
+                        i->iov_base = (char*)(i->iov_base) + ret;
+                        ret = 0;
+                    }
+                    else {
+                        ret -= i->iov_len;
+                        ++i;
+                        --(meta.msg_iovlen);
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+    void Socket::recv( char * buf , int len ) {
+        unsigned retries = 0;
+        while( len > 0 ) {
+            int ret = unsafe_recv( buf , len );
+            if ( ret > 0 ) {
+                if ( len <= 4 && ret != len )
+                    log(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
+                assert( ret <= len );
+                len -= ret;
+                buf += ret;
+            }
+            else if ( ret == 0 ) {
+                log(3) << "Socket recv() conn closed? " << remoteString() << endl;
+                throw SocketException( SocketException::CLOSED , remoteString() );
+            }
+            else { /* ret < 0  */
+                int e = errno;
+                
+#if defined(EINTR) && !defined(_WIN32)
+                if( e == EINTR ) {
+                    if( ++retries == 1 ) {
+                        log() << "EINTR retry" << endl;
+                        continue;
+                    }
+                }
+#endif
+                if ( ( e == EAGAIN 
+#ifdef _WINDOWS
+                       || e == WSAETIMEDOUT
+#endif
+                       ) && _timeout > 0 ) {
+                    // this is a timeout
+                    log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
+                    throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
+                }
+
+                log(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
+                throw SocketException( SocketException::RECV_ERROR , remoteString() );
+            }
+        }
+    }
+
+    int Socket::unsafe_recv( char *buf, int max ) {
+        int x = ::recv( _fd , buf , max , portRecvFlags );
+        _bytesIn += x;
+        return x;
     }
 
 
