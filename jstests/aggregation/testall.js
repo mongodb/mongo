@@ -793,13 +793,13 @@ var p17result = [
 assert(arrayEq(p17.result, p17result), 'p17 failed');
 
 
-// strcmp test
+// strcasecmp test
 var p18 = db.runCommand(
 {aggregate : "article", pipeline : [
     { $project : {
         tags : 1,
-        thisisalametest : {$strcmp: ["foo","bar"]},
-        thisisalamepass : {$strcmp: ["foo","foo"]}
+        thisisalametest : {$strcasecmp: ["foo","bar"]},
+        thisisalamepass : {$strcasecmp: ["foo","foo"]}
     }}
 ]});
 

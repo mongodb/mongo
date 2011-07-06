@@ -973,11 +973,11 @@ namespace mongo {
     };
 
 
-    class ExpressionStrcmp :
+    class ExpressionStrcasecmp :
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionStrcmp();
+        virtual ~ExpressionStrcasecmp();
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
@@ -986,7 +986,7 @@ namespace mongo {
         static shared_ptr<ExpressionNary> create();
 
     private:
-        ExpressionStrcmp();
+        ExpressionStrcasecmp();
     };
 
 

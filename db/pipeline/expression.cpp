@@ -83,7 +83,7 @@ namespace mongo {
                 isOp = 1;
                 kind = OPERATOR;
 
-                if (strcmp(pFieldName, unwindName) != 0) {
+                if (strcasecmp(pFieldName, unwindName) != 0) {
                     pExpression = parseExpression(pFieldName, &fieldElement);
                 }
                 else {
@@ -170,7 +170,7 @@ namespace mongo {
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
-        return strcmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
+        return strcasecmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
     }
 
     /*
@@ -200,7 +200,7 @@ namespace mongo {
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
         {"$second", ExpressionSecond::create},
-        {"$strcmp", ExpressionStrcmp::create},
+        {"$strcasecmp", ExpressionStrcasecmp::create},
         {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
         {"$toLower", ExpressionToLower::create},
@@ -2370,27 +2370,27 @@ namespace mongo {
 	return "$second";
     }
 
-    /* ----------------------- ExpressionStrcmp ---------------------------- */
+    /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 
-    ExpressionStrcmp::~ExpressionStrcmp() {
+    ExpressionStrcasecmp::~ExpressionStrcasecmp() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionStrcmp::create() {
-        shared_ptr<ExpressionStrcmp> pExpression(new ExpressionStrcmp());
+    shared_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
+        shared_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
         return pExpression;
     }
 
-    ExpressionStrcmp::ExpressionStrcmp():
+    ExpressionStrcasecmp::ExpressionStrcasecmp():
         ExpressionNary() {
     }
 
-    void ExpressionStrcmp::addOperand(
+    void ExpressionStrcasecmp::addOperand(
 	const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionStrcmp::evaluate(
+    shared_ptr<const Value> ExpressionStrcasecmp::evaluate(
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
@@ -2401,8 +2401,8 @@ namespace mongo {
         return Value::createInt(str1.compare(str2));
     }
 
-    const char *ExpressionStrcmp::getOpName() const {
-	return "$strcmp";
+    const char *ExpressionStrcasecmp::getOpName() const {
+	return "$strcasecmp";
     }
 
     /* ----------------------- ExpressionSubstr ---------------------------- */
