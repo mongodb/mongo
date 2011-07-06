@@ -910,22 +910,28 @@ namespace mongo {
 
         }
 
-        virtual void getPointsFor( const GeoKeyNode& node, vector< BSONObj >& locsForNode, bool allPoints = false ){
+        virtual void getPointsFor( const BSONObj& key, const BSONObj& obj, vector< BSONObj >& locsForNode, bool allPoints = false ){
 
             // Find all the location objects from the keys
             vector< BSONObj > locs;
-            _g->getKeys( node.recordLoc.obj(), allPoints ? locsForNode : locs );
+            _g->getKeys( obj, allPoints ? locsForNode : locs );
+            _objectsLoaded++;
+
             if( allPoints ) return;
+            if( locs.size() == 1 ){
+                locsForNode.push_back( locs[0] );
+                return;
+            }
 
             // Find the particular location we want
-            GeoHash keyHash( node._key.firstElement(), _g->_bits );
+            GeoHash keyHash( key.firstElement(), _g->_bits );
 
             // log() << "Hash: " << node.key << " and " << keyHash.getHash() << " unique " << _uniqueDocs << endl;
             for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
 
                 // Ignore all locations not hashed to the key's hash, since we may see
                 // those later
-                if( ! allPoints && _g->_hash( *i ) != keyHash ) continue;
+                if( _g->_hash( *i ) != keyHash ) continue;
 
                 locsForNode.push_back( *i );
 
@@ -1435,7 +1441,7 @@ namespace mongo {
                 bool expensiveExact = expensiveExactCheck();
 
                 vector< BSONObj > locs;
-                getPointsFor( node, locs, true );
+                getPointsFor( node._key, node.recordLoc.obj(), locs, true );
                 for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ){
 
                     double d = -1;
@@ -1602,46 +1608,40 @@ namespace mongo {
 
             GEODEBUG( "\t\tInserted new point " << newPoint.toString() << " approx : " << keyD );
 
-            if( _max >= 0 ){
+            assert( _max > 0 );
 
-                // Erase all points from the set with a position >= _max *and*
-                // whose distance isn't close to the _max - 1 position distance
+            // Erase all points from the set with a position >= _max *and*
+            // whose distance isn't close to the _max - 1 position distance
 
-                // TODO:  Don't necessarily need to run this *every* new point, though
-                // usually it'll just delete the last point... issue is when we have
-                // 10,000 of the *same* point at a boundary.  Maybe store iterator to
-                // last seen value, compare > or <?
+            // TODO:  Don't necessarily need to run this *every* new point, though
+            // usually it'll just delete the last point... issue is when we have
+            // 10,000 of the *same* point at a boundary.  Maybe store iterator to
+            // last seen value, compare > or <?
 
-                int numToErase = _points.size() - _max;
-                if( numToErase < 0 ) numToErase = 0;
+            int numToErase = _points.size() - _max;
+            if( numToErase < 0 ) numToErase = 0;
 
-                // Get the first point definitely in the _points array
-                Holder::iterator startErase = _points.end();
-                for( int i = 0; i < numToErase + 1; i++ ) startErase--;
-                _farthest = startErase->distance() + 2 * _distError;
+            // Get the first point definitely in the _points array
+            Holder::iterator startErase = _points.end();
+            for( int i = 0; i < numToErase + 1; i++ ) startErase--;
+            _farthest = startErase->distance() + 2 * _distError;
 
-                GEODEBUG( "\t\tPotentially erasing " << numToErase << " points, " << " size : " << _points.size() << " max : " << _max << " dist : " << startErase->distance() << " farthest dist : " << _farthest << " from error : " << _distError );
+            GEODEBUG( "\t\tPotentially erasing " << numToErase << " points, " << " size : " << _points.size() << " max : " << _max << " dist : " << startErase->distance() << " farthest dist : " << _farthest << " from error : " << _distError );
 
+            startErase++;
+            while( numToErase > 0 && startErase->distance() <= _farthest ){
+                GEODEBUG( "\t\tNot erasing point " << startErase->toString() );
+                numToErase--;
                 startErase++;
-                while( numToErase > 0 && startErase->distance() <= _farthest ){
-                    GEODEBUG( "\t\tNot erasing point " << startErase->toString() );
-                    numToErase--;
-                    startErase++;
-                    assert( startErase != _points.end() || numToErase == 0 );
-                }
-
-                if( _uniqueDocs ){
-                    for( Holder::iterator i = startErase; i != _points.end(); ++i )
-                        _seenPts.erase( i->loc() );
-                }
-
-                _points.erase( startErase, _points.end() );
-
+                assert( startErase != _points.end() || numToErase == 0 );
             }
-            else {
-                _seenPts[ node.recordLoc ] = newIt;
-                _farthest = (--(_points.end()))->distance() + 2 * _distError;
+
+            if( _uniqueDocs ){
+                for( Holder::iterator i = startErase; i != _points.end(); ++i )
+                    _seenPts.erase( i->loc() );
             }
+
+            _points.erase( startErase, _points.end() );
 
             // log() << "points : " << _points.size() << " prev : " << prevSize << " seen : " << _seenPts.size() << " farthest : " << _farthest << " newDist : " << newPoint.distance() << endl;
 
@@ -1694,6 +1694,8 @@ namespace mongo {
         }
 
         void exec() {
+
+            if( _numWanted == 0 ) return;
 
             /*
              * Search algorithm
@@ -1808,19 +1810,13 @@ namespace mongo {
             }
 
             vector<BSONObj> locs;
-            _g->getKeys( pt.obj() , locs );
+            getPointsFor( pt.key(), pt.obj(), locs, _uniqueDocs );
 
             GeoPoint nearestPt( pt, -1, true );
-            bool singlePoint = locs.size() == 1;
-
-            GeoHash h;
-            if( ! singlePoint && ! _uniqueDocs )
-                h = GeoHash( pt.key().firstElement(), _g->_bits );
 
             for( vector<BSONObj>::iterator i = locs.begin(); i != locs.end(); i++ ){
 
                 Point loc( *i );
-                if( ! singlePoint && ! _uniqueDocs && h != _g->hash( loc ) ) continue;
 
                 double d;
                 if( ! exactDocCheck( loc, d ) ) continue;
