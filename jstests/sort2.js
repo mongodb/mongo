@@ -30,3 +30,19 @@ for (var pass = 0; pass < 2; pass++) {
     }
     t.ensureIndex({ x : 1 });
 }
+
+// signed dates check
+var opts = {};
+if (Math.random() < 0.3) {
+    opts.background = true;
+    printjson(opts);
+}
+t.drop();
+t.insert({ x: new Date(50000) });
+t.insert({ x: new Date(-50) });
+var d = new Date(-50);
+for (var pass = 0; pass < 2; pass++) {
+    assert(t.find().sort({x:1})[0].x.valueOf() == d.valueOf());
+    t.ensureIndex({ x: 1 }, opts);
+    t.insert({ x: new Date() });
+}
