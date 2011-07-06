@@ -20,7 +20,8 @@
 #include "sock.h"
 #include "message.h"
 #include "message_port.h"
-#include "../..//bson/util/builder.h"
+#include "../mongoutils/str.h"
+#include "../../bson/util/builder.h"
 
 namespace mongo {
 
@@ -142,6 +143,10 @@ namespace mongo {
 
             if ( h.size() == 0 )
                 break;
+
+            i = h.find( ':' );
+            if ( i != string::npos )
+                _headers[h.substr(0,i)] = str::ltrim(h.substr(i+1));
         }
 
         _body = entire;
