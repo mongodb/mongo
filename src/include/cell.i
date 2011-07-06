@@ -184,17 +184,6 @@ __wt_cell_off(WT_CELL *cell, WT_OFF *off)
 }
 
 /*
- * __wt_cell_off_record --
- *	Copy out a WT_CELL that references a WT_OFF_RECORD structure.
- */
-static inline void
-__wt_cell_off_record(WT_CELL *cell, WT_OFF_RECORD *off_record)
-{
-	/* Version for systems that support unaligned access. */
-	*off_record = *(WT_OFF_RECORD *)__wt_cell_data(cell);
-}
-
-/*
  * __wt_cell_next --
  *	Return a pointer to the next WT_CELL on the page.
  */
@@ -202,23 +191,4 @@ static inline void *
 __wt_cell_next(WT_CELL *cell)
 {
 	return ((u_int8_t *)cell + __wt_cell_len(cell));
-}
-
-/*
- * __wt_key_cell_next --
- *	Return a pointer to the next key WT_CELL on the page.
- */
-static inline WT_CELL *
-__wt_key_cell_next(WT_CELL *cell)
-{
-	/*
-	 * Row-store leaf pages may have a single data cell between each key, or
-	 * keys may be adjacent (when the data cell is empty).  Move to the next
-	 * key.
-	 */
-	cell = __wt_cell_next(cell);
-	if (__wt_cell_type(cell) == WT_CELL_KEY ||
-	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
-		return (cell);
-	return (__wt_cell_next(cell));
 }
