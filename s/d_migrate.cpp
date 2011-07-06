@@ -167,62 +167,6 @@ namespace mongo {
 
     static const char * const cleanUpThreadName = "cleanupOldData";
 
-    void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
-        if (!noauth) {
-            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
-        }
-        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
-
-        int loops = 0;
-        Timer t;
-        while ( t.seconds() < 900 ) { // 15 minutes
-            assert( dbMutex.getState() == 0 );
-            sleepmillis( 20 );
-
-            set<CursorId> now;
-            ClientCursor::find( cleanup.ns , now );
-
-            set<CursorId> left;
-            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                CursorId id = *i;
-                if ( now.count(id) )
-                    left.insert( id );
-            }
-
-            if ( left.size() == 0 )
-                break;
-            cleanup.initial = left;
-
-            if ( ( loops++ % 200 ) == 0 ) {
-                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
-
-                stringstream ss;
-                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                    CursorId id = *i;
-                    ss << id << " ";
-                }
-                log() << " cursors: " << ss.str() << migrateLog;
-            }
-        }
-
-        cleanup.doRemove();
-
-        cc().shutdown();
-    }
-
-    void cleanupOldData( OldDataCleanup cleanup ) {
-        try {
-            _cleanupOldData( cleanup );
-        }
-        catch ( std::exception& e ) {
-            log() << " error cleaning old data:" << e.what() << migrateLog;
-        }
-        catch ( ... ) {
-            log() << " unknown error cleaning old data" << migrateLog;
-        }
-    }
-
     class ChunkCommandHelper : public Command {
     public:
         ChunkCommandHelper( const char * name )
@@ -574,6 +518,18 @@ namespace mongo {
 
         bool isActive() const { return _getActive(); }
 
+        void doRemove( OldDataCleanup& cleanup ) {
+            while ( true ) { 
+                {
+                    scoped_lock lk( _m );
+                    if ( ! _active ) {
+                        cleanup.doRemove();
+                    }
+                }
+                sleepmillis( 100 );
+            }
+        }
+
     private:
         mutable mongo::mutex _m; // protect _inCriticalSection and _active
         bool _inCriticalSection;
@@ -610,6 +566,62 @@ namespace mongo {
             migrateFromStatus.done();
         }
     };
+
+    void _cleanupOldData( OldDataCleanup cleanup ) {
+        Client::initThread( cleanUpThreadName );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
+        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+        int loops = 0;
+        Timer t;
+        while ( t.seconds() < 900 ) { // 15 minutes
+            assert( dbMutex.getState() == 0 );
+            sleepmillis( 20 );
+
+            set<CursorId> now;
+            ClientCursor::find( cleanup.ns , now );
+
+            set<CursorId> left;
+            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                CursorId id = *i;
+                if ( now.count(id) )
+                    left.insert( id );
+            }
+
+            if ( left.size() == 0 )
+                break;
+            cleanup.initial = left;
+
+            if ( ( loops++ % 200 ) == 0 ) {
+                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+                stringstream ss;
+                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                    CursorId id = *i;
+                    ss << id << " ";
+                }
+                log() << " cursors: " << ss.str() << migrateLog;
+            }
+        }
+
+        migrateFromStatus.doRemove( cleanup );
+
+        cc().shutdown();
+    }
+
+    void cleanupOldData( OldDataCleanup cleanup ) {
+        try {
+            _cleanupOldData( cleanup );
+        }
+        catch ( std::exception& e ) {
+            log() << " error cleaning old data:" << e.what() << migrateLog;
+        }
+        catch ( ... ) {
+            log() << " unknown error cleaning old data" << migrateLog;
+        }
+    }
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
         migrateFromStatus.logOp( opstr , ns , obj , patt );
