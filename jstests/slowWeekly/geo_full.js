@@ -288,7 +288,7 @@ var locsArray = function( locs ){
 }
 
 // TODO:  Add spherical $uniqueDocs tests
-var numTests = 300
+var numTests = 100
 
 // Our seed will change every time this is run, but 
 // each individual test will be reproducible given
