@@ -94,6 +94,9 @@ namespace mongo {
     void enableIPv6(bool state=true);
     bool IPv6Enabled();
 
+    /**
+     * wrapped around os representation of network address
+     */
     struct SockAddr {
         SockAddr() {
             addressSize = sizeof(sa);
@@ -142,11 +145,15 @@ namespace mongo {
      * will be stale */
     string getHostNameCached();
 
+    /**
+     * thrown by Socket and SockAddr
+     */
     class SocketException : public DBException {
     public:
         const enum Type { CLOSED , RECV_ERROR , SEND_ERROR, RECV_TIMEOUT, SEND_TIMEOUT, FAILED_STATE, CONNECT_ERROR } _type;
         
-        SocketException( Type t , string server , int code = 9001 , string extra="" ) : DBException( "socket exception" , code ) , _type(t) , _server(server), _extra(extra){ }
+        SocketException( Type t , string server , int code = 9001 , string extra="" ) 
+            : DBException( "socket exception" , code ) , _type(t) , _server(server), _extra(extra){ }
         virtual ~SocketException() throw() {}
 
         bool shouldPrint() const { return _type != CLOSED; }
@@ -157,6 +164,10 @@ namespace mongo {
         string _extra;
     };
 
+    /**
+     * thin wrapped around file descriptor and system calls
+     * todo: ssl
+     */
     class Socket {
     public:
         Socket(int sock, const SockAddr& farEnd);
