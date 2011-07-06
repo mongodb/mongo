@@ -58,4 +58,6 @@ assert( 5 == NumberInt( 5 ) , "eq" );
 assert( 5 < NumberInt( 6 ) , "lt" );
 assert( 5 > NumberInt( 4 ) , "lt" );
 assert( NumberInt( 1 ) , "to bool a" );
-//assert( ! NumberInt( 0 ) , "to bool b" ); // SERVER-3366
+
+// objects are always considered thruthy
+//assert( ! NumberInt( 0 ) , "to bool b" );
