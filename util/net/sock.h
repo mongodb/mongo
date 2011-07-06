@@ -49,7 +49,6 @@
 namespace mongo {
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
-    string getAddrInfoStrError(int code);
 
 #if defined(_WIN32)
 
@@ -173,7 +172,7 @@ namespace mongo {
                 const int buflen=128;
                 char buffer[buflen];
                 int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-                massert(13082, getAddrInfoStrError(ret), ret == 0);
+                massert(13082, errnoWithDescription(ret), ret == 0);
                 return buffer;
             }
 
