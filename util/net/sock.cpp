@@ -20,11 +20,11 @@
 
 namespace mongo {
 
-    static mongo::mutex sock_mutex("sock_mutex");
-
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
+
+    // --- SockAddr
 
     SockAddr::SockAddr(int sourcePort) {
         memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
@@ -97,6 +97,11 @@ namespace mongo {
         return false;
     }
 
+    SockAddr unknownAddress( "0.0.0.0", 0 );
+
+
+    // ------ hostname -------------------
+
     string hostbyname(const char *hostname) {
         string addr =  SockAddr(hostname, 0).getAddr();
         if (addr == "0.0.0.0")
@@ -104,24 +109,6 @@ namespace mongo {
         else
             return addr;
     }
-
-#if defined(_WIN32)
-    namespace {
-        struct WinsockInit {
-            WinsockInit() {
-                WSADATA d;
-                if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                    out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                    problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                    dbexit( EXIT_NTSERVICE_ERROR );
-                }
-            }
-        } winsock_init;
-    }
-#endif
-
-    SockAddr unknownAddress( "0.0.0.0", 0 );
-
 
     string _hostNameCached;
     static void _hostNameCachedInit() {
@@ -133,6 +120,8 @@ namespace mongo {
         boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
         return _hostNameCached;
     }
+
+    // --------- SocketException ----------
 
     string SocketException::toString() const {
         stringstream ss;
@@ -146,6 +135,24 @@ namespace mongo {
         
         return ss.str();
     }
+
+
+    // ---------- global init -------------
+
+
+#if defined(_WIN32)
+    struct WinsockInit {
+        WinsockInit() {
+            WSADATA d;
+            if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
+                out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                dbexit( EXIT_NTSERVICE_ERROR );
+            }
+        }
+    } winsock_init;
+#endif
+
 
 
 
