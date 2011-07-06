@@ -50,18 +50,12 @@ namespace mongo {
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
 
+    void disableNagle(int sock);
+
 #if defined(_WIN32)
 
     typedef short sa_family_t;
     typedef int socklen_t;
-
-    inline void disableNagle(int sock) {
-        int x = 1;
-        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            out() << "ERROR: disableNagle failed" << endl;
-        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            out() << "ERROR: SO_KEEPALIVE failed" << endl;
-    }
 
     // This won't actually be used on windows
     struct sockaddr_un {
@@ -71,30 +65,9 @@ namespace mongo {
 
 #else // _WIN32
 
-    inline void closesocket(int s) {
-        close(s);
-    }
+    inline void closesocket(int s) { close(s); }
     const int INVALID_SOCKET = -1;
     typedef int SOCKET;
-
-    inline void disableNagle(int sock) {
-        int x = 1;
-
-#ifdef SOL_TCP
-        int level = SOL_TCP;
-#else
-        int level = SOL_SOCKET;
-#endif
-
-        if ( setsockopt(sock, level, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            log() << "ERROR: disableNagle failed: " << errnoWithDescription() << endl;
-
-#ifdef SO_KEEPALIVE
-        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            log() << "ERROR: SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
-#endif
-
-    }
 
 #endif // _WIN32
 
