@@ -11,45 +11,51 @@
 static const char *__wt_session_print_state(WT_SESSION_IMPL *);
 
 /*
+ * __wt_session_dump_all --
+ *	Dump information about all open sessions.
+ */
+void
+__wt_session_dump_all(WT_SESSION_IMPL *session)
+{
+	WT_SESSION_IMPL **tp;
+
+	for (tp = S2C(session)->sessions; *tp != NULL; ++tp)
+		__wt_session_dump(*tp);
+}
+
+/*
  * __wt_session_dump --
- *	Dump information about open sessions.
+ *	Dump information about a session.
  */
 void
 __wt_session_dump(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL **tp;
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
 
-	for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
-		__wt_msg(session, "session: %s%s%p",
-		    session->name == NULL ? "" : session->name,
-		    session->name == NULL ? "" : " ",
-		    session);
-		if (session->wq_func == NULL)
-			__wt_msg(session, "\tworkq func: none");
-		else
-			__wt_msg(
-			    session, "\tworkq func: %p", session->wq_func);
+	__wt_msg(session, "session: %s%s%p",
+	    session->name == NULL ? "" : session->name,
+	    session->name == NULL ? "" : " ", session);
+	if (session->wq_func == NULL)
+		__wt_msg(session, "\tworkq func: none");
+	else
+		__wt_msg(session, "\tworkq func: %p", session->wq_func);
 
-		__wt_msg(session,
-		    "\tstate: %s", __wt_session_print_state(session));
+	__wt_msg(session, "\tstate: %s", __wt_session_print_state(session));
 
-		for (hp = session->hazard;
-		    hp < session->hazard + conn->hazard_size; ++hp) {
-			if (hp->page == NULL)
-				continue;
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size; ++hp) {
+		if (hp->page == NULL)
+			continue;
 #ifdef HAVE_DIAGNOSTIC
-			__wt_msg(session,
-			    "\thazard: %" PRIu32 " (%s, line %d)",
-			    WT_PADDR(hp->page), hp->file, hp->line);
+		__wt_msg(session,
+		    "\thazard: %" PRIu32 " (%s, line %d)",
+		    WT_PADDR(hp->page), hp->file, hp->line);
 #else
-			__wt_msg(
-			    session, "\thazard: %" PRIu32, WT_PADDR(hp->page));
+		__wt_msg(session, "\thazard: %" PRIu32, WT_PADDR(hp->page));
 #endif
-		}
 	}
 }
 
