@@ -21,11 +21,25 @@
 #include "message_port.h"
 
 #ifndef _WIN32
+
 # ifndef __sunos__
 #  include <ifaddrs.h>
 # endif
 # include <sys/resource.h>
 # include <sys/stat.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#ifdef __openbsd__
+# include <sys/uio.h>
+#endif
+
 #else
 
 // errno doesn't work for winsock.

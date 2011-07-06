@@ -19,6 +19,24 @@
 #include "sock.h"
 #include "../background.h"
 
+#ifndef _WIN32
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#ifdef __openbsd__
+# include <sys/uio.h>
+#endif
+
+#endif // _WIN32
+
+
 namespace mongo {
 
     static bool ipv6 = false;

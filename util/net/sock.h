@@ -31,17 +31,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
 #include <errno.h>
-#include <netdb.h>
+
 #ifdef __openbsd__
 # include <sys/uio.h>
-#endif
-
-#ifndef AI_ADDRCONFIG
-# define AI_ADDRCONFIG 0
 #endif
 
 #endif // _WIN32
