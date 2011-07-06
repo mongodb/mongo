@@ -283,8 +283,8 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
-        Value(Date_t value);
-        Value(string value);
+        Value(Date_t dateValue);
+        Value(string stringValue);
         Value(const shared_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 

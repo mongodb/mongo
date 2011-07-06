@@ -915,7 +915,6 @@ namespace mongo {
         int year = atoi(date.substr(20,4).c_str());
         bool leapYear = false;
         int dayOfYear = 0;
-cout<<date<<endl<<dayOfMonth<<endl<<month<<year<<endl;
         if ( year % 4 == 0 && year % 100 != 0 )
             leapYear = true;
         else if ( year % 400 == 0 )
@@ -2603,7 +2602,6 @@ cout<<date<<endl<<dayOfMonth<<endl<<month<<year<<endl;
         int dayNum = 0;
         int janFirst = 0;
         int offset = 0;
-cout<<date<<endl;
         if ( year % 4 == 0 && year % 100 != 0 )
             leapYear = true;
         else if ( year % 400 == 0 )
