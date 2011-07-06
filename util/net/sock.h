@@ -138,89 +138,27 @@ namespace mongo {
         SockAddr(int sourcePort); /* listener side */
         SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
-        template <typename T>
-        T& as() { return *(T*)(&sa); }
-        template <typename T>
-        const T& as() const { return *(const T*)(&sa); }
+        template <typename T> T& as() { return *(T*)(&sa); }
+        template <typename T> const T& as() const { return *(const T*)(&sa); }
+        
+        string toString(bool includePort=true) const;
 
-        string toString(bool includePort=true) const {
-            string out = getAddr();
-            if (includePort && getType() != AF_UNIX && getType() != AF_UNSPEC)
-                out += mongoutils::str::stream() << ':' << getPort();
-            return out;
-        }
+        /** 
+         * @return one of AF_INET, AF_INET6, or AF_UNIX
+         */
+        sa_family_t getType() const;
 
-        // returns one of AF_INET, AF_INET6, or AF_UNIX
-        sa_family_t getType() const {
-            return sa.ss_family;
-        }
+        unsigned getPort() const;
 
-        unsigned getPort() const {
-            switch (getType()) {
-            case AF_INET:  return ntohs(as<sockaddr_in>().sin_port);
-            case AF_INET6: return ntohs(as<sockaddr_in6>().sin6_port);
-            case AF_UNIX: return 0;
-            case AF_UNSPEC: return 0;
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return 0;
-            }
-        }
-
-        string getAddr() const {
-            switch (getType()) {
-            case AF_INET:
-            case AF_INET6: {
-                const int buflen=128;
-                char buffer[buflen];
-                int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-                massert(13082, errnoWithDescription(ret), ret == 0);
-                return buffer;
-            }
-
-            case AF_UNIX:  return (addressSize > 2 ? as<sockaddr_un>().sun_path : "anonymous unix socket");
-            case AF_UNSPEC: return "(NONE)";
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
-            }
-        }
+        string getAddr() const;
 
         bool isLocalHost() const;
 
-        bool operator==(const SockAddr& r) const {
-            if (getType() != r.getType())
-                return false;
+        bool operator==(const SockAddr& r) const;
 
-            if (getPort() != r.getPort())
-                return false;
+        bool operator!=(const SockAddr& r) const;
 
-            switch (getType()) {
-            case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr;
-            case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) == 0;
-            case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) == 0;
-            case AF_UNSPEC: return true; // assume all unspecified addresses are the same
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
-            }
-        }
-        bool operator!=(const SockAddr& r) const {
-            return !(*this == r);
-        }
-        bool operator<(const SockAddr& r) const {
-            if (getType() < r.getType())
-                return true;
-            else if (getType() > r.getType())
-                return false;
-
-            if (getPort() < r.getPort())
-                return true;
-            else if (getPort() > r.getPort())
-                return false;
-
-            switch (getType()) {
-            case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
-            case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) < 0;
-            case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) < 0;
-            case AF_UNSPEC: return false;
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
-            }
-        }
+        bool operator<(const SockAddr& r) const;
 
         const sockaddr* raw() const {return (sockaddr*)&sa;}
         sockaddr* raw() {return (sockaddr*)&sa;}
@@ -232,18 +170,11 @@ namespace mongo {
 
     extern SockAddr unknownAddress; // ( "0.0.0.0", 0 )
 
-    const int MaxMTU = 16384;
-
-    inline string getHostName() {
-        char buf[256];
-        int ec = gethostname(buf, 127);
-        if ( ec || *buf == 0 ) {
-            log() << "can't get this server's hostname " << errnoWithDescription() << endl;
-            return "";
-        }
-        return buf;
-    }
-
+    /** this is not cache and does a syscall */
+    string getHostName();
+    
+    /** this is cached, so if changes during the process lifetime
+     * will be stale */
     string getHostNameCached();
 
     class SocketException : public DBException {
