@@ -27,7 +27,8 @@ var p1result = [
         "pageViews" : 5,
         "tags" : [
             "fun",
-            "good"
+            "good",
+            "fun"
         ]
     },
     {
@@ -73,6 +74,12 @@ var p2result = [
         "author" : "bob",
         "pageViews" : 5,
         "tag" : "good"
+    },
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "pageViews" : 5,
+        "tag" : "fun"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
@@ -192,6 +199,14 @@ var p5result = [
         }
     },
     {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "subDocument" : {
+            "foo" : 5,
+            "bar" : "fun"
+        }
+    },
+    {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
         "author" : "dave",
         "subDocument" : {
@@ -263,6 +278,14 @@ var p6result = [
         "tag" : "good",
         "daveWroteIt" : false,
         "weLikeIt" : true
+    },
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "pageViews" : 5,
+        "tag" : "fun",
+        "daveWroteIt" : false,
+        "weLikeIt" : false
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
@@ -364,6 +387,18 @@ var p8result = [
             }
         ],
         "tag" : "good"
+    },
+    {
+        "author" : "bob",
+        "comments" : [
+            {
+                "author" : "joe"
+            },
+            {
+                "author" : "sam"
+            }
+        ],
+        "tag" : "fun"
     },
     {
         "author" : "dave",
@@ -472,7 +507,8 @@ var p10result = [
         "pageViews" : 5,
         "tags" : [
             "fun",
-            "good"
+            "good",
+            "fun"
         ],
         "comments" : [
             {
@@ -652,15 +688,15 @@ var p14 = db.runCommand(
 var p14result = [
     {
         "_id" : ObjectId("4de54958bf1505139918fce6"),
-        "theDifference" : 0
+        "theRemainder" : 0
     },
     {
         "_id" : ObjectId("4de54958bf1505139918fce7"),
-        "theDifference" : 0
+        "theRemainder" : 0
     },
     {
         "_id" : ObjectId("4de54958bf1505139918fce8"),
-        "theDifference" : 2
+        "theRemainder" : 2
     }
 ];
 
@@ -772,10 +808,11 @@ var p18result = [
         "_id" : ObjectId("4e09ee2d75f2a257194c996e"),
         "tags" : [
             "fun",
-            "good"
+            "good",
+            "fun"
         ],
-        "thisisalametest" : false,
-        "thisisalamepass" : true
+        "thisisalametest" : 4,
+        "thisisalamepass" : 0
     },
     {
         "_id" : ObjectId("4e09ee2d75f2a257194c996f"),
@@ -783,8 +820,8 @@ var p18result = [
             "fun",
             "nasty"
         ],
-        "thisisalametest" : false,
-        "thisisalamepass" : true
+        "thisisalametest" : 4,
+        "thisisalamepass" : 0
     },
     {
         "_id" : ObjectId("4e09ee2d75f2a257194c9970"),
@@ -792,12 +829,67 @@ var p18result = [
             "nasty",
             "filthy"
         ],
-        "thisisalametest" : false,
-        "thisisalamepass" : true
+        "thisisalametest" : 4,
+        "thisisalamepass" : 0
     }
 ];
 
 assert(arrayEq(p18.result, p18result), 'p18 failed');
+
+
+// date tests
+var p19 = db.runCommand(
+{aggregate : "article", pipeline : [
+    { $project : {
+        authors : 1,
+        seconds: {$second: "$posted"},
+        minutes: {$minute: "$posted"},
+        hour: {$hour: "$posted"},
+        dayOfYear: {$dayOfYear: "$posted"},
+        dayOfMonth: {$dayOfMonth: "$posted"},
+        dayOfWeek: {$dayOfWeek: "$posted"},
+        week: {$week: "$posted"},
+        year: {$year: "$posted"}
+    }}
+]});
+
+var p19result = [
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c69"),
+        "seconds" : 54,
+        "minutes" : 59,
+        "hour" : 13,
+        "dayOfYear" : 81,
+        "dayOfMonth" : 21,
+        "dayOfWeek" : 1,
+        "week" : 12,
+        "year" : 2004
+    },
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c6a"),
+        "seconds" : 10,
+        "minutes" : 11,
+        "hour" : 23,
+        "dayOfYear" : 219,
+        "dayOfMonth" : 7,
+        "dayOfWeek" : 7,
+        "week" : 31,
+        "year" : 2100
+    },
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c6b"),
+        "seconds" : 14,
+        "minutes" : 17,
+        "hour" : 0,
+        "dayOfYear" : 366,
+        "dayOfMonth" : 31,
+        "dayOfWeek" : 1,
+        "week" : 53,
+        "year" : 2000
+    }
+];
+
+assert(arrayEq(p19.result, p19result), 'p19 failed');
 
 
 
@@ -922,8 +1014,8 @@ var g1result = [
         "_id" : {
             "tag" : "fun"
         },
-        "docsByTag" : 2,
-        "viewsByTag" : 12
+        "docsByTag" : 3,
+        "viewsByTag" : 17
     },
     {
         "_id" : {
@@ -977,11 +1069,11 @@ var g2result = [
         "avgByTag" : 6
     },
     {
-        "docsByTag" : 2,
-        "viewsByTag" : 12,
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
         "mostViewsByTag" : 7,
         "tag" : "fun",
-        "avgByTag" : 6
+        "avgByTag" : 5.666666666666667
     },
     {
         "docsByTag" : 1,
@@ -1029,6 +1121,7 @@ var g3result = [
             "tag" : "fun"
         },
         "authors" : [
+            "bob",
             "bob",
             "dave"
         ]
@@ -1084,9 +1177,9 @@ var g4result = [
         "_id" : {
             "tag" : "fun"
         },
-        "docsByTag" : 2,
-        "viewsByTag" : 12,
-        "avgByTag" : 6
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
+        "avgByTag" : 5.666666666666667
     },
     {
         "_id" : {
@@ -1107,3 +1200,56 @@ var g4result = [
 ];
 
 assert(arrayEq(g4.result, g4result), 'g4 failed');
+
+
+// $addToSet as an accumulator; can pivot data
+var g5 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : 1,
+	tag : { $unwind : "tags" }
+    }},
+    { $group : {
+	_id : { tag : 1 },
+	authors : { $addToSet : "$author" }
+    }}
+]});
+
+var g5result = [
+    {
+        "_id" : {
+            "tag" : "filthy"
+        },
+        "authors" : [
+            "jane"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "fun"
+        },
+        "authors" : [
+            "bob",
+            "dave"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "good"
+        },
+        "authors" : [
+            "bob"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "nasty"
+        },
+        "authors" : [
+            "dave",
+            "jane"
+        ]
+    }
+];
+
+assert(arrayEq(g5.result, g5result), 'g5 failed');
