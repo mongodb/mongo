@@ -22,7 +22,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
-	uint32_t base, i, indx, limit, match, slot, write_gen;
+	uint32_t base, i, indx, limit, match, nrepeat, slot, write_gen;
 	int ret;
 	void *cipdata;
 
@@ -32,7 +32,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_write_gen = 0;
-	session->srch_match = 0;
 	session->srch_ip = NULL;
 	session->srch_vupdate = NULL;
 	session->srch_ins = NULL;
@@ -94,11 +93,15 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	 * record greater than the maximum record in the tree; in that case,
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
+	cip = NULL;
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		if (recno >= page->u.col_leaf.recno + page->entries)
+		if (recno >= page->u.col_leaf.recno + page->entries) {
+			if (LF_ISSET(WT_WRITE))
+				goto append;
 			goto notfound;
+		}
 		cip = page->u.col_leaf.d + (recno - page->u.col_leaf.recno);
 		cipdata = WT_COL_PTR(page, cip);
 		break;
@@ -110,18 +113,22 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		record_cnt = recno - page->u.col_leaf.recno;
 		WT_COL_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
-			if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata)) {
+			nrepeat =
+			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
+			if (record_cnt < nrepeat) {
 				record_cnt = 0;
 				break;
 			}
-			record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
+			record_cnt -= nrepeat;
 		}
-		if (record_cnt != 0)
+		if (record_cnt != 0) {
+			if (LF_ISSET(WT_WRITE))
+				goto append;
 			goto notfound;
+		}
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
-	WT_ASSERT(session, cipdata != NULL);
 
 	/*
 	 * We have the right WT_COL slot: if it's a write, set up the return
@@ -146,6 +153,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		if (LF_ISSET(WT_WRITE))
 			break;
 
+		WT_ASSERT(session, cipdata != NULL);
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
@@ -193,6 +201,8 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		 */
 		if (LF_ISSET(WT_WRITE))
 			break;
+
+		WT_ASSERT(session, cipdata != NULL);
 		if (match) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				goto notfound;
@@ -203,6 +213,10 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
+	session->srch_match = 1;
+	if (0) {
+append:		session->srch_match = 0;
+	}
 	session->srch_page = page;
 	session->srch_write_gen = write_gen;
 	session->srch_ip = cip;

@@ -52,7 +52,7 @@ __btcur_next_fix(
 		*recnop = cbt->recno;
 		if ((upd = WT_COL_UPDATE(cbt->page, cbt->cip)) == NULL) {
 			cell = WT_COL_PTR(cbt->page, cbt->cip);
-			if (!WT_FIX_DELETE_ISSET(cell)) {
+			if (cell != NULL && !WT_FIX_DELETE_ISSET(cell)) {
 				value->data = cell;
 				value->size = cbt->btree->fixed_len;
 				found = 1;
@@ -86,7 +86,8 @@ __btcur_next_rle(
 	}
 
 	for (;; ++cbt->cip, newcell = 1) {
-		cell = WT_COL_PTR(cbt->page, cbt->cip);
+		if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
+			goto deleted;
 		if (newcell) {
 			cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
 			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
@@ -115,7 +116,8 @@ __btcur_next_rle(
 
 		if (found)
 			return (0);
-		else if (--cbt->nitems == 0)
+
+deleted:	if (--cbt->nitems == 0)
 			return (WT_NOTFOUND);
 	}
 
@@ -165,8 +167,9 @@ __btcur_next_var(
 		if (upd != NULL) {
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
-		} else {
-			cell = WT_COL_PTR(cbt->page, cbt->cip);
+		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
+			found = 0;
+		else
 			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
 			case WT_CELL_DATA_OVFL:
@@ -177,7 +180,6 @@ __btcur_next_var(
 				break;
 			WT_ILLEGAL_FORMAT(session);
 			}
-		}
 	}
 
 	return (0);

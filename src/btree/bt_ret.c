@@ -29,6 +29,7 @@ __wt_return_data(
 	const void *value_ret;
 	uint32_t size_ret;
 	int (*callback)(WT_BTREE *, WT_ITEM *, WT_ITEM *), ret;
+	void *cipdata;
 
 	btree = session->btree;
 	cursor = session->cursor;
@@ -56,8 +57,8 @@ __wt_return_data(
 	 * WT_DATAITEMs.  Don't allocate WT_ROW/COL memory for key/value items
 	 * here.  (We never allocate WT_ROW/COL memory for data items.   We do
 	 * allocate WT_ROW/COL memory for keys, but if we are looking at a key
-	 * only to return it, it's not that likely to be accessed again (think
-	 * of a cursor moving through the tree).  Use memory in the
+	 * only to return it, it's not that likely to be accessed again, it's
+	 * probably a cursor moving through the tree).  Use memory in the
 	 * application's WT_ITEM instead, it is discarded when the session is
 	 * closed.
 	 *
@@ -101,42 +102,39 @@ __wt_return_data(
 	}
 
 	/* Otherwise, take the item from the original page. */
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		value_ret = WT_COL_PTR(page, cip);
-		size_ret = btree->fixed_len;
-		break;
-	case WT_PAGE_COL_RLE:
-		value_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(page, cip));
-		size_ret = btree->fixed_len;
-		break;
-	case WT_PAGE_COL_VAR:
-		cell = WT_COL_PTR(page, cip);
-		goto page_cell;
-	case WT_PAGE_ROW_LEAF:
+	if (page->type == WT_PAGE_ROW_LEAF) {
 		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			value_ret = "";
 			size_ret = 0;
+		} else
+			goto page_cell;
+	} else {
+		cipdata = WT_COL_PTR(page, cip);
+		WT_ASSERT(session, cipdata != NULL);
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+			value_ret = cipdata;
+			size_ret = btree->fixed_len;
 			break;
-		}
-page_cell:	switch (__wt_cell_type(cell)) {
-		case WT_CELL_DATA:
-			if (btree->huffman_value == NULL) {
+		case WT_PAGE_COL_RLE:
+			value_ret = WT_RLE_REPEAT_DATA(cipdata);
+			size_ret = btree->fixed_len;
+			break;
+		case WT_PAGE_COL_VAR:
+			cell = cipdata;
+page_cell:		if (btree->huffman_value == NULL &&
+			    __wt_cell_type(cell) == WT_CELL_DATA)
 				__wt_cell_data_and_len(
 				    cell, &value_ret, &size_ret);
-				break;
+			else {
+				WT_RET(__wt_cell_copy(
+				    session, cell, &cursor->value));
+				value_ret = cursor->value.data;
+				size_ret = cursor->value.size;
 			}
-			/* FALLTHROUGH */
-		case WT_CELL_DATA_OVFL:
-			WT_RET(
-			    __wt_cell_copy(session, cell, &cursor->value));
-			value_ret = cursor->value.data;
-			size_ret = cursor->value.size;
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
-		break;
-	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*

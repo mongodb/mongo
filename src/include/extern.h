@@ -310,6 +310,7 @@ extern int __wt_btree_col_del(WT_SESSION_IMPL *session, uint64_t recno);
 extern int __wt_btree_col_put(WT_SESSION_IMPL *session,
     uint64_t recno,
     WT_ITEM *value);
+extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
     uint32_t flags);
@@ -353,6 +354,7 @@ extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
     const char *home,
     mode_t mode);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
+extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_connection_stat_print(WT_CONNECTION_IMPL *conn, FILE *stream);
 extern int __wt_connection_stat_clear(WT_CONNECTION_IMPL *conn);

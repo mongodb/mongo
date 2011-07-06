@@ -86,9 +86,8 @@ __wt_row_update(
 		WT_ERR(__wt_update_alloc(session, value, &upd));
 
 		/* workQ: to insert the WT_UPDATE structure. */
-		__wt_update_serial(
-		    session, page, session->srch_write_gen,
-		    new_upd, session->srch_upd, upd, ret);
+		ret = __wt_update_serial(session, page,
+		    session->srch_write_gen, &new_upd, session->srch_upd, &upd);
 	} else {
 		/*
 		 * Allocate an insert array as necessary -- note we allocate
@@ -111,9 +110,8 @@ __wt_row_update(
 		ins->upd = upd;
 
 		/* workQ: insert the WT_INSERT structure. */
-		__wt_insert_serial(
-		    session, page, session->srch_write_gen,
-		    new_ins, session->srch_ins, ins, ret);
+		ret = __wt_insert_serial(session, page,
+		    session->srch_write_gen, &new_ins, session->srch_ins, &ins);
 	}
 
 	if (ret != 0) {
@@ -123,12 +121,12 @@ err:		if (ins != NULL)
 			__wt_sb_decrement(session, upd->sb);
 	}
 
-	/* Free any insert array unless the workQ used it. */
-	if (new_ins != NULL && new_ins != page->u.row_leaf.ins)
+	/* Free any insert array. */
+	if (new_ins != NULL)
 		__wt_free(session, new_ins);
 
-	/* Free any update array unless the workQ used it. */
-	if (new_upd != NULL && new_upd != page->u.row_leaf.upd)
+	/* Free any update array. */
+	if (new_upd != NULL)
 		__wt_free(session, new_upd);
 
 	WT_PAGE_OUT(session, page);
@@ -178,7 +176,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 
 	ret = 0;
 
-	__wt_insert_unpack(session, page, write_gen, new_ins, srch_ins, ins);
+	__wt_insert_unpack(
+	    session, &page, &write_gen, &new_ins, &srch_ins, &ins);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -190,12 +189,16 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 */
 	switch (page->type) {
 	case WT_PAGE_ROW_LEAF:
-		if (page->u.row_leaf.ins == NULL)
+		if (page->u.row_leaf.ins == NULL) {
 			page->u.row_leaf.ins = new_ins;
+			__wt_insert_new_ins_taken(session);
+		}
 		break;
 	default:
-		if (page->u.col_leaf.ins == NULL)
+		if (page->u.col_leaf.ins == NULL) {
 			page->u.col_leaf.ins = new_ins;
+			__wt_insert_new_ins_taken(session);
+		}
 		break;
 	}
 
@@ -203,6 +206,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 * Insert the new WT_INSERT item into the linked list and flush memory
 	 * to ensure the list is never broken.
 	 */
+	__wt_insert_ins_taken(session);
 	ins->next = *srch_ins;
 	WT_MEMORY_FLUSH;
 	*srch_ins = ins;
@@ -255,7 +259,8 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 
 	ret = 0;
 
-	__wt_update_unpack(session, page, write_gen, new_upd, srch_upd, upd);
+	__wt_update_unpack(
+	    session, &page, &write_gen, &new_upd, &srch_upd, &upd);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -265,20 +270,22 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect and free the passed-in expansion array if we don't use it.)
 	 */
-	switch (page->type) {
-	case WT_PAGE_ROW_LEAF:
-		if (page->u.row_leaf.upd == NULL)
+	if (page->type == WT_PAGE_ROW_LEAF) {
+		if (page->u.row_leaf.upd == NULL) {
 			page->u.row_leaf.upd = new_upd;
-		break;
-	default:
-		if (page->u.col_leaf.upd == NULL)
+			__wt_update_new_upd_taken(session);
+		}
+	} else
+		if (page->u.col_leaf.upd == NULL) {
 			page->u.col_leaf.upd = new_upd;
-		break;
-	}
+			__wt_update_new_upd_taken(session);
+		}
+
 	/*
 	 * Insert the new WT_UPDATE item into the linked list and flush memory
 	 * to ensure the list is never broken.
 	 */
+	__wt_update_upd_taken(session);
 	upd->next = *srch_upd;
 	WT_MEMORY_FLUSH;
 	*srch_upd = upd;

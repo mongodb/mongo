@@ -110,7 +110,7 @@ __wt_dump_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
-			if (!WT_FIX_DELETE_ISSET(cipdata))
+			if (cipdata != NULL && !WT_FIX_DELETE_ISSET(cipdata))
 				dp->p(cipdata, btree->fixed_len, dp->stream);
 		} else
 			if (!WT_UPDATE_DELETED_ISSET(upd))
@@ -158,7 +158,8 @@ __wt_dump_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 					    WT_UPDATE_DATA(upd), upd->size, fp);
 				ins = ins->next;
 			} else
-				if (!WT_FIX_DELETE_ISSET(
+				if (cipdata != NULL &&
+				    !WT_FIX_DELETE_ISSET(
 				    WT_RLE_REPEAT_DATA(cipdata)))
 					dp->p(WT_RLE_REPEAT_DATA(
 					    cipdata), btree->fixed_len, fp);
@@ -197,8 +198,11 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 		}
 
+		/* Check for deleted entry. */
+		if ((cell = WT_COL_PTR(page, cip)) == NULL)
+			continue;
+
 		/* Process the original data. */
-		cell = WT_COL_PTR(page, cip);
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {

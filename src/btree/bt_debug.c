@@ -39,7 +39,6 @@ static void __wt_debug_page_col_fix(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_col_int(WT_DBG *, WT_PAGE *, uint32_t);
 static void __wt_debug_page_col_rle(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_col_var(WT_DBG *, WT_PAGE *);
-static void __wt_debug_page_flags(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __wt_debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_work(WT_DBG *, WT_PAGE *, uint32_t);
@@ -356,7 +355,26 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	__wt_debug_page_flags(ds, page);
+	if (WT_PAGE_IS_ROOT(page))
+		__wt_dmsg(ds, ", root");
+	else
+		__wt_dmsg(ds, ", parent %p", page->parent);
+
+	__wt_dmsg(ds,
+	    " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
+	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+		__wt_dmsg(ds, ", bulk-loaded");
+	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
+		__wt_dmsg(ds, ", cache-counted");
+	if (F_ISSET(page, WT_PAGE_DELETED))
+		__wt_dmsg(ds, ", deleted");
+	if (F_ISSET(page, WT_PAGE_INITIAL_EMPTY))
+		__wt_dmsg(ds, ", initial-empty");
+	if (F_ISSET(page, WT_PAGE_MERGE))
+		__wt_dmsg(ds, ", merge");
+	if (F_ISSET(page, WT_PAGE_PINNED))
+		__wt_dmsg(ds, ", pinned");
+	__wt_dmsg(ds, ")\n");
 
 	/* Skip bulk-loaded pages. */
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD)) {
@@ -395,32 +413,6 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 }
 
 /*
- * __wt_debug_page_flags --
- *	Print out the page flags.
- */
-static void
-__wt_debug_page_flags(WT_DBG *ds, WT_PAGE *page)
-{
-	__wt_dmsg(ds,
-	    " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
-	if (WT_PAGE_IS_ROOT(page))
-		__wt_dmsg(ds, ", root");
-	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-		__wt_dmsg(ds, ", bulk-loaded");
-	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		__wt_dmsg(ds, ", cache-counted");
-	if (F_ISSET(page, WT_PAGE_DELETED))
-		__wt_dmsg(ds, ", deleted");
-	if (F_ISSET(page, WT_PAGE_INITIAL_EMPTY))
-		__wt_dmsg(ds, ", initial-empty");
-	if (F_ISSET(page, WT_PAGE_PINNED))
-		__wt_dmsg(ds, ", pinned");
-	if (F_ISSET(page, WT_PAGE_SPLIT))
-		__wt_dmsg(ds, ", split");
-	__wt_dmsg(ds, ")\n");
-}
-
-/*
  * __wt_debug_page_col_fix --
  *	Dump an in-memory WT_PAGE_COL_FIX page.
  */
@@ -437,7 +429,7 @@ __wt_debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	WT_COL_FOREACH(page, cip, i) {
 		cipvalue = WT_COL_PTR(page, cip);
 		__wt_dmsg(ds, "\tV {");
-		if (WT_FIX_DELETE_ISSET(cipvalue))
+		if (cipvalue == NULL || WT_FIX_DELETE_ISSET(cipvalue))
 			__wt_dmsg(ds, "deleted");
 		else
 			__wt_debug_byte_string(ds, cipvalue, fixed_len);
@@ -491,7 +483,8 @@ __wt_debug_page_col_rle(WT_DBG *ds, WT_PAGE *page)
 		cipvalue = WT_COL_PTR(page, cip);
 		__wt_dmsg(ds,
 		    "\trepeat %" PRIu32 " {", WT_RLE_REPEAT_COUNT(cipvalue));
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipvalue)))
+		if (cipvalue == NULL ||
+		    WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipvalue)))
 			__wt_dmsg(ds, "deleted");
 		else
 			__wt_debug_byte_string(
@@ -768,6 +761,13 @@ __wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL *cell)
 	tmp = NULL;
 	ret = 0;
 
+	/*
+	 * Column-store references to deleted cells return a NULL cell
+	 * reference.
+	 */
+	if (cell == NULL)
+		goto deleted;
+
 	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
 	case WT_CELL_DATA_OVFL:
@@ -779,7 +779,7 @@ __wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL *cell)
 		size = tmp->size;
 		break;
 	case WT_CELL_DEL:
-		p = (uint8_t *)"deleted";
+deleted:	p = (uint8_t *)"deleted";
 		size = strlen("deleted");
 		break;
 	case WT_CELL_OFF:

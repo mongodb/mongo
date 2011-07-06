@@ -70,17 +70,19 @@ __wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
+	void *cipdata;
 
 	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_FOREACH(page, cip, i)
-		if ((upd = WT_COL_UPDATE(page, cip)) == NULL)
-			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(page, cip)))
+		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
+			cipdata = WT_COL_PTR(page, cip);
+			if (cipdata == NULL || WT_FIX_DELETE_ISSET(cipdata))
 				WT_STAT_INCR(stats, file_item_col_deleted);
 			else
 				WT_STAT_INCR(stats, file_item_total_data);
-		else
+		} else
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				WT_STAT_INCR(stats, file_item_col_deleted);
 			else
@@ -108,10 +110,11 @@ __wt_stat_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk the page, counting data items. */
 	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata))) {
+		if (cipdata == NULL ||
+		    WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata))) {
 			WT_STAT_INCRV(stats,
 			    file_item_col_deleted,
-			    WT_RLE_REPEAT_COUNT(cipdata));
+			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata));
 			orig_deleted = 1;
 		} else {
 			WT_STAT_INCRV(stats,
@@ -153,6 +156,7 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
+	void *cipdata;
 
 	stats = session->btree->fstats;
 
@@ -163,8 +167,13 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * figure out if it will require the same space or not, especially if
 	 * there's Huffman encoding).
 	 */
-	WT_COL_FOREACH(page, cip, i)
-		switch (__wt_cell_type(WT_COL_PTR(page, cip))) {
+	WT_COL_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(page, cip);
+		if (cipdata == NULL) {
+			WT_STAT_INCR(stats, file_item_col_deleted);
+			continue;
+		}
+		switch (__wt_cell_type(cipdata)) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
 			upd = WT_COL_UPDATE(page, cip);
@@ -178,6 +187,7 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
+	}
 	return (0);
 }
 

@@ -103,7 +103,7 @@ __wt_cache_read_serial_func(WT_SESSION_IMPL *session)
 	WT_REF *ref;
 	int dsk_verify;
 
-	__wt_cache_read_unpack(session, parent, ref, dsk_verify);
+	__wt_cache_read_unpack(session, &parent, &ref, &dsk_verify);
 
 	cache = S2C(session)->cache;
 

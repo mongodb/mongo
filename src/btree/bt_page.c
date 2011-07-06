@@ -31,16 +31,12 @@ __wt_page_in_func(
 #endif
     )
 {
-	int ret;
-
 	for (;;)
 		switch (ref->state) {
 		case WT_REF_DISK:
 			/* The page isn't in memory, request it be read. */
-			__wt_cache_read_serial(
-			    session, parent, ref, dsk_verify, ret);
-			if (ret != 0)
-				return (ret);
+			WT_RET(__wt_cache_read_serial(
+			    session, parent, ref, dsk_verify));
 			break;
 		case WT_REF_LOCKED:
 			/*
@@ -163,7 +159,7 @@ __wt_page_inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_FIX_FOREACH(btree, dsk, p, i)
-		(cip++)->value = WT_DISK_OFFSET(dsk, p);
+		(cip++)->__value = WT_DISK_OFFSET(dsk, p);
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -240,7 +236,7 @@ __wt_page_inmem_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
-		(cip++)->value = WT_DISK_OFFSET(dsk, p);
+		(cip++)->__value = WT_DISK_OFFSET(dsk, p);
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -275,7 +271,7 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, i)
-		(cip++)->value = WT_DISK_OFFSET(dsk, cell);
+		(cip++)->__value = WT_DISK_OFFSET(dsk, cell);
 
 	page->entries = dsk->u.entries;
 	return (0);

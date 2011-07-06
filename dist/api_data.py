@@ -40,6 +40,12 @@ format_meta = [
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes''', min='512B', max='128MB'),
+	Config('btree_column_internal_extend', '10000', r'''
+		configure the number of records a column-store internal page is
+		extended by when records are appended''', min='500', max='10M'),
+	Config('btree_column_leaf_extend', '10000', r'''
+		configure the number of records a column-store leaf page is
+		extended by when records are appended''', min='500', max='10M'),
 	Config('huffman_key', '', r'''
 		use Huffman encoding for Btree keys.  Permitted values are empty (off),
 		\c "english" or \c "<filename>".  See @ref huffman for more

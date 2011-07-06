@@ -14,10 +14,6 @@
 int
 __wt_bt_sync(WT_SESSION_IMPL *session)
 {
-	int ret;
-
 	/* Ask the eviction thread to flush any dirty pages. */
-	__wt_evict_file_serial(session, 0, ret);
-
-	return (ret);
+	return (__wt_evict_file_serial(session, 0));
 }

@@ -200,7 +200,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	 * that remain in the cache.
 	 */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		__wt_evict_file_serial(session, 1, ret);
+		ret = __wt_evict_file_serial(session, 1);
 
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));

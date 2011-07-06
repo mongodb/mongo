@@ -204,9 +204,11 @@ static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __hazard_qsort_cmp(const void *, const void *);
+STATIN void __rec_cell_build_deleted(WT_KV *);
 static int  __rec_cell_build_key(WT_SESSION_IMPL *, const void *, uint32_t);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *, WT_KV *, u_int);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *, void *, uint32_t);
+static void __rec_col_extend_truncate(WT_PAGE *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int  __rec_col_fix_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -295,13 +297,13 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * Pages have their WT_PAGE_DELETED flag set if they're reconciled and
 	 * are found to have no valid entries.
 	 *
-	 * Pages have their WT_PAGE_SPLIT flag set if they're created as part
-	 * of an internal split.
+	 * Pages have their WT_PAGE_MERGE flag set if they're being merged into
+	 * their parent (for example, created as part of an internal split).
 	 *
 	 * For deleted or split pages, there's nothing to do, they are merged
 	 * into their parent when their parent is reconciled.
 	 */
-	if (F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+	if (F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_MERGE))
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
@@ -348,20 +350,26 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_FIX:
 		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 			WT_RET(__rec_col_fix_bulk(session, page));
-		else
+		else {
+			__rec_col_extend_truncate(page);
 			WT_RET(__rec_col_fix(session, page, salvage_cookie));
+		}
 		break;
 	case WT_PAGE_COL_RLE:
 		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 			WT_RET(__rec_col_rle_bulk(session, page));
-		else
+		else {
+			__rec_col_extend_truncate(page);
 			WT_RET(__rec_col_rle(session, page, salvage_cookie));
+		}
 		break;
 	case WT_PAGE_COL_VAR:
 		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 			WT_RET(__rec_col_var_bulk(session, page));
-		else
+		else {
+			__rec_col_extend_truncate(page);
 			WT_RET(__rec_col_var(session, page, salvage_cookie));
+		}
 		break;
 	case WT_PAGE_COL_INT:
 		WT_RET(__rec_col_int(session, page));
@@ -397,8 +405,8 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * that won't be visited as part of that walk.
 	 */
 	if (btree->root_page.state == WT_REF_MEM &&
-	    F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
-		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
+	    F_ISSET(btree->root_page.page, WT_PAGE_MERGE)) {
+		F_CLR(btree->root_page.page, WT_PAGE_MERGE);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret =
@@ -637,7 +645,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * page for eviction.  If we're not evicting, sync is flushing
 		 * dirty pages: ignore pages that aren't deleted or split.
 		 */
-		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 			if (r->evict)
 				return (1);
 			continue;
@@ -666,7 +674,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * care.  In the case of close, this implies a problem, close
 		 * is not allowed in active trees.
 		 */
-		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_MERGE))
 			return (1);
 
 		/*
@@ -763,7 +771,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * page for eviction.  If we're not evicting, sync is flushing
 		 * dirty pages: ignore pages that aren't deleted or split.
 		 */
-		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 			if (r->evict)
 				return (1);
 			continue;
@@ -792,7 +800,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * care.  In the case of close, this implies a problem, close
 		 * is not allowed in active trees.
 		 */
-		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_MERGE))
 			return (1);
 
 		/*
@@ -1554,10 +1562,10 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (WT_COL_REF_STATE(cref) != WT_REF_DISK) {
 			rp = WT_COL_REF_PAGE(cref);
-			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 				WT_ASSERT(
 				    session, !F_ISSET(rp, WT_PAGE_DELETED));
-				if (F_ISSET(rp, WT_PAGE_SPLIT))
+				if (F_ISSET(rp, WT_PAGE_MERGE))
 					WT_RET(__rec_col_merge(session, rp));
 				continue;
 			}
@@ -1650,8 +1658,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				data = WT_UPDATE_DATA(upd);
 		} else {
 			cipdata = WT_COL_PTR(page, cip);
-			if (WT_FIX_DELETE_ISSET(cipdata))
-				data = tmp->mem;	/* On-disk deleted */
+			if (cipdata == NULL || WT_FIX_DELETE_ISSET(cipdata))
+				data = tmp->mem;	/* Deleted */
 			else
 				data = cipdata;		/* On-disk data */
 		}
@@ -1773,6 +1781,8 @@ __rec_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	/* For each entry in the in-memory page... */
 	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
+		ins = WT_COL_INSERT(page, cip),
+
 		/*
 		 * Generate entries for the new page: loop through the repeat
 		 * records, checking for WT_INSERT entries matching the record
@@ -1781,8 +1791,7 @@ __rec_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 		 * Note the increment of recno in the for loop to update the
 		 * starting record number in case we split.
 		 */
-		ins = WT_COL_INSERT(page, cip),
-		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
+		nrepeat = cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
 		for (n = 0;
 		    n < nrepeat; n += repeat_count, r->recno += repeat_count) {
 			if (ins != NULL && WT_INSERT_RECNO(ins) == r->recno) {
@@ -1795,7 +1804,8 @@ __rec_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 
 				ins = ins->next;
 			} else {
-				if (WT_FIX_DELETE_ISSET(cipdata))
+				if (cipdata == NULL ||
+				    WT_FIX_DELETE_ISSET(cipdata))
 					data = tmp->mem;
 				else
 					data = WT_RLE_REPEAT_DATA(cipdata);
@@ -1897,6 +1907,55 @@ __rec_col_rle_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __rec_col_extend_truncate --
+ *	Discard deleted entries from the end of the name space.
+ */
+static void
+__rec_col_extend_truncate(WT_PAGE *page)
+{
+	WT_COL *cip;
+	WT_PAGE *t;
+
+	/*
+	 * Extending a column-store file can result in thousands of deleted
+	 * entries at the end of the file.  (The first insert triggers the
+	 * creation of a large number of empty slots which are then filled
+	 * in.)  We don't want to write thousands of deleted entries out to
+	 * the file, so we discard them here.
+	 *
+	 * This only affects leaf pages (internal pages are extended on demand,
+	 * and so we'll never write empty slots even if they were allocated).
+	 *
+	 * First, check to see if this page is at the end of the name space.
+	 */
+	for (t = page; !WT_PAGE_IS_ROOT(t); t = t->parent)
+		if (WT_ROW_REF_SLOT(
+		    t->parent, t->parent_ref) != t->parent->entries - 1)
+			return;
+
+	/*
+	 * If we're at the end of the name space, discard any deleted entries
+	 * from the page (always leaving at least one entry on the page, it's
+	 * not possible to delete column-store pages).   Keep it simple, don't
+	 * look for records that existed but were then deleted, that requires
+	 * looking at update chains and on-page overflow objects.
+	 *
+	 * If we ever support deleting column-store pages it would be worth it
+	 * to do that work, because it would actually shrink the file over time.
+	 * Since we can only shrink a single page here, I don't bother.  Another
+	 * possibility would be to review the end of the column-store file on
+	 * close, and take the time to discard all of the deleted records from
+	 * the end of the file.  Close is a relatively rare operation, slowing
+	 * it down shouldn't be too awful.
+	 */
+	cip = &page->u.col_leaf.d[page->entries - 1];
+	for (; page->entries > 1; --cip, --page->entries)
+		if (WT_COL_PTR(page, cip) != NULL ||
+		    WT_COL_UPDATE(page, cip) != NULL)
+			return;
+}
+
+/*
  * __rec_col_var --
  *	Reconcile a variable-width column-store leaf page.
  */
@@ -1922,9 +1981,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	 * were missing records in the column-store name space.
 	 */
 	for (; slvg_missing > 0; --slvg_missing) {
-		__wt_cell_set_fixed(&val->cell, WT_CELL_DEL, &val->cell_len);
-		val->buf.size = 0;
-		val->len = val->cell_len;
+		__rec_cell_build_deleted(val);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -1940,32 +1997,34 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	/* For each entry in the in-memory page... */
 	WT_COL_FOREACH(page, cip, i) {
 		/*
-		 * Get a reference to the value: it's either an update or the
-		 * original on-page item.
+		 * Get a reference to the value: it's a deleted cell, an update,
+		 * or the original on-page item.
 		 */
 		cell = WT_COL_PTR(page, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
-			val->buf.data = cell;
-			val->buf.size = __wt_cell_len(cell);
-			val->cell_len = 0;
-			val->len = val->buf.size;
+			if (cell == NULL)
+				__rec_cell_build_deleted(val);
+			else {
+				val->buf.data = cell;
+				val->buf.size = __wt_cell_len(cell);
+				val->cell_len = 0;
+				val->len = val->buf.size;
+			}
 		} else {
 			/*
 			 * If we update an overflow value, free the underlying
 			 * file space.
 			 */
-			WT_RET(__rec_discard_add_ovfl(session, cell));
+			if (cell != NULL)
+				WT_RET(__rec_discard_add_ovfl(session, cell));
 
 			/*
 			 * Check for deletion, else build the value's WT_CELL
 			 * chunk from the most recent update value.
 			 */
-			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				__wt_cell_set_fixed(
-				    &val->cell, WT_CELL_DEL, &val->cell_len);
-				val->buf.size = 0;
-				val->len = val->cell_len;
-			} else
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				__rec_cell_build_deleted(val);
+			else
 				WT_RET(__rec_cell_build_val(
 				    session, WT_UPDATE_DATA(upd), upd->size));
 		}
@@ -2120,14 +2179,14 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
-			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 				/* Delete overflow keys for merged pages. */
 				if (cell != NULL)
 					WT_RET(__rec_discard_add_ovfl(
 					    session, cell));
 
 				/* Merge split subtrees */
-				if (F_ISSET(rp, WT_PAGE_SPLIT)) {
+				if (F_ISSET(rp, WT_PAGE_MERGE)) {
 					r->merge_ref = rref;
 					WT_RET(__rec_row_merge(session, rp));
 				}
@@ -2228,9 +2287,9 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
-			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 				/* Merge split subtrees */
-				if (F_ISSET(rp, WT_PAGE_SPLIT))
+				if (F_ISSET(rp, WT_PAGE_MERGE))
 					WT_RET(__rec_row_merge(session, rp));
 				continue;
 			}
@@ -2751,25 +2810,30 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_REF *parent_ref;
 
-	/*
-	 * Update the relevant parent WT_REF structure, flush memory, and then
-	 * update the state of the parent reference.  No further memory flush
-	 * needed, the state field is declared volatile.
-	 *
-	 * If we're replacing a valid addr/size pair, free the original disk
-	 * blocks, they're no longer in use.
-	 */
 	WT_ASSERT(session,
 	    replace == NULL || page->parent == replace->parent);
 	WT_ASSERT(session,
 	    replace == NULL || page->parent_ref == replace->parent_ref);
+
 	parent_ref = page->parent_ref;
-	parent_ref->page = replace;
+
+	/*
+	 * If we're replacing a valid addr/size pair, free the original disk
+	 * blocks, they're no longer in use.
+	 */
 	if (parent_ref->addr != WT_ADDR_INVALID)
 		WT_RET(__rec_discard_add_block(
 		    session, parent_ref->addr, parent_ref->size));
+
+	/*
+	 * Updating the state of the parent reference turns on the change.  Set
+	 * the parent's WT_REF addr/size pair and memory reference, flush memory
+	 * and then update the state of the entry (no further flush is required
+	 * as the page state is declared volatile).
+	 */
 	parent_ref->addr = addr;
 	parent_ref->size = size;
+	parent_ref->page = replace;
 	WT_MEMORY_FLUSH;
 	parent_ref->state = state;
 
@@ -2789,6 +2853,18 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 		WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);
+}
+
+/*
+ * __rec_cell_build_deleted --
+ *	Create a deleted cell for a variable-length column-store.
+ */
+static inline void
+__rec_cell_build_deleted(WT_KV *val)
+{
+	__wt_cell_set_fixed(&val->cell, WT_CELL_DEL, &val->cell_len);
+	val->buf.size = 0;
+	val->len = val->cell_len;
 }
 
 /*
@@ -3055,7 +3131,7 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
 	 * into its parent when the parent is reconciled.
 	 */
-	F_SET(page, WT_PAGE_SPLIT);
+	F_SET(page, WT_PAGE_MERGE);
 
 	/* Enter each split page into the new, internal page. */
 	for (rref = page->u.row_int.t,
@@ -3132,7 +3208,7 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
 	 * into its parent when the parent is reconciled.
 	 */
-	F_SET(page, WT_PAGE_SPLIT);
+	F_SET(page, WT_PAGE_MERGE);
 
 	/* Enter each split page into the new, internal page. */
 	for (cref = page->u.col_int.t,

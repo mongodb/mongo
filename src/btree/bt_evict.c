@@ -146,7 +146,7 @@ __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 	WT_EVICT_REQ *er, *er_end;
 	int close_method;
 
-	__wt_evict_file_unpack(session, close_method);
+	__wt_evict_file_unpack(session, &close_method);
 
 	cache = S2C(session)->cache;
 
@@ -612,10 +612,10 @@ walk:		WT_RET(__wt_walk_begin(
 
 		/*
 		 * Pinned pages can't be evicted, and it's not useful to try
-		 * and evict deleted or split pages.
+		 * and evict deleted or temporary pages.
 		 */
 		if (F_ISSET(page,
-		    WT_PAGE_PINNED | WT_PAGE_DELETED | WT_PAGE_SPLIT))
+		    WT_PAGE_PINNED | WT_PAGE_DELETED | WT_PAGE_MERGE))
 			continue;
 
 		cache->evict[slot].page = page;

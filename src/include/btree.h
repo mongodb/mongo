@@ -276,37 +276,36 @@ struct __wt_page {
 
 	/* But the entries are wildly different, based on the page type. */
 	union {
-		/* Row-store internal information. */
+		/* Row-store internal page. */
 		struct {
 			WT_ROW_REF *t;		/* Subtrees */
 		} row_int;
 
+		/* Row-store leaf page. */
 		struct {
 			WT_ROW	   *d;		/* K/V object pairs */
 			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
 
-		/* Column-store internal information. */
+		/* Column-store internal page. */
 		struct {
-			uint64_t recno;		/* Starting recno */
-
+			uint64_t    recno;	/* Starting recno */
+			uint32_t    ext_entries;/* Extension entries */
 			WT_COL_REF *t;		/* Subtrees */
 		} col_int;
 
-		/* Column-store leaf information. */
+		/* Column-store leaf page. */
 		struct {
-			uint64_t recno;		/* Starting recno */
-
+			uint64_t    recno;	/* Starting recno */
 			WT_COL	   *d;		/* V objects */
-			WT_INSERT **ins;	/* Inserts */
+			WT_INSERT **ins;	/* Inserts (RLE) */
 			WT_UPDATE **upd;	/* Updates */
 		} col_leaf;
 
 		/* Bulk-loaded linked list. */
 		struct {
-			uint64_t recno;		/* Starting recno */
-
+			uint64_t   recno;	/* Starting recno */
 			WT_INSERT *ins;		/* Bulk-loaded K/V or V items */
 			WT_UPDATE *upd;		/* Bulk-loaded V items */
 		} bulk;
@@ -322,11 +321,11 @@ struct __wt_page {
 	uint32_t entries;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col store internal page */
-#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
-#define	WT_PAGE_OVFL		5	/* Page of untyped data */
+#define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
+#define	WT_PAGE_COL_INT		2	/* Col-store internal page */
+#define	WT_PAGE_COL_RLE		3	/* Col-store run-length encoded leaf */
+#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
 #define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
 #define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
@@ -336,9 +335,9 @@ struct __wt_page {
 #define	WT_PAGE_CACHE_COUNTED	0x02	/* Page counted in cache stats */
 #define	WT_PAGE_DELETED		0x04	/* Page was empty at reconciliation */
 #define	WT_PAGE_INITIAL_EMPTY	0x08	/* Empty page created during open */
-#define	WT_PAGE_MODIFIED	0x10	/* Page is modified */
-#define	WT_PAGE_PINNED		0x20	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x40	/* Internal page created in a split */
+#define	WT_PAGE_MERGE		0x10	/* Page to merge in reconciliation */
+#define	WT_PAGE_MODIFIED	0x20	/* Page is modified */
+#define	WT_PAGE_PINNED		0x40	/* Page is pinned */
 	uint8_t flags;			/* Page flags */
 };
 
@@ -529,16 +528,26 @@ struct __wt_col {
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_CELL (like row-store pages).
 	 * If the page has fixed-length objects, it's untyped bytes.
+	 *
+	 * If the value is 0, it's a single, deleted record.   While this might
+	 * be marginally faster than looking at the page, the real reason for
+	 * this is to simplify extending column-store files: a newly allocated
+	 * WT_COL array translates to a set of deleted records, which is exactly
+	 * what we want.
+	 *
+	 * Obscure the field name, code shouldn't use WT_COL->value, the public
+	 * interface is WT_COL_PTR.
 	 */
-	uint32_t value;
+	uint32_t __value;
 };
 
 /*
  * WT_COL_PTR --
- *     Return a pointer corresponding to the data offset.
+ *     Return a pointer corresponding to the data offset -- if the item doesn't
+ * exist on the page, return a NULL.
  */
 #define	WT_COL_PTR(page, cip)						\
-	WT_REF_OFFSET(page, (cip)->value)
+	((cip)->__value == 0 ? NULL : WT_REF_OFFSET(page, (cip)->__value))
 
 /*
  * WT_COL_FOREACH --
@@ -789,7 +798,7 @@ struct __wt_off_record {
  * pinned for the life of the table handle.
  */
 #define	WT_PAGE_OUT(session, p)						\
-	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
+	if ((p) != NULL && !WT_PAGE_IS_ROOT(page))			\
 		__wt_hazard_clear((session), (p));
 
 /*

@@ -25,7 +25,7 @@ skip	src/include/bitstring.h
 skip	src/include/extern.h
 skip	src/include/log.i
 skip	src/include/queue.h
-skip	src/include/serial.h
+skip	src/include/serial.i
 skip	src/log/log_desc.c
 skip	src/support/cksum.c
 skip	src/support/stat.c

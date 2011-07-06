@@ -231,7 +231,7 @@ next:		switch (direction) {
 	    retb->data, retb->size, &ikey));
 
 	/* Serialize the swap of the key into place. */
-	__wt_row_key_serial(session, page, rip_arg, ikey, ret);
+	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
 
 	/* Free the WT_IKEY structure if the workQ didn't use it for the key. */
 	if (rip_arg->key != ikey)
@@ -328,7 +328,7 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	WT_PAGE *page;
 	WT_ROW *rip;
 
-	__wt_row_key_unpack(session, page, rip, ikey);
+	__wt_row_key_unpack(session, &page, &rip, &ikey);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler

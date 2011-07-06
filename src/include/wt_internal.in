@@ -153,7 +153,6 @@ struct __wt_walk_entry;
 #include "log.h"
 #include "misc.h"
 #include "mutex.h"
-#include "serial.h"
 #include "stat.h"
 #include "walk.h"
 
@@ -166,6 +165,7 @@ struct __wt_walk_entry;
 
 #include "log.i"
 #include "progress.i"
+#include "serial.i"
 
 #if defined(__cplusplus)
 }
