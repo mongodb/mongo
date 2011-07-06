@@ -62,7 +62,6 @@ namespace mongo {
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
             out() << "ERROR: SO_KEEPALIVE failed" << endl;
     }
-    inline void prebindOptions( int sock ) { }
 
     // This won't actually be used on windows
     struct sockaddr_un {
@@ -96,13 +95,6 @@ namespace mongo {
 #endif
 
     }
-    inline void prebindOptions( int sock ) {
-        DEV log() << "doing prebind option" << endl;
-        int x = 1;
-        if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) < 0 )
-            out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
-    }
-
 
 #endif // _WIN32
 

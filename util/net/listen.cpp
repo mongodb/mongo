@@ -114,7 +114,13 @@ namespace mongo {
                 setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (const char*) &one, sizeof(one));
             }
 
-            prebindOptions( sock );
+#if !defined(_WIN32)
+            {
+                int one;
+                if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0 )
+                    out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
+            }
+#endif
 
             if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
                 int x = errno;
