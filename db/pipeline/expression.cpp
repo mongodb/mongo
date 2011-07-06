@@ -828,8 +828,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string dayOfMonth = date.toString().substr(8,2);
+        string date = (pDate->coerceToDate()).toString();
+        string dayOfMonth = date.substr(8,2);
         return Value::createInt(atoi(dayOfMonth.c_str()));
     }
 
@@ -860,8 +860,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string dayOfWeek = date.toString().substr(0,3);
+        string date = (pDate->coerceToDate()).toString();
+        string dayOfWeek = date.substr(0,3);
         int dayNum = -1;
         if (!dayOfWeek.compare("Sun")) {
             dayNum = 1;
@@ -1825,8 +1825,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string minute = date.toString().substr(14,2);
+        string date = (pDate->coerceToDate()).toString();
+        string minute = date.substr(14,2);
         return Value::createInt(atoi(minute.c_str()));
     }
 
@@ -1900,8 +1900,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string month = date.toString().substr(4,3);
+        string date = (pDate->coerceToDate()).toString();
+        string month = date.substr(4,3);
         int monthNum = -1;
         if (!month.compare("Jan")) {
             monthNum = 1;
@@ -2008,8 +2008,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string hour = date.toString().substr(11,2);
+        string date = (pDate->coerceToDate()).toString();
+        string hour = date.substr(11,2);
         return Value::createInt(atoi(hour.c_str()));
     }
 
@@ -2361,8 +2361,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string second = date.toString().substr(17,2);
+        string date = (pDate->coerceToDate()).toString();
+        string second = date.substr(17,2);
         return Value::createInt(atoi(second.c_str()));
     }
 
@@ -2653,7 +2653,7 @@ namespace mongo {
         }
 
         janFirst = dayNum - dayOfYear % 7;
-        offset = (janFirst + 5) % 7;
+        offset = (janFirst + 6) % 7;
         week = (dayOfYear + offset) / 7;
 
         return Value::createInt(week);
@@ -2686,8 +2686,8 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        Date_t date = pDate->coerceToDate();
-        string year = date.toString().substr(20,4);
+        string date = (pDate->coerceToDate()).toString();
+        string year = date.substr(20,4);
         return Value::createInt(atoi(year.c_str()));
     }
 
