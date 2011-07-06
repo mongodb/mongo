@@ -133,6 +133,11 @@ for (i=0; i<n; i++) {
     }
 
     assert.soon(function() {
+        rs.getMaster();
+        return rs.liveNodes.slaves.length == 2;
+    }, "2 slaves");
+
+    assert.soon(function() {
             versions = [0,0];
             rs.liveNodes.slaves[0].setSlaveOk();
             versions[0] = rs.liveNodes.slaves[0].getDB("local").system.replset.findOne().version;
