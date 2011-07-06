@@ -18,6 +18,8 @@
 
 #include "pch.h"
 
+#include <boost/unordered_set.hpp>
+#include "db/pipeline/value.h"
 #include "db/pipeline/expression.h"
 #include "bson/bsontypes.h"
 
@@ -55,6 +57,32 @@ namespace mongo {
 	 */
 	void opToBson(
 	    BSONObjBuilder *pBuilder, string fieldName, string opName) const;
+    };
+
+
+    class AccumulatorAddToSet :
+        public Accumulator {
+    public:
+        // virtuals from Expression
+	virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual shared_ptr<const Value> getValue() const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create an appending accumulator.
+
+	  @param pCtx the expression context
+          @returns the created accumulator
+         */
+        static shared_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
+        mutable boost::unordered_set<shared_ptr<const Value>, Value::Hash > vpValue;
+        mutable boost::unordered_set<shared_ptr<const Value>, Value::Hash >::iterator itr; 
+	intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
