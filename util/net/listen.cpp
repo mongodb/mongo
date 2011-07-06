@@ -130,7 +130,7 @@ namespace mongo {
 
 #if !defined(_WIN32)
             {
-                int one;
+                const int one = 1;
                 if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0 )
                     out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
             }
