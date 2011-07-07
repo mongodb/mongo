@@ -407,8 +407,13 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 * references the leaf page (which deepens the tree by a level).  This
 	 * is a little like splits in the reconciliation code, but it's all done
 	 * while other threads of control are going through the structures.
+	 *
+	 * Get a reference to the top WT_REF structure, and mark the top-level
+	 * page dirty, we're going to have to reconcile it so our newly created
+	 * level is merged back in.
 	 */
 	orig_ref = page->parent_ref;
+	WT_PAGE_SET_MODIFIED(page->parent);
 
 	/*
 	 * Configure the new internal page.
