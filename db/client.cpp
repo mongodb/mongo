@@ -390,7 +390,7 @@ namespace mongo {
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
-        bool a = _active && _start;
+        bool a = _active && ( _start || _waitingForLock );
         b.append("active", a);
         if ( _lockType )
             b.append("lockType" , _lockType > 0 ? "write" : "read"  );
