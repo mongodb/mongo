@@ -1766,6 +1766,7 @@ namespace mongo {
         }
 
         if ( cmdObj["help"].trueValue() ) {
+            client.curop()->ensureStarted();
             stringstream ss;
             ss << "help for: " << c->name << " ";
             c->help( ss );
@@ -1790,6 +1791,7 @@ namespace mongo {
 
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+            client.curop()->ensureStarted();
             string errmsg;
             int ok = c->run( dbname , cmdObj , errmsg , result , fromRepl );
             if ( ! ok )
@@ -1804,6 +1806,7 @@ namespace mongo {
         }
 
         mongolock lk( needWriteLock );
+        client.curop()->ensureStarted();
         Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
 
         try {
@@ -1837,7 +1840,6 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
-        cc().curop()->ensureStarted();
         string dbname = nsToDatabase( ns );
 
         if( logLevel >= 1 )
