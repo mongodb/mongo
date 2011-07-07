@@ -130,7 +130,7 @@ __wt_dmsg(WT_DBG *ds, const char *fmt, ...)
 			len = (size_t)vsnprintf(
 			    (char *)msg->mem + msg->size, remain, fmt, ap);
 			if (len < remain) {
-				msg->size += len;
+				msg->size += (uint32_t)len;
 				break;
 			}
 
