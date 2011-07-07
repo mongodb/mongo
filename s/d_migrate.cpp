@@ -190,13 +190,14 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _m("MigrateFromStatus") {
+        MigrateFromStatus() : _m("MigrateFromStatus") , _workLock( "MigrateFromStatus::WorkLock" ) {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ) {
+            scoped_lock lk( _workLock );
             scoped_lock l(_m); // reads and writes _active
 
             assert( ! _active );
@@ -519,9 +520,10 @@ namespace mongo {
         void doRemove( OldDataCleanup& cleanup ) {
             while ( true ) { 
                 {
-                    scoped_lock lk( _m );
+                    scoped_lock lk( _workLock );
                     if ( ! _active ) {
                         cleanup.doRemove();
+                        return;
                     }
                 }
                 sleepmillis( 100 );
@@ -550,6 +552,9 @@ namespace mongo {
         list<BSONObj> _reload; // objects that were modified that must be recloned
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
+
+        mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
+                                        // for now, this means migrate or removing old chunk data
 
         bool _getActive() const { scoped_lock l(_m); return _active; }
         void _setActive( bool b ) { scoped_lock l(_m); _active = b; }
