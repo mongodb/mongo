@@ -1610,6 +1610,20 @@ namespace mongo {
 
             assert( _max > 0 );
 
+            Holder::iterator lastPtIt = _points.end();
+            lastPtIt--;
+            _farthest = lastPtIt->distance() + 2 * _distError;
+
+            return _points.size() - prevSize;
+
+        }
+
+        void processExtraPoints(){
+
+            if( _points.size() == 0 ) return;
+
+            int prevSize = _points.size();
+
             // Erase all points from the set with a position >= _max *and*
             // whose distance isn't close to the _max - 1 position distance
 
@@ -1643,9 +1657,7 @@ namespace mongo {
 
             _points.erase( startErase, _points.end() );
 
-            // log() << "points : " << _points.size() << " prev : " << prevSize << " seen : " << _seenPts.size() << " farthest : " << _farthest << " newDist : " << newPoint.distance() << endl;
-
-            return _points.size() - prevSize;
+            _found += _points.size() - prevSize;
 
         }
 
@@ -1717,6 +1729,7 @@ namespace mongo {
                    long long f = found();
                    assert( f <= 0x7fffffff );
                    fillStack( maxPointsHeuristic, _numWanted - static_cast<int>(f) , true );
+                   processExtraPoints();
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
                         found() < _numWanted &&
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
@@ -1726,7 +1739,6 @@ namespace mongo {
                    expandEndPoints();
                    return;
                }
-
            }
 
 #ifdef GEODEBUGGING
@@ -1781,6 +1793,7 @@ namespace mongo {
                 // Do regular search in the full region
                 do {
                    fillStack( maxPointsHeuristic );
+                   processExtraPoints();
                 }
                 while( _state != DONE );
 
@@ -1845,6 +1858,8 @@ namespace mongo {
 
         // TODO: Refactor this back into holder class, allow to run periodically when we are seeing a lot of pts
         void expandEndPoints( bool finish = true ){
+
+            processExtraPoints();
 
             // All points in array *could* be in maxDistance
 
