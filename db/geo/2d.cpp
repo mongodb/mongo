@@ -822,7 +822,16 @@ namespace mongo {
     class GeoAccumulator {
     public:
         GeoAccumulator( const Geo2dType * g , const BSONObj& filter, bool uniqueDocs, bool needDistance )
-            : _g(g) , _lookedAt(0) , _objectsLoaded(0) , _found(0), _uniqueDocs( uniqueDocs ), _needDistance( needDistance ) {
+            : _g(g) ,
+              _keysChecked(0) ,
+              _lookedAt(0) ,
+              _matchesPerfd(0) ,
+              _objectsLoaded(0) ,
+              _pointsLoaded(0) ,
+              _found(0) ,
+              _uniqueDocs( uniqueDocs ) ,
+              _needDistance( needDistance )
+        {
             if ( ! filter.isEmpty() ) {
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
                 GEODEBUG( "Matcher is now " << _matcher->docMatcher().toString() );
@@ -839,6 +848,9 @@ namespace mongo {
         set< pair<DiskLoc,int> > _seen;
     public:
         bool seen(DiskLoc bucket, int pos) {
+
+            _keysChecked++;
+
             pair< set<pair<DiskLoc,int> >::iterator, bool > seenBefore = _seen.insert( make_pair(bucket,pos) );
             if ( ! seenBefore.second ) {
                 GEODEBUG( "\t\t\t\t already seen : " << bucket.toString() << ' ' << pos ); // node.key.toString() << " @ " << Point( _g, GeoHash( node.key.firstElement() ) ).toString() << " with " << node.recordLoc.obj()["_id"] );
@@ -881,6 +893,9 @@ namespace mongo {
                 MatchDetails details;
                 if ( _matcher.get() ) {
                     bool good = _matcher->matchesWithSingleKeyIndex( node._key , node.recordLoc , &details );
+
+                    _matchesPerfd++;
+
                     if ( details._loadedObject )
                         _objectsLoaded++;
 
@@ -915,7 +930,7 @@ namespace mongo {
             // Find all the location objects from the keys
             vector< BSONObj > locs;
             _g->getKeys( obj, allPoints ? locsForNode : locs );
-            _objectsLoaded++;
+            _pointsLoaded++;
 
             if( allPoints ) return;
             if( locs.size() == 1 ){
@@ -953,8 +968,11 @@ namespace mongo {
         map<DiskLoc, bool> _matched;
         shared_ptr<CoveredIndexMatcher> _matcher;
 
+        long long _keysChecked;
         long long _lookedAt;
+        long long _matchesPerfd;
         long long _objectsLoaded;
+        long long _pointsLoaded;
         long long _found;
 
         bool _uniqueDocs;
@@ -1482,6 +1500,14 @@ namespace mongo {
             return _nscanned;
         }
 
+        virtual void customExplain( BSONObjBuilder& b ){
+            b << "keysChecked" << _keysChecked;
+            b << "lookedAt" << _lookedAt;
+            b << "matchesPerfd" << _matchesPerfd;
+            b << "objectsLoaded" << _objectsLoaded;
+            b << "pointsLoaded" << _pointsLoaded;
+        }
+
         string _type;
         BSONObj _filter;
         list<GeoPoint> _stack;
@@ -1618,6 +1644,9 @@ namespace mongo {
 
         }
 
+        // Removes extra points from end of _points set.
+        // Check can be a bit costly if we have lots of exact points near borders,
+        // so we'll do this every once and awhile.
         void processExtraPoints(){
 
             if( _points.size() == 0 ) return;
@@ -1626,11 +1655,6 @@ namespace mongo {
 
             // Erase all points from the set with a position >= _max *and*
             // whose distance isn't close to the _max - 1 position distance
-
-            // TODO:  Don't necessarily need to run this *every* new point, though
-            // usually it'll just delete the last point... issue is when we have
-            // 10,000 of the *same* point at a boundary.  Maybe store iterator to
-            // last seen value, compare > or <?
 
             int numToErase = _points.size() - _max;
             if( numToErase < 0 ) numToErase = 0;
