@@ -153,7 +153,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		if (LF_ISSET(WT_WRITE))
 			break;
 
-		WT_ASSERT(session, cipdata != NULL);
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
@@ -202,7 +201,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		if (LF_ISSET(WT_WRITE))
 			break;
 
-		WT_ASSERT(session, cipdata != NULL);
 		if (match) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				goto notfound;
