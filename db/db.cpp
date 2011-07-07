@@ -795,10 +795,12 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         if (params.count("repair")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
             forceRepair = 1;
         }
         if (params.count("upgrade")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
         }
         if (params.count("notablescan")) {
