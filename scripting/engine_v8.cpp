@@ -491,8 +491,8 @@ namespace mongo {
             return Array;
         if ( v->IsBoolean() )
             return Bool;
-        if ( v->IsInt32() )
-            return NumberInt;
+//        if ( v->IsInt32() )
+//            return NumberInt;
         if ( v->IsNumber() )
             return NumberDouble;
         if ( v->IsExternal() ) {
@@ -950,18 +950,19 @@ namespace mongo {
             }
 
             case mongo::NumberDouble:
+            case mongo::NumberInt:
                 o->Set( name , v8::Number::New( f.number() ) );
                 break;
 
-            case mongo::NumberInt: {
-                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
-                int val = f.numberInt();
-                v8::Function* numberInt = getNamedCons( "NumberInt" );
-                v8::Handle<v8::Value> argv[1];
-                argv[0] = v8::Int32::New( val );
-                o->Set( name, numberInt->NewInstance( 1, argv ) );
-                break;
-            }
+//            case mongo::NumberInt: {
+//                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+//                int val = f.numberInt();
+//                v8::Function* numberInt = getNamedCons( "NumberInt" );
+//                v8::Handle<v8::Value> argv[1];
+//                argv[0] = v8::Int32::New( val );
+//                o->Set( name, numberInt->NewInstance( 1, argv ) );
+//                break;
+//            }
 
             case mongo::Array:
                 sub = f.embeddedObject();
@@ -1150,6 +1151,7 @@ namespace mongo {
             return newId( f.__oid() );
 
         case mongo::NumberDouble:
+        case mongo::NumberInt:
             return v8::Number::New( f.number() );
 
         case mongo::Array:
@@ -1223,14 +1225,14 @@ namespace mongo {
             }
         }
 
-        case mongo::NumberInt: {
-            Local<v8::Object> sub = internalFieldObjects->NewInstance();
-            int val = f.numberInt();
-            v8::Function* numberInt = getNamedCons( "NumberInt" );
-            v8::Handle<v8::Value> argv[1];
-            argv[0] = v8::Int32::New(val);
-            return numberInt->NewInstance( 1, argv );
-        }
+//        case mongo::NumberInt: {
+//            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+//            int val = f.numberInt();
+//            v8::Function* numberInt = getNamedCons( "NumberInt" );
+//            v8::Handle<v8::Value> argv[1];
+//            argv[0] = v8::Int32::New(val);
+//            return numberInt->NewInstance( 1, argv );
+//        }
 
         case mongo::MinKey: {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
