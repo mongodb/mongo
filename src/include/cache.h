@@ -56,6 +56,21 @@ struct __wt_cache {
 	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
 	u_int volatile evict_sleeping;	/* Sleeping */
 
+	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
+	uint32_t evict_entries;		/* Total evict slots */
+	uint32_t evict_allocated;	/* Bytes allocated */
+
+	/*
+	 * File sync can temporarily fail when a tree is active, that is, we may
+	 * not be able to immediately reconcile all of the file's pages.  If the
+	 * pending_retry value is non-zero, it means there are pending requests
+	 * we need to handle.
+	 */
+	int pending_retry;		/* Eviction request needs completion */
+
+	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
+					   slot available if session is NULL */
+
 	/*
 	 * The I/O thread sets/clears the read_sleeping flag when blocked on the
 	 * mtx_read mutex.  The cache thread uses the read_sleeping flag to wake
@@ -67,17 +82,6 @@ struct __wt_cache {
 
 	WT_READ_REQ read_request[40];	/* Read requests:
 					   slot available if session is NULL */
-
-	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
-					   slot available if session is NULL */
-
-	/*
-	 * File sync can temporarily fail when a tree is active, that is, we may
-	 * not be able to immediately reconcile all of the file's pages.  If the
-	 * pending_retry value is non-zero, it means there are pending requests
-	 * we need to handle.
-	 */
-	int pending_retry;		/* Eviction request needs completion */
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 
@@ -94,10 +98,6 @@ struct __wt_cache {
 	uint64_t bytes_in;
 	uint64_t pages_out;
 	uint64_t bytes_out;
-
-	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	uint32_t evict_entries;		/* Total evict slots */
-	uint32_t evict_allocated;	/* Bytes allocated */
 
 	WT_CACHE_STATS *stats;		/* Cache statistics */
 };
