@@ -169,7 +169,7 @@ namespace mongo {
                 time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
 
                 // weight new ping with old pings
-                mem.ping = (old.ping * .8) + (mem.ping * .2);
+                mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
 
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
