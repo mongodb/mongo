@@ -17,26 +17,28 @@ __wt_disk_read(
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
-	off_t offset;
 	uint32_t checksum;
 
 	btree = session->btree;
 	fh = btree->fh;
 
-	WT_STAT_INCR(btree->stats, page_read);
-	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_read);
-
-	offset = WT_ADDR_TO_OFF(btree, addr);
-	WT_RET(__wt_read(session, fh, offset, size, dsk));
+	WT_RET(__wt_read(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		__wt_errx(session, "read checksum error: "
-		    "addr/size %" PRIu32 "/%" PRIu32 " at offset %" PRIu64,
-		    addr, size, offset);
+		__wt_errx(session,
+		    "read checksum error: addr/size %" PRIu32 "/%" PRIu32,
+		    addr, size);
 		return (WT_ERROR);
 	}
+
+	WT_STAT_INCR(btree->stats, page_read);
+	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_read);
+
+	WT_VERBOSE(session, READ,
+	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
+	    addr, size, __wt_page_type_string(dsk->type));
 
 	return (0);
 }
@@ -74,14 +76,18 @@ __wt_disk_write(
 	dsk->lsn = btree->lsn;
 	dsk->size = dsk->memsize = size;
 
+	WT_ASSERT(session, __wt_verify_dsk(session, dsk, addr, size, 0) == 0);
+
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);
-
-	WT_ASSERT(session, __wt_verify_dsk(session, dsk, addr, size, 0) == 0);
+	WT_RET(
+	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 
 	WT_STAT_INCR(btree->stats, page_write);
 	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_write);
 
-	return (
-	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
+	WT_VERBOSE(session, WRITE,
+	    "write addr/size %" PRIu32 "/%" PRIu32 ": %s",
+	    addr, size, __wt_page_type_string(dsk->type));
+	return (0);
 }

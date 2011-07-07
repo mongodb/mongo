@@ -303,4 +303,4 @@ __wt_confchk_wiredtiger_open =
     "hazard_max=(type=int,min=3),logging=(type=boolean),"
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
     "verbose=(type=list,choices=[\"evict\",\"fileops\",\"hazard\",\"mutex\","
-    "\"read\",\"salvage\"])";
+    "\"read\",\"readserver\",\"salvage\",\"write\"])";

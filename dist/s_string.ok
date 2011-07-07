@@ -290,6 +290,7 @@ py
 qdown
 qsort
 qup
+readserver
 realloc
 recno
 req

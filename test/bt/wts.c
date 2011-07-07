@@ -78,6 +78,9 @@ wts_startup(void)
 	    // "hazard,"
 	    // "mutex,"
 	    // "read,"
+	    // "readserver,"
+	    // "salvage,"
+	    // "write"
 	);
 
 	ret = wiredtiger_open(NULL, &event_handler, config, &conn);
@@ -537,10 +540,20 @@ wts_ops(void)
 					return (1);
 				break;
 			}
-		} else if (g.c_file_type == ROW &&
-		    op < g.c_delete_pct + g.c_insert_pct) {
-			if (wts_row_put(keyno, 1))
-				return (1);
+		} else if (op < g.c_delete_pct + g.c_insert_pct) {
+			switch (g.c_file_type) {
+			case ROW:
+				if (wts_row_put(keyno, 1))
+					return (1);
+				break;
+			case FIX:
+			case VAR:
+				/* Column-store tables only support append. */
+				keyno = ++g.c_rows;
+				if (wts_col_put(keyno))
+					return (1);
+				break;
+			}
 		} else if (
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
@@ -712,6 +725,7 @@ wts_col_put(uint64_t keyno)
 	cursor = g.wts_cursor;
 	session = g.wts_session;
 
+	key_gen(&key.data, &key.size, keyno, 0);
 	value_gen(&value.data, &value.size, 0);
 
 	/* Log the operation */
@@ -719,7 +733,6 @@ wts_col_put(uint64_t keyno)
 		(void)session->msg_printf(session, "%-10s%" PRIu64 " {%.*s}",
 		    "put", keyno, (int)value.size, (char *)value.data);
 
-	key_gen(&key.data, &key.size, keyno, 0);
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 	

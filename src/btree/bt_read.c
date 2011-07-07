@@ -66,7 +66,7 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 		if (bytes_inuse <= bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
-		WT_VERBOSE(session, READ,
+		WT_VERBOSE(session, READSERVER,
 		    "workQ locks out reads: "
 		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
 		    bytes_inuse, bytes_max);
@@ -160,12 +160,12 @@ __wt_cache_read_server(void *arg)
 	F_SET(session, WT_SESSION_INTERNAL);
 
 	for (;;) {
-		WT_VERBOSE(session, READ, "cache read server sleeping");
+		WT_VERBOSE(session, READSERVER, "read server sleeping");
 		cache->read_sleeping = 1;
 		__wt_lock(session, cache->mtx_read);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(session, READ, "cache read server waking");
+		WT_VERBOSE(session, READSERVER, "read server waking");
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
@@ -201,7 +201,7 @@ __wt_cache_read_server(void *arg)
 		} while (didwork);
 	}
 
-	WT_VERBOSE(session, READ, "cache read server exiting");
+	WT_VERBOSE(session, READSERVER, "read server exiting");
 	(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
@@ -265,8 +265,6 @@ __cache_read(
 	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
-	WT_VERBOSE(session, READ,
-	    "cache read addr/size %" PRIu32 "/%" PRIu32, addr, size);
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/* Verify the disk image on demand. */
