@@ -1914,7 +1914,7 @@ static void
 __rec_col_extend_truncate(WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_PAGE *t;
+	WT_PAGE *t, *parent;
 
 	/*
 	 * Extending a column-store file can result in thousands of deleted
@@ -1928,17 +1928,20 @@ __rec_col_extend_truncate(WT_PAGE *page)
 	 *
 	 * First, check to see if this page is at the end of the name space.
 	 */
-	for (t = page; !WT_PAGE_IS_ROOT(t); t = t->parent)
-		if (WT_ROW_REF_SLOT(
-		    t->parent, t->parent_ref) != t->parent->entries - 1)
+	for (t = page; !WT_PAGE_IS_ROOT(t); t = parent) {
+		parent = t->parent;
+		if (t->u.col_leaf.recno !=
+		    parent->u.col_int.t[parent->entries - 1].recno)
 			return;
+	}
 
 	/*
 	 * If we're at the end of the name space, discard any deleted entries
 	 * from the page (always leaving at least one entry on the page, it's
 	 * not possible to delete column-store pages).   Keep it simple, don't
-	 * look for records that existed but were then deleted, that requires
-	 * looking at update chains and on-page overflow objects.
+	 * look for records that existed but were subsequently deleted, that
+	 * requires looking at update chains and on-page overflow objects and
+	 * it gets complicated.
 	 *
 	 * If we ever support deleting column-store pages it would be worth it
 	 * to do that work, because it would actually shrink the file over time.
