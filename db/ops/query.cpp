@@ -420,6 +420,8 @@ namespace mongo {
 
             *_b << "indexBounds" << c->prettyIndexBounds();
 
+            c->customExplain( *_b );
+
             if ( !hint ) {
                 *_b << "allPlans" << _a->arr();
             }
