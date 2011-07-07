@@ -14,11 +14,6 @@ add	examples/c/ex_stat.c
 add	examples/c/ex_thread.c
 add	examples/c/ex_tpcb.c
 add	examples/c/ex_transaction.c
-add	src/utilities/util_dump.c
-add	src/utilities/util_load.c
-add	src/utilities/util_salvage.c
-add	src/utilities/util_stat.c
-add	src/utilities/util_verify.c
 skip	src/api/config_def.c
 skip	src/api/strerror.c
 skip	src/include/bitstring.h
