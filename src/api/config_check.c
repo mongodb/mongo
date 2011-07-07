@@ -19,9 +19,9 @@ int
 __wt_config_check(WT_SESSION_IMPL *session,
     const char *checks, const char *config)
 {
-	WT_CONFIG parser, cparser, lparser;
-	WT_CONFIG_ITEM k, v, chk, ck, cv, lv;
-	int ret;
+	WT_CONFIG parser, cparser, sparser;
+	WT_CONFIG_ITEM k, v, chk, ck, cv, dummy;
+	int found, ret;
 
 	/* It is always okay to pass NULL. */
 	if (config == NULL)
@@ -35,11 +35,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 			    (int)k.len, k.str);
 			return (EINVAL);
 		}
-		/*
-		 * TODO
-		 * Need to handle configuration keys that only match a prefix
-		 * such as "index_1=(),index_2=()".
-		 */
+
 		if ((ret = __wt_config_getone(session,
 		    checks, &k, &chk)) != 0) {
 			if (ret == WT_NOTFOUND) {
@@ -86,15 +82,30 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					return (EINVAL);
 				}
 			} else if (strncmp(ck.str, "choices", ck.len) == 0) {
-				WT_RET(__wt_config_initn(session,
-				    &lparser, cv.str, cv.len));
 				if (v.type == ITEM_STRUCT) {
 					/*
-					 * TODO: handle the 'verbose' case of a
-					 * list containing restricted choices.
+					 * Handle the 'verbose' case of a list
+					 * containing restricted choices.
 					 */
-				} else if (__wt_config_getraw(&lparser,
-				    &v, &lv) != 0) {
+					WT_RET(__wt_config_initn(session,
+					    &sparser, v.str, v.len));
+					found = 1;
+					while (found &&
+					    (ret = __wt_config_next(&sparser,
+					    &v, &dummy)) == 0) {
+						ret = __wt_config_getoneraw(
+						    session, &cv, &v, &dummy);
+						found = (ret == 0);
+					}
+				} else  {
+					ret = __wt_config_getoneraw(session,
+					    &cv, &v, &dummy);
+					found = (ret == 0);
+				}
+
+				if (ret != 0 && ret != WT_NOTFOUND)
+					return (ret);
+				if (!found) {
 					__wt_errx(session, "Value '%.*s' not a "
 					    "permitted choice for key '%.*s'",
 					    (int)v.len, v.str,
