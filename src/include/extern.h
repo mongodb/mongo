@@ -23,6 +23,10 @@ extern int __wt_config_next(WT_CONFIG *conf,
 extern int __wt_config_getraw( WT_CONFIG *cparser,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
+extern  int __wt_config_getoneraw(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *cfg,
+    WT_CONFIG_ITEM *key,
+    WT_CONFIG_ITEM *value);
 extern int __wt_config_get(WT_SESSION_IMPL *session,
     const char **cfg,
     WT_CONFIG_ITEM *key,

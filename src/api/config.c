@@ -524,6 +524,21 @@ __wt_config_getraw(
 }
 
 /*
+ * __wt_config_getoneraw --
+ *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
+ *	This is useful for dealing with nested structs in config strings.
+ */
+ int
+__wt_config_getoneraw(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG cparser;
+
+	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
+	return (__wt_config_getraw(&cparser, key, value));
+}
+
+/*
  * __wt_config_get --
  *	Given a NULL-terminated list of configuration strings, find
  *	the final value for a given key.

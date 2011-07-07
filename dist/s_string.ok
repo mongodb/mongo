@@ -209,6 +209,7 @@ fsyncs
 ftruncate
 func
 getone
+getoneraw
 getones
 getraw
 gobare
