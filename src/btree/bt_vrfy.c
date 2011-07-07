@@ -35,7 +35,7 @@ static int __wt_verify_int(WT_SESSION_IMPL *, int);
 static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_CELL *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
-	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, uint32_t, WT_VSTUFF *);
 static int __wt_verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
@@ -189,7 +189,7 @@ __wt_verify_tree(
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
 	uint64_t recno;
-	uint32_t i;
+	uint32_t entry, i;
 	int ret;
 
 	ret = 0;
@@ -334,6 +334,7 @@ recno_chk:	if (parent_recno != recno) {
 		break;
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
+		entry = 0;
 		WT_ROW_REF_FOREACH(page, rref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
@@ -343,9 +344,10 @@ recno_chk:	if (parent_recno != recno) {
 			 * The 0th key of any internal page is magic, and we
 			 * can't test against it.
 			 */
-			if (WT_ROW_REF_SLOT(page, rref) != 0)
+			if (entry != 0)
 				WT_RET(__wt_verify_row_int_key_order(
-				    session, page, rref, vs));
+				    session, page, rref, entry, vs));
+			++entry;
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
@@ -368,8 +370,8 @@ recno_chk:	if (parent_recno != recno) {
  * far; update the largest key we've seen so far to that key.
  */
 static int
-__wt_verify_row_int_key_order(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW_REF *rref, WT_VSTUFF *vs)
+__wt_verify_row_int_key_order(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_ROW_REF *rref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
@@ -393,7 +395,7 @@ __wt_verify_row_int_key_order(
 		    "the internal key in entry %" PRIu32
 		    " on the page at addr %" PRIu32
 		    " sorts before the last key appearing on page %" PRIu32,
-		    WT_ROW_REF_SLOT(page, rref), WT_PADDR(page), vs->max_addr);
+		    entry, WT_PADDR(page), vs->max_addr);
 		return (WT_ERROR);
 	}
 

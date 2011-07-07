@@ -455,12 +455,6 @@ struct __wt_row_ref {
 #define	WT_ROW_REF_FOREACH(page, rref, i)				\
 	for ((i) = (page)->entries,					\
 	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
-/*
- * WT_ROW_REF_SLOT --
- *	Return the 0-based array offset based on a WT_ROW_REF reference.
- */
-#define	WT_ROW_REF_SLOT(page, rref)					\
-	((uint32_t)(((WT_ROW_REF *)rref) - (page)->u.row_int.t))
 
 /*
  * WT_COL_REF --
