@@ -47,7 +47,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 			return (ret);
 		}
 
-		WT_RET(__wt_config_initn(session, &cparser, chk.str, chk.len));
+		WT_RET(__wt_config_subinit(session, &cparser, &chk));
 		while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
 			if (strncmp(ck.str, "type", ck.len) == 0) {
 				if ((strncmp(cv.str, "int", cv.len) == 0 &&
@@ -87,18 +87,18 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					 * Handle the 'verbose' case of a list
 					 * containing restricted choices.
 					 */
-					WT_RET(__wt_config_initn(session,
-					    &sparser, v.str, v.len));
+					WT_RET(__wt_config_subinit(session,
+					    &sparser, &v));
 					found = 1;
 					while (found &&
 					    (ret = __wt_config_next(&sparser,
 					    &v, &dummy)) == 0) {
-						ret = __wt_config_getoneraw(
+						ret = __wt_config_subgetraw(
 						    session, &cv, &v, &dummy);
 						found = (ret == 0);
 					}
 				} else  {
-					ret = __wt_config_getoneraw(session,
+					ret = __wt_config_subgetraw(session,
 					    &cv, &v, &dummy);
 					found = (ret == 0);
 				}

@@ -9,7 +9,8 @@
 
 /*
  * __wt_config_init --
- *	Initialize a config handle, used to iterate through a config string.
+ *	Initialize a config handle, used to iterate through a config string of
+ *	specified length.
  */
 int
 __wt_config_initn(
@@ -27,7 +28,8 @@ __wt_config_initn(
 
 /*
  * __wt_config_init --
- *	Initialize a config handle, used to iterate through a config string.
+ *	Initialize a config handle, used to iterate through a NUL-terminated
+ *	config string.
  */
 int
 __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
@@ -37,6 +39,19 @@ __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
 	len = (str == NULL) ? 0 : strlen(str);
 
 	return (__wt_config_initn(session, conf, str, len));
+}
+
+/*
+ * __wt_config_subinit --
+ *	Initialize a config handle, used to iterate through a config string
+ *	extracted from another config string (used for parsing nested
+ *	structures).
+ */
+int
+__wt_config_subinit(
+    WT_SESSION_IMPL *session, WT_CONFIG *conf, WT_CONFIG_ITEM *item)
+{
+	return (__wt_config_initn(session, conf, item->str, item->len));
 }
 
 #define	PUSH(i, t) do {							\
@@ -524,21 +539,6 @@ __wt_config_getraw(
 }
 
 /*
- * __wt_config_getoneraw --
- *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
- *	This is useful for dealing with nested structs in config strings.
- */
- int
-__wt_config_getoneraw(WT_SESSION_IMPL *session,
-    WT_CONFIG_ITEM *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
-{
-	WT_CONFIG cparser;
-
-	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
-	return (__wt_config_getraw(&cparser, key, value));
-}
-
-/*
  * __wt_config_get --
  *	Given a NULL-terminated list of configuration strings, find
  *	the final value for a given key.
@@ -602,3 +602,36 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 	const char *cfgs[] = { cfg, NULL };
 	return (__wt_config_gets(session, cfgs, key, value));
 }
+
+/*
+ * __wt_config_subgetraw --
+ *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
+ *	This is useful for dealing with nested structs in config strings.
+ */
+ int
+__wt_config_subgetraw(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG cparser;
+
+	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
+	return (__wt_config_getraw(&cparser, key, value));
+}
+
+/*
+ * __wt_config_subgets --
+ *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
+ *	This is useful for dealing with nested structs in config strings.
+ */
+ int
+__wt_config_subgets(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG_ITEM key_item;
+
+	key_item.str = key;
+	key_item.len = strlen(key);
+
+	return (__wt_config_subgetraw(session, cfg, &key_item, value));
+}
+
