@@ -69,7 +69,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		btree = btree_session->btree;
 		if (strncmp(name, btree->name, namelen) == 0 &&
 		    btree->name[namelen] == '\0') {
-			*btree_sessionp = btree_session;
+			if (btree_sessionp != NULL)
+				*btree_sessionp = btree_session;
 			return (0);
 		}
 	}
