@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 /*
- * __wt_config_init --
+ * __wt_config_initn --
  *	Initialize a config handle, used to iterate through a config string of
  *	specified length.
  */
