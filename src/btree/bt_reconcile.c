@@ -1952,7 +1952,8 @@ __rec_col_extend_truncate(WT_PAGE *page)
 	cip = &page->u.col_leaf.d[page->entries - 1];
 	for (; page->entries > 1; --cip, --page->entries)
 		if (WT_COL_PTR(page, cip) != NULL ||
-		    WT_COL_UPDATE(page, cip) != NULL)
+		    WT_COL_UPDATE(page, cip) != NULL ||
+		    WT_COL_INSERT(page, cip) != NULL)
 			return;
 }
 
