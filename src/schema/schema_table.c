@@ -36,7 +36,7 @@ __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
-	return (__wt_curbtree_create(session, 0, NULL, cursorp));
+	return (__wt_curfile_create(session, 0, NULL, cursorp));
 }
 
 int

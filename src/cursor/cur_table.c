@@ -434,7 +434,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *config)
 
 	for (i = 0, cp = ctable->cg_cursors; i < table->ncolgroups; i++, cp++) {
 		session->btree = table->colgroup[i];
-		WT_RET(__wt_curbtree_create(session, 0, config, cp));
+		WT_RET(__wt_curfile_create(session, 0, config, cp));
 	}
 	return (0);
 }
@@ -513,7 +513,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		return (EINVAL);
 	} else if (table->is_simple) {
 		session->btree = table->colgroup[0];
-		return (__wt_curbtree_create(session, 0, config, cursorp));
+		return (__wt_curfile_create(session, 0, config, cursorp));
 	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));

@@ -539,6 +539,7 @@ struct wt_session {
 	 * percentage of the maximum Btree page size\, that is\, when a Btree
 	 * page is split\, it will be split into smaller pages\, where each page
 	 * is the specified percentage of the maximum Btree page size}
+	 * @config{type, the file type}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate

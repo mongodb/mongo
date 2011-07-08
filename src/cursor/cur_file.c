@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __curbtree_first --
+ * __curfile_first --
  *	WT_CURSOR->first method for the btree cursor type.
  */
 static int
-__curbtree_first(WT_CURSOR *cursor)
+__curfile_first(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -27,11 +27,11 @@ __curbtree_first(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_last --
+ * __curfile_last --
  *	WT_CURSOR->last method for the btree cursor type.
  */
 static int
-__curbtree_last(WT_CURSOR *cursor)
+__curfile_last(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -44,11 +44,11 @@ __curbtree_last(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_next --
+ * __curfile_next --
  *	WT_CURSOR->next method for the btree cursor type.
  */
 static int
-__curbtree_next(WT_CURSOR *cursor)
+__curfile_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -63,11 +63,11 @@ __curbtree_next(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_prev --
+ * __curfile_prev --
  *	WT_CURSOR->prev method for the btree cursor type.
  */
 static int
-__curbtree_prev(WT_CURSOR *cursor)
+__curfile_prev(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -82,11 +82,11 @@ __curbtree_prev(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_search_near --
+ * __curfile_search_near --
  *	WT_CURSOR->search_near method for the btree cursor type.
  */
 static int
-__curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
+__curfile_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -101,11 +101,11 @@ __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 }
 
 /*
- * __curbtree_insert --
+ * __curfile_insert --
  *	WT_CURSOR->insert method for the btree cursor type.
  */
 static int
-__curbtree_insert(WT_CURSOR *cursor)
+__curfile_insert(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -120,11 +120,11 @@ __curbtree_insert(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_update --
+ * __curfile_update --
  *	WT_CURSOR->update method for the btree cursor type.
  */
 static int
-__curbtree_update(WT_CURSOR *cursor)
+__curfile_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -139,11 +139,11 @@ __curbtree_update(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_remove --
+ * __curfile_remove --
  *	WT_CURSOR->remove method for the btree cursor type.
  */
 static int
-__curbtree_remove(WT_CURSOR *cursor)
+__curfile_remove(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -158,11 +158,11 @@ __curbtree_remove(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_close --
+ * __curfile_close --
  *	WT_CURSOR->close method for the btree cursor type.
  */
 static int
-__curbtree_close(WT_CURSOR *cursor, const char *config)
+__curfile_close(WT_CURSOR *cursor, const char *config)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -180,11 +180,11 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 }
 
 /*
- * __wt_curbtree_create --
+ * __wt_curfile_create --
  *	Open a cursor for a given btree handle.
  */
 int
-__wt_curbtree_create(WT_SESSION_IMPL *session,
+__wt_curfile_create(WT_SESSION_IMPL *session,
     int is_public, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
@@ -195,16 +195,16 @@ __wt_curbtree_create(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__curbtree_first,
-		__curbtree_last,
-		__curbtree_next,
-		__curbtree_prev,
+		__curfile_first,
+		__curfile_last,
+		__curfile_next,
+		__curfile_prev,
 		NULL,
-		__curbtree_search_near,
-		__curbtree_insert,
-		__curbtree_update,
-		__curbtree_remove,
-		__curbtree_close,
+		__curfile_search_near,
+		__curfile_insert,
+		__curfile_update,
+		__curfile_remove,
+		__curfile_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
@@ -261,11 +261,11 @@ err:		__wt_free(session, cbt);
 }
 
 /*
- * __wt_curbtree_open --
+ * __wt_curfile_open --
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
 int
-__wt_curbtree_open(WT_SESSION_IMPL *session,
+__wt_curfile_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	WT_BTREE_SESSION *btree_session;
@@ -273,7 +273,7 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	int ret;
 
 	/* TODO: handle projections. */
-	name = uri + strlen("table:");
+	name = uri + strlen("file:");
 
 	if ((ret = __wt_session_get_btree(session,
 	    name, strlen(name), &btree_session)) == 0)
@@ -285,5 +285,5 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	} else
 		return (ret);
 
-	return (__wt_curbtree_create(session, 1, config, cursorp));
+	return (__wt_curfile_create(session, 1, config, cursorp));
 }

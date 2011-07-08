@@ -37,7 +37,7 @@ format_meta = [
 		type='format'),
 ]
 
-btree_meta = format_meta + [
+file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes''', min='512B', max='128MB'),
 	Config('huffman_key', '', r'''
@@ -81,6 +81,8 @@ btree_meta = format_meta + [
 		Btree page size, that is, when a Btree page is split, it will be split
 		into smaller pages, where each page is the specified percentage of the
 		maximum Btree page size''', min='0', max='100'),
+	Config('type', 'btree', r'''
+		the file type''', choices=['btree']),
 ]
 
 columns_meta = [
@@ -106,14 +108,14 @@ table_only_meta = [
 		separate call to WT_SESSION::create'''),
 ]
 
-colgroup_meta = btree_meta + columns_meta + filename_meta
+colgroup_meta = file_meta + columns_meta + filename_meta
 
 index_meta = colgroup_meta
 
 table_meta = format_meta + columns_meta + table_only_meta
 
 methods = {
-'btree.meta' : Method(btree_meta),
+'btree.meta' : Method(file_meta),
 
 'colgroup.meta' : Method(colgroup_meta),
 

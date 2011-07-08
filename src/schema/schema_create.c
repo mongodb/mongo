@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static int
-__create_btree(
+__create_file(
     WT_SESSION_IMPL *session, const char *name, int intable, const char *config)
 {
 	const char *cfg[] = API_CONF_DEFAULTS(btree, meta, config);
@@ -119,7 +119,7 @@ __create_colgroup(
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
-	WT_ERR(__create_btree(session, filename, 1, cgconf));
+	WT_ERR(__create_file(session, filename, 1, cgconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -174,7 +174,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
-	WT_ERR(__create_btree(session, filename, 1, idxconf));
+	WT_ERR(__create_file(session, filename, 1, idxconf));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, namebuf);
@@ -236,15 +236,15 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	if (strncmp(name, "btree:", 6) == 0)
-		return (__create_btree(session,
-		    name + strlen("btree:"), 0, config));
-	else if (strncmp(name, "colgroup:", 6) == 0)
+	if (strncmp(name, "colgroup:", 6) == 0)
 		return (__create_colgroup(session, name, config));
+	else if (strncmp(name, "file:", 5) == 0)
+		return (__create_file(session,
+		    name + strlen("file:"), 0, config));
 	else if (strncmp(name, "index:", 6) == 0)
 		return (__create_index(session, name, config));
 	else if (strncmp(name, "schema:", 7) == 0)
-		return (__create_btree(session,
+		return (__create_file(session,
 		    name + strlen("schema:"), 1, config));
 	else if (strncmp(name, "table:", 6) == 0)
 		return (__create_table(session, name, config));

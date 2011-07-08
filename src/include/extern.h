@@ -120,20 +120,20 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
-extern int __wt_curbtree_create(WT_SESSION_IMPL *session,
-    int is_public,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_curbtree_open(WT_SESSION_IMPL *session,
-    const char *uri,
-    const char *config,
-    WT_CURSOR **cursorp);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *config,
     WT_CURSOR **cursorp);
 extern void __wt_curdump_init(WT_CURSOR *cursor, int printable);
+extern int __wt_curfile_create(WT_SESSION_IMPL *session,
+    int is_public,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_curfile_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
 extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *config,
