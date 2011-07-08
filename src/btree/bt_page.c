@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
-#include "cell.i"
 
 static int  __page_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
 static void __page_row_leaf_slots( bitstr_t *, uint32_t, uint32_t, uint32_t);

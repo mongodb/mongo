@@ -257,7 +257,7 @@ methods = {
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as
 		a list, such as \c "verbose=[evict,read]"''',
-		type='list', choices=['evict', 'fileops', 'hazard', 'mutex', 'read', 'readserver', 'salvage', 'write']),
+		type='list', choices=['evictserver', 'fileops', 'hazard', 'mutex', 'read', 'readserver', 'reconcile', 'salvage', 'write']),
 ]),
 }
 
@@ -272,12 +272,13 @@ flags = {
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],
 	'verbose' : [
-		'VERB_EVICT',
+		'VERB_EVICTSERVER',
 		'VERB_FILEOPS',
 		'VERB_HAZARD',
 		'VERB_MUTEX',
 		'VERB_READ',
 		'VERB_READSERVER',
+		'VERB_RECONCILE',
 		'VERB_SALVAGE',
 		'VERB_WRITE'
 	],

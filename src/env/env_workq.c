@@ -89,12 +89,8 @@ __wt_workq_srvr(void *arg)
 		if (call_read)
 			__wt_workq_read_server(conn, 0);
 
-		/*
-		 * If a read or flush is scheduled, check on the eviction
-		 * server.
-		 */
-		if (call_read || call_evict)
-			__wt_workq_evict_server(conn, call_evict);
+		/* Check on the eviction server. */
+		__wt_workq_evict_server(conn, call_evict);
 
 		/* If we didn't find work, yield the processor. */
 		if (!request) {

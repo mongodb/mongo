@@ -6,43 +6,72 @@
  */
 
 /*
- * __wt_cache_page_in --
- *	Read pages into the cache.
+ * __wt_cache_page_workq --
+ *	Create pages into the cache.
  */
 static inline void
-__wt_cache_page_in(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_page_workq(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 
-	if (page->dsk == NULL)
-		return;
-
 	cache = S2C(session)->cache;
 
-	++cache->pages_in;
-	cache->bytes_in += page->dsk->size;
-	F_SET(page, WT_PAGE_CACHE_COUNTED);
+	++cache->pages_workq;
 }
 
 /*
- * __wt_cache_page_out --
- *	Discard pages from the cache.
+ * __wt_cache_page_workq_incr --
+ *	Increment a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_out(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_page_workq_incr(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
-	++cache->pages_out;
-	cache->bytes_out += page->dsk->size;
+	cache->bytes_workq += size;
+	page->memory_footprint += size;
+}
 
-	WT_ASSERT(session, cache->pages_in >= cache->pages_out);
-	WT_ASSERT(session, cache->bytes_in >= cache->bytes_out);
+/*
+ * __wt_cache_page_read --
+ *	Read pages into the cache.
+ */
+static inline void
+__wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+{
+	WT_CACHE *cache;
 
-	WT_ASSERT(session, F_ISSET(page, WT_PAGE_CACHE_COUNTED));
-	F_CLR(page, WT_PAGE_CACHE_COUNTED);
+	cache = S2C(session)->cache;
+
+	WT_ASSERT(session, size != 0);
+	WT_ASSERT(session, page->memory_footprint == 0);
+
+	++cache->pages_read;
+	cache->bytes_read += size;
+
+	page->memory_footprint = size;
+}
+
+/*
+ * __wt_cache_page_evict --
+ *	Evict pages from the cache.
+ */
+static inline void
+__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	WT_ASSERT(session, page->memory_footprint != 0);
+
+	++cache->pages_evict;
+	cache->bytes_evict += page->memory_footprint;
+
+	page->memory_footprint = 0;
 }
 
 static inline uint64_t
@@ -66,8 +95,8 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	pages_in = cache->pages_in;
-	pages_out = cache->pages_out;
+	pages_in = cache->pages_read + cache->pages_workq;
+	pages_out = cache->pages_evict;
 	return (pages_in > pages_out ? pages_in - pages_out : 0);
 }
 
@@ -86,8 +115,8 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	bytes_in = cache->bytes_in;
-	bytes_out = cache->bytes_out;
+	bytes_in = cache->bytes_read + cache->bytes_workq;
+	bytes_out = cache->bytes_evict;
 	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
 

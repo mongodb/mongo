@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
-#include "cell.i"
 
 typedef struct {
 	void (*p)(const uint8_t *, uint32_t, FILE *);	/* Print function */

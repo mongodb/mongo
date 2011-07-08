@@ -88,16 +88,18 @@ struct __wt_cache {
 	void	  *rec;			/* Page reconciliation structure */
 
 	/*
-	 * Different threads read/write pages to/from the cache, so we cannot
-	 * know precisely how much memory is in use at any specific time.
-	 * However, even though the values don't have to be exact, they can't
-	 * be garbage -- we track what comes in and what goes out and calculate
-	 * the difference as needed.
+	 * Different threads read/write pages to/from the cache and create pages
+	 * in the cache, so we cannot know precisely how much memory is in use
+	 * at any specific time.  However, even though the values don't have to
+	 * be exact, they can't be garbage, we track what comes in and what goes
+	 * out and calculate the difference as needed.
 	 */
-	uint64_t pages_in;
-	uint64_t bytes_in;
-	uint64_t pages_out;
-	uint64_t bytes_out;
+	uint64_t bytes_read;		/* Bytes/pages read by read server */
+	uint64_t pages_read;
+	uint64_t bytes_workq;		/* Bytes/pages created by workQ */
+	uint64_t pages_workq;
+	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
+	uint64_t pages_evict;
 
 	WT_CACHE_STATS *stats;		/* Cache statistics */
 };

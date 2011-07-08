@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 /*
  * __wt_cache_create --

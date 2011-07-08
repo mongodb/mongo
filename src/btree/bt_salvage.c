@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
-#include "cell.i"
 
 struct __wt_stuff; 		typedef struct __wt_stuff WT_STUFF;
 struct __wt_track; 		typedef struct __wt_track WT_TRACK;

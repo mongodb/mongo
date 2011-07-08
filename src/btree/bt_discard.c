@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static void __wt_free_insert(WT_SESSION_IMPL *, WT_INSERT **, uint32_t);
 static void __wt_free_insert_list(WT_SESSION_IMPL *, WT_INSERT *);
@@ -47,12 +46,11 @@ __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    F_ISSET(page, WT_PAGE_MERGE) || !WT_PAGE_IS_MODIFIED(page));
 
 	/*
-	 * Pages created in memory aren't counted against our cache limit; if
-	 * this was originally a disk-backed page read by the read server, we
-	 * have more space.
+	 * If this page has a memory footprint associated with it, update
+	 * the cache information.
 	 */
-	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		__wt_cache_page_out(session, page);
+	if (page->memory_footprint != 0)
+		__wt_cache_page_evict(session, page);
 
 	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))

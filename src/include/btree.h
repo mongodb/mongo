@@ -315,6 +315,13 @@ struct __wt_page {
 	WT_PAGE_DISK *dsk;
 
 	/*
+	 * In-memory pages may have an optional memory allocation; this field
+	 * is only so the appropriate calculations are done when the page is
+	 * discarded.
+	 */
+	uint32_t memory_footprint;
+
+	/*
 	 * Every in-memory page references a number of entries, originally
 	 * based on the number of on-disk entries found.
 	 */
@@ -332,12 +339,11 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BULK_LOAD	0x01	/* Page bulk loaded */
-#define	WT_PAGE_CACHE_COUNTED	0x02	/* Page counted in cache stats */
-#define	WT_PAGE_DELETED		0x04	/* Page was empty at reconciliation */
-#define	WT_PAGE_INITIAL_EMPTY	0x08	/* Empty page created during open */
-#define	WT_PAGE_MERGE		0x10	/* Page to merge in reconciliation */
-#define	WT_PAGE_MODIFIED	0x20	/* Page is modified */
-#define	WT_PAGE_PINNED		0x40	/* Page is pinned */
+#define	WT_PAGE_DELETED		0x02	/* Page was empty at reconciliation */
+#define	WT_PAGE_INITIAL_EMPTY	0x04	/* Empty page created during open */
+#define	WT_PAGE_MERGE		0x08	/* Page to merge in reconciliation */
+#define	WT_PAGE_MODIFIED	0x10	/* Page is modified */
+#define	WT_PAGE_PINNED		0x20	/* Page is pinned */
 	uint8_t flags;			/* Page flags */
 };
 

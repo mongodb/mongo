@@ -6,10 +6,10 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static int __col_extend(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
-static int __col_insert_alloc(WT_SESSION_IMPL *, uint64_t, WT_INSERT **);
+static int __col_insert_alloc(
+		WT_SESSION_IMPL *, uint64_t, WT_INSERT **, uint32_t *);
 static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
 static int __col_update(WT_SESSION_IMPL *, uint64_t, WT_ITEM *, int);
 static int __col_wrong_fixed_size(WT_SESSION_IMPL *, uint32_t, uint32_t);
@@ -60,12 +60,14 @@ __col_update(
 	WT_PAGE *page;
 	WT_INSERT **new_ins, *ins;
 	WT_UPDATE **new_upd, *upd;
+	uint32_t ins_size, new_ins_size, new_upd_size, upd_size;
 	int hazard_ref, ret;
 
 	new_ins = NULL;
 	ins = NULL;
 	new_upd = NULL;
 	upd = NULL;
+	ins_size = new_ins_size = new_upd_size = upd_size = 0;
 	ret = 0;
 
 	/* Search the btree for the key. */
@@ -121,6 +123,7 @@ __col_update(
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries, &new_upd));
+			new_upd_size = page->entries * sizeof(WT_UPDATE *);
 			/*
 			 * If there was no update array, the search function
 			 * could not have set the WT_UPDATE location.
@@ -131,12 +134,14 @@ __col_update(
 	case WT_PAGE_COL_RLE:
 		/* Allocate an update array as necessary. */
 		if (session->srch_upd != NULL) {		/* #2 */
-simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
+simple_update:		WT_ERR(
+			    __wt_update_alloc(session, value, &upd, &upd_size));
 
 			/* workQ: insert the WT_UPDATE structure. */
 			ret = __wt_update_serial(
 			    session, page, session->srch_write_gen,
-			    &new_upd, session->srch_upd, &upd);
+			    &new_upd, new_upd_size,
+			    session->srch_upd, &upd, upd_size);
 			break;
 		}
 								/* #3 */
@@ -144,6 +149,7 @@ simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
 		if (session->srch_ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries, &new_ins));
+			new_ins_size = page->entries * sizeof(WT_INSERT *);
 			/*
 			 * If there was no insert array, the search function
 			 * could not have set the WT_INSERT location.
@@ -152,14 +158,15 @@ simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
 		}
 
 		/* Allocate a WT_INSERT/WT_UPDATE pair. */
-		WT_ERR(__col_insert_alloc(session, recno, &ins));
-		WT_ERR(__wt_update_alloc(session, value, &upd));
+		WT_ERR(__col_insert_alloc(session, recno, &ins, &ins_size));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
+		ins_size += upd_size;
 
 		/* workQ: insert the WT_INSERT structure. */
 		ret = __wt_insert_serial(
 		    session, page, session->srch_write_gen,
-		    &new_ins, session->srch_ins, &ins);
+		    &new_ins, new_ins_size, session->srch_ins, &ins, ins_size);
 		break;
 	}
 
@@ -189,7 +196,8 @@ err:		if (ins != NULL)
  *	buffer and fill it in.
  */
 static int
-__col_insert_alloc(WT_SESSION_IMPL *session, uint64_t recno, WT_INSERT **insp)
+__col_insert_alloc(WT_SESSION_IMPL *session,
+    uint64_t recno, WT_INSERT **insp, uint32_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -205,12 +213,13 @@ __col_insert_alloc(WT_SESSION_IMPL *session, uint64_t recno, WT_INSERT **insp)
 	WT_INSERT_RECNO(ins) = recno;
 
 	*insp = ins;
+	*ins_sizep = sizeof(WT_INSERT) + sizeof(uint64_t);
 	return (0);
 }
 
 /*
  * __wt_file_wrong_fixed_size --
- *	Print a standard error message on attempts to put the wrong size element
+ *	The standard error message on attempts to put the wrong size element
  *	into a fixed-size file.
  */
 static int
@@ -235,12 +244,14 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	WT_CONFIG_ITEM cval;
 	WT_PAGE *new_intl, *new_leaf, *parent;
 	uint64_t next;
+	uint32_t d_size, new_intl_size, new_leaf_size, t_size;
 	uint32_t internal_extend, leaf_extend;
 	int ret;
 
-	new_intl = new_leaf = NULL;
 	d = NULL;
 	t = NULL;
+	new_intl = new_leaf = NULL;
+	d_size = new_intl_size = new_leaf_size = t_size = 0;
 	internal_extend = leaf_extend = 0;
 	ret = 0;
 
@@ -262,6 +273,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 
 	/* We always need a new entries array, allocate it. */
 	WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &d));
+	d_size = leaf_extend * sizeof(WT_COL);
 
 	/*
 	 * Check if the page is a newly created page: all we'll need is a new
@@ -272,6 +284,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 
 	/* We'll need a new leaf page. */
 	WT_ERR(__wt_calloc_def(session, 1, &new_leaf));
+	new_leaf_size = sizeof(WT_PAGE);
 
 	/* Check if there's a parent page with room for a new leaf page. */
 	parent = page->parent;
@@ -281,13 +294,16 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 
 	/* We'll need a new parent page, with its own entries array. */
 	WT_ERR(__wt_calloc_def(session, 1, &new_intl));
+	new_intl_size = sizeof(WT_PAGE);
 	WT_RET(__wt_config_getones(session,
 	    session->btree->config, "btree_column_internal_extend", &cval));
 	internal_extend = (uint32_t)cval.val;
 	WT_ERR(__wt_calloc_def(session, (size_t)internal_extend, &t));
+	t_size = internal_extend * sizeof(WT_COL_REF);
 
-done:	return (__wt_col_extend_serial(session, page,
-	    &new_intl, &t, internal_extend, &new_leaf, &d, leaf_extend, recno));
+done:	return (__wt_col_extend_serial(session, page, &new_intl, new_intl_size,
+	    &t, t_size, internal_extend, &new_leaf, new_leaf_size, &d, d_size,
+	    leaf_extend, recno));
 
 err:
 	if (new_intl != NULL)
@@ -344,7 +360,7 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (page->u.col_leaf.d == NULL) {
 		page->u.col_leaf.d = d;
-		__wt_col_extend_d_taken(session);
+		__wt_col_extend_d_taken(session, page);
 
 		WT_MEMORY_FLUSH;
 		page->entries = leaf_extend;
@@ -388,12 +404,13 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 		new_leaf->entries = leaf_extend;
 		new_leaf->type = page->type;
 		WT_PAGE_SET_MODIFIED(new_leaf);
+		__wt_cache_page_workq(session);
 
 		WT_MEMORY_FLUSH;
 		++parent->entries;
 
-		__wt_col_extend_new_leaf_taken(session);
-		__wt_col_extend_d_taken(session);
+		__wt_col_extend_new_leaf_taken(session, new_leaf);
+		__wt_col_extend_d_taken(session, new_leaf);
 
 		goto done;
 	}
@@ -413,7 +430,8 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 * level is merged back in.
 	 */
 	orig_ref = page->parent_ref;
-	WT_PAGE_SET_MODIFIED(page->parent);
+	if (!WT_PAGE_IS_ROOT(page))
+		WT_PAGE_SET_MODIFIED(page->parent);
 
 	/*
 	 * Configure the new internal page.
@@ -427,6 +445,8 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	new_intl->dsk = NULL;
 	new_intl->entries = 2;
 	new_intl->type = WT_PAGE_COL_INT;
+	WT_PAGE_SET_MODIFIED(new_intl);
+	__wt_cache_page_workq(session);
 
 	/*
 	 * If the new internal page isn't the root page, then we should merge
@@ -434,7 +454,6 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (!WT_PAGE_IS_ROOT(page))
 		F_SET(new_intl, WT_PAGE_MERGE);
-	WT_PAGE_SET_MODIFIED(new_intl);
 
 	/* Slot 0 of the new internal page references the original leaf page. */
 	cref = &new_intl->u.col_int.t[0];
@@ -463,11 +482,12 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	new_leaf->entries = leaf_extend;
 	new_leaf->type = page->type;
 	WT_PAGE_SET_MODIFIED(new_leaf);
+	__wt_cache_page_workq(session);
 
-	__wt_col_extend_new_intl_taken(session);
-	__wt_col_extend_t_taken(session);
-	__wt_col_extend_new_leaf_taken(session);
-	__wt_col_extend_d_taken(session);
+	__wt_col_extend_new_intl_taken(session, new_intl);
+	__wt_col_extend_t_taken(session, new_intl);
+	__wt_col_extend_new_leaf_taken(session, new_leaf);
+	__wt_col_extend_d_taken(session, new_leaf);
 
 	/*
 	 * Make the switch: set the addr/size pair then update the pointer (we

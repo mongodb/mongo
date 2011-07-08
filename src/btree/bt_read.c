@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static inline void __cache_read_req_set(
 	WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
@@ -275,7 +274,7 @@ __cache_read(
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
 
 	/* Add the page to our cache statistics. */
-	__wt_cache_page_in(session, ref->page);
+	__wt_cache_page_read(session, ref->page, sizeof(WT_PAGE) + size);
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;

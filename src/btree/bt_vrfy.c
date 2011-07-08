@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
-#include "cell.i"
 
 /*
  * There's a bunch of stuff we pass around during verification, group it

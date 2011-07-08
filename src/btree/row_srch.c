@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static inline int __wt_ins_search(WT_SESSION_IMPL *, WT_INSERT *, WT_ITEM *);
 

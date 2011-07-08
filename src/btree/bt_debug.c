@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
-#include "cell.i"
 
 /*
  * We pass around a session handle and output information, group it together.
@@ -364,8 +362,6 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	    " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 		__wt_dmsg(ds, ", bulk-loaded");
-	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		__wt_dmsg(ds, ", cache-counted");
 	if (F_ISSET(page, WT_PAGE_DELETED))
 		__wt_dmsg(ds, ", deleted");
 	if (F_ISSET(page, WT_PAGE_INITIAL_EMPTY))

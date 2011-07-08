@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "cell.i"
 
 static int __wt_err_cell_vs_page(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_CELL *, WT_PAGE_DISK *, int);

@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "cell.i"
 
 /*
  * __wt_cell_set --

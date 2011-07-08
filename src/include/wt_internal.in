@@ -163,6 +163,8 @@ struct __wt_walk_entry;
 #include "extern.h"
 #include "verify_build.h"
 
+#include "btree.i"
+#include "cell.i"
 #include "log.i"
 #include "progress.i"
 #include "serial.i"

@@ -334,11 +334,13 @@ extern int __wt_btree_row_put(WT_SESSION_IMPL *session,
     WT_ITEM *value);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *key,
-    WT_INSERT **insp);
+    WT_INSERT **insp,
+    uint32_t *ins_sizep);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
-    WT_UPDATE **updp);
+    WT_UPDATE **updp,
+    uint32_t *upd_sizep);
 extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *key,

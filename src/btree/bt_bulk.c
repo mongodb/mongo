@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static int __wt_bulk_col(WT_CURSOR_BULK *);
 static int __wt_bulk_col_page(WT_CURSOR_BULK *);
@@ -121,6 +120,7 @@ __wt_bulk_col(WT_CURSOR_BULK *cbulk)
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
+	uint32_t not_used;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
@@ -131,7 +131,8 @@ __wt_bulk_col(WT_CURSOR_BULK *cbulk)
 	 * Allocate an WT_UPDATE item and append the V object onto the page's
 	 * update list.
 	 */
-	WT_RET(__wt_update_alloc(session, (WT_ITEM *)&cursor->value, &upd));
+	WT_RET(__wt_update_alloc(
+	    session, (WT_ITEM *)&cursor->value, &upd, &not_used));
 	(*cbulk->updp) = upd;
 	cbulk->updp = &upd->next;
 
@@ -157,6 +158,7 @@ __wt_bulk_row(WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
+	uint32_t not_used;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
@@ -168,9 +170,10 @@ __wt_bulk_row(WT_CURSOR_BULK *cbulk)
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
 	 * page's insert list.
 	 */
-	WT_RET(__wt_row_insert_alloc(session, (WT_ITEM *)&cursor->key, &ins));
-	WT_ERR(
-	    __wt_update_alloc(session, (WT_ITEM *)&cursor->value, &ins->upd));
+	WT_RET(__wt_row_insert_alloc(
+	    session, (WT_ITEM *)&cursor->key, &ins, &not_used));
+	WT_ERR(__wt_update_alloc(
+	    session, (WT_ITEM *)&cursor->value, &ins->upd, &not_used));
 	(*cbulk->insp) = ins;
 	cbulk->insp = &ins->next;
 

@@ -99,6 +99,7 @@ def output(entry, f):
 	for l in entry[1].args:
 		f.write('\t' + decl(l) + ';\n')
 		if l[2]:
+			f.write('\tint ' + l[1] + '_size;\n')
 			f.write('\tint ' + l[1] + '_taken;\n')
 	f.write('} __wt_' + entry[0] + '_args;\n\n')
 
@@ -107,7 +108,7 @@ def output(entry, f):
 	o = 'WT_SESSION_IMPL *session'
 	for l in entry[1].args:
 		if l[2]:
-			o += ', ' + decl_p(l)
+			o += ', ' + decl_p(l) + ', uint32_t ' + l[1] + '_size'
 		else:
 			o += ', ' + decl(l)
 	o += ')'
@@ -123,13 +124,15 @@ def output(entry, f):
 			f.write('\telse {\n')
 			f.write('\t\targs->' + l[1] + ' = *' + l[1] + 'p;\n')
 			f.write('\t\t*' + l[1] + 'p = NULL;\n')
+			f.write('\t\targs->' +
+			    l[1] + '_size = ' + l[1] + '_size;\n')
 			f.write('\t}\n')
-			f.write('\targs->' + l[1] + '_taken = 0;\n')
+			f.write('\targs->' + l[1] + '_taken = 0;\n\n')
 		else:
-			f.write('\targs->' + l[1] + ' = ' + l[1] + ';\n')
+			f.write('\targs->' + l[1] + ' = ' + l[1] + ';\n\n')
 	f.write('\tret = __wt_session_serialize_func(session,\n')
 	f.write('\t    ' + entry[1].op + ', ' + str(entry[1].spin) +
-	    ', __wt_' + entry[1].key + '_serial_func, args);\n')
+	    ', __wt_' + entry[1].key + '_serial_func, args);\n\n')
 	for l in entry[1].args:
 		if l[2]:
 			f.write('\tif (!args->' + l[1] + '_taken)\n')
@@ -148,7 +151,7 @@ def output(entry, f):
 		f.write('\t' + l + '\n')
 	f.write('{\n')
 	f.write('\t__wt_' + entry[0] + '_args *args =\n	    ')
-	f.write('(__wt_' + entry[0] + '_args *)session->wq_args;\n')
+	f.write('(__wt_' + entry[0] + '_args *)session->wq_args;\n\n')
 	for l in entry[1].args:
 		f.write('\t*' + l[1] + 'p = args->' + l[1] + ';\n')
 	f.write('}\n')
@@ -158,13 +161,18 @@ def output(entry, f):
 		if l[2]:
 			f.write('\n')
 			f.write('static inline void\n__wt_' + entry[0] +
-			    '_' + l[1] + '_taken(WT_SESSION_IMPL *session)\n')
+			    '_' + l[1] +
+			    '_taken(WT_SESSION_IMPL *session, WT_PAGE *page)\n')
 			f.write('{\n')
 			f.write('\t__wt_' +
 			    entry[0] + '_args *args =\n	    ')
 			f.write('(__wt_' +
 			    entry[0] + '_args *)session->wq_args;\n\n')
-			f.write('\targs->' + l[1] + '_taken = 1;\n')
+			f.write('\targs->' + l[1] + '_taken = 1;\n\n')
+			f.write('\tWT_ASSERT(session, args->' +
+			    l[1] + '_size != 0);\n')
+			f.write('\t__wt_cache_page_workq_incr(' +
+			    'session, page, args->' + l[1] + '_size);\n')
 			f.write('}\n')
 
 #####################################################################

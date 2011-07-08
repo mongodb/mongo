@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static inline void __evict_clr(WT_EVICT_LIST *);
 static inline void __evict_req_clr(WT_SESSION_IMPL *, WT_EVICT_REQ *);
@@ -121,7 +120,7 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
-	WT_VERBOSE(session, EVICT,
+	WT_VERBOSE(session, EVICTSERVER,
 	    "waking eviction server: force %sset, read lockout %sset, "
 	    "bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
@@ -199,12 +198,12 @@ __wt_cache_evict_server(void *arg)
 	F_SET(session, WT_SESSION_INTERNAL);
 
 	for (;;) {
-		WT_VERBOSE(session, EVICT, "eviction server sleeping");
+		WT_VERBOSE(session, EVICTSERVER, "eviction server sleeping");
 		cache->evict_sleeping = 1;
 		__wt_lock(session, cache->mtx_evict);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(session, EVICT, "eviction server waking");
+		WT_VERBOSE(session, EVICTSERVER, "eviction server waking");
 
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
@@ -222,7 +221,7 @@ __wt_cache_evict_server(void *arg)
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");
 
-	WT_VERBOSE(session, EVICT, "cache eviction server exiting");
+	WT_VERBOSE(session, EVICTSERVER, "cache eviction server exiting");
 
 	if (cache->evict != NULL)
 		__wt_free(session, cache->evict);

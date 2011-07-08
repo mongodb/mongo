@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "cell.i"
 
 static int __wt_stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static int __wt_stat_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);

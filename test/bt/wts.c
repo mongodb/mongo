@@ -73,12 +73,13 @@ wts_startup(void)
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
 	    g.progname, g.c_cache,
 	    ""
-	    // "evict,"
+	    // "evictserver,"
 	    // "fileops,"
 	    // "hazard,"
 	    // "mutex,"
 	    // "read,"
 	    // "readserver,"
+	    // "reconcile,"
 	    // "salvage,"
 	    // "write"
 	);
