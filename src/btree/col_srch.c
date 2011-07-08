@@ -21,7 +21,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
-	uint32_t base, i, indx, limit, match, nrepeat, slot, write_gen;
+	uint32_t base, i, indx, limit, match, slot, write_gen;
 	int ret;
 	void *cipdata;
 
@@ -105,22 +105,16 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		cipdata = WT_COL_PTR(page, cip);
 		break;
 	case WT_PAGE_COL_RLE:
-		/*
-		 * Walk the page, counting records -- do the record count
-		 * calculation in a funny way to avoid overflow.
-		 */
-		record_cnt = recno - page->u.col_leaf.recno;
+		/* Walk the page, counting records. */
+		record_cnt = page->u.col_leaf.recno - 1;
 		WT_COL_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
-			nrepeat =
+			record_cnt +=
 			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
-			if (record_cnt < nrepeat) {
-				record_cnt = 0;
+			if (record_cnt >= recno)
 				break;
-			}
-			record_cnt -= nrepeat;
 		}
-		if (record_cnt != 0) {
+		if (record_cnt < recno) {
 			if (LF_ISSET(WT_WRITE))
 				goto append;
 			goto notfound;
