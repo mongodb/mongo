@@ -61,7 +61,7 @@ __wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_PACK_GET(session, pv, ap);
-		WT_PACK_SIZE(session, pv, total);
+		total += __pack_size(session, &pv);
 	}
 
 	return (total);
@@ -87,7 +87,7 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_PACK_GET(session, pv, ap);
-		WT_PACK_WRITE(session, pv, p, end);
+		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
 	}
 
 	WT_ASSERT(session, p <= end);
@@ -117,7 +117,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 	end = p + size;
 
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
-		WT_UNPACK_READ(session, pv, p, end);
+		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_UNPACK_PUT(session, pv, ap);
 	}
 

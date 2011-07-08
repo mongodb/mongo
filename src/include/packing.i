@@ -31,7 +31,7 @@ typedef struct {
 	} u;
 } WT_PACK_VALUE;
 
-static int
+static inline int
 __pack_initn(
     WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t len)
 {
@@ -47,13 +47,13 @@ __pack_initn(
 	return (0);
 }
 
-static int
+static inline int
 __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 {
 	return (__pack_initn(session, pack, fmt, strlen(fmt)));
 }
 
-static int
+static inline int
 __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 {
 	char *endsize;
@@ -146,186 +146,194 @@ next:	if (pack->cur == pack->end)
 	}								\
 } while (0)
 
-#define	WT_PACK_SIZE(session, pv, total) do {				\
-	size_t len, padding;						\
-									\
-	switch (pv.type) {						\
-	case 'x':							\
-		total += pv.size;					\
-		break;							\
-	case 's':							\
-	case 'S':							\
-		/*							\
-		 * XXX if pv.havesize, only want to know if there is a	\
-		 * '\0' in the first pv.size characters.		\
-		 */							\
-		len = strlen(pv.u.s);					\
-		if ((pv.type == 's' || pv.havesize) && pv.size < len) { \
-			len = pv.size;					\
-			padding = 0;					\
-		} else if (pv.havesize)					\
-			padding = pv.size - len;			\
-		else							\
-			padding = 1;					\
-		total += len + padding;					\
-		break;							\
-	case 'U':							\
-	case 'u':							\
-		len = pv.u.item.size;					\
-		padding = 0;						\
-		if (pv.havesize && pv.size < len)			\
-			len = pv.size;					\
-		else if (pv.havesize)					\
-			padding = pv.size - len;			\
-		if (pv.type == 'U')					\
-			total += __wt_vsize_uint(len + padding);	\
-		total += len + padding;					\
-		break;							\
-	case 'b':							\
-	case 'h':							\
-	case 'i':							\
-	case 'l':							\
-	case 'q':							\
-		total += __wt_vsize_int(pv.u.i);			\
-		break;							\
-	case 'B':							\
-	case 'H':							\
-	case 'I':							\
-	case 'L':							\
-	case 'Q':							\
-	case 'r':							\
-		total += __wt_vsize_uint(pv.u.u);			\
-		break;							\
-	}								\
-} while (0)
+static inline size_t
+__pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
+{
+	size_t s, pad;
 
-#define	WT_PACK_WRITE(session, pv, p, end) do {				\
-	size_t len, padding;						\
-									\
-	switch (pv.type) {						\
-	case 'x':							\
-		memset(p, 0, pv.size);					\
-		p += pv.size;						\
-		break;							\
-	case 's':							\
-	case 'S':							\
-		/*							\
-		 * XXX if pv.havesize, only want to know if there is a	\
-		 * '\0' in the first pv.size characters.		\
-		 */							\
-		len = strlen(pv.u.s);					\
-		if ((pv.type == 's' || pv.havesize) && pv.size < len) { \
-			len = pv.size;					\
-			padding = 0;					\
-		} else if (pv.havesize)					\
-			padding = pv.size - len;			\
-		else							\
-			padding = 1;					\
-		if (p + len + padding > end)				\
-			return (ENOMEM);				\
-		if (len > 0)						\
-			memcpy(p, pv.u.s, len);				\
-		p += len;						\
-		if (padding > 0)					\
-			memset(p, 0, padding);				\
-		p += padding;						\
-		break;							\
-	case 'U':							\
-	case 'u':							\
-		len = pv.u.item.size;					\
-		padding = 0;						\
-		if (pv.havesize && pv.size < len)			\
-			len = pv.size;					\
-		else if (pv.havesize)					\
-			padding = pv.size - len;			\
-		if (pv.type == 'U')					\
-			WT_RET(__wt_vpack_uint(session,			\
-			     &p, (size_t)(end - p), len + padding));	\
-		if (p + len + padding > end)				\
-			return (ENOMEM);				\
-		if (len > 0)						\
-			memcpy(p, pv.u.item.data, len);			\
-		p += len;						\
-		if (padding > 0)					\
-			memset(p, 0, padding);				\
-		p += padding;						\
-		break;							\
-	case 'b':							\
-	case 'h':							\
-	case 'i':							\
-	case 'l':							\
-	case 'q':							\
-		WT_RET(__wt_vpack_int(session,				\
-		     &p, (size_t)(end - p), pv.u.i));			\
-		break;							\
-	case 'B':							\
-	case 'H':							\
-	case 'I':							\
-	case 'L':							\
-	case 'Q':							\
-	case 'r':							\
-		WT_RET(__wt_vpack_uint(session,				\
-		     &p, (size_t)(end - p), pv.u.u));			\
-		break;							\
-	default:							\
-		WT_ASSERT(session, pv.type != pv.type);			\
-		break;							\
-	}								\
-} while (0)
+	switch (pv->type) {
+	case 'x':
+		return (pv->size);
+	case 's':
+	case 'S':
+		/*
+		 * XXX if pv->havesize, only want to know if there is a
+		 * '\0' in the first pv->size characters.
+		 */
+		s = strlen(pv->u.s);
+		if ((pv->type == 's' || pv->havesize) && pv->size < s) {
+			s = pv->size;
+			pad = 0;
+		} else if (pv->havesize)
+			pad = pv->size - s;
+		else
+			pad = 1;
+		return (s + pad);
+	case 'U':
+	case 'u':
+		s = pv->u.item.size;
+		pad = 0;
+		if (pv->havesize && pv->size < s)
+			s = pv->size;
+		else if (pv->havesize)
+			pad = pv->size - s;
+		if (pv->type == 'U')
+			s += __wt_vsize_uint(s + pad);
+		return (s + pad);
+	case 'b':
+	case 'h':
+	case 'i':
+	case 'l':
+	case 'q':
+		return (__wt_vsize_int(pv->u.i));
+	case 'B':
+	case 'H':
+	case 'I':
+	case 'L':
+	case 'Q':
+	case 'r':
+		return (__wt_vsize_uint(pv->u.u));
+	}
 
-#define	WT_UNPACK_READ(session, pv, p, end) do {			\
-	size_t len;						\
-									\
-	switch (pv.type) {						\
-	case 'x':							\
-		p += pv.size;						\
-		break;							\
-	case 's':							\
-	case 'S':							\
-		if (pv.type == 's' || pv.havesize)			\
-			len = pv.size;					\
-		else							\
-			len = strlen((const char *)p) + 1;		\
-		if (len > 0)						\
-			pv.u.s = (const char *)p;			\
-		p += len;						\
-		break;							\
-	case 'U':							\
-		WT_RET(__wt_vunpack_uint(session,			\
-		     &p, (size_t)(end - p), &pv.u.u));			\
-		len = (size_t)pv.u.u;					\
-		/* FALLTHROUGH */					\
-	case 'u':							\
-		if (pv.havesize)					\
-			len = pv.size;					\
-		else if (pv.type != 'U')				\
-			len = (size_t)(end - p);			\
-		pv.u.item.data = p;					\
-		pv.u.item.size = (uint32_t)len;				\
-		p += len;						\
-		break;							\
-	case 'b':							\
-	case 'h':							\
-	case 'i':							\
-	case 'l':							\
-	case 'q':							\
-		WT_RET(__wt_vunpack_int(session,			\
-		     &p, (size_t)(end - p), &pv.u.i));			\
-		break;							\
-	case 'B':							\
-	case 'H':							\
-	case 'I':							\
-	case 'L':							\
-	case 'Q':							\
-	case 'r':							\
-		WT_RET(__wt_vunpack_uint(session,			\
-		     &p, (size_t)(end - p), &pv.u.u));			\
-		break;							\
-	default:							\
-		WT_ASSERT(session, pv.type != pv.type);			\
-		break;							\
-	}								\
-} while (0)
+	WT_ASSERT(session, pv->type != pv->type);
+	return (0);
+}
+
+static inline int
+__pack_write(
+    WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **p, size_t maxlen)
+{
+	size_t s, pad;
+
+	switch (pv->type) {
+	case 'x':
+		memset(*p, 0, pv->size);
+		*p += pv->size;
+		break;
+	case 's':
+	case 'S':
+		/*
+		 * XXX if pv->havesize, only want to know if there is a
+		 * '\0' in the first pv->size characters.
+		 */
+		s = strlen(pv->u.s);
+		if ((pv->type == 's' || pv->havesize) && pv->size < s) {
+			s = pv->size;
+			pad = 0;
+		} else if (pv->havesize)
+			pad = pv->size - s;
+		else
+			pad = 1;
+		if (s + pad > maxlen)
+			return (ENOMEM);
+		if (s > 0)
+			memcpy(*p, pv->u.s, s);
+		*p += s;
+		if (pad > 0) {
+			memset(*p, 0, pad);
+			*p += pad;
+		}
+		break;
+	case 'U':
+	case 'u':
+		s = pv->u.item.size;
+		pad = 0;
+		if (pv->havesize && pv->size < s)
+			s = pv->size;
+		else if (pv->havesize)
+			pad = pv->size - s;
+		if (pv->type == 'U') {
+			WT_RET(__wt_vpack_uint(session, p, maxlen, s + pad));
+			maxlen -= __wt_vsize_uint(s + pad);
+		}
+		if (s + pad > maxlen)
+			return (ENOMEM);
+		if (s > 0)
+			memcpy(*p, pv->u.item.data, s);
+		*p += s;
+		if (pad > 0) {
+			memset(*p, 0, pad);
+			*p += pad;
+		}
+		break;
+	case 'b':
+	case 'h':
+	case 'i':
+	case 'l':
+	case 'q':
+		WT_RET(__wt_vpack_int(session, p, maxlen, pv->u.i));
+		break;
+	case 'B':
+	case 'H':
+	case 'I':
+	case 'L':
+	case 'Q':
+	case 'r':
+		WT_RET(__wt_vpack_uint(session, p, maxlen, pv->u.u));
+		break;
+	default:
+		WT_ASSERT(session, pv->type != pv->type);
+		break;
+	}
+
+	return (0);
+}
+
+static inline int
+__unpack_read(WT_SESSION_IMPL *session,
+    WT_PACK_VALUE *pv, const uint8_t **p, size_t maxlen)
+{
+	size_t s;
+
+	switch (pv->type) {
+	case 'x':
+		*p += pv->size;
+		break;
+	case 's':
+	case 'S':
+		if (pv->type == 's' || pv->havesize)
+			s = pv->size;
+		else
+			s = strlen((const char *)*p) + 1;
+		if (s > 0)
+			pv->u.s = (const char *)*p;
+		*p += s;
+		break;
+	case 'U':
+		WT_RET(__wt_vunpack_uint(session, p, maxlen, &pv->u.u));
+		s = (size_t)pv->u.u;
+		/* FALLTHROUGH */
+	case 'u':
+		if (pv->havesize)
+			s = pv->size;
+		else if (pv->type != 'U')
+			s = maxlen;
+		pv->u.item.data = *p;
+		pv->u.item.size = (uint32_t)s;
+		*p += s;
+		break;
+	case 'b':
+	case 'h':
+	case 'i':
+	case 'l':
+	case 'q':
+		WT_RET(__wt_vunpack_int(session, p, maxlen, &pv->u.i));
+		break;
+	case 'B':
+	case 'H':
+	case 'I':
+	case 'L':
+	case 'Q':
+	case 'r':
+		WT_RET(__wt_vunpack_uint(session, p, maxlen, &pv->u.u));
+		break;
+	default:
+		WT_ASSERT(session, pv->type != pv->type);
+		break;
+	}
+
+	return (0);
+}
 
 #define	WT_UNPACK_PUT(session, pv, ap) do {				\
 	switch (pv.type) {						\

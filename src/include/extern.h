@@ -467,6 +467,24 @@ extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     va_list ap);
+extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
+    WT_CURSOR **cp,
+    const char *proj_arg,
+    va_list ap);
+extern int __wt_schema_project_out(WT_SESSION_IMPL *session,
+    WT_CURSOR **cp,
+    const char *proj_arg,
+    va_list ap);
+extern int __wt_schema_project_slice(WT_SESSION_IMPL *session,
+    WT_CURSOR **cp,
+    const char *proj_arg,
+    const char *vformat,
+    WT_ITEM *value);
+extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
+    WT_CURSOR **cp,
+    const char *proj_arg,
+    const char *vformat,
+    WT_BUF *value);
 extern int __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest);
 extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
     const char *key_format,
