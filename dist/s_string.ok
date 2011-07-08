@@ -26,6 +26,7 @@ CELL's
 CELLs
 COL's
 CONCAT
+CONFIG
 CURSORs
 Checksum
 Config
@@ -125,6 +126,7 @@ alloc
 allocsize
 ap
 api
+arg
 bigram
 bitpos
 bitstring
