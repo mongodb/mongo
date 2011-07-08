@@ -104,7 +104,10 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
-
+    
+    /** 
+     * need to put in DbMesssage::ReservedOptions as well
+     */
     enum InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
         InsertOption_KeepGoing = 1 << 0
