@@ -103,14 +103,13 @@ static void
 __wt_dmsg(WT_DBG *ds, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
+	va_list ap;
 	WT_BUF *msg;
 	WT_SESSION_IMPL *session;
-	size_t len, remain;
-	va_list ap;
+	uint32_t len, space;
+	char *p;
 
 	session = ds->session;
-
-	va_start(ap, fmt);
 
 	/*
 	 * Debug output chunks are not necessarily terminated with a newline
@@ -122,11 +121,15 @@ __wt_dmsg(WT_DBG *ds, const char *fmt, ...)
 	if (ds->fp == NULL) {
 		msg = ds->msg;
 		for (;;) {
-			remain = msg->mem_size - msg->size;
-			len = (size_t)vsnprintf(
-			    (char *)msg->mem + msg->size, remain, fmt, ap);
-			if (len < remain) {
-				msg->size += (uint32_t)len;
+			p = (char *)((uint8_t *)msg->mem + msg->size);
+			space = msg->mem_size - msg->size;
+			va_start(ap, fmt);
+			len = (uint32_t)vsnprintf(p, (size_t)space, fmt, ap);
+			va_end(ap);
+
+			/* Check if there was enough space. */
+			if (len < space) {
+				msg->size += len;
 				break;
 			}
 
@@ -145,10 +148,11 @@ __wt_dmsg(WT_DBG *ds, const char *fmt, ...)
 			__wt_msg(session, "%s", (char *)msg->mem);
 			msg->size = 0;
 		}
-	} else
+	} else {
+		va_start(ap, fmt);
 		(void)vfprintf(ds->fp, fmt, ap);
-
-	va_end(ap);
+		va_end(ap);
+	}
 }
 
 /*
