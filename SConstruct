@@ -138,6 +138,7 @@ add_option( "usev8" , "use v8 for javascript" , 0 , True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
+add_option( "osnew", "use newer operating system API features" , 0 , False )
 
 # dev tools
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
@@ -226,7 +227,6 @@ if has_option( "cpppath" ):
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
-
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -518,6 +518,9 @@ elif "win32" == os.sys.platform:
     windows = True
     #if force64:
     #    release = True
+
+    if has_option( "osnew" ):
+        env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
 	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
