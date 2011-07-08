@@ -452,6 +452,9 @@ namespace mongo {
         BSONObjBuilder b;
         while ( i.more() )
             b.append( i.next() );
+        
+        b.appendElementsUnique( _handshake );
+
         _handshake = b.obj();
 
         if (theReplSet && o.hasField("member")) {
