@@ -211,6 +211,18 @@ assert.gte = function( a , b , msg ){
     doassert( a + " is not greater than or eq " + b + " : " + msg );
 }
 
+assert.between = function( a, b, c, msg, inclusive ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    if( ( inclusive == undefined || inclusive = true ) &&
+        a <= b && b <= c ) return;
+    else if( a < b && b < c ) return;
+    
+    doassert( b + " is not between " + a + " and " + c + " : " + msg );
+}
+
+assert.betweenIn = function( a, b, c, msg ){ assert.between( a, b, c, msg, true ) }
+assert.betweenEx = function( a, b, c, msg ){ assert.between( a, b, c, msg, false ) }
 
 assert.close = function( a , b , msg , places ){
     if (places === undefined) {
