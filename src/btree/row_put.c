@@ -76,7 +76,8 @@ __wt_row_update(
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries, &new_upd));
-			new_upd_size = page->entries * sizeof(WT_UPDATE *);
+			new_upd_size =
+			    page->entries * WT_SIZEOF32(WT_UPDATE *);
 			/*
 			 * If there was no update array, the search function
 			 * could not have set the WT_UPDATE location.
@@ -100,7 +101,8 @@ __wt_row_update(
 		if (session->srch_ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &new_ins));
-			new_ins_size = page->entries + 1 * sizeof(WT_INSERT *);
+			new_ins_size =
+			    (page->entries + 1) * WT_SIZEOF32(WT_INSERT *);
 			/*
 			 * If there was no insert array, the search function
 			 * could not have set the WT_INSERT location.
@@ -166,7 +168,7 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 	memcpy(WT_INSERT_KEY(ins), key->data, size);
 
 	*insp = ins;
-	*ins_sizep = sizeof(WT_INSERT) + sizeof(uint32_t) + size;
+	*ins_sizep = WT_SIZEOF32(WT_INSERT) + WT_SIZEOF32(uint32_t) + size;
 
 	return (0);
 }
@@ -251,7 +253,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	*upd_sizep = size + sizeof(WT_UPDATE);
+	*upd_sizep = size + WT_SIZEOF32(WT_UPDATE);
 	*updp = upd;
 
 	return (0);

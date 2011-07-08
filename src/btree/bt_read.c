@@ -274,7 +274,7 @@ __cache_read(
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
 
 	/* Add the page to our cache statistics. */
-	__wt_cache_page_read(session, ref->page, sizeof(WT_PAGE) + size);
+	__wt_cache_page_read(session, ref->page, WT_SIZEOF32(WT_PAGE) + size);
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;

@@ -123,7 +123,8 @@ __col_update(
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries, &new_upd));
-			new_upd_size = page->entries * sizeof(WT_UPDATE *);
+			new_upd_size =
+			    page->entries * WT_SIZEOF32(WT_UPDATE *);
 			/*
 			 * If there was no update array, the search function
 			 * could not have set the WT_UPDATE location.
@@ -149,7 +150,8 @@ simple_update:		WT_ERR(
 		if (session->srch_ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries, &new_ins));
-			new_ins_size = page->entries * sizeof(WT_INSERT *);
+			new_ins_size =
+			    page->entries * WT_SIZEOF32(WT_INSERT *);
 			/*
 			 * If there was no insert array, the search function
 			 * could not have set the WT_INSERT location.
@@ -269,11 +271,11 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	if (recno < next)			/* Fits on the current page. */
 		return (WT_RESTART);
 	if (recno >= next + leaf_extend)	/* Fits in default extension. */
-		leaf_extend = (recno - next) + 100;
+		leaf_extend = (uint32_t)(recno - next) + 100;
 
 	/* We always need a new entries array, allocate it. */
 	WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &d));
-	d_size = leaf_extend * sizeof(WT_COL);
+	d_size = leaf_extend * WT_SIZEOF32(WT_COL);
 
 	/*
 	 * Check if the page is a newly created page: all we'll need is a new
@@ -299,7 +301,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	    session->btree->config, "btree_column_internal_extend", &cval));
 	internal_extend = (uint32_t)cval.val;
 	WT_ERR(__wt_calloc_def(session, (size_t)internal_extend, &t));
-	t_size = internal_extend * sizeof(WT_COL_REF);
+	t_size = internal_extend * WT_SIZEOF32(WT_COL_REF);
 
 done:	return (__wt_col_extend_serial(session, page, &new_intl, new_intl_size,
 	    &t, t_size, internal_extend, &new_leaf, new_leaf_size, &d, d_size,
