@@ -2233,7 +2233,7 @@ namespace mongo {
             _fudge = _g->_error;
             _wantLen = _fudge +
                        std::max( ( _want._max._x - _want._min._x ) ,
-                                 ( _want._max._y - _want._min._y ) );
+                                 ( _want._max._y - _want._min._y ) ) / 2;
 
             ok();
         }
@@ -2308,7 +2308,7 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
-            _maxDim = _bounds.maxDim();
+            _maxDim = _bounds.maxDim() / 2;
 
             ok();
         }
