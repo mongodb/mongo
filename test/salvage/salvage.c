@@ -449,9 +449,9 @@ build(int ikey, int ivalue, int cnt)
 	default:
 		assert(0);
 	}
-	assert(session->create(session, "table:" LOAD, config) == 0);
+	assert(session->create(session, "file:" LOAD, config) == 0);
 	assert(session->open_cursor(
-	    session, "table:" LOAD, NULL, "bulk", &cursor) == 0);
+	    session, "file:" LOAD, NULL, "bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:
@@ -473,7 +473,7 @@ build(int ikey, int ivalue, int cnt)
 		assert(cursor->insert(cursor) == 0);
 	}
 
-	assert(session->sync(session, "table:" LOAD, NULL) == 0);
+	assert(session->sync(session, "file:" LOAD, NULL) == 0);
 	assert(conn->close(conn, 0) == 0);
 }
 
@@ -551,22 +551,22 @@ process(void)
 		    "error_prefix=\"%s\",verbose=[salvage]", progname);
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->salvage(session, "table:" SLVG, 0) == 0);
+	assert(session->salvage(session, "file:" SLVG, 0) == 0);
 	assert(conn->close(conn, 0) == 0);
 
 	/* Verify. */
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->verify(session, "table:" SLVG, 0) == 0);
+	assert(session->verify(session, "file:" SLVG, 0) == 0);
 	assert(conn->close(conn, 0) == 0);
 
 	/* Dump. */
 	assert((fp = fopen(DUMP, "w")) != NULL);
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->create(session, "table:" SLVG, NULL) == 0);
+	assert(session->create(session, "file:" SLVG, NULL) == 0);
 	assert(session->open_cursor(
-	    session, "table:" SLVG, NULL, "dump,printable", &cursor) == 0);
+	    session, "file:" SLVG, NULL, "dump,printable", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
 		assert (cursor->get_key(cursor, &key) == 0);
 		if (key.data != NULL) {
