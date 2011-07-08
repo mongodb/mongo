@@ -418,7 +418,7 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=\"20u\","
 		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
+		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
@@ -426,7 +426,7 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=\"20u\",runlength_encoding,"
 		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
+		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
@@ -434,7 +434,7 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,"
 		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
+		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
@@ -442,7 +442,7 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=u,"
 		    "allocation_size=%d,"
-		    "intl_node_min=%d,intl_node_max=%d,"
+		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
