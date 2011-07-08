@@ -101,7 +101,9 @@ next:	if (pack->cur == pack->end)
 		pack->repeats = pv->size - 1;
 		return (0);
 	default:
-		WT_ASSERT(NULL, pv->type != pv->type);
+		__wt_errx(pack->session,
+		   "Invalid type '%c' found in format '%.*s'",
+		    pv->type, (int)(pack->end - pack->orig), pack->orig);
 		return (EINVAL);
 	}
 
