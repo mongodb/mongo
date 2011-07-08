@@ -297,6 +297,14 @@ namespace mongo {
 
         }
 
+        BSONObj _fromBSONHash( const BSONElement& e ) const {
+            return _unhash( _tohash( e ) );
+        }
+
+        BSONObj _fromBSONHash( const BSONObj& o ) const {
+            return _unhash( _tohash( o.firstElement() ) );
+        }
+
         GeoHash _tohash( const BSONElement& e ) const {
             if ( e.isABSONObj() )
                 return _hash( e.embeddedObject() );
@@ -450,6 +458,10 @@ namespace mongo {
         }
 
         Box() {}
+
+        BSONArray toBSON() const {
+            return BSON_ARRAY( BSON_ARRAY( _min._x << _min._y ) << BSON_ARRAY( _max._x << _max._y ) );
+        }
 
         string toString() const {
             StringBuilder buf(64);
@@ -863,7 +875,7 @@ namespace mongo {
 
         virtual void add( const GeoKeyNode& node ) {
 
-            GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
+            GEODEBUG( "\t\t\t\t checking key " << node._key.toString() )
 
             _lookedAt++;
 
