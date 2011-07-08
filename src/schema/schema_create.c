@@ -107,15 +107,11 @@ __create_colgroup(
 			    "No 'columns' configuration for '%s'", name);
 			WT_ERR(EINVAL);
 		}
-		WT_ERR(__wt_buf_sprintf(session, &fmt,
-		    "key_format=%s,value_format=", table->key_format));
+		WT_ERR(__wt_buf_sprintf(session, &fmt, "value_format="));
 		WT_ERR(__wt_struct_reformat(session,
 		    table, cval.str, cval.len, 1, &fmt));
-	} else
-		WT_ERR(__wt_buf_sprintf(session, &fmt,
-		    "key_format=%s,value_format=%s",
-		    table->key_format, table->value_format));
-	*cfgp++ = fmt.data;
+		*cfgp++ = fmt.data;
+	}
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
@@ -208,7 +204,7 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 	} else if (ret != WT_NOTFOUND)
 		return (ret);
 
-	WT_RET(__wt_config_getones(session, config, "colgroups", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));
 	WT_RET(__wt_config_subinit(session, &conf, &cval));
 	for (ncolgroups = 0;
 	    (ret = __wt_config_next(&conf, &cgkey, &cgval)) == 0;

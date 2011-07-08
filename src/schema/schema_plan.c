@@ -62,6 +62,9 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_PACK_VALUE pv;
 	int cg, col, i, ret;
 
+	if (table->is_simple)
+		return (0);
+
 	/* Count the number of key columns. */
 	WT_RET(__pack_init(session, &pack, table->key_format));
 	table->nkey_columns = 0;

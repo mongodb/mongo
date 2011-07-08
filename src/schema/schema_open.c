@@ -105,12 +105,14 @@ end:		if (cursor != NULL) {
 		}
 	}
 
-	WT_ERR(__wt_table_check(session, table));
+	if (!table->is_simple) {
+		WT_ERR(__wt_table_check(session, table));
 
-	WT_CLEAR(plan);
-	WT_ERR(__wt_struct_plan(session,
-	    table, table->colconf.str, table->colconf.len, &plan));
-	__wt_buf_steal(session, &plan, &table->plan, &plansize);
+		WT_CLEAR(plan);
+		WT_ERR(__wt_struct_plan(session,
+		    table, table->colconf.str, table->colconf.len, &plan));
+		__wt_buf_steal(session, &plan, &table->plan, &plansize);
+	}
 
 	table->is_complete = 1;
 
@@ -150,22 +152,15 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
 	table->is_simple = (cval.len == 0);
 
-	/* We count below for complex tables. */
+	WT_ERR(__wt_config_getones(session, tconfig, "key_format", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
+	WT_ERR(__wt_config_getones(session, tconfig, "value_format", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
+	WT_ERR(__wt_strdup(session, tconfig, &table->config));
 
 	if (table->is_simple)
 		table->ncolgroups = 1;
 	else {
-		WT_ERR(__wt_config_getones(session, tconfig,
-		    "key_format", &cval));
-		WT_ERR(__wt_strndup(session,
-		    cval.str, cval.len, &table->key_format));
-		WT_ERR(__wt_config_getones(session, tconfig,
-		    "value_format", &cval));
-		WT_ERR(__wt_strndup(session,
-		    cval.str, cval.len, &table->value_format));
-
-		WT_ERR(__wt_strdup(session, tconfig, &table->config));
-
 		/* Point to some items in the copy to save re-parsing. */
 		WT_ERR(__wt_config_getones(session,
 		    table->config, "columns", &table->colconf));
