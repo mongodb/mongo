@@ -98,7 +98,8 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
  *	representing the plan will be appended to the plan buffer.
  */
 int
-__wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, WT_BUF *plan)
+__wt_struct_plan(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *columns, size_t len, WT_BUF *plan)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
@@ -106,7 +107,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, WT_BUF *plan)
 	int i, have_it, ret;
 
 	/* Work through the value columns by skipping over the key columns. */
-	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));
+	WT_RET(__wt_config_initn(session, &conf, columns, len));
 
 	for (i = 0; i < table->nkey_columns; i++)
 		WT_RET(__wt_config_next(&conf, &k, &v));

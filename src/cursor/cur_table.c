@@ -83,7 +83,7 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		ret = __wt_schema_project_merge(session,
-		    ctable->cg_cursors, ctable->table->plan,
+		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
 		if (ret == 0) {
 			item = va_arg(ap, WT_ITEM *);
@@ -92,7 +92,7 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 		}
 	} else
 		ret = __wt_schema_project_out(session,
-		    ctable->cg_cursors, ctable->table->plan, ap);
+		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
 	API_END(session);
@@ -187,11 +187,11 @@ __curtable_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;
 		ret = __wt_schema_project_slice(session,
-		    ctable->cg_cursors, ctable->table->plan,
+		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, (WT_ITEM *)&cursor->value);
 	} else
 		ret = __wt_schema_project_in(session,
-		    ctable->cg_cursors, ctable->table->plan, ap);
+		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
 	if (ret == 0)
@@ -402,6 +402,8 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 			*cp = NULL;
 		}
 
+	if (ctable->plan != ctable->table->plan)
+		__wt_free(session, ctable->plan);
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END(session);
 
@@ -485,15 +487,25 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	const char *tablename;
+	const char *tablename, *columns;
+	WT_BUF fmt, plan;
 	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR *cursor;
 	WT_TABLE *table;
+	size_t size;
+	uint32_t bufsz;
 	int ret;
 
+	WT_CLEAR(fmt);
+	WT_CLEAR(plan);
 	tablename = uri + strlen("table:");
+	columns = strchr(tablename, '(');
+	if (columns == NULL)
+		size = strlen(tablename);
+	else
+		size = columns - tablename;
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, strlen(tablename), &table));
+	    tablename, size, &table));
 
 	if (!table->is_complete) {
 		__wt_errx(session,
@@ -512,6 +524,18 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 	ctable->table = table;
+	ctable->plan = table->plan;
+
+	/* Handle projections. */
+	if (columns != NULL) {
+		WT_ERR(__wt_struct_reformat(session, table,
+		    columns, strlen(columns), 1, &fmt));
+		__wt_buf_steal(session, &fmt, &cursor->value_format, &bufsz);
+
+		WT_ERR(__wt_struct_plan(session, table,
+		    columns, strlen(columns), &plan));
+		__wt_buf_steal(session, &plan, &ctable->plan, &bufsz);
+	}
 
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
@@ -526,6 +550,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		__wt_free(session, ctable);
+		__wt_buf_free(session, &fmt);
+		__wt_buf_free(session, &plan);
 	}
 
 	return (ret);

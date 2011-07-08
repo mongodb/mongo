@@ -57,7 +57,8 @@ struct __wt_cursor_index {
 	WT_CURSOR iface;
 
 	WT_TABLE *table;
-	int idx;
+	const char *plan;
+	WT_CURSOR **cg_cursors;
 };
 
 struct __wt_cursor_stat {
@@ -68,6 +69,7 @@ struct __wt_cursor_table {
 	WT_CURSOR iface;
 
 	WT_TABLE *table;
+	const char *plan;
 	WT_CURSOR **cg_cursors;
 	WT_CURSOR **idx_cursors;
 };

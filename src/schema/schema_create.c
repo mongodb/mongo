@@ -199,8 +199,12 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, strlen(tablename), &table)) == 0) {
-		__wt_errx(session, "Table exists: %s", tablename);
-		return (EEXIST);
+		if (__wt_config_getones(session,
+		    config, "exclusive", &cval) == 0 && cval.val) {
+			__wt_errx(session, "Table exists: %s", tablename);
+			return (EEXIST);
+		} else
+			return (0);
 	} else if (ret != WT_NOTFOUND)
 		return (ret);
 

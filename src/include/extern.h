@@ -464,6 +464,8 @@ extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     WT_TABLE *table,
+    const char *columns,
+    size_t len,
     WT_BUF *plan);
 extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
     WT_TABLE *table,

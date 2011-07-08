@@ -108,7 +108,8 @@ end:		if (cursor != NULL) {
 	WT_ERR(__wt_table_check(session, table));
 
 	WT_CLEAR(plan);
-	WT_ERR(__wt_struct_plan(session, table, &plan));
+	WT_ERR(__wt_struct_plan(session,
+	    table, table->colconf.str, table->colconf.len, &plan));
 	__wt_buf_steal(session, &plan, &table->plan, &plansize);
 
 	table->is_complete = 1;
