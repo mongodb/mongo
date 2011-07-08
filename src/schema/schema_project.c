@@ -100,7 +100,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				break;
 
 			default:
-				WT_ASSERT(session, *proj != *proj);
+				WT_FAILURE(session, NULL);
 			}
 		}
 	}
@@ -268,7 +268,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 				break;
 
 			default:
-				WT_ASSERT(session, *proj != *proj);
+				WT_FAILURE(session, NULL);
 			}
 		}
 	}

@@ -524,8 +524,8 @@ extern void __wt_msg(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE ((format (printf,
     2,
     3)));
-extern void __wt_assert( WT_SESSION_IMPL *session,
-    const char *check,
+extern void __wt_failure(WT_SESSION_IMPL *session,
+    const char *msg,
     const char *file_name,
     int line_number);
 extern int __wt_file_format(WT_SESSION_IMPL *session);

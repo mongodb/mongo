@@ -112,8 +112,10 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					    (int)k.len, k.str);
 					return (EINVAL);
 				}
-			} else
-				WT_ASSERT(session, ck.str != ck.str);
+			} else {
+				WT_FAILURE(session, NULL);
+				return (EINVAL);
+			}
 		}
 	}
 

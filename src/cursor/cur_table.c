@@ -150,7 +150,7 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 			return;
 		}
 	}
-	WT_ASSERT(NULL, sz <= UINT32_MAX);
+	WT_ASSERT(session, sz <= UINT32_MAX);
 	cursor->key.size = (uint32_t)sz;
 	va_end(ap);
 

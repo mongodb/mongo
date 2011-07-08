@@ -102,7 +102,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 			return;
 		}
 	}
-	WT_ASSERT(NULL, sz <= UINT32_MAX);
+	WT_ASSERT(session, sz <= UINT32_MAX);
 	cursor->key.size = (uint32_t)sz;
 	va_end(ap);
 
@@ -153,7 +153,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 		}
 		cursor->value.data = buf->mem;
 	}
-	WT_ASSERT(NULL, sz <= UINT32_MAX);
+	WT_ASSERT(session, sz <= UINT32_MAX);
 	cursor->value.size = (uint32_t)sz;
 	va_end(ap);
 

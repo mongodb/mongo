@@ -121,7 +121,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return;
 		}
 	__wt_errx(session, "hazard reference not found");
-	WT_ASSERT(session, 0);
+	WT_FAILURE(session, NULL);
 }
 
 /*
@@ -185,7 +185,7 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    "discarded page has hazard reference: "
 			    "(%p: %s, line %d)",
 			    hp->page, hp->file, hp->line);
-			WT_ASSERT(session, 0);
+			WT_FAILURE(session, NULL);
 		}
 }
 #endif

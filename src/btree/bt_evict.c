@@ -216,7 +216,6 @@ __wt_cache_evict_server(void *arg)
 			    "%" PRIu64 " bytes in use",
 			    __wt_cache_pages_inuse(cache),
 			    __wt_cache_bytes_inuse(cache));
-			WT_ASSERT(session, 0);
 		}
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");

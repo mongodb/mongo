@@ -120,16 +120,18 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_assert --
- *	Internal version of assert function.
+ * __wt_failure --
+ *	Assert and other failures.
  */
 void
-__wt_assert(
-    WT_SESSION_IMPL *session, const char *check,
-    const char *file_name, int line_number)
+__wt_failure(WT_SESSION_IMPL *session,
+    const char *msg, const char *file_name, int line_number)
 {
-	__wt_errx(session,
-	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
+	if (msg == NULL)
+		__wt_errx(session, "failure: %s/%d", file_name, line_number);
+	else
+		__wt_errx(session, "failure: %s/%d: %s",
+		    file_name, line_number, msg == NULL ? "" : msg);
 
 	__wt_abort(session);
 	/* NOTREACHED */

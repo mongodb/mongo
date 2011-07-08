@@ -498,7 +498,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
-	WT_ASSERT(NULL, session->event_handler != NULL);
+	WT_ASSERT(session, session->event_handler != NULL);
 	session_ret->event_handler = session->event_handler;
 	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
 

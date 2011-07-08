@@ -62,8 +62,8 @@ __wt_page_in_func(
 			__wt_yield();
 			break;
 		default:
-			WT_ABORT(session, "invalid page state");
-			break;
+			WT_FAILURE(session, "invalid page state");
+			return (WT_ERROR);
 		}
 	/* NOTREACHED */
 }
