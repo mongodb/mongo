@@ -278,20 +278,23 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
-	 * If the page does not yet have an update array, our caller passed
-	 * us one of the correct size.   (It's the caller's responsibility to
-	 * detect and free the passed-in expansion array if we don't use it.)
+	 * If the page requires an update array (RLE pages never use the update
+	 * array, inserted items in row-store pages don't use the update array),
+	 * and does not yet have an update array, our caller passed us one of
+	 * the correct size.
 	 */
-	if (page->type == WT_PAGE_ROW_LEAF) {
-		if (page->u.row_leaf.upd == NULL) {
-			page->u.row_leaf.upd = new_upd;
-			__wt_update_new_upd_taken(session, page);
-		}
-	} else
-		if (page->u.col_leaf.upd == NULL) {
-			page->u.col_leaf.upd = new_upd;
-			__wt_update_new_upd_taken(session, page);
-		}
+	if (new_upd != NULL) {
+		if (page->type == WT_PAGE_ROW_LEAF) {
+			if (page->u.row_leaf.upd == NULL) {
+				page->u.row_leaf.upd = new_upd;
+				__wt_update_new_upd_taken(session, page);
+			}
+		} else
+			if (page->u.col_leaf.upd == NULL) {
+				page->u.col_leaf.upd = new_upd;
+				__wt_update_new_upd_taken(session, page);
+			}
+	}
 
 	/*
 	 * Insert the new WT_UPDATE item into the linked list and flush memory
