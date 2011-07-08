@@ -101,6 +101,7 @@ namespace mongo {
             _resultFlags() = 0;   
         }
     };
+
 #pragma pack()
 
     /* For the database/server protocol, these objects and functions encapsulate
@@ -119,7 +120,11 @@ namespace mongo {
             nextjsobj = data;
         }
 
-        /** the 32 bit field before the ns */
+        /** the 32 bit field before the ns 
+         * track all bit usage here as its cross op
+         * 0: InsertOption_KeepGoing
+         * 1: fromWriteback
+         */
         int& reservedField() { return *reserved; }
 
         const char * getns() const {
@@ -225,6 +230,12 @@ namespace mongo {
         const char *theEnd;
 
         const char * mark;
+
+    public:
+        enum ReservedOptions {
+            Reserved_InsertOption_KeepGoing = 1 << 0 , 
+            Reserved_FromWriteback = 1 << 1 
+        };
     };
 
 

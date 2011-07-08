@@ -87,6 +87,8 @@ namespace mongo {
             dbresponse->responseTo = m.header()->id;
             return true;
         }
+        
+        uassert( 9517 , "writeback" , ( d.reservedField() & DbMessage::Reserved_FromWriteback ) == 0 );
 
         OID writebackID;
         writebackID.init();
