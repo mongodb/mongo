@@ -437,12 +437,6 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     size_t namelen,
     WT_TABLE **tablep);
 extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_mapping(WT_SESSION_IMPL *session,
-    const char *kcols,
-    const char *vcols,
-    const char *mcols,
-    size_t mlen,
-    int **mapping);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
     WT_TABLE *table);
 extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
@@ -467,6 +461,16 @@ extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     va_list ap);
+extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
+extern int __wt_struct_plan(WT_SESSION_IMPL *session,
+    WT_TABLE *table,
+    WT_BUF *plan);
+extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
+    WT_TABLE *table,
+    const char *columns,
+    size_t len,
+    int value_only,
+    WT_BUF *format);
 extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
     WT_CURSOR **cp,
     const char *proj_arg,
@@ -485,12 +489,6 @@ extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
     const char *proj_arg,
     const char *vformat,
     WT_BUF *value);
-extern int __wt_struct_repack(WT_CURSOR *cursor, int *mapping, WT_BUF *dest);
-extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
-    const char *key_format,
-    const char *value_format,
-    int *mapping,
-    char **result);
 extern int __wt_schema_table_cursor(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
@@ -569,6 +567,12 @@ extern void __wt_buf_steal( WT_SESSION_IMPL *session,
     const void *datap,
     uint32_t *sizep);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
+extern int __wt_buf_sprintf(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    3,
+    4)));
 extern int __wt_scr_alloc(WT_SESSION_IMPL *session,
     uint32_t size,
     WT_BUF **scratchp);

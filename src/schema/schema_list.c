@@ -74,8 +74,7 @@ __wt_schema_remove_table(
 	__wt_free(session, table->config);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
-	__wt_free(session, table->cg_mapping);
-	__wt_free(session, table->idx_mapping);
+	__wt_free(session, table->plan);
 	__wt_free(session, table);
 
 	return (0);

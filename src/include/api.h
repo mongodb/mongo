@@ -77,22 +77,16 @@ struct __wt_btree_session {
 
 struct __wt_table {
 	const char *name, *config;
-	const char *key_format;
-	const char *value_format;
+	const char *key_format, *value_format;
+	const char *plan;
 
-	const char *cgconf, *colconf;
-	size_t cgconf_len, colconf_len;
+	WT_CONFIG_ITEM cgconf, colconf;
 
-	int is_simple;
-	int is_complete;
-
-	int ncolgroups;
-	int nindices;
+	int is_complete, is_simple;
+	int ncolgroups, nindices, nkey_columns;
 
 	WT_BTREE **colgroup;
-	int *cg_mapping;
 	WT_BTREE **index;
-	int *idx_mapping;
 
 	TAILQ_ENTRY(__wt_table) q;
 };

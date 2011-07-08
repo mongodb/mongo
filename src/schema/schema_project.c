@@ -9,12 +9,6 @@
 #include "intpack.i"
 #include "packing.i"
 
-#define	WT_PROJ_NEXT 'n'
-#define	WT_PROJ_REUSE 'r'
-#define	WT_PROJ_SKIP 's'
-#define	WT_PROJ_CURSOR_KEY 'k'
-#define	WT_PROJ_CURSOR_VALUE 'v'
-
 /*
  * __wt_schema_project_in --
  *	Given list of cursors and a projection, read columns from the
@@ -36,10 +30,10 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
 		arg = (uint32_t)strtoul(proj, &proj, 10);
-		if (*proj == WT_PROJ_CURSOR_KEY) {
+		if (*proj == WT_PROJ_KEY) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->key, 0));
-		} else if (*proj == WT_PROJ_CURSOR_VALUE) {
+		} else if (*proj == WT_PROJ_VALUE) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->value, 0));
 		}
@@ -49,28 +43,28 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 		arg = (uint32_t)strtoul(proj, &proj, 10);
 
 		switch (*proj) {
-		case WT_PROJ_CURSOR_KEY:
+		case WT_PROJ_KEY:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
 			buf = &c->key;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 
-		case WT_PROJ_CURSOR_VALUE:
+		case WT_PROJ_VALUE:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 		}
 
 		/*
 		 * Otherwise, the argument is a count, where a missing
 		 * count means a count of 1.
 		 */
-		do {
+		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
@@ -108,7 +102,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 			default:
 				WT_ASSERT(session, *proj != *proj);
 			}
-		} while (--arg > 0);
+		}
 	}
 
 	return (0);
@@ -134,26 +128,26 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 		arg = (uint32_t)strtoul(proj, &proj, 10);
 
 		switch (*proj) {
-		case WT_PROJ_CURSOR_KEY:
+		case WT_PROJ_KEY:
 			c = cp[arg];
 			p = (uint8_t *)c->key.data;
 			end = p + c->key.size;
 			WT_RET(__pack_init(session, &pack, c->key_format));
-			break;
+			continue;
 
-		case WT_PROJ_CURSOR_VALUE:
+		case WT_PROJ_VALUE:
 			c = cp[arg];
 			p = (uint8_t *)c->value.data;
 			end = p + c->value.size;
 			WT_RET(__pack_init(session, &pack, c->value_format));
-			break;
+			continue;
 		}
 
 		/*
 		 * Otherwise, the argument is a count, where a missing
 		 * count means a count of 1.
 		 */
-		do {
+		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
@@ -169,7 +163,7 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 				/* Don't copy out the same value twice. */
 				break;
 			}
-		} while (--arg > 0);
+		}
 	}
 
 	return (0);
@@ -200,10 +194,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
 		arg = (uint32_t)strtoul(proj, &proj, 10);
-		if (*proj == WT_PROJ_CURSOR_KEY) {
+		if (*proj == WT_PROJ_KEY) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->key, 0));
-		} else if (*proj == WT_PROJ_CURSOR_VALUE) {
+		} else if (*proj == WT_PROJ_VALUE) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->value, 0));
 		}
@@ -213,28 +207,28 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 		arg = (uint32_t)strtoul(proj, &proj, 10);
 
 		switch (*proj) {
-		case WT_PROJ_CURSOR_KEY:
+		case WT_PROJ_KEY:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
 			buf = &c->key;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 
-		case WT_PROJ_CURSOR_VALUE:
+		case WT_PROJ_VALUE:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 		}
 
 		/*
 		 * Otherwise, the argument is a count, where a missing
 		 * count means a count of 1.
 		 */
-		do {
+		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
@@ -276,7 +270,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 			default:
 				WT_ASSERT(session, *proj != *proj);
 			}
-		} while (--arg > 0);
+		}
 	}
 
 	return (0);
@@ -300,34 +294,35 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	size_t len;
 	uint32_t arg;
 
+	WT_RET(__wt_buf_init(session, value, 0));
 	WT_RET(__pack_init(session, &vpack, vformat));
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
 		arg = (uint32_t)strtoul(proj, &proj, 10);
 
 		switch (*proj) {
-		case WT_PROJ_CURSOR_KEY:
+		case WT_PROJ_KEY:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
 			buf = &c->key;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 
-		case WT_PROJ_CURSOR_VALUE:
+		case WT_PROJ_VALUE:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
-			break;
+			continue;
 		}
 
 		/*
 		 * Otherwise, the argument is a count, where a missing
 		 * count means a count of 1.
 		 */
-		do {
+		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
@@ -351,7 +346,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				/* Don't copy the same value twice. */
 				break;
 			}
-		} while (--arg > 0);
+		}
 	}
 
 	return (0);

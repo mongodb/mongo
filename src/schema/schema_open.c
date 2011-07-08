@@ -11,12 +11,14 @@ int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_BTREE_SESSION *btree_session;
+	WT_BUF plan;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
 	char *namebuf;
 	const char *config, *config_copy;
 	size_t namesize;
+	uint32_t plansize;
 	int i, ret;
 
 	if (table->is_complete)
@@ -26,37 +28,41 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	cursor = NULL;
 	namebuf = NULL;
 
-	WT_RET(__wt_config_initn(session,
-	    &cparser, table->cgconf, table->cgconf_len));
+	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
 	/* Open the primary. */
 	for (i = 0; i < table->ncolgroups; i++) {
+		if (!table->is_simple)
+			WT_ERR(__wt_config_next(&cparser, &ckey, &cval));
 		if (table->colgroup[i] != NULL)
 			continue;
 		/* The primary filename is in the table config. */
-		if (i == 0)
-			config = table->config;
-		else {
-			WT_ERR(__wt_config_next(&cparser, &ckey, &cval));
+		if (table->is_simple) {
+			namesize = strlen("colgroup:") +
+			    strlen(table->name) + 1;
+			WT_ERR(__wt_realloc(session, NULL, namesize, &namebuf));
+			snprintf(namebuf, namesize, "colgroup:%s", table->name);
+		} else {
 			namesize = strlen("colgroup::") +
 			    strlen(table->name) + ckey.len + 1;
 			WT_ERR(__wt_realloc(session, NULL, namesize, &namebuf));
 			snprintf(namebuf, namesize, "colgroup:%s:%.*s",
 			    table->name, (int)ckey.len, ckey.str);
-			WT_ERR(__wt_schema_table_cursor(session, &cursor));
-			cursor->set_key(cursor, namebuf);
-			if ((ret = cursor->search(cursor)) != 0) {
-				/*
-				 * It's okay at this point if the table is not
-				 * yet complete.  Cursor opens will fail if
-				 * table->is_complete is not set.
-				 */
-				if (ret == WT_NOTFOUND)
-					ret = 0;
-				goto err;
-			}
-			cursor->get_value(cursor, &config);
 		}
+
+		WT_ERR(__wt_schema_table_cursor(session, &cursor));
+		cursor->set_key(cursor, namebuf);
+		if ((ret = cursor->search(cursor)) != 0) {
+			/*
+			 * It's okay at this point if the table is not
+			 * yet complete.  Cursor opens will fail if
+			 * table->is_complete is not set.
+			 */
+			if (ret == WT_NOTFOUND)
+				ret = 0;
+			goto err;
+		}
+		cursor->get_value(cursor, &config);
 
 		WT_ERR(__wt_config_getones(session, config, "filename", &cval));
 		if ((ret = __wt_session_get_btree(session,
@@ -67,8 +73,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_realloc(session, NULL, cval.len + 1, &namebuf));
 		memcpy(namebuf, cval.str, cval.len);
-
-		printf("open_colgroups: attempting to open '%s'\n", namebuf);
 
 		if (!__wt_exist(namebuf)) {
 			if (i == 0)
@@ -100,6 +104,12 @@ end:		if (cursor != NULL) {
 			WT_ERR(ret);
 		}
 	}
+
+	WT_ERR(__wt_table_check(session, table));
+
+	WT_CLEAR(plan);
+	WT_ERR(__wt_struct_plan(session, table, &plan));
+	__wt_buf_steal(session, &plan, &table->plan, &plansize);
 
 	table->is_complete = 1;
 
@@ -140,9 +150,10 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	table->is_simple = (cval.len == 0);
 
 	/* We count below for complex tables. */
-	table->ncolgroups = 1;
 
-	if (!table->is_simple) {
+	if (table->is_simple)
+		table->ncolgroups = 1;
+	else {
 		WT_ERR(__wt_config_getones(session, tconfig,
 		    "key_format", &cval));
 		WT_ERR(__wt_strndup(session,
@@ -156,18 +167,14 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 		/* Point to some items in the copy to save re-parsing. */
 		WT_ERR(__wt_config_getones(session,
-		    table->config, "columns", &cval));
-		table->colconf = cval.str;
-		table->colconf_len = cval.len;
+		    table->config, "columns", &table->colconf));
 
 		WT_ERR(__wt_config_getones(session,
-		    table->config, "colgroups", &cval));
-		table->cgconf = cval.str;
-		table->cgconf_len = cval.len;
+		    table->config, "colgroups", &table->cgconf));
 
 		/* Count the number of column groups; */
-		WT_ERR(__wt_config_initn(session,
-		    &cparser, cval.str, cval.len));
+		WT_ERR(__wt_config_subinit(session, &cparser, &cval));
+		table->ncolgroups = 0;
 		while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 			++table->ncolgroups;
 		if (ret != WT_NOTFOUND)
