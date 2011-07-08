@@ -149,25 +149,29 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
 	__wt_buf_clear(buf);
 }
 
+/*
+ * __wt_buf_sprintf --
+ *	Grow a buffer to accommodate a formatted string.
+ */
 int
 __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
 {
 	va_list ap;
-	size_t len, space;
+	uint32_t len, space;
 	char *p;
 
 	for (;;) {
 		va_start(ap, fmt);
-		p = (char *)buf->mem + buf->size;
+		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->mem_size >= buf->size);
 		space = buf->mem_size - buf->size;
-		len = vsnprintf(p, space, fmt, ap);
+		len = (uint32_t)vsnprintf(p, (size_t)space, fmt, ap);
 		va_end(ap);
 
 		/* Check if there was enough space. */
 		if (len < space) {
-			buf->size += (uint32_t)len;
+			buf->size += len;
 			return (0);
 		}
 
