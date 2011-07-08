@@ -317,7 +317,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
 	for (vt = verbtypes; vt->vname != NULL; vt++) {
 		WT_ERR(
-		    __wt_config_initn(session, &subconfig, cval.str, cval.len));
+		    __wt_config_subinit(session, &subconfig, &cval));
 		skey.str = vt->vname;
 		skey.len = strlen(vt->vname);
 		ret = __wt_config_getraw(&subconfig, &skey, &sval);
@@ -337,7 +337,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
-	WT_ERR(__wt_config_initn(session, &subconfig, cval.str, cval.len));
+	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
 		if (snprintf(expath, sizeof(expath), "%.*s",
 		    (int)skey.len, skey.str) >= (int)sizeof (expath)) {

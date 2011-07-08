@@ -105,7 +105,6 @@ __wt_dmsg_wrapup(WT_DBG *ds)
 static void
 __wt_dmsg(WT_DBG *ds, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
-
 {
 	WT_BUF *msg;
 	WT_SESSION_IMPL *session;
