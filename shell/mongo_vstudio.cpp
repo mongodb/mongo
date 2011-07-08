@@ -2409,7 +2409,7 @@ const StringData _jscode_raw_db =
 "print(\"\\t syncedTo: \" + st.toString() );\n" 
 "var ago = (now-st)/1000;\n" 
 "var hrs = Math.round(ago/36)/100;\n" 
-"print(\"\\t\\t = \" + Math.round(ago) + \"secs ago (\" + hrs + \"hrs)\");\n" 
+"print(\"\\t\\t = \" + Math.round(ago) + \" secs ago (\" + hrs + \"hrs)\");\n" 
 "};\n" 
 "\n" 
 "function g(x) {\n" 
