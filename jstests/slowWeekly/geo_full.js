@@ -298,7 +298,7 @@ var seed = Math.floor( Random.rand() * ( 10 ^ 30) )
 for ( var test = 0; test < numTests; test++ ) {
 	
 	Random.srand( seed + test );
-	//Random.srand( 195 )
+	//Random.srand( 42240 )
 	var t = db.testAllGeo
 	t.drop()
 	
