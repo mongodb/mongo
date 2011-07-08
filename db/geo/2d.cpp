@@ -1282,6 +1282,9 @@ namespace mongo {
 
                     GEODEBUG( "expanding box points... ");
 
+                    // Record the prefix we're actively exploring...
+                    _expPrefix.reset( new GeoHash( _prefix ) );
+
                     // Find points inside this prefix
                     while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
                     while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
@@ -1304,6 +1307,7 @@ namespace mongo {
                     if ( ! _prefix.constrains() ) {
                         GEODEBUG( "box exhausted" );
                         _state = DONE;
+                        notePrefix();
                         return;
                     }
 
@@ -1328,8 +1332,9 @@ namespace mongo {
                     break;
 
                 }
-            }
 
+                notePrefix();
+            }
 
             // If we doeighbors
             if( onlyExpand ) return;
@@ -1370,7 +1375,7 @@ namespace mongo {
                     GeoHash _neighborPrefix = _centerPrefix;
                     _neighborPrefix.move( i, j );
 
-                    GEODEBUG( "moving to " << i << " , " << j );
+                    GEODEBUG( "moving to " << i << " , " << j << " fringe : " << _fringe.size() );
                     PREFIXDEBUG( _centerPrefix, _g );
                     PREFIXDEBUG( _neighborPrefix , _g );
                     while( _fringe.size() > 0 ) {
@@ -1520,6 +1525,27 @@ namespace mongo {
             b << "pointsLoaded" << _pointsLoaded;
         }
 
+        virtual BSONObj prettyIndexBounds() const {
+
+            vector<GeoHash>::const_iterator i = _expPrefixes.end();
+            if( _expPrefixes.size() > 0 && *(--i) != *( _expPrefix.get() ) )
+                _expPrefixes.push_back( *( _expPrefix.get() ) );
+
+            BSONObjBuilder bob;
+            BSONArrayBuilder bab;
+            for( i = _expPrefixes.begin(); i != _expPrefixes.end(); ++i ){
+                bab << Box( _g, *i ).toBSON();
+            }
+            bob << _g->_geo << bab.arr();
+
+            return bob.obj();
+
+        }
+
+        void notePrefix() {
+            _expPrefixes.push_back( _prefix );
+        }
+
         string _type;
         BSONObj _filter;
         list<GeoPoint> _stack;
@@ -1547,6 +1573,9 @@ namespace mongo {
         // Start and end of our search range in the current box
         BtreeLocation _min;
         BtreeLocation _max;
+
+        shared_ptr<GeoHash> _expPrefix;
+        mutable vector<GeoHash> _expPrefixes;
 
     };
 
