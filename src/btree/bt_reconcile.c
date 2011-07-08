@@ -2082,7 +2082,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the key's WT_CELL reference was set.
 		 */
 		ikey = rref->key;
-		cell = ikey->cell_offset == 0 ?
+		cell = (ikey->cell_offset == 0) ?
 		    NULL : WT_REF_OFFSET(page, ikey->cell_offset);
 
 		/*
@@ -2862,7 +2862,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, const void *data, uint32_t size)
 		 * Overflow objects aren't prefix compressed -- rebuild any
 		 * object that was prefix compressed.
 		 */
-		return (pfx == 0 ?
+		return ((pfx == 0) ?
 		    __rec_cell_build_ovfl(session, key, WT_CELL_KEY_OVFL) :
 		    __rec_cell_build_key(session, NULL, 0));
 	}

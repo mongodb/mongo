@@ -234,7 +234,7 @@ done:	/*
 
 	session->srch_page = page;
 	session->srch_write_gen = write_gen;
-	session->srch_match = cmp == 0 ? 1 : 0;
+	session->srch_match = (cmp == 0);
 	session->srch_ip = rip;
 	return (0);
 

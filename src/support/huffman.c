@@ -111,7 +111,7 @@ static void recursive_free_node(WT_SESSION_IMPL *, WT_FREQTREE_NODE *);
 static void set_codes(WT_FREQTREE_NODE *, WT_HUFFMAN_CODE *, uint16_t, uint8_t);
 
 #define	node_queue_is_empty(queue)					\
-	(((queue) == NULL || (queue)->first == NULL) ? 1 : 0)
+	((queue) == NULL || (queue)->first == NULL)
 
 /*
  * indexed_symbol_compare --

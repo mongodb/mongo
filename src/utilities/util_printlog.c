@@ -90,7 +90,7 @@ err:		ret = 1;
 	}
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 static int

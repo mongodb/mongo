@@ -67,5 +67,5 @@ __wt_ispo2(uint32_t v)
 	 * However n must be positive, this returns 0 as a power of 2; to fix
 	 * that, use: (! (v & (v - 1)) && v)
 	 */
-	return ((v & (v - 1)) == 0 ? 1 : 0);
+	return ((v & (v - 1)) == 0);
 }

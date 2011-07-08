@@ -275,7 +275,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	fp = fopen(file, "r");
 	__wt_free(session, file);
 	if (fp == NULL) {
-nofile:		ret = errno == 0 ? WT_ERROR : errno;
+nofile:		ret = (errno == 0) ? WT_ERROR : errno;
 		__wt_err(session, ret,
 		    "no Huffman table file specified or unable to read "
 		    "Huffman table file %.*s",

@@ -16,5 +16,5 @@ __wt_exist(const char *path)
 {
 	struct stat sb;
 
-	return (stat(path, &sb) == 0 ? 1 : 0);
+	return (stat(path, &sb) == 0);
 }

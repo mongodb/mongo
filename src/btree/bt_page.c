@@ -345,7 +345,7 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* Get the cell's prefix and check if it's an overflow cell. */
 		prefix = __wt_cell_prefix(cell);
-		cell_ovfl = __wt_cell_type_is_ovfl(cell) ? 1 : 0;
+		cell_ovfl = __wt_cell_type_is_ovfl(cell);
 
 		/*
 		 * We can discard the underlying disk page if we don't have any

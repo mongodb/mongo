@@ -142,5 +142,5 @@ __wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx)
 
 	__wt_free(session, mtx);
 
-	return (ret == 0 ? 0 : WT_ERROR);
+	return ((ret == 0) ? 0 : WT_ERROR);
 }

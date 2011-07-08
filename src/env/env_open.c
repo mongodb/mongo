@@ -125,5 +125,5 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (ret == 0)
 		ret = secondary_err;
 
-	return (ret == 0 ? secondary_err : ret);
+	return ((ret == 0) ? secondary_err : ret);
 }

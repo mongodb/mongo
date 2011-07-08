@@ -54,7 +54,7 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 */
 	session->wq_args = args;
 	session->wq_func = func;
-	session->wq_sleeping = spin ? 0 : 1;
+	session->wq_sleeping = !spin;
 	WT_MEMORY_FLUSH;
 	session->wq_state = op;
 

@@ -148,7 +148,7 @@ __wt_cell_type_is_ovfl(WT_CELL *cell)
 	u_int type;
 
 	type = __wt_cell_type(cell);
-	return (type == WT_CELL_DATA_OVFL || type == WT_CELL_KEY_OVFL ? 1 : 0);
+	return (type == WT_CELL_DATA_OVFL || type == WT_CELL_KEY_OVFL);
 }
 
 /*
