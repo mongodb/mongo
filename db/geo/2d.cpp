@@ -1517,7 +1517,7 @@ namespace mongo {
             return _nscanned;
         }
 
-        virtual void customExplain( BSONObjBuilder& b ){
+        virtual void explainDetails( BSONObjBuilder& b ){
             b << "keysChecked" << _keysChecked;
             b << "lookedAt" << _lookedAt;
             b << "matchesPerfd" << _matchesPerfd;

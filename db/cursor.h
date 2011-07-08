@@ -133,7 +133,7 @@ namespace mongo {
             massert( 13285, "manual matcher config not allowed", false );
         }
 
-        virtual void customExplain( BSONObjBuilder& b ) { return; }
+        virtual void explainDetails( BSONObjBuilder& b ) { return; }
     };
 
     // strategy object implementing direction of traversal.
