@@ -147,6 +147,7 @@ cksum
 clr
 cmp
 colgroup
+colgroups
 cond
 conf
 config
@@ -159,8 +160,11 @@ curbtree
 curbulk
 curconfig
 curdump
+curfile
+curindex
 cursorp
 curstat
+curtable
 datalen
 datasets
 del
@@ -211,12 +215,14 @@ func
 getone
 getoneraw
 getones
+getonesn
 getraw
 gobare
 goesc
 gostring
 gostruct
 goutf
+havesize
 hrow
 html
 huffman
@@ -227,6 +233,7 @@ incr
 indices
 indx
 init
+initn
 initsize
 inmem
 intl
@@ -275,8 +282,10 @@ packv
 patchp
 pfx
 posint
+prepended
 printf
 pthread
+pv
 py
 qdown
 qsort
@@ -313,6 +322,7 @@ stdout
 strdup
 strerror
 stringin
+strndup
 struct
 structs
 subgetraw
@@ -348,6 +358,7 @@ unesc
 uninstantiated
 unjams
 unpackv
+unsized
 upd
 uri
 utf
@@ -362,6 +373,7 @@ workQ
 workq
 wq
 wrapup
+wti
 xff
 xxxx
 xxxxx
