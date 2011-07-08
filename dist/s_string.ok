@@ -315,6 +315,9 @@ strerror
 stringin
 struct
 structs
+subgetraw
+subgets
+subinit
 subtree
 subtrees
 superset
