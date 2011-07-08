@@ -533,7 +533,6 @@ __col_next_recno(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t *recnop)
 			recno +=
 			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
 		}
-		++recno;
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
