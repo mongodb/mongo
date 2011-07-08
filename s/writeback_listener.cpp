@@ -184,35 +184,47 @@ namespace mongo {
                     // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
 
                     BSONObj gle;
-                    try {
-                        
-                        Request r( m , 0 );
-                        r.init();
+                    while ( true ) {
+                        try {
+                            
+                            Request r( m , 0 );
+                            r.init();
+                            
+                            r.d().reservedField() |= DbMessage::Reserved_FromWriteback;
+                            
+                            ClientInfo * ci = r.getClientInfo();
+                            if (!noauth) {
+                                ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
+                            }
+                            ci->noAutoSplit();
+                            
+                            r.process();
+                            
+                            ci->newRequest(); // this so we flip prev and cur shards
+                            
+                            BSONObjBuilder b;
+                            if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
+                                b.appendBool( "commandFailed" , true );
+                            }
+                            gle = b.obj();
+                            
+                            if ( gle["code"].numberInt() == 9517 ) {
+                                db->getChunkManager( ns , true );
+                                r.reset();
+                                continue;
+                            }
 
-                        ClientInfo * ci = r.getClientInfo();
-                        if (!noauth) {
-                            ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
+                            ci->clearSinceLastGetError();
                         }
-                        ci->noAutoSplit();
-
-                        r.process();
-                        
-                        ci->newRequest(); // this so we flip prev and cur shards
-
-                        BSONObjBuilder b;
-                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
-                            b.appendBool( "commandFailed" , true );
+                        catch ( DBException& e ) {
+                            error() << "error processing writeback: " << e << endl;
+                            BSONObjBuilder b;
+                            b.append( "err" , e.toString() );
+                            e.getInfo().append( b );
+                            gle = b.obj();
                         }
-                        gle = b.obj();
-
-                        ci->clearSinceLastGetError();
-                    }
-                    catch ( DBException& e ) {
-                        error() << "error processing writeback: " << e << endl;
-                        BSONObjBuilder b;
-                        b.append( "err" , e.toString() );
-                        e.getInfo().append( b );
-                        gle = b.obj();
+                        
+                        break;
                     }
 
                     {

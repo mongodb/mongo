@@ -168,6 +168,9 @@ namespace mongo {
                 // couldn't connect because exception is thrown
                 time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
 
+                // weight new ping with old pings
+                mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
+
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
                     if( t > after )

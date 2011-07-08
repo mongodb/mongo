@@ -242,6 +242,8 @@ namespace mongo {
          * @return this, for simple chaining
          */
         Record* accessed();
+
+        static bool MemoryTrackingEnabled;
     };
 
     /* extents are datafile regions where all the records within the region

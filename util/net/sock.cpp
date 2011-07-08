@@ -15,25 +15,70 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "../../pch.h"
 #include "sock.h"
+#include "../background.h"
+
+#ifndef _WIN32
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#ifdef __openbsd__
+# include <sys/uio.h>
+#endif
+
+#endif // _WIN32
+
 
 namespace mongo {
-
-    static mongo::mutex sock_mutex("sock_mutex");
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
+    
+    // --- some global helpers -----
 
-    string getAddrInfoStrError(int code) {
-#if !defined(_WIN32)
-        return gai_strerror(code);
-#else
-        /* gai_strerrorA is not threadsafe on windows. don't use it. */
-        return errnoWithDescription(code);
-#endif
+#if defined(_WIN32)
+    void disableNagle(int sock) {
+        int x = 1;
+        if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
+            out() << "ERROR: disableNagle failed" << endl;
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            out() << "ERROR: SO_KEEPALIVE failed" << endl;
     }
+#else
+    
+    void disableNagle(int sock) {
+        int x = 1;
+
+#ifdef SOL_TCP
+        int level = SOL_TCP;
+#else
+        int level = SOL_SOCKET;
+#endif
+
+        if ( setsockopt(sock, level, TCP_NODELAY, (char *) &x, sizeof(x)) )
+            log() << "ERROR: disableNagle failed: " << errnoWithDescription() << endl;
+
+#ifdef SO_KEEPALIVE
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            log() << "ERROR: SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+#endif
+
+    }
+
+
+
+#endif
+
+    // --- SockAddr
 
     SockAddr::SockAddr(int sourcePort) {
         memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
@@ -106,6 +151,90 @@ namespace mongo {
         return false;
     }
 
+    string SockAddr::toString(bool includePort) const {
+        string out = getAddr();
+        if (includePort && getType() != AF_UNIX && getType() != AF_UNSPEC)
+            out += mongoutils::str::stream() << ':' << getPort();
+        return out;
+    }
+    
+    sa_family_t SockAddr::getType() const {
+        return sa.ss_family;
+    }
+    
+    unsigned SockAddr::getPort() const {
+        switch (getType()) {
+        case AF_INET:  return ntohs(as<sockaddr_in>().sin_port);
+        case AF_INET6: return ntohs(as<sockaddr_in6>().sin6_port);
+        case AF_UNIX: return 0;
+        case AF_UNSPEC: return 0;
+        default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return 0;
+        }
+    }
+    
+    string SockAddr::getAddr() const {
+        switch (getType()) {
+        case AF_INET:
+        case AF_INET6: {
+            const int buflen=128;
+            char buffer[buflen];
+            int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
+            massert(13082, errnoWithDescription(ret), ret == 0);
+            return buffer;
+        }
+            
+        case AF_UNIX:  return (addressSize > 2 ? as<sockaddr_un>().sun_path : "anonymous unix socket");
+        case AF_UNSPEC: return "(NONE)";
+        default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
+        }
+    }
+
+    bool SockAddr::operator==(const SockAddr& r) const {
+        if (getType() != r.getType())
+            return false;
+        
+        if (getPort() != r.getPort())
+            return false;
+        
+        switch (getType()) {
+        case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr;
+        case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) == 0;
+        case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) == 0;
+        case AF_UNSPEC: return true; // assume all unspecified addresses are the same
+        default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+        }
+    }
+    
+    bool SockAddr::operator!=(const SockAddr& r) const {
+        return !(*this == r);
+    }
+    
+    bool SockAddr::operator<(const SockAddr& r) const {
+        if (getType() < r.getType())
+            return true;
+        else if (getType() > r.getType())
+            return false;
+        
+        if (getPort() < r.getPort())
+            return true;
+        else if (getPort() > r.getPort())
+            return false;
+        
+        switch (getType()) {
+        case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
+        case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) < 0;
+        case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) < 0;
+        case AF_UNSPEC: return false;
+        default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+        }
+        
+    }
+
+    SockAddr unknownAddress( "0.0.0.0", 0 );
+
+
+    // ------ hostname -------------------
+
     string hostbyname(const char *hostname) {
         string addr =  SockAddr(hostname, 0).getAddr();
         if (addr == "0.0.0.0")
@@ -113,107 +242,18 @@ namespace mongo {
         else
             return addr;
     }
+   
+    //  --- my --
 
-    class UDPConnection {
-    public:
-        UDPConnection() {
-            sock = 0;
+    string getHostName() {
+        char buf[256];
+        int ec = gethostname(buf, 127);
+        if ( ec || *buf == 0 ) {
+            log() << "can't get this server's hostname " << errnoWithDescription() << endl;
+            return "";
         }
-        ~UDPConnection() {
-            if ( sock ) {
-                closesocket(sock);
-                sock = 0;
-            }
-        }
-        bool init(const SockAddr& myAddr);
-        int recvfrom(char *buf, int len, SockAddr& sender);
-        int sendto(char *buf, int len, const SockAddr& EndPoint);
-        int mtu(const SockAddr& sa) {
-            return sa.isLocalHost() ? 16384 : 1480;
-        }
-
-        SOCKET sock;
-    };
-
-    inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
-        return ::recvfrom(sock, buf, len, 0, sender.raw(), &sender.addressSize);
+        return buf;
     }
-
-    inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
-        if ( 0 && rand() < (RAND_MAX>>4) ) {
-            out() << " NOTSENT ";
-            return 0;
-        }
-        return ::sendto(sock, buf, len, 0, EndPoint.raw(), EndPoint.addressSize);
-    }
-
-    inline bool UDPConnection::init(const SockAddr& myAddr) {
-        sock = socket(myAddr.getType(), SOCK_DGRAM, IPPROTO_UDP);
-        if ( sock == INVALID_SOCKET ) {
-            out() << "invalid socket? " << errnoWithDescription() << endl;
-            return false;
-        }
-        if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
-            out() << "udp init failed" << endl;
-            closesocket(sock);
-            sock = 0;
-            return false;
-        }
-        socklen_t optLen;
-        int rcvbuf;
-        if (getsockopt(sock,
-                       SOL_SOCKET,
-                       SO_RCVBUF,
-                       (char*)&rcvbuf,
-                       &optLen) != -1)
-            out() << "SO_RCVBUF:" << rcvbuf << endl;
-        return true;
-    }
-
-    void sendtest() {
-        out() << "sendtest\n";
-        SockAddr me(27016);
-        SockAddr dest("127.0.0.1", 27015);
-        UDPConnection c;
-        if ( c.init(me) ) {
-            char buf[256];
-            out() << "sendto: ";
-            out() << c.sendto(buf, sizeof(buf), dest) << " " << errnoWithDescription() << endl;
-        }
-        out() << "end\n";
-    }
-
-    void listentest() {
-        out() << "listentest\n";
-        SockAddr me(27015);
-        SockAddr sender;
-        UDPConnection c;
-        if ( c.init(me) ) {
-            char buf[256];
-            out() << "recvfrom: ";
-            out() << c.recvfrom(buf, sizeof(buf), sender) << " " << errnoWithDescription() << endl;
-        }
-        out() << "end listentest\n";
-    }
-
-    void xmain();
-
-#if defined(_WIN32)
-    namespace {
-        struct WinsockInit {
-            WinsockInit() {
-                WSADATA d;
-                if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                    out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                    problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                    dbexit( EXIT_NTSERVICE_ERROR );
-                }
-            }
-        } winsock_init;
-    }
-#endif
-
-    SockAddr unknownAddress( "0.0.0.0", 0 );
 
 
     string _hostNameCached;
@@ -227,6 +267,17 @@ namespace mongo {
         return _hostNameCached;
     }
 
+    // --------- SocketException ----------
+
+#ifdef MSG_NOSIGNAL
+    const int portSendFlags = MSG_NOSIGNAL;
+    const int portRecvFlags = MSG_NOSIGNAL;
+#else
+    const int portSendFlags = 0;
+    const int portRecvFlags = 0;
+#endif
+
+
     string SocketException::toString() const {
         stringstream ss;
         ss << _ei.code << " socket exception [" << _type << "] ";
@@ -239,6 +290,237 @@ namespace mongo {
         
         return ss.str();
     }
+
+
+    // ------------ Socket -----------------
+    
+    Socket::Socket(int fd , const SockAddr& remote) : 
+        _fd(fd), _remote(remote), _timeout(0) {
+        _logLevel = 0;
+        _bytesOut = 0;
+        _bytesIn = 0;
+    }
+
+    Socket::Socket( double timeout, int ll ) {
+        _logLevel = ll;
+        _fd = -1;
+        _timeout = timeout;
+        _bytesOut = 0;
+        _bytesIn = 0;
+    }
+
+    void Socket::close() {
+        if ( _fd >= 0 ) {
+            closesocket( _fd );
+            _fd = -1;
+        }
+    }
+
+    class ConnectBG : public BackgroundJob {
+    public:
+        ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) { }
+
+        void run() { _res = ::connect(_sock, _remote.raw(), _remote.addressSize); }
+        string name() const { return "ConnectBG"; }
+        int inError() const { return _res; }
+
+    private:
+        int _sock;
+        int _res;
+        SockAddr _remote;
+    };
+
+    bool Socket::connect(SockAddr& remote) {
+        _remote = remote;
+
+        _fd = socket(remote.getType(), SOCK_STREAM, 0);
+        if ( _fd == INVALID_SOCKET ) {
+            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
+            return false;
+        }
+
+        if ( _timeout > 0 ) {
+            setSockTimeouts( _fd, _timeout );
+        }
+
+        ConnectBG bg(_fd, remote);
+        bg.go();
+        if ( bg.wait(5000) ) {
+            if ( bg.inError() ) {
+                close();
+                return false;
+            }
+        }
+        else {
+            // time out the connect
+            close();
+            bg.wait(); // so bg stays in scope until bg thread terminates
+            return false;
+        }
+
+        if (remote.getType() != AF_UNIX)
+            disableNagle(_fd);
+
+#ifdef SO_NOSIGPIPE
+        // osx
+        const int one = 1;
+        setsockopt( _fd , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
+
+        return true;
+    }
+
+
+    // sends all data or throws an exception
+    void Socket::send( const char * data , int len, const char *context ) {
+        while( len > 0 ) {
+            int ret = ::send( _fd , data , len , portSendFlags );
+            if ( ret == -1 ) {
+                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                    log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
+                }
+                else {
+                    SocketException::Type t = SocketException::SEND_ERROR;
+#if defined(_WINDOWS)
+                    if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
+#endif
+                    log(_logLevel) << "Socket " << context << " send() " 
+                                   << errnoWithDescription() << ' ' << remoteString() << endl;
+                    throw SocketException( t , remoteString() );
+                }
+            }
+            else {
+                _bytesOut += ret;
+
+                assert( ret <= len );
+                len -= ret;
+                data += ret;
+            }
+        }
+    }
+
+    // sends all data or throws an exception
+    void Socket::send( const vector< pair< char *, int > > &data, const char *context ) {
+#if defined(_WIN32)
+        // TODO use scatter/gather api
+        for( vector< pair< char *, int > >::const_iterator i = data.begin(); i != data.end(); ++i ) {
+            char * data = i->first;
+            int len = i->second;
+            send( data, len, context );
+        }
+#else
+        vector< struct iovec > d( data.size() );
+        int i = 0;
+        for( vector< pair< char *, int > >::const_iterator j = data.begin(); j != data.end(); ++j ) {
+            if ( j->second > 0 ) {
+                d[ i ].iov_base = j->first;
+                d[ i ].iov_len = j->second;
+                ++i;
+                _bytesOut += j->second;
+            }
+        }
+        struct msghdr meta;
+        memset( &meta, 0, sizeof( meta ) );
+        meta.msg_iov = &d[ 0 ];
+        meta.msg_iovlen = d.size();
+
+        while( meta.msg_iovlen > 0 ) {
+            int ret = ::sendmsg( _fd , &meta , portSendFlags );
+            if ( ret == -1 ) {
+                if ( errno != EAGAIN || _timeout == 0 ) {
+                    log(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
+                    throw SocketException( SocketException::SEND_ERROR , remoteString() );
+                }
+                else {
+                    log(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
+                }
+            }
+            else {
+                struct iovec *& i = meta.msg_iov;
+                while( ret > 0 ) {
+                    if ( i->iov_len > unsigned( ret ) ) {
+                        i->iov_len -= ret;
+                        i->iov_base = (char*)(i->iov_base) + ret;
+                        ret = 0;
+                    }
+                    else {
+                        ret -= i->iov_len;
+                        ++i;
+                        --(meta.msg_iovlen);
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+    void Socket::recv( char * buf , int len ) {
+        unsigned retries = 0;
+        while( len > 0 ) {
+            int ret = unsafe_recv( buf , len );
+            if ( ret > 0 ) {
+                if ( len <= 4 && ret != len )
+                    log(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
+                assert( ret <= len );
+                len -= ret;
+                buf += ret;
+            }
+            else if ( ret == 0 ) {
+                log(3) << "Socket recv() conn closed? " << remoteString() << endl;
+                throw SocketException( SocketException::CLOSED , remoteString() );
+            }
+            else { /* ret < 0  */
+                int e = errno;
+                
+#if defined(EINTR) && !defined(_WIN32)
+                if( e == EINTR ) {
+                    if( ++retries == 1 ) {
+                        log() << "EINTR retry" << endl;
+                        continue;
+                    }
+                }
+#endif
+                if ( ( e == EAGAIN 
+#ifdef _WINDOWS
+                       || e == WSAETIMEDOUT
+#endif
+                       ) && _timeout > 0 ) {
+                    // this is a timeout
+                    log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
+                    throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
+                }
+
+                log(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
+                throw SocketException( SocketException::RECV_ERROR , remoteString() );
+            }
+        }
+    }
+
+    int Socket::unsafe_recv( char *buf, int max ) {
+        int x = ::recv( _fd , buf , max , portRecvFlags );
+        _bytesIn += x;
+        return x;
+    }
+
+
+    // ---------- global init -------------
+
+
+#if defined(_WIN32)
+    struct WinsockInit {
+        WinsockInit() {
+            WSADATA d;
+            if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
+                out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                dbexit( EXIT_NTSERVICE_ERROR );
+            }
+        }
+    } winsock_init;
+#endif
+
 
 
 

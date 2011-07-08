@@ -104,7 +104,10 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
-
+    
+    /** 
+     * need to put in DbMesssage::ReservedOptions as well
+     */
     enum InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
         InsertOption_KeepGoing = 1 << 0
@@ -465,12 +468,12 @@ namespace mongo {
         */
         bool createCollection(const string &ns, long long size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
-        /** Get error result from the last operation on this connection.
+        /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return error message text, or empty string if no error.
         */
         string getLastError();
 
-        /** Get error result from the last operation on this connection.
+        /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return full error object.
         */
         virtual BSONObj getLastErrorDetailed();

@@ -6,9 +6,9 @@
 #include "../util/net/listen.h"
 
 namespace mongo {
-    
-    namespace ps {
 
+    namespace ps {
+        
         enum State {
             In , Out, Unk
         };
@@ -129,7 +129,7 @@ namespace mongo {
 
                 RARELY {
                     long long now = Listener::getElapsedTimeMillis();
-                    OCCASIONALLY if ( now == 0 ) {
+                    RARELY if ( now == 0 ) {
                         tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
                     }
                     
@@ -177,6 +177,7 @@ namespace mongo {
         
     }
 
+    bool Record::MemoryTrackingEnabled = true;
     
 
     int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
@@ -192,6 +193,9 @@ namespace mongo {
     }
 
     bool Record::likelyInPhysicalMemory() {
+        if ( ! MemoryTrackingEnabled )
+            return true;
+
         static bool blockSupported = ProcessInfo::blockCheckSupported();
 
         const size_t page = (size_t)data >> 12;
@@ -207,6 +211,9 @@ namespace mongo {
     }
 
     Record* Record::accessed() {
+        if ( ! MemoryTrackingEnabled ) 
+            return this;
+
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;

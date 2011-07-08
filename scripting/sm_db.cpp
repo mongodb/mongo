@@ -1200,8 +1200,8 @@ zzz
 #else
         if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ) {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            //TODO: make signed
-            b.appendDate( name , Date_t((unsigned long long)d) );
+            long long d2 = (long long)d;
+            b.appendDate( name , Date_t((unsigned long long)d2) );
             return true;
         }
 #endif

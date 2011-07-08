@@ -614,7 +614,7 @@ namespace PerfTests {
             return "findOne_by_id";
         }
         void post() {
-            assert( client().count(ns()) > 100 );
+            assert( client().count(ns()) > 50 );
         }
         unsigned long long expectation() { return 1000; }
     };

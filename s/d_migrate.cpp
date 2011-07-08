@@ -153,6 +153,10 @@ namespace mongo {
             _numThreads--;
         }
 
+        string toString() const {
+            return str::stream() << ns << " from " << min << " -> " << max;
+        }
+
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             writelock lk(ns);
@@ -192,13 +196,14 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _m("MigrateFromStatus") {
+        MigrateFromStatus() : _m("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ) {
+            scoped_lock ll(_workLock);
             scoped_lock l(_m); // reads and writes _active
 
             assert( ! _active );
@@ -517,16 +522,19 @@ namespace mongo {
         void setInCriticalSection( bool b ) { scoped_lock l(_m); _inCriticalSection = b; }
 
         bool isActive() const { return _getActive(); }
-
+        
         void doRemove( OldDataCleanup& cleanup ) {
+            int it = 0;
             while ( true ) { 
+                if ( it > 20 && it % 10 == 0 ) log() << "doRemote iteration " << it << " for: " << cleanup << endl;
                 {
-                    scoped_lock lk( _m );
+                    scoped_lock ll(_workLock);
                     if ( ! _active ) {
                         cleanup.doRemove();
+                        return;
                     }
                 }
-                sleepmillis( 100 );
+                sleepmillis( 1000 );
             }
         }
 
@@ -553,6 +561,9 @@ namespace mongo {
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
+        mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
+                                        // for now, this means migrate or removing old chunk data
+
         bool _getActive() const { scoped_lock l(_m); return _active; }
         void _setActive( bool b ) { scoped_lock l(_m); _active = b; }
 
@@ -572,7 +583,7 @@ namespace mongo {
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
-        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+        log() << " (start) waiting to cleanup " << cleanup << "  # cursors:" << cleanup.initial.size() << migrateLog;
 
         int loops = 0;
         Timer t;

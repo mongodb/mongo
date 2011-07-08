@@ -21,11 +21,25 @@
 #include "message_port.h"
 
 #ifndef _WIN32
+
 # ifndef __sunos__
 #  include <ifaddrs.h>
 # endif
 # include <sys/resource.h>
 # include <sys/stat.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#ifdef __openbsd__
+# include <sys/uio.h>
+#endif
+
 #else
 
 // errno doesn't work for winsock.
@@ -114,7 +128,13 @@ namespace mongo {
                 setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (const char*) &one, sizeof(one));
             }
 
-            prebindOptions( sock );
+#if !defined(_WIN32)
+            {
+                const int one = 1;
+                if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0 )
+                    out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
+            }
+#endif
 
             if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
                 int x = errno;

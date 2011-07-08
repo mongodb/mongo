@@ -591,9 +591,10 @@ namespace mongo {
             case Undefined:
                 return JSVAL_NULL;
             case NumberDouble:
-                return toval( e.number() );
             case NumberInt:
-                return toval( e.numberInt() );
+                return toval( e.number() );
+//            case NumberInt:
+//                return toval( e.numberInt() );
             case Symbol: // TODO: should we make a special class for this
             case String:
                 return toval( e.valuestr() );
