@@ -115,20 +115,33 @@ void shellHistoryDone() {
     linenoiseHistorySave( (char*)historyFile.c_str() );
 #endif
 }
-void shellHistoryAdd( const char * line ) {
+void shellHistoryAdd( string line ) {
 #ifdef USE_LINENOISE
     if ( line[0] == '\0' )
         return;
 
     // dont record duplicate lines
     static string lastLine;
-    if (lastLine == line)
+    if (!lastLine.compare(line))
         return;
     lastLine = line;
 
-    if ((strstr(line, ".auth")) == NULL)
-        linenoiseHistoryAdd( line );
+    while ( line.find("\n") != string::npos) {
+        line.replace(line.find("\n"), 1, "...");
+    }
+
+    if (line.find(".auth") == string::npos)
+        linenoiseHistoryAdd( line.c_str() );
 #endif
+}
+
+void remultiline( char * line ) {
+    string buffer = line;
+
+    while ( buffer.find("...") != string::npos) {
+        buffer.replace(buffer.find("..."), 3, "\n", 1);
+    }
+    strncpy(line, buffer.c_str(), strlen(line));
 }
 
 void intr( int sig ) {
@@ -727,6 +740,7 @@ int _main(int argc, char* argv[]) {
                 break;
             }
 
+            remultiline(line);
             string code = line;
             if ( code == "exit" || code == "exit;" ) {
                 break;
@@ -775,7 +789,7 @@ int _main(int argc, char* argv[]) {
                 }
             }
 
-            shellHistoryAdd( line );
+            shellHistoryAdd( code );
         }
 
         shellHistoryDone();
