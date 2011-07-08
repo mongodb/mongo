@@ -25,17 +25,25 @@ var randEnvironment = function(){
 		return { max : 180, 
 				 min : -180, 
 				 bits : Math.floor( Random.rand() * 32 ) + 1, 
-				 earth : true }
+				 earth : true,
+				 bucketSize : 360 / ( 4 * 1024 * 1024 * 1024 ) }
 	}
 	
 	var scales = [ 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000 ]
 	var scale = scales[ Math.floor( Random.rand() * scales.length ) ]
 	var offset = Random.rand() * scale
 	
-	return { max : Random.rand() * scale + offset,
-		     min : - Random.rand() * scale + offset,
-		     bits : Math.floor( Random.rand() * 32 ) + 1,
-		     earth : false }
+    var max = Random.rand() * scale + offset
+	var min = - Random.rand() * scale + offset
+	var bits = Math.floor( Random.rand() * 32 ) + 1
+	var range = max - min
+    var bucketSize = range / ( 4 * 1024 * 1024 * 1024 )
+    	
+	return { max : max,
+		     min : min,
+		     bits : bits,
+		     earth : false,
+		     bucketSize : bucketSize }
 	
 }
 
@@ -287,6 +295,25 @@ var locsArray = function( locs ){
 	}
 }
 
+var minBoxSize = function( env, box ){
+    return env.bucketSize * Math.pow( 2, minBucketScale( env, box ) )
+}
+
+var minBucketScale = function( env, box ){
+        
+    if( box.length && box[0].length )
+        box = [ box[0][0] - box[1][0], box[0][1] - box[1][1] ]
+    
+    if( box.length )
+        box = Math.max( box[0], box[1] )
+        
+    print( box )
+    print( env.bucketSize )
+        
+    return Math.ceil( Math.log( box / env.bucketSize ) / Math.log( 2 ) )
+
+}
+
 // TODO:  Add spherical $uniqueDocs tests
 var numTests = 100
 
@@ -364,9 +391,10 @@ for ( var test = 0; test < numTests; test++ ) {
 	// exact
 	print( "Exact query..." )
 	assert.eq( results.exact.docsIn, t.find( { "locs.loc" : randLocType( query.exact ), "exact.docIn" : randYesQuery() } ).count() )
-	
+		
 	// $center
 	print( "Center query..." )
+	print( "Min box : " + minBoxSize( env, query.radius ) )
 	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() )
 	assert.eq( results.center.locsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() } ).count() )
 	if( query.sphereRadius >= 0 ){
