@@ -464,13 +464,67 @@ namespace ThreadedTests {
         }
     };
 
+    class UpgradableTest : public ThreadedTest<4> {
+        RWLock m;
+    public:
+        UpgradableTest() : m("utest") {}
+    private:
+        virtual void validate() { }
+        virtual void subthread(int x) {
+            Client::initThread("utest");
+
+            switch( x ) { 
+            case 1:
+                {
+                    sleepsecs(3);
+                    log() << x << " W want" << endl;
+                    m.lock();
+                    log() << x << " W got" << endl;
+                    sleepsecs(1);
+                    log() << x << " W unlock" << endl;
+                    m.unlock();
+                }
+                break;
+            case 2:
+                {
+                    log() << x << " U want" << endl;
+                    m.lockAsUpgradable();
+                    log() << x << " U got\n" << endl;
+                    sleepsecs(8);
+                    cout << endl;
+                    log() << x << " U unlock\n" << endl;
+                    m.unlockFromUpgradable();
+                }
+                break;
+            case 4:
+                {
+                    sleepsecs(2);
+                }
+            case 3:
+                {
+                    sleepsecs(2);
+                    log() << x << " R want " << endl;
+                    m.lock_shared();
+                    log() << x << " R got " << endl;
+                    sleepsecs(1);
+                    log() << x << " R unlock" << endl;
+                    m.unlock_shared();
+                }
+                break;
+            default:
+                log() << "default " << x << endl;
+            }
+
+            cc().shutdown();
+        }
+    };
 
     class All : public Suite {
     public:
-        All() : Suite( "threading" ) {
-        }
+        All() : Suite( "threading" ) { }
 
         void setupTests() {
+            //add< UpgradableTest >();
             add< List1Test >();
             add< List1Test2 >();
 
