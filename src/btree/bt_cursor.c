@@ -365,8 +365,9 @@ int
 __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
-	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -376,13 +377,20 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	case BTREE_COL_FIX:
 	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
-		return (__wt_btree_col_put(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value));
+		while ((ret = __wt_col_modify(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+			;
+		break;
 	case BTREE_ROW:
-		return (__wt_btree_row_put(session,
-		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+		while ((ret = __wt_row_modify(session,
+		    (WT_ITEM *)&cursor->key,
+		    (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+			;
+		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+
+	return (ret);
 }
 
 /*
@@ -393,8 +401,9 @@ int
 __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
-	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -402,15 +411,31 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
+		if (((WT_ITEM *)&cursor->value)->size != btree->fixed_len) {
+			__wt_errx(session, "length of %" PRIu32
+			    " does not match fixed-length file configuration "
+			    "of %" PRIu32,
+			    ((WT_ITEM *)&cursor->value)->size,
+			    btree->fixed_len);
+			return (WT_ERROR);
+		}
+		/* FALLTHROUGH */
 	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
-		return (__wt_btree_col_put(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value));
+		while ((ret = __wt_col_modify(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+			;
+		break;
 	case BTREE_ROW:
-		return (__wt_btree_row_put(session,
-		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+		while ((ret = __wt_row_modify(session,
+		    (WT_ITEM *)&cursor->key,
+		    (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+			;
+		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+
+	return (ret);
 }
 
 /*
@@ -421,8 +446,9 @@ int
 __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
-	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -432,11 +458,19 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	case BTREE_COL_FIX:
 	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
-		return (__wt_btree_col_del(session, cursor->recno));
+		while ((ret = __wt_col_modify(
+		    session, cursor->recno, NULL, 0)) == WT_RESTART)
+			;
+		break;
 	case BTREE_ROW:
-		return (__wt_btree_row_del(session, (WT_ITEM *)&cursor->key));
+		while ((ret = __wt_row_modify(
+		    session, (WT_ITEM *)&cursor->key, NULL, 0)) == WT_RESTART)
+			;
+		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+
+	return (ret);
 }
 
 /*

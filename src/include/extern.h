@@ -306,10 +306,10 @@ extern int __wt_walk_next(WT_SESSION_IMPL *session,
 extern int __wt_btree_col_get(WT_SESSION_IMPL *session,
     uint64_t recno,
     WT_ITEM *value);
-extern int __wt_btree_col_del(WT_SESSION_IMPL *session, uint64_t recno);
-extern int __wt_btree_col_put(WT_SESSION_IMPL *session,
+extern int __wt_col_modify( WT_SESSION_IMPL *session,
     uint64_t recno,
-    WT_ITEM *value);
+    WT_ITEM *value,
+    int is_write);
 extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
@@ -328,10 +328,10 @@ extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t size,
     WT_IKEY **ikeyp);
 extern int __wt_row_key_serial_func(WT_SESSION_IMPL *session);
-extern int __wt_btree_row_del(WT_SESSION_IMPL *session, WT_ITEM *key);
-extern int __wt_btree_row_put(WT_SESSION_IMPL *session,
+extern int __wt_row_modify( WT_SESSION_IMPL *session,
     WT_ITEM *key,
-    WT_ITEM *value);
+    WT_ITEM *value,
+    int is_write);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *key,
     WT_INSERT **insp,

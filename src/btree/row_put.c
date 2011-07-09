@@ -7,42 +7,12 @@
 
 #include "wt_internal.h"
 
-static int __wt_row_update(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM *, int);
-
 /*
- * __wt_btree_row_del --
- *	Db.row_del method.
- */
-int
-__wt_btree_row_del(WT_SESSION_IMPL *session, WT_ITEM *key)
-{
-	int ret;
-
-	while ((ret = __wt_row_update(session, key, NULL, 0)) == WT_RESTART)
-		;
-	return (ret);
-}
-
-/*
- * __wt_btree_row_put --
- *	Db.row_put method.
- */
-int
-__wt_btree_row_put(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value)
-{
-	int ret;
-
-	while ((ret = __wt_row_update(session, key, value, 1)) == WT_RESTART)
-		;
-	return (ret);
-}
-
-/*
- * __wt_row_update --
+ * __wt_row_modify --
  *	Row-store delete and update.
  */
-static int
-__wt_row_update(
+int
+__wt_row_modify(
     WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 {
 	WT_INSERT **new_ins, *ins;

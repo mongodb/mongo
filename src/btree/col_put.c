@@ -11,50 +11,13 @@ static int __col_extend(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int __col_insert_alloc(
 		WT_SESSION_IMPL *, uint64_t, WT_INSERT **, uint32_t *);
 static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
-static int __col_update(WT_SESSION_IMPL *, uint64_t, WT_ITEM *, int);
-static int __col_wrong_fixed_size(WT_SESSION_IMPL *, uint32_t, uint32_t);
 
 /*
- * __wt_btree_col_del --
- *	Db.col_del method.
- */
-int
-__wt_btree_col_del(WT_SESSION_IMPL *session, uint64_t recno)
-{
-	int ret;
-
-	while ((ret = __col_update(session, recno, NULL, 0)) == WT_RESTART)
-		;
-	return (ret);
-}
-
-/*
- * __wt_btree_col_put --
- *	Db.put method.
- */
-int
-__wt_btree_col_put(WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value)
-{
-	WT_BTREE *btree;
-	int ret;
-
-	btree = session->btree;
-
-	if (btree->type == BTREE_COL_FIX && value->size != btree->fixed_len)
-		WT_RET(__col_wrong_fixed_size(
-		    session, value->size, btree->fixed_len));
-
-	while ((ret = __col_update(session, recno, value, 1)) == WT_RESTART)
-		;
-	return (ret);
-}
-
-/*
- * __col_update --
+ * __wt_col_modify --
  *	Column-store delete and update.
  */
-static int
-__col_update(
+int
+__wt_col_modify(
     WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
@@ -217,21 +180,6 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 	*insp = ins;
 	*ins_sizep = sizeof(WT_INSERT) + sizeof(uint64_t);
 	return (0);
-}
-
-/*
- * __wt_file_wrong_fixed_size --
- *	The standard error message on attempts to put the wrong size element
- *	into a fixed-size file.
- */
-static int
-__col_wrong_fixed_size(
-    WT_SESSION_IMPL *session, uint32_t len, uint32_t config_len)
-{
-	__wt_errx(session, "length of %" PRIu32
-	    " does not match fixed-length file configuration of %" PRIu32,
-	    len, config_len);
-	return (WT_ERROR);
 }
 
 /*
