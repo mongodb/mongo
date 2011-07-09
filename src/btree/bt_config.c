@@ -65,6 +65,8 @@ __wt_btconf_write(
 	char *fullname;
 	int ret;
 
+	fh = NULL;
+
 	namesize = strlen(name) + sizeof(".conf");
 	WT_RET(__wt_calloc_def(session, namesize, &fullname));
 	snprintf(fullname, namesize, "%s.conf", name);
@@ -74,7 +76,6 @@ __wt_btconf_write(
 		WT_ERR(remove(fullname));
 
 	/* Open the config file. */
-	fh = NULL;
 	WT_ERR(__wt_open(session, fullname, 0666, 1, &fh));
 
 	/* Write the config string and a newline. */
