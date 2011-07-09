@@ -42,17 +42,17 @@ __wt_cache_read_unpack(
 typedef struct {
 	WT_PAGE *page;
 	WT_PAGE *new_intl;
-	int new_intl_size;
+	uint32_t new_intl_size;
 	int new_intl_taken;
 	WT_COL_REF *t;
-	int t_size;
+	uint32_t t_size;
 	int t_taken;
 	uint32_t internal_extend;
 	WT_PAGE *new_leaf;
-	int new_leaf_size;
+	uint32_t new_leaf_size;
 	int new_leaf_taken;
 	WT_COL *d;
-	int d_size;
+	uint32_t d_size;
 	int d_taken;
 	uint32_t leaf_extend;
 	uint64_t recno;
@@ -226,11 +226,11 @@ typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_INSERT **new_ins;
-	int new_ins_size;
+	uint32_t new_ins_size;
 	int new_ins_taken;
 	WT_INSERT **srch_ins;
 	WT_INSERT *ins;
-	int ins_size;
+	uint32_t ins_size;
 	int ins_taken;
 } __wt_insert_args;
 
@@ -359,11 +359,11 @@ typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_UPDATE **new_upd;
-	int new_upd_size;
+	uint32_t new_upd_size;
 	int new_upd_taken;
 	WT_UPDATE **srch_upd;
 	WT_UPDATE *upd;
-	int upd_size;
+	uint32_t upd_size;
 	int upd_taken;
 } __wt_update_args;
 

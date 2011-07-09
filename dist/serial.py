@@ -99,7 +99,7 @@ def output(entry, f):
 	for l in entry[1].args:
 		f.write('\t' + decl(l) + ';\n')
 		if l[2]:
-			f.write('\tint ' + l[1] + '_size;\n')
+			f.write('\tuint32_t ' + l[1] + '_size;\n')
 			f.write('\tint ' + l[1] + '_taken;\n')
 	f.write('} __wt_' + entry[0] + '_args;\n\n')
 
