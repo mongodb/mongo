@@ -15,27 +15,24 @@
  *    limitations under the License.
  */
 
-#include "../../pch.h"
+#include "pch.h"
 #include "sock.h"
 #include "../background.h"
 
-#ifndef _WIN32
-
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netdb.h>
-#ifdef __openbsd__
-# include <sys/uio.h>
+#if !defined(_WIN32)
+# include <sys/socket.h>
+# include <sys/types.h>
+# include <sys/socket.h>
+# include <sys/un.h>
+# include <netinet/in.h>
+# include <netinet/tcp.h>
+# include <arpa/inet.h>
+# include <errno.h>
+# include <netdb.h>
+# if defined(__openbsd__)
+#  include <sys/uio.h>
+# endif
 #endif
-
-#endif // _WIN32
-
 
 namespace mongo {
 
@@ -73,8 +70,6 @@ namespace mongo {
 #endif
 
     }
-
-
 
 #endif
 
@@ -203,6 +198,7 @@ namespace mongo {
         case AF_UNSPEC: return true; // assume all unspecified addresses are the same
         default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
         }
+        return false;
     }
     
     bool SockAddr::operator!=(const SockAddr& r) const {
@@ -227,11 +223,10 @@ namespace mongo {
         case AF_UNSPEC: return false;
         default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
         }
-        
+        return false;        
     }
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
-
 
     // ------ hostname -------------------
 
@@ -276,7 +271,6 @@ namespace mongo {
     const int portSendFlags = 0;
     const int portRecvFlags = 0;
 #endif
-
 
     string SocketException::toString() const {
         stringstream ss;
@@ -376,15 +370,16 @@ namespace mongo {
         while( len > 0 ) {
             int ret = ::send( _fd , data , len , portSendFlags );
             if ( ret == -1 ) {
+#if defined(_WIN32)
+                if ( WSAGetLastError() == WSAETIMEDOUT && _timeout != 0 ) {
+#else
                 if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+#endif
                     log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
-#if defined(_WINDOWS)
-                    if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
-#endif
                     log(_logLevel) << "Socket " << context << " send() " 
                                    << errnoWithDescription() << ' ' << remoteString() << endl;
                     throw SocketException( t , remoteString() );
@@ -483,7 +478,8 @@ namespace mongo {
                 }
 #endif
                 if ( ( e == EAGAIN 
-#ifdef _WINDOWS
+#if defined(_WIN32)
+
                        || e == WSAETIMEDOUT
 #endif
                        ) && _timeout > 0 ) {
@@ -504,10 +500,6 @@ namespace mongo {
         return x;
     }
 
-
-    // ---------- global init -------------
-
-
 #if defined(_WIN32)
     struct WinsockInit {
         WinsockInit() {
@@ -520,9 +512,5 @@ namespace mongo {
         }
     } winsock_init;
 #endif
-
-
-
-
 
 } // namespace mongo
