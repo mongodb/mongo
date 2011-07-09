@@ -69,9 +69,9 @@ __wt_btconf_write(
 	WT_RET(__wt_calloc_def(session, namesize, &fullname));
 	snprintf(fullname, namesize, "%s.conf", name);
 
-        /* There is no truncate mode in __wt_open. */
-        if (__wt_exist(fullname))
-                WT_ERR(remove(fullname));
+	/* There is no truncate mode in __wt_open. */
+	if (__wt_exist(fullname))
+		WT_ERR(remove(fullname));
 
 	/* Open the config file. */
 	fh = NULL;
