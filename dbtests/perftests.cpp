@@ -46,6 +46,9 @@ namespace mongo {
 }
 
 namespace PerfTests {
+
+    const bool profiling = false;
+
     typedef DBDirectClient DBClientType;
     //typedef DBClientConnection DBClientType;
 
@@ -124,7 +127,7 @@ namespace PerfTests {
         virtual int expectationTimeMillis() { return -1; }
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
-        virtual int howLongMillis() { return 5000; } 
+        virtual int howLongMillis() { return profiling ? 60000 : 5000; } 
 
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
@@ -742,26 +745,31 @@ namespace PerfTests {
             cout
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
-            add< Dummy >();
-            add< TLS >();
-            add< Malloc >();
-            add< Timer >();
-            add< CTM >();
-            add< KeyTest >();
-            add< Bldr >();
-            add< StkBldr >();
-            add< BSONIter >();
-            add< BSONGetFields1 >();
-            add< BSONGetFields2 >();
-            add< ChecksumTest >();
-            add< TaskQueueTest >();
-            add< InsertDup >();
-            add< Insert1 >();
-            add< InsertRandom >();
-            add< MoreIndexes<InsertRandom> >();
-            add< Update1 >();
-            add< MoreIndexes<Update1> >();
-            add< InsertBig >();
+            if( profiling ) { 
+                add< Update1 >();
+            }
+            else {
+                add< Dummy >();
+                add< TLS >();
+                add< Malloc >();
+                add< Timer >();
+                add< CTM >();
+                add< KeyTest >();
+                add< Bldr >();
+                add< StkBldr >();
+                add< BSONIter >();
+                add< BSONGetFields1 >();
+                add< BSONGetFields2 >();
+                add< ChecksumTest >();
+                add< TaskQueueTest >();
+                add< InsertDup >();
+                add< Insert1 >();
+                add< InsertRandom >();
+                add< MoreIndexes<InsertRandom> >();
+                add< Update1 >();
+                add< MoreIndexes<Update1> >();
+                add< InsertBig >();
+            }
         }
     } myall;
 }
