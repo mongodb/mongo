@@ -614,7 +614,9 @@ namespace PerfTests {
             return "findOne_by_id";
         }
         void post() {
+#if !defined(_DEBUG)
             assert( client().count(ns()) > 50 );
+#endif
         }
         unsigned long long expectation() { return 1000; }
     };
@@ -689,8 +691,6 @@ namespace PerfTests {
             return s.c_str();
         }
 
-        void post() {
-        }
         unsigned long long expectation() { return 1000; }
     };
 
@@ -729,11 +729,8 @@ namespace PerfTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "perf" )
-        {
-        }
-        ~All() { 
-        }
+        All() : Suite( "perf" ) { }
+
         Result * run( const string& filter ) { 
             boost::thread a(t);
             Result * res = Suite::run(filter); 
