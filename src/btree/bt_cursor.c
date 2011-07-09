@@ -341,12 +341,25 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	case BTREE_COL_FIX:
 	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
-		ret = __wt_btree_col_get(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value);
+		while ((ret = __wt_col_search(
+		    session, cursor->recno, 0)) == WT_RESTART)
+			;
+		if (ret == 0) {
+			ret = __wt_return_data(session,
+			    NULL, (WT_ITEM *)&cursor->value, 0);
+			WT_PAGE_OUT(session, session->srch_page);
+		}
 		break;
 	case BTREE_ROW:
-		ret = __wt_btree_row_get(session,
-		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value);
+		while ((ret = __wt_row_search(
+		    session, (WT_ITEM *)&cursor->key, 0)) == WT_RESTART)
+			;
+		if (ret == 0) {
+			ret = __wt_return_data(session,
+			    (WT_ITEM *)&cursor->key,
+			    (WT_ITEM *)&cursor->value, 0);
+			WT_PAGE_OUT(session, session->srch_page);
+		}
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}

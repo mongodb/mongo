@@ -303,9 +303,6 @@ extern void __wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk);
 extern int __wt_walk_next(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);
-extern int __wt_btree_col_get(WT_SESSION_IMPL *session,
-    uint64_t recno,
-    WT_ITEM *value);
 extern int __wt_col_modify( WT_SESSION_IMPL *session,
     uint64_t recno,
     WT_ITEM *value,
@@ -314,9 +311,6 @@ extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
     uint32_t flags);
-extern int __wt_btree_row_get(WT_SESSION_IMPL *session,
-    WT_ITEM *key,
-    WT_ITEM *value);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
