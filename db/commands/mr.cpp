@@ -719,8 +719,16 @@ namespace mongo {
                 }
 
                 ClientCursor::YieldLock yield (cursor.get());
-                // reduce an finalize array
-                finalReduce( all );
+
+                try {
+                    // reduce a finalize array
+                    finalReduce( all );
+                }
+                catch (...) {
+                    yield.relock();
+                    cursor.release();
+                    throw;
+                }
 
                 all.clear();
                 prev = o;
