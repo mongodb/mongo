@@ -798,7 +798,7 @@ struct __wt_off_record {
  * pinned for the life of the table handle.
  */
 #define	WT_PAGE_OUT(session, p)						\
-	if ((p) != NULL && !WT_PAGE_IS_ROOT(page))			\
+	if ((p) != NULL && !WT_PAGE_IS_ROOT(p))				\
 		__wt_hazard_clear((session), (p));
 
 /*
