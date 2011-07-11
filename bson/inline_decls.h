@@ -45,7 +45,7 @@
 #define MONGO_IF(x) if( (x) )
 
 // prefetch data from memory
-#define MONGOPREFETCH(x) { /*just check we compile:*/ sizeof(*x); }
+#define MONGOPREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
 
 #if 0
 
@@ -53,6 +53,6 @@
 
 #define _IF(x) if( __builtin_expect((x), 0) )
 
-#define PREFETCH(x) { /*just check we compile:*/ sizeof(*x); }
+#define PREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
 
 #endif
