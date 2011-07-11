@@ -215,7 +215,7 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 			break;
 		case WT_CELL_DEL:
 			break;
-		WT_ILLEGAL_FORMAT_ERR(session, ret);
+		WT_ILLEGAL_FORMAT_ERR(session);
 		}
 	}
 
@@ -314,7 +314,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 			WT_ERR(__wt_cell_copy(session, cell, value_tmp));
 			value = (WT_ITEM *)value_tmp;
 			break;
-		WT_ILLEGAL_FORMAT_ERR(session, ret);
+		WT_ILLEGAL_FORMAT_ERR(session);
 		}
 
 		dp->p(key->data, key->size, dp->stream);

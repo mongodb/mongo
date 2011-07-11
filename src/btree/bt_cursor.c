@@ -279,7 +279,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 				ret = __btcur_next_row(cbt,
 				    &cursor->key, &cursor->value);
 				break;
-			WT_ILLEGAL_FORMAT_ERR(session, ret);
+			WT_ILLEGAL_FORMAT_ERR(session);
 			}
 			if (ret != WT_NOTFOUND)
 				break;
@@ -306,7 +306,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			cbt->nitems = cbt->page->entries;
 			cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
 			break;
-		WT_ILLEGAL_FORMAT_ERR(session, ret);
+		WT_ILLEGAL_FORMAT_ERR(session);
 		}
 	}
 

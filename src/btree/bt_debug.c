@@ -786,7 +786,7 @@ deleted:	p = (uint8_t *)"deleted";
 		p = (uint8_t *)"offpage";
 		size = strlen("offpage");
 		break;
-	WT_ILLEGAL_FORMAT_ERR(session, ret);
+	WT_ILLEGAL_FORMAT_ERR(session);
 	}
 
 	__wt_debug_item(ds, tag, p, size);

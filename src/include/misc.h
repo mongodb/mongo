@@ -117,7 +117,7 @@ extern "C" {
 #define	WT_ILLEGAL_FORMAT(session)					\
 	default:							\
 		return (__wt_file_format(session))
-#define	WT_ILLEGAL_FORMAT_ERR(session, ret)				\
+#define	WT_ILLEGAL_FORMAT_ERR(session)					\
 	default:							\
 		ret = __wt_file_format(session);			\
 		goto err
