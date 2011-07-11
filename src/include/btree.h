@@ -315,17 +315,17 @@ struct __wt_page {
 	WT_PAGE_DISK *dsk;
 
 	/*
+	 * In-memory pages optionally reference a number of entries, originally
+	 * read from disk.
+	 */
+	uint32_t entries;
+
+	/*
 	 * In-memory pages may have an optional memory allocation; this field
 	 * is only so the appropriate calculations are done when the page is
 	 * discarded.
 	 */
 	uint32_t memory_footprint;
-
-	/*
-	 * Every in-memory page references a number of entries, originally
-	 * based on the number of on-disk entries found.
-	 */
-	uint32_t entries;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
