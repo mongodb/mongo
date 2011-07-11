@@ -415,19 +415,20 @@ struct __wt_ref {
 
 /*
  * WT_IKEY --
- * Instantiated key: keys are usually prefix compressed and sometimes Huffman
- * encoded or overflow.  Normally, a row-store page in-memory key points to the
- * on-page WT_CELL, but in some cases, we instantiate the key in memory.  In
- * that case, the row-store page in-memory key points to a WT_IKEY structure.
+ * Instantiated key: row-store keys are usually prefix compressed and sometimes
+ * Huffman encoded or overflow objects.  Normally, a row-store page in-memory
+ * key points to the on-page WT_CELL, but in some cases, we instantiate the key
+ * in memory, in which case the row-store page in-memory key points to a WT_IKEY
+ * structure.
  */
 struct __wt_ikey {
 	WT_SESSION_BUFFER *sb;		/* Session buffer holding the WT_IKEY */
 
-	uint32_t  size;			/* Key length */
+	uint32_t size;			/* Key length */
 
 	/*
-	 * If we no longer point to the key's on-page WT_CELL, we can't find
-	 * its related value.  Save the offset of the key cell in the page.
+	 * If we no longer point to the key's on-page WT_CELL, we can't find its
+	 * related value.  Save the offset of the key cell in the page.
 	 *
 	 * Row-store cell references are page offsets, not pointers (we boldly
 	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
