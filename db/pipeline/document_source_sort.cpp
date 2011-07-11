@@ -26,6 +26,9 @@
 
 namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
+    int limit;
+    int skip;
+
 
     DocumentSourceSort::~DocumentSourceSort() {
     }
@@ -105,6 +108,8 @@ namespace mongo {
         shared_ptr<DocumentSourceSort> pSort(DocumentSourceSort::create(pCtx));
 
         BSONObj sortObj(pBsonElement->Obj());
+        limit = sortObj.getIntField("limit");
+        skip = sortObj.getIntField("skip");
         BSONObjIterator sortIterator(sortObj.getObjectField("key"));
         while(sortIterator.more()) {
             BSONElement sortField(sortIterator.next());
@@ -150,6 +155,14 @@ namespace mongo {
 
         /* start the sort iterator */
         listIterator = documents.begin();
+
+        if (skip == INT_MIN)
+            skip = 0;
+        for ( int i = 0; i < skip; i++ ) {
+            listIterator++;
+            if (listIterator == documents.end())
+                break;
+        }
         if (listIterator != documents.end())
             pCurrent = listIterator->pDocument;
         populated = true;
