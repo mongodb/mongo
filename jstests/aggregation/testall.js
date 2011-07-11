@@ -494,8 +494,9 @@ assert(arrayEq(p9.result, p9result), 'p9 failed');
 var p10 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $sort : {
-	title : 1
-    }}
+	key: {
+        title : 1
+    }}}
 ]});
 
 var p10result = [

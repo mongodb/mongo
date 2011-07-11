@@ -105,7 +105,7 @@ namespace mongo {
         shared_ptr<DocumentSourceSort> pSort(DocumentSourceSort::create(pCtx));
 
         BSONObj sortObj(pBsonElement->Obj());
-        BSONObjIterator sortIterator(sortObj);
+        BSONObjIterator sortIterator(sortObj.getObjectField("key"));
         while(sortIterator.more()) {
             BSONElement sortField(sortIterator.next());
             const char *pFieldName = sortField.fieldName();
