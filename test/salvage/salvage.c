@@ -60,8 +60,6 @@ main(int argc, char *argv[])
 		case 't':
 			if (strcmp(optarg, "fix") == 0)
 				page_type = WT_PAGE_COL_FIX;
-			else if (strcmp(optarg, "rle") == 0)
-				page_type = WT_PAGE_COL_RLE;
 			else if (strcmp(optarg, "var") == 0)
 				page_type = WT_PAGE_COL_VAR;
 			else if (strcmp(optarg, "row") == 0)
@@ -82,10 +80,6 @@ main(int argc, char *argv[])
 	printf("salvage test run started\n");
 	if (r == 0) {
 		page_type = WT_PAGE_COL_FIX;
-		for (r = 1; r <= 23; ++r)
-			run(r);
-
-		page_type = WT_PAGE_COL_RLE;
 		for (r = 1; r <= 23; ++r)
 			run(r);
 
@@ -415,16 +409,12 @@ build(int ikey, int ivalue, int cnt)
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
+		/*
+		 * TODO: update this to configure a bitfield, only generate
+		 * a single byte value.
+		 */
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=\"20u\","
-		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
-		break;
-	case WT_PAGE_COL_RLE:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=\"20u\",runlength_encoding,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -451,11 +441,10 @@ build(int ikey, int ivalue, int cnt)
 	}
 	assert(session->create(session, "file:" LOAD, config) == 0);
 	assert(session->open_cursor(
-	    session, "file:" LOAD, NULL, "bulk", &cursor) == 0);
+	    session, "file:" LOAD, NULL, "raw,bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			break;
 		case WT_PAGE_ROW_LEAF:
