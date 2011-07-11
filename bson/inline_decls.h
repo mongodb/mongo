@@ -42,7 +42,7 @@
 #define MONGOIF(x) if( (x) )
 
 // branch prediction.  indicate we expect to not enter the if statement body
-#define MONGO_IF(x) if( (x) ) 
+#define MONGO_IF(x) if( (x) )
 
 // prefetch data from memory
 #define MONGOPREFETCH(x) { /*just check we compile:*/ sizeof(*x); }
