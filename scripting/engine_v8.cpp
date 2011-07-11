@@ -118,9 +118,12 @@ namespace mongo {
       return val;
     }
 
-//    static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-//      return Handle<Value>();
-//    }
+    static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Value>();
+    }
 
     static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
         BSONObj *obj = unwrapBSONObj(info.Holder());
@@ -136,6 +139,14 @@ namespace mongo {
             arr->Set(i, name);
         }
         return arr;
+    }
+
+    Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        cout << "setting modded" << endl;
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Boolean>();
     }
 
 //    v8::Handle<v8::Integer> namedQuery(Local<v8::String> property, const AccessorInfo& info) {
@@ -170,6 +181,13 @@ namespace mongo {
         return val;
     }
 
+    Handle<Boolean> indexedDelete( uint32_t index, const AccessorInfo& info ) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Boolean>();
+    }
+
     static Handle<v8::Value> indexedGetRO(uint32_t index, const v8::AccessorInfo &info) {
         StringBuilder ss;
         ss << index;
@@ -193,9 +211,12 @@ namespace mongo {
         return val;
     }
 
-//    static Handle<v8::Value> indexedSet(uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-//      return Handle<Value>();
-//    }
+    static Handle<v8::Value> indexedSet(uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Value>();
+    }
 
 //    static Handle<v8::Array> indexedEnumerator(const AccessorInfo &info) {
 //        BSONObj *obj = unwrapBSONObj(info.Holder());
@@ -212,22 +233,24 @@ namespace mongo {
 //    }
 
     Handle<Value> NamedReadOnlySet( Local<v8::String> property, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only object" << endl;
+        string key = toSTLString(property);
+        cout << "cannot write property " << key << " to read-only object" << endl;
         return value;
     }
 
     Handle<Boolean> NamedReadOnlyDelete( Local<v8::String> property, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only object" << endl;
+        string key = toSTLString(property);
+        cout << "cannot delete property " << key << " from read-only object" << endl;
         return Boolean::New( false );
     }
 
     Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only array" << endl;
+        cout << "cannot write property " << index << " to read-only array" << endl;
         return value;
     }
 
     Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only array" << endl;
+        cout << "cannot delete property " << index << " from read-only array" << endl;
         return Boolean::New( false );
     }
 
@@ -278,8 +301,8 @@ namespace mongo {
         // initialize lazy object template
         lzObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         lzObjectTemplate->SetInternalFieldCount( 1 );
-        lzObjectTemplate->SetNamedPropertyHandler(namedGet, 0, 0, 0, 0, v8::External::New(this));
-        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0, v8::External::New(this));
+        lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete, 0, v8::External::New(this));
+        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete, 0, v8::External::New(this));
 
         roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         roObjectTemplate->SetInternalFieldCount( 1 );
@@ -318,6 +341,7 @@ namespace mongo {
         V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
         V8STR_RO = getV8Str( "_ro" );
+        V8STR_MODIFIED = getV8Str( "_mod" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -473,7 +497,7 @@ namespace mongo {
         V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
-        _global->Set( getV8Str( field ) , mongoToV8( obj, false, readOnly) );
+        _global->Set( getV8Str( field ) , mongoToLZV8( obj, false, readOnly) );
     }
 
     int V8Scope::type( const char *field ) {
@@ -491,6 +515,7 @@ namespace mongo {
             return Array;
         if ( v->IsBoolean() )
             return Bool;
+        // needs to be explicit NumberInt to use integer
 //        if ( v->IsInt32() )
 //            return NumberInt;
         if ( v->IsNumber() )
@@ -1290,9 +1315,10 @@ namespace mongo {
         }
 
         if ( value->IsNumber() ) {
-            if ( value->IsInt32() )
-                b.append( sname, int( value->ToInt32()->Value() ) );
-            else
+            // needs to be explicit NumberInt to use integer
+//            if ( value->IsInt32() )
+//                b.append( sname, int( value->ToInt32()->Value() ) );
+//            else
                 b.append( sname , value->ToNumber()->Value() );
             return;
         }
@@ -1408,8 +1434,10 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
-        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ) {
+        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
+                (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
             // object was readonly, use bson as is
+            log(1) << "Using bson as is for v8ToMongo" << endl;
             BSONObj* ro = unwrapBSONObj(o);
             if (ro)
                 return *ro;
