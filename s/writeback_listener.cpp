@@ -40,6 +40,7 @@ namespace mongo {
     mongo::mutex WriteBackListener::_seenWritebacksLock("WriteBackListener::seen");
 
     WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ) {
+        _name = str::stream() << "WriteBackListener-" << addr;
         log() << "creating WriteBackListener for: " << addr << endl;
     }
 
