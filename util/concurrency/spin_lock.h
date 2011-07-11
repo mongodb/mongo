@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
-#include "rwlock.h"
+#include "mutex.h"
 
 namespace mongo {
 
@@ -27,7 +26,7 @@ namespace mongo {
      * The spinlock currently requires late GCC support routines to be efficient.
      * Other platforms default to a mutex implemenation.
      */
-    class SpinLock {
+    class SpinLock : boost::noncopyable {
     public:
         SpinLock();
         ~SpinLock();
@@ -35,7 +34,7 @@ namespace mongo {
         void lock();
         void unlock();
 
-        static bool isfast();
+        static bool isfast(); // true if a real spinlock on this platform
 
     private:
 #if defined(_WIN32)
@@ -45,24 +44,20 @@ namespace mongo {
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         volatile bool _locked;
 #else
-        // default to a scoped mutex if not implemented
-        RWLock _mutex;
+        // default to a mutex if not implemented
+        SimpleMutex _mutex;
 #endif
-
-        // Non-copyable, non-assignable
-        SpinLock(SpinLock&);
-        SpinLock& operator=(SpinLock&);
     };
     
-    struct scoped_spinlock {
-        scoped_spinlock( SpinLock& l ) : _l(l){
+    class scoped_spinlock : boost::noncopyable {
+    public:
+        scoped_spinlock( SpinLock& l ) : _l(l) {
             _l.lock();
         }
         ~scoped_spinlock() {
-            _l.unlock();
-        }
+            _l.unlock();}
+    private:
         SpinLock& _l;
     };
 
 }  // namespace mongo
-

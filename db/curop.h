@@ -134,16 +134,9 @@ namespace mongo {
         }
 
         void append( BSONObjBuilder& b , const StringData& name ) {
-            _lock.lock();
-            try {
-                BSONObj temp = _get();
-                b.append( name , temp );
-                _lock.unlock();
-            }
-            catch ( ... ) {
-                _lock.unlock();
-                throw;
-            }
+            scoped_spinlock lk(_lock);
+            BSONObj temp = _get();
+            b.append( name , temp );
         }
 
     private:

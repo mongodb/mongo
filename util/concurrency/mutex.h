@@ -227,11 +227,15 @@ namespace mongo {
     public:
         SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
         ~SimpleMutex() { DeleteCriticalSection(&_cs); }
+
+        void lock() { EnterCriticalSection(&_cs); }
+        void unlock() { LeaveCriticalSection(&_cs); }
+
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
         public:
-            scoped_lock( SimpleMutex &m ) : _m(m) { EnterCriticalSection(&_m._cs); }
-            ~scoped_lock() { LeaveCriticalSection(&_m._cs); }
+            scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
+            ~scoped_lock() { _m.unlock(); }
         };
     };
 #else
@@ -244,6 +248,9 @@ namespace mongo {
         public:
             scoped_lock( SimpleMutex &m ) : _lk(m._m) { }
         };
+
+        void lock()   { _m.lock(); }
+        void unlock() { _m.unlock(); }
     };
 #endif
 
