@@ -464,7 +464,7 @@ namespace ThreadedTests {
         }
     };
 
-    class UpgradableTest : public ThreadedTest<4> {
+    class UpgradableTest : public ThreadedTest<5> {
         RWLock m;
     public:
         UpgradableTest() : m("utest") {}
@@ -473,13 +473,17 @@ namespace ThreadedTests {
         virtual void subthread(int x) {
             Client::initThread("utest");
 
-            const char *what = " RURWR";
+            /* r = read lock 
+               R = get a read lock and we expect it to be fast
+               w = write lock
+            */
+            const char *what = " RURwR";
 
             sleepmillis(100*x);
 
             log() << x << " " << what[x] << endl;
             switch( what[x] ) { 
-            case 'W':
+            case 'w':
                 {
                     m.lock();
                     log() << x << " W got" << endl;
@@ -488,20 +492,32 @@ namespace ThreadedTests {
                     m.unlock();
                 }
                 break;
+            case 'u':
             case 'U':
                 {
+                    Timer t;
                     m.lockAsUpgradable();
                     log() << x << " U got\n" << endl;
-                    sleepsecs(1);
+                    if( what[x] == 'U' ) {
+                        ASSERT( t.millis() < 15 );
+                    }
+                    sleepsecs(5);
                     cout << endl;
                     log() << x << " U unlock\n" << endl;
                     m.unlockFromUpgradable();
                 }
                 break;
+            case 'r':
             case 'R':
                 {
+                    Timer t;
                     m.lock_shared();
                     log() << x << " R got " << endl;
+                    if( what[x] == 'R' ) {
+                        if( t.millis() > 15 ) { 
+                            log() << "warning: when in upgradable write locks are still greedy on this platform" << endl;
+                        }
+                    }
                     sleepmillis(100);
                     log() << x << " R unlock" << endl;
                     m.unlock_shared();
