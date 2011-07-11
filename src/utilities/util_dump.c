@@ -17,13 +17,12 @@ util_dump(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	size_t len;
 	char cursor_config[100];
 	int ch, printable, ret, tret;
-	char *tablename;
+	char *name;
 
 	conn = NULL;
-	tablename = NULL;
+	name = NULL;
 	printable = 0;
 
 	while ((ch = getopt(argc, argv, "f:p")) != EOF)
@@ -48,13 +47,9 @@ util_dump(int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-
-	len = sizeof("table:") + strlen(*argv);
-	if ((tablename = calloc(len, 1)) == NULL) {
-		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+	if ((name = util_name(
+	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
-	}
-	snprintf(tablename, len, "table:%s", *argv);
 
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
@@ -65,9 +60,9 @@ util_dump(int argc, char *argv[])
 	    "dump,%s", printable ? "printable" : "raw");
 
 	if ((ret = session->open_cursor(
-	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
+	    session, name, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, tablename, wiredtiger_strerror(ret));
+		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -89,7 +84,7 @@ util_dump(int argc, char *argv[])
 		ret = 0;
 	else {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
-		    progname, tablename, wiredtiger_strerror(ret));
+		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -99,8 +94,8 @@ err:		ret = 1;
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
-	if (tablename != NULL)
-		free(tablename);
+	if (name != NULL)
+		free(name);
 
 	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -110,7 +105,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-p] [-f output-file] file\n",
+	    "dump [-p] [-f output-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

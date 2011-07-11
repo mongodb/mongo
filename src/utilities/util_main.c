@@ -13,12 +13,13 @@ const char *progname;				/* Program name */
 const char *usage_prefix = "[-Vv] [-h home]";	/* Global arguments */
 int verbose;					/* Verbose flag */
 
+static const char *command;			/* Command name */
+
 static int usage(void);
 
 int
 main(int argc, char *argv[])
 {
-	char *cmd;
 	int ch, major_v,  minor_v;
 
 	/* Get the program name. */
@@ -26,6 +27,7 @@ main(int argc, char *argv[])
 		progname = argv[0];
 	else
 		++progname;
+	command = "";
 
 	/* Check the version against the library build. */
 	(void)wiredtiger_version(&major_v, & minor_v, NULL);
@@ -66,35 +68,35 @@ main(int argc, char *argv[])
 	/* The next argument is the command name. */
 	if (argc < 1)
 		return (usage());
-	cmd = argv[0];
+	command = argv[0];
 
 	/* Reset getopt. */
 	optreset = 1;
 	optind = 1;
 
-	switch (cmd[0]) {
+	switch (command[0]) {
 	case 'd':
-		if (strcmp(cmd, "dump") == 0)
+		if (strcmp(command, "dump") == 0)
 			return (util_dump(argc, argv));
-		if (strcmp(cmd, "dumpfile") == 0)
+		if (strcmp(command, "dumpfile") == 0)
 			return (util_dumpfile(argc, argv));
 		break;
 	case 'l':
-		if (strcmp(cmd, "load") == 0)
+		if (strcmp(command, "load") == 0)
 			return (util_load(argc, argv));
 		break;
 	case 'p':
-		if (strcmp(cmd, "printlog") == 0)
+		if (strcmp(command, "printlog") == 0)
 			return (util_printlog(argc, argv));
 		break;
 	case 's':
-		if (strcmp(cmd, "salvage") == 0)
+		if (strcmp(command, "salvage") == 0)
 			return (util_salvage(argc, argv));
-		if (strcmp(cmd, "stat") == 0)
+		if (strcmp(command, "stat") == 0)
 			return (util_stat(argc, argv));
 		break;
 	case 'v':
-		if (strcmp(cmd, "verify") == 0)
+		if (strcmp(command, "verify") == 0)
 			return (util_verify(argc, argv));
 		break;
 	default:
@@ -126,4 +128,55 @@ usage(void)
 	    "\tverify\t  verify a file\n");
 
 	return (EXIT_FAILURE);
+}
+
+/*
+ * util_name --
+ *	Build a name.
+ */
+char *
+util_name(const char *s, const char *type, u_int flags)
+{
+	size_t len;
+	int copy;
+	char *name;
+
+	copy = 0;
+	if (strncmp(s, "file:", strlen("file:")) == 0) {
+		if (!(flags & UTIL_FILE_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"file\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	} else if (strncmp(s, "stat:", strlen("stat:")) == 0) {
+		if (!(flags & UTIL_STAT_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"stat\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	} else if (strncmp(s, "table:", strlen("table:")) == 0) {
+		if (!(flags & UTIL_TABLE_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"table\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	}
+
+	len = 20 + strlen(s);
+	if ((name = calloc(len, 1)) == NULL) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		return (NULL);
+	}
+
+	if (copy)
+		strcpy(name, s);
+	else
+		snprintf(name, len, "%s:%s", type, s);
+	return (name);
 }

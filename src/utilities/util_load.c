@@ -27,16 +27,15 @@ util_load(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	struct record_t record;
-	size_t len;
 	uint64_t insert_count;
 	int ch, debug, eof, ret, printable, tret;
 	const char *table_config;
 	char cursor_config[100];
-	char *tablename;
+	char *name;
 
 	conn = NULL;
 	table_config = NULL;
-	tablename = NULL;
+	name = NULL;
 	debug = printable = 0;
 
 	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
@@ -77,32 +76,27 @@ util_load(int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-
-	len = sizeof("table:") + strlen(*argv);
-	if ((tablename = calloc(len, 1)) == NULL) {
-		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+	if ((name = util_name(*argv, "table", UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
-	}
-	snprintf(tablename, len, "table:%s", *argv);
 
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	if ((ret = session->drop(session, tablename, "force")) != 0)
+	if ((ret = session->drop(session, name, "force")) != 0)
 		goto err;
 
-	if ((ret = session->create(session, tablename, table_config)) != 0)
+	if ((ret = session->create(session, name, table_config)) != 0)
 		goto err;
 
 	snprintf(cursor_config, sizeof(cursor_config), "dump%s%s",
 	    printable ? ",printable" : ",raw", debug ? ",debug" : "");
 
 	if ((ret = session->open_cursor(
-	    session, tablename, NULL, cursor_config, &cursor)) != 0) {
+	    session, name, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, tablename, wiredtiger_strerror(ret));
+		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -113,7 +107,7 @@ util_load(int argc, char *argv[])
 	for (eof = 0; (ret = bulk_read(&record, &eof)) == 0 && !eof;) {
                 /* Report on progress every 100 inserts. */
                 if (verbose && ++insert_count % 100 == 0) {
-                        printf("\r\t%s: %" PRIu64, tablename, insert_count);
+                        printf("\r\t%s: %" PRIu64, name, insert_count);
 			fflush(stdout);
 		}
 	
@@ -121,13 +115,13 @@ util_load(int argc, char *argv[])
 		cursor->set_value(cursor, &record.value);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr, "%s: cursor insert(%s) failed: %s\n",
-			    progname, tablename, wiredtiger_strerror(ret));
+			    progname, name, wiredtiger_strerror(ret));
 			goto err;
 		}
 	}
 
 	if (verbose)
-		printf("\r\t%s: %" PRIu64 "\n", tablename, insert_count);
+		printf("\r\t%s: %" PRIu64 "\n", name, insert_count);
 
 	if (0) {
 err:		ret = 1;
@@ -135,8 +129,8 @@ err:		ret = 1;
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
-	if (tablename != NULL)
-		free(tablename);
+	if (name != NULL)
+		free(name);
 
 	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -205,7 +199,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "load [-dT] [-c configuration] [-f input-file] file\n",
+	    "load [-dT] [-c configuration] [-f input-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

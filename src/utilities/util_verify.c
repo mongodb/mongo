@@ -15,13 +15,11 @@ util_verify(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	size_t len;
 	int ch, ret, tret;
-	char *tablename;
+	char *name;
 
 	conn = NULL;
-	tablename = NULL;
-
+	name = NULL;
 	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
@@ -31,25 +29,21 @@ util_verify(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the file name. */
+	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-
-	len = sizeof("table:") + strlen(*argv);
-	if ((tablename = calloc(len, 1)) == NULL) {
-		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+	if ((name = util_name(
+	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
-	}
-	snprintf(tablename, len, "table:%s", *argv);
 
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	if ((ret = session->verify(session, tablename, NULL)) != 0) {
+	if ((ret = session->verify(session, name, NULL)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
-		    progname, tablename, wiredtiger_strerror(ret));
+		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 	if (verbose)
@@ -61,8 +55,8 @@ err:		ret = 1;
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
-	if (tablename != NULL)
-		free(tablename);
+	if (name != NULL)
+		free(name);
 
 	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
