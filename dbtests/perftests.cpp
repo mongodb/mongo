@@ -541,7 +541,7 @@ namespace PerfTests {
     class Dummy : public B {
     public:
         Dummy() { }
-        virtual int howLongMillis() { return 4000; } 
+        virtual int howLongMillis() { return 3000; } 
         string name() { return "dummy"; }
         void timed() {
             dontOptimizeOutHopefully++;
@@ -554,7 +554,7 @@ namespace PerfTests {
     class TLS : public B {
     public:
         TLS() { }
-        virtual int howLongMillis() { return 4000; } 
+        virtual int howLongMillis() { return 3000; } 
         string name() { return "thread-local-storage"; }
         void timed() {
             if( &cc() )
