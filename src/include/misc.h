@@ -130,10 +130,20 @@ extern "C" {
 	if ((ret = (a)) != 0)						\
 		goto err;						\
 } while (0)
+#define	WT_ERR_CHK(a, v) do {						\
+	if (a) {							\
+		ret = (v);						\
+		goto err;						\
+	}								\
+} while (0)
 #define	WT_RET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0)						\
 		return (__ret);						\
+} while (0)
+#define	WT_RET_CHK(a, v) do {						\
+	if (a) {							\
+		return (v);						\
 } while (0)
 #define	WT_TRET(a) do {							\
 	int __ret;							\

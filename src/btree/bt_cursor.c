@@ -256,13 +256,41 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		return (__wt_btcur_first(cbt));
 
 	/*
-	 * If we haven't yet started the walk, get the first page and set up
-	 * the cursor.
+	 * Walk any page we're holding until the underlying call returns not-
+	 * found.  Then, move to the next page, until we reach the end of the
+	 * file.
 	 */
-	if (cbt->page == NULL) {
-		WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
-		if (cbt->page == NULL)
-			goto notfound;
+	for (;;) {
+		if (cbt->page != NULL) {
+			switch (cbt->page->type) {
+			case WT_PAGE_COL_FIX:
+				ret = __btcur_next_fix(cbt,
+				   &cursor->recno, &cursor->value);
+				break;
+			case WT_PAGE_COL_RLE:
+				ret = __btcur_next_rle(cbt,
+				    &cursor->recno, &cursor->value);
+				break;
+			case WT_PAGE_COL_VAR:
+				ret = __btcur_next_var(cbt,
+				    &cursor->recno, &cursor->value);
+				break;
+			case WT_PAGE_ROW_LEAF:
+				ret = __btcur_next_row(cbt,
+				    &cursor->key, &cursor->value);
+				break;
+			WT_ILLEGAL_FORMAT_ERR(session, ret);
+			}
+			if (ret != WT_NOTFOUND)
+				break;
+		}
+
+		do {
+			WT_ERR(__wt_walk_next(session, &cbt->walk, &cbt->page));
+			WT_ERR_CHK(cbt->page == NULL, WT_NOTFOUND);
+		} while (
+		    cbt->page->type == WT_PAGE_COL_INT ||
+		    cbt->page->type == WT_PAGE_ROW_INT);
 
 		switch (cbt->page->type) {
 		case WT_PAGE_COL_FIX:
@@ -278,45 +306,11 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			cbt->nitems = cbt->page->entries;
 			cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_FORMAT_ERR(session, ret);
 		}
 	}
 
-	/* Walk the page until the underlying "next" call returns not-found. */
-	for (;;) {
-		switch (cbt->page->type) {
-		case WT_PAGE_COL_FIX:
-			ret = __btcur_next_fix(cbt,
-			   &cursor->recno, &cursor->value);
-			break;
-		case WT_PAGE_COL_RLE:
-			ret = __btcur_next_rle(cbt,
-			    &cursor->recno, &cursor->value);
-			break;
-		case WT_PAGE_COL_VAR:
-			ret = __btcur_next_var(cbt,
-			    &cursor->recno, &cursor->value);
-			break;
-		case WT_PAGE_ROW_LEAF:
-			ret = __btcur_next_row(cbt,
-			    &cursor->key, &cursor->value);
-			break;
-		WT_ILLEGAL_FORMAT(session);
-		}
-		if (ret != WT_NOTFOUND)
-			break;
-
-		/* Get the next page; if that fails, the walk is complete. */
-		WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
-		if (cbt->page == NULL)
-			goto notfound;
-	}
-
-	if (0) {
-notfound:	ret = WT_NOTFOUND;
-	}
-
-	if (ret == 0)
+err:	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else
 		F_CLR(cursor, WT_CURSTD_POSITIONED |
