@@ -492,17 +492,16 @@ struct wt_session {
 	 * @param name the uri of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
-	 * @config{btree_column_internal_extend, configure the number of records
-	 * a column-store internal page is extended by when records are
-	 * appended}
-	 * @config{btree_column_leaf_extend, configure the number of records a
-	 * column-store leaf page is extended by when records are appended}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  Any column that does not appear in a column group is
 	 * stored in a default\, unnamed\, column group for the table.  Each
 	 * column group must be created with a separate call to
 	 * WT_SESSION::create}
+	 * @config{column_internal_extend, configure the number of records a
+	 * column-store internal page is extended by when records are appended}
+	 * @config{column_leaf_extend, configure the number of records a column-
+	 * store leaf page is extended by when records are appended}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  For tables\, the number of
 	 * entries must match the total number of values in \c key_format and \c

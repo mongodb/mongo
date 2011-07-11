@@ -207,7 +207,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 
 	/* Find out by how much we'll extend the leaf key space. */
 	WT_RET(__wt_config_getones(session,
-	    session->btree->config, "btree_column_leaf_extend", &cval));
+	    session->btree->config, "column_leaf_extend", &cval));
 	leaf_extend = (uint32_t)cval.val;
 
 	/*
@@ -246,7 +246,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	WT_ERR(__wt_calloc_def(session, 1, &new_intl));
 	new_intl_size = sizeof(WT_PAGE);
 	WT_RET(__wt_config_getones(session,
-	    session->btree->config, "btree_column_internal_extend", &cval));
+	    session->btree->config, "column_internal_extend", &cval));
 	internal_extend = (uint32_t)cval.val;
 	WT_ERR(__wt_calloc_def(session, (size_t)internal_extend, &t));
 	t_size = internal_extend * WT_SIZEOF32(WT_COL_REF);

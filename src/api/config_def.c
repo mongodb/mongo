@@ -4,8 +4,8 @@
 
 const char *
 __wt_confdfl_btree_meta =
-    "allocation_size=512B,btree_column_internal_extend=10000,"
-    "btree_column_leaf_extend=10000,huffman_key=,huffman_value=,"
+    "allocation_size=512B,column_internal_extend=10000,"
+    "column_leaf_extend=10000,huffman_key=,huffman_value=,"
     "internal_key_truncate=true,internal_node_max=2KB,internal_node_min=2KB,"
     "key_format=u,key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,"
     "prefix_compression=true,runlength_encoding=false,split_min=false,"
@@ -14,8 +14,8 @@ __wt_confdfl_btree_meta =
 const char *
 __wt_confchk_btree_meta =
     "allocation_size=(type=int,min=512B,max=128MB),"
-    "btree_column_internal_extend=(type=int,min=500,max=10M),"
-    "btree_column_leaf_extend=(type=int,min=500,max=10M),huffman_key=(),"
+    "column_internal_extend=(type=int,min=500,max=10M),"
+    "column_leaf_extend=(type=int,min=500,max=10M),huffman_key=(),"
     "huffman_value=(),internal_key_truncate=(type=boolean),"
     "internal_node_max=(type=int,min=512B,max=512MB),"
     "internal_node_min=(type=int,min=512B,max=512MB),key_format=(type=format)"
@@ -27,18 +27,18 @@ __wt_confchk_btree_meta =
 
 const char *
 __wt_confdfl_colgroup_meta =
-    "allocation_size=512B,btree_column_internal_extend=10000,"
-    "btree_column_leaf_extend=10000,columns=,filename=,huffman_key=,"
-    "huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
-    "internal_node_min=2KB,key_format=u,key_gap=10,leaf_node_max=1MB,"
-    "leaf_node_min=32KB,prefix_compression=true,runlength_encoding=false,"
-    "split_min=false,split_pct=75,type=btree,value_format=u";
+    "allocation_size=512B,column_internal_extend=10000,"
+    "column_leaf_extend=10000,columns=,filename=,huffman_key=,huffman_value=,"
+    "internal_key_truncate=true,internal_node_max=2KB,internal_node_min=2KB,"
+    "key_format=u,key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,"
+    "prefix_compression=true,runlength_encoding=false,split_min=false,"
+    "split_pct=75,type=btree,value_format=u";
 
 const char *
 __wt_confchk_colgroup_meta =
     "allocation_size=(type=int,min=512B,max=128MB),"
-    "btree_column_internal_extend=(type=int,min=500,max=10M),"
-    "btree_column_leaf_extend=(type=int,min=500,max=10M),columns=(type=list),"
+    "column_internal_extend=(type=int,min=500,max=10M),"
+    "column_leaf_extend=(type=int,min=500,max=10M),columns=(type=list),"
     "filename=(),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
     "min=512B,max=512MB),internal_node_min=(type=int,min=512B,max=512MB),"
@@ -115,18 +115,18 @@ __wt_confchk_cursor_close =
 
 const char *
 __wt_confdfl_index_meta =
-    "allocation_size=512B,btree_column_internal_extend=10000,"
-    "btree_column_leaf_extend=10000,columns=,filename=,huffman_key=,"
-    "huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
-    "internal_node_min=2KB,key_format=u,key_gap=10,leaf_node_max=1MB,"
-    "leaf_node_min=32KB,prefix_compression=true,runlength_encoding=false,"
-    "split_min=false,split_pct=75,type=btree,value_format=u";
+    "allocation_size=512B,column_internal_extend=10000,"
+    "column_leaf_extend=10000,columns=,filename=,huffman_key=,huffman_value=,"
+    "internal_key_truncate=true,internal_node_max=2KB,internal_node_min=2KB,"
+    "key_format=u,key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,"
+    "prefix_compression=true,runlength_encoding=false,split_min=false,"
+    "split_pct=75,type=btree,value_format=u";
 
 const char *
 __wt_confchk_index_meta =
     "allocation_size=(type=int,min=512B,max=128MB),"
-    "btree_column_internal_extend=(type=int,min=500,max=10M),"
-    "btree_column_leaf_extend=(type=int,min=500,max=10M),columns=(type=list),"
+    "column_internal_extend=(type=int,min=500,max=10M),"
+    "column_leaf_extend=(type=int,min=500,max=10M),columns=(type=list),"
     "filename=(),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
     "min=512B,max=512MB),internal_node_min=(type=int,min=512B,max=512MB),"
@@ -176,28 +176,27 @@ __wt_confchk_session_commit_transaction =
 
 const char *
 __wt_confdfl_session_create =
-    "allocation_size=512B,btree_column_internal_extend=10000,"
-    "btree_column_leaf_extend=10000,colgroups=,columns=,exclusive=false,"
-    "filename=,huffman_key=,huffman_value=,internal_key_truncate=true,"
-    "internal_node_max=2KB,internal_node_min=2KB,key_format=u,key_gap=10,"
-    "leaf_node_max=1MB,leaf_node_min=32KB,prefix_compression=true,"
-    "runlength_encoding=false,split_min=false,split_pct=75,type=btree,"
-    "value_format=u";
+    "allocation_size=512B,colgroups=,column_internal_extend=10000,"
+    "column_leaf_extend=10000,columns=,exclusive=false,filename=,huffman_key="
+    ",huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
+    "internal_node_min=2KB,key_format=u,key_gap=10,leaf_node_max=1MB,"
+    "leaf_node_min=32KB,prefix_compression=true,runlength_encoding=false,"
+    "split_min=false,split_pct=75,type=btree,value_format=u";
 
 const char *
 __wt_confchk_session_create =
-    "allocation_size=(type=int,min=512B,max=128MB),"
-    "btree_column_internal_extend=(type=int,min=500,max=10M),"
-    "btree_column_leaf_extend=(type=int,min=500,max=10M),colgroups=(),"
-    "columns=(type=list),exclusive=(type=boolean),filename=(),huffman_key=(),"
-    "huffman_value=(),internal_key_truncate=(type=boolean),"
-    "internal_node_max=(type=int,min=512B,max=512MB),"
-    "internal_node_min=(type=int,min=512B,max=512MB),key_format=(type=format)"
-    ",key_gap=(type=int,min=0),leaf_node_max=(type=int,min=512B,max=512MB),"
-    "leaf_node_min=(type=int,min=512B,max=512MB),"
-    "prefix_compression=(type=boolean),runlength_encoding=(type=boolean),"
-    "split_min=(type=boolean),split_pct=(type=int,min=0,max=100),"
-    "type=(choices=[\"btree\"]),value_format=(type=format)";
+    "allocation_size=(type=int,min=512B,max=128MB),colgroups=(),"
+    "column_internal_extend=(type=int,min=500,max=10M),"
+    "column_leaf_extend=(type=int,min=500,max=10M),columns=(type=list),"
+    "exclusive=(type=boolean),filename=(),huffman_key=(),huffman_value=(),"
+    "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
+    "min=512B,max=512MB),internal_node_min=(type=int,min=512B,max=512MB),"
+    "key_format=(type=format),key_gap=(type=int,min=0),"
+    "leaf_node_max=(type=int,min=512B,max=512MB),leaf_node_min=(type=int,"
+    "min=512B,max=512MB),prefix_compression=(type=boolean),"
+    "runlength_encoding=(type=boolean),split_min=(type=boolean),"
+    "split_pct=(type=int,min=0,max=100),type=(choices=[\"btree\"]),"
+    "value_format=(type=format)";
 
 const char *
 __wt_confdfl_session_drop =
