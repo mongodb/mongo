@@ -433,6 +433,7 @@ namespace PerfTests {
     RWLock lk("testrw");
     SimpleMutex m("simptst");
     mongo::mutex mtest("mtest");
+    SpinLock s;
 
     class mutexspeed : public B { 
     public:
@@ -452,6 +453,16 @@ namespace PerfTests {
             SimpleMutex::scoped_lock lk(m);
         }
     };    
+    class spinlockspeed : public B { 
+    public:
+        string name() { return "spinlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            mongo::scoped_spinlock lk(s);
+        }
+    };    
+
     class rlock : public B { 
     public:
         string name() { return "rlock"; }
@@ -816,6 +827,7 @@ namespace PerfTests {
                 add< ulock >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
+                add< spinlockspeed >();
                 add< CTM >();
                 add< KeyTest >();
                 add< Bldr >();
