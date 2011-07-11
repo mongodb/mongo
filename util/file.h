@@ -24,10 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/statvfs.h>
-#else
-#include <windows.h>
 #endif
-
 #include "text.h"
 
 namespace mongo {
