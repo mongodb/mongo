@@ -28,7 +28,7 @@ namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
     int limit;
     int skip;
-
+    int count = 0;
 
     DocumentSourceSort::~DocumentSourceSort() {
     }
@@ -47,8 +47,12 @@ namespace mongo {
         assert(listIterator != documents.end()); // CW TODO error
 
         ++listIterator;
+        ++count;
+        if (count >= limit)
+            listIterator = documents.end();
         if (listIterator == documents.end()) {
             pCurrent.reset();
+            count = 0;
             return false;
         }
 	pCurrent = listIterator->pDocument;
