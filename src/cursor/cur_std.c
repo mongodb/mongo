@@ -232,8 +232,6 @@ __wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *config)
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	cursor->flags = 0;
-
 	if (is_public) {
 		F_SET(cursor, WT_CURSTD_PUBLIC);
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
