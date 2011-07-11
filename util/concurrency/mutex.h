@@ -249,8 +249,8 @@ namespace mongo {
             scoped_lock( SimpleMutex &m ) : _lk(m._m) { }
         };
 
-        void lock()   { _m.lock(); }
-        void unlock() { _m.unlock(); }
+	//      void lock()   { _m.lock(); }
+        //void unlock() { _m.unlock(); }
     };
 #endif
 
