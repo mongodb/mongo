@@ -105,7 +105,7 @@ namespace mongo {
             hints.ai_flags |= AI_NUMERICHOST; // first pass tries w/o DNS lookup
             hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
-            stringstream ss;
+            StringBuilder ss;
             ss << port;
             int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
 
@@ -122,7 +122,10 @@ namespace mongo {
             }
 
             if (ret) {
-                log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
+                // don't log if this as it is a CRT construction and log() may not work yet.
+                if( strcmp("0.0.0.0", iporhost) ) {
+                    log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
+                }
                 *this = SockAddr(port);
             }
             else {
