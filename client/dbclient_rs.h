@@ -215,6 +215,9 @@ namespace mongo {
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster();
+        /* this is used to indicate we got a "not master or secondary" error from a secondary.
+         */
+        void isntSecondary();
 
         // ----- status ------
 
@@ -239,6 +242,9 @@ namespace mongo {
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
+
+        // Used to simplify slave-handling logic on errors
+        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();

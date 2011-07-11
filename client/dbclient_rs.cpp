@@ -544,7 +544,7 @@ namespace mongo {
             // checkSlave will try a different slave automatically after a failure
             for ( int i=0; i<2; i++ ) {
                 try {
-                    return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
+                    return checkSlaveQueryResult( checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize) );
                 }
                 catch ( DBException &e ) {
                     log() << "can't query replica set slave " << i << " : " << _slaveHost << e.what() << endl;
@@ -580,6 +580,38 @@ namespace mongo {
         // and can have a cursor survive a master change
         assert(0);
     }
+
+    auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
+
+        bool isError = result->hasResultFlag( ResultFlag_ErrSet );
+        if( ! isError ) return result;
+
+        BSONObj error = result->peekOne();
+
+        BSONElement code = error["code"];
+        if( code.eoo() || ! code.isNumber() ){
+            warning() << "no code for error from secondary host " << _slaveHost << ", error was " << error << endl;
+            return result;
+        }
+
+        // We only check for "not master or secondary" errors here
+
+        // If the error code here ever changes, we need to change this code also
+        if( code.Int() == 13436 /* not master or secondary */ ){
+            isntSecondary();
+            throw DBException( str::stream() << "slave " << _slaveHost.toString() << " is no longer secondary", 14812 );
+        }
+
+        return result;
+    }
+
+    void DBClientReplicaSet::isntSecondary() {
+        log() << "slave no longer has secondary status: " << _slaveHost << endl;
+        // Failover to next slave
+        _monitor->notifySlaveFailure( _slaveHost );
+        _slave.reset();
+    }
+
 
     void DBClientReplicaSet::isntMaster() { 
         log() << "got not master for: " << _masterHost << endl;

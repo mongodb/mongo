@@ -86,6 +86,11 @@ namespace mongo {
             WARNING: no support for _putBack yet!
         */
         void peek(vector<BSONObj>&, int atMost);
+        BSONObj peekOne(){
+            vector<BSONObj> v;
+            peek( v, 1 );
+            return v.size() > 0 ? v[0] : BSONObj();
+        }
 
         /**
            iterate the rest of the cursor and return the number if items
