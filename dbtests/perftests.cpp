@@ -418,10 +418,62 @@ namespace PerfTests {
         string name() { return "Timer"; }
         virtual int howLongMillis() { return 1000; } 
         virtual bool showDurStats() { return false; }
-
         void timed() {
             mongo::Timer t;
             aaa += t.millis();
+        }
+    };
+
+    RWLock lk("testrw");
+    SimpleMutex m("simptst");
+    mongo::mutex mtest("mtest");
+
+    class mutexspeed : public B { 
+    public:
+        string name() { return "mutex"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            mongo::mutex::scoped_lock lk(mtest);
+        }
+    };    
+    class simplemutexspeed : public B { 
+    public:
+        string name() { return "simplemutex"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            SimpleMutex::scoped_lock lk(m);
+        }
+    };    
+    class rlock : public B { 
+    public:
+        string name() { return "rlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lock_shared();
+            lk.unlock_shared();
+        }
+    };
+    class wlock : public B { 
+    public:
+        string name() { return "wlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lock();
+            lk.unlock();
+        }
+    };
+    class ulock : public B { 
+    public:
+        string name() { return "ulock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lockAsUpgradable();
+            lk.unlockFromUpgradable();
         }
     };
 
@@ -753,6 +805,11 @@ namespace PerfTests {
                 add< TLS >();
                 add< Malloc >();
                 add< Timer >();
+                add< rlock >();
+                add< wlock >();
+                add< ulock >();
+                add< mutexspeed >();
+                add< simplemutexspeed >();
                 add< CTM >();
                 add< KeyTest >();
                 add< Bldr >();
