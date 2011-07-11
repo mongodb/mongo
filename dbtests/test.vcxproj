@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -219,6 +219,7 @@
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
     <ClInclude Include="..\pcre-7.4\pcrecpp.h" />
+    <ClInclude Include="..\server.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp" />
     <ClInclude Include="..\pcre-7.4\config.h" />

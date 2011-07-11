@@ -301,6 +301,9 @@
     <ClInclude Include="..\db\ops\query.h">
       <Filter>db\cpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\server.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -515,31 +518,16 @@
     <ClCompile Include="..\util\base64.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\httpclient.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\md5.c">
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\md5main.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\message.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\message_server_port.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\miniwebserver.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\mmap.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\sock.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\util.cpp">
@@ -843,6 +831,27 @@
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\ops\query.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbmessage.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\listen.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message_server_port.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message_port.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\miniwebserver.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\sock.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

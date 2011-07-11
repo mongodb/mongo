@@ -30,3 +30,29 @@
 #define NOINLINE_DECL
 
 #endif
+
+
+/* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
+
+//#if 1
+
+//#if !defined(__GNUC__)
+
+// branch prediction.  indicate we expect to enter the if statement body
+#define MONGOIF(x) if( (x) )
+
+// branch prediction.  indicate we expect to not enter the if statement body
+#define MONGO_IF(x) if( (x) ) 
+
+// prefetch data from memory
+#define MONGOPREFETCH(x) { /*just check we compile:*/ sizeof(*x); }
+
+#if 0
+
+#define IF(x) if( __builtin_expect((x), 1) )
+
+#define _IF(x) if( __builtin_expect((x), 0) )
+
+#define PREFETCH(x) { /*just check we compile:*/ sizeof(*x); }
+
+#endif

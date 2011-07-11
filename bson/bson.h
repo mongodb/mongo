@@ -105,7 +105,6 @@ namespace mongo {
 #include "oid.h"
 #include "bsonelement.h"
 #include "bsonobj.h"
-
 #include "bsonobjbuilder.h"
 #include "bsonobjiterator.h"
 #include "bson-inl.h"

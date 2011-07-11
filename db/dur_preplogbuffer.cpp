@@ -35,6 +35,7 @@
 #include "../util/alignedbuilder.h"
 #include "../util/timer.h"
 #include "dur_stats.h"
+#include "../server.h"
 
 using namespace mongoutils;
 
@@ -59,7 +60,7 @@ namespace mongo {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
 
-            if( !mmf->willNeedRemap() ) {
+            _IF( !mmf->willNeedRemap() ) {
                 // tag this mmf as needed a remap of its private view later.
                 // usually it will already be dirty/already set, so we do the if above first
                 // to avoid possibility of cpu cache line contention
@@ -96,7 +97,7 @@ namespace mongo {
 #endif
             bb.appendBuf(i->start(), e.len);
 
-            if (e.len != (unsigned)i->length()) {
+            _IF (e.len != (unsigned)i->length()) {
                 log() << "journal info splitting prepBasicWrite at boundary" << endl;
 
                 // This only happens if we write to the last byte in a file and
@@ -119,9 +120,21 @@ namespace mongo {
             // each time events switch to a different database we journal a JDbContext
             RelativePath lastDbPath;
 
-            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
-                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
-            }
+            set<WriteIntent>::iterator i = commitJob.writes().begin();
+
+            const WriteIntent *w = &(*i);
+            while(1) {
+                i++;
+                const WriteIntent *next = 0;
+                IF( i != commitJob.writes().end() ) {
+                    next = &(*i);
+                    PREFETCH(next);
+                }
+                prepBasicWrite_inlock(bb, w, lastDbPath);
+                _IF( next == 0 )
+                    break;
+                w = next;
+            };
         }
 
         void resetLogBuffer(AlignedBuilder& bb) {
