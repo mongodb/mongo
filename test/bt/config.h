@@ -37,7 +37,7 @@ typedef struct {
 static CONFIG c[] = {
 	{ "cache", 0, 0, 1, 30, &g.c_cache },
 	{ "data_max",  C_ROW|C_VAR, 0,  32, 4096,  &g.c_data_max },
-	{ "data_min",  0,  0,  10, 32,  &g.c_data_min },
+	{ "data_min",  0,  0,  1, 8,  &g.c_data_min },
 	{ "file_type", 0,  C_IGNORE, 1, 3,  &g.c_file_type },
 	{ "delete_pct",  0,  0,  0, 45,  &g.c_delete_pct },
 	{ "huffman_key", C_ROW,  C_BOOL,  0, 10,  &g.c_huffman_key },

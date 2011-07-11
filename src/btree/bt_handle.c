@@ -285,23 +285,16 @@ __btree_type(WT_SESSION_IMPL *session)
 	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
 	WT_RET(__wt_struct_check(session,
 	    cval.str, cval.len, &fixed, &btree->fixed_len));
-	if (btree->type == BTREE_COL_VAR && fixed)
+	if (btree->type == BTREE_COL_VAR && fixed) {
 		btree->type = BTREE_COL_FIX;
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
-
-	/* Check for run-length encoding */
-	WT_RET(__wt_config_getones(session,
-	    config, "runlength_encoding", &cval));
-	if (cval.val != 0) {
-		if (btree->type != BTREE_COL_FIX) {
-			__wt_errx(session,
-			    "Run-length encoding is incompatible with variable "
-			    "length column-store records, you must specify a "
-			    "fixed-length record");
-			return (WT_ERROR);
-		}
-		btree->type = BTREE_COL_RLE;
+		/*
+		 * TODO: the size we get back is in bits.  When bitfields
+		 * are supported, we'll know what to do with that.  For now,
+		 * turn it into a number of bytes.
+		 */
+		btree->fixed_len = (btree->fixed_len + 7) >> 3;
 	}
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 	return (0);
 }
 

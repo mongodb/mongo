@@ -77,8 +77,6 @@ file_meta = format_meta + [
 		configure the Btree for prefix compression, storing keys as a count of
 		bytes matching the previous key plus a unique suffix''',
 		type='boolean'),
-	Config('runlength_encoding', 'false', r'''
-		compress repeated adjacent values''', type='boolean'),
 	Config('split_min', 'false', r'''
 		configure minimal splits in Btree reconciliation code (debugging
 		only)''', type='boolean'),

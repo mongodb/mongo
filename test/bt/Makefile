@@ -21,7 +21,7 @@ distclean realclean: clean
 	rm -f __* tags
 
 tags: ${HDRS} ${SRCS}
-	@type ctags > /dev/null 2>&1 && ctags -w $> || exit 0
+	@type ctags > /dev/null 2>&1 && ctags -w ${HDRS} ${SRCS} || exit 0
 
 ${SRCS}: ${HDRS}
 ${OBJS}: ${SRCS}

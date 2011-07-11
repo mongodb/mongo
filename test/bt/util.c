@@ -108,18 +108,21 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 	len = 0;
 	switch (g.c_file_type) {
 	case FIX:
+		/* Use the last decimal digit in the record number. */
+		p = buf + 9;
+		len = (g.c_data_min + 7) >> 3;
+		break;
+	case VAR:
 		/*
-		 * If doing run-length encoding on the data, use different data
-		 * some percentage of the time, otherwise we'd end up with a
-		 * single chunk of repeated data.   To do that, we just jump
-		 * forward in the buffer by a small, random number of bytes.
+		 * If testing run-length encoding, use different data some
+		 * percentage of the time, otherwise we'd end up with a single
+		 * chunk of repeated data.   To do that, we just jump forward
+		 * in the buffer by a small, random number of bytes.
 		 */
 		if (g.c_repeat_comp_pct != 0 &&
 		    (u_int)wts_rand() % 100 > g.c_repeat_comp_pct)
 			p += wts_rand() % 7;
-		len = g.c_data_min;
-		break;
-	case VAR:
+		/* FALLTHROUGH */
 	case ROW:
 		/*
 		 * WiredTiger doesn't store zero-length records, and I want to

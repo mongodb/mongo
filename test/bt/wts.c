@@ -114,16 +114,15 @@ wts_startup(void)
 	switch (g.c_file_type) {
 	case FIX:
 		/*
-		 * XXX
+		 * XXX -- does some limit still apply?
 		 * Don't go past the WT limit of 20 objects per leaf page.
+		 *
+		 * if (20 * g.c_data_min > (1U << g.c_leaf_node_min))
+		 * 	g.c_data_min = (1U << g.c_leaf_node_min) / 20;
 		 */
-		if (20 * g.c_data_min > (1U << g.c_leaf_node_min))
-			g.c_data_min = (1U << g.c_leaf_node_min) / 20;
+
 		p += snprintf(p,
-		    (size_t)(end - p), ",value_format=\"%du\"", g.c_data_min);
-		if (g.c_repeat_comp_pct != 0)
-			p += snprintf(
-			    p, (size_t)(end - p), ",runlength_encoding");
+		    (size_t)(end - p), ",value_format=%dt", g.c_data_min);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
@@ -221,7 +220,10 @@ wts_bulk_load(void)
 	
 		if (key != NULL)
 			cursor->set_key(cursor, key);
-		cursor->set_value(cursor, value);
+		if (g.c_file_type == FIX)
+			cursor->set_value(cursor, *(uint8_t *)value->data);
+		else
+			cursor->set_value(cursor, value);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr, "%s: cursor insert failed: %s\n",
 			    g.progname, wiredtiger_strerror(ret));
@@ -626,6 +628,7 @@ wts_read(uint64_t keyno)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
+	uint8_t bitfield;
 
 	cursor = g.wts_cursor;
 	session = g.wts_session;
@@ -651,8 +654,14 @@ wts_read(uint64_t keyno)
 		break;
 	}
 
-	if ((ret = cursor->search(cursor)) == 0)
-		ret = cursor->get_value(cursor, &value);
+	if ((ret = cursor->search(cursor)) == 0) {
+		if (g.c_file_type == FIX) {
+			ret = cursor->get_value(cursor, &bitfield);
+			value.data = &bitfield;
+			value.size = 1;
+		} else
+			ret = cursor->get_value(cursor, &value);
+	}
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_read: read row %" PRIu64 ": %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
@@ -738,7 +747,10 @@ wts_col_put(uint64_t keyno)
 		return (1);
 	
 	cursor->set_key(cursor, (wiredtiger_recno_t)keyno);
-	cursor->set_value(cursor, &value);
+	if (g.c_file_type == FIX)
+		cursor->set_value(cursor, *(uint8_t *)value.data);
+	else
+		cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
                     "%s: wts_col_put: put col %" PRIu64 " by key: %s\n",

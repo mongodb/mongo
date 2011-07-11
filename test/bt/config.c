@@ -288,10 +288,7 @@ config_dtype(void)
 {
 	switch (g.c_file_type) {
 	case FIX:
-		if (g.c_repeat_comp_pct == 0)
-			return ("fixed-length column-store");
-		else
-			return ("fixed-length column-store (RLE)");
+		return ("fixed-length column-store");
 	case VAR:
 		return ("variable-length column-store");
 	case ROW:

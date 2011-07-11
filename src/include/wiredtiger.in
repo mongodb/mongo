@@ -536,7 +536,6 @@ struct wt_session {
 	 * @config{prefix_compression, configure the Btree for prefix
 	 * compression\, storing keys as a count of bytes matching the previous
 	 * key plus a unique suffix}
-	 * @config{runlength_encoding, compress repeated adjacent values}
 	 * @config{split_min, configure minimal splits in Btree reconciliation
 	 * code (debugging only)}
 	 * @config{split_pct, configure the Btree page split size as a

@@ -184,6 +184,7 @@ transactionally
 tt
 txn
 txns
+uint
 ul
 unallocated
 untyped

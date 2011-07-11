@@ -11,8 +11,8 @@
 
 /*
  * __wt_struct_check --
- *	Check that the specified packing format is valid, and whether it will
- *	be encoded into a fixed size.
+ *	Check that the specified packing format is valid, and whether it fits
+ *	into a fixed-sized bitfield.
  */
 int
 __wt_struct_check(WT_SESSION_IMPL *session,
@@ -20,21 +20,23 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 {
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	char *endp, t;
-	int ret;
+	int fields, ret;
 
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 
-	while ((ret = __pack_next(&pack, &pv)) == 0)
+	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
 		;
 
 	if (ret != WT_NOTFOUND)
 		return (ret);
 
 	if (fixedp != NULL && fixed_lenp != NULL) {
-		if (len > 1 && ((t = fmt[len - 1]) == 'u' || t == 'S')) {
-			*fixed_lenp = (uint32_t)strtol(fmt, &endp, 10);
-			*fixedp = (endp == fmt + len - 1);
+		if (fields == 0) {
+			*fixedp = 1;
+			*fixed_lenp = 0;
+		} else if (fields == 1 && pv.type == 't') {
+			*fixedp = 1;
+			*fixed_lenp = pv.size;
 		} else
 			*fixedp = 0;
 	}

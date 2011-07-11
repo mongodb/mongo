@@ -20,6 +20,7 @@ BSR
 BTREE
 BUF
 BUFs
+Bitfield
 Bsearch
 Btree
 CELL's
@@ -128,6 +129,8 @@ ap
 api
 arg
 bigram
+bitfield
+bitfields
 bitpos
 bitstring
 bitwise
@@ -315,6 +318,7 @@ sizev
 slvg
 snprintf
 sp
+sprintf
 src
 srch
 srvr

@@ -71,18 +71,26 @@ next:	if (pack->cur == pack->end)
 	if (!pv->havesize)
 		pv->size = 1;
 	pack->cur = endsize;
+	pack->repeats = 0;
 	pv->type = *pack->cur++;
 
 	switch (pv->type) {
-	case 'u':
-		/* Special case for items with a size prefix. */
-		if (!pv->havesize && *pack->cur != '\0')
-			pv->type = 'U';
-		/* FALLTHROUGH */
 	case 'x':
-	case 's':
 	case 'S':
-		pack->repeats = 0;
+		return (0);
+	case 't':
+		if (pv->size < 1 || pv->size > 8) {
+			__wt_errx(pack->session,
+			    "Bitfield sizes must be between 1 and 8 bits "
+			    "in format '%.*s'",
+			    (int)(pack->end - pack->orig), pack->orig);
+			return (EINVAL);
+		}
+		return (0);
+	case 'u':
+	case 'U':
+		/* Special case for items with a size prefix. */
+		pv->type = (!pv->havesize && *pack->cur != '\0') ? 'U' : 'u';
 		return (0);
 	case 'b':
 	case 'h':
@@ -127,6 +135,7 @@ next:	if (pack->cur == pack->end)
 	case 'B':							\
 	case 'H':							\
 	case 'I':							\
+	case 't':							\
 		pv.u.u = va_arg(ap, unsigned int);			\
 		break;							\
 	case 'l':							\
@@ -183,12 +192,14 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 			s += __wt_vsize_uint(s + pad);
 		return (s + pad);
 	case 'b':
+	case 'B':
+	case 't':
+		return (1);
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
 		return (__wt_vsize_int(pv->u.i));
-	case 'B':
 	case 'H':
 	case 'I':
 	case 'L':
@@ -259,13 +270,21 @@ __pack_write(
 		}
 		break;
 	case 'b':
+		/* Translate to maintain ordering with the sign bit. */
+		**p = (uint8_t)(pv->u.i + 0x80);
+		*p += 1;
+		break;
+	case 'B':
+	case 't':
+		**p = (uint8_t)pv->u.u;
+		*p += 1;
+		break;
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
 		WT_RET(__wt_vpack_int(session, p, maxlen, pv->u.i));
 		break;
-	case 'B':
 	case 'H':
 	case 'I':
 	case 'L':
@@ -315,13 +334,21 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*p += s;
 		break;
 	case 'b':
+		/* Translate to maintain ordering with the sign bit. */
+		pv->u.i = (int8_t)(**p - 0x80);
+		*p += 1;
+		break;
+	case 'B':
+	case 't':
+		pv->u.u = **p;
+		*p += 1;
+		break;
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
 		WT_RET(__wt_vunpack_int(session, p, maxlen, &pv->u.i));
 		break;
-	case 'B':
 	case 'H':
 	case 'I':
 	case 'L':
@@ -363,6 +390,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*va_arg(ap, int64_t *) = pv.u.i;			\
 		break;							\
 	case 'B':							\
+	case 't':							\
 		*va_arg(ap, uint8_t *) = (uint8_t)pv.u.u;		\
 		break;							\
 	case 'H':							\
