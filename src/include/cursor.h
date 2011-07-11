@@ -8,15 +8,18 @@
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
 
-	WT_BTREE *btree;
-	WT_WALK walk;
-	WT_PAGE *page;
-	WT_COL *cip;
-	WT_ROW *rip;
-	WT_INSERT *ins;                 /* For walking through RLE pages. */
+	WT_BTREE *btree;			/* Enclosing btree */
+	WT_WALK	  walk;				/* Current walk */
+	WT_PAGE	 *page;				/* Current page */
+	uint32_t  nitems;			/* Total page slots */
+
+	WT_COL	  *cip;				/* Col-store page slot ref */
+	WT_ROW	  *rip;				/* Row-store page slot ref */
+	WT_INSERT *ins;				/* Insert chain */
+
 	wiredtiger_recno_t recno;
-	uint32_t nitems;
 	uint32_t nrepeats;
+	int newcell;				/* XXX */
 };
 
 struct __wt_cursor_bulk {

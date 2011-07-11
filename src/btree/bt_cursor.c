@@ -30,20 +30,8 @@ __btcur_next_fix(
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
-	int found;
 
-	/* New page? */
-	if (cbt->nitems == 0) {
-		cbt->cip = cbt->page->u.col_leaf.d;
-		cbt->nitems = cbt->page->entries;
-		cbt->recno = cbt->page->u.col_leaf.recno;
-	}
-
-	/*
-	 * This slightly odd-looking loop lets us have one place that does the
-	 * incrementing to move through a page.
-	 */
-	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+	for (;; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
 
@@ -53,12 +41,12 @@ __btcur_next_fix(
 			if (cell != NULL && !WT_FIX_DELETE_ISSET(cell)) {
 				value->data = cell;
 				value->size = cbt->btree->fixed_len;
-				found = 1;
+				break;
 			}
 		} else if (!WT_UPDATE_DELETED_ISSET(upd)) {
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = cbt->btree->fixed_len;
-			found = 1;
+			break;
 		}
 	}
 
@@ -71,22 +59,12 @@ __btcur_next_rle(
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
-	int found, newcell;
+	int found;
 
-	newcell = 0;
-
-	/* New page? */
-	if (cbt->nitems == 0) {
-		cbt->cip = cbt->page->u.col_leaf.d;
-		cbt->nitems = cbt->page->entries;
-		cbt->recno = cbt->page->u.col_leaf.recno;
-		newcell = 1;
-	}
-
-	for (;; ++cbt->cip, newcell = 1) {
+	for (;; ++cbt->cip, cbt->newcell = 1) {
 		if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
 			goto deleted;
-		if (newcell) {
+		if (cbt->newcell) {
 			cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
 			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 		}
@@ -132,13 +110,6 @@ __btcur_next_var(
 	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	/* New page? */
-	if (cbt->nitems == 0) {
-		cbt->cip = cbt->page->u.col_leaf.d;
-		cbt->nitems = cbt->page->entries;
-		cbt->recno = cbt->page->u.col_leaf.recno;
-	}
 
 	/*
 	 * This slightly odd-looking loop lets us have one place that does the
@@ -188,66 +159,81 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_IKEY *ikey;
+	WT_INSERT *ins;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/* New page? */
-	if (cbt->nitems == 0) {
-		cbt->rip = cbt->page->u.row_leaf.d;
-		cbt->nitems = cbt->page->entries;
-	}
+	for (;;) {
+		/* Continue traversing any insert list. */
+		while ((ins = cbt->ins) != NULL) {
+			cbt->ins = cbt->ins->next;
+			upd = ins->upd;
+			if (!WT_UPDATE_DELETED_ISSET(upd)) {
+				key->data = WT_INSERT_KEY(ins);
+				key->size = WT_INSERT_KEY_SIZE(ins);
+				value->data = WT_UPDATE_DATA(upd);
+				value->size = upd->size;
+				return (0);
+			}
+		}
 
-	/*
-	 * This slightly odd-looking loop lets us have one place that does the
-	 * incrementing to move through a page.
-	 */
-	for (found = 0; !found; ++cbt->rip, --cbt->nitems) {
+		/* Check to see if we've completed the page. */
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
 
-		/* Check for deletion. */
+		/* If the slot hasn't been deleted, we have a record. */
 		upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
-		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-			continue;
+		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
+			break;
 
-		/* We've got a record. */
-		found = 1;
+		/* Traverse this slot's insert list. */
+		cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip);
 
-		/*
-		 * Set the key.
-		 *
-		 * XXX
-		 * If we have the last key, we can easily build the next prefix
-		 * compressed key without calling __wt_row_key() -- obviously,
-		 * that won't work for overflow or Huffman-encoded keys, so we
-		 * need to check the cell type, at the least, before taking the
-		 * fast path.
-		 */
-		if (__wt_off_page(cbt->page, cbt->rip->key)) {
-			ikey = cbt->rip->key;
-			key->data = WT_IKEY_DATA(ikey);
-			key->size = ikey->size;
-		} else
-			WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
-
-		/*
-		 * If the item was ever modified, use the data from the
-		 * WT_UPDATE entry. Then check for empty data.  Finally, use
-		 * the value from the disk image.
-		 */
-		if (upd != NULL) {
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = upd->size;
-		} else if ((cell =
-		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
-			value->data = "";
-			value->size = 0;
-		} else
-			WT_RET(__wt_cell_copy(session, cell, value));
+		/* Move past the slot. */
+		++cbt->rip;
+		--cbt->nitems;
 	}
+
+	/*
+	 * Set the key.
+	 *
+	 * XXX
+	 * If we have the last key, we can easily build the next prefix
+	 * compressed key without calling __wt_row_key() -- obviously,
+	 * that won't work for overflow or Huffman-encoded keys, so we
+	 * need to check the cell type, at the least, before taking the
+	 * fast path.
+	 */
+	if (__wt_off_page(cbt->page, cbt->rip->key)) {
+		ikey = cbt->rip->key;
+		key->data = WT_IKEY_DATA(ikey);
+		key->size = ikey->size;
+	} else
+		WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
+
+	/*
+	 * If the item was ever modified, use the data from the
+	 * WT_UPDATE entry. Then check for empty data.  Finally, use
+	 * the value from the disk image.
+	 */
+	if (upd != NULL) {
+		value->data = WT_UPDATE_DATA(upd);
+		value->size = upd->size;
+	} else if ((cell =
+	    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
+		value->data = "";
+		value->size = 0;
+	} else
+		WT_RET(__wt_cell_copy(session, cell, value));
+
+	/* Traverse this slot's insert list. */
+	cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip);
+
+	/* Move past the slot. */
+	++cbt->rip;
+	--cbt->nitems;
 
 	return (0);
 }
@@ -269,15 +255,35 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));
 
-	for (ret = WT_NOTFOUND; ret == WT_NOTFOUND;) {
-		if (cbt->nitems == 0) {
-			WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
-			if (cbt->page == NULL) {
-				ret = WT_NOTFOUND;
-				break;
-			}
-		}
+	/*
+	 * If we haven't yet started the walk, get the first page and set up
+	 * the cursor.
+	 */
+	if (cbt->page == NULL) {
+		WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
+		if (cbt->page == NULL)
+			goto notfound;
 
+		switch (cbt->page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
+		case WT_PAGE_COL_VAR:
+			cbt->cip = cbt->page->u.col_leaf.d;
+			cbt->nitems = cbt->page->entries;
+			cbt->recno = cbt->page->u.col_leaf.recno;
+			cbt->newcell = 1;
+			break;
+		case WT_PAGE_ROW_LEAF:
+			cbt->rip = cbt->page->u.row_leaf.d;
+			cbt->nitems = cbt->page->entries;
+			cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
+	}
+
+	/* Walk the page until the underlying "next" call returns not-found. */
+	for (;;) {
 		switch (cbt->page->type) {
 		case WT_PAGE_COL_FIX:
 			ret = __btcur_next_fix(cbt,
@@ -295,9 +301,19 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			ret = __btcur_next_row(cbt,
 			    &cursor->key, &cursor->value);
 			break;
-		default:
-			continue;
+		WT_ILLEGAL_FORMAT(session);
 		}
+		if (ret != WT_NOTFOUND)
+			break;
+
+		/* Get the next page; if that fails, the walk is complete. */
+		WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
+		if (cbt->page == NULL)
+			goto notfound;
+	}
+
+	if (0) {
+notfound:	ret = WT_NOTFOUND;
 	}
 
 	if (ret == 0)
