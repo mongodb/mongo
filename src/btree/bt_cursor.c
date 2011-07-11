@@ -287,7 +287,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 
 		do {
 			WT_ERR(__wt_walk_next(session, &cbt->walk, &cbt->page));
-			WT_ERR_CHK(cbt->page == NULL, WT_NOTFOUND);
+			WT_ERR_TEST(cbt->page == NULL, WT_NOTFOUND);
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
 		    cbt->page->type == WT_PAGE_ROW_INT);

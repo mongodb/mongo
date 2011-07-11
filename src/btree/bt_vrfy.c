@@ -326,8 +326,7 @@ recno_chk:	if (parent_recno != recno) {
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
 			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
-			if (ret != 0)
-				return (ret);
+			WT_RET_TEST(ret, ret);
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -354,8 +353,7 @@ recno_chk:	if (parent_recno != recno) {
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
 			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
-			if (ret != 0)
-				return (ret);
+			WT_RET_TEST(ret, ret);
 		}
 		break;
 	}
