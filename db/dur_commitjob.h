@@ -38,8 +38,8 @@ namespace mongo {
          * since that is heavily used in set lookup.
          */
         struct WriteIntent { /* copyable */
-            WriteIntent() : w_ptr(0), p(0) { }
-            WriteIntent(void *a, unsigned b) : w_ptr(0), p((char*)a+b), len(b) { }
+            WriteIntent() : /*w_ptr(0), */ p(0) { }
+            WriteIntent(void *a, unsigned b) : /*w_ptr(0), */ p((char*)a+b), len(b) { }
 
             void* start() const { return (char*)p - len; }
             void* end() const { return p; }
@@ -64,7 +64,7 @@ namespace mongo {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
 
-            mutable void *w_ptr;  // writable mapping of p.
+            //mutable void *w_ptr;  // writable mapping of p.
             // mutable because set::iterator is const but this isn't used in op<
 #if defined(_EXPERIMENTAL)
             mutable unsigned ofsInJournalBuffer;

@@ -58,7 +58,6 @@ namespace mongo {
         void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
-            dassert( i->w_ptr == 0 );
 
             if( !mmf->willNeedRemap() ) {
                 // tag this mmf as needed a remap of its private view later.
@@ -69,8 +68,13 @@ namespace mongo {
 
             // since we have already looked up the mmf, we go ahead and remember the write view location
             // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
+            // 
+            // this was for WRITETODATAFILES_Impl2 so commented out now
+            //
+            /*
             dassert( i->w_ptr == 0 );
             i->w_ptr = ((char*)mmf->view_write()) + ofs;
+            */
 
             JEntry e;
             e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
