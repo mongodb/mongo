@@ -213,9 +213,9 @@ namespace mongo {
 
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection( const Shard * s , const string& ns );
-        ShardConnection( const Shard& s , const string& ns );
-        ShardConnection( const string& addr , const string& ns );
+        ShardConnection( const Shard * s , const string& ns, bool ignoreDirect = false );
+        ShardConnection( const Shard& s , const string& ns, bool ignoreDirect = false );
+        ShardConnection( const string& addr , const string& ns, bool ignoreDirect = false );
 
         ~ShardConnection();
 
@@ -267,7 +267,7 @@ namespace mongo {
         static void checkMyConnectionVersions( const string & ns );
 
     private:
-        void _init();
+        void _init( bool ignoreDirect = false );
         void _finishInit();
 
         bool _finishedInit;
