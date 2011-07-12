@@ -64,11 +64,12 @@ namespace mongo {
     protected:
         WriteBackListener( const string& addr );
 
-        string name() const { return "WriteBackListener"; }
+        string name() const { return _name; }
         void run();
 
     private:
         string _addr;
+        string _name;
         
         static mongo::mutex _cacheLock; // protects _cache
         static map<string,WriteBackListener*> _cache; // server to listener

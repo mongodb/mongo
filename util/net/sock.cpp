@@ -52,6 +52,16 @@ namespace mongo {
     }
 #else
     
+    string getAddrInfoStrError(int code) {
+#if !defined(_WIN32)
+        return gai_strerror(code);
+#else
+        /* gai_strerrorA is not threadsafe on windows. don't use it. */
+        return errnoWithDescription(code);
+#endif
+    }
+
+
     void disableNagle(int sock) {
         int x = 1;
 
@@ -177,7 +187,7 @@ namespace mongo {
             const int buflen=128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082, errnoWithDescription(ret), ret == 0);
+            massert(13082, getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
             
