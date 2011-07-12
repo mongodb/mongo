@@ -942,7 +942,7 @@ struct wt_connection {
 	/*! Open a session.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip session;
+	 * @skip *session;
 	 * @until open_session
 	 *
 	 * @param connection the connection handle
