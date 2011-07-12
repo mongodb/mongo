@@ -30,8 +30,13 @@ __btcur_next_fix(
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
+	int found;
 
-	for (;; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+	/*
+	 * This slightly odd-looking loop lets us have one place that does the
+	 * incrementing to move through a page.
+	 */
+	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
 
@@ -41,12 +46,12 @@ __btcur_next_fix(
 			if (cell != NULL && !WT_FIX_DELETE_ISSET(cell)) {
 				value->data = cell;
 				value->size = cbt->btree->fixed_len;
-				break;
+				found = 1;
 			}
 		} else if (!WT_UPDATE_DELETED_ISSET(upd)) {
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = cbt->btree->fixed_len;
-			break;
+			found = 1;
 		}
 	}
 
