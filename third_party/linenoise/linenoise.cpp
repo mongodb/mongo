@@ -581,6 +581,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t len = 0;
     size_t cols = getColumns();
 
+    char del[LINENOISE_MAX_LINE];
+
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
 
@@ -713,13 +715,24 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             }
             break;
         case 21: /* Ctrl+u, delete the whole line. */
+            strncpy( del, buf, LINENOISE_MAX_LINE );
+            del[len] = '\0';
             buf[0] = '\0';
             pos = len = 0;
             refreshLine(fd,prompt,buf,len,pos,cols);
             break;
         case 11: /* Ctrl+k, delete from current to end of line. */
+            strncpy( del, buf+pos, pos+len );
+            del[len-pos] = '\0';
             buf[pos] = '\0';
             len = pos;
+            refreshLine(fd,prompt,buf,len,pos,cols);
+            break;
+        case 25: /* Ctrl+y, paste the most recently deleted portion. */
+            memmove( buf+pos+strlen(del), buf+pos, len-pos );
+            memcpy( buf+pos, del, strlen(del) );
+            len = len + strlen(del);
+            pos = pos + strlen(del);
             refreshLine(fd,prompt,buf,len,pos,cols);
             break;
         case 1: /* Ctrl+a, go to the start of the line */
