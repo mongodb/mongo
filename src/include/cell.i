@@ -36,7 +36,7 @@
  *
  * WT_PAGE_ROW_LEAF (row-store leaf pages):
  *	Variable-length key and data pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- *	cell, followed by a WT_CELL_DATA or WT_CELL_DATA_OVFL cell).
+ *	cell, optionally followed by a WT_CELL_DATA or WT_CELL_DATA_OVFL cell).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Variable-length data cells (a WT_CELL_DATA or WT_CELL_DATA_OVFL cell,
@@ -63,14 +63,15 @@
  * it's a short data item, less than 128 bytes in length, and the other 7 bits
  * are the length.   If bit 2 is set (but not bit 1), it's a short key, less
  * than 64 bytes in length, and the other 6 bits are the length.  (We test for
- * short data items first, otherwise this trick wouldn't work.)  The 0x03 bit
- * combination is unused, but would require code changes.
+ * short data items first, otherwise this trick wouldn't work.)
+ *
+ * The 0x03 bit combination is unused, but would require code changes.
  */
 #define	WT_CELL_DATA_SHORT	0x01		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x02		/* Short key */
 
 /*
- * Bits 3-5 are for other cell types -- there are 7 cell types and 8 possible
+ * Bits 3-5 are for other cell types -- there are 6 cell types and 8 possible
  * values, the bit combinations (6 << 2) and (7 << 2) remain unused.
  */
 #define	WT_CELL_DATA		(0 << 2)	/* Data */
