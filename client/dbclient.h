@@ -799,6 +799,8 @@ namespace mongo {
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
         
         virtual ConnectionString::ConnectionType type() const = 0;
+        
+        virtual double getSoTimeout() const = 0;
 
     }; // DBClientBase
 
@@ -917,6 +919,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
         void setSoTimeout(double to) { _so_timeout = to; }
+        double getSoTimeout() const { return _so_timeout; }
 
         static int getNumConnections() {
             return _numConnections;

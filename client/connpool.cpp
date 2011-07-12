@@ -46,17 +46,24 @@ namespace mongo {
         }
     }
 
-    DBClientBase * PoolForHost::get( DBConnectionPool * pool ) {
+    DBClientBase * PoolForHost::get( DBConnectionPool * pool , double socketTimeout ) {
 
         time_t now = time(0);
-
+        
         while ( ! _pool.empty() ) {
             StoredConnection sc = _pool.top();
             _pool.pop();
-            if ( sc.ok( now ) ) 
-                return sc.conn;
-            pool->onDestory( sc.conn );
-            delete sc.conn;
+            
+            if ( ! sc.ok( now ) )  {
+                pool->onDestory( sc.conn );
+                delete sc.conn;
+                continue;
+            }
+            
+            assert( sc.conn->getSoTimeout() == socketTimeout );
+
+            return sc.conn;
+
         }
 
         return NULL;
@@ -125,17 +132,17 @@ namespace mongo {
           _hooks( new list<DBConnectionHook*>() ) { 
     }
 
-    DBClientBase* DBConnectionPool::_get(const string& ident) {
+    DBClientBase* DBConnectionPool::_get(const string& ident , double socketTimeout ) {
         assert( ! inShutdown() );
         scoped_lock L(_mutex);
-        PoolForHost& p = _pools[ident];
-        return p.get( this );
+        PoolForHost& p = _pools[PoolKey(ident,socketTimeout)];
+        return p.get( this , socketTimeout );
     }
 
-    DBClientBase* DBConnectionPool::_finishCreate( const string& host , DBClientBase* conn ) {
+    DBClientBase* DBConnectionPool::_finishCreate( const string& host , double socketTimeout , DBClientBase* conn ) {
         {
             scoped_lock L(_mutex);
-            PoolForHost& p = _pools[host];
+            PoolForHost& p = _pools[PoolKey(host,socketTimeout)];
             p.createdOne( conn );
         }
 
@@ -146,7 +153,7 @@ namespace mongo {
     }
 
     DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
-        DBClientBase * c = _get( url.toString() );
+        DBClientBase * c = _get( url.toString() , socketTimeout );
         if ( c ) {
             onHandedOut( c );
             return c;
@@ -156,11 +163,11 @@ namespace mongo {
         c = url.connect( errmsg, socketTimeout );
         uassert( 13328 ,  _name + ": connect failed " + url.toString() + " : " + errmsg , c );
 
-        return _finishCreate( url.toString() , c );
+        return _finishCreate( url.toString() , socketTimeout , c );
     }
 
     DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
-        DBClientBase * c = _get( host );
+        DBClientBase * c = _get( host , socketTimeout );
         if ( c ) {
             onHandedOut( c );
             return c;
@@ -173,7 +180,7 @@ namespace mongo {
         c = cs.connect( errmsg, socketTimeout );
         if ( ! c )
             throw SocketException( SocketException::CONNECT_ERROR , host , 11002 , str::stream() << _name << " error: " << errmsg );
-        return _finishCreate( host , c );
+        return _finishCreate( host , socketTimeout , c );
     }
 
     void DBConnectionPool::release(const string& host, DBClientBase *c) {
@@ -183,7 +190,7 @@ namespace mongo {
             return;
         }
         scoped_lock L(_mutex);
-        _pools[host].done(this,c);
+        _pools[PoolKey(host,c->getSoTimeout())].done(this,c);
     }
 
 
@@ -244,7 +251,8 @@ namespace mongo {
                 if ( i->second.numCreated() == 0 )
                     continue;
 
-                string s = i->first;
+                string s = str::stream() << i->first.ident << "::" << i->first.timeout;
+
                 BSONObjBuilder temp( bb.subobjStart( s ) );
                 temp.append( "available" , i->second.numAvailable() );
                 temp.appendNumber( "created" , i->second.numCreated() );
@@ -277,6 +285,20 @@ namespace mongo {
         
         return ap < bp;
     }
+    
+    bool DBConnectionPool::poolKeyCompare::operator()( const PoolKey& a , const PoolKey& b ) const {
+        string ap = str::before( a.ident , "/" );
+        string bp = str::before( b.ident , "/" );
+        
+        if ( ap < bp )
+            return true;
+        
+        if ( ap > bp )
+            return false;
+
+        return a.timeout < b.timeout;
+    }
+
 
     void DBConnectionPool::taskDoWork() { 
         vector<DBClientBase*> toDelete;
