@@ -249,7 +249,10 @@ namespace mongo {
 #define MONGO_DESTRUCTOR_GUARD( expression ) \
     try { \
         expression; \
-    } catch ( ... ) { problem() << "caught unknown exception in destructor " << __FUNCTION__ << endl;  }
-
+    } catch ( const std::exception &e ) { \
+        problem() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ << ")" << endl; \
+    } catch ( ... ) { \
+        problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
+    }
 
 #undef MONGO_NORETURN
