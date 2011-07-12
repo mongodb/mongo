@@ -557,6 +557,102 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
     return c; /* Return last read character */
 }
 
+void historyResult(const char *search, char *buf){
+    int i;
+    i = history_index > 0 ? history_index-1 : history_len-1;
+    for (; i>=0; i--) {
+        if ( strstr(history[i], search) ) {
+            strcpy(buf, history[i]);
+            history_index = i;
+            return;
+        }
+    }
+}
+
+int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *pos, size_t cols) {
+    char c;
+    int searchlen = 0;
+    *pos = *len = 0;
+    char search[LINENOISE_MAX_LINE] = "";
+    char search_prompt[LINENOISE_MAX_LINE] = "reverse-i-search'': "; 
+    history_index = history_len-1;
+    refreshLine(fd,search_prompt,buf,*len,*pos,cols);
+
+    while (true){
+        c = linenoiseReadChar(fd);
+        strcpy(search_prompt, "reverse-i-search'");
+        if ( c <= 126 && c >= 32 ) { //all the useful ascii chars
+            search[searchlen] = c;
+            searchlen++;
+            historyResult(search, buf);
+            *len = strlen(buf);
+            if ( strstr(buf, search) != NULL)
+                *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+                refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
+        } else if (c == 127 || c == 8) { //delete
+            if (searchlen > 1) {
+                searchlen--;
+                search[searchlen] = '\0';
+                history_index = history_len-1;
+                historyResult(search, buf);
+                *len = strlen(buf);
+                if ( strstr(buf, search) != NULL)
+                    *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+                refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
+            } else {
+                *len = *pos = 0;
+                buf[0] = '\0';
+                refreshLine(fd,prompt,buf,*len,*pos,cols);
+                return 0;
+            }
+        } else if (c == 14) { // Ctrl+n next history item
+            if (history_index < history_len)
+                history_index++;
+            strcpy( buf, history[history_index] );
+            *len = *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 16) { // Ctrl+p previous history item
+            if (history_index > 0)
+                history_index--;
+            strcpy( buf, history[history_index] );
+            *len = *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 27 || c == 3 ) { // esc or Ctrl+C 
+            buf[0]  = '\0';
+            *len = *pos = 0;
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 2) { // Ctrl+b place cursor before query
+            *pos = strlen(buf) - strlen(strstr(buf, search));
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 6) { // Ctrl+f place cursor after query 
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 1) { // Ctrl+a place cursor at start of string
+            *pos = 0;
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 5) { // Ctrl+e place cursor at end of string
+            *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 18) { // Ctrl+r earlier match
+            historyResult(search, buf);
+            *len = strlen(buf);
+            if ( strstr(buf, search) != NULL)
+                *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+            refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
+        } else if (c == 13) { // enter
+            *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        }
+    }
+}
+
 void linenoiseClearScreen(void) {
 #ifdef _WIN32
     COORD coord = {0, 0};
@@ -746,6 +842,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 12: /* ctrl+l, clear screen */
             linenoiseClearScreen();
             refreshLine(fd,prompt,buf,len,pos,cols);
+            break;
+        case 18: /* Ctrl+r, history search */
+            historySearch(fd,prompt,buf,&len,&pos,cols);
+            break;
         }
     }
     return len;
