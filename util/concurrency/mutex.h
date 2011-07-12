@@ -152,12 +152,8 @@ namespace mongo {
      */
     class mutex : boost::noncopyable {
     public:
-#if defined(_DEBUG)
         const char * const _name;
         mutex(const char *name) : _name(name)
-#else
-        mutex(const char *)
-#endif
         {
             _m = new boost::timed_mutex();
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
