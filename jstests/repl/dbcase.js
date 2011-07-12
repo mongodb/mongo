@@ -16,7 +16,12 @@ n2 = "dbNAme";
  */
 function check( n ) {
     assert.soon( function() {
-                names = s.getDBNames();
+                try {
+                    // Our db name changes may trigger an exception - SERVER-3189.
+                    names = s.getDBNames();
+                } catch (e) {
+                    return false;
+                }
                 n1Idx = names.indexOf( n1 );
                 n2Idx = names.indexOf( n2 );
                 if ( n1Idx != -1 && n2Idx != -1 ) {
