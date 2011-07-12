@@ -26,47 +26,56 @@ class Config:
 
 format_meta = [
 	Config('key_format', 'u', r'''
-		the format of the data packed into key items.  See @ref packing for
-		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		the format of the data packed into key items.  See @ref packing
+		for details.  By default, applications use the WT_ITEM struct
+		to manipulate raw byte arrays.  Key items of type \c 'r' are
+		record numbers and records will be stored using a column
+		store''',
 		type='format'),
 	Config('value_format', 'u', r'''
-		the format of the data packed into value items.  See @ref packing for
-		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays''',
+		the format of the data packed into value items.  See @ref
+		packing for details.  By default, applications use the WT_ITEM
+		struct to manipulate raw byte arrays.  Value items of type
+		\c 't' are bitfields, and in column stores will be stored using
+		a fixed-length store''',
 		type='format'),
 ]
 
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
-		file unit allocation size, in bytes''', min='512B', max='128MB'),
+		file unit allocation size, in bytes''',
+		min='512B', max='128MB'),
 	Config('column_internal_extend', '10000', r'''
 		configure the number of records a column-store internal page is
-		extended by when records are appended''', min='500', max='10M'),
+		extended by when records are appended''',
+		min='500', max='10M'),
 	Config('column_leaf_extend', '10000', r'''
 		configure the number of records a column-store leaf page is
-		extended by when records are appended''', min='500', max='10M'),
+		extended by when records are appended''',
+		min='500', max='10M'),
 	Config('huffman_key', '', r'''
-		use Huffman encoding for Btree keys.  Permitted values are empty (off),
-		\c "english" or \c "<filename>".  See @ref huffman for more
-		details.'''),
+		use Huffman encoding for Btree keys.  Permitted values are
+		empty (off), \c "english" or \c "<filename>".  See @ref huffman
+		for more details'''),
 	Config('huffman_value', '', r'''
-		use Huffman encoding for Btree values.  Permitted values are empty
-		(off), \c "english" or \c "<filename>".  See @ref huffman for more
-		details.'''),
+		use Huffman encoding for Btree values.  Permitted values are
+		empty (off), \c "english" or \c "<filename>".  See @ref huffman
+		for more details'''),
 	Config('internal_key_truncate', 'true', r'''
 		configure the Btree for truncation of internal keys, discarding
-		unnecessary trailing bytes on internal keys''', type='boolean'),
+		unnecessary trailing bytes on internal keys''',
+		type='boolean'),
 	Config('internal_node_max', '2KB', r'''
-		maximum page size for internal nodes, in bytes''', min='512B',
-		max='512MB'),
+		maximum page size for internal nodes, in bytes''',
+		min='512B', max='512MB'),
 	Config('internal_node_min', '2KB', r'''
-		minimum page size for internal nodes, in bytes''', min='512B',
-		max='512MB'),
+		minimum page size for internal nodes, in bytes''',
+		min='512B', max='512MB'),
 	Config('key_gap', '10', r'''
-		configure the maximum gap between instantiated keys in a Btree leaf
-		page, constraining the number of keys processed to instantiate a random
-		Btree leaf page key''', min='0'),
+		configure the maximum gap between instantiated keys in a Btree
+		leaf page, constraining the number of keys processed to
+		instantiate a random Btree leaf page key''',
+		min='0'),
 	Config('leaf_node_max', '1MB', r'''
 		maximum page size for leaf nodes, in bytes''',
 		min='512B', max='512MB'),
@@ -74,28 +83,33 @@ file_meta = format_meta + [
 		minimum page size for leaf nodes, in bytes''',
 		min='512B', max='512MB'),
 	Config('prefix_compression', 'true', r'''
-		configure the Btree for prefix compression, storing keys as a count of
-		bytes matching the previous key plus a unique suffix''',
+		configure the Btree for prefix compression, storing keys as a
+		count of bytes matching the previous key plus a unique
+		suffix''',
 		type='boolean'),
 	Config('split_min', 'false', r'''
-		configure minimal splits in Btree reconciliation code (debugging
-		only)''', type='boolean'),
+		configure minimal splits in Btree reconciliation code
+		(debugging only)''',
+		type='boolean'),
 	Config('split_pct', '75', r'''
-		configure the Btree page split size as a percentage of the maximum
-		Btree page size, that is, when a Btree page is split, it will be split
-		into smaller pages, where each page is the specified percentage of the
-		maximum Btree page size''', min='0', max='100'),
+		configure the Btree page split size as a percentage of the
+		maximum Btree page size, that is, when a Btree page is split,
+		it will be split into smaller pages, where each page is the
+		specified percentage of the maximum Btree page size''',
+		min='0', max='100'),
 	Config('type', 'btree', r'''
-		the file type''', choices=['btree']),
+		the file type''',
+		choices=['btree']),
 ]
 
 columns_meta = [
 	Config('columns', '', r'''
 		list of the column names.  Comma-separated list of the form
-		<code>(column[,...])</code>.  For tables, the number of entries must
-		match the total number of values in \c key_format and \c value_format.
-		For colgroups and indices, all column names must appear in the list of
-		columns for the table''', type='list'),
+		<code>(column[,...])</code>.  For tables, the number of entries
+		must match the total number of values in \c key_format and \c
+		value_format.  For colgroups and indices, all column names must
+		appear in the list of columns for the table''',
+		type='list'),
 ]
 
 filename_meta = [
@@ -105,11 +119,13 @@ filename_meta = [
 
 table_only_meta = [
 	Config('colgroups', '', r'''
-		comma-separated list of names of column groups.  Each column group is
-		stored separately, keyed by the primary key of the table.  Any column
-		that does not appear in a column group is stored in a default, unnamed,
-		column group for the table.  Each column group must be created with a
-		separate call to WT_SESSION::create'''),
+		comma-separated list of names of column groups.  Each column
+		group is stored separately, keyed by the primary key of the
+		table.  If no column groups are specified, all columns are
+		stored together in a single file.  All value columns in the
+		table must appear in at least one column group.  Each column
+		group must be created with a separate call to
+		WT_SESSION::create'''),
 ]
 
 colgroup_meta = file_meta + columns_meta + filename_meta
@@ -133,13 +149,16 @@ methods = {
 
 'session.create' : Method(index_meta + table_only_meta + [
 	Config('exclusive', 'false', r'''
-		fail if the table exists (if "no", the default, verifies that the
-		table exists and has the specified schema''', type='boolean'),
+		fail if the object exists.  When false (the default), if the
+		object exists, check that its settings match the specified
+		configuration''',
+		type='boolean'),
 ]),
 
 'session.drop' : Method([
 	Config('force', 'false', r'''
-		return success if the object does not exist''', type='boolean'),
+		return success if the object does not exist''',
+		type='boolean'),
 	]),
 
 'session.log_printf' : Method([]),
@@ -162,8 +181,8 @@ methods = {
 		for dump cursors, pass through printable bytes unmodified''',
 		type='boolean'),
 	Config('raw', 'false', r'''
-		ignore the encodings for the key and value, manage data as if the
-		formats were \c "u"''',
+		ignore the encodings for the key and value, manage data as if
+		the formats were \c "u"''',
 		type='boolean'),
 ]),
 
@@ -176,18 +195,18 @@ methods = {
 
 'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''
-		the isolation level for this transaction; default "serializable"''',
+		the isolation level for this transaction''',
 		choices=['serializable', 'snapshot', 'read-committed',
-			'read-uncommitted']),
+		    'read-uncommitted']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''
-		how to sync log records when the transaction commits"''',
+		how to sync log records when the transaction commits''',
 		choices=["full", "flush", "write", "none"]),
 	Config('priority', 0, r'''
-		priority of the transaction for resolving conflicts, an integer
-		between -100 and 100.  Transactions with higher values are less likely
-		to abort''', min='-100', max='100'),
+		priority of the transaction for resolving conflicts.
+		Transactions with higher values are less likely to abort''',
+		min='-100', max='100'),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -195,21 +214,27 @@ methods = {
 
 'session.checkpoint' : Method([
 	Config('archive', 'false', r'''
-		remove log files no longer required for transactional durability''',
+		remove log files no longer required for transactional
+		durability''',
 		type='boolean'),
 	Config('flush_cache', 'true', r'''
-		flush the cache''', type='boolean'),
+		flush the cache''',
+		type='boolean'),
 	Config('flush_log', 'true', r'''
-		flush the log to disk''', type='boolean'),
+		flush the log to disk''',
+		type='boolean'),
 	Config('log_size', '0', r'''
 		only proceed if more than the specified number of bytes of log
-		records have been written since the last checkpoint''', min='0'),
+		records have been written since the last checkpoint''',
+		min='0'),
 	Config('force', 'false', r'''
-		write a new checkpoint even if nothing has changed since the last
-		one''', type='boolean'),
+		write a new checkpoint even if nothing has changed since the
+		last one''',
+		type='boolean'),
 	Config('timeout', '0', r'''
-		only proceed if more than the specified number of milliseconds have
-		elapsed since the last checkpoint''', min='0'),
+		only proceed if more than the specified number of milliseconds
+		have elapsed since the last checkpoint''',
+		min='0'),
 ]),
 
 'connection.add_cursor_type' : Method([]),
@@ -222,8 +247,8 @@ methods = {
 	Config('entry', 'wiredtiger_extension_init', r'''
 		the entry point of the extension'''),
 	Config('prefix', '', r'''
-		a prefix for all names registered by this extension (e.g., to make
-		namespaces distinct or during upgrades'''),
+		a prefix for all names registered by this extension (e.g., to
+		make namespaces distinct or during upgrades'''),
 ]),
 
 'connection.open_session' : Method([]),
@@ -233,29 +258,38 @@ methods = {
 		maximum heap memory to allocate for the cache''',
 		min='1MB', max='10TB'),
 	Config('create', 'false', r'''
-		create the database if it does not exist''', type='boolean'),
+		create the database if it does not exist''',
+		type='boolean'),
 	Config('exclusive', 'false', r'''
-		fail if the database already exists''', type='boolean'),
-	Config('extensions', '[]', r'''
-		list of extensions to load.  Optional values override the name of the
-		default entry function \c "wiredtiger_init"''', type='list'),
+		fail if the database already exists''',
+		type='boolean'),
+	Config('extensions', '', r'''
+		list of extensions to load.  Optional values override the name
+		of the default entry function \c wiredtiger_init''',
+		type='list'),
 	Config('error_prefix', '', r'''
 		Prefix string for error messages'''),
 	Config('hazard_max', '15', r'''
-		number of hazard references per session''', min='3'),
+		number of hazard references per session''',
+		min='3'),
 	Config('logging', 'false', r'''
-		enable logging''', type='boolean'),
+		enable logging''',
+		type='boolean'),
 	Config('multiprocess', 'false', r'''
-		permit sharing between processes (will automatically start an RPC
-		server for primary processes and use RPC for secondary processes)''',
+		permit sharing between processes (will automatically start an
+		RPC server for primary processes and use RPC for secondary
+		processes)''',
 		type='boolean'),
 	Config('session_max', '50', r'''
-		maximum expected number of sessions (including server threads)''',
+		maximum expected number of sessions (including server
+		threads)''',
 		min='1'),
 	Config('verbose', '', r'''
-		enable messages for various events.  Options are given as
-		a list, such as \c "verbose=[evict,read]"''',
-		type='list', choices=['evictserver', 'fileops', 'hazard', 'mutex', 'read', 'readserver', 'reconcile', 'salvage', 'write']),
+		enable messages for various events.  Options are given as a
+		list, such as <code>"verbose=[evict,read]"</code>''',
+		type='list', choices=['evictserver', 'fileops', 'hazard',
+		    'mutex', 'read', 'readserver', 'reconcile', 'salvage',
+		    'write']),
 ]),
 }
 

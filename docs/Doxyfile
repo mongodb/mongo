@@ -214,10 +214,10 @@ ALIASES                = "errors=\returns zero on success and a non-zero error c
                          "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
                          "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
                          "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>" \
-                         "configstart{2}=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table>@hrow{Key,Effect [Default]}" \
-                         "config{2}=\row{\1,\2}" \
-                         "configend=</table>" \
-                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted."
+                         "configstart{2}=\param config\n  Configuration string, see \ref config_strings. Permitted values:\n  <table>@hrow{Name,Effect,Default}" \
+                         "config{3}=  \row{\1,\2,\3}" \
+                         "configend=  </table>" \
+                         "configempty{2}=\param config\n  Configuration string, see \ref config_strings.  No values currently permitted."
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 

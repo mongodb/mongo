@@ -13,36 +13,84 @@ tmp_file = '__tmp'
 f='../src/include/wiredtiger.in'
 tfile = open(tmp_file, 'w')
 
-cbegin_re = re.compile(r'(\s*\*\s*)@configstart\{(.*?),.*\}')
+cbegin_re = re.compile(r'(\s*\*\s*)@config(?:empty|start)\{(.*?),.*\}')
+
+def typedesc(c):
+	'''Descripe what type of value is expected for the given config item'''
+	checks = c.flags
+	ctype = checks.get('type', None)
+	cmin = str(checks.get('min', ''))
+	cmax = str(checks.get('max', ''))
+	choices = checks.get('choices', [])
+	if not ctype and ('min' in checks or 'max' in checks):
+		ctype = 'int'
+	desc = '. The value'
+	if ctype:
+		desc += ' must be ' + {'boolean' : 'a boolean flag',
+				'format': 'a format string',
+				'int' : 'an integer',
+				'list': 'a list'}[ctype]
+	else:
+		desc += ' must be a string'
+	if cmin and cmax:
+		desc += ' between ' + cmin + ' and ' + cmax
+	elif cmin:
+		desc += ' greater than or equal to ' + cmin
+	elif cmax:
+		desc += ' no more than ' + cmax
+	if choices:
+		if ctype == 'list':
+			desc += ', with values chosen from the following options: '
+		else:
+			desc += ', chosen from the following options: '
+		desc += ', '.join('\\c "' + c + '"' for c in choices)
+	elif ctype == 'list':
+		desc += ' of strings'
+	return desc + '.'
 
 skip = False
 for line in open(f, 'r'):
 	if skip:
 		if '@configend' in line:
-			tfile.write(line)
 			skip = False
 		continue
-	tfile.write(line)
 
 	m = cbegin_re.match(line)
 	if not m:
+		tfile.write(line)
 		continue
 
 	prefix, config_name = m.groups()
 	if config_name not in api_data.methods:
 		print >>sys.stderr, "Missing configuration for " + config_name
+		tfile.write(line)
 		continue
 
-	width = 80 - len(prefix.expandtabs())
+	skip = ('@configstart' in line)
+
+	if not api_data.methods[config_name].config:
+		tfile.write(prefix + '@configempty{' + config_name +
+				', see dist/api_data.py}\n')
+		continue
+
+	tfile.write(prefix + '@configstart{' + config_name +
+			', see dist/api_data.py}\n')
+
+	w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
+			break_on_hyphens=False)
 	for c in sorted(api_data.methods[config_name].config):
-		desc = textwrap.dedent(c.desc).replace(',', '\\,')
 		name = c.name
 		if '.' in name:
 			print >>sys.stderr, "Bad config key " + name
-		output = '@config{' + name + ',' + desc + '}'
-		for l in textwrap.wrap(output, width):
+		desc = textwrap.dedent(c.desc)
+		desc += typedesc(c)
+		desc = desc.replace(',', '\\,')
+		default = '\\c ' + str(c.default)
+		output = '@config{' + name + ',' + desc + ',' + default + '}'
+		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
-	skip = True
+
+	tfile.write(prefix + '@configend\n')
 
 tfile.close()
 compare_srcfile(tmp_file, f)
@@ -59,7 +107,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 ''')
 
 # Make a TextWrapper that can wrap at commas.
-w = textwrap.TextWrapper(width=72)
+w = textwrap.TextWrapper(width=72, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 def checkstr(c):
