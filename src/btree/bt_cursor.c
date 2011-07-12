@@ -32,10 +32,7 @@ __btcur_next_fix(
 	WT_UPDATE *upd;
 	int found;
 
-	/*
-	 * This slightly odd-looking loop lets us have one place that does the
-	 * incrementing to move through a page.
-	 */
+	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
@@ -116,10 +113,7 @@ __btcur_next_var(
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/*
-	 * This slightly odd-looking loop lets us have one place that does the
-	 * incrementing to move through a page.
-	 */
+	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
@@ -129,8 +123,6 @@ __btcur_next_var(
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
-		/* We've got a record. */
-		found = 1;
 		*recnop = cbt->recno;
 
 		/*
@@ -141,16 +133,15 @@ __btcur_next_var(
 		if (upd != NULL) {
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
-		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
-			found = 0;
-		else
+			found = 1;
+		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL)
 			switch (__wt_cell_type(cell)) {
 			case WT_CELL_DATA:
 			case WT_CELL_DATA_OVFL:
 				WT_RET(__wt_cell_copy(session, cell, value));
+				found = 1;
 				break;
 			case WT_CELL_DEL:
-				found = 0;
 				break;
 			WT_ILLEGAL_FORMAT(session);
 			}
@@ -167,10 +158,14 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 	WT_INSERT *ins;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	for (;;) {
+	/* This loop moves through a page, including after reading a record. */
+	for (found = 0; !found;
+	    cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip),
+	    ++cbt->rip, --cbt->nitems) {
 		/* Continue traversing any insert list. */
 		while ((ins = cbt->ins) != NULL) {
 			cbt->ins = cbt->ins->next;
@@ -188,57 +183,46 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
 
-		/* If the slot hasn't been deleted, we have a record. */
+		/* If the slot has been deleted, we don't have a record. */
 		upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
-		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
-			break;
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+			continue;
 
-		/* Traverse this slot's insert list. */
-		cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip);
+		/* We have a record. */
+		found = 1;
 
-		/* Move past the slot. */
-		++cbt->rip;
-		--cbt->nitems;
+		/*
+		 * Set the key.
+		 *
+		 * XXX
+		 * If we have the last key, we can easily build the next prefix
+		 * compressed key without calling __wt_row_key() -- obviously,
+		 * that won't work for overflow or Huffman-encoded keys, so we
+		 * need to check the cell type, at the least, before taking the
+		 * fast path.
+		 */
+		if (__wt_off_page(cbt->page, cbt->rip->key)) {
+			ikey = cbt->rip->key;
+			key->data = WT_IKEY_DATA(ikey);
+			key->size = ikey->size;
+		} else
+			WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
+
+		/*
+		 * If the item was ever modified, use the data from the
+		 * WT_UPDATE entry. Then check for empty data.  Finally, use
+		 * the value from the disk image.
+		 */
+		if (upd != NULL) {
+			value->data = WT_UPDATE_DATA(upd);
+			value->size = upd->size;
+		} else if ((cell =
+		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
+			value->data = "";
+			value->size = 0;
+		} else
+			WT_RET(__wt_cell_copy(session, cell, value));
 	}
-
-	/*
-	 * Set the key.
-	 *
-	 * XXX
-	 * If we have the last key, we can easily build the next prefix
-	 * compressed key without calling __wt_row_key() -- obviously,
-	 * that won't work for overflow or Huffman-encoded keys, so we
-	 * need to check the cell type, at the least, before taking the
-	 * fast path.
-	 */
-	if (__wt_off_page(cbt->page, cbt->rip->key)) {
-		ikey = cbt->rip->key;
-		key->data = WT_IKEY_DATA(ikey);
-		key->size = ikey->size;
-	} else
-		WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
-
-	/*
-	 * If the item was ever modified, use the data from the
-	 * WT_UPDATE entry. Then check for empty data.  Finally, use
-	 * the value from the disk image.
-	 */
-	if (upd != NULL) {
-		value->data = WT_UPDATE_DATA(upd);
-		value->size = upd->size;
-	} else if ((cell =
-	    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
-		value->data = "";
-		value->size = 0;
-	} else
-		WT_RET(__wt_cell_copy(session, cell, value));
-
-	/* Traverse this slot's insert list. */
-	cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip);
-
-	/* Move past the slot. */
-	++cbt->rip;
-	--cbt->nitems;
 
 	return (0);
 }
