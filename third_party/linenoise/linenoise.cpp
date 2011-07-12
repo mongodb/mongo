@@ -336,6 +336,10 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
         else
             nomatch = mismatchpos[mismatched];
 
+        if ( nomatch >= pos && nomatch >= cols-plen )
+            nomatch = -1;
+        if ( highlight >= pos && highlight >= cols-plen )
+            highlight = -1;
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
