@@ -983,11 +983,15 @@ namespace mongo {
                 
                 {
                     readlock lk( *i );
+                    if ( !dbHolder.get( *i, dbpath ) ) {
+                        // Db has been removed.
+                        continue;
+                    }
                     Client::Context ctx( *i );
                     b.appendBool( "empty", ctx.db()->isEmpty() );
                 }
-                
-                dbInfos.push_back( b.obj() );
+
+                dbInfos.push_back( b.obj() );                        
 
                 seen.insert( i->c_str() );
             }
@@ -1011,6 +1015,10 @@ namespace mongo {
 
                 {
                     readlock lk( name );
+                    if ( !dbHolder.get( *i, dbpath ) ) {
+                        // Db has been removed.
+                        continue;
+                    }
                     Client::Context ctx( name );
                     b.appendBool( "empty", ctx.db()->isEmpty() );
                 }
