@@ -112,6 +112,7 @@ static DWORD oldMode;
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <signal.h>
 
 static struct termios orig_termios; /* in order to restore at exit */
 #endif /* _WIN32 */
@@ -715,6 +716,9 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             return (int)len;
         case 3:     /* ctrl-c */
             errno = EAGAIN;
+#ifndef _WIN32
+                raise(SIGINT);
+#endif
             return -1;
         case 127:   /* delete */
             if (len > 0 && pos < len) {
