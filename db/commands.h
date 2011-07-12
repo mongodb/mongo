@@ -20,6 +20,7 @@
 #include "../pch.h"
 #include "jsobj.h"
 #include "../util/timer.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
 
@@ -46,6 +47,9 @@ namespace mongo {
            return value is true if succeeded.  if false, set errmsg text.
         */
         virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
+        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int options){
+            return run( db, cmdObj, errmsg, result, ( options & QueryOption_NoOplog ) > 0 );
+        }
 
         /*
            note: logTheTop() MUST be false if READ
@@ -120,7 +124,7 @@ namespace mongo {
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const map<string,Command*>* webCommands() { return _webCommands; }
         /** @return if command was found and executed */
-        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions = 0);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );
     };

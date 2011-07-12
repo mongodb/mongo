@@ -170,8 +170,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     var localhost = otherParams.useHostname ? getHostName() : "localhost";
 
     this._alldbpaths = []
-
-
+    
     if ( otherParams.rs ){
         localhost = getHostName();
         // start replica sets
@@ -179,16 +178,18 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         for ( var i=0; i<numShards; i++){
             var setName = testName + "-rs" + i;
             
-            var rsDefaults = { oplogSize : 40 }
+            var rsDefaults = { oplogSize : 40, nodes : 3 }
             var rsParams = otherParams["rs" + i]
             
             for( var param in rsParams ){
                 rsDefaults[param] = rsParams[param]
             }
 
-            var numReplicas = otherParams.numReplicas || 3
+            var numReplicas = rsDefaults.nodes || otherParams.numReplicas || 3
+            delete rsDefaults.nodes 
+            
             var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ) } );
-            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsParams ) , url : rs.getURL() };
+            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
             
         }
@@ -1297,6 +1298,7 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
   return master;
 }
 
+ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster
 
 ReplSetTest.prototype.getSecondaries = function( timeout ){
     var master = this.getMaster( timeout )
@@ -1307,6 +1309,12 @@ ReplSetTest.prototype.getSecondaries = function( timeout ){
         }
     }
     return secs
+}
+
+ReplSetTest.prototype.status = function( timeout ){
+    var master = this.callIsMaster()
+    if( ! master ) master = this.liveNodes.slaves[0]
+    return master.getDB("admin").runCommand({replSetGetStatus: 1})
 }
 
 // Add a node to the test set
@@ -1719,10 +1727,10 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var lastTime = null
     var currTime = new Date().getTime()
     var status = undefined
-    
+        
     this.attempt({context: this, timeout: timeout, desc: "waiting for state indicator " + ind + " for " + timeout + "ms" }, function() {
         
-        status = this.getMaster().getDB("admin").runCommand({ replSetGetStatus : 1 })
+        status = this.status()
         
         if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ){
             if( lastTime == null ) print( "ReplSetTest waitForIndicator Initial status ( timeout : " + timeout + " ) :" )

@@ -80,7 +80,9 @@ namespace mongo {
          */
         QueryOption_PartialResults = 1 << 7 ,
 
-        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust | QueryOption_PartialResults
+        QueryOption_NoOplog = 1 << 8 ,
+
+        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust | QueryOption_PartialResults | QueryOption_NoOplog
 
     };
 

@@ -57,18 +57,26 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
 
         protected:
+
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
-                return _passthrough(conf->getName(), conf, cmdObj, result);
+                return _passthrough(conf->getName(), conf, cmdObj, 0, result);
             }
             bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
-                return _passthrough("admin", conf, cmdObj, result);
+                return _passthrough("admin", conf, cmdObj, 0, result);
+            }
+
+            bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
+                return _passthrough(conf->getName(), conf, cmdObj, options, result);
+            }
+            bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
+                return _passthrough("admin", conf, cmdObj, options, result);
             }
 
         private:
-            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
+            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , int options , BSONObjBuilder& result ) {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
-                bool ok = conn->runCommand( db , cmdObj , res );
+                bool ok = conn->runCommand( db , cmdObj , res , options );
                 if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
                     conn.done();
                     throw StaleConfigException("foo","command failed because of stale config");
@@ -160,12 +168,16 @@ namespace mongo {
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
 
             virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                return run( dbName, cmdObj, errmsg, result, 0);
+            }
+
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int options) {
                 string fullns = getFullNS( dbName , cmdObj );
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    return passthrough( conf , cmdObj , result );
+                    return passthrough( conf , cmdObj , options, result );
                 }
                 errmsg = "can't do command: " + name + " on sharded collection";
                 return false;
@@ -1285,7 +1297,7 @@ namespace mongo {
 
     }
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions) {
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
@@ -1326,7 +1338,7 @@ namespace mongo {
                 anObjBuilder.append( "help" , help.str() );
             }
             else {
-                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
+                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, queryOptions);
             }
 
             BSONObj tmp = anObjBuilder.asTempObj();

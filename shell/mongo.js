@@ -24,8 +24,9 @@ if ( typeof mongoInject == "function" ){
     mongoInject( Mongo.prototype );
 }
 
-Mongo.prototype.setSlaveOk = function() {
-    this.slaveOk = true;
+Mongo.prototype.setSlaveOk = function( value ) {
+    if( value == undefined ) value = true
+    this.slaveOk = value
 }
 
 Mongo.prototype.getDB = function( name ){
@@ -41,6 +42,10 @@ Mongo.prototype.getDBs = function(){
 
 Mongo.prototype.adminCommand = function( cmd ){
     return this.getDB( "admin" ).runCommand( cmd );
+}
+
+Mongo.prototype.setLogLevel = function( logLevel ){
+    return this.adminCommand({ setParameter : 1, logLevel : logLevel })
 }
 
 Mongo.prototype.getDBNames = function(){

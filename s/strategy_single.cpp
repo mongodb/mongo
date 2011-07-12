@@ -36,7 +36,7 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
-            log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << endl;
+            log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
 
             if ( r.isCommand() ) {
 
@@ -55,7 +55,7 @@ namespace mongo {
                                                          : str::equals("query", e.fieldName())))
                                 cmdObj = e.embeddedObject();
                         }
-                        bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder);
+                        bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder, q.queryOptions);
                         if ( ok ) {
                             BSONObj x = builder.done();
                             replyToQuery(0, r.p(), r.m(), x);
