@@ -19,10 +19,8 @@ function check( n ) {
                 names = s.getDBNames();
                 n1Idx = names.indexOf( n1 );
                 n2Idx = names.indexOf( n2 );
-                if ( n1Idx != -1 && n2Idx != -1 ) {
-                    // n1 and n2 may both be reported as present transiently.
-                    return false;
-                }
+                // Check n1 and n2 are not both present.
+                assert( n1Idx == -1 || n2Idx == -1 );
                 // Return true if we matched expected n.
                 return -1 != names.indexOf( n );
                 } );
