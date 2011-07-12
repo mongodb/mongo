@@ -380,8 +380,12 @@ namespace mongo {
         if ( ! dbname.size() )
             dbname = _db;
 
-        if ( ! ( _username.size() || _password.size() ) )
+        if ( ! ( _username.size() || _password.size() ) ) {
+            // Make sure that we don't need authentication to connect to this db
+            // findOne throws an AssertionException if it's not authenticated.
+            conn().findOne(getNS(), Query("{}"));
             return;
+        }
 
         string errmsg;
         if ( _conn->auth( dbname , _username , _password , errmsg ) )
