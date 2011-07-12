@@ -52,16 +52,6 @@ namespace mongo {
     }
 #else
     
-    string getAddrInfoStrError(int code) {
-#if !defined(_WIN32)
-        return gai_strerror(code);
-#else
-        /* gai_strerrorA is not threadsafe on windows. don't use it. */
-        return errnoWithDescription(code);
-#endif
-    }
-
-
     void disableNagle(int sock) {
         int x = 1;
 
@@ -82,6 +72,16 @@ namespace mongo {
     }
 
 #endif
+
+    string getAddrInfoStrError(int code) {
+#if !defined(_WIN32)
+        return gai_strerror(code);
+#else
+        /* gai_strerrorA is not threadsafe on windows. don't use it. */
+        return errnoWithDescription(code);
+#endif
+    }
+
 
     // --- SockAddr
 
