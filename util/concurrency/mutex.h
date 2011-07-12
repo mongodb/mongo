@@ -169,6 +169,9 @@ namespace mongo {
             }
         }
 
+        void lock() { _m->lock(); }
+        void unlock() { _m->unlock(); }
+
         class try_lock : boost::noncopyable {
         public:
             try_lock( mongo::mutex &m , int millis = 0 )
@@ -249,8 +252,8 @@ namespace mongo {
             scoped_lock( SimpleMutex &m ) : _lk(m._m) { }
         };
 
-	//      void lock()   { _m.lock(); }
-        //void unlock() { _m.unlock(); }
+        void lock()   { _m.lock(); }
+        void unlock() { _m.unlock(); }
     };
 #endif
 
