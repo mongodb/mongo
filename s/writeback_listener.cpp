@@ -41,7 +41,7 @@ namespace mongo {
 
     WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ) {
         _name = str::stream() << "WriteBackListener-" << addr;
-        log() << "creating WriteBackListener for: " << addr << endl;
+        log() << "creating WriteBackListener for: " << addr << " serverID: " << serverID << endl;
     }
 
     /* static */
@@ -89,7 +89,7 @@ namespace mongo {
     /* static */
     BSONObj WriteBackListener::waitFor( const ConnectionIdent& ident, const OID& oid ) {
         Timer t;
-        for ( int i=0; i<5000; i++ ) {
+        for ( int i=0; i<10000; i++ ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[ident];
@@ -131,6 +131,7 @@ namespace mongo {
                     BSONObjBuilder cmd;
                     cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
                     if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ) {
+                        result = result.getOwned();
                         log() <<  "writebacklisten command failed!  "  << result << endl;
                         conn.done();
                         continue;
@@ -138,7 +139,7 @@ namespace mongo {
 
                 }
 
-                log(1) << "writebacklisten result: " << result << endl;
+                LOG(1) << "writebacklisten result: " << result << endl;
 
                 BSONObj data = result.getObjectField( "data" );
                 if ( data.getBoolField( "writeBack" ) ) {
@@ -165,9 +166,10 @@ namespace mongo {
                     ShardChunkVersion needVersion( data["version"] );
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
-                           << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
+                           << " mine : " << db->getChunkManager( ns )->getVersion().toString() 
+                           << endl;
 
-                    if ( logLevel ) log(1) << m.toString() << endl;
+                    LOG(1) << m.toString() << endl;
 
                     if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ) {
                         // this means when the write went originally, the version was old
@@ -185,7 +187,10 @@ namespace mongo {
                     // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
 
                     BSONObj gle;
+                    int attempts = 0;
                     while ( true ) {
+                        attempts++;
+
                         try {
                             
                             Request r( m , 0 );
@@ -210,8 +215,8 @@ namespace mongo {
                             gle = b.obj();
                             
                             if ( gle["code"].numberInt() == 9517 ) {
+                                log() << "writeback failed because of stale config, retrying attempts: " << attempts << endl;
                                 db->getChunkManager( ns , true );
-                                r.reset();
                                 continue;
                             }
 
