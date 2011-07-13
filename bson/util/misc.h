@@ -79,7 +79,7 @@ namespace mongo {
         void toTm (tm *buf) {
             time_t dtime = (time_t) millis/1000;
 #if defined(_WIN32)
-            _gmtime_s(buf, &dtime);
+            gmtime_s(buf, &dtime);
 #else
             gmtime_r(&dtime, buf);
 #endif
