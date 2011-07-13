@@ -849,6 +849,7 @@ var p19 = db.runCommand(
         dayOfYear: {$dayOfYear: "$posted"},
         dayOfMonth: {$dayOfMonth: "$posted"},
         dayOfWeek: {$dayOfWeek: "$posted"},
+        month: {$month: "$posted"},
         week: {$week: "$posted"},
         year: {$year: "$posted"}
     }}
@@ -859,10 +860,11 @@ var p19result = [
         "_id" : ObjectId("4e14a3f1ffc569a332159c69"),
         "seconds" : 54,
         "minutes" : 59,
-        "hour" : 13,
+        "hour" : 18,
         "dayOfYear" : 81,
         "dayOfMonth" : 21,
         "dayOfWeek" : 1,
+        "month" : 3,
         "week" : 12,
         "year" : 2004
     },
@@ -870,21 +872,23 @@ var p19result = [
         "_id" : ObjectId("4e14a3f1ffc569a332159c6a"),
         "seconds" : 10,
         "minutes" : 11,
-        "hour" : 23,
-        "dayOfYear" : 219,
-        "dayOfMonth" : 7,
-        "dayOfWeek" : 7,
-        "week" : 31,
+        "hour" : 4,
+        "dayOfYear" : 220,
+        "dayOfMonth" : 8,
+        "dayOfWeek" : 1,
+        "month" : 8,
+        "week" : 32,
         "year" : 2100
     },
     {
         "_id" : ObjectId("4e14a3f1ffc569a332159c6b"),
         "seconds" : 14,
         "minutes" : 17,
-        "hour" : 0,
+        "hour" : 5,
         "dayOfYear" : 366,
         "dayOfMonth" : 31,
         "dayOfWeek" : 1,
+        "month" : 12,
         "week" : 53,
         "year" : 2000
     }

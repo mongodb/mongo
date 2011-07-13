@@ -76,6 +76,14 @@ namespace mongo {
         Date_t(unsigned long long m): millis(m) {}
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
+        void toTm (tm *buf) {
+            time_t dtime = (time_t) millis/1000;
+#if defined(_WIN32)
+            _gmtime_s(buf, &dtime);
+#else
+            gmtime_r(&dtime, buf);
+#endif
+        }
         string toString() const {
             char buf[64];
             time_t_to_String(millis/1000, buf);

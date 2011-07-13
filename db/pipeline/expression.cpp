@@ -830,9 +830,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string dayOfMonth = date.substr(8,2);
-        return Value::createInt(atoi(dayOfMonth.c_str()));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_mday); 
     }
 
     const char *ExpressionDayOfMonth::getOpName() const {
@@ -862,27 +862,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string dayOfWeek = date.substr(0,3);
-        int dayNum = -1;
-        /* days start at 1 with sunday to mimic MySQL */
-        if (!dayOfWeek.compare("Sun")) {
-            dayNum = 1;
-        } else if (!dayOfWeek.compare("Mon")) {
-            dayNum = 2;
-        } else if (!dayOfWeek.compare("Tue")) {
-            dayNum = 3;
-        } else if (!dayOfWeek.compare("Wed")) {
-            dayNum = 4;
-        } else if (!dayOfWeek.compare("Thu")) {
-            dayNum = 5;
-        } else if (!dayOfWeek.compare("Fri")) {
-            dayNum = 6;
-        } else if (!dayOfWeek.compare("Sat")) {
-            dayNum = 7;
-        }
-        assert(dayNum != -1); // CW TODO user error
-        return Value::createInt(dayNum);
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
     const char *ExpressionDayOfWeek::getOpName() const {
@@ -912,46 +894,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-
-        string month = date.substr(4,3);
-        int dayOfMonth = atoi(date.substr(8,2).c_str());
-        int year = atoi(date.substr(20,4).c_str());
-        bool leapYear = false;
-        int dayOfYear = 0;
-        if ( year % 4 == 0 && year % 100 != 0 )
-            leapYear = true;
-        else if ( year % 400 == 0 )
-            leapYear = true;
-
-        if (!month.compare("Feb")) {
-            dayOfYear = 31;
-        } else if (!month.compare("Mar")) {
-            dayOfYear = 59;
-        } else if (!month.compare("Apr")) {
-            dayOfYear = 90;
-        } else if (!month.compare("May")) {
-            dayOfYear = 120;
-        } else if (!month.compare("Jun")) {
-            dayOfYear = 151;
-        } else if (!month.compare("Jul")) {
-            dayOfYear = 181;
-        } else if (!month.compare("Aug")) {
-            dayOfYear = 212;
-        } else if (!month.compare("Sep")) {
-            dayOfYear = 243;
-        } else if (!month.compare("Oct")) {
-            dayOfYear = 273;
-        } else if (!month.compare("Nov")) {
-            dayOfYear = 304;
-        } else if (!month.compare("Dec")) {
-            dayOfYear = 334;
-        }
-
-        if (leapYear && dayOfYear >= 59)
-            dayOfYear+=1;
-
-        return Value::createInt(dayOfYear + dayOfMonth);
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
     const char *ExpressionDayOfYear::getOpName() const {
@@ -1829,9 +1774,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string minute = date.substr(14,2);
-        return Value::createInt(atoi(minute.c_str()));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_min);
     }
 
     const char *ExpressionMinute::getOpName() const {
@@ -1904,36 +1849,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string month = date.substr(4,3);
-        int monthNum = -1;
-        if (!month.compare("Jan")) {
-            monthNum = 1;
-        } else if (!month.compare("Feb")) {
-            monthNum = 2;
-        } else if (!month.compare("Mar")) {
-            monthNum = 3;
-        } else if (!month.compare("Apr")) {
-            monthNum = 4;
-        } else if (!month.compare("May")) {
-            monthNum = 5;
-        } else if (!month.compare("Jun")) {
-            monthNum = 6;
-        } else if (!month.compare("Jul")) {
-            monthNum = 7;
-        } else if (!month.compare("Jul")) {
-            monthNum = 8;
-        } else if (!month.compare("Sep")) {
-            monthNum = 9;
-        } else if (!month.compare("Oct")) {
-            monthNum = 10;
-        } else if (!month.compare("Nov")) {
-            monthNum = 11;
-        } else if (!month.compare("Dec")) {
-            monthNum = 12;
-        }
-        assert(monthNum != -1); // CW TODO user error
-        return Value::createString(month);
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_mon+1); // MySQL uses 1-12 tm uses 0-11
     }
 
     const char *ExpressionMonth::getOpName() const {
@@ -2013,9 +1931,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string hour = date.substr(11,2);
-        return Value::createInt(atoi(hour.c_str()));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_hour);
     }
 
     const char *ExpressionHour::getOpName() const {
@@ -2366,9 +2284,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string second = date.substr(17,2);
-        return Value::createInt(atoi(second.c_str()));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_sec);
     }
 
     const char *ExpressionSecond::getOpName() const {
@@ -2602,72 +2520,17 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-
-        string dayOfWeek = date.substr(0,3);
-        string month = date.substr(4,3);
-        int dayOfMonth = atoi(date.substr(8,2).c_str());
-        int year = atoi(date.substr(20,4).c_str());
-        bool leapYear = false;
-        int dayOfYear = 0;
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        int dayOfWeek = date.tm_wday+1;
+        int dayOfYear = date.tm_yday;
         int week = 0;
-        int dayNum = 0;
         int janFirst = 0;
         int offset = 0;
-        if ( year % 4 == 0 && year % 100 != 0 )
-            leapYear = true;
-        else if ( year % 400 == 0 )
-            leapYear = true;
 
-        if (!month.compare("Feb")) {
-            dayOfYear = 31;
-        } else if (!month.compare("Mar")) {
-            dayOfYear = 59;
-        } else if (!month.compare("Apr")) {
-            dayOfYear = 90;
-        } else if (!month.compare("May")) {
-            dayOfYear = 120;
-        } else if (!month.compare("Jun")) {
-            dayOfYear = 151;
-        } else if (!month.compare("Jul")) {
-            dayOfYear = 181;
-        } else if (!month.compare("Aug")) {
-            dayOfYear = 212;
-        } else if (!month.compare("Sep")) {
-            dayOfYear = 243;
-        } else if (!month.compare("Oct")) {
-            dayOfYear = 273;
-        } else if (!month.compare("Nov")) {
-            dayOfYear = 304;
-        } else if (!month.compare("Dec")) {
-            dayOfYear = 334;
-        }
-
-        if (leapYear && dayOfYear >= 59)
-            dayOfYear+=1;
-
-        dayOfYear += dayOfMonth;
-
-        if (!dayOfWeek.compare("Sun")) {
-            dayNum = 1;
-        } else if (!dayOfWeek.compare("Mon")) {
-            dayNum = 2;
-        } else if (!dayOfWeek.compare("Tue")) {
-            dayNum = 3;
-        } else if (!dayOfWeek.compare("Wed")) {
-            dayNum = 4;
-        } else if (!dayOfWeek.compare("Thu")) {
-            dayNum = 5;
-        } else if (!dayOfWeek.compare("Fri")) {
-            dayNum = 6;
-        } else if (!dayOfWeek.compare("Sat")) {
-            dayNum = 7;
-        }
-
-        janFirst = dayNum - dayOfYear % 7;
+        janFirst = dayOfWeek - dayOfYear % 7;
         offset = (janFirst + 6) % 7;
         week = (dayOfYear + offset) / 7;
-
         return Value::createInt(week);
     }
 
@@ -2698,9 +2561,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        string date = (pDate->coerceToDate()).toString();
-        string year = date.substr(20,4);
-        return Value::createInt(atoi(year.c_str()));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_year+1900); // tm_year is years since 1900
     }
 
     const char *ExpressionYear::getOpName() const {

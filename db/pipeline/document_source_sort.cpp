@@ -113,7 +113,11 @@ namespace mongo {
 
         BSONObj sortObj(pBsonElement->Obj());
         limit = sortObj.getIntField("limit");
+        if (limit == INT_MIN)
+            limit = INT_MAX;
         skip = sortObj.getIntField("skip");
+        if (skip == INT_MIN)
+            skip = 0;
         BSONObjIterator sortIterator(sortObj.getObjectField("key"));
         while(sortIterator.more()) {
             BSONElement sortField(sortIterator.next());
@@ -160,8 +164,6 @@ namespace mongo {
         /* start the sort iterator */
         listIterator = documents.begin();
 
-        if (skip == INT_MIN)
-            skip = 0;
         for ( int i = 0; i < skip; i++ ) {
             listIterator++;
             if (listIterator == documents.end())
