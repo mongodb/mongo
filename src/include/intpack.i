@@ -243,6 +243,7 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 		*xp += POS_2BYTE_MAX + 1;
 		return (0);
 	default:
+		WT_FAILURE(session, "corrupted packed unsigned value");
 		return (EINVAL);
 	}
 

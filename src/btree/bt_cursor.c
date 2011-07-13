@@ -217,7 +217,7 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
 		} else if ((cell =
-		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
+		    __wt_row_value(session, cbt->page, cbt->rip)) == NULL) {
 			value->data = "";
 			value->size = 0;
 		} else

@@ -481,7 +481,7 @@ __wt_verify_overflow(
 	}
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
-	WT_CELL_FOREACH(dsk, cell, i)
+	WT_CELL_FOREACH(session, dsk, cell, i)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
@@ -508,7 +508,7 @@ __wt_verify_overflow_cell(
 	tmp = NULL;
 	ret = 0;
 
-	__wt_cell_off(cell, &ovfl);
+	__wt_cell_off(session, cell, &ovfl);
 	addr = ovfl.addr;
 	size = ovfl.size;
 

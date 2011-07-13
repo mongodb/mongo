@@ -678,10 +678,6 @@ struct __wt_insert {
 /*
  * WT_CELL --
  *	Variable-length cell type; see include/cell.i for more information.
- *
- * 1 cell byte
- * 1 optional key-prefix byte
- * 4 optional data-length bytes
  */
 struct __wt_cell {
 	uint8_t __chunk[6];		/* cell: 1 to 6 bytes */

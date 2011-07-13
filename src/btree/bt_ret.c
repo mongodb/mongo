@@ -101,7 +101,7 @@ __wt_return_data(
 
 	/* Otherwise, take the item from the original page. */
 	if (page->type == WT_PAGE_ROW_LEAF) {
-		if ((cell = __wt_row_value(page, rip)) == NULL) {
+		if ((cell = __wt_row_value(session, page, rip)) == NULL) {
 			value_ret = "";
 			size_ret = 0;
 		} else
@@ -122,7 +122,7 @@ __wt_return_data(
 			cell = cipdata;
 page_cell:		if (btree->huffman_value == NULL &&
 			    __wt_cell_type(cell) == WT_CELL_DATA)
-				__wt_cell_data_and_len(
+				__wt_cell_data_and_len(session,
 				    cell, &value_ret, &size_ret);
 			else {
 				WT_RET(__wt_cell_copy(

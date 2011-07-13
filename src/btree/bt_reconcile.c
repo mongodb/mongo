@@ -880,7 +880,7 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * We're deleting the page, which means any overflow item we ever had
 	 * is deleted as well.
 	 */
-	WT_CELL_FOREACH(dsk, cell, i)
+	WT_CELL_FOREACH(session, dsk, cell, i)
 		WT_RET(__rec_discard_add_ovfl(session, cell));
 
 	return (0);
@@ -2008,7 +2008,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				__rec_cell_build_deleted(val);
 			else {
 				val->buf.data = cell;
-				val->buf.size = __wt_cell_len(cell);
+				val->buf.size = __wt_cell_len(session, cell);
 				val->cell_len = 0;
 				val->len = val->buf.size;
 			}
@@ -2209,7 +2209,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (cell != NULL) {
 			key->buf.data = cell;
-			key->buf.size = __wt_cell_len(cell);
+			key->buf.size = __wt_cell_len(session, cell);
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
@@ -2436,11 +2436,13 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 			 * was read into memory, there may not have been a value
 			 * item, that is, it may have been zero length.
 			 */
-			if ((val_cell = __wt_row_value(page, rip)) == NULL)
+			if ((val_cell =
+			    __wt_row_value(session, page, rip)) == NULL)
 				val->buf.size = 0;
 			else {
 				val->buf.data = val_cell;
-				val->buf.size = __wt_cell_len(val_cell);
+				val->buf.size =
+				    __wt_cell_len(session, val_cell);
 			}
 			val->cell_len = 0;
 			val->len = val->buf.size;
@@ -2449,7 +2451,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 			 * If we updated an overflow value, free the underlying
 			 * file space.
 			 */
-			if ((val_cell = __wt_row_value(page, rip)) != NULL)
+			if ((val_cell =
+			    __wt_row_value(session, page, rip)) != NULL)
 				WT_ERR(
 				    __rec_discard_add_ovfl(session, val_cell));
 
@@ -2483,7 +2486,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 		 */
 		if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
 			key->buf.data = cell;
-			key->buf.size = __wt_cell_len(cell);
+			key->buf.size = __wt_cell_len(session, cell);
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
@@ -3398,7 +3401,7 @@ __rec_discard_add_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell)
 	WT_OFF ovfl;
 
 	if (__wt_cell_type_is_ovfl(cell)) {
-		__wt_cell_off(cell, &ovfl);
+		__wt_cell_off(session, cell, &ovfl);
 		return (__rec_discard_add(session, NULL, ovfl.addr, ovfl.size));
 	}
 	return (0);

@@ -5,6 +5,19 @@
  *	All rights reserved.
  */
 
+#undef	STATIN
+#define	STATIN static inline
+
+STATIN void	__wt_cell_data_and_len(
+			WT_SESSION_IMPL *, WT_CELL *, void *, uint32_t *);
+STATIN void    *__wt_cell_next(WT_SESSION_IMPL *, WT_CELL *);
+STATIN void	__wt_cell_off(WT_SESSION_IMPL *, WT_CELL *, WT_OFF *);
+STATIN u_int	__wt_cell_prefix(WT_CELL *);
+STATIN void	__wt_cell_set_fixed(WT_CELL *, u_int, uint32_t *);
+STATIN u_int	__wt_cell_type(WT_CELL *);
+STATIN int	__wt_cell_type_is_ovfl(WT_CELL *);
+STATIN u_int	__wt_cell_type_raw(WT_CELL *);
+
 /*
  * WT_CELL --
  *	Variable-length cell type.
@@ -67,37 +80,30 @@
  *
  * The 0x03 bit combination is unused, but would require code changes.
  */
-#define	WT_CELL_DATA_SHORT	0x01		/* Short data */
-#define	WT_CELL_KEY_SHORT	0x02		/* Short key */
+#define	WT_CELL_DATA_SHORT	0x001		/* Short data */
+#define	WT_CELL_KEY_SHORT	0x002		/* Short key */
+#define	WT_CELL_UNUSED_BIT3	0x004		/* Unused */
+#define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
+#define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
 /*
- * Bits 3-5 are for other cell types -- there are 6 cell types and 8 possible
- * values, the bit combinations (6 << 2) and (7 << 2) remain unused.
+ * Bits 6-8 are for other cell types -- there are 6 cell types and 8 possible
+ * values.
  */
-#define	WT_CELL_DATA		(0 << 2)	/* Data */
-#define	WT_CELL_DATA_OVFL	(1 << 2)	/* Data: overflow */
-#define	WT_CELL_DEL		(2 << 2)	/* Deleted */
-#define	WT_CELL_KEY		(3 << 2)	/* Key */
-#define	WT_CELL_KEY_OVFL	(4 << 2)	/* Key: overflow */
-#define	WT_CELL_OFF		(5 << 2)	/* Off-page ref */
-
-/*
- * WT_CELL_{1,2,3,4}_BYTE --
- *	  Bits 7-8 of the descriptor byte specify how many bytes of data
- * length follow, if any.
- */
-#define	WT_CELL_1_BYTE		(0 << 6)	/* 1 byte of length follows */
-#define	WT_CELL_2_BYTE		(1 << 6)	/* 2 bytes of length follow */
-#define	WT_CELL_3_BYTE		(2 << 6)	/* 3 ... */
-#define	WT_CELL_4_BYTE		(3 << 6)	/* 4 ... */
-#define	WT_CELL_BYTES(cell)						\
-	(((WT_CELL *)(cell))->__chunk[0] & (3 << 6))
+#define	WT_CELL_DATA		(0 << 5)	/* Data */
+#define	WT_CELL_DATA_OVFL	(1 << 5)	/* Data: overflow */
+#define	WT_CELL_DEL		(2 << 5)	/* Deleted */
+#define	WT_CELL_KEY		(3 << 5)	/* Key */
+#define	WT_CELL_KEY_OVFL	(4 << 5)	/* Key: overflow */
+#define	WT_CELL_OFF		(5 << 5)	/* Off-page ref */
+#define	WT_CELL_UNUSED_TYPE6	(6 << 5)	/* Unused */
+#define	WT_CELL_UNUSED_TYPE7	(7 << 5)	/* Unused */
 
 /* WT_CELL_FOREACH is a loop that walks the cells on a page */
-#define	WT_CELL_FOREACH(dsk, cell, i)					\
+#define	WT_CELL_FOREACH(session, dsk, cell, i)				\
 	for ((cell) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries;					\
-	    (i) > 0; (cell) = __wt_cell_next(cell), --(i))
+	    (i) > 0; (cell) = __wt_cell_next(session, cell), --(i))
 
 /*
  * __wt_cell_set_fixed --
@@ -121,7 +127,7 @@ __wt_cell_type_raw(WT_CELL *cell)
 		return (WT_CELL_DATA_SHORT);
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY_SHORT);
-	return (cell->__chunk[0] & (7 << 2));
+	return (cell->__chunk[0] & (7 << 5));
 }
 
 /*
@@ -136,7 +142,7 @@ __wt_cell_type(WT_CELL *cell)
 		return (WT_CELL_DATA);
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
-	return (cell->__chunk[0] & (7 << 2));
+	return (cell->__chunk[0] & (7 << 5));
 }
 
 /*
@@ -167,10 +173,11 @@ __wt_cell_prefix(WT_CELL *cell)
  *	Fill in both the first byte of data for a cell as well as the length.
  */
 static inline void
-__wt_cell_data_and_len(WT_CELL *cell, void *p, uint32_t *sizep)
+__wt_cell_data_and_len(
+    WT_SESSION_IMPL *session, WT_CELL *cell, void *p, uint32_t *sizep)
 {
-	*(void **)p = __wt_cell_data(cell);
-	*sizep = __wt_cell_datalen(cell);
+	*(void **)p = __wt_cell_data(session, cell);
+	*sizep = __wt_cell_datalen(session, cell);
 }
 
 /*
@@ -178,10 +185,10 @@ __wt_cell_data_and_len(WT_CELL *cell, void *p, uint32_t *sizep)
  *	Copy out a WT_CELL that references a WT_OFF structure.
  */
 static inline void
-__wt_cell_off(WT_CELL *cell, WT_OFF *off)
+__wt_cell_off(WT_SESSION_IMPL *session, WT_CELL *cell, WT_OFF *off)
 {
 	/* Version for systems that support unaligned access. */
-	*off = *(WT_OFF *)__wt_cell_data(cell);
+	*off = *(WT_OFF *)__wt_cell_data(session, cell);
 }
 
 /*
@@ -189,7 +196,7 @@ __wt_cell_off(WT_CELL *cell, WT_OFF *off)
  *	Return a pointer to the next WT_CELL on the page.
  */
 static inline void *
-__wt_cell_next(WT_CELL *cell)
+__wt_cell_next(WT_SESSION_IMPL *session, WT_CELL *cell)
 {
-	return ((u_int8_t *)cell + __wt_cell_len(cell));
+	return ((u_int8_t *)cell + __wt_cell_len(session, cell));
 }

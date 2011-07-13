@@ -204,8 +204,9 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		switch (__wt_cell_type(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				dp->p(__wt_cell_data(cell),
-				    __wt_cell_datalen(cell), dp->stream);
+				dp->p(__wt_cell_data(session, cell),
+				    __wt_cell_datalen(session, cell),
+				    dp->stream);
 				break;
 			}
 			/* FALLTHROUGH */
@@ -294,7 +295,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Check for an empty item. */
-		if ((cell = __wt_row_value(page, rip)) == NULL) {
+		if ((cell = __wt_row_value(session, page, rip)) == NULL) {
 			dp->p(key->data, key->size, dp->stream);
 			dp->p(NULL, 0, dp->stream);
 			goto dump_insert;
@@ -305,7 +306,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
 				value = &_value;
-				__wt_cell_data_and_len(
+				__wt_cell_data_and_len(session,
 				    cell, &value->data, &value->size);
 				break;
 			}

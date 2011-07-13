@@ -171,9 +171,9 @@ extern void __wt_cell_set(WT_SESSION_IMPL *session,
     u_int prefix,
     uint32_t size,
     uint32_t *cell_lenp);
-extern void *__wt_cell_data(WT_CELL *cell);
-extern uint32_t __wt_cell_datalen(WT_CELL *cell);
-extern uint32_t __wt_cell_len(WT_CELL *cell);
+extern void *__wt_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell);
+extern uint32_t __wt_cell_datalen(WT_SESSION_IMPL *session, WT_CELL *cell);
+extern uint32_t __wt_cell_len(WT_SESSION_IMPL *session, WT_CELL *cell);
 extern int __wt_cell_copy(WT_SESSION_IMPL *session,
     WT_CELL *cell,
     WT_BUF *retb);
@@ -315,7 +315,9 @@ extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
     WT_BUF *retb);
-extern WT_CELL *__wt_row_value(WT_PAGE *page, WT_ROW *rip);
+extern WT_CELL *__wt_row_value(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_ROW *rip);
 extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
     const void *key,

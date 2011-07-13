@@ -15,7 +15,6 @@ void
 __wt_cell_set(WT_SESSION_IMPL *session,
     WT_CELL *cell, u_int type, u_int prefix, uint32_t size, uint32_t *cell_lenp)
 {
-	uint32_t len;
 	uint8_t byte, *p;
 
 	/*
@@ -45,41 +44,18 @@ __wt_cell_set(WT_SESSION_IMPL *session,
 		return;
 	}
 
-	/*
-	 * Key and data items that fit on the page, but are too big for the
-	 * length to fit into the descriptor byte.
-	 */
-	if (size < 0xff) {
-		cell->__chunk[0] = WT_CELL_1_BYTE | (uint8_t)type;
-		len = 2;			/* Cell byte + 1 length byte */
-	} else if (size < 0xffff) {
-		cell->__chunk[0] = WT_CELL_2_BYTE | (uint8_t)type;
-		len = 3;			/* Cell byte + 2 length bytes */
-	} else if (size < 0xffffff) {
-		cell->__chunk[0] = WT_CELL_3_BYTE | (uint8_t)type;
-		len = 4;			/* Cell byte + 3 length bytes */
-	} else {
-		cell->__chunk[0] = WT_CELL_4_BYTE | (uint8_t)type;
-		len = 5;			/* Cell byte + 4 length bytes */
-	}
+	p = cell->__chunk;
+	*p++ = (uint8_t)type;			/* Type */
 
-	p = &cell->__chunk[0];			/* Cell byte */
-	if (type == WT_CELL_KEY) {
-		*++p = (uint8_t)prefix;		/* Prefix byte */
-		++len;
-	}
+	if (type == WT_CELL_KEY)		/* Prefix byte */
+		*p++ = (uint8_t)prefix;
 
-	*cell_lenp = len;			/* Return the cell's length */
+	/* Pack the data length. */
+	(void)__wt_vpack_uint(
+	    session, &p, sizeof(cell->__chunk) - 1, (uint64_t)size);
 
-#ifdef WORDS_BIGENDIAN
-	__wt_cell_set has not been written for a big-endian system.
-#else
-	/* Little endian copy of the size into the WT_CELL. */
-	*++p = ((uint8_t *)&size)[0];
-	*++p = ((uint8_t *)&size)[1];
-	*++p = ((uint8_t *)&size)[2];
-	*++p = ((uint8_t *)&size)[3];
-#endif
+						/* Return the cell's length */
+	*cell_lenp = WT_PTRDIFF32(p, cell->__chunk);
 }
 
 /*
@@ -87,11 +63,10 @@ __wt_cell_set(WT_SESSION_IMPL *session,
  *	Return a reference to the first byte of data for a cell.
  */
 void *
-__wt_cell_data(WT_CELL *cell)
+__wt_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell)
 {
-	uint8_t *p;
-
-	p = (uint8_t *)cell + 1;		/* Step past cell byte */
+	uint64_t v;
+	const uint8_t *p;
 
 	/*
 	 * Delete and off-page items have known sizes, we don't store length
@@ -108,22 +83,16 @@ __wt_cell_data(WT_CELL *cell)
 	case WT_CELL_KEY_SHORT:
 		return ((uint8_t *)cell + 2);	/* Cell + prefix byte */
 	case WT_CELL_KEY:
-		++p;				/* Step past prefix byte */
-		/* FALLTHROUGH */
+		p = (uint8_t *)cell + 2;	/* Cell + prefix */
+		(void)__wt_vunpack_uint(
+		    session, &p, sizeof(cell->__chunk) - 2, &v);
+		return ((void *)p);
 	case WT_CELL_DATA:
-	default:				/* N bytes more */
-		switch (WT_CELL_BYTES(cell)) {
-		case WT_CELL_1_BYTE:
-			return (p + 1);		/* Step past 1 length byte */
-		case WT_CELL_2_BYTE:
-			return (p + 2);		/* Step past 2 length bytes */
-		case WT_CELL_3_BYTE:
-			return (p + 3);		/* Step past 3 length bytes */
-		case WT_CELL_4_BYTE:
-		default:
-			return (p + 4);		/* Step past 4 length bytes */
-		}
-		/* NOTREACHED */
+	default:				/* Impossible */
+		p = (uint8_t *)cell + 1;	/* Cell */
+		(void)__wt_vunpack_uint(
+		    session, &p, sizeof(cell->__chunk) - 1, &v);
+		return ((void *)p);
 	}
 	/* NOTREACHED */
 }
@@ -133,10 +102,10 @@ __wt_cell_data(WT_CELL *cell)
  *	Return the number of data bytes referenced by a WT_CELL.
  */
 uint32_t
-__wt_cell_datalen(WT_CELL *cell)
+__wt_cell_datalen(WT_SESSION_IMPL *session, WT_CELL *cell)
 {
-	uint32_t _v;
-	uint8_t *p, *v;
+	uint64_t v;
+	const uint8_t *p;
 
 	/*
 	 * Delete and off-page items have known sizes, we don't store length
@@ -163,30 +132,8 @@ __wt_cell_datalen(WT_CELL *cell)
 		break;
 	}
 
-	/* Copy out the length bytes, and return the value. */
-	_v = 0;
-	v = (uint8_t *)&_v;
-
-#ifdef WORDS_BIGENDIAN
-	__wt_cell_datalen has not been written for a big-endian system.
-#else
-	/* Little endian copy of the size from the WT_CELL. */
-	switch (WT_CELL_BYTES(cell)) {
-	case WT_CELL_4_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_3_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_2_BYTE:
-		*v++ = *p++;
-		/* FALLTHROUGH */
-	case WT_CELL_1_BYTE:
-		*v = *p;
-		break;
-	}
-#endif
-	return (_v);
+	(void)__wt_vunpack_uint(session, &p, sizeof(cell->__chunk) - 1, &v);
+	return ((uint32_t)v);
 }
 
 /*
@@ -195,47 +142,36 @@ __wt_cell_datalen(WT_CELL *cell)
  * trailing data.
  */
 uint32_t
-__wt_cell_len(WT_CELL *cell)
+__wt_cell_len(WT_SESSION_IMPL *session, WT_CELL *cell)
 {
-	uint32_t len;
+	uint64_t v;
+	const uint8_t *p;
 
-	len = 1;				/* Step past cell */
 	/*
 	 * Delete and off-page items have known sizes, we don't store length
 	 * bytes.  Short key/data items have 6- or 7-bits of length in the
 	 * descriptor byte and no length bytes.
 	 */
 	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_SHORT:		/* Cell + data */
-		return (1 + __wt_cell_datalen(cell));
 	case WT_CELL_DATA_OVFL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-		return (1 + sizeof(WT_OFF));	/* Cell + WT_OFF */
+	case WT_CELL_DATA_SHORT:
 	case WT_CELL_DEL:
-		return (1);			/* Cell */
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_OFF:			/* Cell + data */
+		return (1 + __wt_cell_datalen(session, cell));
 	case WT_CELL_KEY_SHORT:			/* Cell + prefix + data */
-		return (2 + __wt_cell_datalen(cell));
+		return (2 + __wt_cell_datalen(session, cell));
 	case WT_CELL_KEY:
-		++len;				/* Step past prefix byte */
-		/* FALLTHROUGH */
+		p = &cell->__chunk[2];		/* Cell + prefix */
+		break;
 	case WT_CELL_DATA:
-	default:
-		/* Calculate the length bytes and the data length. */
-		switch (WT_CELL_BYTES(cell)) {
-		case WT_CELL_1_BYTE:
-			return (len + 1 + __wt_cell_datalen(cell));
-		case WT_CELL_2_BYTE:
-			return (len + 2 + __wt_cell_datalen(cell));
-		case WT_CELL_3_BYTE:
-			return (len + 3 + __wt_cell_datalen(cell));
-		case WT_CELL_4_BYTE:
-		default:
-			return (len + 4 + __wt_cell_datalen(cell));
-		}
-		/* NOTREACHED */
+	default:				/* Impossible */
+		p = &cell->__chunk[1];		/* Cell */
+		break;
 	}
-	/* NOTREACHED */
+
+	(void)__wt_vunpack_uint(session, &p, sizeof(cell->__chunk) - 1, &v);
+	return ((uint32_t)(WT_PTRDIFF32(p, cell->__chunk) + v));
 }
 
 /*
@@ -257,12 +193,12 @@ __wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_BUF *retb)
 	switch (__wt_cell_type(cell)) {
 	case WT_CELL_DATA:
 	case WT_CELL_KEY:
-		__wt_cell_data_and_len(cell, &p, &size);
+		__wt_cell_data_and_len(session, cell, &p, &size);
 		WT_RET(__wt_buf_set(session, retb, p, size));
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
-		__wt_cell_off(cell, &ovfl);
+		__wt_cell_off(session, cell, &ovfl);
 		WT_RET(__wt_ovfl_in(session, &ovfl, retb));
 		break;
 	WT_ILLEGAL_FORMAT(session);

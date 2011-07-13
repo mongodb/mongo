@@ -166,7 +166,7 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 
 	last_cell_type = FIRST;
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, i) {
+	WT_CELL_FOREACH(session, dsk, cell, i) {
 		++cell_num;
 
 		/* Check the cell itself. */
@@ -245,7 +245,7 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		case WT_CELL_DATA_OVFL:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
-			__wt_cell_off(cell, &off);
+			__wt_cell_off(session, cell, &off);
 			if (WT_ADDR_TO_OFF(btree,
 			    off.addr) + off.size > file_size)
 				goto eof;
@@ -308,7 +308,8 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 			 * Get the cell's data/length and make sure we have
 			 * enough buffer space.
 			 */
-			__wt_cell_data_and_len(cell, &data, &data_size);
+			__wt_cell_data_and_len(
+			    session, cell, &data, &data_size);
 			WT_ERR(__wt_buf_grow(
 			    session, current, prefix + data_size));
 
@@ -545,7 +546,7 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 	end = (uint8_t *)dsk + size;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, i) {
+	WT_CELL_FOREACH(session, dsk, cell, i) {
 		++cell_num;
 
 		/* Check the cell itself. */
@@ -567,7 +568,7 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 
 		/* Check if any referenced item is entirely in the file. */
 		if (cell_type == WT_CELL_DATA_OVFL) {
-			__wt_cell_off(cell, &off);
+			__wt_cell_off(session, cell, &off);
 			if (WT_ADDR_TO_OFF(btree,
 			    off.addr) + off.size > file_size)
 				return (__wt_err_eof(
@@ -636,6 +637,8 @@ __wt_verify_cell(WT_SESSION_IMPL *session,
 	 */
 	p = (uint8_t *)cell;
 
+#ifdef XXX
+	This code needs a "safe" check of the cell & the cell data.
 	switch (__wt_cell_type_raw(cell)) {
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_DATA_SHORT:
@@ -670,7 +673,8 @@ __wt_verify_cell(WT_SESSION_IMPL *session,
 		 */
 		break;
 	}
-	if (p > end || (uint8_t *)(cell) + __wt_cell_len(cell) > end)
+#endif
+	if (p > end || (uint8_t *)(cell) + __wt_cell_len(session, cell) > end)
 		return (__wt_err_eop(session, cell_num, addr, quiet));
 	return (0);
 }

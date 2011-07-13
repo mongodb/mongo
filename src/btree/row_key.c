@@ -252,7 +252,7 @@ err:	if (is_local && retb != NULL)
  * NULL if there isn't one.
  */
 WT_CELL *
-__wt_row_value(WT_PAGE *page, WT_ROW *rip)
+__wt_row_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
 
@@ -283,7 +283,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	cell = __wt_cell_next(cell);
+	cell = __wt_cell_next(session, cell);
 	if (__wt_cell_type(cell) == WT_CELL_KEY ||
 	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
 		return (NULL);
