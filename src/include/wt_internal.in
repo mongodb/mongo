@@ -165,7 +165,9 @@ struct __wt_walk_entry;
 
 #include "btree.i"
 #include "cell.i"
+#include "intpack.i"
 #include "log.i"
+#include "packing.i"
 #include "progress.i"
 #include "serial.i"
 

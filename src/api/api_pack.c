@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "intpack.i"
 
 /*
  * wiredtiger_struct_size --

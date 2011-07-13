@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "intpack.i"
-#include "packing.i"
 
 /*
  * __wt_schema_project_in --

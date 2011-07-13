@@ -6,8 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "intpack.i"
-#include "packing.i"
 
 static int
 __find_next_col(WT_SESSION_IMPL *session,
