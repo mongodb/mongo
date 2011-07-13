@@ -171,9 +171,6 @@ extern void __wt_cell_set(WT_SESSION_IMPL *session,
     u_int prefix,
     uint32_t size,
     uint32_t *cell_lenp);
-extern void *__wt_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell);
-extern uint32_t __wt_cell_datalen(WT_SESSION_IMPL *session, WT_CELL *cell);
-extern uint32_t __wt_cell_len(WT_SESSION_IMPL *session, WT_CELL *cell);
 extern int __wt_cell_copy(WT_SESSION_IMPL *session,
     WT_CELL *cell,
     WT_BUF *retb);
