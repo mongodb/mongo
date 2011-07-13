@@ -80,8 +80,9 @@ namespace mongo {
 
     private:
         AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
-        mutable boost::unordered_set<shared_ptr<const Value>, Value::Hash > vpValue;
-        mutable boost::unordered_set<shared_ptr<const Value>, Value::Hash >::iterator itr; 
+        typedef boost::unordered_set<shared_ptr<const Value>, Value::Hash > SetType;
+        mutable SetType vpValue;
+        mutable SetType::iterator itr; 
 	intrusive_ptr<ExpressionContext> pCtx;
     };
 

@@ -99,7 +99,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createString(string value);
+        static shared_ptr<const Value> createString(const string &value);
 
         /*
           Construct a date-valued Value.
@@ -107,7 +107,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDate(Date_t value);
+        static shared_ptr<const Value> createDate(const Date_t &value);
 
         /*
           Construct a document-valued Value.
@@ -283,8 +283,8 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
-        Value(Date_t dateValue);
-        Value(string stringValue);
+        Value(const Date_t &dateValue);
+        Value(const string &stringValue);
         Value(const shared_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 

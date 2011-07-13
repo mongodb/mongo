@@ -324,38 +324,40 @@ namespace mongo {
           and integral types in parallel, tracking the current narrowest
           type.
          */
-        bool stringFlag = false;
-        bool dateFlag = false;
-        bool doubleDateFlag = false;
+        unsigned stringCount = 0;
+        unsigned dateCount = 0;
         const size_t n = vpOperand.size();
 
         for (size_t i = 0; i < n; ++i) {
             shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (pValue->getType() == String)
-                stringFlag = true;
+                ++stringCount;
             if (pValue->getType() == Date) {
-                if (dateFlag)
-                    doubleDateFlag = true;
-                dateFlag = true;
+                ++dateCount;
             }
         }
-
-        if (doubleDateFlag && !stringFlag){
-            assert(false); // CW TODO user error
+        /* 
+        We don't allow adding two dates because it doesn't make sense especially
+        since they are in epoch time. However, if there is a string present then
+        we would be appending the dates to a string so having many would not be 
+        not a problem.
+        */
+        if ((dateCount > 1) && !stringCount){
+            assert(false); // CW TODO user error: can't add two dates
             return Value::getNull();
         }
             
         
-        if (stringFlag) {
-            string stringTotal = "";
+        if (stringCount) {
+            stringstream stringTotal;
             for (size_t i = 0; i < n; ++i) {
                 shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-                stringTotal += pValue->coerceToString();
+                stringTotal << pValue->coerceToString();
             }
-            return Value::createString(stringTotal);
+            return Value::createString(stringTotal.str());
         }
 
-        if (dateFlag) {
+        if (dateCount) {
             long long dateTotal = 0;
             for (size_t i = 0; i < n; ++i) {
                 shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
@@ -863,6 +865,7 @@ namespace mongo {
         string date = (pDate->coerceToDate()).toString();
         string dayOfWeek = date.substr(0,3);
         int dayNum = -1;
+        /* days start at 1 with sunday to mimic MySQL */
         if (!dayOfWeek.compare("Sun")) {
             dayNum = 1;
         } else if (!dayOfWeek.compare("Mon")) {
@@ -878,6 +881,7 @@ namespace mongo {
         } else if (!dayOfWeek.compare("Sat")) {
             dayNum = 7;
         }
+        assert(dayNum != -1); // CW TODO user error
         return Value::createInt(dayNum);
     }
 
@@ -1928,6 +1932,7 @@ namespace mongo {
         } else if (!month.compare("Dec")) {
             monthNum = 12;
         }
+        assert(monthNum != -1); // CW TODO user error
         return Value::createString(month);
     }
 
@@ -2396,6 +2401,7 @@ namespace mongo {
         shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
 
+        /* boost::iequals returns a bool not an int so strings must actually be allocated */
         string str1 = boost::to_upper_copy( pString1->coerceToString() );
         string str2 = boost::to_upper_copy( pString2->coerceToString() );
         return Value::createInt(str1.compare(str2));
@@ -2433,6 +2439,12 @@ namespace mongo {
         shared_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
 
         string str = pString->coerceToString();
+        assert(pLower->getType() == NumberInt 
+            || pLower->getType() == NumberLong 
+            || pLower->getType() == NumberDouble); // CW TODO user error lower must be numeric
+        assert(pLength->getType() == NumberInt 
+            || pLength->getType() == NumberLong 
+            || pLength->getType() == NumberDouble); // CW TODO user error length must be numeric
         long lower = pLower->coerceToLong();
         long length = pLength->coerceToLong();
         return Value::createString( str.substr(lower, length) );

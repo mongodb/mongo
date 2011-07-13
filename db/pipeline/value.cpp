@@ -221,26 +221,26 @@ namespace mongo {
         return pValue;
     }
 
-    Value::Value(Date_t value):
+    Value::Value(const Date_t &value):
         type(Date),
         pDocumentValue(),
         vpValue() {
         dateValue = value;
     }
 
-    shared_ptr<const Value> Value::createDate(Date_t value) {
+    shared_ptr<const Value> Value::createDate(const Date_t &value) {
         shared_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
-    Value::Value(string value):
+    Value::Value(const string &value):
         type(String),
         pDocumentValue(),
         vpValue() {
         stringValue = value;
     }
 
-    shared_ptr<const Value> Value::createString(string value) {
+    shared_ptr<const Value> Value::createString(const string &value) {
         shared_ptr<const Value> pValue(new Value(value));
         return pValue;
     }

@@ -55,6 +55,7 @@ namespace mongo {
         for (itr = vpValue.begin(); itr != vpValue.end(); ++itr) {
             valVec.push_back(*itr);
         }
+        /* there is no issue of scope since createArray copy constructs */
         return Value::createArray(valVec);
     }
 
