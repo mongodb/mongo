@@ -1,4 +1,3 @@
-
 // this tests that slaveOk'd queries in sharded setups get correctly routed when
 // a slave goes into RECOVERING state, and don't break
 
@@ -7,9 +6,9 @@ var shardTest = new ShardingTest( name = "clusteredstale" ,
                                   numShards = 2 ,
                                   verboseLevel = 0 ,
                                   numMongos = 2 ,
-                                  otherParams = { rs : true, 
-                                                  rs0 : { logpath : "$path/mongod.log" }, 
-                                                  rs1 : { logpath : "$path/mongod.log" } } );
+                                  otherParams = { rs : true } )//, 
+                                                  //rs0 : { logpath : "$path/mongod.log" }, 
+                                                  //rs1 : { logpath : "$path/mongod.log" } } );
 
 shardTest.setBalancer( false )
 
