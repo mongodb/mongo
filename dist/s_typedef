@@ -11,7 +11,7 @@ build() {
 	    -e 'q' \
 	    -e '}' < $f
 
-	l=`echo ../src/include/*.h ../src/include/*.in |
+	l=`echo ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e 's/wiredtiger.in//' -e 's/queue.h//'`
 	for i in \
 	    `egrep -h '^struct[	 ]*__.*[	 ]*{$' $l |
