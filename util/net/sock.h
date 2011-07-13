@@ -39,6 +39,10 @@
 
 #endif // _WIN32
 
+#ifdef MONGO_SSL
+#include <openssl/ssl.h>
+#endif
+
 namespace mongo {
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
@@ -157,6 +161,29 @@ namespace mongo {
         string _extra;
     };
 
+#ifdef MONGO_SSL
+    class SSLManager : boost::noncopyable {
+    public:
+        SSLManager( bool client );
+        
+        void setupPEM( const string& keyFile , const string& password );
+        void setupPubPriv( const string& privateKeyFile , const string& publicKeyFile );
+
+        /**
+         * creates an SSL context to be used for this file descriptor
+         * caller should delete
+         */
+        SSL * secure( int fd );
+        
+        static int password_cb( char *buf,int num, int rwflag,void *userdata );
+
+    private:
+        bool _client;
+        SSL_CTX* _context;
+        string _password;
+    };
+#endif
+
     /**
      * thin wrapped around file descriptor and system calls
      * todo: ssl
@@ -191,13 +218,31 @@ namespace mongo {
         long long getBytesIn() const { return _bytesIn; }
         long long getBytesOut() const { return _bytesOut; }
 
+#ifdef MONGO_SSL
+        void secure( SSLManager * ssl );
+#endif
+
     private:
+        void _init();
+        /** raw send, same semantics as ::send */
+        int _send( const char * data , int len );
+        
+        /** sends dumbly, just each buffer at a time */
+        void _send( const vector< pair< char *, int > > &data, const char *context );
+
+        /** raw recv, same semantics as ::recv */
+        int _recv( char * buf , int max );
+
         int _fd;
         SockAddr _remote;
         double _timeout;
 
         long long _bytesIn;
         long long _bytesOut;
+
+#ifdef MONGO_SSL
+        shared_ptr<SSL> _ssl;
+#endif
 
     protected:
         int _logLevel; // passed to log() when logging errors

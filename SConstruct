@@ -126,10 +126,10 @@ add_option( "staticlibpath", "comma separated list of dirs to search for staticl
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
-
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
+add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
@@ -751,6 +751,10 @@ if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
     if hacks is not None:
         hacks.insert( env , { "linux64" : linux64 } )
+
+if has_option( "ssl" ):
+    env.Append( CPPDEFINES=["MONGO_SSL"] )
+    env.Append( LIBS=["ssl"] )
 
 try:
     umask = os.umask(022)
