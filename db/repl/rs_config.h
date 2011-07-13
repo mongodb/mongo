@@ -69,7 +69,6 @@ namespace mongo {
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
-                log(5) << h.toString() << " updating to " << last.toString() << endl;
                 for (set<TagSubgroup*>::iterator it = groups.begin(); it != groups.end(); it++) {
                     ((TagSubgroup*)(*it))->updateLast(last);
                 }
