@@ -750,18 +750,19 @@ namespace UpdateTests {
             virtual BSONObj after() { return BSONObj(); }
 
             void dotest() {
-                client().insert( ns() , BSON( "x" << 5 ) );
+                long long start = numeric_limits<int>::max() - 5;
+                long long max   = numeric_limits<int>::max() + 5ll;
+
+                client().insert( ns() , BSON( "x" << (int)start ) );
                 ASSERT( findOne()["x"].type() == NumberInt );
-                long long start = 5;
-                long long max = numeric_limits<int>::max();
-                max *= 32;
 
                 while ( start < max ) {
-                    update( BSON( "$inc" << BSON( "x" << 500000 ) ) );
-                    start += 500000;
+                    update( BSON( "$inc" << BSON( "x" << 1 ) ) );
+                    start += 1;
                     ASSERT_EQUALS( start , findOne()["x"].numberLong() ); // SERVER-2005
                 }
 
+                ASSERT( findOne()["x"].type() == NumberLong );
             }
         };
 
