@@ -43,14 +43,14 @@ wait(function() {
     if (!status.members) {
       return false;
     }
-    
+
     for (i=0; i<7; i++) {
       if (status.members[i].state != 1 && status.members[i].state != 2) {
         return false;
       }
     }
     return true;
-    
+
   });
 
 replTest.awaitReplication();
@@ -75,6 +75,18 @@ try {
 catch(e) {
     print("trying to reconfigure: "+e);
 }
+
+// wait for a heartbeat, too, just in case sync happens before hb
+assert.soon(function() {
+    var status = master.getDB("admin").runCommand({replSetGetStatus : 1});
+    for (var m in status.members) {
+        if (status.members[m].health == 0) {
+            print(status.members[m].name+" is down");
+            return false;
+        }
+    }
+    return true;
+});
 
 rs2.awaitReplication();
 
