@@ -58,13 +58,21 @@ assert.eq( shardAColl.findOne()._id, -1 )
 
 print("5: overflow oplog");
 
-rsA.overflow( rsA.getSecondaries() )
+var secs = rsA.getSecondaries()
+var goodSec = secs[0]
+var badSec = secs[1]
+
+rsA.overflow( badSec )
+
+print("6: stop non-overflowed secondary")
+
+rsA.stop( goodSec, undefined, true )
 
 print("7: check our regular and slaveok query")
 
 assert.eq( coll.find().itcount(), collSOk.find().itcount() )
 
-print("8: restart our secondaries clean")
+print("8: restart both our secondaries clean")
 
 rsA.restart( rsA.getSecondaries(), { remember : true, startClean : true }, undefined, 5 * 60 * 1000 )
 
@@ -72,7 +80,7 @@ print("9: wait for recovery")
 
 rsA.waitForState( rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 )
 
-print("9: check our regular and slaveok query")
+print("10: check our regular and slaveok query")
 
 assert.eq( coll.find().itcount(), collSOk.find().itcount() )
 
