@@ -72,18 +72,6 @@ namespace mongo {
         return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
     }
 
-    inline void setSockTimeouts(int sock, double secs) {
-        struct timeval tv;
-        tv.tv_sec = (int)secs;
-        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
-        bool report = logLevel > 3; // solaris doesn't provide these
-        DEV report = true;
-        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
-        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
-    }
-
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname);

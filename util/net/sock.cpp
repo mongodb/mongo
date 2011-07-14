@@ -425,7 +425,7 @@ namespace mongo {
         }
 
         if ( _timeout > 0 ) {
-            setSockTimeouts( _fd, _timeout );
+            setTimeout( _timeout );
         }
 
         ConnectBG bg(_fd, remote);
@@ -631,7 +631,15 @@ namespace mongo {
     }
 
     void Socket::setTimeout( double secs ) {
-        setSockTimeouts( _fd , secs );
+        struct timeval tv;
+        tv.tv_sec = (int)secs;
+        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
+        bool report = logLevel > 3; // solaris doesn't provide these
+        DEV report = true;
+        bool ok = setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+        ok = setsockopt(_fd, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
     }
 
 #if defined(_WIN32)
