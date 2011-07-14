@@ -214,14 +214,16 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 
 static inline int
 __pack_write(
-    WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **p, size_t maxlen)
+    WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t maxlen)
 {
+	uint8_t *oldp;
 	size_t s, pad;
 
 	switch (pv->type) {
 	case 'x':
-		memset(*p, 0, pv->size);
-		*p += pv->size;
+		WT_SIZE_CHECK(pv->size, maxlen);
+		memset(*pp, 0, pv->size);
+		*pp += pv->size;
 		break;
 	case 's':
 	case 'S':
@@ -237,14 +239,13 @@ __pack_write(
 			pad = pv->size - s;
 		else
 			pad = 1;
-		if (s + pad > maxlen)
-			return (ENOMEM);
+		WT_SIZE_CHECK(s + pad, maxlen);
 		if (s > 0)
-			memcpy(*p, pv->u.s, s);
-		*p += s;
+			memcpy(*pp, pv->u.s, s);
+		*pp += s;
 		if (pad > 0) {
-			memset(*p, 0, pad);
-			*p += pad;
+			memset(*pp, 0, pad);
+			*pp += pad;
 		}
 		break;
 	case 'U':
@@ -256,41 +257,43 @@ __pack_write(
 		else if (pv->havesize)
 			pad = pv->size - s;
 		if (pv->type == 'U') {
-			WT_RET(__wt_vpack_uint(p, maxlen, s + pad));
-			maxlen -= __wt_vsize_uint(s + pad);
+			oldp = *pp;
+			WT_RET(__wt_vpack_uint(pp, maxlen, s + pad));
+			maxlen -= (size_t)(*pp - oldp);
 		}
-		if (s + pad > maxlen)
-			return (ENOMEM);
+		WT_SIZE_CHECK(s + pad, maxlen);
 		if (s > 0)
-			memcpy(*p, pv->u.item.data, s);
-		*p += s;
+			memcpy(*pp, pv->u.item.data, s);
+		*pp += s;
 		if (pad > 0) {
-			memset(*p, 0, pad);
-			*p += pad;
+			memset(*pp, 0, pad);
+			*pp += pad;
 		}
 		break;
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
-		**p = (uint8_t)(pv->u.i + 0x80);
-		*p += 1;
+		WT_SIZE_CHECK(1, maxlen);
+		**pp = (uint8_t)(pv->u.i + 0x80);
+		*pp += 1;
 		break;
 	case 'B':
 	case 't':
-		**p = (uint8_t)pv->u.u;
-		*p += 1;
+		WT_SIZE_CHECK(1, maxlen);
+		**pp = (uint8_t)pv->u.u;
+		*pp += 1;
 		break;
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
-		WT_RET(__wt_vpack_int(p, maxlen, pv->u.i));
+		WT_RET(__wt_vpack_int(pp, maxlen, pv->u.i));
 		break;
 	case 'H':
 	case 'I':
 	case 'L':
 	case 'Q':
 	case 'r':
-		WT_RET(__wt_vpack_uint(p, maxlen, pv->u.u));
+		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	default:
 		WT_ASSERT(session, pv->type != pv->type);
@@ -302,26 +305,28 @@ __pack_write(
 
 static inline int
 __unpack_read(WT_SESSION_IMPL *session,
-    WT_PACK_VALUE *pv, const uint8_t **p, size_t maxlen)
+    WT_PACK_VALUE *pv, const uint8_t **pp, size_t maxlen)
 {
 	size_t s;
 
 	switch (pv->type) {
 	case 'x':
-		*p += pv->size;
+		WT_SIZE_CHECK(pv->size, maxlen);
+		*pp += pv->size;
 		break;
 	case 's':
 	case 'S':
 		if (pv->type == 's' || pv->havesize)
 			s = pv->size;
 		else
-			s = strlen((const char *)*p) + 1;
+			s = strlen((const char *)*pp) + 1;
 		if (s > 0)
-			pv->u.s = (const char *)*p;
-		*p += s;
+			pv->u.s = (const char *)*pp;
+		WT_SIZE_CHECK(s, maxlen);
+		*pp += s;
 		break;
 	case 'U':
-		WT_RET(__wt_vunpack_uint(p, maxlen, &pv->u.u));
+		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		s = (size_t)pv->u.u;
 		/* FALLTHROUGH */
 	case 'u':
@@ -329,32 +334,33 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = pv->size;
 		else if (pv->type != 'U')
 			s = maxlen;
-		pv->u.item.data = *p;
+		WT_SIZE_CHECK(s, maxlen);
+		pv->u.item.data = *pp;
 		pv->u.item.size = (uint32_t)s;
-		*p += s;
+		*pp += s;
 		break;
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
-		pv->u.i = (int8_t)(**p - 0x80);
-		*p += 1;
+		WT_SIZE_CHECK(1, maxlen);
+		pv->u.i = (int8_t)(**pp++ - 0x80);
 		break;
 	case 'B':
 	case 't':
-		pv->u.u = **p;
-		*p += 1;
+		WT_SIZE_CHECK(1, maxlen);
+		pv->u.u = **pp++;
 		break;
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
-		WT_RET(__wt_vunpack_int(p, maxlen, &pv->u.i));
+		WT_RET(__wt_vunpack_int(pp, maxlen, &pv->u.i));
 		break;
 	case 'H':
 	case 'I':
 	case 'L':
 	case 'Q':
 	case 'r':
-		WT_RET(__wt_vunpack_uint(p, maxlen, &pv->u.u));
+		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	default:
 		WT_ASSERT(session, pv->type != pv->type);
