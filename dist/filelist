@@ -70,11 +70,13 @@ src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
 src/os_posix/os_mtx.c
 src/os_posix/os_open.c
+src/os_posix/os_remove.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_yield.c
 src/schema/schema_create.c
+src/schema/schema_drop.c
 src/schema/schema_list.c
 src/schema/schema_open.c
 src/schema/schema_pack.c

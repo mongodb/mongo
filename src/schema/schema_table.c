@@ -54,3 +54,17 @@ __wt_schema_table_insert(
 	WT_TRET(cursor->close(cursor, NULL));
 	return (ret);
 }
+
+int
+__wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	ret = 0;
+	cursor->set_key(cursor, key);
+	WT_TRET(cursor->remove(cursor));
+	WT_TRET(cursor->close(cursor, NULL));
+	return (ret);
+}

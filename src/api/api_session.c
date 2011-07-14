@@ -157,19 +157,11 @@ __session_drop(
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, drop, config, cfg);
-	if (strncmp(name, "file:", 5) != 0) {
-		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
-	}
-	name += strlen("file:");
 
-	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
-	/* TODO: Combine the table name with home to make a filename. */
-
-	ret = remove(name);
-err:
+	ret = __wt_schema_drop(session, name, config);
 	API_END(session);
 
 	return (force ? 0 : ret);

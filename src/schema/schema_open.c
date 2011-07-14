@@ -8,6 +8,33 @@
 #include "wt_internal.h"
 
 int
+__wt_schema_colgroup_name(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *cgname, size_t len, char **namebufp)
+{
+	char *namebuf;
+	size_t namesize;
+
+	namebuf = *namebufp;
+
+	/* The primary filename is in the table config. */
+	if (table->is_simple) {
+		namesize = strlen("colgroup:") +
+		    strlen(table->name) + 1;
+		WT_RET(__wt_realloc(session, NULL, namesize, &namebuf));
+		snprintf(namebuf, namesize, "colgroup:%s", table->name);
+	} else {
+		namesize = strlen("colgroup::") +
+		    strlen(table->name) + len + 1;
+		WT_RET(__wt_realloc(session, NULL, namesize, &namebuf));
+		snprintf(namebuf, namesize, "colgroup:%s:%.*s",
+		    table->name, (int)len, cgname);
+	}
+
+	*namebufp = namebuf;
+	return (0);
+}
+
+int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_BTREE_SESSION *btree_session;
@@ -17,7 +44,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_CURSOR *cursor;
 	char *namebuf;
 	const char *config, *config_copy;
-	size_t namesize;
 	uint32_t plansize;
 	int i, ret;
 
@@ -34,21 +60,13 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	for (i = 0; i < table->ncolgroups; i++) {
 		if (!table->is_simple)
 			WT_ERR(__wt_config_next(&cparser, &ckey, &cval));
+		else
+			WT_CLEAR(ckey);
 		if (table->colgroup[i] != NULL)
 			continue;
-		/* The primary filename is in the table config. */
-		if (table->is_simple) {
-			namesize = strlen("colgroup:") +
-			    strlen(table->name) + 1;
-			WT_ERR(__wt_realloc(session, NULL, namesize, &namebuf));
-			snprintf(namebuf, namesize, "colgroup:%s", table->name);
-		} else {
-			namesize = strlen("colgroup::") +
-			    strlen(table->name) + ckey.len + 1;
-			WT_ERR(__wt_realloc(session, NULL, namesize, &namebuf));
-			snprintf(namebuf, namesize, "colgroup:%s:%.*s",
-			    table->name, (int)ckey.len, ckey.str);
-		}
+		/* Get the filename from the schema table. */
+		WT_ERR(__wt_schema_colgroup_name(session, table,
+		    ckey.str, ckey.len, &namebuf));
 
 		WT_ERR(__wt_schema_table_cursor(session, &cursor));
 		cursor->set_key(cursor, namebuf);
@@ -158,23 +176,25 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
 	WT_ERR(__wt_strdup(session, tconfig, &table->config));
 
-	if (table->is_simple)
+	/* Point to some items in the copy to save re-parsing. */
+	WT_ERR(__wt_config_getones(session, table->config,
+	    "columns", &table->colconf));
+
+	WT_ERR(__wt_config_getones(session, table->config,
+	    "colgroups", &table->cgconf));
+
+	/* Count the number of column groups; */
+	WT_ERR(__wt_config_subinit(session, &cparser, &table->cgconf));
+	table->ncolgroups = 0;
+	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+		++table->ncolgroups;
+	if (ret != WT_NOTFOUND)
+		goto err;
+
+	if (table->ncolgroups == 0) {
+		/* We need a pointer to the primary. */
 		table->ncolgroups = 1;
-	else {
-		/* Point to some items in the copy to save re-parsing. */
-		WT_ERR(__wt_config_getones(session,
-		    table->config, "columns", &table->colconf));
-
-		WT_ERR(__wt_config_getones(session,
-		    table->config, "colgroups", &table->cgconf));
-
-		/* Count the number of column groups; */
-		WT_ERR(__wt_config_subinit(session, &cparser, &cval));
-		table->ncolgroups = 0;
-		while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-			++table->ncolgroups;
-		if (ret != WT_NOTFOUND)
-			goto err;
+		table->is_simple = 1;
 	}
 
 	WT_ERR(__wt_calloc_def(session, table->ncolgroups, &table->colgroup));
