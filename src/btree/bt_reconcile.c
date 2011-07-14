@@ -2646,6 +2646,21 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_STAT_INCR(btree->stats, page_delete);
 
 		/*
+		 * If the tree is empty, we will arrive here with an empty root
+		 * page.  Discard the old root page and allocate a new empty
+		 * page.  This balances the eviction server's accounting.
+		 */
+		if (WT_PAGE_IS_ROOT(page)) {
+			if (!r->salvage)
+				WT_RET(__rec_discard_add_page(session, page));
+
+			/* Discard everything we've queued for discard. */
+			WT_RET(__rec_discard_evict(session));
+			WT_RET(__wt_btree_root_init(session));
+			return (0);
+		}
+
+		/*
 		 * Deleted pages cannot be evicted; we're going to evict the
 		 * file blocks and it's possible for a thread to traverse into
 		 * them before we reconcile their parent.  That's a big problem
@@ -2654,13 +2669,6 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * it again.
 		 */
 		F_SET(page, WT_PAGE_DELETED);
-
-		/*
-		 * XXX
-		 * I'm pretty sure we can empty the entire tree and arrive here
-		 * deleting the root page, and that's not OK: ignore for now.
-		 */
-		WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
 
 		/*
 		 * We're not going to reconcile this page after all -- release

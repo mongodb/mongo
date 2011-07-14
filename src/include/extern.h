@@ -225,6 +225,7 @@ extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *config,
