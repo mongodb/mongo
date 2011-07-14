@@ -20,47 +20,35 @@ STATIN int	__wt_cell_unpack_safe(
  * WT_CELL --
  *	Variable-length cell type.
  *
- * Pages containing variable-length data (WT_PAGE_ROW_LEAF, WT_PAGE_ROW_INT
+ * Pages containing variable-length data (WT_PAGE_ROW_INT, WT_PAGE_ROW_LEAF, 
  * and WT_PAGE_COL_VAR page types), have variable-length cells after the page
  * header.
  *
- * There are 2 basic cell types: keys and data, each of which has an overflow
- * form.  The cell is usually followed by additional data, varying by type: a
- * key or data cell is followed by a set of bytes; a WT_OFF structure follows
- * an overflow form.
+ * There are 4 basic cell types: keys and data (each of which has an overflow
+ * form), deleted items and off-page references.  The cell is usually followed
+ * by additional data, varying by type: a key or data cell is followed by a set
+ * of bytes, a WT_OFF structure with addr/size pair follows overflow or off-page
+ * cells.
  *
- * There are 3 additional cell types: (1) a deleted type (a place-holder for
- * deleted cells where the cell cannot be removed, for example, a column-store
- * cell that must remain to preserve the record count); (2) a subtree reference
- * for keys that reference subtrees with no associated record count (a row-store
- * internal page has a key/reference pair for the tree containing all key/data
- * pairs greater than the key); (3) a subtree reference for keys that reference
- * subtrees with an associated record count (a column-store internal page has
- * a reference for the tree containing all records greater than the specified
- * record).
+ * Deleted items are place-holders for column-store files, where entries cannot
+ * be removed in order to preserve the record count.
  *
- * Here's the cell type usage by page type:
+ * Here's cell use by page type:
  *
  * WT_PAGE_ROW_INT (row-store internal pages):
- *	Variable-length keys with offpage-reference pairs (a WT_CELL_KEY or
- *	WT_CELL_KEY_OVFL cell, followed by a WT_CELL_OFF cell).
+ *	Keys with offpage-reference items (a WT_CELL_KEY or WT_CELL_KEY_OVFL
+ * cell followed by a WT_CELL_OFF cell).
  *
  * WT_PAGE_ROW_LEAF (row-store leaf pages):
- *	Variable-length key and data pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- *	cell, optionally followed by a WT_CELL_DATA or WT_CELL_DATA_OVFL cell).
+ *	Keys with optional data items (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
+ *	optionally followed by a WT_CELL_DATA or WT_CELL_DATA_OVFL cell).
+ *
+ * Both WT_PAGE_ROW_INT and WT_PAGE_ROW_LEAF pages prefix compress keys, using
+ * a single byte immediately following the cell.
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
- *	Variable-length data cells (a WT_CELL_DATA or WT_CELL_DATA_OVFL cell,
- *	and for deleted cells, a WT_CELL_DEL).
- *
- * A cell consists of 1 descriptor byte, optionally followed by: 1 byte which
- * specifies key prefix compression, 1-4 bytes which specify a data length,
- * and bytes of data.
- *
- * A cell is never more than 6 bytes in length, and the WT_CELL structure is
- * just an array of 6 unsigned bytes.  (The WT_CELL structure's __chunk field
- * should not be directly read or written, use the macros and in-line functions
- * to manipulate it.)
+ *	Data items (a WT_CELL_DATA or WT_CELL_DATA_OVFL cell), and deleted
+ * items (a WT_CELL_DEL cell).
  */
 
 /*
@@ -70,11 +58,10 @@ STATIN int	__wt_cell_unpack_safe(
  * type, the 6th bit is unused, and bits 7-8 specify how many bytes of data
  * length follow the cell (if data-length bytes follow the cell).
  *
- * Bits 1 and 2 are reserved for "short" key and data items.  If bit 1 is set,
- * it's a short data item, less than 128 bytes in length, and the other 7 bits
- * are the length.   If bit 2 is set (but not bit 1), it's a short key, less
- * than 64 bytes in length, and the other 6 bits are the length.  (We test for
- * short data items first, otherwise this trick wouldn't work.)
+ * Bits 1 and 2 are reserved for "short" key and data items.  If bit 1 (but not
+ * bit 2) is set, it's a short data item, less than 128 bytes in length, and the
+ * other 7 bits are the length.   If bit 2 is set (but not bit 1), it's a short
+ * key, less than 64 bytes in length, and the other 6 bits are the length.
  *
  * The 0x03 bit combination is unused, but would require code changes.
  */
