@@ -106,9 +106,7 @@ namespace mongo {
             SockAddr& me = *it;
 
             SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
-            if ( sock == INVALID_SOCKET ) {
-                log() << "ERROR: listen(): invalid socket? " << errnoWithDescription() << endl;
-            }
+            massert( 15863 , str::stream() << "listen(): invalid socket? " << errnoWithDescription() , sock >= 0 );
 
             if (me.getType() == AF_UNIX) {
 #if !defined(_WIN32)
