@@ -42,10 +42,23 @@
 #define	POS_1BYTE_MAX ((1 << 6) - 1)
 #define	POS_2BYTE_MAX ((1 << 13) + POS_1BYTE_MAX)
 
+/* Extract bits <start> to <end> from a value (counting from LSB == 0). */
 #define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
 
 #define	WT_SIZE_CHECK(l, maxl)						\
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
+
+/* Count the leading zero bytes. */
+#ifdef __GNUC__
+#define	WT_LEADING_ZEROS(x, i) (i = __builtin_clzll(x) >> 3)
+#else
+#define	WT_LEADING_ZEROS(x, i) do {                                     \
+	uint64_t __x = (x);                                             \
+	uint64_t __m = 0xff << 56;                                      \
+	for (i = 0; !(__x & __m) && i != 8; i++)                        \
+		__m >>= 8;                                              \
+} while (0)
+#endif
 
 /*
  * __wt_vpack_posint --
@@ -55,19 +68,17 @@ static inline int
 __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
-	int len, shift;
+	int len, lz, shift;
 
-	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
-		if (x >> shift != 0)
-			break;
-
+	WT_LEADING_ZEROS(x, lz);
+	len = 8 - lz;
 	WT_SIZE_CHECK(len + 1, maxlen);
 	p = *pp;
 
 	/* There are four bits we can use in the first byte. */
 	*p++ |= (len & 0xf);
 
-	for (; len != 0; shift -= 8, --len)
+	for (shift = (len - 1) << 3; len != 0; --len, shift -= 8)
 		*p++ = (x >> shift);
 
 	*pp = p;
@@ -82,23 +93,22 @@ static inline int
 __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
-	int len, shift;
+	int len, lz, shift;
 
-	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
-		if (((x >> shift) & 0xff) != 0xff)
-			break;
-
+	WT_LEADING_ZEROS(~x, lz);
+	len = 8 - lz;
 	WT_SIZE_CHECK(len + 1, maxlen);
 	p = *pp;
 
 	/*
-	 * There are four bits we can use in the first byte.
-	 * We store (8 - len) to maintain ordering: this is the number of
-	 * 0xff bytes in the prefix.
+	 * There are four size bits we can use in the first byte.
+	 * For negative numbers, we store the number of leading 0xff bytes
+	 * to maintain ordering (if this is not obvious, it may help to
+	 * remember that -1 is the largest negative number).
 	 */
-	*p++ |= ((8 - len) & 0xf);
+	*p++ |= (lz & 0xf);
 
-	for (; len != 0; shift -= 8, --len)
+	for (shift = (len - 1) << 3; len != 0; shift -= 8, --len)
 		*p++ = (x >> shift);
 
 	*pp = p;
@@ -119,11 +129,10 @@ __wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 	/* There are four length bits in the first byte. */
 	p = *pp;
 	len = (*p++ & 0xf);
-
 	WT_SIZE_CHECK(len + 1, maxlen);
 
-	for (x = 0; len != 0; --len, ++p)
-		x = (x << 8) | *p;
+	for (x = 0; len != 0; --len)
+		x = (x << 8) | *p++;
 
 	*retp = x;
 	*pp = p;
@@ -144,11 +153,10 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 	/* There are four length bits in the first byte. */
 	p = *pp;
 	len = 8 - (*p++ & 0xf);
-
 	WT_SIZE_CHECK(len + 1, maxlen);
 
-	for (x = UINT64_MAX; len != 0; --len, ++p)
-		x = (x << 8) | *p;
+	for (x = UINT64_MAX; len != 0; --len)
+		x = (x << 8) | *p++;
 
 	*retp = x;
 	*pp = p;
@@ -235,8 +243,9 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 	case POS_2BYTE_MARKER:
 	case POS_2BYTE_MARKER | 0x10:
 		WT_SIZE_CHECK(2, maxlen);
-		*xp = POS_1BYTE_MAX + 1 + ((GET_BITS(*p, 5, 0) << 8) | p[1]);
-		p += 2;
+		*xp = GET_BITS(*p++, 5, 0) << 8;
+		*xp |= *p++;
+		*xp += POS_1BYTE_MAX + 1;
 		break;
 	case POS_MULTI_MARKER:
 		WT_RET(__wt_vunpack_posint(pp, maxlen, xp));
@@ -268,7 +277,9 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
 		WT_SIZE_CHECK(2, maxlen);
-		*xp = NEG_2BYTE_MIN + ((GET_BITS(*p, 5, 0) << 8) | p[1]);
+		*xp = GET_BITS(*p++, 5, 0) << 8;
+		*xp |= *p++;
+		*xp += NEG_2BYTE_MIN;
 		p += 2;
 		break;
 	case NEG_1BYTE_MARKER:
@@ -294,13 +305,10 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 static inline size_t
 __wt_vsize_posint(uint64_t x)
 {
-	int len, shift;
+	int lz;
 
-	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
-		if (x >> shift != 0)
-			break;
-
-	return (size_t)(len + 1);
+	WT_LEADING_ZEROS(x, lz);
+	return (9 - lz);
 }
 
 /*
@@ -310,13 +318,11 @@ __wt_vsize_posint(uint64_t x)
 static inline size_t
 __wt_vsize_negint(uint64_t x)
 {
-	int len, shift;
+	int lz;
 
-	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
-		if (((x >> shift) & 0xff) != 0xff)
-			break;
+	WT_LEADING_ZEROS(~x, lz);
 
-	return (size_t)(len + 1);
+	return (size_t)(9 - lz);
 }
 
 /*
