@@ -49,4 +49,5 @@ for arg in sys.argv[1:]:
 		tests.addTests(loader.loadTestsFromName('test%03d' % t))
 
 import wttest
-wttest.runsuite(tests)
+result = wttest.runsuite(tests)
+sys.exit(not result.wasSuccessful())

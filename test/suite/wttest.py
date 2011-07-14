@@ -88,11 +88,12 @@ class WiredTigerTestCase(unittest.TestCase):
 
 def runsuite(suite):
     try:
-        unittest.TextTestRunner(verbosity=2).run(suite)
+        return unittest.TextTestRunner(verbosity=2).run(suite)
     except BaseException as e:
         # This should not happen for regular test errors, unittest should catch everything
         print('ERROR: running test: ' + repr(name) + ': ', e)
         raise e
 
 def run(name='__main__'):
-    runsuite(unittest.TestLoader().loadTestsFromName(name))
+    result = runsuite(unittest.TestLoader().loadTestsFromName(name))
+    sys.exit(not result.wasSuccessful())
