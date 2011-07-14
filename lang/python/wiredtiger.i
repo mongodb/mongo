@@ -37,13 +37,14 @@ from packing import pack, unpack
 }
 
 %typemap(argout) WT_CURSOR ** {
-        (*$1)->flags |= WT_CURSTD_RAW;
         $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
              SWIGTYPE_p_wt_cursor, 0);
-        PyObject_SetAttrString($result, "is_column",
-            PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
+        if (*$1 != NULL) {
+                (*$1)->flags |= WT_CURSTD_RAW;
+                PyObject_SetAttrString($result, "is_column",
+                    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
+        }
 }
-
 
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
@@ -190,9 +191,7 @@ SELFHELPER(struct wt_cursor)
                 return self
 
         def next(self):
-                try:
-                        self._next()
-                except WiredTigerError:
+                if self._next() == WT_NOTFOUND:
                         raise StopIteration
                 return self.get_keys() + self.get_values()
 %}

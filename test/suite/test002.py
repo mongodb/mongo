@@ -20,14 +20,14 @@ class test002(wttest.WiredTigerTestCase):
     """
     Test configuration strings
     """
-    table_name1 = 'test002a.wt'
+    table_name1 = 'test002a'
 
     def create_and_drop_table(self, tablename, confstr):
         self.pr('create_table with config:\n      ' + confstr)
         self.session.create('table:' + tablename, confstr)
 
         #### Drop table not implemented, instead, we're able to explicitly remove the file
-        ####self.session.drop('table:' + tablename, None)
+        self.session.drop('table:' + tablename, None)
 
         import subprocess                          #### added
         subprocess.call(["rm", "-f", tablename])   #### added
@@ -39,23 +39,19 @@ class test002(wttest.WiredTigerTestCase):
         conf_confsize = [
             None,
             'allocation_size=1024',
-            'intl_node_max=64k,intl_node_min=4k',
+            'internal_node_max=64k,internal_node_min=4k',
             'leaf_node_max=128k,leaf_node_min=512',
-            'leaf_node_max=256k,leaf_node_min=1k,intl_node_max=8k,intl_node_min=512',
+            'leaf_node_max=256k,leaf_node_min=1k,internal_node_max=8k,internal_node_min=512',
             ]
         conf_col = [
-            #### Fixed size strings (e.g. '5s') not yet implemented
             'columns=(first,second, third)',
             'columns=(first)',
-            'key_format="S", value_format="Su", columns=(first,second, third)',
+            'key_format="5S", value_format="Su", columns=(first,second, third)',
             ',,columns=(first=S,second="4u", third=S),,',
-            #### index.xxxx, colgroup.xxxx not yet implemented
-            ####'index.country_year=(country,year),key_format=r,colgroup.population=(population),columns=(id,country,year,population),value_format=SS2u',
             ]
         conf_encoding = [
             None,
             'huffman_key=,huffman_value=english',
-            'runlength_encoding'
             ]
         for size in conf_confsize:
             for col in conf_col:
@@ -74,11 +70,10 @@ class test002(wttest.WiredTigerTestCase):
                     "key_format" : "r",
                     "value_format" : "5sHQ",
                     "columns" : ("id", "country", "year", "population"),
-                    "colgroup.population" : ("population",),
-                    "index.country_year" : ("country","year")})]
+                    "colgroups" : ("cyear", "population"),
+			})]
         for confstr in conf_jsonstr:
             self.create_and_drop_table(self.table_name1, confstr)
-
 
 if __name__ == '__main__':
     wttest.run()

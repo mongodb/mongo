@@ -17,10 +17,10 @@ class test003(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test003a.wt'
-    table_name2 = 'test003b.wt'
-    table_name3 = 'test003c.wt'
-    table_name4 = 'test003d.wt'
+    table_name1 = 'test003a'
+    table_name2 = 'test003b'
+    table_name3 = 'test003c'
+    table_name4 = 'test003d'
     nentries = 10
 
     def create_table(self, tablename):
@@ -42,11 +42,11 @@ class test003(wttest.WiredTigerTestCase):
 
         i = 0
         for key, value in cursor:
-            self.assertTrue(key == ('key' + str(i)))
-            self.assertTrue(value == ('value' + str(i)))
+            self.assertEqual(key, ('key' + str(i)))
+            self.assertEqual(value, ('value' + str(i)))
             i += 1
 
-        self.assertTrue(i == self.nentries)
+        self.assertEqual(i, self.nentries)
         cursor.close(None)
 
     def test_table_si(self):
@@ -55,7 +55,7 @@ class test003(wttest.WiredTigerTestCase):
         """
         self.session.create("table:" + self.table_name2, 'key_format=S,value_format=i')
         self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.session.open_cursor('table:' + self.table_name2, None, None)
         for i in range(0, self.nentries):
             cursor.set_key('key' + str(i))
             cursor.set_value(i)
@@ -64,13 +64,13 @@ class test003(wttest.WiredTigerTestCase):
         i = 0
         for key, value in cursor:
             self.pr('got: ' + str(key) + ': ' + str(value))
-            self.assertTrue(key == ('key' + str(i)))
-            self.assertTrue(value == i)
+            self.assertEqual(key, 'key' + str(i))
+            self.assertEqual(value, i)
             i += 1
 
         self.pr("i = " + str(i))
         self.pr("self.... = " + str(self.nentries))
-        self.assertTrue(i == self.nentries)
+        self.assertEqual(i, self.nentries)
         cursor.close(None)
 
     def test_table_is(self):
@@ -79,7 +79,7 @@ class test003(wttest.WiredTigerTestCase):
         """
         self.session.create("table:" + self.table_name3, 'key_format=i,value_format=S')
         self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.session.open_cursor('table:' + self.table_name3, None, None)
         for i in range(0, self.nentries):
             cursor.set_key(i)
             cursor.set_value('value' + str(i))
@@ -88,11 +88,11 @@ class test003(wttest.WiredTigerTestCase):
         i = 0
         for key, value in cursor:
             self.pr('got: ' + str(key) + ': ' + str(value))
-            self.assertTrue(key == i)
-            self.assertTrue(value == ('value' + str(i)))
+            self.assertEqual(key, i)
+            self.assertEqual(value, 'value' + str(i))
             i += 1
 
-        self.assertTrue(i == self.nentries)
+        self.assertEqual(i, self.nentries)
         cursor.close(None)
 
     def test_table_ii(self):
@@ -101,22 +101,22 @@ class test003(wttest.WiredTigerTestCase):
         """
         self.session.create("table:" + self.table_name4, 'key_format=i,value_format=i')
         self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.session.open_cursor('table:' + self.table_name4, None, None)
         self.pr('stepping')
         for i in range(0, self.nentries):
-            self.pr('got')
+            self.pr('put %d -> %d' % (i, i))
             cursor.set_key(i)
             cursor.set_value(i)
             cursor.insert()
 
         i = 0
         for key, value in cursor:
-            self.pr('got: ' + str(key) + ': ' + str(value))
-            self.assertTrue(key == i)
-            self.assertTrue(value == i)
+            self.pr('got %d -> %d' % (key, value))
+            self.assertEqual(key, i)
+            self.assertEqual(value, i)
             i += 1
 
-        self.assertTrue(i == self.nentries)
+        self.assertEqual(i, self.nentries)
         cursor.close(None)
 
 
