@@ -14,6 +14,8 @@ setup(name='wiredtiger', version='1.0',
 	    include_dirs=['.'],
 	    library_dirs=['.'],
 	    libraries=['wiredtiger'],
+		extra_compile_args=[os.environ.get('CFLAGS','')],
+		extra_link_args=[os.environ.get('LDFLAGS','')],
 	)],
 	py_modules=['wiredtiger'],
 )
