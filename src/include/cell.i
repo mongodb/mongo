@@ -156,7 +156,7 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 	 * descriptor byte and no length bytes.
 	 */
 	WT_ASSERT(session, type == WT_CELL_DATA || type == WT_CELL_KEY);
-	if (type == WT_CELL_DATA && size < 0x7f) {
+	if (type == WT_CELL_DATA && size <= 0x7f) {
 		/*
 		 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are
 		 * the size.
@@ -166,7 +166,7 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 		*cell_lenp = 1;			/* Cell byte */
 		return;
 	}
-	if (size < 0x3f) {
+	if (size <= 0x3f) {
 		/*
 		 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag; the other
 		 * 6 bits are the size.
