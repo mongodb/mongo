@@ -161,7 +161,7 @@ restart(void)
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	(void)system("rm -f __bdb* __log __wt*");
+	(void)system("rm -f __db* __bdb* __log __wt*");
 
 	p = "__log";
 	if (g.logging &&
