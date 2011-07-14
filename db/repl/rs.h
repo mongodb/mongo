@@ -111,7 +111,7 @@ namespace mongo {
         /**
          * This is a cache of ghost slaves
          */
-        map<BSONObj,GhostSlave> _ghostCache;
+        map<mongo::OID,GhostSlave> _ghostCache;
         ReplSetImpl *rs;
         virtual void starting();
     public:
@@ -136,7 +136,7 @@ namespace mongo {
          */
         void percolate(const BSONObj& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
-        void updateSlave(const BSONObj& rid, const OpTime& last);
+        void updateSlave(const mongo::OID& id, const OpTime& last);
     };
 
     struct Target;

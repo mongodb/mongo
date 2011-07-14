@@ -518,7 +518,7 @@ namespace mongo {
     }
 
     void GhostSync::associateSlave(const BSONObj& rid, const int memberId) {
-        GhostSlave &slave = _ghostCache[rid];
+        GhostSlave &slave = _ghostCache[rid["_id"].OID()];
         if (slave.init) {
             log(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
             return;
@@ -534,10 +534,10 @@ namespace mongo {
         }
     }
 
-    void GhostSync::updateSlave(const BSONObj& rid, const OpTime& last) {
-        GhostSlave& slave = _ghostCache[rid];
+    void GhostSync::updateSlave(const mongo::OID& id, const OpTime& last) {
+        GhostSlave& slave = _ghostCache[id];
         if (!slave.init) {
-            log() << "couldn't update slave " << rid << rsLog;
+            log() << "couldn't update slave " << id << rsLog;
             return;
         }
 
@@ -545,7 +545,7 @@ namespace mongo {
     }
 
     void GhostSync::percolate(const BSONObj& rid, const OpTime& last) {
-        GhostSlave &s = _ghostCache[rid];
+        GhostSlave &s = _ghostCache[rid["_id"].OID()];
         if (!s.init) {
             log() << "replSet couldn't find a slave with id " << rid
                   << ", not faux syncing" << rsLog;
