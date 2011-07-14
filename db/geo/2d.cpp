@@ -1929,12 +1929,12 @@ namespace mongo {
         virtual BSONObj current() { assert(ok()); return _cur->_o; }
         virtual DiskLoc currLoc() { assert(ok()); return _cur->_loc; }
         virtual bool advance() {
-            bool isOk = ok();
-            if( isOk ){
+            if( ok() ){
                 _cur++;
                 incNscanned();
+                return ok();
             }
-            return isOk;
+            return false;
         }
         virtual BSONObj currKey() const { return _cur->_key; }
 
