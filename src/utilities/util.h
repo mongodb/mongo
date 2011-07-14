@@ -27,6 +27,7 @@ extern int verbose;			/* Verbose flag */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
+int	 util_create(int, char *[]);
 int	 util_dump(int, char *[]);
 int	 util_dumpfile(int, char *[]);
 int	 util_load(int, char *[]);

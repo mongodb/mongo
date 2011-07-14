@@ -1,10 +1,10 @@
-/*! @page utility-dump Dump Utility Command Line Interface
+/*! @page utility-dump wt dump: export data in a text format
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c dump command.
 
 \section Synopsis
-<code>wt [-Vv] [-h directory] dump [-dp] [-f output] table</code>
+<code>wt [-Vv] [-h directory] dump [-dp] [-f output] uri</code>
 
 \section Description
 The \c wt tool is a command-line tool that acts as a front-end to a set
@@ -25,14 +25,15 @@ Specify a database home directory.
 The following are command-specific options for the \c dump command:
 
 \par <code>-d</code>
-Dump the table in a debugging format.
+Dump the specified table or file in a debugging format.
 
 \par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
 the <code>-f</code> option re-directs the output to the specified file.
 
 \par <code>-p</code>
-Dump the table in a printable format.
+Use a printable format, so that ASCII strings are included without
+translation in the dump.
 
 \section Description
 

@@ -1,4 +1,4 @@
-/*! @page utility-load Load Utility Command Line Interface
+/*! @page utility-load wt load: import a table from a text dump
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c load command.
@@ -28,7 +28,7 @@ The following are command-specific options for the \c load command:
 @todo Reference the possible configuration options.
 
 \par <code>-d</code>
-@todo Describe what the -d option to load does.
+Configure for debugging.
 
 \par <code>-f</code>
 By default, the \c load command reads from the standard output; the

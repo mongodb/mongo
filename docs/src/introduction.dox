@@ -20,8 +20,8 @@ For full details about using WiredTiger, see:
 - @ref wt\n
   the reference manual for the WiredTiger API.
 
-- @subpage command-line\n
-  the reference for the WiredTiger command-line interface.
+- @subpage utility\n
+  the reference for the WiredTiger command-line utility.
 
 - @subpage using\n
   how to write WiredTiger applications.

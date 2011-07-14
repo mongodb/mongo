@@ -1,4 +1,4 @@
-/*! @page utility-salvage Salvage Utility Command Line Interface
+/*! @page utility-salvage wt salvage: recover data from a corrupted file.
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c salvage command.

@@ -75,6 +75,9 @@ main(int argc, char *argv[])
 	optind = 1;
 
 	switch (command[0]) {
+	case 'c':
+		if (strcmp(command, "create") == 0)
+			return (util_create(argc, argv));
 	case 'd':
 		if (strcmp(command, "dump") == 0)
 			return (util_dump(argc, argv));
@@ -119,6 +122,7 @@ usage(void)
 	    "\t-v\tverbose\n");
 	fprintf(stderr,
 	    "commands:\n"
+	    "\tcreate\t  create an object\n"
 	    "\tdump\t  dump a table\n"
 	    "\tdumpfile  dump a physical file in debugging format\n"
 	    "\tload\t  load a table\n"

@@ -1,4 +1,4 @@
-/*! @page utility-printlog Printlog Utility Command Line Interface
+/*! @page utility-printlog wt printlog: output the database log
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c printlog command.

@@ -1,4 +1,4 @@
-/*! @page utility-verify Verify Utility Command Line Interface
+/*! @page utility-dumpfile wt dumpfile: dumps the file in a debugging format
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c dumpfile command.

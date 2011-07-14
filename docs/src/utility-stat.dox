@@ -1,4 +1,4 @@
-/*! @page utility-stat Stat Utility Command Line Interface
+/*! @page utility-stat wt stat: output statistics for the specified object
 
 WiredTiger includes a command line tool, \c wt.  One of the commands for
 the \c wt tool is the \c stat command.
