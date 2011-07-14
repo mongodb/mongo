@@ -136,9 +136,9 @@ namespace mongo {
 
             if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
                 int x = errno;
-                log() << "listen(): bind() failed " << errnoWithDescription(x) << " for socket: " << me.toString() << endl;
+                error() << "listen(): bind() failed " << errnoWithDescription(x) << " for socket: " << me.toString() << endl;
                 if ( x == EADDRINUSE )
-                    log() << "  addr already in use" << endl;
+                    error() << "  addr already in use" << endl;
                 closesocket(sock);
                 return;
             }
@@ -146,15 +146,14 @@ namespace mongo {
 #if !defined(_WIN32)
             if (me.getType() == AF_UNIX) {
                 if (chmod(me.getAddr().c_str(), 0777) == -1) {
-                    log() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
+                    error() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
                 }
-
                 ListeningSockets::get()->addPath( me.getAddr() );
             }
 #endif
 
             if ( ::listen(sock, 128) != 0 ) {
-                log() << "listen(): listen() failed " << errnoWithDescription() << endl;
+                error() << "listen(): listen() failed " << errnoWithDescription() << endl;
                 closesocket(sock);
                 return;
             }
