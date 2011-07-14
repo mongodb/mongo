@@ -44,7 +44,8 @@
 
 #define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
 
-#define	WT_SIZE_CHECK(l, maxl) WT_RET(((size_t)(l) > (maxl)) ? ENOMEM : 0)
+#define WT_SIZE_CHECK(l, maxl)						\
+	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
 
 /*
  * __wt_vpack_posint --
