@@ -365,6 +365,9 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			__evict_req_clr(session, er);
 		} else
 			cache->pending_retry = 1;
+
+		/* Clear the reference to the btree handle. */
+		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	return (0);
 }
@@ -496,6 +499,8 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 			__wt_session_serialize_wrapup(request_session, NULL, 0);
 			__evict_req_clr(session, er);
 		}
+
+		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	return (0);
 }
@@ -561,6 +566,8 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 			WT_ERR(__evict_walk_file(session, i));
 			i += WT_EVICT_WALK_PER_TABLE;
+
+			WT_CLEAR_BTREE_IN_SESSION(session);
 		}
 	}
 err:	__wt_unlock(session, conn->mtx);
@@ -712,6 +719,8 @@ __evict_page(WT_SESSION_IMPL *session)
 		 */
 		if (__wt_page_reconcile(session, page, WT_REC_EVICT) != 0)
 			page->read_gen = __wt_cache_read_gen(session);
+
+		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 }
 

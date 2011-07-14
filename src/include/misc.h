@@ -39,6 +39,9 @@ extern "C" {
 #define	WT_SET_BTREE_IN_SESSION(s, b)					\
 	((s)->btree = (b))
 
+#define	WT_CLEAR_BTREE_IN_SESSION(s)					\
+	((s)->btree = NULL)
+
 /*
  * Align an unsigned value of any type to a specified power-of-2, including the
  * offset result of a pointer subtraction.  Do the calculation using the largest

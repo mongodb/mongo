@@ -196,6 +196,8 @@ __wt_cache_read_server(void *arg)
 				__cache_read_req_clr(rr);
 				__wt_session_serialize_wrapup(
 				    request_session, NULL, ret);
+
+				WT_CLEAR_BTREE_IN_SESSION(session);
 			}
 		} while (didwork);
 	}
