@@ -44,7 +44,7 @@
 
 #define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
 
-#define WT_SIZE_CHECK(l, maxl)						\
+#define	WT_SIZE_CHECK(l, maxl)						\
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
 
 /*
@@ -243,7 +243,6 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 		*xp += POS_2BYTE_MAX + 1;
 		return (0);
 	default:
-		WT_FAILURE(session, "corrupted packed unsigned value");
 		return (EINVAL);
 	}
 
