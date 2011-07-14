@@ -526,7 +526,13 @@ namespace mongo {
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
-            catch ( GetMoreWaitException& ) {
+            catch ( AssertionException& e ) {
+                exhaust = false;
+                curop.debug().exceptionInfo = e.getInfo();
+                msgdata = emptyMoreResult(cursorid);
+                ok = false;
+            }
+            if (msgdata == 0) {
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
                 if( pass == 0 ) {
@@ -546,12 +552,6 @@ namespace mongo {
                 else
                     sleepmillis(2);
                 continue;
-            }
-            catch ( AssertionException& e ) {
-                exhaust = false;
-                curop.debug().exceptionInfo = e.getInfo();
-                msgdata = emptyMoreResult(cursorid);
-                ok = false;
             }
             break;
         };

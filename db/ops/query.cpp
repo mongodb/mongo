@@ -145,7 +145,7 @@ namespace mongo {
                             continue;
 
                         if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
-                            throw GetMoreWaitException();
+                            return 0;
                         }
 
                         break;
