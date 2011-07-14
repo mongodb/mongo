@@ -256,7 +256,7 @@ __pack_write(
 		else if (pv->havesize)
 			pad = pv->size - s;
 		if (pv->type == 'U') {
-			WT_RET(__wt_vpack_uint(session, p, maxlen, s + pad));
+			WT_RET(__wt_vpack_uint(p, maxlen, s + pad));
 			maxlen -= __wt_vsize_uint(s + pad);
 		}
 		if (s + pad > maxlen)
@@ -283,14 +283,14 @@ __pack_write(
 	case 'i':
 	case 'l':
 	case 'q':
-		WT_RET(__wt_vpack_int(session, p, maxlen, pv->u.i));
+		WT_RET(__wt_vpack_int(p, maxlen, pv->u.i));
 		break;
 	case 'H':
 	case 'I':
 	case 'L':
 	case 'Q':
 	case 'r':
-		WT_RET(__wt_vpack_uint(session, p, maxlen, pv->u.u));
+		WT_RET(__wt_vpack_uint(p, maxlen, pv->u.u));
 		break;
 	default:
 		WT_ASSERT(session, pv->type != pv->type);
@@ -321,7 +321,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*p += s;
 		break;
 	case 'U':
-		WT_RET(__wt_vunpack_uint(session, p, maxlen, &pv->u.u));
+		WT_RET(__wt_vunpack_uint(p, maxlen, &pv->u.u));
 		s = (size_t)pv->u.u;
 		/* FALLTHROUGH */
 	case 'u':
@@ -347,14 +347,14 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'i':
 	case 'l':
 	case 'q':
-		WT_RET(__wt_vunpack_int(session, p, maxlen, &pv->u.i));
+		WT_RET(__wt_vunpack_int(p, maxlen, &pv->u.i));
 		break;
 	case 'H':
 	case 'I':
 	case 'L':
 	case 'Q':
 	case 'r':
-		WT_RET(__wt_vunpack_uint(session, p, maxlen, &pv->u.u));
+		WT_RET(__wt_vunpack_uint(p, maxlen, &pv->u.u));
 		break;
 	default:
 		WT_ASSERT(session, pv->type != pv->type);

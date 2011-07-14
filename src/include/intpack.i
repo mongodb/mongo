@@ -52,13 +52,10 @@
  *	Packs a positive variable-length integer in the specified location.
  */
 static inline int
-__wt_vpack_posint(
-    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 	int len, shift;
-
-	WT_UNUSED(session);
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (x >> shift != 0)
@@ -82,13 +79,10 @@ __wt_vpack_posint(
  *	Packs a negative variable-length integer in the specified location.
  */
 static inline int
-__wt_vpack_negint(
-    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 	int len, shift;
-
-	WT_UNUSED(session);
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (((x >> shift) & 0xff) != 0xff)
@@ -116,14 +110,11 @@ __wt_vpack_negint(
  *	Reads a variable-length positive integer from the specified location.
  */
 static inline int
-__wt_vunpack_posint(
-    WT_SESSION_IMPL *session, const uint8_t **pp, size_t maxlen, uint64_t *retp)
+__wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
 	const uint8_t *p;
 	uint8_t len;
-
-	WT_UNUSED(session);
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
@@ -144,14 +135,11 @@ __wt_vunpack_posint(
  *	Reads a variable-length negative integer from the specified location.
  */
 static inline int
-__wt_vunpack_negint(
-    WT_SESSION_IMPL *session, const uint8_t **pp, size_t maxlen, uint64_t *retp)
+__wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
 	const uint8_t *p;
 	uint8_t len;
-
-	WT_UNUSED(session);
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
@@ -172,8 +160,7 @@ __wt_vunpack_negint(
  *	Variable-sized packing for unsigned integers
  */
 static inline int
-__wt_vpack_uint(
-    WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, uint64_t x)
+__wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 
@@ -189,7 +176,7 @@ __wt_vpack_uint(
 	} else {
 		x -= POS_2BYTE_MAX + 1;
 		*p = POS_MULTI_MARKER;
-		return (__wt_vpack_posint(session, pp, maxlen, x));
+		return (__wt_vpack_posint(pp, maxlen, x));
 	}
 
 	*pp = p;
@@ -201,7 +188,7 @@ __wt_vpack_uint(
  *	Variable-sized packing for signed integers
  */
 static inline int
-__wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
+__wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
 {
 	uint8_t *p;
 
@@ -209,7 +196,7 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 	p = *pp;
 	if (x < NEG_2BYTE_MIN) {
 		*p = NEG_MULTI_MARKER;
-		return (__wt_vpack_negint(session, pp, maxlen, (uint64_t)x));
+		return (__wt_vpack_negint(pp, maxlen, (uint64_t)x));
 	} else if (x < NEG_1BYTE_MIN) {
 		WT_SIZE_CHECK(2, maxlen);
 		x -= NEG_2BYTE_MIN;
@@ -220,7 +207,7 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 		*p++ = NEG_1BYTE_MARKER | GET_BITS(x, 6, 0);
 	} else
 		/* For non-negative values, use the unsigned code above. */
-		return (__wt_vpack_uint(session, pp, maxlen, (uint64_t)x));
+		return (__wt_vpack_uint(pp, maxlen, (uint64_t)x));
 
 	*pp = p;
 	return (0);
@@ -231,8 +218,7 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
  *	Variable-sized unpacking for unsigned integers
  */
 static inline int
-__wt_vunpack_uint(
-    WT_SESSION_IMPL *session, const uint8_t **pp, size_t maxlen, uint64_t *xp)
+__wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 {
 	const uint8_t *p;
 
@@ -253,11 +239,10 @@ __wt_vunpack_uint(
 		p += 2;
 		break;
 	case POS_MULTI_MARKER:
-		WT_RET(__wt_vunpack_posint(session, pp, maxlen, xp));
+		WT_RET(__wt_vunpack_posint(pp, maxlen, xp));
 		*xp += POS_2BYTE_MAX + 1;
 		return (0);
 	default:
-		WT_ASSERT(session, *p != *p);
 		return (EINVAL);
 	}
 
@@ -270,8 +255,7 @@ __wt_vunpack_uint(
  *	Variable-sized packing for signed integers
  */
 static inline int
-__wt_vunpack_int(
-    WT_SESSION_IMPL *session, const uint8_t **pp, size_t maxlen, int64_t *xp)
+__wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 {
 	const uint8_t *p;
 
@@ -279,8 +263,7 @@ __wt_vunpack_int(
 	p = *pp;
 	switch (*p & 0xf0) {
 	case NEG_MULTI_MARKER:
-		WT_RET(__wt_vunpack_negint(session,
-		    pp, maxlen, (uint64_t *)xp));
+		WT_RET(__wt_vunpack_negint(pp, maxlen, (uint64_t *)xp));
 		return (0);
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
@@ -297,8 +280,7 @@ __wt_vunpack_int(
 		break;
 	default:
 		/* Identical to the unsigned case. */
-		return (__wt_vunpack_uint(session,
-		    pp, maxlen, (uint64_t *)xp));
+		return (__wt_vunpack_uint(pp, maxlen, (uint64_t *)xp));
 	}
 
 	*pp = p;
