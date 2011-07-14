@@ -87,5 +87,5 @@ assert.eq( coll.find().itcount(), collSOk.find().itcount() )
 
 
 
-shardTest.stop()
+//shardTest.stop()
 
