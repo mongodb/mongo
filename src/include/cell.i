@@ -197,8 +197,7 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 		*p++ = (uint8_t)prefix;
 
 	/* Pack the data length. */
-	(void)__wt_vpack_uint(
-	    session, &p, sizeof(cell->__chunk) - 1, (uint64_t)size);
+	(void)__wt_vpack_uint(&p, sizeof(cell->__chunk) - 1, (uint64_t)size);
 
 	*cell_lenp = WT_PTRDIFF32(p, cell);
 }
@@ -300,8 +299,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 			if (end != NULL && p + len > end)
 				return (WT_ERROR);
 		}
-		WT_RET(__wt_vunpack_uint(
-		    session, &p, sizeof(cell->__chunk) - 1, &v));
+		WT_RET(__wt_vunpack_uint(&p, sizeof(cell->__chunk) - 1, &v));
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
@@ -326,8 +324,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 			if (end != NULL && p + len > end)
 				return (WT_ERROR);
 		}
-		WT_RET(__wt_vunpack_uint(
-		    session, &p, sizeof(cell->__chunk) - 2, &v));
+		WT_RET(__wt_vunpack_uint(&p, sizeof(cell->__chunk) - 2, &v));
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
