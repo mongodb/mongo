@@ -1928,7 +1928,14 @@ namespace mongo {
         virtual Record* _current() { assert(ok()); return _cur->_loc.rec(); }
         virtual BSONObj current() { assert(ok()); return _cur->_o; }
         virtual DiskLoc currLoc() { assert(ok()); return _cur->_loc; }
-        virtual bool advance() { _cur++; incNscanned(); return ok(); }
+        virtual bool advance() {
+            bool isOk = ok();
+            if( isOk ){
+                _cur++;
+                incNscanned();
+            }
+            return isOk;
+        }
         virtual BSONObj currKey() const { return _cur->_key; }
 
         virtual string toString() {
