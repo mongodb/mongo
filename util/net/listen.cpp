@@ -233,13 +233,13 @@ namespace mongo {
                     disableNagle(s);
                 if ( _logConnect && ! cmdLine.quiet )
                     log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
-                accepted(s, from);
+                accepted(Socket(s, from));
             }
         }
     }
 
-    void Listener::accepted(int sock, const SockAddr& from) {
-        accepted( new MessagingPort(sock, from) );
+    void Listener::accepted(Socket socket) {
+        accepted( new MessagingPort(socket) );
     }
     
     void Listener::accepted(MessagingPort *mp) {

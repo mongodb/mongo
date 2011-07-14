@@ -630,6 +630,10 @@ namespace mongo {
         return ::recv( _fd , buf , max , portRecvFlags );
     }
 
+    void Socket::setTimeout( double secs ) {
+        setSockTimeouts( _fd , secs );
+    }
+
 #if defined(_WIN32)
     struct WinsockInit {
         WinsockInit() {

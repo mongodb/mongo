@@ -217,6 +217,8 @@ namespace mongo {
         void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
         long long getBytesIn() const { return _bytesIn; }
         long long getBytesOut() const { return _bytesOut; }
+        
+        void setTimeout( double secs );
 
 #ifdef MONGO_SSL
         void secure( SSLManager * ssl );

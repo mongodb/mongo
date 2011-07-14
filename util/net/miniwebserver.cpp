@@ -108,17 +108,17 @@ namespace mongo {
         return false;
     }
 
-    void MiniWebServer::accepted(int s, const SockAddr &from) {
-        setSockTimeouts(s, 8);
+    void MiniWebServer::accepted(Socket sock) {
+        sock.setTimeout(8);
         char buf[4096];
         int len = 0;
         while ( 1 ) {
             int left = sizeof(buf) - 1 - len;
             if( left == 0 )
                 break;
-            int x = ::recv(s, buf + len, left, 0);
+            int x = sock.unsafe_recv( buf + len , left );
             if ( x <= 0 ) {
-                closesocket(s);
+                sock.close();
                 return;
             }
             len += x;
@@ -134,7 +134,7 @@ namespace mongo {
         vector<string> headers;
 
         try {
-            doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, from);
+            doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, sock.remoteAddr() );
         }
         catch ( std::exception& e ) {
             responseCode = 500;
@@ -165,8 +165,8 @@ namespace mongo {
         ss << responseMsg;
         string response = ss.str();
 
-        ::send(s, response.c_str(), response.size(), 0);
-        closesocket(s);
+        sock.send( response.c_str(), response.size() , "http response" );
+        sock.close();
     }
 
     string MiniWebServer::getHeader( const char * req , string wanted ) {

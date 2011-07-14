@@ -53,7 +53,7 @@ namespace mongo {
         static string urlDecode(string s) {return urlDecode(s.c_str());}
 
     private:
-        void accepted(int s, const SockAddr &from);
+        void accepted(Socket socket);
         static bool fullReceive( const char *buf );
     };
 
