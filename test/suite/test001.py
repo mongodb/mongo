@@ -80,4 +80,4 @@ class test001(wttest.WiredTigerTestCase):
 
 
 if __name__ == '__main__':
-    wttest.run(test001)
+    wttest.run()

@@ -25,30 +25,28 @@ sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
 # These may be needed on some systems
 #os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = wt_builddir
 
-import wiredtiger
-import wttest
-
 #export ARCH="x86_64"  # may be needed on OS/X
 
-def canonicalizeName(n):
-    """
-    convert numeric value to string, e.g. 1->"001"
-    """
-    _s = "" + n;
-    while len(_s) < 3:
-        _s = "0" + _s
-    return _s
 
-tests = []
+tests = unittest.TestSuite()
+
+# Without arguments, do discovery
+if len(sys.argv) < 2:
+	# Use the backport of Python 2.7+ unittest discover module.
+	# (Under a BSD license, so we include a copy in our tree for simplicity.)
+	from discover import defaultTestLoader as loader
+	tests.addTests(loader.discover(suitedir))
+
+# Otherwise, turn numbers and ranges into test module names
 for arg in sys.argv[1:]:
-    # TODO: handle ranges, commas and combinations 1-4,6,12-14
-    tests.append(canonicalizeName(arg))
+	from unittest import defaultTestLoader as loader
+	# Deal with ranges
+	if '-' in arg:
+		start, end = (int(a) for a in arg.split('-'))
+	else:
+		start, end = int(arg), int(arg)
+	for t in xrange(start, end+1):
+		tests.addTests(loader.loadTestsFromName('test%03d' % t))
 
-suite = unittest.TestSuite()
-for test in tests:
-    testname = 'test' + test
-    module = __import__(testname)
-    cl = getattr(module, testname)
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(cl))
-
-wttest.runsuite(suite)
+import wttest
+wttest.runsuite(tests)

@@ -94,5 +94,5 @@ def runsuite(suite):
         print('ERROR: running test: ' + repr(name) + ': ', e)
         raise e
 
-def run(name):
-    runsuite(unittest.TestLoader().loadTestsFromTestCase(name))
+def run(name='__main__'):
+    runsuite(unittest.TestLoader().loadTestsFromName(name))
