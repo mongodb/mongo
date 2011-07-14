@@ -44,6 +44,8 @@
 
 #define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
 
+#define	WT_SIZE_CHECK(l, maxl) WT_RET(((size_t)(l) > (maxl)) ? ENOMEM : 0)
+
 /*
  * __wt_vpack_posint --
  *      Packs a positive variable-length integer in the specified location.
@@ -55,11 +57,14 @@ __wt_vpack_posint(
 	uint8_t *p;
 	int len, shift;
 
-	p = *pp;
+	WT_UNUSED(session);
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (x >> shift != 0)
 			break;
+
+	WT_SIZE_CHECK(len + 1, maxlen);
+	p = *pp;
 
 	/* There are four bits we can use in the first byte. */
 	*p++ |= (len & 0xf);
@@ -67,7 +72,6 @@ __wt_vpack_posint(
 	for (; len != 0; shift -= 8, --len)
 		*p++ = (x >> shift);
 
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -83,11 +87,14 @@ __wt_vpack_negint(
 	uint8_t *p;
 	int len, shift;
 
-	p = *pp;
+	WT_UNUSED(session);
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (((x >> shift) & 0xff) != 0xff)
 			break;
+
+	WT_SIZE_CHECK(len + 1, maxlen);
+	p = *pp;
 
 	/*
 	 * There are four bits we can use in the first byte.
@@ -99,7 +106,6 @@ __wt_vpack_negint(
 	for (; len != 0; shift -= 8, --len)
 		*p++ = (x >> shift);
 
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -116,16 +122,18 @@ __wt_vunpack_posint(
 	const uint8_t *p;
 	uint8_t len;
 
-	p = *pp;
+	WT_UNUSED(session);
 
 	/* There are four length bits in the first byte. */
+	p = *pp;
 	len = (*p++ & 0xf);
+
+	WT_SIZE_CHECK(len + 1, maxlen);
 
 	for (x = 0; len != 0; --len, ++p)
 		x = (x << 8) | *p;
 
 	*retp = x;
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -142,16 +150,18 @@ __wt_vunpack_negint(
 	const uint8_t *p;
 	uint8_t len;
 
-	p = *pp;
+	WT_UNUSED(session);
 
 	/* There are four length bits in the first byte. */
+	p = *pp;
 	len = 8 - (*p++ & 0xf);
+
+	WT_SIZE_CHECK(len + 1, maxlen);
 
 	for (x = UINT64_MAX; len != 0; --len, ++p)
 		x = (x << 8) | *p;
 
 	*retp = x;
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -166,10 +176,12 @@ __wt_vpack_uint(
 {
 	uint8_t *p;
 
+	WT_SIZE_CHECK(1, maxlen);
 	p = *pp;
 	if (x <= POS_1BYTE_MAX)
 		*p++ = POS_1BYTE_MARKER | GET_BITS(x, 6, 0);
 	else if (x <= POS_2BYTE_MAX) {
+		WT_SIZE_CHECK(2, maxlen);
 		x -= POS_1BYTE_MAX + 1;
 		*p++ = POS_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
@@ -179,7 +191,6 @@ __wt_vpack_uint(
 		return (__wt_vpack_posint(session, pp, maxlen, x));
 	}
 
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -193,11 +204,13 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 {
 	uint8_t *p;
 
+	WT_SIZE_CHECK(1, maxlen);
 	p = *pp;
 	if (x < NEG_2BYTE_MIN) {
 		*p = NEG_MULTI_MARKER;
 		return (__wt_vpack_negint(session, pp, maxlen, (uint64_t)x));
 	} else if (x < NEG_1BYTE_MIN) {
+		WT_SIZE_CHECK(2, maxlen);
 		x -= NEG_2BYTE_MIN;
 		*p++ = NEG_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
@@ -208,7 +221,6 @@ __wt_vpack_int(WT_SESSION_IMPL *session, uint8_t **pp, size_t maxlen, int64_t x)
 		/* For non-negative values, use the unsigned code above. */
 		return (__wt_vpack_uint(session, pp, maxlen, (uint64_t)x));
 
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
@@ -223,6 +235,7 @@ __wt_vunpack_uint(
 {
 	const uint8_t *p;
 
+	WT_SIZE_CHECK(1, maxlen);
 	p = *pp;
 	switch (*p & 0xf0) {
 	case POS_1BYTE_MARKER:
@@ -234,6 +247,7 @@ __wt_vunpack_uint(
 		break;
 	case POS_2BYTE_MARKER:
 	case POS_2BYTE_MARKER | 0x10:
+		WT_SIZE_CHECK(2, maxlen);
 		*xp = POS_1BYTE_MAX + 1 + ((GET_BITS(*p, 5, 0) << 8) | p[1]);
 		p += 2;
 		break;
@@ -260,6 +274,7 @@ __wt_vunpack_int(
 {
 	const uint8_t *p;
 
+	WT_SIZE_CHECK(1, maxlen);
 	p = *pp;
 	switch (*p & 0xf0) {
 	case NEG_MULTI_MARKER:
@@ -268,6 +283,7 @@ __wt_vunpack_int(
 		return (0);
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
+		WT_SIZE_CHECK(2, maxlen);
 		*xp = NEG_2BYTE_MIN + ((GET_BITS(*p, 5, 0) << 8) | p[1]);
 		p += 2;
 		break;
@@ -284,7 +300,6 @@ __wt_vunpack_int(
 		    pp, maxlen, (uint64_t *)xp));
 	}
 
-	WT_ASSERT(session, (size_t)(p - *pp) <= maxlen);
 	*pp = p;
 	return (0);
 }
