@@ -973,7 +973,7 @@ namespace mongo {
 	const shared_ptr<Document> &pResult,
         const shared_ptr<Document> &pDocument) const {
 	const size_t pathSize = path.size();
-	set<string>::iterator end(path.end());
+	set<string>::const_iterator end(path.end());
 
 	/*
 	  Take care of inclusions or exclusions.  Note that _id is special,
@@ -1257,7 +1257,7 @@ namespace mongo {
 	  fields are listed in the result.  That comes from the underlying
 	  Document they are fetched from.
 	 */
-	for(set<string>::iterator end(path.end()),
+	for(set<string>::const_iterator end(path.end()),
 		iter(path.begin()); iter != end; ++iter) {
 
 	    /* find the matching field description */
@@ -1309,7 +1309,7 @@ namespace mongo {
 
 	/* then add any expressions */
 	const size_t nField = vFieldName.size();
-	const set<string>::iterator pathEnd(path.end());
+	const set<string>::const_iterator pathEnd(path.end());
 	for(size_t iField = 0; iField < nField; ++iField) {
 	    string fieldName(vFieldName[iField]);
 
