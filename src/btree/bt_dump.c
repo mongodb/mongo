@@ -177,6 +177,7 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_UPDATE *upd;
 	int ret;
 	uint32_t i;
@@ -184,6 +185,7 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 	btree = session->btree;
 	huffman = btree->huffman_value;
+	unpack = &_unpack;
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
@@ -201,17 +203,16 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 
 		/* Process the original data. */
-		switch (__wt_cell_type(cell)) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				dp->p(__wt_cell_data(session, cell),
-				    __wt_cell_datalen(session, cell),
-				    dp->stream);
+				dp->p(unpack->data, unpack->size, dp->stream);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_cell_copy(session, cell, tmp));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
 			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		case WT_CELL_DEL:
@@ -234,6 +235,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_BTREE *btree;
 	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_INSERT *ins;
 	WT_ITEM *key, _key, *value, _value;
 	WT_ROW *rip;
@@ -246,6 +248,7 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 	key = value = NULL;
 	key_tmp = value_tmp = NULL;
 	huffman = btree->huffman_value;
+	unpack = &_unpack;
 	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key_tmp));
@@ -302,17 +305,19 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Set cell to reference the value we'll dump. */
-		switch (__wt_cell_type(cell)) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
 				value = &_value;
-				__wt_cell_data_and_len(session,
-				    cell, &value->data, &value->size);
+				value->data = unpack->data;
+				value->size = unpack->size;
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_cell_copy(session, cell, value_tmp));
+			WT_ERR(
+			    __wt_cell_unpack_copy(session, unpack, value_tmp));
 			value = (WT_ITEM *)value_tmp;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(session);

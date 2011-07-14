@@ -676,14 +676,6 @@ struct __wt_insert {
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
 
 /*
- * WT_CELL --
- *	Variable-length cell type; see include/cell.i for more information.
- */
-struct __wt_cell {
-	uint8_t __chunk[6];		/* cell: 1 to 6 bytes */
-};
-
-/*
  * WT_OFF --
  *	Row-store internal pages reference subtrees with no record count, and
  * row- and column-store overflow key and data items.

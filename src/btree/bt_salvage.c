@@ -619,17 +619,21 @@ static int
 __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 {
 	WT_CELL *cell;
-	WT_OFF ovfl;
+	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i, ovfl_cnt;
+
+	unpack = &_unpack;
 
 	/*
 	 * Two passes: count the overflow items, then copy them into an
 	 * allocated array.
 	 */
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH(session, dsk, cell, i)
-		if (__wt_cell_type_is_ovfl(cell))
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		if (unpack->ovfl)
 			++ovfl_cnt;
+	}
 	if (ovfl_cnt == 0)
 		return (0);
 
@@ -637,20 +641,22 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	trk->ovfl_cnt = ovfl_cnt;
 
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH(session, dsk, cell, i)
-		if (__wt_cell_type_is_ovfl(cell)) {
-			__wt_cell_off(session, cell, &ovfl);
-			trk->ovfl[ovfl_cnt].addr = ovfl.addr;
-			trk->ovfl[ovfl_cnt].size = ovfl.size;
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		if (unpack->ovfl) {
+			trk->ovfl[ovfl_cnt].addr = unpack->off.addr;
+			trk->ovfl[ovfl_cnt].size = unpack->off.size;
 
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] overflow reference [%" PRIu32
 			    "/%" PRIu32 "]",
-			    trk->addr, ovfl.addr, ovfl.size);
+			    trk->addr, unpack->off.addr, unpack->off.size);
 
 			if (++ovfl_cnt == trk->ovfl_cnt)
 				break;
 		}
+	}
+
 	return (0);
 }
 
@@ -1220,21 +1226,23 @@ static int
 __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
     uint32_t addr, WT_PAGE *page, uint32_t start, uint32_t stop)
 {
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CELL *cell;
 	WT_COL *cip;
-	WT_OFF ovfl;
+
+	unpack = &_unpack;
 
 	for (cip = page->u.col_leaf.d + start; start < stop; ++start) {
 		cell = WT_COL_PTR(page, cip);
-		if (__wt_cell_type(cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_off(session, cell, &ovfl);
-
+		__wt_cell_unpack(session, cell, unpack);
+		if (unpack->type == WT_CELL_DATA_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
 			    "reference [%" PRIu32 "/%" PRIu32 "]",
-			    addr, ovfl.addr, ovfl.size);
+			    addr, unpack->off.addr, unpack->off.size);
 
-			WT_RET(__wt_block_free(session, ovfl.addr, ovfl.size));
+			WT_RET(__wt_block_free(
+			    session, unpack->off.addr, unpack->off.size));
 		}
 	}
 	return (0);
@@ -1781,8 +1789,10 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
    uint32_t addr, WT_PAGE *page, uint32_t start, uint32_t stop)
 {
 	WT_CELL *cell;
-	WT_OFF ovfl;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_ROW *rip;
+
+	unpack = &_unpack;
 
 	for (rip = page->u.row_leaf.d + start; start < stop; ++start) {
 		if (__wt_off_page(page, rip->key))
@@ -1790,26 +1800,28 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    page, ((WT_IKEY *)rip->key)->cell_offset);
 		else
 			cell = rip->key;
-		if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
-			__wt_cell_off(session, cell, &ovfl);
-
+		__wt_cell_unpack(session, cell, unpack);
+		if (unpack->type == WT_CELL_KEY_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
 			    "reference [%" PRIu32 "/%" PRIu32 "]",
-			    addr, ovfl.addr, ovfl.size);
+			    addr, unpack->off.addr, unpack->off.size);
 
-			WT_RET(__wt_block_free(session, ovfl.addr, ovfl.size));
+			WT_RET(__wt_block_free(
+			    session, unpack->off.addr, unpack->off.size));
 		}
-		if ((cell = __wt_row_value(session, page, rip)) != NULL &&
-		    __wt_cell_type(cell) == WT_CELL_DATA_OVFL) {
-			__wt_cell_off(session, cell, &ovfl);
 
+		if ((cell = __wt_row_value(session, page, rip)) == NULL)
+			continue;
+		__wt_cell_unpack(session, cell, unpack);
+		if (unpack->type == WT_CELL_DATA_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
 			    "reference [%" PRIu32 "/%" PRIu32 "]",
-			    addr, ovfl.addr, ovfl.size);
+			    addr, unpack->off.addr, unpack->off.size);
 
-			WT_RET(__wt_block_free(session, ovfl.addr, ovfl.size));
+			WT_RET(__wt_block_free(
+			    session, unpack->off.addr, unpack->off.size));
 		}
 	}
 	return (0);

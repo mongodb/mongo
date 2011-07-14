@@ -7,13 +7,12 @@
 
 #include "wt_internal.h"
 
-static int __wt_err_cell_vs_page(
-	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_CELL *, WT_PAGE_DISK *, int);
+static int __wt_err_cell_corrupted(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
+static int __wt_err_cell_type(
+	WT_SESSION_IMPL *, uint32_t, uint32_t, uint8_t, WT_PAGE_DISK *, int);
 static int __wt_err_delfmt(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_err_eof(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
-static int __wt_verify_cell(
-	WT_SESSION_IMPL *, WT_CELL *, uint32_t, uint32_t, uint8_t *, int);
 static int __wt_verify_dsk_col_fix(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
 static int __wt_verify_dsk_col_int(
@@ -141,11 +140,11 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_BUF *current, *last, *last_pfx, *last_ovfl;
 	WT_CELL *cell;
-	WT_OFF off;
+	WT_CELL_UNPACK *unpack, _unpack;
 	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	off_t file_size;
-	void *huffman, *data;
-	uint32_t cell_num, cell_type, data_size, i, prefix;
+	void *huffman;
+	uint32_t cell_num, cell_type, i, prefix;
 	uint8_t *end;
 	int ret;
 	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
@@ -153,6 +152,7 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	func = btree->btree_compare;
 	huffman = btree->huffman_key;
+	unpack = &_unpack;
 	ret = 0;
 
 	current = last_pfx = last_ovfl = NULL;
@@ -166,29 +166,37 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 
 	last_cell_type = FIRST;
 	cell_num = 0;
-	WT_CELL_FOREACH(session, dsk, cell, i) {
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
 		++cell_num;
 
-		/* Check the cell itself. */
-		WT_ERR(__wt_verify_cell(
-		    session, cell, cell_num, addr, end, quiet));
+		/* Carefully unpack the cell. */
+		if (__wt_cell_unpack_safe(session, cell, unpack, end) != 0) {
+			ret = __wt_err_cell_corrupted(
+			    session, cell_num, addr, quiet);
+			goto err;
+		}
 
 		/* Check the cell type. */
-		cell_type = __wt_cell_type(cell);
+		cell_type = unpack->raw;
 		switch (cell_type) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
+		case WT_CELL_DATA_SHORT:
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
+		case WT_CELL_KEY_SHORT:
 			break;
 		case WT_CELL_OFF:
 			if (dsk->type == WT_PAGE_ROW_INT)
 				break;
 			/* FALLTHROUGH */
 		default:
-			return (__wt_err_cell_vs_page(
-			    session, cell_num, addr, cell, dsk, quiet));
+			return (__wt_err_cell_type(
+			    session, cell_num, addr, unpack->type, dsk, quiet));
 		}
+
+		/* Collapse the short key/data types. */
+		cell_type = unpack->type;
 
 		/*
 		 * Check ordering relationships between the WT_CELL entries.
@@ -245,9 +253,8 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		case WT_CELL_DATA_OVFL:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
-			__wt_cell_off(session, cell, &off);
 			if (WT_ADDR_TO_OFF(btree,
-			    off.addr) + off.size > file_size)
+			    unpack->off.addr) + unpack->off.size > file_size)
 				goto eof;
 			break;
 		}
@@ -263,7 +270,7 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_copy(session, cell, current));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -276,7 +283,7 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		 * Confirm the first non-overflow key on a page has a zero
 		 * prefix compression count.
 		 */
-		prefix = __wt_cell_prefix(cell);
+		prefix = unpack->prefix;
 		if (last_pfx->size == 0 && prefix != 0) {
 			WT_VRFY_ERR(session, quiet,
 			    "the %" PRIu32 " key on page at addr %" PRIu32
@@ -298,30 +305,28 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		}
 
 		/*
-		 * If Huffman decoding, use the heavy-weight __wt_cell_copy()
-		 * code to build the key, up to the prefix. Else, we can do
-		 * it faster internally because we don't have to shuffle memory
-		 * around as much.
+		 * If Huffman decoding required, use the heavy-weight call to
+		 * __wt_cell_unpack_copy() to build the key, up to the prefix.
+		 * Else, we can do it faster internally because we don't have
+		 * to shuffle memory around as much.
 		 */
 		if (huffman == NULL) {
 			/*
 			 * Get the cell's data/length and make sure we have
 			 * enough buffer space.
 			 */
-			__wt_cell_data_and_len(
-			    session, cell, &data, &data_size);
 			WT_ERR(__wt_buf_grow(
-			    session, current, prefix + data_size));
+			    session, current, prefix + unpack->size));
 
 			/* Copy the prefix then the data into place. */
 			if (prefix != 0)
 				memcpy((void *)
 				    current->data, last->data, prefix);
 			memcpy((uint8_t *)
-			    current->data + prefix, data, data_size);
-			current->size = prefix + data_size;
+			    current->data + prefix, unpack->data, unpack->size);
+			current->size = prefix + unpack->size;
 		} else {
-			WT_ERR(__wt_cell_copy(session, cell, current));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -536,25 +541,27 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_OFF off;
+	WT_CELL_UNPACK *unpack, _unpack;
 	off_t file_size;
 	uint32_t cell_num, cell_type, i;
 	uint8_t *end;
 
 	btree = session->btree;
+	unpack = &_unpack;
 	file_size = btree->fh->file_size;
 	end = (uint8_t *)dsk + size;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(session, dsk, cell, i) {
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
 		++cell_num;
 
-		/* Check the cell itself. */
-		WT_RET(__wt_verify_cell(
-		    session, cell, cell_num, addr, end, quiet));
+		/* Carefully unpack the cell. */
+		if (__wt_cell_unpack_safe(session, cell, unpack, end) != 0)
+			return (__wt_err_cell_corrupted(
+			    session, cell_num, addr, quiet));
 
 		/* Check the cell type. */
-		cell_type = __wt_cell_type_raw(cell);
+		cell_type = unpack->raw;
 		switch (cell_type) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
@@ -562,15 +569,14 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 		case WT_CELL_DEL:
 			break;
 		default:
-			return (__wt_err_cell_vs_page(
-			    session, cell_num, addr, cell, dsk, quiet));
+			return (__wt_err_cell_type(
+			    session, cell_num, addr, unpack->raw, dsk, quiet));
 		}
 
 		/* Check if any referenced item is entirely in the file. */
 		if (cell_type == WT_CELL_DATA_OVFL) {
-			__wt_cell_off(session, cell, &off);
 			if (WT_ADDR_TO_OFF(btree,
-			    off.addr) + off.size > file_size)
+			    unpack->off.addr) + unpack->off.size > file_size)
 				return (__wt_err_eof(
 				    session, cell_num, addr, quiet));
 		}
@@ -617,81 +623,33 @@ __wt_verify_dsk_chunk(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_verify_cell --
- *	Check to see if a cell is safe.
+ * __wt_err_cell_corrupted --
+ *	Generic corrupted cell, we couldn't read it.
  */
 static int
-__wt_verify_cell(WT_SESSION_IMPL *session,
-    WT_CELL *cell, uint32_t cell_num, uint32_t addr, uint8_t *end, int quiet)
+__wt_err_cell_corrupted(
+    WT_SESSION_IMPL *session, uint32_t entry_num, uint32_t addr, int quiet)
 {
-	uint8_t *p;
-
-	/*
-	 * Check if this cell is on the page, and once we know the cell
-	 * is safe, check if the cell's data is entirely on the page.
-	 *
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of size in the
-	 * descriptor byte and no length bytes.  In both cases, the data is
-	 * after the single byte WT_CELL.
-	 */
-	p = (uint8_t *)cell;
-
-#ifdef XXX
-	This code needs a "safe" check of the cell & the cell data.
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DATA_SHORT:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_KEY_SHORT:
-	case WT_CELL_OFF:
-		p += 1;
-		break;
-	case WT_CELL_DATA:
-	case WT_CELL_KEY:
-		switch (WT_CELL_BYTES(cell)) {
-			case WT_CELL_1_BYTE:
-				p += 2;
-				break;
-			case WT_CELL_2_BYTE:
-				p += 3;
-				break;
-			case WT_CELL_3_BYTE:
-				p += 4;
-				break;
-			case WT_CELL_4_BYTE:
-			default:
-				p += 5;
-				break;
-			}
-		break;
-	default:
-		/*
-		 * Don't worry about illegal types -- our caller will check,
-		 * based on the page type.
-		 */
-		break;
-	}
-#endif
-	if (p > end || (uint8_t *)(cell) + __wt_cell_len(session, cell) > end)
-		return (__wt_err_eop(session, cell_num, addr, quiet));
-	return (0);
+	WT_VRFY_ERR(session, quiet,
+	    "item %" PRIu32
+	    " on page at addr %" PRIu32 " is a corrupted cell",
+	    entry_num, addr);
+	return (WT_ERROR);
 }
 
 /*
- * __wt_err_cell_vs_page --
+ * __wt_err_cell_type --
  *	Generic illegal cell type for a particular page type error.
  */
 static int
-__wt_err_cell_vs_page(WT_SESSION_IMPL *session, uint32_t entry_num,
-    uint32_t addr, WT_CELL *cell, WT_PAGE_DISK *dsk, int quiet)
+__wt_err_cell_type(WT_SESSION_IMPL *session, uint32_t entry_num,
+    uint32_t addr, uint8_t cell_type, WT_PAGE_DISK *dsk, int quiet)
 {
 	WT_VRFY_ERR(session, quiet,
 	    "illegal cell and page type combination cell %" PRIu32
 	    " on page at addr %" PRIu32 " is a %s cell on a %s page",
 	    entry_num, addr,
-	    __wt_cell_type_string(cell), __wt_page_type_string(dsk->type));
+	    __wt_cell_type_string(cell_type), __wt_page_type_string(dsk->type));
 	return (WT_ERROR);
 }
 

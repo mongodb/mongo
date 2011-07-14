@@ -152,12 +152,14 @@ static int
 __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE_FILE_STATS *stats;
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
-	void *cipdata;
 
 	stats = session->btree->fstats;
+	unpack = &_unpack;
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
@@ -167,12 +169,12 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * there's Huffman encoding).
 	 */
 	WT_COL_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
-		if (cipdata == NULL) {
+		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
 			WT_STAT_INCR(stats, file_item_col_deleted);
 			continue;
 		}
-		switch (__wt_cell_type(cipdata)) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
 			upd = WT_COL_UPDATE(page, cip);

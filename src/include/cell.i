@@ -8,18 +8,13 @@
 #undef	STATIN
 #define	STATIN static inline
 
-STATIN void    *__wt_cell_data(WT_SESSION_IMPL *, WT_CELL *);
-STATIN void	__wt_cell_data_and_len(
-			WT_SESSION_IMPL *, WT_CELL *, void *, uint32_t *);
-STATIN uint32_t	__wt_cell_datalen(WT_SESSION_IMPL *, WT_CELL *);
-STATIN uint32_t	__wt_cell_len(WT_SESSION_IMPL *, WT_CELL *);
-STATIN void    *__wt_cell_next(WT_SESSION_IMPL *, WT_CELL *);
-STATIN void	__wt_cell_off(WT_SESSION_IMPL *, WT_CELL *, WT_OFF *);
-STATIN u_int	__wt_cell_prefix(WT_CELL *);
-STATIN void	__wt_cell_set_fixed(WT_CELL *, u_int, uint32_t *);
-STATIN u_int	__wt_cell_type(WT_CELL *);
-STATIN int	__wt_cell_type_is_ovfl(WT_CELL *);
-STATIN u_int	__wt_cell_type_raw(WT_CELL *);
+STATIN void	__wt_cell_pack_fixed(WT_CELL *, u_int, uint32_t *);
+STATIN void	__wt_cell_pack(WT_SESSION_IMPL *,
+		    WT_CELL *, u_int, u_int, uint32_t, uint32_t *);
+STATIN void	__wt_cell_unpack(
+		    WT_SESSION_IMPL *, WT_CELL *, WT_CELL_UNPACK *);
+STATIN int	__wt_cell_unpack_safe(
+		    WT_SESSION_IMPL *, WT_CELL *, WT_CELL_UNPACK *, uint8_t *);
 
 /*
  * WT_CELL --
@@ -101,222 +96,247 @@ STATIN u_int	__wt_cell_type_raw(WT_CELL *);
 #define	WT_CELL_OFF		(5 << 5)	/* Off-page ref */
 #define	WT_CELL_UNUSED_TYPE6	(6 << 5)	/* Unused */
 #define	WT_CELL_UNUSED_TYPE7	(7 << 5)	/* Unused */
-
-/* WT_CELL_FOREACH is a loop that walks the cells on a page */
-#define	WT_CELL_FOREACH(session, dsk, cell, i)				\
-	for ((cell) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = (dsk)->u.entries;					\
-	    (i) > 0; (cell) = __wt_cell_next(session, cell), --(i))
+#define	WT_CELL_TYPE_MASK	(7 << 5)
 
 /*
- * __wt_cell_set_fixed --
- *	Set a WT_CELL's contents based on a fixed-size type.
+ * WT_CELL --
+ *	Variable-length, on-page cell header.
+ */
+struct __wt_cell {
+	/*
+	 * Maximum of 6 bytes:
+	 *	  0: descriptor/type
+	 *	  1: prefix compression
+	 *	2-5: data-length
+	 */
+	uint8_t __chunk[6];
+};
+
+/*
+ * WT_CELL_UNPACK --
+ *	Unpacked cell.
+ */
+struct __wt_cell_unpack {
+	uint8_t  raw;			/* Raw cell type (include "shorts") */
+	uint8_t  type;			/* Cell type */
+
+	uint8_t  prefix;		/* Cell prefix */
+
+	uint8_t	 ovfl;			/* Cell is an overflow */
+
+	WT_OFF	 off;			/* WT_OFF structure */
+
+	const void *data;		/* Data */
+	uint32_t    size;		/* Data size */
+
+	uint32_t len;			/* Cell + data total length */
+};
+
+/*
+ * WT_CELL_FOREACH --
+ *	Walk the cells on a page.
+ */
+#define	WT_CELL_FOREACH(session, dsk, cell, unpack, i)			\
+	for ((cell) = WT_PAGE_DISK_BYTE(dsk), (i) = (dsk)->u.entries;	\
+	    (i) > 0;							\
+	    (cell) = (WT_CELL *)((uint8_t *)cell + (unpack)->len), --(i))
+
+/*
+ * __wt_cell_pack_fixed --
+ *	Write a WT_CELL's contents based on a fixed-size type.
  */
 static inline void
-__wt_cell_set_fixed(WT_CELL *cell, u_int type, uint32_t *cell_lenp)
+__wt_cell_pack_fixed(WT_CELL *cell, u_int type, uint32_t *cell_lenp)
 {
 	cell->__chunk[0] = (u_int8_t)type;
 	*cell_lenp = 1;				/* Cell byte */
 }
 
 /*
- * __wt_cell_type_raw --
- *	Return the cell's type.
+ * __wt_cell_pack --
+ *	Set a WT_CELL's contents based on a type, prefix and data size.
  */
-static inline u_int
-__wt_cell_type_raw(WT_CELL *cell)
+static inline void
+__wt_cell_pack(WT_SESSION_IMPL *session,
+    WT_CELL *cell, u_int type, u_int prefix, uint32_t size, uint32_t *cell_lenp)
 {
-	if (cell->__chunk[0] & WT_CELL_DATA_SHORT)
-		return (WT_CELL_DATA_SHORT);
-	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
-		return (WT_CELL_KEY_SHORT);
-	return (cell->__chunk[0] & (7 << 5));
+	uint8_t byte, *p;
+
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.  Short key/data items have 6- or 7-bits of length in the
+	 * descriptor byte and no length bytes.
+	 */
+	WT_ASSERT(session, type == WT_CELL_DATA || type == WT_CELL_KEY);
+	if (type == WT_CELL_DATA && size < 0x7f) {
+		/*
+		 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are
+		 * the size.
+		 */
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
+		*cell_lenp = 1;			/* Cell byte */
+		return;
+	}
+	if (size < 0x3f) {
+		/*
+		 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag; the other
+		 * 6 bits are the size.
+		 */
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
+		cell->__chunk[1] = (uint8_t)prefix;
+		*cell_lenp = 2;			/* Cell byte + prefix byte */
+		return;
+	}
+
+	p = cell->__chunk;
+	*p++ = (uint8_t)type;			/* Type */
+
+	if (type == WT_CELL_KEY)		/* Prefix byte */
+		*p++ = (uint8_t)prefix;
+
+	/* Pack the data length. */
+	(void)__wt_vpack_uint(
+	    session, &p, sizeof(cell->__chunk) - 1, (uint64_t)size);
+
+	*cell_lenp = WT_PTRDIFF32(p, cell);
 }
 
 /*
  * __wt_cell_type --
- *	Return a cell's type, mapping the short types to the normal, on-page
- * types.
+ *	Return the cell's type (collapsing "short" types).
  */
 static inline u_int
 __wt_cell_type(WT_CELL *cell)
 {
+	/*
+	 * NOTE: WT_CELL_DATA_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
+	 */
 	if (cell->__chunk[0] & WT_CELL_DATA_SHORT)
 		return (WT_CELL_DATA);
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
-	return (cell->__chunk[0] & (7 << 5));
+	return (cell->__chunk[0] & WT_CELL_TYPE_MASK);
 }
 
 /*
- * __wt_cell_type_is_ovfl --
- *	Return if a cell references an overflow item.
+ * __wt_cell_unpack --
+ *	Unpack a WT_CELL into a structure.
+ */
+static inline void
+__wt_cell_unpack(
+    WT_SESSION_IMPL *session, WT_CELL *cell, WT_CELL_UNPACK *unpack)
+{
+	(void)__wt_cell_unpack_safe(session, cell, unpack, NULL);
+}
+
+/*
+ * __wt_cell_unpack_safe --
+ *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_type_is_ovfl(WT_CELL *cell)
-{
-	u_int type;
-
-	type = __wt_cell_type(cell);
-	return (type == WT_CELL_DATA_OVFL || type == WT_CELL_KEY_OVFL);
-}
-
-/*
- * __wt_cell_prefix --
- *	Return a cell's prefix-compression value.
- */
-static inline u_int
-__wt_cell_prefix(WT_CELL *cell)
-{
-	return (cell->__chunk[1]);
-}
-
-/*
- * __wt_cell_data --
- *	Return a reference to the first byte of data for a cell.
- */
-static inline void *
-__wt_cell_data(WT_SESSION_IMPL *session, WT_CELL *cell)
+__wt_cell_unpack_safe(WT_SESSION_IMPL *session,
+    WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	uint64_t v;
+	u_int len;
 	const uint8_t *p;
 
 	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
+	 * If our caller specifies an "1 past the end-of-buffer" reference, it's
+	 * the verification code and we have to make sure we don't go past the
+	 * end of the buffer when reading.  Don't complain on error here, our
+	 * caller will take care of that.
+	 *
+	 * NOTE: WT_CELL_DATA_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
 	 */
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DATA_SHORT:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:
-		return ((uint8_t *)cell + 1);	/* Cell byte */
-	case WT_CELL_KEY_SHORT:
-		return ((uint8_t *)cell + 2);	/* Cell + prefix byte */
-	case WT_CELL_KEY:
-		p = (uint8_t *)cell + 2;	/* Cell + prefix */
-		(void)__wt_vunpack_uint(
-		    session, &p, sizeof(cell->__chunk) - 2, &v);
-		return ((void *)p);
-	case WT_CELL_DATA:
-	default:				/* Impossible */
-		p = (uint8_t *)cell + 1;	/* Cell */
-		(void)__wt_vunpack_uint(
-		    session, &p, sizeof(cell->__chunk) - 1, &v);
-		return ((void *)p);
-	}
-	/* NOTREACHED */
-}
+	if (cell->__chunk[0] & WT_CELL_DATA_SHORT) {
+		unpack->type = WT_CELL_DATA;
+		unpack->raw = WT_CELL_DATA_SHORT;
+	} else if (cell->__chunk[0] & WT_CELL_KEY_SHORT) {
+		unpack->type = WT_CELL_KEY;
+		unpack->raw = WT_CELL_KEY_SHORT;
+	} else
+		unpack->type =
+		    unpack->raw = cell->__chunk[0] & WT_CELL_TYPE_MASK;
 
-/*
- * __wt_cell_datalen --
- *	Return the number of data bytes referenced by a WT_CELL.
- */
-static inline uint32_t
-__wt_cell_datalen(WT_SESSION_IMPL *session, WT_CELL *cell)
-{
-	uint64_t v;
-	const uint8_t *p;
+	unpack->prefix = 0;
+	unpack->ovfl = 0;
+	p = (uint8_t *)cell + 1;			/* skip cell */
 
 	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
+	 * Delete and off-page items have known sizes, there's no length bytes.
+	 * Short key/data items have 6- or 7-bits of length in the descriptor
+	 * byte and no length bytes.   Normal key/data items have length bytes.
 	 */
-	switch (__wt_cell_type_raw(cell)) {
+	switch (unpack->raw) {
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
+		unpack->ovfl = 1;
+		/* FALLTHROUGH */
 	case WT_CELL_OFF:
-		return (sizeof(WT_OFF));
-	case WT_CELL_DATA_SHORT:
-		return (cell->__chunk[0] >> 1);
+		if (end != NULL && p + sizeof(WT_OFF) > end)
+			return (WT_ERROR);
+		memcpy(&unpack->off, p, sizeof(WT_OFF));
+
+		unpack->data = NULL;
+		unpack->size = sizeof(WT_OFF);
+		unpack->len = 1 + sizeof(WT_OFF);
+		break;
 	case WT_CELL_DEL:
-		return (0);
-	case WT_CELL_KEY_SHORT:
-		return (cell->__chunk[0] >> 2);
-	case WT_CELL_KEY:
-		p = (uint8_t *)cell + 2;	/* Step past cell + prefix */
+		unpack->data = NULL;
+		unpack->size = 0;
+		unpack->len = 1;
+		break;
+	case WT_CELL_DATA_SHORT:
+		unpack->data = p;
+		unpack->size = cell->__chunk[0] >> 1;
+		unpack->len = 1 + unpack->size;
 		break;
 	case WT_CELL_DATA:
+		if (end != NULL) {
+			WT_RET(__wt_vpack_uint_len(p, &len));
+			if (end != NULL && p + len > end)
+				return (WT_ERROR);
+		}
+		WT_RET(__wt_vunpack_uint(
+		    session, &p, sizeof(cell->__chunk) - 1, &v));
+		if (end != NULL && p + v > end)
+			return (WT_ERROR);
+
+		unpack->data = p;
+		unpack->size = v;
+		unpack->len = WT_PTRDIFF32(p, cell) + v;
+		break;
+	case WT_CELL_KEY_SHORT:
+		unpack->prefix = cell->__chunk[1];
+		++p;					/* skip prefix */
+
+		unpack->data = p;
+		unpack->size = cell->__chunk[0] >> 2;
+		unpack->len = 2 + unpack->size;
+		break;
+	case WT_CELL_KEY:
+		unpack->prefix = cell->__chunk[1];
+		++p;					/* skip prefix */
+
+		if (end != NULL) {
+			WT_RET(__wt_vpack_uint_len(p, &len));
+			if (end != NULL && p + len > end)
+				return (WT_ERROR);
+		}
+		WT_RET(__wt_vunpack_uint(
+		    session, &p, sizeof(cell->__chunk) - 2, &v));
+		if (end != NULL && p + v > end)
+			return (WT_ERROR);
+
+		unpack->data = p;
+		unpack->size = v;
+		unpack->len = WT_PTRDIFF32(p, cell) + v;
+		break;
 	default:
-		p = (uint8_t *)cell + 1;	/* Step past cell byte */
-		break;
+		return (end == NULL ? __wt_file_format(session) : WT_ERROR);
 	}
-
-	(void)__wt_vunpack_uint(session, &p, sizeof(cell->__chunk) - 1, &v);
-	return ((uint32_t)v);
+	return (0);
 }
-
-/*
- * __wt_cell_len --
- *	Return the total bytes taken up by a WT_CELL on page, including the
- * trailing data.
- */
-static inline uint32_t
-__wt_cell_len(WT_SESSION_IMPL *session, WT_CELL *cell)
-{
-	uint64_t v;
-	const uint8_t *p;
-
-	/*
-	 * Delete and off-page items have known sizes, we don't store length
-	 * bytes.  Short key/data items have 6- or 7-bits of length in the
-	 * descriptor byte and no length bytes.
-	 */
-	switch (__wt_cell_type_raw(cell)) {
-	case WT_CELL_DATA_OVFL:
-	case WT_CELL_DATA_SHORT:
-	case WT_CELL_DEL:
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_OFF:			/* Cell + data */
-		return (1 + __wt_cell_datalen(session, cell));
-	case WT_CELL_KEY_SHORT:			/* Cell + prefix + data */
-		return (2 + __wt_cell_datalen(session, cell));
-	case WT_CELL_KEY:
-		p = &cell->__chunk[2];		/* Cell + prefix */
-		break;
-	case WT_CELL_DATA:
-	default:				/* Impossible */
-		p = &cell->__chunk[1];		/* Cell */
-		break;
-	}
-
-	(void)__wt_vunpack_uint(session, &p, sizeof(cell->__chunk) - 1, &v);
-	return ((uint32_t)(WT_PTRDIFF32(p, cell->__chunk) + v));
-}
-
-/*
- * __wt_cell_data_and_len --
- *	Fill in both the first byte of data for a cell as well as the length.
- */
-static inline void
-__wt_cell_data_and_len(
-    WT_SESSION_IMPL *session, WT_CELL *cell, void *p, uint32_t *sizep)
-{
-	*(void **)p = __wt_cell_data(session, cell);
-	*sizep = __wt_cell_datalen(session, cell);
-}
-
-/*
- * __wt_cell_off --
- *	Copy out a WT_CELL that references a WT_OFF structure.
- */
-static inline void
-__wt_cell_off(WT_SESSION_IMPL *session, WT_CELL *cell, WT_OFF *off)
-{
-	/* Version for systems that support unaligned access. */
-	*off = *(WT_OFF *)__wt_cell_data(session, cell);
-}
-
-/*
- * __wt_cell_next --
- *	Return a pointer to the next WT_CELL on the page.
- */
-static inline void *
-__wt_cell_next(WT_SESSION_IMPL *session, WT_CELL *cell)
-{
-	return ((u_int8_t *)cell + __wt_cell_len(session, cell));
-}
-

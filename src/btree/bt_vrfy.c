@@ -30,8 +30,9 @@ static int __wt_verify_addfrag(
 static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __wt_verify_int(WT_SESSION_IMPL *, int);
-static int __wt_verify_overflow(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_CELL *, WT_VSTUFF *);
+static int __wt_verify_overflow(
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, uint32_t, WT_VSTUFF *);
 static int __wt_verify_row_leaf_key_order(
@@ -295,7 +296,7 @@ recno_chk:	if (parent_recno != recno) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow(session, page, vs));
+		WT_RET(__wt_verify_overflow_cell(session, page, vs));
 		break;
 	}
 
@@ -460,16 +461,19 @@ __wt_verify_row_leaf_key_order(
 }
 
 /*
- * __wt_verify_overflow --
+ * __wt_verify_overflow_cell --
  *	Verify any overflow cells on the page.
  */
 static int
-__wt_verify_overflow(
+__wt_verify_overflow_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
+
+	unpack = &_unpack;
 
 	/*
 	 * Row-store internal page disk images are discarded when there's no
@@ -481,13 +485,16 @@ __wt_verify_overflow(
 	}
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
-	WT_CELL_FOREACH(session, dsk, cell, i)
-		switch (__wt_cell_type(cell)) {
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
-			WT_RET(__wt_verify_overflow_cell(session, cell, vs));
+			WT_RET(__wt_verify_overflow(
+			    session, unpack->off.addr, unpack->off.size, vs));
 			break;
 		}
+	}
 	return (0);
 }
 
@@ -496,21 +503,15 @@ __wt_verify_overflow(
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow_cell(
-    WT_SESSION_IMPL *session, WT_CELL *cell, WT_VSTUFF *vs)
+__wt_verify_overflow(
+    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
 	WT_BUF *tmp;
-	WT_OFF ovfl;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, size;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
-
-	__wt_cell_off(session, cell, &ovfl);
-	addr = ovfl.addr;
-	size = ovfl.size;
 
 	/* Allocate enough memory to hold the overflow pages. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));

@@ -165,14 +165,11 @@ extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
-extern void __wt_cell_set(WT_SESSION_IMPL *session,
-    WT_CELL *cell,
-    u_int type,
-    u_int prefix,
-    uint32_t size,
-    uint32_t *cell_lenp);
 extern int __wt_cell_copy(WT_SESSION_IMPL *session,
     WT_CELL *cell,
+    WT_BUF *retb);
+extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
+    WT_CELL_UNPACK *unpack,
     WT_BUF *retb);
 extern int __wt_bt_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
@@ -236,7 +233,7 @@ extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern const char *__wt_page_type_string(u_int type);
-extern const char *__wt_cell_type_string(WT_CELL *cell);
+extern const char *__wt_cell_type_string(uint8_t type);
 extern int __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store);
 extern int
 __wt_page_in_func(

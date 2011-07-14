@@ -108,10 +108,12 @@ __btcur_next_var(
 {
 	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_UPDATE *upd;
 	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	unpack = &_unpack;
 
 	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
@@ -134,17 +136,13 @@ __btcur_next_var(
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
 			found = 1;
-		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL)
-			switch (__wt_cell_type(cell)) {
-			case WT_CELL_DATA:
-			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_copy(session, cell, value));
-				found = 1;
-				break;
-			case WT_CELL_DEL:
-				break;
-			WT_ILLEGAL_FORMAT(session);
-			}
+		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
+			__wt_cell_unpack(session, cell, unpack);
+			if (unpack->type == WT_CELL_DEL)
+				continue;
+			WT_RET(__wt_cell_unpack_copy(session, unpack, value));
+			found = 1;
+		}
 	}
 
 	return (0);

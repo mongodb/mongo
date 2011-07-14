@@ -62,6 +62,8 @@ struct __wt_cache_stats;
     typedef struct __wt_cache_stats WT_CACHE_STATS;
 struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
+struct __wt_cell_unpack;
+    typedef struct __wt_cell_unpack WT_CELL_UNPACK;
 struct __wt_col;
     typedef struct __wt_col WT_COL;
 struct __wt_col_ref;

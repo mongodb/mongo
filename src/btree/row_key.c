@@ -18,14 +18,15 @@ __wt_row_key(
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BUF *tmp;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_ROW *rip;
-	uint32_t pfx;
 	int is_local, ret, slot_offset;
 	void *key;
 
 	rip = rip_arg;
 	tmp = NULL;
+	unpack = &_unpack;
 
 	/*
 	 * If the caller didn't pass us a buffer, create one.  We don't use
@@ -78,33 +79,22 @@ __wt_row_key(
 		 * 1: the test for an on/off page reference.
 		 */
 		if (__wt_off_page(page, key)) {
+			ikey = key;
+
 			/*
 			 * If this is the key we originally wanted, we don't
 			 * care if we're rolling forward or backward, or if
 			 * it's an overflow key or not, it's what we wanted.
 			 * Take a copy and wrap up.
-			 *
-			 * If we wanted a different key and this key is not an
-			 * overflow key, it has a valid prefix, we can use it.
-			 *	If rolling backward, take a copy of the key and
-			 * switch directions, we can roll forward from this key.
-			 *	If rolling forward, replace the key we've been
-			 * building with this key, it's what we would have built
-			 * anyway.
-			 * To summarize, in both cases, take a copy of the key
-			 * and roll forward.
 			 */
-			ikey = key;
-			if (slot_offset == 0 || !__wt_cell_type_is_ovfl(
-			    WT_REF_OFFSET(page, ikey->cell_offset))) {
+			if (slot_offset == 0) {
 				WT_ERR(__wt_buf_set(session,
 				    retb, WT_IKEY_DATA(ikey), ikey->size));
-				if (slot_offset == 0)
-					break;
-
-				direction = FORWARD;
-				goto next;
+				break;
 			}
+
+			__wt_cell_unpack(session,
+			    WT_REF_OFFSET(page, ikey->cell_offset), unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -116,19 +106,38 @@ __wt_row_key(
 			 * done because prefixes skip overflow keys: keep
 			 * rolling forward.
 			 */
+			if (unpack->ovfl)
+				goto next;
+
+			/*
+			 * If we wanted a different key and this key is not an
+			 * overflow key, it has a valid prefix, we can use it.
+			 *	If rolling backward, take a copy of the key and
+			 * switch directions, we can roll forward from this key.
+			 *	If rolling forward, replace the key we've been
+			 * building with this key, it's what we would have built
+			 * anyway.
+			 * In short: if it's not an overflow key, take a copy
+			 * and roll forward.
+			 */
+			WT_ERR(__wt_buf_set(
+			    session, retb, WT_IKEY_DATA(ikey), ikey->size));
+			direction = FORWARD;
 			goto next;
 		}
 
+		/* Unpack the key's cell. */
+		__wt_cell_unpack(session, key, unpack);
+
 		/* 2: the test for an on-page reference to an overflow key. */
-		if (__wt_cell_type(key) == WT_CELL_KEY_OVFL) {
+		if (unpack->type == WT_CELL_KEY_OVFL) {
 			/*
 			 * If this is the key we wanted from the start, we don't
-			 * care if it's an overflow key.  Flag the target key
-			 * was an overflow key: the serialization function needs
-			 * to know so it can update the overflow bit array.
+			 * care if it's an overflow key, get a copy and wrap up.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_cell_copy(session, key, retb));
+				WT_ERR(__wt_cell_unpack_copy(
+				    session, unpack, retb));
 				break;
 			}
 
@@ -149,7 +158,7 @@ __wt_row_key(
 		 * 3: the test for an on-page reference to a key that isn't
 		 * prefix compressed.
 		 */
-		if ((pfx = __wt_cell_prefix(key)) == 0) {
+		if (unpack->prefix == 0) {
 			/*
 			 * If this is the key we originally wanted, we don't
 			 * care if we're rolling forward or backward, it's
@@ -163,7 +172,7 @@ __wt_row_key(
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			WT_ERR(__wt_cell_copy(session, key, retb));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, retb));
 			if (slot_offset == 0)
 				break;
 
@@ -188,11 +197,11 @@ __wt_row_key(
 			 */
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_copy(session, key, tmp));
-			WT_ERR(
-			    __wt_buf_initsize(session, retb, tmp->size + pfx));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
+			WT_ERR(__wt_buf_initsize(
+			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)
-			    retb->data + pfx, tmp->data, tmp->size);
+			    retb->data + unpack->prefix, tmp->data, tmp->size);
 
 			if (slot_offset == 0)
 				break;
@@ -255,6 +264,9 @@ WT_CELL *
 __wt_row_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
+
+	unpack = &_unpack;
 
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
@@ -283,7 +295,8 @@ __wt_row_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	cell = __wt_cell_next(session, cell);
+	__wt_cell_unpack(session, cell, unpack);
+	cell = (WT_CELL *)((uint8_t *)cell + unpack->len);
 	if (__wt_cell_type(cell) == WT_CELL_KEY ||
 	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
 		return (NULL);

@@ -250,10 +250,12 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
 	dsk = page->dsk;
+	unpack = &_unpack;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -268,8 +270,10 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * (WT_CELL_DATA_OVFL) or deleted (WT_CELL_DEL) items.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_CELL_FOREACH(session, dsk, cell, i)
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
 		(cip++)->__value = WT_DISK_OFFSET(dsk, cell);
+	}
 
 	page->entries = dsk->u.entries;
 	return (0);
@@ -285,15 +289,16 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_BUF *current, *last, *tmp;
 	WT_CELL *cell;
-	WT_OFF off;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
-	uint32_t data_size, i, nindx, prefix;
-	int cell_ovfl, found_ovfl, ret;
-	void *data, *huffman;
+	uint32_t i, nindx, prefix;
+	int found_ovfl, ret;
+	void *huffman;
 
 	btree = session->btree;
 	current = last = NULL;
+	unpack = &_unpack;
 	dsk = page->dsk;
 	found_ovfl = ret = 0;
 	huffman = btree->huffman_key;
@@ -323,61 +328,36 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_CELL_FOREACH(session, dsk, cell, i) {
-		switch (__wt_cell_type(cell)) {
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_OFF:
-			__wt_cell_off(session, cell, &off);
-			WT_ROW_REF_ADDR(rref) = off.addr;
-			WT_ROW_REF_SIZE(rref) = off.size;
+			WT_ROW_REF_ADDR(rref) = unpack->off.addr;
+			WT_ROW_REF_SIZE(rref) = unpack->off.size;
 			++rref;
 			continue;
 		WT_ILLEGAL_FORMAT(session);
 		}
 
-		/* Get the cell's prefix and check if it's an overflow cell. */
-		prefix = __wt_cell_prefix(cell);
-		cell_ovfl = __wt_cell_type_is_ovfl(cell);
-
 		/*
 		 * We can discard the underlying disk page if we don't have any
 		 * overflow keys.
 		 */
-		if (cell_ovfl)
+		if (unpack->ovfl)
 			found_ovfl = 1;
 
 		/*
-		 * Overflow keys are simple, and don't participate in prefix
-		 * compression.
-		 *
-		 * If Huffman decoding, use the heavy-weight __wt_cell_copy()
-		 * code to build the key, up to the prefix. Else, we can do
-		 * it faster internally because we don't have to shuffle memory
-		 * around as much.
+		 * If Huffman decoding is required or it's an overflow record,
+		 * use the heavy-weight __wt_cell_unpack_copy() call to build
+		 * the key.  Else, we can do it faster internally as we don't
+		 * have to shuffle memory around as much.
 		 */
-		if (cell_ovfl)
-			WT_RET(__wt_cell_copy(session, cell, current));
-		else if (huffman == NULL) {
-			/*
-			 * Get the cell's data/length and make sure we have
-			 * enough buffer space.
-			 */
-			__wt_cell_data_and_len(
-			    session, cell, &data, &data_size);
-			WT_ERR(__wt_buf_grow(
-			    session, current, prefix + data_size));
-
-			/* Copy the prefix then the data into place. */
-			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, data, data_size);
-			current->size = prefix + data_size;
-		} else {
-			WT_RET(__wt_cell_copy(session, cell, current));
+		prefix = unpack->prefix;
+		if (huffman != NULL || unpack->ovfl) {
+			WT_RET(__wt_cell_unpack_copy(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -393,6 +373,21 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				    (void *)current->data, last->data, prefix);
 				current->size += prefix;
 			}
+		} else {
+			/*
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
+			 */
+			WT_ERR(__wt_buf_grow(
+			    session, current, prefix + unpack->size));
+
+			/* Copy the prefix then the data into place. */
+			if (prefix != 0)
+				memcpy((void *)
+				    current->data, last->data, prefix);
+			memcpy((uint8_t *)
+			    current->data + prefix, unpack->data, unpack->size);
+			current->size = prefix + unpack->size;
 		}
 
 		/*
@@ -402,14 +397,14 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * and will need a reference to it during reconciliation.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
-		    cell_ovfl ? WT_DISK_OFFSET(dsk, cell) : 0,
+		    unpack->ovfl ? WT_DISK_OFFSET(dsk, cell) : 0,
 		    current->data, current->size, (WT_IKEY **)&rref->key));
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
 		 * prefix-compressed page.
 		 */
-		if (!cell_ovfl) {
+		if (!unpack->ovfl) {
 			tmp = last;
 			last = current;
 			current = tmp;
@@ -434,11 +429,13 @@ static int
 __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
 
 	dsk = page->dsk;
+	unpack = &_unpack;
 
 	/*
 	 * Leaf row-store page entries map to a maximum of two-to-one to the
@@ -458,8 +455,9 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
-	WT_CELL_FOREACH(session, dsk, cell, i)
-		switch (__wt_cell_type(cell)) {
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
 			++nindx;
@@ -472,6 +470,7 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
+	}
 
 	page->entries = nindx;
 

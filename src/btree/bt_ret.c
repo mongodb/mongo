@@ -16,6 +16,7 @@ __wt_return_data(
     WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 {
 	WT_BTREE *btree;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CURSOR *cursor;
 	WT_IKEY *ikey;
 	WT_ITEM local_key, local_value;
@@ -31,7 +32,8 @@ __wt_return_data(
 
 	btree = session->btree;
 	cursor = session->cursor;
-	callback = NULL; /* TODO: was value->callback */
+	callback = NULL; 			/* TODO: was value->callback */
+	unpack = &_unpack;
 	ret = 0;
 
 	page = session->srch_page;
@@ -120,15 +122,17 @@ __wt_return_data(
 			break;
 		case WT_PAGE_COL_VAR:
 			cell = cipdata;
-page_cell:		if (btree->huffman_value == NULL &&
-			    __wt_cell_type(cell) == WT_CELL_DATA)
-				__wt_cell_data_and_len(session,
-				    cell, &value_ret, &size_ret);
-			else {
-				WT_RET(__wt_cell_copy(
-				    session, cell, &cursor->value));
+
+page_cell:		__wt_cell_unpack(session, cell, unpack);
+			if (btree->huffman_value != NULL ||
+			    unpack->type != WT_CELL_DATA) {
+				WT_RET(__wt_cell_unpack_copy(
+				    session, unpack, &cursor->value));
 				value_ret = cursor->value.data;
 				size_ret = cursor->value.size;
+			} else {
+				value_ret = unpack->data;
+				size_ret = unpack->size;
 			}
 			break;
 		WT_ILLEGAL_FORMAT(session);
@@ -138,15 +142,15 @@ page_cell:		if (btree->huffman_value == NULL &&
 	/*
 	 * When we get here, value_ret and size_ret are set to the byte string
 	 * and the length we're going to return.   That byte string has been
-	 * decoded, we called __wt_cell_copy above in all cases where the item
-	 * could be encoded.
+	 * decoded, we called __wt_cell_unpack_copy above in all cases where an
+	 * item could be encoded.
 	 */
 	if (callback == NULL) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
 		 * haven't copied the value_ret/size_ret pair into the return
-		 * WT_ITEM yet (potentially done by __wt_cell_copy()), do that
-		 * now.
+		 * WT_ITEM yet (potentially done by __wt_cell_unpack_copy), do
+		 * that now.
 		 */
 		if (value_ret != cursor->value.data)
 			WT_RET(__wt_buf_set(

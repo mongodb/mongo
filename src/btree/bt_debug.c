@@ -23,8 +23,8 @@ typedef struct {
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
-static int  __wt_debug_cell(WT_DBG *, WT_CELL *);
-static int  __wt_debug_cell_data(WT_DBG *, const char *, WT_CELL *);
+static int  __wt_debug_cell(WT_DBG *, WT_CELL_UNPACK *);
+static int  __wt_debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
 static void __wt_debug_col_insert(WT_DBG *, WT_INSERT *);
 static int  __wt_debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __wt_debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
@@ -503,13 +503,22 @@ __wt_debug_page_col_rle(WT_DBG *ds, WT_PAGE *page)
 static int
 __wt_debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 {
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
 
+	session = ds->session;
+	unpack = &_unpack;
+
 	WT_COL_FOREACH(page, cip, i) {
-		WT_RET(
-		    __wt_debug_cell_data(ds, "V", WT_COL_PTR(page, cip)));
+		if ((cell = WT_COL_PTR(page, cip)) == NULL)
+			unpack = NULL;
+		else
+			__wt_cell_unpack(session, cell, unpack);
+		WT_RET(__wt_debug_cell_data(ds, "V", unpack));
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
 			__wt_debug_update(ds, upd);
@@ -551,6 +560,7 @@ static int
 __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
@@ -558,6 +568,7 @@ __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	uint32_t i;
 
 	session = ds->session;
+	unpack = &_unpack;
 
 	/*
 	 * Dump any K/V pairs inserted into the page before the first from-disk
@@ -570,13 +581,17 @@ __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	WT_ROW_FOREACH(page, rip, i) {
 		if (__wt_off_page(page, rip->key))
 			__wt_debug_ikey(ds, rip->key);
-		else
-			WT_RET(__wt_debug_cell_data(ds, "K", rip->key));
+		else {
+			__wt_cell_unpack(session, rip->key, unpack);
+			WT_RET(__wt_debug_cell_data(ds, "K", unpack));
+		}
 
 		if ((cell = __wt_row_value(session, page, rip)) == NULL)
 			__wt_dmsg(ds, "\tV {}\n");
-		else
-			WT_RET(__wt_debug_cell_data(ds, "V", cell));
+		else {
+			__wt_cell_unpack(session, cell, unpack);
+			WT_RET(__wt_debug_cell_data(ds, "V", unpack));
+		}
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
 			__wt_debug_update(ds, upd);
@@ -638,14 +653,18 @@ __wt_debug_update(WT_DBG *ds, WT_UPDATE *upd)
 static int
 __wt_debug_dsk_cell(WT_DBG *ds, WT_PAGE_DISK *dsk)
 {
-	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
+	WT_SESSION_IMPL *session;
 	uint32_t i;
 
 	session = ds->session;
+	unpack = &_unpack;
 
-	WT_CELL_FOREACH(session, dsk, cell, i)
-		WT_RET(__wt_debug_cell(ds, cell));
+	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+		__wt_cell_unpack(session, cell, unpack);
+		WT_RET(__wt_debug_cell(ds, unpack));
+	}
 	return (0);
 }
 
@@ -654,35 +673,33 @@ __wt_debug_dsk_cell(WT_DBG *ds, WT_PAGE_DISK *dsk)
  *	Dump a single WT_CELL.
  */
 static int
-__wt_debug_cell(WT_DBG *ds, WT_CELL *cell)
+__wt_debug_cell(WT_DBG *ds, WT_CELL_UNPACK *unpack)
 {
 	WT_SESSION_IMPL *session;
-	WT_OFF off;
 
 	session = ds->session;
 
 	__wt_dmsg(ds, "\t%s: len %" PRIu32,
-	    __wt_cell_type_string(cell), __wt_cell_datalen(session, cell));
+	    __wt_cell_type_string(unpack->raw), unpack->size);
 
-	switch (__wt_cell_type(cell)) {
+	switch (unpack->type) {
 	case WT_CELL_DATA:
 	case WT_CELL_DEL:
 		break;
 	case WT_CELL_KEY:
-		__wt_dmsg(ds, ", pfx: %u", __wt_cell_prefix(cell));
+		__wt_dmsg(ds, ", pfx: " PRIu8, unpack->prefix);
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
-		__wt_cell_off(session, cell, &off);
 		__wt_dmsg(ds, ", offpage: addr %" PRIu32 ", size %" PRIu32,
-		    off.addr, off.size);
+		    unpack->off.addr, unpack->off.size);
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
 	__wt_dmsg(ds, "\n");
 
-	return (__wt_debug_cell_data(ds, NULL, cell));
+	return (__wt_debug_cell_data(ds, NULL, unpack));
 }
 
 /*
@@ -755,7 +772,7 @@ __wt_debug_dsk_col_rle(WT_DBG *ds, WT_PAGE_DISK *dsk)
  *	Dump a single cell's data in debugging mode.
  */
 static int
-__wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL *cell)
+__wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
 	WT_BUF *tmp;
 	WT_SESSION_IMPL *session;
@@ -771,16 +788,16 @@ __wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL *cell)
 	 * Column-store references to deleted cells return a NULL cell
 	 * reference.
 	 */
-	if (cell == NULL)
+	if (unpack == NULL)
 		goto deleted;
 
-	switch (__wt_cell_type(cell)) {
+	switch (unpack->type) {
 	case WT_CELL_DATA:
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
 		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-		WT_ERR(__wt_cell_copy(session, cell, tmp));
+		WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
 		p = tmp->data;
 		size = tmp->size;
 		break;

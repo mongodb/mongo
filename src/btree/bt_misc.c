@@ -44,15 +44,15 @@ __wt_page_type_string(u_int type)
  *	Return a string representing the cell type.
  */
 const char *
-__wt_cell_type_string(WT_CELL *cell)
+__wt_cell_type_string(uint8_t type)
 {
-	switch (__wt_cell_type_raw(cell)) {
+	switch (type) {
 	case WT_CELL_DATA:
 		return ("data");
 	case WT_CELL_DATA_OVFL:
 		return ("data-overflow");
 	case WT_CELL_DATA_SHORT:
-		return ("data-short");
+		return ("short-data");
 	case WT_CELL_DEL:
 		return ("deleted");
 	case WT_CELL_KEY:
@@ -60,7 +60,7 @@ __wt_cell_type_string(WT_CELL *cell)
 	case WT_CELL_KEY_OVFL:
 		return ("key-overflow");
 	case WT_CELL_KEY_SHORT:
-		return ("key-short");
+		return ("short-key");
 	case WT_CELL_OFF:
 		return ("off-page");
 	default:

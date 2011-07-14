@@ -360,3 +360,34 @@ __wt_vsize_int(int64_t x)
 		/* For non-negative values, use the unsigned code above. */
 		return (__wt_vsize_uint((uint64_t)x));
 }
+
+/*
+ * __wt_vpack_uint_len --
+ *      Returns the length of the variable-length unsigned integer.
+ */
+static inline int
+__wt_vpack_uint_len(const uint8_t *p, u_int *lenp)
+{
+	/*
+	 * This routine is used by the verification code to ensure it never
+	 * oversteps the buffer because of corruption.
+	 */
+	switch (*p & 0xf0) {
+	case POS_1BYTE_MARKER:
+	case POS_1BYTE_MARKER | 0x10:
+	case POS_1BYTE_MARKER | 0x20:
+	case POS_1BYTE_MARKER | 0x30:
+		*lenp = 1;
+		break;
+	case POS_2BYTE_MARKER:
+	case POS_2BYTE_MARKER | 0x10:
+		*lenp = 2;
+		break;
+	case POS_MULTI_MARKER:
+		*lenp = *p & 0xf;
+		break;
+	default:
+		return (WT_ERROR);
+	}
+	return (0);
+}

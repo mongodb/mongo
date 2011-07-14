@@ -15,6 +15,7 @@ int
 __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_INSERT *ins;
@@ -25,9 +26,10 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	int ret;
 	void *cipdata;
 
-	cipdata = NULL;
+	unpack = &_unpack;
 	cref = NULL;
 	start_recno = 0;
+	cipdata = NULL;
 
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_write_gen = 0;
@@ -153,9 +155,11 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
-		} else
-			if (__wt_cell_type(cipdata) == WT_CELL_DEL)
+		} else {
+			__wt_cell_unpack(session, cipdata, unpack);
+			if (unpack->type == WT_CELL_DEL)
 				goto notfound;
+		}
 		break;
 	case WT_PAGE_COL_RLE:
 		/*
