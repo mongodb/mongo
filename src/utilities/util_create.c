@@ -15,20 +15,16 @@ util_create(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ch, debug, ret, tret;
+	int ch, ret, tret;
 	const char *config, *uri;
 
 	conn = NULL;
 	config = NULL;
-	debug = 0;
 
-	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
+	while ((ch = getopt(argc, argv, "c:f:T")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
 			config = optarg;
-			break;
-		case 'd':			/* command-line option */
-			debug = 1;
 			break;
 		case '?':
 		default:
@@ -66,7 +62,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "create [-d] [-c configuration] uri\n",
+	    "create [-c configuration] uri\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
