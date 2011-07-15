@@ -92,21 +92,15 @@ namespace mongo {
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p.c();
 
-        int bufSize = 512;
-        if ( cc ) {
-            bufSize += sizeof( QueryResult );
-            bufSize += MaxBytesToReturnToClientAtOnce;
-        }
+        int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
 
         BufBuilder b( bufSize );
-
         b.skip(sizeof(QueryResult));
-
         int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
-        if ( !cc ) {
+        _IF ( !cc ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
