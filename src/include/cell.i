@@ -94,9 +94,10 @@ struct __wt_cell {
 	 * Maximum of 6 bytes:
 	 *	  0: descriptor/type
 	 *	  1: prefix compression
-	 *	2-5: data-length
+	 *	2-6: data-length
+	 *           (variable-length encoding of a uint32_t can go to 5 bytes).
 	 */
-	uint8_t __chunk[6];
+	uint8_t __chunk[7];
 };
 
 /*
@@ -183,8 +184,8 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 	if (type == WT_CELL_KEY)		/* Prefix byte */
 		*p++ = (uint8_t)prefix;
 
-	/* Pack the data length. */
-	(void)__wt_vpack_uint(&p, sizeof(cell->__chunk) - 1, (uint64_t)size);
+	/* Pack the data length: a cell is always big enough. */
+	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
 
 	*cell_lenp = WT_PTRDIFF32(p, cell);
 }
