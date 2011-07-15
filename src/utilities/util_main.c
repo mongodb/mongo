@@ -78,6 +78,7 @@ main(int argc, char *argv[])
 	case 'c':
 		if (strcmp(command, "create") == 0)
 			return (util_create(argc, argv));
+		break;
 	case 'd':
 		if (strcmp(command, "dump") == 0)
 			return (util_dump(argc, argv));
