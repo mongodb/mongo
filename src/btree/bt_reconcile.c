@@ -205,7 +205,7 @@ static int  __hazard_qsort_cmp(const void *, const void *);
 STATIN void __rec_cell_build_deleted(WT_KV *);
 static int  __rec_cell_build_key(
 		WT_SESSION_IMPL *, const void *, uint32_t, int *);
-static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *, WT_KV *, u_int);
+static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *, WT_KV *, uint8_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *, void *, uint32_t);
 static void __rec_col_extend_truncate(WT_PAGE *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
@@ -1373,7 +1373,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
-	uint32_t addr, size, notused;
+	uint32_t addr, size;
 
 	r = S2C(session)->cache->rec;
 	dsk = buf->mem;
@@ -1395,7 +1395,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 		WT_ASSERT(session, buf->size < buf->mem_size);
 
 		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
-		__wt_cell_pack_fixed(cell, WT_CELL_KEY, &notused);
+		(void)__wt_cell_pack_fixed(cell, WT_CELL_KEY);
 		++buf->size;
 	}
 
@@ -2141,7 +2141,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * The value cells all look the same -- we can set it up once and then
 	 * just reset the addr/size pairs we're writing after the cell.
 	 */
-	__wt_cell_pack_fixed(&val->cell, WT_CELL_OFF, &val->cell_len);
+	val->cell_len = __wt_cell_pack_fixed(&val->cell, WT_CELL_OFF);
 	val->buf.data = &val->off;
 	val->buf.size = WT_SIZEOF32(WT_OFF);
 	val->len = val->cell_len + WT_SIZEOF32(WT_OFF);
@@ -2884,7 +2884,7 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 static inline void
 __rec_cell_build_deleted(WT_KV *val)
 {
-	__wt_cell_pack_fixed(&val->cell, WT_CELL_DEL, &val->cell_len);
+	val->cell_len = __wt_cell_pack_fixed(&val->cell, WT_CELL_DEL);
 	val->buf.size = 0;
 	val->len = val->cell_len;
 }
@@ -2901,7 +2901,8 @@ __rec_cell_build_key(
 	WT_BTREE *btree;
 	WT_KV *key;
 	WT_RECONCILE *r;
-	uint32_t pfx_len, pfx;
+	uint32_t pfx_max;
+	uint8_t pfx;
 	const uint8_t *a, *b;
 
 	r = S2C(session)->cache->rec;
@@ -2934,12 +2935,12 @@ __rec_cell_build_key(
 		 * than 256 bytes, limit the comparison to that.
 		 */
 		if (r->key_pfx_compress) {
-			pfx_len = size;
-			if (pfx_len > r->last->size)
-				pfx_len = r->last->size;
-			if (pfx_len > UINT8_MAX)
-				pfx_len = UINT8_MAX;
-			for (a = data, b = r->last->data; pfx < pfx_len; ++pfx)
+			pfx_max = UINT8_MAX;
+			if (size < pfx_max)
+				pfx_max = size;
+			if (r->last->size < pfx_max)
+				pfx_max = r->last->size;
+			for (a = data, b = r->last->data; pfx < pfx_max; ++pfx)
 				if (*a++ != *b++)
 					break;
 		}
@@ -2970,8 +2971,7 @@ __rec_cell_build_key(
 		return (__rec_cell_build_key(session, NULL, 0, is_ovflp));
 	}
 
-	__wt_cell_pack(session,
-	    &key->cell, WT_CELL_KEY, pfx, key->buf.size, &key->cell_len);
+	key->cell_len = __wt_cell_pack_key(&key->cell, pfx, key->buf.size);
 	key->len = key->cell_len + key->buf.size;
 
 	return (0);
@@ -3002,8 +3002,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, void *data, uint32_t size)
 
 	/* Handle zero-length cells quickly. */
 	if (size == 0) {
-		__wt_cell_pack(
-		    session, &val->cell, WT_CELL_DATA, 0, 0, &val->cell_len);
+		val->cell_len = __wt_cell_pack_data(&val->cell, 0, 0);
 		val->len = val->cell_len + val->buf.size;
 		return (0);
 	}
@@ -3020,8 +3019,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, void *data, uint32_t size)
 		return (__rec_cell_build_ovfl(session, val, WT_CELL_DATA_OVFL));
 	}
 
-	__wt_cell_pack(session,
-	    &val->cell, WT_CELL_DATA, 0, val->buf.size, &val->cell_len);
+	val->cell_len = __wt_cell_pack_data(&val->cell, 0, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
 	return (0);
 }
@@ -3031,7 +3029,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, void *data, uint32_t size)
  *	Store bulk-loaded overflow items in the file, returning the WT_OFF.
  */
 static int
-__rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_KV *kv, u_int type)
+__rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type)
 {
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
@@ -3068,7 +3066,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_KV *kv, u_int type)
 	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;
 	kv->buf.size = sizeof(kv->off);
-	__wt_cell_pack_fixed(&kv->cell, type, &kv->cell_len);
+	kv->cell_len = __wt_cell_pack_fixed(&kv->cell, type);
 	kv->len = kv->cell_len + kv->buf.size;
 
 	ret = __wt_disk_write(session, dsk, addr, size);

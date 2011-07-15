@@ -8,9 +8,9 @@
 #undef	STATIN
 #define	STATIN static inline
 
-STATIN void	__wt_cell_pack_fixed(WT_CELL *, u_int, uint32_t *);
-STATIN void	__wt_cell_pack(WT_SESSION_IMPL *,
-		    WT_CELL *, u_int, u_int, uint32_t, uint32_t *);
+STATIN uint32_t	__wt_cell_pack_fixed(WT_CELL *, uint8_t);
+STATIN uint32_t	__wt_cell_pack_key(WT_CELL *, uint8_t, uint32_t);
+STATIN uint32_t	__wt_cell_pack_data(WT_CELL *, uint32_t, uint32_t);
 STATIN void	__wt_cell_unpack(
 		    WT_SESSION_IMPL *, WT_CELL *, WT_CELL_UNPACK *);
 STATIN int	__wt_cell_unpack_safe(
@@ -61,13 +61,16 @@ STATIN int	__wt_cell_unpack_safe(
  * Bits 1 and 2 are reserved for "short" key and data items.  If bit 1 (but not
  * bit 2) is set, it's a short data item, less than 128 bytes in length, and the
  * other 7 bits are the length.   If bit 2 is set (but not bit 1), it's a short
- * key, less than 64 bytes in length, and the other 6 bits are the length.
+ * key, less than 64 bytes in length, and the other 6 bits are the length.  The
+ * 0x03 bit combination (setting both 0x01 and 0x02) is unused, but will require
+ * code changes.
  *
- * The 0x03 bit combination is unused, but would require code changes.
+ * Bit 3 marks run-length encoded variable-length column store data: immediately
+ * after the cell description byte, there's a uint32_t repeat count.
  */
 #define	WT_CELL_DATA_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
-#define	WT_CELL_UNUSED_BIT3	0x004		/* Unused */
+#define	WT_CELL_RLE		0x004		/* Run-length encoding */
 #define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
 #define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
@@ -91,13 +94,12 @@ STATIN int	__wt_cell_unpack_safe(
  */
 struct __wt_cell {
 	/*
-	 * Maximum of 6 bytes:
-	 *	  0: descriptor/type
-	 *	  1: prefix compression
-	 *	2-6: data-length
-	 *           (variable-length encoding of a uint32_t can go to 5 bytes).
-	 */
-	uint8_t __chunk[7];
+	 * Maximum of 12 bytes:
+	 *	   0: type, RLE flag
+	 *	   1: prefix compression count
+	 *	 2-6: optional RLE count (uint32_t encoding up to 5 bytes)
+	 *	7-11: optional data length (uint32_t encoding up to 5 bytes)
+	uint8_t __chunk[12];
 };
 
 /*
@@ -107,17 +109,17 @@ struct __wt_cell {
 struct __wt_cell_unpack {
 	uint8_t  raw;			/* Raw cell type (include "shorts") */
 	uint8_t  type;			/* Cell type */
-
 	uint8_t  prefix;		/* Cell prefix */
-
 	uint8_t	 ovfl;			/* Cell is an overflow */
+
+	uint32_t rle;			/* RLE count */
 
 	WT_OFF	 off;			/* WT_OFF structure */
 
 	const void *data;		/* Data */
 	uint32_t    size;		/* Data size */
 
-	uint32_t len;			/* Cell + data total length */
+	uint32_t    len;		/* Cell + data total length */
 };
 
 /*
@@ -133,20 +135,19 @@ struct __wt_cell_unpack {
  * __wt_cell_pack_fixed --
  *	Write a WT_CELL's contents based on a fixed-size type.
  */
-static inline void
-__wt_cell_pack_fixed(WT_CELL *cell, u_int type, uint32_t *cell_lenp)
+static inline uint32_t
+__wt_cell_pack_fixed(WT_CELL *cell, uint8_t type)
 {
-	cell->__chunk[0] = (u_int8_t)type;
-	*cell_lenp = 1;				/* Cell byte */
+	cell->__chunk[0] = type;
+	return (1);
 }
 
 /*
- * __wt_cell_pack --
- *	Set a WT_CELL's contents based on a type, prefix and data size.
+ * __wt_cell_pack_key --
+ *	Set a key's WT_CELL contents.
  */
-static inline void
-__wt_cell_pack(WT_SESSION_IMPL *session,
-    WT_CELL *cell, u_int type, u_int prefix, uint32_t size, uint32_t *cell_lenp)
+static inline uint32_t
+__wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 {
 	uint8_t byte, *p;
 
@@ -155,17 +156,6 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 	 * bytes.  Short key/data items have 6- or 7-bits of length in the
 	 * descriptor byte and no length bytes.
 	 */
-	WT_ASSERT(session, type == WT_CELL_DATA || type == WT_CELL_KEY);
-	if (type == WT_CELL_DATA && size <= 0x7f) {
-		/*
-		 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are
-		 * the size.
-		 */
-		byte = (uint8_t)size;
-		cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
-		*cell_lenp = 1;			/* Cell byte */
-		return;
-	}
 	if (size <= 0x3f) {
 		/*
 		 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag; the other
@@ -173,21 +163,54 @@ __wt_cell_pack(WT_SESSION_IMPL *session,
 		 */
 		byte = (uint8_t)size;
 		cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
-		cell->__chunk[1] = (uint8_t)prefix;
-		*cell_lenp = 2;			/* Cell byte + prefix byte */
-		return;
+		cell->__chunk[1] = prefix;
+		return (2);
 	}
 
-	p = cell->__chunk;
-	*p++ = (uint8_t)type;			/* Type */
+	cell->__chunk[0] = WT_CELL_KEY;		/* Type */
+	cell->__chunk[1] = prefix;		/* Prefix */
 
-	if (type == WT_CELL_KEY)		/* Prefix byte */
-		*p++ = (uint8_t)prefix;
-
-	/* Pack the data length: a cell is always big enough. */
+	p = cell->__chunk + 2;			/* Length */
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
 
-	*cell_lenp = WT_PTRDIFF32(p, cell);
+	return (WT_PTRDIFF32(p, cell));
+}
+
+/*
+ * __wt_cell_pack_data --
+ *	Set a data item's WT_CELL contents.
+ */
+static inline uint32_t
+__wt_cell_pack_data(WT_CELL *cell, uint32_t rle, uint32_t size)
+{
+	uint8_t byte, *p;
+
+	/*
+	 * Delete and off-page items have known sizes, we don't store length
+	 * bytes.  Short key/data items have 6- or 7-bits of length in the
+	 * descriptor byte and no length bytes.
+	 */
+	if (rle == 0 && size <= 0x7f) {
+		/*
+		 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are
+		 * the size.
+		 */
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
+		return (1);
+	}
+
+	p = cell->__chunk + 1;
+	if (rle == 0)				/* Type + RLE */
+		cell->__chunk[0] = WT_CELL_DATA;
+	else {
+		cell->__chunk[0] = WT_CELL_DATA | WT_CELL_RLE;
+		(void)__wt_vpack_uint(&p, 0, (uint64_t)rle);
+	}
+						/* Length */
+	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
+
+	return (WT_PTRDIFF32(p, cell));
 }
 
 /*
@@ -249,13 +272,14 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 
 	unpack->prefix = 0;
 	unpack->ovfl = 0;
-	p = (uint8_t *)cell + 1;			/* skip cell */
+	unpack->rle = 0;
 
 	/*
 	 * Delete and off-page items have known sizes, there's no length bytes.
 	 * Short key/data items have 6- or 7-bits of length in the descriptor
 	 * byte and no length bytes.   Normal key/data items have length bytes.
 	 */
+	p = (uint8_t *)cell + 1;			/* skip cell */
 	switch (unpack->raw) {
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
@@ -281,8 +305,13 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 		unpack->len = 1 + unpack->size;
 		break;
 	case WT_CELL_DATA:
-		WT_RET_TEST(__wt_vunpack_uint(&p,
-		    (end == NULL) ? 0 : (size_t)(end - p), &v), WT_ERROR);
+		if (cell->__chunk[0] & WT_CELL_RLE) {
+			WT_RET(__wt_vunpack_uint(
+			    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+			unpack->rle = v;
+		}
+		WT_RET(__wt_vunpack_uint(
+		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
@@ -301,8 +330,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 	case WT_CELL_KEY:
 		unpack->prefix = cell->__chunk[1];
 		++p;					/* skip prefix */
-		WT_RET_TEST(__wt_vunpack_uint(&p,
-		    (end == NULL) ? 0 : (size_t)(end - p), &v), WT_ERROR);
+		WT_RET(__wt_vunpack_uint(
+		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
