@@ -49,6 +49,20 @@ from packing import pack, unpack
         }
 }
 
+/* Throw away references after close. */
+%define DESTRUCTOR(class, method)
+%feature("shadow") class::method %{
+    def method(self, *args):
+        try:
+            return $action(self, *args)
+        finally:
+            self.this = None
+%}
+%enddef
+DESTRUCTOR(wt_connection, close)
+DESTRUCTOR(wt_cursor, close)
+DESTRUCTOR(wt_session, close)
+
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
 
