@@ -209,9 +209,17 @@ namespace mongo {
         void setTimeout( double secs );
 
 #ifdef MONGO_SSL
+        /** secures inline */
         void secure( SSLManager * ssl );
-#endif
 
+        void secureAccepted( SSLManager * ssl );
+#endif
+        
+        /**
+         * call this after a fork for server sockets
+         */
+        void postFork();
+        
     private:
         void _init();
         /** raw send, same semantics as ::send */
@@ -232,6 +240,7 @@ namespace mongo {
 
 #ifdef MONGO_SSL
         shared_ptr<SSL> _ssl;
+        SSLManager * _sslAccepted;
 #endif
 
     protected:

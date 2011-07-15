@@ -380,6 +380,9 @@ namespace mongo {
     void Socket::_init() {
         _bytesOut = 0;
         _bytesIn = 0;
+#ifdef MONGO_SSL
+        _sslAccepted = 0;
+#endif
     }
 
     void Socket::close() {
@@ -399,7 +402,22 @@ namespace mongo {
         _ssl.reset( ssl->secure( _fd ) );
         SSL_connect( _ssl.get() );
     }
+
+    void Socket::secureAccepted( SSLManager * ssl ) { 
+        _sslAccepted = ssl;
+    }
 #endif
+
+    void Socket::postFork() {
+#ifdef MONGO_SSL
+        if ( _sslAccepted ) {
+            assert( _fd );
+            _ssl.reset( _sslAccepted->secure( _fd ) );
+            SSL_accept( _ssl.get() );
+            _sslAccepted = 0;
+        }
+#endif
+    }
 
     class ConnectBG : public BackgroundJob {
     public:
