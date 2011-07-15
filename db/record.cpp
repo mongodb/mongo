@@ -180,14 +180,17 @@ namespace mongo {
     bool Record::MemoryTrackingEnabled = true;
     
 
-    int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
+    volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
     void Record::touch( bool entireRecrd ) {
 
         if ( lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             char * addr = data;
             char * end = data + netLength();
-            for ( ; addr <= end ; addr += 2048 )
+            for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
+                if ( ! entireRecrd )
+                    break;
+            }
         }
 
     }
