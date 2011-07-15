@@ -37,9 +37,9 @@ class WiredTigerTestCase(unittest.TestCase):
         subprocess.call(["mkdir", "-p", self.testdir])
         os.chdir(self.testdir)
 
-        self.conn = wiredtiger.wiredtiger_open(".", None, 'create')
+        self.conn = wiredtiger.wiredtiger_open(".", 'create')
         self.pr(`self.conn`)
-        self.session = self.conn.open_session(None, None)
+        self.session = self.conn.open_session()
 
     def tearDown(self):
         self.pr('finishing')

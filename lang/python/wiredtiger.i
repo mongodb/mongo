@@ -26,6 +26,9 @@ from packing import pack, unpack
         $1 = &temp;
 }
 
+/* Event handlers are not supported in Python. */
+%typemap(in, numinputs=0) WT_EVENT_HANDLER * { $1 = NULL; }
+
 /* Set the return value to the returned connection, session, or cursor */
 %typemap(argout) WT_CONNECTION ** {
         $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
@@ -45,6 +48,9 @@ from packing import pack, unpack
                     PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
         }
 }
+
+/* Don't require empty config strings. */
+%typemap(default) const char *config { $1 = NULL; }
 
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
@@ -203,11 +209,14 @@ SELFHELPER(struct wt_cursor)
 %rename(_next) next(WT_CURSOR *);
 
 /* Remove / rename parts of the C API that we don't want in Python. */
+%immutable wt_cursor::session;
 %immutable wt_cursor::key_format;
 %immutable wt_cursor::value_format;
+%immutable wt_session::connection;
 
-%ignore WT_BUF;
+%ignore wt_buf;
 %ignore wt_collator;
+%ignore wt_compressor;
 %ignore wt_connection::add_collator;
 %ignore wt_cursor_type;
 %ignore wt_connection::add_cursor_type;
