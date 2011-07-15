@@ -1081,11 +1081,22 @@ namespace mongo {
             modsIsIndexed = mods->isIndexed();
         }
 
-        if( !upsert && !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
+        if( !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                return _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                if (!upsert) {
+                    return result;
+                }
+                // for repl
+                else if (upsert && !result.existing && !isOperatorUpdate && !logop) {
+                    checkNoMods( updateobj );
+                    debug.upsert = true;
+                    BSONObj no = updateobj;
+                    theDataFileMgr.insertWithObjMod(ns, no, god);
+                    return UpdateResult( 0 , 0 , 1 , no );
+                }
             }
         }
 
