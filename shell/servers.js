@@ -76,7 +76,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
             dbpath: "/data/db/" + dirname,
             noprealloc: "",
             smallfiles: "",
-            oplogSize: "10",
+            oplogSize: "40",
             nohttpinterface: ""
         };
 
@@ -889,7 +889,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
         extra = {};
 
     if ( ! extra.oplogSize )
-        extra.oplogSize = "10";
+        extra.oplogSize = "40";
         
     var a = []
     if ( putBinaryFirst )
@@ -1026,7 +1026,7 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
     this.numNodes = opts.nodes || 0;
-    this.oplogSize = opts.oplogSize || 20;
+    this.oplogSize = opts.oplogSize || 40;
     this.useSeedList = opts.useSeedList || false;
     this.bridged = opts.bridged || false;
     this.ports = [];
