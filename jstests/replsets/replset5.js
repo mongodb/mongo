@@ -32,7 +32,9 @@ doTest = function (signal) {
     // If you want to test failure, just add values for w and wtimeout
     // to the following command. This will override the default set above and
     // prevent replication from happening in time for the count tests below.
-    master.getDB("admin").runCommand({getlasterror: 1});
+    var result = master.getDB("admin").runCommand({getlasterror: 1});
+    printjson(result);
+
 
     var slaves = replTest.liveNodes.slaves;
     slaves[0].setSlaveOk();
