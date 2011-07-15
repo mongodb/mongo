@@ -294,16 +294,13 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 static inline size_t
 __wt_vsize_posint(uint64_t x)
 {
-	size_t size;
 	int len, shift;
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (x >> shift != 0)
 			break;
 
-	for (size = 1; len != 0; shift -= 8, --len)
-		++size;
-	return (size);
+	return (size_t)(len + 1);
 }
 
 /*
@@ -313,16 +310,13 @@ __wt_vsize_posint(uint64_t x)
 static inline size_t
 __wt_vsize_negint(uint64_t x)
 {
-	size_t size;
 	int len, shift;
 
 	for (shift = 56, len = 8; len != 0; shift -= 8, --len)
 		if (((x >> shift) & 0xff) != 0xff)
 			break;
 
-	for (size = 1; len != 0; shift -= 8, --len)
-		++size;
-	return (size);
+	return (size_t)(len + 1);
 }
 
 /*
