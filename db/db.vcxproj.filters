@@ -313,6 +313,7 @@
     <ClInclude Include="..\util\net\message.h" />
     <ClInclude Include="..\util\net\message_server.h" />
     <ClInclude Include="..\util\net\sock.h" />
+    <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
