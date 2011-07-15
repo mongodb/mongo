@@ -239,14 +239,14 @@ static void output(const char* str, size_t len, int x, int y)
     WriteConsoleOutputCharacterA(console_out, str, len, pos, &count);
 }
 #else
-static int highlightBlue(int fd, char c) {
+static int writeBlue(int fd, char c) {
     if (write(fd, "\x1b[1;34m", 7) == -1) return -1; // bright blue (visible with both B&W bg)
     if (write(fd, &c, 1) == -1) return -1;
     if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
     return 0;
 }
 
-static int highlightRed(int fd, char c) {
+static int writeRed(int fd, char c) {
     if (write(fd, "\x1b[1;31m", 7) == -1) return -1; // bright red (visible with both B&W bg)
     if (write(fd, &c, 1) == -1) return -1;
     if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
@@ -256,17 +256,19 @@ static int highlightRed(int fd, char c) {
 
 static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
     size_t plen = strlen(prompt);
+    int offset = 0;
+    size_t lendif = 0;
+
+    if ( (plen + pos) >= cols )
+        offset = plen + pos - cols + 1;
     
-    while((plen+pos) >= cols) {
-        buf++;
-        len--;
-        pos--;
-    }
-    while (plen+len > cols) {
-        len--;
-    }
+    if ( (len + plen) > cols ) 
+        lendif = len + plen - cols;
 
 #ifdef _WIN32
+    buf += offset;
+    pos -= offset;
+    len -= lendif;
     CONSOLE_SCREEN_BUFFER_INFO inf = { 0 };
     GetConsoleScreenBufferInfo(console_out, &inf);
     output(prompt, plen, 0, inf.dwCursorPosition.Y);
@@ -283,7 +285,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 #else
     {
         char seq[64];
-        int highlight = -1;
+        int curmatchpos = -1;
 
         if (pos < len) {
             /* this scans for a brace matching buf[pos] to highlight */
@@ -304,7 +306,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
                         unmatched++;
 
                     if (unmatched == 0) {
-                        highlight = i;
+                        curmatchpos = i;
                         break;
                     }
                 }
@@ -313,61 +315,72 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 
         /* scans for unmatched {[( to be highlighted */
         int mismatched = 0;
-        int mismatchpos[len];
-        int nomatch = -1;
+        int mismatchpos[LINENOISE_MAX_LINE];
+        int unmatchedpos = -1;
 
-        for (unsigned i = 0; i <= len; i++) {
+        for (size_t i = 0; i <= LINENOISE_MAX_LINE; i++) {
             mismatchpos[i] = -1;
         }
 
-        for (unsigned i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++) {
             if (strchr("{[(", buf[i])) {
                 mismatched++;
                 mismatchpos[mismatched] = i;
             } else if (strchr("}])", buf[i])) {
                 mismatched--;
-                if ( mismatched < 0 && mismatchpos[len + mismatched] == -1)
-                    mismatchpos[len + mismatched] = i;
+                if ( mismatched < 0 && mismatchpos[LINENOISE_MAX_LINE + mismatched] == -1)
+                    mismatchpos[LINENOISE_MAX_LINE + mismatched] = i;
             }
         }
 
         if ( mismatched < 0 )
-            nomatch = mismatchpos[len + mismatched];
+            unmatchedpos = mismatchpos[LINENOISE_MAX_LINE + mismatched];
         else
-            nomatch = mismatchpos[mismatched];
+            unmatchedpos = mismatchpos[mismatched];
 
-        if ( nomatch >= pos && nomatch >= cols-plen )
-            nomatch = -1;
-        if ( highlight >= pos && highlight >= cols-plen )
-            highlight = -1;
+        buf += offset;
+        pos -= offset;
+        len -= lendif;
+        int max = offset + len;
+
+        if ( unmatchedpos < offset || unmatchedpos >= max )
+            unmatchedpos = -1;
+        else 
+            unmatchedpos -= offset;
+
+        if ( curmatchpos < offset || curmatchpos >= max )
+            curmatchpos = -1;
+        else 
+            curmatchpos -= offset;
+
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
 
-        if (highlight == -1 && nomatch == -1) {
+        if (curmatchpos == -1 && unmatchedpos == -1) {
             if (write(fd,buf,len) == -1) return;
-        } else if (highlight != -1 && nomatch == -1) {
-            if (write(fd,buf,highlight) == -1) return;
-            if (highlightBlue(fd, buf[highlight]) == -1) return;
-            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
-        } else if (highlight == -1 && nomatch != -1) {
-            if (write(fd,buf,nomatch) == -1) return;
-            if (highlightRed(fd, buf[nomatch]) == -1) return;
-            if (write(fd,buf+nomatch+1,len-nomatch-1) == -1) return;
-        } else if (highlight > nomatch) {
-            if (write(fd,buf,nomatch) == -1) return;
-            if (highlightRed(fd, buf[nomatch]) == -1) return;
-            if (write(fd,buf+nomatch+1,highlight-nomatch-1) == -1) return;
-            if (highlightBlue(fd, buf[highlight]) == -1) return;
-            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+        } else if (curmatchpos != -1 && unmatchedpos == -1) {
+            if (write(fd,buf,curmatchpos) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,len-curmatchpos-1) == -1) return;
+        } else if (curmatchpos == -1 && unmatchedpos != -1) {
+            if (write(fd,buf,unmatchedpos) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,len-unmatchedpos-1) == -1) return;
+        } else if (curmatchpos > unmatchedpos) {
+            if (write(fd,buf,unmatchedpos) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,curmatchpos-unmatchedpos-1) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,len-curmatchpos-1) == -1) return;
         } else {
-            if (write(fd,buf,highlight) == -1) return;
-            if (highlightBlue(fd, buf[highlight]) == -1) return;
-            if (write(fd,buf+highlight+1,nomatch-highlight-1) == -1) return;
-            if (highlightRed(fd, buf[nomatch]) == -1) return;
-            if (write(fd,buf+nomatch+1,len-nomatch-1) == -1) return;
+            if (write(fd,buf,curmatchpos) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,unmatchedpos-curmatchpos-1) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,len-unmatchedpos-1) == -1) return;
         }
 
         /* Erase to right */
@@ -682,7 +695,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t len = 0;
     size_t cols = getColumns();
 
-    char del[LINENOISE_MAX_LINE];
+    char del[LINENOISE_MAX_LINE] = {'\0'};
 
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
@@ -835,8 +848,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 25: /* Ctrl+y, paste the most recently deleted portion. */
             memmove( buf+pos+strlen(del), buf+pos, len-pos );
             memcpy( buf+pos, del, strlen(del) );
-            len = len + strlen(del);
-            pos = pos + strlen(del);
+            len += strlen(del);
+            pos += strlen(del);
             refreshLine(fd,prompt,buf,len,pos,cols);
             break;
         case 1: /* Ctrl+a, go to the start of the line */
