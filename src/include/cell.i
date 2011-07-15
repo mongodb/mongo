@@ -226,7 +226,6 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
     WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	uint64_t v;
-	u_int len;
 	const uint8_t *p;
 
 	/*
@@ -281,12 +280,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 		unpack->len = 1 + unpack->size;
 		break;
 	case WT_CELL_DATA:
-		if (end != NULL) {
-			WT_RET(__wt_vpack_uint_len(p, &len));
-			if (end != NULL && p + len > end)
-				return (WT_ERROR);
-		}
-		WT_RET(__wt_vunpack_uint(&p, sizeof(cell->__chunk) - 1, &v));
+		WT_RET_TEST(__wt_vunpack_uint(&p,
+		    (end == NULL) ? 0 : (size_t)(end - p), &v), WT_ERROR);
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
@@ -305,13 +300,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 	case WT_CELL_KEY:
 		unpack->prefix = cell->__chunk[1];
 		++p;					/* skip prefix */
-
-		if (end != NULL) {
-			WT_RET(__wt_vpack_uint_len(p, &len));
-			if (end != NULL && p + len > end)
-				return (WT_ERROR);
-		}
-		WT_RET(__wt_vunpack_uint(&p, sizeof(cell->__chunk) - 2, &v));
+		WT_RET_TEST(__wt_vunpack_uint(&p,
+		    (end == NULL) ? 0 : (size_t)(end - p), &v), WT_ERROR);
 		if (end != NULL && p + v > end)
 			return (WT_ERROR);
 
