@@ -520,7 +520,7 @@ namespace mongo {
     void GhostSync::associateSlave(const BSONObj& rid, const int memberId) {
         GhostSlave &slave = _ghostCache[rid["_id"].OID()];
         if (slave.init) {
-            log(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
+            LOG(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
             return;
         }
 
@@ -537,7 +537,7 @@ namespace mongo {
     void GhostSync::updateSlave(const mongo::OID& id, const OpTime& last) {
         GhostSlave& slave = _ghostCache[id];
         if (!slave.init) {
-            log() << "couldn't update slave " << id << rsLog;
+            OCCASIONALLY log() << "couldn't update slave " << id << rsLog;
             return;
         }
 
