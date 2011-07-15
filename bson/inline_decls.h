@@ -46,7 +46,9 @@ namespace mongo {
 # if defined(_WIN32)
     // prefetch data from memory
     inline void prefetch(const void *p) { 
+#if defined(_MM_HINT_T0)
         _mm_prefetch((char *) p, _MM_HINT_T0);
+#endif
     }
 #else
     inline void prefetch(void *p) { }

@@ -36,7 +36,7 @@
 #include "../lasterror.h"
 #include "../../s/d_logic.h"
 #include "../repl_block.h"
-#include "server.h"
+#include "../server.h"
 
 namespace mongo {
 
