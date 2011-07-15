@@ -150,7 +150,7 @@ namespace mongo {
             time_t when;
             unsigned who;
         };
-        static mutex lyMutex;
+        static SimpleMutex lyMutex;
         Guarded<LastYea,lyMutex> ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void electionFailed(unsigned meid);

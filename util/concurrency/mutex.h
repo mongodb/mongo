@@ -232,6 +232,9 @@ namespace mongo {
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
+# if defined(_DEBUG)
+            const SimpleMutex& m() const { return _m; }
+# endif
         };
     };
 #else
@@ -243,15 +246,16 @@ namespace mongo {
                 assert( pthread_mutex_destroy(&_lock) == 0 ); 
             }
         }
-
+    private:
         void lock() { assert( pthread_mutex_lock(&_lock) == 0 ); }
         void unlock() { assert( pthread_mutex_unlock(&_lock) == 0 ); }
-        
+    public:
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
+            const SimpleMutex& m() const { return _m; }
         };
 
     private:

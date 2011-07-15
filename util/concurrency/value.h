@@ -35,12 +35,12 @@ namespace mongo {
         later to forget to be in the lock.  Check is made that it is the right lock in _DEBUG
         builds at runtime.
     */
-    template <typename T, mutex& BY>
+    template <typename T, SimpleMutex& BY>
     class Guarded {
         T _val;
     public:
-        T& ref(const scoped_lock& lk) {
-            dassert( lk._mut == &BY );
+        T& ref(const SimpleMutex::scoped_lock& lk) {
+            dassert( &lk.m() == &BY );
             return _val;
         }
     };
