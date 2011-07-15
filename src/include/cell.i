@@ -291,8 +291,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 			return (WT_ERROR);
 
 		unpack->data = p;
-		unpack->size = v;
-		unpack->len = WT_PTRDIFF32(p, cell) + v;
+		unpack->size = (uint32_t)v;
+		unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
 		break;
 	case WT_CELL_KEY_SHORT:
 		unpack->prefix = cell->__chunk[1];
@@ -316,8 +316,8 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 			return (WT_ERROR);
 
 		unpack->data = p;
-		unpack->size = v;
-		unpack->len = WT_PTRDIFF32(p, cell) + v;
+		unpack->size = (uint32_t)v;
+		unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
 		break;
 	default:
 		return (end == NULL ? __wt_file_format(session) : WT_ERROR);
