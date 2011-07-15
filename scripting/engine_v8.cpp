@@ -103,6 +103,12 @@ namespace mongo {
       V8Scope* scope = (V8Scope*)(scp->Value());
       val = scope->mongoToV8Element(elmt, false);
       info.This()->ForceSet(name, val);
+
+      if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+          // if accessing a subobject, it may get modified and base obj would not know
+          // have to set base as modified, which means some optim is lost
+          info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+      }
       return val;
     }
 
@@ -178,6 +184,12 @@ namespace mongo {
             return Handle<Value>();
         Handle<Value> val = scope->mongoToV8Element(elmt, false);
 //        info.This()->ForceSet(name, val);
+
+        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+            // if accessing a subobject, it may get modified and base obj would not know
+            // have to set base as modified, which means some optim is lost
+            info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        }
         return val;
     }
 
