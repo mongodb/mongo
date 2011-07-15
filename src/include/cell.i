@@ -97,8 +97,9 @@ struct __wt_cell {
 	 * Maximum of 12 bytes:
 	 *	   0: type, RLE flag
 	 *	   1: prefix compression count
-	 *	 2-6: optional RLE count (uint32_t encoding up to 5 bytes)
-	 *	7-11: optional data length (uint32_t encoding up to 5 bytes)
+	 *	 2-6: optional RLE count	(uint32_t encoding, max 5 bytes)
+	 *	7-11: optional data length	(uint32_t encoding, max 5 bytes)
+	 */
 	uint8_t __chunk[12];
 };
 
@@ -293,31 +294,23 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 		unpack->data = NULL;
 		unpack->size = sizeof(WT_OFF);
 		unpack->len = 1 + sizeof(WT_OFF);
-		break;
+		return (0);
 	case WT_CELL_DEL:
 		unpack->data = NULL;
 		unpack->size = 0;
 		unpack->len = 1;
-		break;
+		return (0);
 	case WT_CELL_DATA_SHORT:
 		unpack->data = p;
 		unpack->size = cell->__chunk[0] >> 1;
 		unpack->len = 1 + unpack->size;
-		break;
+		return (0);
 	case WT_CELL_DATA:
 		if (cell->__chunk[0] & WT_CELL_RLE) {
 			WT_RET(__wt_vunpack_uint(
 			    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 			unpack->rle = v;
 		}
-		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		if (end != NULL && p + v > end)
-			return (WT_ERROR);
-
-		unpack->data = p;
-		unpack->size = (uint32_t)v;
-		unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
 		break;
 	case WT_CELL_KEY_SHORT:
 		unpack->prefix = cell->__chunk[1];
@@ -326,21 +319,27 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session,
 		unpack->data = p;
 		unpack->size = cell->__chunk[0] >> 2;
 		unpack->len = 2 + unpack->size;
-		break;
+		return (0);
 	case WT_CELL_KEY:
 		unpack->prefix = cell->__chunk[1];
 		++p;					/* skip prefix */
-		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		if (end != NULL && p + v > end)
-			return (WT_ERROR);
-
-		unpack->data = p;
-		unpack->size = (uint32_t)v;
-		unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
 		break;
 	default:
 		return (end == NULL ? __wt_file_format(session) : WT_ERROR);
 	}
+
+	/*
+	 * WT_CELL_DATA, WT_CELL_KEY:
+	 *	common code to get the data length and fill in the unpacked
+	 * cell's data, size and length fields.
+	 */
+	WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : (size_t)(end - p), &v));
+	if (end != NULL && p + v > end)
+		return (WT_ERROR);
+
+	unpack->data = p;
+	unpack->size = (uint32_t)v;
+	unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
+
 	return (0);
 }
