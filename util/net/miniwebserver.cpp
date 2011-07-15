@@ -109,6 +109,7 @@ namespace mongo {
     }
 
     void MiniWebServer::accepted(Socket sock) {
+        sock.postFork();
         sock.setTimeout(8);
         char buf[4096];
         int len = 0;

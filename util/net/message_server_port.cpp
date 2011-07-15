@@ -43,6 +43,8 @@ namespace mongo {
             inPort->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
+            p->postFork();
+
             string otherSide;
 
             Message m;
