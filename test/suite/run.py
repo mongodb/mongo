@@ -40,6 +40,14 @@ if len(sys.argv) < 2:
 # Otherwise, turn numbers and ranges into test module names
 for arg in sys.argv[1:]:
 	from unittest import defaultTestLoader as loader
+
+	# Explicit test class names
+	if not arg[0].isdigit():
+		if arg.endswith('.py'):
+			arg = arg[:-3]
+		tests.addTests(loader.loadTestsFromName(arg))
+		continue
+
 	# Deal with ranges
 	if '-' in arg:
 		start, end = (int(a) for a in arg.split('-'))
