@@ -45,6 +45,7 @@ namespace mongo {
         }
     };
 
+    // todo: rename this to ThreadSafeString or something
     class DiagStr {
         string _s;
         static mutex m;
