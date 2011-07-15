@@ -577,14 +577,22 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
 
 void historyResult(const char *search, char *buf){
     int i;
-    i = history_index > 0 ? history_index-1 : history_len-1;
-    for (; i>=0; i--) {
+    int looped = history_index+1;
+    i = history_index;
+    for (; i!=looped; i--) {
         if ( strstr(history[i], search) ) {
             strcpy(buf, history[i]);
+            if (i == history_index+1) // same result from a repeat search
+                beep();
             history_index = i;
             return;
         }
+        if ( i == 0) {
+            i = history_len;
+            looped--;
+        }
     }
+    return;
 }
 
 int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *pos, size_t cols) {
@@ -592,13 +600,13 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
     int searchlen = 0;
     *pos = *len = 0;
     char search[LINENOISE_MAX_LINE] = "";
-    char search_prompt[LINENOISE_MAX_LINE] = "reverse-i-search'': "; 
+    char search_prompt[LINENOISE_MAX_LINE] = "reverse-i-search (): "; 
     history_index = history_len-1;
     refreshLine(fd,search_prompt,buf,*len,*pos,cols);
 
     while (true){
         c = linenoiseReadChar(fd);
-        strcpy(search_prompt, "reverse-i-search'");
+        strcpy(search_prompt, "reverse-i-search (");
         if ( c <= 126 && c >= 32 ) { //all the useful ascii chars
             search[searchlen] = c;
             searchlen++;
@@ -606,9 +614,11 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
             *len = strlen(buf);
             if ( strstr(buf, search) != NULL)
                 *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
-                refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
-        } else if (c == 127 || c == 8) { //delete
-            if (searchlen > 1) {
+            else 
+                beep(); // TODO nomatching
+            refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
+        } else if (c == 8) { // backspace
+            if (searchlen > 0) {
                 searchlen--;
                 search[searchlen] = '\0';
                 history_index = history_len-1;
@@ -616,13 +626,12 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
                 *len = strlen(buf);
                 if ( strstr(buf, search) != NULL)
                     *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
-                refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
+                refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
             } else {
-                *len = *pos = 0;
-                buf[0] = '\0';
-                refreshLine(fd,prompt,buf,*len,*pos,cols);
-                return 0;
+                beep();
             }
+        } else if (c == 127) {
+            beep();
         } else if (c == 14) { // Ctrl+n next history item
             if (history_index < history_len)
                 history_index++;
@@ -638,6 +647,7 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
             refreshLine(fd,prompt,buf,*len,*pos,cols);
             return 0;
         } else if (c == 27 || c == 3 ) { // esc or Ctrl+C 
+            history_index = history_len;
             buf[0]  = '\0';
             *len = *pos = 0;
             refreshLine(fd,prompt,buf,*len,*pos,cols);
@@ -658,11 +668,12 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
             refreshLine(fd,prompt,buf,*len,*pos,cols);
             return 0;
         } else if (c == 18) { // Ctrl+r earlier match
+            history_index--;
             historyResult(search, buf);
             *len = strlen(buf);
             if ( strstr(buf, search) != NULL)
                 *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
-            refreshLine(fd, strcat(strcat(search_prompt,search),"': ") ,buf,*len,*pos,cols);
+            refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
         } else if (c == 13) { // enter
             *pos = strlen(buf);
             refreshLine(fd,prompt,buf,*len,*pos,cols);
