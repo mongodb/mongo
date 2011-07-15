@@ -20,7 +20,7 @@ STATIN int	__wt_cell_unpack_safe(
  * WT_CELL --
  *	Variable-length cell type.
  *
- * Pages containing variable-length data (WT_PAGE_ROW_INT, WT_PAGE_ROW_LEAF, 
+ * Pages containing variable-length data (WT_PAGE_ROW_INT, WT_PAGE_ROW_LEAF,
  * and WT_PAGE_COL_VAR page types), have variable-length cells after the page
  * header.
  *
