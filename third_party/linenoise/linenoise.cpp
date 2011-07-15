@@ -257,18 +257,20 @@ static int writeRed(int fd, char c) {
 static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
     size_t plen = strlen(prompt);
     int offset = 0;
-    size_t lendif = 0;
+    size_t lenDiff = 0;
 
+    /* offset is the portion of the line before what will be displayed */
     if ( (plen + pos) >= cols )
         offset = plen + pos - cols + 1;
     
+    /* lenDiff is the change that must be made in len to keep the line to one line */
     if ( (len + plen) > cols ) 
-        lendif = len + plen - cols;
+        lenDiff = len + plen - cols;
 
 #ifdef _WIN32
     buf += offset;
     pos -= offset;
-    len -= lendif;
+    len -= lenDiff;
     CONSOLE_SCREEN_BUFFER_INFO inf = { 0 };
     GetConsoleScreenBufferInfo(console_out, &inf);
     output(prompt, plen, 0, inf.dwCursorPosition.Y);
@@ -340,7 +342,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 
         buf += offset;
         pos -= offset;
-        len -= lendif;
+        len -= lenDiff;
         int max = offset + len;
 
         if ( unmatchedpos < offset || unmatchedpos >= max )
@@ -600,13 +602,13 @@ int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *po
     int searchlen = 0;
     *pos = *len = 0;
     char search[LINENOISE_MAX_LINE] = "";
-    char search_prompt[LINENOISE_MAX_LINE] = "reverse-i-search (): "; 
+    char search_prompt[LINENOISE_MAX_LINE] = "search (): "; 
     history_index = history_len-1;
     refreshLine(fd,search_prompt,buf,*len,*pos,cols);
 
     while (true){
         c = linenoiseReadChar(fd);
-        strcpy(search_prompt, "reverse-i-search (");
+        strcpy(search_prompt, "search (");
         if ( c <= 126 && c >= 32 ) { //all the useful ascii chars
             search[searchlen] = c;
             searchlen++;
