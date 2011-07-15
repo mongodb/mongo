@@ -1,4 +1,4 @@
-// @file common.cpp
+/** @file common.cpp Common code for server binaries (mongos, mongod, test).  Nothing used by driver should be here. */
 
 /*
  *    Copyright (C) 2010 10gen Inc.
