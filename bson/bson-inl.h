@@ -172,7 +172,7 @@ dodouble:
     }
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() const {
-        if ( isABSONObj() )
+        MONGOIF ( isABSONObj() )
             return BSONObj(value());
         stringstream ss;
         ss << "invalid parameter: expected an object (" << fieldName() << ")";

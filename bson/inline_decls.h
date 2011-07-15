@@ -31,6 +31,7 @@
 
 #endif
 
+namespace mongo {
 
 /* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
 
@@ -42,13 +43,23 @@
 // branch prediction.  indicate we expect to not enter the if statement body
 # define MONGO_IF(x) if( (x) )
 
-// prefetch data from memory
-# define MONGOPREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
+# if defined(_WIN32)
+    // prefetch data from memory
+    inline void prefetch(const void *p) { 
+        _mm_prefetch((char *) p, _MM_HINT_T0);
+    }
+#else
+    inline void prefetch(void *p) { }
+#endif
 
 #else
 
 # define MONGOIF(x) if( __builtin_expect((x), 1) )
 # define MONGO_IF(x) if( __builtin_expect((x), 0) )
-# define MONGOPREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
+
+    inline void prefetch(void *p) { 
+    }
 
 #endif
+
+}

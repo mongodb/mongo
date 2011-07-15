@@ -123,7 +123,6 @@ namespace mongo {
             for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                 prepBasicWrite_inlock(bb, &(*i), lastDbPath);
             }
-
         }
 
         void resetLogBuffer(AlignedBuilder& bb) {

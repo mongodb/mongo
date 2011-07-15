@@ -19,5 +19,3 @@
 // branch prediction.  indicate we expect to not enter the if statement body
 #define _IF MONGO_IF
 
-// prefetch data from memory
-#define PREFETCH MONGOPREFETCH
