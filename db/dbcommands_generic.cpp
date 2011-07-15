@@ -1,4 +1,4 @@
-// dbcommands_generic.cpp
+/** @file dbcommands_generic.cpp commands suited for any mongo server (both mongod, mongos) */
 
 /**
 *
@@ -14,10 +14,6 @@
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-/**
- * commands suited for any mongo server
- */
 
 #include "pch.h"
 #include "ops/query.h"
@@ -44,8 +40,61 @@
 #include "background.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"
+#include "repl/multicmd.h"
+#include "server.h"
 
 namespace mongo {
+
+    namespace cloud {
+        SimpleMutex mtx("cloud");
+        Guarded< vector<string>, mtx > ips;
+        bool startedThread = false;
+
+        void thread() { 
+            bson::bo cmd;
+            while( 1 ) {
+                list<Target> L;
+                {
+                    SimpleMutex::scoped_lock lk(mtx);
+                    if( ips.ref(lk).empty() )
+                        continue;
+                    for( unsigned i = 0; i < ips.ref(lk).size(); i++ ) { 
+                        L.push_back( Target(ips.ref(lk)[i]) );
+                    }
+                }
+
+
+                /** repoll as machines might be down on the first lookup (only if not found previously) */
+                sleepsecs(6); 
+            }
+        }
+    }
+
+    class CmdCloud : public Command {
+    public:
+        CmdCloud() : Command( "cloud" ) { }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream &help ) const {
+            help << "internal command facilitating running in certain cloud computing environments";
+        }
+        bool run(const string& dbname, BSONObj& obj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            if( !obj.hasElement("servers") ) { 
+                vector<string> ips;
+                obj["servers"].Obj().Vals(ips);
+                {
+                    SimpleMutex::scoped_lock lk(cloud::mtx);
+                    cloud::ips.ref(lk).swap(ips);
+                    if( !cloud::startedThread ) {
+                        cloud::startedThread = true;
+                        boost::thread thr(cloud::thread);
+                    }
+                }
+            }
+            return true;
+        }
+    } cmdCloud;
 
     class CmdBuildInfo : public Command {
     public:

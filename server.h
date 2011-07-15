@@ -21,3 +21,5 @@
 
 // prefetch data from memory
 #define PREFETCH MONGOPREFETCH
+
+using namespace bson;
