@@ -23,13 +23,15 @@ prototype.chk: $(libwiredtiger_a_SOURCES)
 	@(cd ../dist && sh s_prototypes) && touch $@
 
 if PYTHON
+PYSRC = ../lang/python
 if DEBUG
 PY_SETUP_DEBUG = -g
 endif
 all-local: _wiredtiger.so
-../lang/python/wiredtiger_wrap.c: wiredtiger.h ../lang/python/wiredtiger.i
-	@(cd ../lang/python && swig -python -I../../build_posix wiredtiger.i)
+$(PYSRC)/wiredtiger_wrap.c: wiredtiger.h $(PYSRC)/wiredtiger.i
+	@(cd $(PYSRC) && swig -python -I../../build_posix wiredtiger.i)
 
-_wiredtiger.so: libwiredtiger.a ../lang/python/wiredtiger_wrap.c
-	@env CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(PYTHON) ../lang/python/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
+_wiredtiger.so: libwiredtiger.a $(PYSRC)/wiredtiger_wrap.c
+	@env CFLAGS="$(PYTHON_CFLAGS)" LDFLAGS="$(PYTHON_LDFLAGS)" \
+	    $(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
 endif
