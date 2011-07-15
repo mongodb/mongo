@@ -113,6 +113,7 @@ static DWORD oldMode;
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <poll.h>
 
 static struct termios orig_termios; /* in order to restore at exit */
 #endif /* _WIN32 */
@@ -452,6 +453,13 @@ static char linenoiseReadChar(int fd){
 #endif
 
     if (c == 27) { /* escape */
+        /* wait 200ms to see if other keys come in. if not, assume escape key
+         * was hit rather than start of escape sequence */
+
+        struct pollfd pfd = {fd, POLLIN, 0};
+        if (poll(&pfd, 1, 200/*ms*/) == 0) // true on timeout
+            return 27;
+
         if (read(fd,seq,2) == -1) return 0;
         if (seq[0] == 91){
             if (seq[1] == 68) { /* left arrow */
