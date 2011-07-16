@@ -111,10 +111,13 @@ namespace mongo {
         /**
          * This is a cache of ghost slaves
          */
-        map<mongo::OID,GhostSlave> _ghostCache;
+        typedef map<mongo::OID,GhostSlave> MAP;
+        MAP _ghostCache;
+        RWLock _lock; // protects _ghostCache
         ReplSetImpl *rs;
+
     public:
-        GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), rs(_rs) {}
+        GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), _lock("GhostSync"), rs(_rs) {}
         ~GhostSync() {
             log() << "~GhostSync() called" << rsLog;
         }
