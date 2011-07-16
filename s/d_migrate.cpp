@@ -1363,21 +1363,23 @@ namespace mongo {
                     if ( res["size"].number() > 0 && apply( res , &lastOpApplied ) )
                         continue;
 
-                    if ( state == COMMIT_START && flushPendingWrites( lastOpApplied ) )
-                        break;
-
+                    if ( state == ABORT ) {
+                        timing.note( "aborted" );
+                        return;
+                    }
+                    
+                    if ( state == COMMIT_START ) {
+                        if ( flushPendingWrites( lastOpApplied ) )
+                            break;
+                        
+                        if ( timeWaitingForCommit.seconds() > 86400 ) {
+                            state = FAIL;
+                            errmsg = "timed out waiting for commit";
+                            return;
+                        }
+                    }
+                    
                     sleepmillis( 10 );
-                }
-
-                if ( state == ABORT ) {
-                    timing.note( "aborted" );
-                    return;
-                }
-
-                if ( timeWaitingForCommit.seconds() > 86400 ) {
-                    state = FAIL;
-                    errmsg = "timed out waiting for commit";
-                    return;
                 }
 
                 timing.done(5);
@@ -1472,10 +1474,11 @@ namespace mongo {
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
             if ( ! opReplicatedEnough( lastOpApplied ) ) {
-                warning() << "migrate commit attempt timed out contacting " << slaveCount
-                          << " slaves for '" << ns << "' " << min << " -> " << max << migrateLog;
+                OCCASIONALLY warning() << "migrate commit waiting for " << slaveCount 
+                                       << " slaves for '" << ns << "' " << min << " -> " << max << migrateLog;
                 return false;
             }
+
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
