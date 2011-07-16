@@ -78,6 +78,7 @@ namespace mongo {
 
     void enableIPv6(bool state=true);
     bool IPv6Enabled();
+    void setSockTimeouts(int sock, double secs);
 
     /**
      * wrapped around os representation of network address
@@ -180,9 +181,12 @@ namespace mongo {
     public:
         Socket(int sock, const SockAddr& farEnd);
 
-        // in some cases the timeout will actually be 2x this value - eg we do a partial send,
-        // then the timeout fires, then we try to send again, then the timeout fires again with
-        // no data sent, then we detect that the other side is down
+        /** In some cases the timeout will actually be 2x this value - eg we do a partial send,
+            then the timeout fires, then we try to send again, then the timeout fires again with
+            no data sent, then we detect that the other side is down.
+
+            Generally you don't want a timeout, you should be very prepared for errors if you set one.
+        */
         Socket(double so_timeout = 0, int logLevel = 0 );
 
         bool connect(SockAddr& farEnd);

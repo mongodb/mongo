@@ -46,7 +46,17 @@ namespace mongo {
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
     
-    // --- some global helpers -----
+    void setSockTimeouts(int sock, double secs) {
+        struct timeval tv;
+        tv.tv_sec = (int)secs;
+        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
+        bool report = logLevel > 3; // solaris doesn't provide these
+        DEV report = true;
+        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+    }
 
 #if defined(_WIN32)
     void disableNagle(int sock) {
@@ -604,23 +614,26 @@ namespace mongo {
                 log(3) << "Socket recv() conn closed? " << remoteString() << endl;
                 throw SocketException( SocketException::CLOSED , remoteString() );
             }
-            else { /* ret < 0  */
+            else { /* ret < 0  */                
+#if defined(_WIN32)
+                int e = WSAGetLastError();
+#else
                 int e = errno;
-                
-#if defined(EINTR) && !defined(_WIN32)
+# if defined(EINTR)
                 if( e == EINTR ) {
                     if( ++retries == 1 ) {
                         log() << "EINTR retry" << endl;
                         continue;
                     }
                 }
+# endif
 #endif
                 if ( ( e == EAGAIN 
 #if defined(_WIN32)
-
                        || e == WSAETIMEDOUT
 #endif
-                       ) && _timeout > 0 ) {
+                       ) && _timeout > 0 ) 
+                {
                     // this is a timeout
                     log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
                     throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
