@@ -350,7 +350,7 @@ namespace mongo {
             while (dot) {
                 // get x.y
                 string xyTag = string(prevPrefix.c_str(), dot - prevPrefix.c_str());
-                log(1) << "generating tag " << xyTag << rsLog;
+                LOG(1) << "replSet generating tag " << xyTag << rsLog;
                 TagClause& xyClause = tagMap[xyTag];
                 xyClause.name = xyTag;
 
@@ -461,7 +461,7 @@ namespace mongo {
             }
 
             // if we got here, this is a valid rule
-            log(1) << "new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
+            LOG(1) << "replSet new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
             rules[rule.fieldName()] = r;
         }
     }

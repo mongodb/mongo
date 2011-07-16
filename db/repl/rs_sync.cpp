@@ -221,7 +221,7 @@ namespace mongo {
         BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
         OpTime ts = remoteOldestOp["ts"]._opTime();
         DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
-        else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
+        else LOG(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
         DEV {
             log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
             log() << "replSet our state: " << state().toString() << rsLog;
@@ -261,7 +261,7 @@ namespace mongo {
         assert(r.conn() == 0);
 
         if( !r.connect(hn) ) {
-            log(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
+            LOG(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
             r.resetConnection();
             return false;
         }
@@ -440,7 +440,7 @@ namespace mongo {
             }
             r.tailCheck();
             if( !r.haveCursor() ) {
-                log(1) << "replSet end syncTail pass with " << hn << rsLog;
+                LOG(1) << "replSet end syncTail pass with " << hn << rsLog;
                 // TODO : reuse our connection to the primary.
                 return;
             }
@@ -593,7 +593,7 @@ namespace mongo {
             // the target might end up with a new Member, but s.slave never
             // changes so we'll compare the names
             || target == slave->slave || target->fullName() == slave->slave->fullName()) {
-            log(1) << "replica set ghost target no good" << endl;
+            LOG(1) << "replica set ghost target no good" << endl;
             return;
         }
 
@@ -606,8 +606,7 @@ namespace mongo {
                 slave->reader.ghostQueryGTE(rsoplog, last);
             }
 
-            log(1) << "last: " << slave->last.toString() << " to " << last.toString() << rsLog;
-
+            LOG(1) << "replSet last: " << slave->last.toString() << " to " << last.toString() << rsLog;
             if (slave->last > last) {
                 return;
             }
@@ -621,11 +620,11 @@ namespace mongo {
                 BSONObj o = slave->reader.nextSafe();
                 slave->last = o["ts"]._opTime();
             }
-            log(2) << "now last is " << slave->last.toString() << rsLog;
+            LOG(2) << "now last is " << slave->last.toString() << rsLog;
         }
         catch (DBException& e) {
             // we'll be back
-            log(2) << "replSet ghost sync error: " << e.what() << " for "
+            LOG(2) << "replSet ghost sync error: " << e.what() << " for "
                    << slave->slave->fullName() << rsLog;
             slave->reader.resetConnection();
         }
