@@ -1474,9 +1474,10 @@ namespace mongo {
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
             if ( ! opReplicatedEnough( lastOpApplied ) ) {
+                OpTime op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for " << slaveCount 
                                        << " slaves for '" << ns << "' " << min << " -> " << max 
-                                       << " waiting for: " << lastOpApplied
+                                       << " waiting for: " << op
                                        << migrateLog;
                 return false;
             }
