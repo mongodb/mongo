@@ -93,7 +93,7 @@ __wt_row_key(
 				break;
 			}
 
-			__wt_cell_unpack(session,
+			__wt_cell_unpack(
 			    WT_REF_OFFSET(page, ikey->cell_offset), unpack);
 
 			/*
@@ -127,7 +127,7 @@ __wt_row_key(
 		}
 
 		/* Unpack the key's cell. */
-		__wt_cell_unpack(session, key, unpack);
+		__wt_cell_unpack(key, unpack);
 
 		/* 2: the test for an on-page reference to an overflow key. */
 		if (unpack->type == WT_CELL_KEY_OVFL) {
@@ -261,7 +261,7 @@ err:	if (is_local && retb != NULL)
  * NULL if there isn't one.
  */
 WT_CELL *
-__wt_row_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
+__wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -295,7 +295,7 @@ __wt_row_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	__wt_cell_unpack(session, cell, unpack);
+	__wt_cell_unpack(cell, unpack);
 	cell = (WT_CELL *)((uint8_t *)cell + unpack->len);
 	if (__wt_cell_type(cell) == WT_CELL_KEY ||
 	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)

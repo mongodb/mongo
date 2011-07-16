@@ -629,8 +629,8 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	 * allocated array.
 	 */
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl)
 			++ovfl_cnt;
 	}
@@ -641,8 +641,8 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 	trk->ovfl_cnt = ovfl_cnt;
 
 	ovfl_cnt = 0;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl) {
 			trk->ovfl[ovfl_cnt].addr = unpack->off.addr;
 			trk->ovfl[ovfl_cnt].size = unpack->off.size;
@@ -1234,7 +1234,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 
 	for (cip = page->u.col_leaf.d + start; start < stop; ++start) {
 		cell = WT_COL_PTR(page, cip);
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_DATA_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
@@ -1800,7 +1800,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    page, ((WT_IKEY *)rip->key)->cell_offset);
 		else
 			cell = rip->key;
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
@@ -1811,9 +1811,9 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    session, unpack->off.addr, unpack->off.size));
 		}
 
-		if ((cell = __wt_row_value(session, page, rip)) == NULL)
+		if ((cell = __wt_row_value(page, rip)) == NULL)
 			continue;
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_DATA_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "

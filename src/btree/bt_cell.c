@@ -18,7 +18,7 @@ __wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_BUF *retb)
 
 	unpack = &_unpack;
 
-	__wt_cell_unpack(session, cell, unpack);
+	__wt_cell_unpack(cell, unpack);
 	return (__wt_cell_unpack_copy(session, unpack, retb));
 }
 

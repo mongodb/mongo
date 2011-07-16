@@ -506,18 +506,16 @@ __wt_debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	session = ds->session;
 	unpack = &_unpack;
 
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL)
 			unpack = NULL;
 		else
-			__wt_cell_unpack(session, cell, unpack);
+			__wt_cell_unpack(cell, unpack);
 		WT_RET(__wt_debug_cell_data(ds, "V", unpack));
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
@@ -563,11 +561,9 @@ __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_INSERT *ins;
 	WT_ROW *rip;
-	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	session = ds->session;
 	unpack = &_unpack;
 
 	/*
@@ -582,14 +578,14 @@ __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		if (__wt_off_page(page, rip->key))
 			__wt_debug_ikey(ds, rip->key);
 		else {
-			__wt_cell_unpack(session, rip->key, unpack);
+			__wt_cell_unpack(rip->key, unpack);
 			WT_RET(__wt_debug_cell_data(ds, "K", unpack));
 		}
 
-		if ((cell = __wt_row_value(session, page, rip)) == NULL)
+		if ((cell = __wt_row_value(page, rip)) == NULL)
 			__wt_dmsg(ds, "\tV {}\n");
 		else {
-			__wt_cell_unpack(session, cell, unpack);
+			__wt_cell_unpack(cell, unpack);
 			WT_RET(__wt_debug_cell_data(ds, "V", unpack));
 		}
 
@@ -655,14 +651,12 @@ __wt_debug_dsk_cell(WT_DBG *ds, WT_PAGE_DISK *dsk)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_SESSION_IMPL *session;
 	uint32_t i;
 
-	session = ds->session;
 	unpack = &_unpack;
 
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		WT_RET(__wt_debug_cell(ds, unpack));
 	}
 	return (0);

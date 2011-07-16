@@ -166,11 +166,11 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 
 	last_cell_type = FIRST;
 	cell_num = 0;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(session, cell, unpack, end) != 0) {
+		if (__wt_cell_unpack_safe(cell, unpack, end) != 0) {
 			ret = __wt_err_cell_corrupted(
 			    session, cell_num, addr, quiet);
 			goto err;
@@ -552,11 +552,11 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 	end = (uint8_t *)dsk + size;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(session, cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__wt_err_cell_corrupted(
 			    session, cell_num, addr, quiet));
 

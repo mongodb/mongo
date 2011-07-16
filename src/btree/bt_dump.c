@@ -203,7 +203,7 @@ __wt_dump_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 
 		/* Process the original data. */
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
@@ -298,14 +298,14 @@ __wt_dump_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Check for an empty item. */
-		if ((cell = __wt_row_value(session, page, rip)) == NULL) {
+		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			dp->p(key->data, key->size, dp->stream);
 			dp->p(NULL, 0, dp->stream);
 			goto dump_insert;
 		}
 
 		/* Set cell to reference the value we'll dump. */
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {

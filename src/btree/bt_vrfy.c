@@ -485,8 +485,8 @@ __wt_verify_overflow_cell(
 	}
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:

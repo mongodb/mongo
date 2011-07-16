@@ -310,9 +310,7 @@ extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
     WT_BUF *retb);
-extern WT_CELL *__wt_row_value(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_ROW *rip);
+extern WT_CELL *__wt_row_value(WT_PAGE *page, WT_ROW *rip);
 extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
     const void *key,

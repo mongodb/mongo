@@ -270,8 +270,8 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * (WT_CELL_DATA_OVFL) or deleted (WT_CELL_DEL) items.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_DISK_OFFSET(dsk, cell);
 	}
 
@@ -328,8 +328,8 @@ __wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
@@ -455,8 +455,8 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:

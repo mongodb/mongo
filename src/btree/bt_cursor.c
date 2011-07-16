@@ -137,7 +137,7 @@ __btcur_next_var(
 			value->size = upd->size;
 			found = 1;
 		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
-			__wt_cell_unpack(session, cell, unpack);
+			__wt_cell_unpack(cell, unpack);
 			if (unpack->type == WT_CELL_DEL)
 				continue;
 			WT_RET(__wt_cell_unpack_copy(session, unpack, value));
@@ -215,7 +215,7 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
 		} else if ((cell =
-		    __wt_row_value(session, cbt->page, cbt->rip)) == NULL) {
+		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
 			value->data = "";
 			value->size = 0;
 		} else

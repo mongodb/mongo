@@ -173,7 +173,7 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_STAT_INCR(stats, file_item_col_deleted);
 			continue;
 		}
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:

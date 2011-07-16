@@ -883,8 +883,8 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * We're deleting the page, which means any overflow item we ever had
 	 * is deleted as well.
 	 */
-	WT_CELL_FOREACH(session, dsk, cell, unpack, i) {
-		__wt_cell_unpack(session, cell, unpack);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
 		WT_RET(__rec_discard_add_ovfl(session, unpack));
 	}
 
@@ -1395,7 +1395,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 		WT_ASSERT(session, buf->size < buf->mem_size);
 
 		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
-		(void)__wt_cell_pack_fixed(cell, WT_CELL_KEY);
+		(void)__wt_cell_pack_type(cell, WT_CELL_KEY, 0);
 		++buf->size;
 	}
 
@@ -1466,7 +1466,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		 * only copy the non-prefix-compressed portion of the key.)
 		 */
 		cell = WT_PAGE_DISK_BYTE(r->dsk.mem);
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		WT_ASSERT(session,
 		    unpack->prefix == 0 || unpack->type == WT_CELL_KEY_OVFL);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
@@ -2012,7 +2012,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 		 * or the original on-page item.
 		 */
 		if ((cell = WT_COL_PTR(page, cip)) != NULL)
-			__wt_cell_unpack(session, cell, unpack);
+			__wt_cell_unpack(cell, unpack);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
 			if (cell == NULL)
 				__rec_cell_build_deleted(val);
@@ -2141,7 +2141,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * The value cells all look the same -- we can set it up once and then
 	 * just reset the addr/size pairs we're writing after the cell.
 	 */
-	val->cell_len = __wt_cell_pack_fixed(&val->cell, WT_CELL_OFF);
+	val->cell_len = __wt_cell_pack_type(&val->cell, WT_CELL_OFF, 0);
 	val->buf.data = &val->off;
 	val->buf.size = WT_SIZEOF32(WT_OFF);
 	val->len = val->cell_len + WT_SIZEOF32(WT_OFF);
@@ -2159,7 +2159,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			cell = NULL;
 		else {
 			cell = WT_REF_OFFSET(page, ikey->cell_offset);
-			__wt_cell_unpack(session, cell, unpack);
+			__wt_cell_unpack(cell, unpack);
 		}
 
 		/*
@@ -2444,8 +2444,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 			cell = rip->key;
 		}
 							/* Build value cell. */
-		if ((val_cell = __wt_row_value(session, page, rip)) != NULL)
-			__wt_cell_unpack(session, val_cell, unpack);
+		if ((val_cell = __wt_row_value(page, rip)) != NULL)
+			__wt_cell_unpack(val_cell, unpack);
 		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
 			/*
 			 * Copy the item off the page -- however, when the page
@@ -2474,7 +2474,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 			 * space.
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				__wt_cell_unpack(session, cell, unpack);
+				__wt_cell_unpack(cell, unpack);
 				WT_ERR(__rec_discard_add_ovfl(session, unpack));
 				goto leaf_insert;
 			}
@@ -2497,7 +2497,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 		 * If the key is an overflow item, assume prefix compression
 		 * won't make things better, and simply copy it.
 		 */
-		__wt_cell_unpack(session, cell, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL) {
 			key->buf.data = cell;
 			key->buf.size = unpack->len;
@@ -2884,7 +2884,7 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 static inline void
 __rec_cell_build_deleted(WT_KV *val)
 {
-	val->cell_len = __wt_cell_pack_fixed(&val->cell, WT_CELL_DEL);
+	val->cell_len = __wt_cell_pack_type(&val->cell, WT_CELL_DEL, 0);
 	val->buf.size = 0;
 	val->len = val->cell_len;
 }
@@ -3066,7 +3066,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type)
 	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;
 	kv->buf.size = sizeof(kv->off);
-	kv->cell_len = __wt_cell_pack_fixed(&kv->cell, type);
+	kv->cell_len = __wt_cell_pack_type(&kv->cell, type, 0);
 	kv->len = kv->cell_len + kv->buf.size;
 
 	ret = __wt_disk_write(session, dsk, addr, size);

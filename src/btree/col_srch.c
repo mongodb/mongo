@@ -156,7 +156,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
 		} else {
-			__wt_cell_unpack(session, cipdata, unpack);
+			__wt_cell_unpack(cipdata, unpack);
 			if (unpack->type == WT_CELL_DEL)
 				goto notfound;
 		}
