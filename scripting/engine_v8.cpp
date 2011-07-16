@@ -41,8 +41,8 @@ namespace mongo {
      */
     static BSONObj* unwrapBSONObj(const Handle<v8::Object>& obj) {
       Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
-//      if (field.IsEmpty() || !field->IsExternal())
-//          return 0;
+      if (field.IsEmpty() || !field->IsExternal())
+          return 0;
       void* ptr = field->Value();
       return (BSONObj*)ptr;
     }
