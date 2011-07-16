@@ -330,11 +330,11 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	(void)cfg;
 
-	if (strncmp(name, "table:", 6) != 0) {
+	if (strncmp(name, "file:", 5) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("table:");
+	name += strlen("file:");
 
 	/*
 	 * Open a btree handle.
