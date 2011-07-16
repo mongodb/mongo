@@ -24,6 +24,16 @@ var coll = dbase.getCollection("foo")
 var dbaseSOk = mongosSOK.getDB( "" + dbase )
 var collSOk = mongosSOK.getCollection( "" + coll )
 
+
+var rsA = shardTest._rs[0].test
+var rsB = shardTest._rs[1].test
+
+rsA.getMaster().getDB( "test" ).dummy.insert( { x : 1 } )
+rsB.getMaster().getDB( "test" ).dummy.insert( { x : 1 } )
+
+rsA.awaitReplication()
+rsB.awaitReplication()
+
 print("1: initial insert")
 
 coll.save({ _id : -1, a : "a", date : new Date() })
@@ -39,9 +49,6 @@ print("3: test normal and slaveOk queries")
 var shardA = shardTest.getShard(  coll, { _id : -1 } )
 var shardAColl = shardA.getCollection( "" + coll )
 var shardB = shardTest.getShard(  coll, { _id : 1 } )
-
-var rsA = shardTest._rs[0].test
-var rsB = shardTest._rs[1].test
 
 if( shardA.name == rsB.getURL() ){
     var swap = rsB
