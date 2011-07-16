@@ -505,7 +505,7 @@ namespace mongo {
         }
         n++;
 
-        Client::initThread("replica set sync");
+        Client::initThread("rsSync");
         cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();

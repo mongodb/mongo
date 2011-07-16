@@ -117,7 +117,7 @@ namespace mongo {
         ReplSetImpl *rs;
 
     public:
-        GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), _lock("GhostSync"), rs(_rs) {}
+        GhostSync(ReplSetImpl *_rs) : task::Server("rsGhostSync"), _lock("GhostSync"), rs(_rs) {}
         ~GhostSync() {
             log() << "~GhostSync() called" << rsLog;
         }

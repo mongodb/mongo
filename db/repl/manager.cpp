@@ -51,7 +51,7 @@ namespace mongo {
     }
 
     Manager::Manager(ReplSetImpl *_rs) :
-        task::Server("rs Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY) {
+        task::Server("rsMgr"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY) {
     }
 
     Manager::~Manager() {
@@ -64,7 +64,7 @@ namespace mongo {
     }
 
     void Manager::starting() {
-        Client::initThread("rs Manager");
+        Client::initThread("rsMgr");
         replLocalAuth();
     }
 

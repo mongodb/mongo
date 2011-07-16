@@ -676,7 +676,7 @@ namespace mongo {
        terminates.
     */
     void startReplSets(ReplSetCmdline *replSetCmdline) {
-        Client::initThread("startReplSets");
+        Client::initThread("rsStart");
         try {
             assert( theReplSet == 0 );
             if( replSetCmdline == 0 ) {
