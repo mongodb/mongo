@@ -1311,7 +1311,7 @@ namespace mongo {
         v8ToMongoElement(builder, v8name, fieldName, value);
     }
 
-    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ) {
+    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
 
         if ( value->IsString() ) {
 //            Handle<v8::String> str = Handle<v8::String>::Cast(value);
@@ -1327,11 +1327,18 @@ namespace mongo {
         }
 
         if ( value->IsNumber() ) {
-            // needs to be explicit NumberInt to use integer
-//            if ( value->IsInt32() )
-//                b.append( sname, int( value->ToInt32()->Value() ) );
-//            else
-                b.append( sname , value->ToNumber()->Value() );
+            double val = value->ToNumber()->Value();
+            // if previous type was integer, keep it
+            int intval = (int)val;
+            if (val == intval && originalParent) {
+                BSONElement elmt = originalParent->getField(sname);
+                if (elmt.type() == mongo::NumberInt) {
+                    b.append( sname , intval );
+                    return;
+                }
+            }
+
+            b.append( sname , val );
             return;
         }
 
@@ -1446,21 +1453,23 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
+        BSONObj* originalBSON = 0;
+        if (o->HasNamedLookupInterceptor()) {
+            originalBSON = unwrapBSONObj(o);
+        }
+
         if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
                 (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
             // object was readonly, use bson as is
-            log(1) << "Using bson as is for v8ToMongo" << endl;
-            BSONObj* ro = unwrapBSONObj(o);
-            if (ro)
-                return *ro;
-            return BSONObj();
+            if (originalBSON)
+                return *originalBSON;
         }
 
         BSONObjBuilder b;
 
         if ( depth == 0 ) {
             if ( o->HasRealNamedProperty( V8STR_ID ) ) {
-                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ) );
+                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
             }
         }
 
@@ -1478,7 +1487,7 @@ namespace mongo {
             if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , name , sname , value , depth + 1 );
+            v8ToMongoElement( b , name , sname , value , depth + 1, originalBSON );
         }
         return b.obj();
     }
