@@ -133,8 +133,66 @@ namespace PerfTests {
         virtual bool showDurStats() { return true; }
 
         static DBClientConnection *conn;
+        static unsigned once;
 
     public:
+        /* if you want recording of the timings, place the password for the perf database 
+            in ./../settings.py:
+                pstatspassword="<pwd>"
+        */
+        void connect() { 
+            if( once )
+                return;
+            ++once;
+
+            // no writing to perf db if _DEBUG
+            DEV return;
+            
+            const char *fn = "../../settings.py";
+            if( !exists(fn) ) { 
+                if( exists("settings.py") )
+                    fn = "settings.py";
+                else {
+                    cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
+                    cout << "it is recommended this be enabled even on dev boxes" << endl;
+                    return;
+                }
+            }
+
+            try {
+                if( conn == 0 ) {
+                    MemoryMappedFile f;
+                    const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
+                    string pwd;
+
+                    {
+                        const char *q = str::after(p, "pstatspassword=\"");
+                        if( *q == 0 ) {
+                            cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
+                            return;
+                        }
+                        else {
+                            pwd = str::before(q, '\"');
+                        }
+                    }
+
+                    DBClientConnection *c = new DBClientConnection(false, 0, 10);
+                    string err;
+                    if( c->connect("mongo05.10gen.cust.cbici.net", err) ) { 
+                        if( !c->auth("perf", "perf", pwd, err) ) { 
+                            cout << "info: authentication with stats db failed: " << err << endl;
+                            assert(false);
+                        }
+                        conn = c;
+                    }
+                    else { 
+                        cout << err << " (to log perfstats)" << endl;
+                    }
+                }
+            }
+            catch(...) { }
+        }
+
         void say(unsigned long long n, int ms, string s) {
             unsigned long long rps = n*1000/ms;
             cout << "stats " << setw(33) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
@@ -142,124 +200,70 @@ namespace PerfTests {
                 cout << dur::stats.curr->_asCSV();
             cout << endl;
 
-            /* if you want recording of the timings, place the password for the perf database 
-               in ./../settings.py:
-                 pstatspassword="<pwd>"
-            */
-            const char *fn = "../../settings.py";
-            static bool ok = true;
-            if( ok ) {
-                DEV { 
-                    // no writing to perf db if dev
-                }
-                else if( !exists(fn) ) { 
-                    static int once;
-                    if( exists("settings.py") )
-                        fn = "settings.py";
-                    else if( once++ == 0 ) {
-                        cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
-                        cout << "it is recommended this be enabled even on dev boxes" << endl;
-                    }
-                }
-                else {
+            connect();
+
+            if( conn && !conn->isFailed() ) { 
+                const char *ns = "perf.pstats";
+                if( perfHist ) {
+                    static bool needver = true;
                     try {
-                        if( conn == 0 ) {
-                            MemoryMappedFile f;
-                            const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
-                            string pwd;
-
-                            {
-                                const char *q = str::after(p, "pstatspassword=\"");
-                                if( *q == 0 ) {
-                                    cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
-                                    ok = false;
+                        // try to report rps from last time */
+                        Query q;
+                        {
+                            BSONObjBuilder b;
+                            b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
+                            DEV { b.append("info.DEBUG",true); }
+                            else b.appendNull("info.DEBUG");
+                            if( sizeof(int*) == 4 ) 
+                                b.append("info.bits", 32);
+                            else 
+                                b.appendNull("info.bits");
+                            q = Query(b.obj()).sort("when",-1);
+                        }
+                        BSONObj fields = BSON( "rps" << 1 << "info" << 1 );
+                        vector<BSONObj> v;
+                        conn->findN(v, ns, q, perfHist, 0, &fields);
+                        for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
+                            BSONObj o = *i;
+                            double lastrps = o["rps"].Number();
+                            if( lastrps ) {
+                                cout << "stats " << setw(33) << right << "new/old:" << ' ' << setw(9);
+                                cout << fixed << setprecision(2) << rps / lastrps;
+                                if( needver ) {
+                                    cout << "         " << o.getFieldDotted("info.git").toString();
                                 }
-                                else {
-                                    pwd = str::before(q, '\"');
-                                }
-                            }
-
-                            if( ok ) {
-                                conn = new DBClientConnection(false, 0, 10);
-                                string err;
-                                if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
-                                    if( !conn->auth("perf", "perf", pwd, err) ) { 
-                                        cout << "info: authentication with stats db failed: " << err << endl;
-                                        assert(false);
-                                    }
-                                }
-                                else { 
-                                    cout << err << " (to log perfstats)" << endl;
-                                    ok = false;
-                                }
+                                cout << '\n';
                             }
                         }
-                        if( conn && !conn->isFailed() ) { 
-                            const char *ns = "perf.pstats";
-                            if( perfHist ) {
-                                static bool needver = true;
-                                try {
-                                    // try to report rps from last time */
-                                    Query q;
-                                    {
-                                        BSONObjBuilder b;
-                                        b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
-                                        DEV b.append("info.DEBUG",true);
-                                        else b.appendNull("info.DEBUG");
-                                        if( sizeof(int*) == 4 ) b.append("info.bits", 32);
-                                        else b.appendNull("info.bits");
-                                        q = Query(b.obj()).sort("when",-1);
-                                   }
-                                    //cout << q.toString() << endl;
-                                    BSONObj fields = BSON( "rps" << 1 << "info" << 1 );
-                                    vector<BSONObj> v;
-                                    conn->findN(v, ns, q, perfHist, 0, &fields);
-                                    for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
-                                        BSONObj o = *i;
-                                        double lastrps = o["rps"].Number();
-                                        if( lastrps ) {
-                                            cout << "stats " << setw(33) << right << "new/old:" << ' ' << setw(9);
-                                            cout << fixed << setprecision(2) << rps / lastrps;
-                                            if( needver ) {
-                                                cout << "         " << o.getFieldDotted("info.git").toString();
-                                            }
-                                            cout << '\n';
-                                        }
-                                    }
-                                } catch(...) { }
-                                cout.flush();
-                                needver = false;
-                            }
-                            {
-                                bob b;
-                                b.append("host", getHostName());
-                                b.appendTimeT("when", time(0));
-                                b.append("test", s);
-                                b.append("rps", (int) rps);
-                                b.append("millis", ms);
-                                b.appendBool("dur", cmdLine.dur);
-                                if( showDurStats() && cmdLine.dur ) 
-                                    b.append("durStats", dur::stats.curr->_asObj());
-                                {
-                                    bob inf;
-                                    inf.append("version", versionString);
-                                    if( sizeof(int*) == 4 ) inf.append("bits", 32);
-                                    DEV inf.append("DEBUG", true);
+                    } catch(...) { }
+                    cout.flush();
+                    needver = false;
+                }
+                {
+                    bob b;
+                    b.append("host", getHostName());
+                    b.appendTimeT("when", time(0));
+                    b.append("test", s);
+                    b.append("rps", (int) rps);
+                    b.append("millis", ms);
+                    b.appendBool("dur", cmdLine.dur);
+                    if( showDurStats() && cmdLine.dur ) 
+                        b.append("durStats", dur::stats.curr->_asObj());
+                    {
+                        bob inf;
+                        inf.append("version", versionString);
+                        if( sizeof(int*) == 4 ) inf.append("bits", 32);
+                        DEV inf.append("DEBUG", true);
 #if defined(_WIN32)
-                                    inf.append("os", "win");
+                        inf.append("os", "win");
 #endif
-                                    inf.append("git", gitVersion());
-                                    inf.append("boost", BOOST_VERSION);
-                                    b.append("info", inf.obj());
-                                }
-                                BSONObj o = b.obj();
-                                //cout << "inserting " << o.toString() << endl;
-                                conn->insert(ns, o);
-                            }
-                        }
+                        inf.append("git", gitVersion());
+                        inf.append("boost", BOOST_VERSION);
+                        b.append("info", inf.obj());
                     }
-                    catch(...) { 
-                    }
+                    BSONObj o = b.obj();
+                    //cout << "inserting " << o.toString() << endl;
+                    conn->insert(ns, o);
                 }
             }
         }
@@ -335,6 +339,7 @@ namespace PerfTests {
     };
 
     DBClientConnection *B::conn;
+    unsigned B::once;
 
     unsigned dontOptimizeOutHopefully;
 
