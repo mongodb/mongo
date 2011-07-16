@@ -136,11 +136,11 @@ namespace mongo {
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
     }
-
+/*
     string ReplSetConfig::TagSubgroup::toString() const {
         bool first = true;
         string result = "\""+name+"\": [";
-        for (set<MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
+        for (set<const MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
             if (!first) {
                 result += ", ";
             }
@@ -149,12 +149,13 @@ namespace mongo {
         }
         return result+"]";
     }
-
+    */
     string ReplSetConfig::TagClause::toString() const {
         string result = name+": {";
         for (map<string,TagSubgroup*>::const_iterator i = subgroups.begin(); i != subgroups.end(); i++) {
-            result += (*i).second->toString()+", ";
+//TEMP?            result += (*i).second->toString()+", ";
         }
+        result += "TagClause toString TEMPORARILY DISABLED";
         return result + "}";
     }
 
@@ -427,15 +428,17 @@ namespace mongo {
                     (*sgs).second->clauses.push_back(node);
 
                     // if this subgroup contains the primary, it's automatically always up-to-date
-                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
-                         cfg != (*sgs).second->m.end(); cfg++) {
+                    for( set<MemberCfg*>::const_iterator cfg = (*sgs).second->m.begin();
+                         cfg != (*sgs).second->m.end(); 
+                         cfg++) 
+                    {
                         if ((*cfg)->h.isSelf()) {
                             node->actualTarget--;
                             foundMe = true;
                         }
                     }
 
-                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
+                    for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
                         (*cfg)->groups.insert((*sgs).second);
                     }

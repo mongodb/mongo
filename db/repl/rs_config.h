@@ -138,7 +138,8 @@ namespace mongo {
             set<MemberCfg*> m;
 
             void updateLast(const OpTime& op);
-            string toString() const;
+
+            //string toString() const;
 
             /**
              * If two tags have the same name, they should compare as equal so
