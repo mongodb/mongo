@@ -102,7 +102,7 @@ namespace mongo {
 
     class GhostSync : public task::Server {
         struct GhostSlave {
-        GhostSlave() : last(0), slave(0), init(false) {}
+            GhostSlave() : last(0), slave(0), init(false) {}
             OplogReader reader;
             OpTime last;
             Member* slave;
@@ -113,7 +113,6 @@ namespace mongo {
          */
         map<mongo::OID,GhostSlave> _ghostCache;
         ReplSetImpl *rs;
-        virtual void starting();
     public:
         GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), rs(_rs) {}
         ~GhostSync() {
