@@ -1011,7 +1011,7 @@ namespace mongo {
                 break;
 
             case mongo::Date:
-                o->Set( name , v8::Date::New( f.date() ) );
+                o->Set( name , v8::Date::New( (double) ((long long)f.date().millis) ));
                 break;
 
             case mongo::Bool:
@@ -1201,7 +1201,7 @@ namespace mongo {
             return mongoToLZV8( f.embeddedObject() , false, readOnly);
 
         case mongo::Date:
-            return v8::Date::New( f.date() );
+            return v8::Date::New( (double) ((long long)f.date().millis) );
 
         case mongo::Bool:
             return v8::Boolean::New( f.boolean() );
@@ -1349,7 +1349,8 @@ namespace mongo {
         }
 
         if ( value->IsDate() ) {
-            b.appendDate( sname , Date_t( (unsigned long long)(v8::Date::Cast( *value )->NumberValue())) );
+            long long dateval = (long long)(v8::Date::Cast( *value )->NumberValue());
+            b.appendDate( sname , Date_t( (unsigned long long) dateval ) );
             return;
         }
 
