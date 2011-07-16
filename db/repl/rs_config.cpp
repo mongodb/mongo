@@ -327,8 +327,7 @@ namespace mongo {
 
                 TagSubgroup* subgroup;
                 if (clause.subgroups.find(perServerName) == clause.subgroups.end()) {
-                    clause.subgroups[perServerName] = subgroup = new TagSubgroup();
-                    subgroup->name = perServerName;
+                    clause.subgroups[perServerName] = subgroup = new TagSubgroup(perServerName);
                 }
                 else {
                     subgroup = clause.subgroups[perServerName];
@@ -345,7 +344,7 @@ namespace mongo {
         // "x.w" => {D} {E, F}
         for (map<string,TagClause>::iterator baseClause = tagMap.begin(); baseClause != tagMap.end(); baseClause++) {
             string prevPrefix = (*baseClause).first;
-            char *dot = strrchr((char*)prevPrefix.c_str(), '.');
+            const char *dot = strrchr(prevPrefix.c_str(), '.');
 
             while (dot) {
                 // get x.y
@@ -357,11 +356,14 @@ namespace mongo {
                 // get all of x.y.z's subgroups, add them as a single subgroup of x.y
                 TagSubgroup* condensedSubgroup;;
                 if (xyClause.subgroups.find(prevPrefix) == xyClause.subgroups.end()) {
-                    condensedSubgroup = new TagSubgroup();
+                    // label this subgroup one higher than the current, e.g.,
+                    // "x.y.z" if we're creating the "x.y" clause
+                    condensedSubgroup = new TagSubgroup(prevPrefix);
                     xyClause.subgroups[prevPrefix] = condensedSubgroup;
                 }
                 else {
                     condensedSubgroup = xyClause.subgroups[prevPrefix];
+                    assert(condensedSubgroup->name == prevPrefix);
                 }
 
                 TagClause& xyzClause = tagMap[prevPrefix];
@@ -376,13 +378,9 @@ namespace mongo {
                     }
                 }
 
-                // label this subgroup one higher than the current, e.g.,
-                // "x.y.z" if we're creating the "x.y" clause
-                condensedSubgroup->name = prevPrefix;
-
                 // advance: if we were handling "x.y", now do "x"
                 prevPrefix = xyTag;
-                dot = strrchr((char*)prevPrefix.c_str(), '.');
+                dot = strrchr(prevPrefix.c_str(), '.');
             }
         }
     }

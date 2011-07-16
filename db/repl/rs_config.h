@@ -125,8 +125,10 @@ namespace mongo {
          * point to this subgroup. When one of their oplog-tailing cursors is
          * updated, this subgroup is updated.
          */
-        struct TagSubgroup {
-            string name;
+        struct TagSubgroup : boost::noncopyable {
+            ~TagSubgroup(); // never called; not defined
+            TagSubgroup(string nm) : name(nm) { }
+            const string name;
             OpTime last;
             vector<TagClause*> clauses;
 
