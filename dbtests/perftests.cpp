@@ -153,13 +153,13 @@ namespace PerfTests {
                     // no writing to perf db if dev
                 }
                 else if( !exists(fn) ) { 
-		  static int once;
-		  if( exists("settings.py") )
-		    fn = "settings.py";
-		  else if( once++ == 0 ) {
-                    cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
-		    cout << "it is recommended this be enabled even on dev boxes" << endl;
-		  }
+                    static int once;
+                    if( exists("settings.py") )
+                        fn = "settings.py";
+                    else if( once++ == 0 ) {
+                        cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
+                        cout << "it is recommended this be enabled even on dev boxes" << endl;
+                    }
                 }
                 else {
                     try {
