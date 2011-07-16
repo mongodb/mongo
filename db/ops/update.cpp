@@ -1086,11 +1086,11 @@ namespace mongo {
             if( idxNo >= 0 ) {
                 debug.idhack = true;
                 UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
-                if (!upsert) {
+                if ( result.existing || ! upsert ) {
                     return result;
                 }
-                // for repl
-                else if (upsert && !result.existing && !isOperatorUpdate && !logop) {
+                else if ( upsert && ! isOperatorUpdate && ! logop) {
+                    // this handles repl inserts
                     checkNoMods( updateobj );
                     debug.upsert = true;
                     BSONObj no = updateobj;
