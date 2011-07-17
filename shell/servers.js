@@ -102,7 +102,7 @@ startMongodEmpty = function () {
     return startMongoProgram.apply(null, args);
 }
 startMongod = function () {
-    print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING RENAME YOUR INVOCATION");
+    print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
     return startMongodEmpty.apply(null, arguments);
 }
 startMongodNoReset = function(){
@@ -1018,7 +1018,7 @@ var testingReplication = false;
 function skipIfTestingReplication(){
     if (testingReplication) {
         print("skipIfTestingReplication skipping");
-	    quit(0);
+        quit(0);
     }
 }
 
@@ -1512,8 +1512,9 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
         this.savedStartOptions[n] = options
     }
     
-    printjson( options )
-        
+    if( tojson(options) != tojson({}) )
+        printjson(options)
+                
     var o = this.getOptions( n , options , restart && ! startClean );
 
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
