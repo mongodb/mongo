@@ -8,7 +8,6 @@
 #include "wts.h"
 
 static int  bulk(WT_ITEM **, WT_ITEM **);
-static void wt_stream_item(const char *, const void *, uint32_t, FILE *);
 static int  wts_col_del(uint64_t);
 static int  wts_col_put(uint64_t);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
@@ -16,6 +15,7 @@ static int  wts_read(uint64_t);
 static int  wts_row_del(uint64_t);
 static int  wts_row_put(uint64_t, int);
 static int  wts_sync(void);
+static void wts_stream_item(const char *, WT_ITEM *);
 
 static void
 handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
@@ -675,8 +675,8 @@ wts_read(uint64_t keyno)
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
 		fprintf(stderr, "wts_read: read row %" PRIu64 ":\n", keyno);
-		wt_stream_item("bdb", bdb_value.data, bdb_value.size, stderr);
-		wt_stream_item("wt", value.data, value.size, stderr);
+		wts_stream_item("bdb", &bdb_value);
+		wts_stream_item("wt", &value);
 		return (1);
 	}
 	return (0);
@@ -857,13 +857,25 @@ wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 }
 
 /*
- * wt_stream_item --
+ * wts_stream_item --
  *	Dump a single data/size pair, with a tag.
  */
 static void
-wt_stream_item(const char *tag, const void *data, uint32_t size, FILE *stream)
+wts_stream_item(const char *tag, WT_ITEM *item)
 {
-	fprintf(stream, "\t%s {", tag);
-	__wt_stream_byte_string(data, size, stream);
-	fprintf(stream, "}\n");
+	static const char hex[] = "0123456789abcdef";
+	const uint8_t *data;
+	uint32_t size;
+	int ch;
+
+	fprintf(stderr, "\t%s {", tag);
+	for (data = item->data, size = item->size; size > 0; --size, ++data) {
+		ch = data[0];
+		if (isprint(ch))
+			fprintf(stderr, "%c", ch);
+		else
+			fprintf(stderr, "%x%x",
+			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
+	}
+	fprintf(stderr, "}\n");
 }

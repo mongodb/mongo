@@ -210,16 +210,6 @@ extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern void __wt_page_free(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern int __wt_btree_dump(WT_SESSION_IMPL *session,
-    FILE *stream,
-    uint32_t flags);
-extern void __wt_stream_byte_string(const uint8_t *data,
-    uint32_t size,
-    FILE *stream);
-extern int __wt_load_byte_string( WT_SESSION_IMPL *session,
-    const uint8_t *data,
-    uint32_t size,
-    WT_BUF *buf);
 extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
 extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);

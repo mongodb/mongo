@@ -297,7 +297,6 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'bt_dump' : [ 'DUMP_PRINT' ],
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],
