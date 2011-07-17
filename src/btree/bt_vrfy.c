@@ -183,6 +183,8 @@ static int
 __wt_verify_tree(
     WT_SESSION_IMPL *session, WT_REF *ref, uint64_t parent_recno, WT_VSTUFF *vs)
 {
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -193,6 +195,7 @@ __wt_verify_tree(
 
 	ret = 0;
 	page = ref->page;
+	unpack = &_unpack;
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -265,8 +268,18 @@ recno_chk:	if (parent_recno != recno) {
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
 		vs->record_total += page->entries;
+		break;
+	case WT_PAGE_COL_VAR:
+		recno = 0;
+		WT_COL_FOREACH(page, cip, i)
+			if ((cell = WT_COL_PTR(page, cip)) == NULL)
+				++recno;
+			else {
+				__wt_cell_unpack(cell, unpack);
+				recno += unpack->rle;
+			}
+		vs->record_total += recno;
 		break;
 	case WT_PAGE_COL_RLE:
 		recno = 0;
