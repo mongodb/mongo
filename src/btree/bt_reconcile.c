@@ -2047,7 +2047,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	}
 
 	/* For each entry in the in-memory page... */
-	rle = 1;
+	rle = 0;
 	deleted = last_deleted = 0;
 	tracking = 0;
 	WT_COL_FOREACH(page, cip, i) {
