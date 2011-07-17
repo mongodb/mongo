@@ -25,7 +25,6 @@
 
 namespace mongo {
 
-    /* singleton config object is stored here */
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
