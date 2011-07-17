@@ -21,6 +21,7 @@
 #pragma once
 
 #include "../../util/net/hostandport.h"
+#include "../../util/concurrency/race.h"
 #include "health.h"
 
 namespace mongo {
@@ -29,7 +30,6 @@ namespace mongo {
 
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
-    private:
         struct TagSubgroup;
     public:
         /**
@@ -62,13 +62,21 @@ namespace mongo {
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
             set<string> tags;     /* tagging for data center, rack, etc. */
-            set<TagSubgroup*> groups; // the subgroups this member belongs to
-
+        private:
+            set<TagSubgroup*> _groups; // the subgroups this member belongs to
+        public:
+            const set<TagSubgroup*>& groups() const { 
+                return _groups;
+            }
+            set<TagSubgroup*>& groupsw(ReplSetConfig *c) { 
+                assert(!c->_constructed);
+                return _groups;
+            }
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
-                for (set<TagSubgroup*>::iterator it = groups.begin(); it != groups.end(); it++) {
+                for (set<TagSubgroup*>::iterator it = groups().begin(); it != groups().end(); it++) {
                     ((TagSubgroup*)(*it))->updateLast(last);
                 }
             }
@@ -107,6 +115,7 @@ namespace mongo {
 
         BSONObj asBson() const;
 
+        bool _constructed;
     private:
         bool _ok;
         void from(BSONObj);

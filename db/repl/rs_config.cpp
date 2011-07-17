@@ -440,7 +440,7 @@ namespace mongo {
 
                     for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
-                        (*cfg)->groups.insert((*sgs).second);
+                        (*cfg)->groupsw(this).insert((*sgs).second);
                     }
                 }
 
@@ -575,6 +575,7 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) {
+        _constructed = false;
         clear();
         from(cfg);
         if( force ) {
@@ -584,9 +585,11 @@ namespace mongo {
         if( version < 1 )
             version = 1;
         _ok = true;
+        _constructed = true;
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        _constructed = false;
         clear();
         int level = 2;
         DEV level = 0;
@@ -662,6 +665,7 @@ namespace mongo {
         checkRsConfig();
         _ok = true;
         log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        _constructed = true;
     }
 
 }
