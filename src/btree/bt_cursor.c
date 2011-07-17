@@ -194,7 +194,7 @@ __btcur_next_var(
 				value->data = WT_UPDATE_DATA(upd);
 				value->size = upd->size;
 			} else {
-				if (cbt->value.data == NULL)
+				if (cell == NULL)
 					continue;
 				value->data = cbt->value.data;
 				value->size = cbt->value.size;
