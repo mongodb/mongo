@@ -2013,7 +2013,7 @@ __rec_col_var_helper(
 static int
 __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 {
-	WT_BUF *a, *cur, *last, *orig, _orig;
+	WT_BUF *last, orig;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -2021,15 +2021,17 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle;
-	uint32_t i;
+	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, tracking;
+	const void *data;
 
 	r = S2C(session)->cache->rec;
-	unpack = &_unpack;
-	orig = &_orig;
-
-	cur = r->cur;
 	last = r->last;
+	unpack = &_unpack;
+
+	WT_CLEAR(orig);
+	data = NULL;
+	size = 0;
 
 	WT_RET(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,
@@ -2106,7 +2108,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			}
 
 			/* Get a copy of the cell. */
-			WT_RET(__wt_cell_unpack_copy(session, unpack, orig));
+			WT_RET(__wt_cell_unpack_copy(session, unpack, &orig));
 
 			/*
 			 * If we're re-writing a cell's reference of an overflow
@@ -2127,19 +2129,20 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				upd = ins->upd;
 				ins = ins->next;
 
-				cur->data = WT_UPDATE_DATA(upd);
-				cur->size = upd->size;
+				data = WT_UPDATE_DATA(upd);
+				size = upd->size;
 
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				repeat_count = 1;
 			} else {
 				upd = NULL;
 
-				if (cell != NULL) {
-					cur->data = orig->data;
-					cur->size = orig->size;
-				} else
+				if (cell == NULL)
 					deleted = orig_deleted;
+				else {
+					data = orig.data;
+					size = orig.size;
+				}
 
 				/*
 				 * The repeat count is the number of records up
@@ -2169,8 +2172,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			 */
 			if (tracking) {
 				if ((deleted && last_deleted) ||
-				    (last->size == cur->size && memcmp(
-				    last->data, cur->data, last->size) == 0)) {
+				    (last->size == size &&
+				    memcmp(last->data, data, size) == 0)) {
 					rle += repeat_count;
 					continue;
 				}
@@ -2181,8 +2184,10 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 
 			/* Swap the current/last state, reset RLE counter. */
 			last_deleted = deleted;
-			a = last; last = cur; cur = a;
+			WT_RET(__wt_buf_set(session, last, data, size));
+
 			rle = repeat_count;
+
 			tracking = 1;
 		}
 	}
