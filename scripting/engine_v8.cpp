@@ -150,7 +150,7 @@ namespace mongo {
     Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
         Local< External > scp = External::Cast( *info.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
-        cout << "setting modded" << endl;
+        LOG(10) << "setting modded" << endl;
         info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
         return Handle<Boolean>();
     }
