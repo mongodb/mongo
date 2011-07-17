@@ -125,8 +125,9 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 		/* FALLTHROUGH */
 	case ROW:
 		/*
-		 * WiredTiger doesn't store zero-length records, and I want to
-		 * test that: records divisible by 63 are always zero-length.
+		 * WiredTiger doesn't store zero-length data items in row-store
+		 * files, and I want to test that: records divisible by 63 are
+		 * always zero-length.
 		 */
 		if (r % 63 == 0)
 			len = 0;
