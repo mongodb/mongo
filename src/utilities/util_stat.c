@@ -46,7 +46,7 @@ util_stat(int argc, char *argv[])
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump=print%s",
+	snprintf(cursor_config, sizeof(cursor_config), "dump%s",
 	    debug ? ",debug" : "");
 
 
