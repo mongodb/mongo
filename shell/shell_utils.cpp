@@ -302,7 +302,7 @@ namespace mongo {
             if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
             if ( port > 0 )
-                buf << "m" << port << "| " << line;
+                buf << " m" << port << "| " << line;
             else
                 buf << "sh" << pid << "| " << line;
             cout << buf.str() << endl;
