@@ -17,9 +17,20 @@ struct __wt_cursor_btree {
 	WT_ROW	  *rip;				/* Row-store page slot ref */
 	WT_INSERT *ins;				/* Insert chain */
 
-	wiredtiger_recno_t recno;
-	uint32_t nrepeats;
-	int newcell;				/* XXX */
+	wiredtiger_recno_t recno;		/* Cursor record number */
+	/*
+	 * Column-store variable length items are optionally run-length encoded.
+	 * WT_CURSOR_BTREE->rle is the count of items to return, decremented to
+	 * 0.
+	 */
+	uint64_t rle;				/* RLE count */
+	/*
+	 * Column-store variable length items are optionally Huffman encoded.
+	 * WT_CURSOR_BTREE->value is a buffer that contains a copy of the item
+	 * we're returning, so we don't repeatedly decode them.  The buffer is
+	 * NULL if the item was deleted.
+	 */
+	WT_BUF  value;				/* Cursor value copy */
 };
 
 struct __wt_cursor_bulk {

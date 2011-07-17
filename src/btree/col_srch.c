@@ -97,7 +97,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	cip = NULL;
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
 		if (recno >= page->u.col_leaf.recno + page->entries) {
 			if (LF_ISSET(WT_WRITE))
 				goto append;
@@ -106,6 +105,26 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		cip = page->u.col_leaf.d + (recno - page->u.col_leaf.recno);
 		cipdata = WT_COL_PTR(page, cip);
 		break;
+	case WT_PAGE_COL_VAR:
+		/* Walk the page, counting records. */
+		record_cnt = page->u.col_leaf.recno - 1;
+		WT_COL_FOREACH(page, cip, i) {
+			if ((cipdata = WT_COL_PTR(page, cip)) == NULL)
+				++record_cnt;
+			else {
+				__wt_cell_unpack(cipdata, unpack);
+				record_cnt += unpack->rle;
+			}
+			if (record_cnt >= recno)
+				break;
+		}
+		if (record_cnt < recno) {
+			if (LF_ISSET(WT_WRITE))
+				goto append;
+			goto notfound;
+		}
+		break;
+
 	case WT_PAGE_COL_RLE:
 		/* Walk the page, counting records. */
 		record_cnt = page->u.col_leaf.recno - 1;
@@ -132,7 +151,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
 		slot = WT_COL_SLOT(page, cip);
 		if (page->u.col_leaf.upd == NULL)
 			session->srch_slot = slot;
@@ -160,6 +178,50 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 			if (unpack->type == WT_CELL_DEL)
 				goto notfound;
 		}
+		break;
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Search the WT_COL's insert list for the record's WT_INSERT
+		 * slot.  The insert list is a sorted, forward-linked list --
+		 * on average, we have to search half of it.
+		 *
+		 * Do an initial setup of the return information (we'll correct
+		 * it as needed depending on what we find).
+		 */
+		session->srch_slot = WT_COL_SLOT(page, cip);
+		if (page->u.col_leaf.ins != NULL)
+			session->srch_ins =
+			    &page->u.col_leaf.ins[session->srch_slot];
+
+		for (match = 0, ins =
+		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
+			if (WT_INSERT_RECNO(ins) == recno) {
+				match = 1;
+				session->srch_ins = NULL;
+				session->srch_vupdate = ins->upd;
+				session->srch_upd = &ins->upd;
+				break;
+			}
+			if (WT_INSERT_RECNO(ins) > recno)
+				break;
+			session->srch_ins = &ins->next;
+		}
+
+		/*
+		 * If we're not updating an existing data item, check to see if
+		 * the item has been deleted.   If we found a match, use the
+		 * WT_INSERT's WT_UPDATE value.   If we didn't find a match, use
+		 * use the original data.
+		 */
+		if (LF_ISSET(WT_WRITE))
+			break;
+
+		if (match) {
+			if (WT_UPDATE_DELETED_ISSET(ins->upd))
+				goto notfound;
+		} else
+			if (cipdata != NULL && unpack->type == WT_CELL_DEL)
+				goto notfound;
 		break;
 	case WT_PAGE_COL_RLE:
 		/*

@@ -81,7 +81,6 @@ __wt_col_modify(
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:					/* #1 */
-	case WT_PAGE_COL_VAR:
 		/* Allocate an update array as necessary. */
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
@@ -95,6 +94,7 @@ __wt_col_modify(
 			session->srch_upd = &new_upd[session->srch_slot];
 		}
 		goto simple_update;
+	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_RLE:
 		/* Allocate an update array as necessary. */
 		if (session->srch_upd != NULL) {		/* #2 */
@@ -465,17 +465,28 @@ done:	__wt_session_serialize_wrapup(session, page, ret);
 static int
 __col_next_recno(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t *recnop)
 {
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	uint64_t recno;
 	uint32_t i;
+	uint64_t recno;
 	void *cipdata;
 
 	recno = page->u.col_leaf.recno;
+	unpack = &_unpack;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
 		recno += page->entries;
+		break;
+	case WT_PAGE_COL_VAR:
+		WT_COL_FOREACH(page, cip, i)
+			if ((cell = WT_COL_PTR(page, cip)) == NULL)
+				++recno;
+			else {
+				__wt_cell_unpack(cell, unpack);
+				recno += unpack->rle;
+			}
 		break;
 	case WT_PAGE_COL_RLE:
 		WT_COL_FOREACH(page, cip, i) {

@@ -32,6 +32,13 @@ __btcur_next_fix(
 	WT_UPDATE *upd;
 	int found;
 
+	/* Initialize for each new page. */
+	if (cbt->cip == NULL) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+	}
+
 	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
@@ -61,19 +68,28 @@ __btcur_next_rle(
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
-	int found;
+	int found, newcell;
 
-	for (;; ++cbt->cip, cbt->newcell = 1) {
+	/* Initialize for each new page. */
+	if (cbt->cip == NULL) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+		newcell = 1;
+	} else
+		newcell = 0;
+
+	for (;; ++cbt->cip, newcell = 1) {
 		if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
 			goto deleted;
-		if (cbt->newcell) {
-			cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
+		if (newcell) {
+			cbt->rle = WT_RLE_REPEAT_COUNT(cell);
 			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 		}
 
 		for (found = 0;
-		    !found && cbt->nrepeats > 0;
-		    ++cbt->recno, --cbt->nrepeats) {
+		    !found && cbt->rle > 0;
+		    ++cbt->recno, --cbt->rle) {
 			*recnop = cbt->recno;
 			if (cbt->ins != NULL &&
 			    WT_INSERT_RECNO(cbt->ins) == *recnop) {
@@ -110,42 +126,83 @@ __btcur_next_var(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_UPDATE *upd;
-	int found;
+	int newcell;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	unpack = &_unpack;
 
-	/* This loop moves through a page, including after reading a record. */
-	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+	/* Initialize for each new page. */
+	if (cbt->cip == NULL) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+		newcell = 1;
+	} else
+		newcell = 0;
+
+	/* This loop moves through a page. */
+	for (;; ++cbt->cip, --cbt->nitems, newcell = 1) {
+		/* Check for the end of the page */
 		if (cbt->nitems == 0)
-			return (WT_NOTFOUND);
+			break;
 
-		/* Check for deletion. */
-		upd = WT_COL_UPDATE(cbt->page, cbt->cip);
-		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-			continue;
+		/* Unpack each cell, find out how many times it's repeated. */
+		if (newcell) {
+			if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
+				__wt_cell_unpack(cell, unpack);
+				cbt->rle = unpack->rle;
+			} else
+				cbt->rle = 1;
 
-		*recnop = cbt->recno;
+			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 
-		/*
-		 * If the item was ever modified, use the data from the
-		 * WT_UPDATE entry. Then check for empty data.  Finally, use
-		 * the value from the disk image.
-		 */
-		if (upd != NULL) {
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = upd->size;
-			found = 1;
-		} else if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
-			__wt_cell_unpack(cell, unpack);
-			if (unpack->type == WT_CELL_DEL)
+			/*
+			 * Skip deleted records, there might be a large number
+			 * of them.
+			 */
+			if (cbt->ins == NULL &&
+			    (cell == NULL || unpack->type == WT_CELL_DEL)) {
+				cbt->recno += cbt->rle;
 				continue;
-			WT_RET(__wt_cell_unpack_copy(session, unpack, value));
-			found = 1;
+			}
+
+			/*
+			 * Get a copy of the item we're returning: it might be
+			 * encoded, and we don't want to repeatedly decode it.
+			 */
+			if (cell != NULL)
+				WT_RET(__wt_cell_unpack_copy(
+				    session, unpack, &cbt->value));
+		}
+
+		/* Return the data RLE-count number of times. */
+		while (cbt->rle > 0) {
+			--cbt->rle;
+			*recnop = cbt->recno++;
+
+			/*
+			 * Check any insert list for a matching record (insert
+			 * lists are in sorted order, we check the next entry).
+			 */
+			if (cbt->ins != NULL &&
+			    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
+				upd = cbt->ins->upd;
+				cbt->ins = cbt->ins->next;
+
+				if (WT_UPDATE_DELETED_ISSET(upd))
+					continue;
+				value->data = WT_UPDATE_DATA(upd);
+				value->size = upd->size;
+			} else {
+				if (cbt->value.data == NULL)
+					continue;
+				value->data = cbt->value.data;
+				value->size = cbt->value.size;
+			}
+			return (0);
 		}
 	}
-
-	return (0);
+	return (WT_NOTFOUND);
 }
 
 static inline int
@@ -159,6 +216,13 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	/* Initialize for each new page. */
+	if (cbt->rip == NULL) {
+		cbt->rip = cbt->page->u.row_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
+	}
 
 	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found;
@@ -271,6 +335,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			if (ret != WT_NOTFOUND)
 				break;
 		}
+		cbt->cip = NULL;
+		cbt->rip = NULL;
 
 		do {
 			WT_ERR(__wt_walk_next(session, &cbt->walk, &cbt->page));
@@ -278,23 +344,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
 		    cbt->page->type == WT_PAGE_ROW_INT);
-
-		switch (cbt->page->type) {
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
-		case WT_PAGE_COL_VAR:
-			cbt->cip = cbt->page->u.col_leaf.d;
-			cbt->nitems = cbt->page->entries;
-			cbt->recno = cbt->page->u.col_leaf.recno;
-			cbt->newcell = 1;
-			break;
-		case WT_PAGE_ROW_LEAF:
-			cbt->rip = cbt->page->u.row_leaf.d;
-			cbt->nitems = cbt->page->entries;
-			cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
-			break;
-		WT_ILLEGAL_FORMAT_ERR(session);
-		}
 	}
 
 err:	if (ret == 0)
@@ -496,5 +545,6 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	__wt_walk_end(session, &cbt->walk);
+	__wt_buf_free(session, &cbt->value);
 	return (0);
 }

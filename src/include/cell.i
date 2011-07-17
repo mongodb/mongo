@@ -8,9 +8,9 @@
 #undef	STATIN
 #define	STATIN static inline
 
-STATIN uint32_t	__wt_cell_pack_data(WT_CELL *, uint32_t, uint32_t);
+STATIN uint32_t	__wt_cell_pack_data(WT_CELL *, uint64_t, uint32_t);
 STATIN uint32_t	__wt_cell_pack_key(WT_CELL *, uint8_t, uint32_t);
-STATIN uint32_t	__wt_cell_pack_type(WT_CELL *, uint8_t, uint32_t);
+STATIN uint32_t	__wt_cell_pack_type(WT_CELL *, uint8_t, uint64_t);
 STATIN void	__wt_cell_unpack(WT_CELL *, WT_CELL_UNPACK *);
 STATIN int	__wt_cell_unpack_safe(WT_CELL *, WT_CELL_UNPACK *, uint8_t *);
 
@@ -103,7 +103,7 @@ struct __wt_cell_unpack {
 	uint8_t  prefix;		/* Cell prefix */
 	uint8_t	 ovfl;			/* Cell is an overflow */
 
-	uint32_t rle;			/* RLE count */
+	uint64_t rle;			/* RLE count */
 
 	WT_OFF	 off;			/* WT_OFF structure */
 
@@ -120,7 +120,7 @@ struct __wt_cell_unpack {
 #define	WT_CELL_FOREACH(dsk, cell, unpack, i)				\
 	for ((cell) = WT_PAGE_DISK_BYTE(dsk), (i) = (dsk)->u.entries;	\
 	    (i) > 0;							\
-	    (cell) = (WT_CELL *)((uint8_t *)cell + (unpack)->len), --(i))
+	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->len), --(i))
 
 /*
  * __wt_cell_pack_key --
@@ -159,7 +159,7 @@ __wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
  *	Set a data item's WT_CELL contents.
  */
 static inline uint32_t
-__wt_cell_pack_data(WT_CELL *cell, uint32_t rle, uint32_t size)
+__wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 {
 	uint8_t byte, *p;
 
@@ -169,18 +169,18 @@ __wt_cell_pack_data(WT_CELL *cell, uint32_t rle, uint32_t size)
 	 *
 	 * Bit 0 is the WT_CELL_DATA_SHORT flag; the other 7 bits are the size.
 	 */
-	if (rle == 0 && size <= 0x7f) {
+	if (rle < 2 && size <= 0x7f) {
 		byte = (uint8_t)size;
 		cell->__chunk[0] = (byte << 1) | WT_CELL_DATA_SHORT;
 		return (1);
 	}
 
 	p = cell->__chunk + 1;
-	if (rle == 0)				/* Type + RLE */
+	if (rle < 2)				/* Type + RLE */
 		cell->__chunk[0] = WT_CELL_DATA;
 	else {
 		cell->__chunk[0] = WT_CELL_DATA | WT_CELL_RLE;
-		(void)__wt_vpack_uint(&p, 0, (uint64_t)rle);
+		(void)__wt_vpack_uint(&p, 0, rle);
 	}
 						/* Length */
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
@@ -194,11 +194,11 @@ __wt_cell_pack_data(WT_CELL *cell, uint32_t rle, uint32_t size)
  * fixed-size data (that is, no need for data length bytes).
  */
 static inline uint32_t
-__wt_cell_pack_type(WT_CELL *cell, uint8_t type, uint32_t rle)
+__wt_cell_pack_type(WT_CELL *cell, uint8_t type, uint64_t rle)
 {
 	uint8_t *p;
 
-	if (rle == 0) {				/* Type + RLE */
+	if (rle < 2) {				/* Type + RLE */
 		cell->__chunk[0] = type;
 		return (1);
 	}
@@ -206,7 +206,7 @@ __wt_cell_pack_type(WT_CELL *cell, uint8_t type, uint32_t rle)
 	cell->__chunk[0] = type | WT_CELL_RLE;
 
 	p = cell->__chunk + 1;
-	(void)__wt_vpack_uint(&p, 0, (uint64_t)rle);
+	(void)__wt_vpack_uint(&p, 0, rle);
 
 	return (WT_PTRDIFF32(p, cell));
 }
@@ -248,8 +248,6 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	uint64_t v;
 	const uint8_t *p;
 
-	memset(unpack, 0, sizeof(*unpack));
-
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
 	 * the end-of-page.  In that case, make sure we don't go past the end
@@ -262,6 +260,9 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	if (end != NULL && (((uint8_t *)p) + (len)) > end)		\
 		return (WT_ERROR);					\
 } while (0)
+
+	memset(unpack, 0, sizeof(*unpack));
+	unpack->rle = 1;
 
 	/*
 	 * Check the cell description byte, then get the cell type.
@@ -331,11 +332,9 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->prefix = cell->__chunk[1];
 	}
 
-	if (cell->__chunk[0] & WT_CELL_RLE) {		/* skip RLE */
+	if (cell->__chunk[0] & WT_CELL_RLE)		/* skip RLE */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		unpack->rle = v;
-	}
+		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->rle));
 
 	/*
 	 * Overflow and deleted cells have known sizes, and no length bytes.

@@ -506,20 +506,27 @@ __wt_debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	WT_UPDATE *upd;
+	WT_INSERT *ins;
 	uint32_t i;
+	char tag[64];
 
 	unpack = &_unpack;
 
 	WT_COL_FOREACH(page, cip, i) {
+		tag[0] = 'V';
+		tag[1] = '\0';
 		if ((cell = WT_COL_PTR(page, cip)) == NULL)
 			unpack = NULL;
-		else
+		else {
 			__wt_cell_unpack(cell, unpack);
-		WT_RET(__wt_debug_cell_data(ds, "V", unpack));
+			if (unpack->rle > 1)
+				snprintf(tag,
+				    sizeof(tag), "V %" PRIu64, unpack->rle);
+		}
+		WT_RET(__wt_debug_cell_data(ds, tag, unpack));
 
-		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
-			__wt_debug_update(ds, upd);
+		if ((ins = WT_COL_INSERT(page, cip)) != NULL)
+			__wt_debug_col_insert(ds, ins);
 	}
 	return (0);
 }
@@ -679,6 +686,8 @@ __wt_debug_cell(WT_DBG *ds, WT_CELL_UNPACK *unpack)
 	switch (unpack->type) {
 	case WT_CELL_DATA:
 	case WT_CELL_DEL:
+		if (unpack->rle != 0)
+			__wt_dmsg(ds, ", rle: " PRIu64, unpack->rle);
 		break;
 	case WT_CELL_KEY:
 		__wt_dmsg(ds, ", pfx: " PRIu8, unpack->prefix);
