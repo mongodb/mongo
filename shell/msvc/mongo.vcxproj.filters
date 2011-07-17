@@ -69,9 +69,6 @@
     <ClCompile Include="..\..\db\json.cpp">
       <Filter>shared source files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\util\sock.cpp">
-      <Filter>shell</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\util\debug_util.cpp">
       <Filter>shell</Filter>
     </ClCompile>
@@ -165,9 +162,6 @@
     <ClCompile Include="..\..\util\md5main.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\util\message.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\util\util.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -233,6 +227,18 @@
     </ClCompile>
     <ClCompile Include="..\..\util\concurrency\spin_lock.cpp">
       <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\listen.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\message.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\sock.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\message_port.cpp">
+      <Filter>util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
