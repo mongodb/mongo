@@ -315,7 +315,7 @@ recno_chk:	if (parent_recno != recno) {
 				    " has a starting record of %" PRIu64
 				    " where the expected starting record was "
 				    "%" PRIu64,
-				    WT_PADDR(page),
+				    WT_COL_REF_ADDR(cref),
 				    cref->recno, vs->record_total + 1);
 				return (WT_ERROR);
 			}
