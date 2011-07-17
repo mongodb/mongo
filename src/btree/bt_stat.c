@@ -155,8 +155,10 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_INSERT *ins;
 	WT_UPDATE *upd;
 	uint32_t i;
+	int orig_deleted;
 
 	stats = session->btree->fstats;
 	unpack = &_unpack;
@@ -170,23 +172,33 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
+			orig_deleted = 1;
 			WT_STAT_INCR(stats, file_item_col_deleted);
-			continue;
+		} else {
+			__wt_cell_unpack(cell, unpack);
+
+			orig_deleted = 0;
+			WT_STAT_INCRV(stats, file_item_total_data, unpack->rle);
 		}
-		__wt_cell_unpack(cell, unpack);
-		switch (unpack->type) {
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
-			upd = WT_COL_UPDATE(page, cip);
-			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd)) {
+
+		/*
+		 * Walk the insert list, checking for changes.  For each insert
+		 * we find, correct the original count based on its state.
+		 */
+		for (ins =
+		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
+			upd = ins->upd;
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				if (orig_deleted)
+					continue;
+				WT_STAT_INCR(stats, file_item_col_deleted);
+				WT_STAT_DECR(stats, file_item_total_data);
+			} else {
+				if (!orig_deleted)
+					continue;
+				WT_STAT_DECR(stats, file_item_col_deleted);
 				WT_STAT_INCR(stats, file_item_total_data);
-				break;
 			}
-			/* FALLTHROUGH */
-		case WT_CELL_DEL:
-			WT_STAT_INCR(stats, file_item_col_deleted);
-			break;
-		WT_ILLEGAL_FORMAT(session);
 		}
 	}
 	return (0);
