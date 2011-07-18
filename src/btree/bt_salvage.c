@@ -94,7 +94,7 @@ static int  __slvg_col_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_build_leaf(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_COL_REF *);
 static int  __slvg_col_merge_ovfl(
-		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint32_t, uint32_t);
+		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint64_t, uint64_t);
 static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
 static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
@@ -525,9 +525,6 @@ __slvg_trk_leaf(
 		WT_VERBOSE(session, SALVAGE,
 		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
 		    addr, trk->col_start, trk->col_stop);
-
-		if (dsk->type == WT_PAGE_COL_VAR)
-			WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
 		break;
 	case WT_PAGE_COL_VAR:
 		/*
@@ -547,6 +544,9 @@ __slvg_trk_leaf(
 		WT_VERBOSE(session, SALVAGE,
 		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
 		    addr, trk->col_start, trk->col_stop);
+
+		/* Column-store pages can contain overflow items. */
+		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
 		break;
 	case WT_PAGE_COL_RLE:
 		/*
@@ -1104,7 +1104,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
-	uint32_t i, n_repeat, skip, take, save_entries;
+	uint64_t skip, take;
+	uint32_t i, n_repeat, save_entries;
 	int ret;
 	void *cipdata;
 
@@ -1125,8 +1126,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	take = (uint32_t)(trk->col_stop - trk->col_start) + 1;
 
 	WT_VERBOSE(session, SALVAGE,
-	    "[%" PRIu32 "] merge discarding first %" PRIu32 " records, "
-	    "then taking %" PRIu32 " records",
+	    "[%" PRIu32 "] merge discarding first %" PRIu64 " records, "
+	    "then taking %" PRIu64 " records",
 	    trk->addr, skip, take);
 
 	switch (page->type) {
@@ -1189,9 +1190,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 		 * that reference overflow pages.
 		 */
 		WT_ERR(__slvg_col_merge_ovfl(
-		    session, trk->addr, page, 0, skip));
-		WT_ERR(__slvg_col_merge_ovfl(
-		    session, trk->addr, page, skip + take, page->entries - 1));
+		    session, trk->addr, page, skip, take));
 
 		cookie->skip = skip;
 		cookie->take = take;
@@ -1253,26 +1252,37 @@ err:	/*
  */
 static int
 __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
-    uint32_t addr, WT_PAGE *page, uint32_t start, uint32_t stop)
+    uint32_t addr, WT_PAGE *page, uint64_t skip, uint64_t take)
 {
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CELL *cell;
 	WT_COL *cip;
+	uint64_t recno, start, stop;
+	uint32_t i;
 
 	unpack = &_unpack;
 
-	for (cip = page->u.col_leaf.d + start; start < stop; ++start) {
+	recno = page->u.col_leaf.recno;
+	start = recno + skip;
+	stop = (recno + skip + take) - 1;
+
+	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_DATA_OVFL) {
-			WT_VERBOSE(session, SALVAGE,
-			    "[%" PRIu32 "] merge discard freed overflow "
-			    "reference [%" PRIu32 "/%" PRIu32 "]",
-			    addr, unpack->off.addr, unpack->off.size);
+		recno += unpack->rle;
 
-			WT_RET(__wt_block_free(
-			    session, unpack->off.addr, unpack->off.size));
-		}
+		if (unpack->type != WT_CELL_DATA_OVFL)
+			continue;
+		if (recno >= start && recno <= stop)
+			continue;
+
+		WT_VERBOSE(session, SALVAGE,
+		    "[%" PRIu32 "] merge discard freed overflow "
+		    "reference [%" PRIu32 "/%" PRIu32 "]",
+		    addr, unpack->off.addr, unpack->off.size);
+
+		WT_RET(__wt_block_free(
+		    session, unpack->off.addr, unpack->off.size));
 	}
 	return (0);
 }
