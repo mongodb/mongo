@@ -27,7 +27,7 @@ namespace mongo {
 
     class MiniWebServer : public Listener {
     public:
-        MiniWebServer(const string &ip, int _port);
+        MiniWebServer(const string& name, const string &ip, int _port);
         virtual ~MiniWebServer() {}
 
         virtual void doRequest(

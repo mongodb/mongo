@@ -25,11 +25,21 @@ namespace mongo {
 
     class Listener : boost::noncopyable {
     public:
-        Listener(const string &ip, int p, bool logConnect=true ) : _port(p), _ip(ip), _logConnect(logConnect), _elapsedTime(0) { }
-        virtual ~Listener() {
-            if ( _timeTracker == this )
-                _timeTracker = 0;
-        }
+
+        Listener(const string& name, const string &ip, int port, bool logConnect=true );
+
+        virtual ~Listener();
+        
+#ifdef MONGO_SSL
+        /**
+         * make this an ssl socket
+         * ownership of SSLManager remains with the caller
+         */
+        void secure( SSLManager* manager );
+
+        void addSecurePort( SSLManager* manager , int additionalPort );
+#endif
+
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
@@ -60,12 +70,25 @@ namespace mongo {
         }
 
     private:
+        string _name;
         string _ip;
         bool _logConnect;
         long long _elapsedTime;
+        
+#ifdef MONGO_SSL
+        SSLManager* _ssl;
+        int _sslPort;
+#endif
+        
+        /**
+         * @return true iff everything went ok
+         */
+        bool _setupSockets( const vector<SockAddr>& mine , vector<int>& socks );
+        
+        void _logListen( int port , bool ssl );
 
         static const Listener* _timeTracker;
-
+        
         virtual bool useUnixSockets() const { return false; }
     };
 

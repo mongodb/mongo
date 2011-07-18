@@ -23,8 +23,8 @@
 
 namespace mongo {
 
-    MiniWebServer::MiniWebServer(const string &ip, int port)
-        : Listener(ip, port, false)
+    MiniWebServer::MiniWebServer(const string& name, const string &ip, int port)
+        : Listener(name, ip, port, false)
     {}
 
     string MiniWebServer::parseURL( const char * buf ) {
