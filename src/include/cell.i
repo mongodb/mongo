@@ -346,7 +346,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		CHK(p, sizeof(WT_OFF));			/* check WT_OFF */
 		unpack->ovfl = 1;
 		memcpy(&unpack->off, p, sizeof(WT_OFF));
-		unpack->len = WT_PTRDIFF32(p, cell) + sizeof(WT_OFF);
+		unpack->len = WT_PTRDIFF32(p, cell) + WT_SIZEOF32(WT_OFF);
 		break;
 	case WT_CELL_DEL:
 		unpack->len = WT_PTRDIFF32(p, cell);
