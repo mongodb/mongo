@@ -61,7 +61,7 @@ dirs = [ "" , "bson/" , "bson/util/" ,
          "client/"  , "s/" , "shell/" , 
          "db/" , 
          "scripting/" , 
-         "util/" , "util/concurrency/" , "util/mongoutils/" ]
+         "util/" , "util/concurrency/" , "util/mongoutils/" , "util/net/" ]
 
 allClientFiles = []
 for x in dirs:
