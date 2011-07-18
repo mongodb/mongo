@@ -21,6 +21,38 @@ namespace mongo {
 
 #if defined(_DEBUG)
 
+    namespace race {
+
+        class CodePoint { 
+        public:
+            string lastName;
+            unsigned lastTid;
+            string file;
+            CodePoint(string f) : lastTid(0), file(f) { }
+        };
+        class Check {
+        public:
+            Check(CodePoint& p) {
+                unsigned t = GetCurrentThreadId();
+                if( p.lastTid == 0 ) {
+                    p.lastTid = t;
+                    p.lastName = getThreadName();
+                }
+                else if( t != p.lastTid ) { 
+                    log() << "\n\n\n\n\nRACE? error assert\n  " << p.file << '\n' 
+                        << "  " << p.lastName
+                        << "  " << getThreadName() << "\n\n" << endl;
+                    mongoAbort("racecheck");
+                }
+            };
+        };
+
+#define RACECHECK \
+        static race::CodePoint __cp(__FILE__); \
+        race::Check __ck(__cp);
+
+    }
+
     class CodeBlock { 
         volatile int n;
         unsigned tid;

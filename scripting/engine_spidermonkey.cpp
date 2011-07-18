@@ -1135,6 +1135,7 @@ namespace mongo {
 
         if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ) {
             // TODO: this is a hack to get around sub objects being modified
+            // basically right now whenever a sub object is read we mark whole obj as possibly modified
             JSObject * oo = JSVAL_TO_OBJECT( val );
             if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) ||
                     JS_IsArrayObject( cx , oo ) ) {

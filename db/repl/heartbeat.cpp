@@ -144,7 +144,7 @@ namespace mongo {
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
-        string name() const { return "ReplSetHealthPollTask"; }
+        string name() const { return "rsHealthPoll"; }
         void doWork() {
             if ( !theReplSet ) {
                 log(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;

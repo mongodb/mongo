@@ -25,6 +25,47 @@ namespace mongo {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
     private:
+        bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
+            unsigned id = cmdObj["id"].Int();
+            const Member* primary = theReplSet->box.getPrimary();
+            const Member* hopeful = theReplSet->findById(id);
+            const Member *highestPriority = theReplSet->getMostElectable();
+
+            if( !hopeful ) {
+                errmsg = str::stream() << "replSet couldn't find member with id " << id;
+                return true;
+            }
+            else if( theReplSet->isPrimary() && theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
+                // hbinfo is not updated, so we have to check the primary's last optime separately
+                errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
+                    " can try again once I've stepped down";
+                return true;
+            }
+            else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
+                // other members might be aware of more up-to-date nodes
+                errmsg = str::stream() << hopeful->fullName() << " is trying to elect itself but " <<
+                    primary->fullName() << " is already primary and more up-to-date";
+                return true;
+            }
+            else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
+                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " << highestPriority->fullName();
+                return true;
+            }
+
+            // don't veto older versions
+            if (cmdObj["id"].eoo()) {
+                // they won't be looking for the veto field
+                return false;
+            }
+
+            if (!hopeful || !theReplSet->isElectable(id) ||
+                (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
+                return true;
+            }
+
+            return false;
+        }
+
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
@@ -50,23 +91,8 @@ namespace mongo {
             }
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             result.append("fresher", weAreFresher);
-            
-            // don't veto older versions
-            if (cmdObj["id"].eoo()) {
-                // they won't be looking for the priorityVeto field
-                return true;
-            }
-            
-            unsigned id = cmdObj["id"].Int();
-            const Member* hopeful = theReplSet->findById(id);
-            const Member *highestPriority = theReplSet->getMostElectable();
-            bool veto = false;
-            if (!hopeful || !theReplSet->isElectable(id) ||
-                (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
-                veto = true;
-            }
+            result.append("veto", shouldVeto(cmdObj, errmsg));
 
-            result.append("priorityVeto", veto);
             return true;
         }
     } cmdReplSetFresh;
@@ -266,8 +292,15 @@ namespace mongo {
                     nTies++;
                 assert( remoteOrd <= ord );
 
-                if( i->result["priorityVeto"].trueValue() ) {
-                    log() << "not electing self, " << i->toHost << " thinks another member is more electable" << rsLog;
+                if( i->result["veto"].trueValue() ) {
+                    BSONElement msg = i->result["errmsg"];
+                    if (!msg.eoo()) {
+                        log() << "not electing self, " << i->toHost << " would veto with '" <<
+                            msg.String() << "'" << rsLog;
+                    }
+                    else {
+                        log() << "not electing self, " << i->toHost << " would veto" << rsLog;
+                    }
                     return false;
                 }
             }

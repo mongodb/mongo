@@ -41,8 +41,8 @@ namespace mongo {
      */
     static BSONObj* unwrapBSONObj(const Handle<v8::Object>& obj) {
       Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
-//      if (field.IsEmpty() || !field->IsExternal())
-//          return 0;
+      if (field.IsEmpty() || !field->IsExternal())
+          return 0;
       void* ptr = field->Value();
       return (BSONObj*)ptr;
     }
@@ -103,6 +103,12 @@ namespace mongo {
       V8Scope* scope = (V8Scope*)(scp->Value());
       val = scope->mongoToV8Element(elmt, false);
       info.This()->ForceSet(name, val);
+
+      if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+          // if accessing a subobject, it may get modified and base obj would not know
+          // have to set base as modified, which means some optim is lost
+          info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+      }
       return val;
     }
 
@@ -144,7 +150,7 @@ namespace mongo {
     Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
         Local< External > scp = External::Cast( *info.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
-        cout << "setting modded" << endl;
+        LOG(10) << "setting modded" << endl;
         info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
         return Handle<Boolean>();
     }
@@ -178,6 +184,12 @@ namespace mongo {
             return Handle<Value>();
         Handle<Value> val = scope->mongoToV8Element(elmt, false);
 //        info.This()->ForceSet(name, val);
+
+        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+            // if accessing a subobject, it may get modified and base obj would not know
+            // have to set base as modified, which means some optim is lost
+            info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        }
         return val;
     }
 
@@ -999,7 +1011,7 @@ namespace mongo {
                 break;
 
             case mongo::Date:
-                o->Set( name , v8::Date::New( f.date() ) );
+                o->Set( name , v8::Date::New( (double) ((long long)f.date().millis) ));
                 break;
 
             case mongo::Bool:
@@ -1189,7 +1201,7 @@ namespace mongo {
             return mongoToLZV8( f.embeddedObject() , false, readOnly);
 
         case mongo::Date:
-            return v8::Date::New( f.date() );
+            return v8::Date::New( (double) ((long long)f.date().millis) );
 
         case mongo::Bool:
             return v8::Boolean::New( f.boolean() );
@@ -1299,7 +1311,7 @@ namespace mongo {
         v8ToMongoElement(builder, v8name, fieldName, value);
     }
 
-    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ) {
+    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
 
         if ( value->IsString() ) {
 //            Handle<v8::String> str = Handle<v8::String>::Cast(value);
@@ -1315,11 +1327,18 @@ namespace mongo {
         }
 
         if ( value->IsNumber() ) {
-            // needs to be explicit NumberInt to use integer
-//            if ( value->IsInt32() )
-//                b.append( sname, int( value->ToInt32()->Value() ) );
-//            else
-                b.append( sname , value->ToNumber()->Value() );
+            double val = value->ToNumber()->Value();
+            // if previous type was integer, keep it
+            int intval = (int)val;
+            if (val == intval && originalParent) {
+                BSONElement elmt = originalParent->getField(sname);
+                if (elmt.type() == mongo::NumberInt) {
+                    b.append( sname , intval );
+                    return;
+                }
+            }
+
+            b.append( sname , val );
             return;
         }
 
@@ -1330,7 +1349,8 @@ namespace mongo {
         }
 
         if ( value->IsDate() ) {
-            b.appendDate( sname , Date_t( (unsigned long long)(v8::Date::Cast( *value )->NumberValue())) );
+            long long dateval = (long long)(v8::Date::Cast( *value )->NumberValue());
+            b.appendDate( sname , Date_t( (unsigned long long) dateval ) );
             return;
         }
 
@@ -1434,21 +1454,23 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
+        BSONObj* originalBSON = 0;
+        if (o->HasNamedLookupInterceptor()) {
+            originalBSON = unwrapBSONObj(o);
+        }
+
         if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
                 (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
             // object was readonly, use bson as is
-            log(1) << "Using bson as is for v8ToMongo" << endl;
-            BSONObj* ro = unwrapBSONObj(o);
-            if (ro)
-                return *ro;
-            return BSONObj();
+            if (originalBSON)
+                return *originalBSON;
         }
 
         BSONObjBuilder b;
 
         if ( depth == 0 ) {
             if ( o->HasRealNamedProperty( V8STR_ID ) ) {
-                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ) );
+                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
             }
         }
 
@@ -1466,7 +1488,7 @@ namespace mongo {
             if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , name , sname , value , depth + 1 );
+            v8ToMongoElement( b , name , sname , value , depth + 1, originalBSON );
         }
         return b.obj();
     }

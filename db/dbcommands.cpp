@@ -594,9 +594,12 @@ namespace mongo {
                 result.append("dur", dur::stats.asObj());
             }
 
+            timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
-
+            
+            timeBuilder.appendNumber( "at end" , Listener::getElapsedTimeMillis() - start );
             if ( Listener::getElapsedTimeMillis() - start > 1000 ) {
                 BSONObj t = timeBuilder.obj();
                 log() << "serverStatus was very slow: " << t << endl;
