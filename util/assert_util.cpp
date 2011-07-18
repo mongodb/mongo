@@ -66,7 +66,19 @@ namespace mongo {
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
-        problem() << "warning Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        static bool rateLimited;
+        static time_t lastWhen;
+        static unsigned lastLine;
+        if( lastLine == line && time(0)-lastWhen < 5 ) { 
+            if( rateLimited++ == 0 ) { 
+                log() << "rate limiting wassert" << endl;
+            }
+            return;
+        }
+        lastWhen = time(0);
+        lastLine = line;
+
+        problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
