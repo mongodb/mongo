@@ -3,8 +3,13 @@
 bdb=db/build_unix
 
 colflag=0
+dump_bdb=0
 while :
 	do case "$1" in
+	# -b means we need to dump the BDB database
+	-b)
+		dump_bdb=1;
+		shift ;;
 	# -c means it was a column-store.
 	-c)
 		colflag=1
@@ -19,18 +24,20 @@ if test $# -ne 0; then
 	exit 1
 fi
 
-if test $colflag -eq 0; then
-	$bdb/db_dump -p __wt.bdb |
-	    sed -e '1,/HEADER=END/d' \
-		-e 's/^ //' > __wt.bdb_dump
-else
-	$bdb/db_dump -p __wt.bdb |
-	    sed -e '1,/HEADER=END/d' \
-		-e 's/^ //' |
-	    sed -n \
-		-e '$p' \
-		-e n \
-		-e p > __wt.bdb_dump
+if test $dump_bdb -eq 1; then
+	if test $colflag -eq 0; then
+		$bdb/db_dump -p __wt.bdb |
+		    sed -e '1,/HEADER=END/d' \
+			-e 's/^ //' > __wt.bdb_dump
+	else
+		$bdb/db_dump -p __wt.bdb |
+		    sed -e '1,/HEADER=END/d' \
+			-e 's/^ //' |
+		    sed -n \
+			-e '$p' \
+			-e n \
+			-e p > __wt.bdb_dump
+	fi
 fi
 
 sed -e '1,/HEADER=END/d' __wt.wt_dump | cmp - __wt.bdb_dump > /dev/null

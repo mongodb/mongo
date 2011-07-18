@@ -84,7 +84,7 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 						/* Close, verify, re-open */
-		if (wts_teardown() || wts_verify() || wts_startup())
+		if (wts_teardown() || wts_verify("bulk") || wts_startup())
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
@@ -101,7 +101,8 @@ main(int argc, char *argv[])
 			if (wts_ops())		/* Random operations */
 				goto err;
 						/* Close, verify, re-open */
-			if (wts_teardown() || wts_verify() || wts_startup())
+			if (wts_teardown() ||
+			    wts_verify("ops") || wts_startup())
 				goto err;
 		}
 
@@ -111,22 +112,23 @@ main(int argc, char *argv[])
 		track("shutting down BDB", 0ULL);
 		bdb_teardown();	
 
+		if (wts_dump("standard", 1))	/* Dump the file */
+			goto err;
+
 		/*
 		 * If we don't delete any records, we can salvage the file.  The
 		 * problem with deleting records is that WiredTiger will restore
 		 * deleted records during salvage when a page fragments, leaving
 		 * a deleted record on one side of the split.
+		 *
+		 * Close, salvage, verify, re-open, dump.
 		 */
-		if (g.c_delete_pct == 0) {
-			track("salvage", 0ULL);
-						/* Close,
-						    salvage, verify, re-open */
-			if (wts_teardown() ||
-			    wts_salvage() || wts_verify() || wts_startup())
-				goto err;
-		}
-
-		if (wts_dump())			/* Dump the file */
+		if (g.c_delete_pct == 0 && (
+		    wts_teardown() ||
+		    wts_salvage() ||
+		    wts_verify("salvage") ||
+		    wts_startup() ||
+		    wts_dump("salvage", 0)))
 			goto err;
 
 		track("shutting down WT", 0ULL);

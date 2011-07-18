@@ -237,7 +237,7 @@ err:	(void)cursor->close(cursor, NULL);
 }
 
 int
-wts_dump(void)
+wts_dump(const char *tag, int dump_bdb)
 {
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
@@ -246,6 +246,9 @@ wts_dump(void)
 	int ret;
 	uint64_t row_count;
 	const char *p;
+	char cmd[64];
+
+	track("dump WT", 0ULL);
 
 	/* Dump the WiredTiger file. */
 	session = g.wts_session;
@@ -256,7 +259,6 @@ wts_dump(void)
 		return (1);
 	}
 
-	track("dump", 0ULL);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: fopen: %s\n",
@@ -297,18 +299,21 @@ wts_dump(void)
 	fprintf(fp, "DATA=END\n");
 	(void)fclose(fp);
 
-	track("dump comparison", 0ULL);
+	track("dump BDB and compare", 0ULL);
 	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
-		p = "sh ./s_dumpcmp -c";
+		snprintf(cmd, sizeof(cmd),
+		    "sh ./s_dumpcmp%s -c", dump_bdb ? " -b" : "");
 		break;
 	case ROW:
-		p = "sh ./s_dumpcmp";
+		snprintf(cmd, sizeof(cmd),
+		    "sh ./s_dumpcmp%s", dump_bdb ? " -b" : "");
 		break;
 	}
-	if (system(p) != 0) {
-		fprintf(stderr, "%s: dump comparison failed\n", g.progname);
+	if (system(cmd) != 0) {
+		fprintf(stderr,
+		    "%s: %s dump comparison failed\n", tag, g.progname);
 		return (1);
 	}
 
@@ -322,6 +327,8 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 	char config[200];
+
+	track("salvage", 0ULL);
 
 	/* Save a copy of the file before we salvage it. */
 	(void)system("cp __" WT_PREFIX ".conf __wt.salvage.conf");
@@ -365,6 +372,8 @@ wts_sync(void)
 
 	session = g.wts_session;
 
+	track("salvage", 0ULL);
+
 	if ((ret = session->sync(session, WT_TABLENAME, NULL)) != 0) {
 		fprintf(stderr, "%s: sync: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
@@ -374,12 +383,14 @@ wts_sync(void)
 }
 
 int
-wts_verify(void)
+wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
 	char config[200];
+
+	track("verify", 0ULL);
 
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
@@ -396,8 +407,8 @@ wts_verify(void)
 		return (1);
 	}
 	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0) {
-		fprintf(stderr, "%s: verify: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
+		fprintf(stderr, "%s: %s verify: %s\n",
+		    g.progname, tag, wiredtiger_strerror(ret));
 		return (1);
 	}
 	if ((ret = conn->close(conn, NULL)) != 0) {
@@ -426,6 +437,7 @@ wts_stats(void)
 	session = g.wts_session;
 
 	track("stat", 0ULL);
+
 	p = fname("stats");
 	if ((fp = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: fopen: %s\n",
