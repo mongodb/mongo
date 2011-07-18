@@ -158,9 +158,6 @@ namespace mongo {
         cursorCache.startTimeoutThread();
         PeriodicTask::theRunner->go();
 
-        log() << "waiting for connections on port " << cmdLine.port << endl;
-        //DbGridListener l(port);
-        //l.listen();
         ShardedMessageHandler handler;
         MessageServer * server = createServer( opts , &handler );
         server->setAsTimeTracker();

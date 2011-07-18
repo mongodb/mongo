@@ -215,8 +215,6 @@ namespace mongo {
 
     void listen(int port) {
         //testTheDb();
-        log() << "waiting for connections on port " << port << endl;
-
         MessageServer::Options options;
         options.port = port;
         options.ipList = cmdLine.bind_ip;

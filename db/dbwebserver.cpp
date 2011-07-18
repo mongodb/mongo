@@ -61,7 +61,7 @@ namespace mongo {
     class DbWebServer : public MiniWebServer {
     public:
         DbWebServer(const string& ip, int port, const AdminAccess* webUsers)
-            : MiniWebServer(ip, port), _webUsers(webUsers) {
+            : MiniWebServer("admin web console", ip, port), _webUsers(webUsers) {
             WebStatusPlugin::initAll();
         }
 
@@ -531,7 +531,6 @@ namespace mongo {
         Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
         DbWebServer mini(cmdLine.bind_ip, p, adminAccessPtr.get());
-        log() << "web admin interface listening on port " << p << endl;
         mini.initAndListen();
         cc().shutdown();
     }
