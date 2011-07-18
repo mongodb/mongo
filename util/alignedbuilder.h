@@ -28,6 +28,9 @@ namespace mongo {
         AlignedBuilder(unsigned init_size);
         ~AlignedBuilder() { kill(); }
 
+        /** reset with a hint as to the upcoming needed size specified */
+        void reset(unsigned sz);
+
         /** reset for a re-use. shrinks if > 128MB */
         void reset();
 
@@ -94,7 +97,7 @@ namespace mongo {
         inline char* grow(unsigned by) {
             unsigned oldlen = _len;
             _len += by;
-            if ( _len > _p._size ) {
+            MONGO_IF ( _len > _p._size ) {
                 growReallocate(oldlen);
             }
             return _p._data + oldlen;

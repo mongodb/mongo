@@ -129,6 +129,7 @@ namespace mongo {
                        "commits" << _commits <<
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
+                       "compression" << _journaledBytes / (_uncompressedBytes+1.0) <<
                        "commitsInWriteLock" << _commitsInWriteLock <<
                        "earlyCommits" << _earlyCommits << 
                        "timeMs" <<

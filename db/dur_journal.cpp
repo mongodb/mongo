@@ -34,6 +34,7 @@
 #include "dur_journalimpl.h"
 #include "../util/file.h"
 #include "../util/checksum.h"
+#include "../util/compress.h"
 
 using namespace mongoutils;
 
@@ -633,17 +634,30 @@ namespace mongo {
         void journal(const AlignedBuilder& b) {
             j.journal(b);
         }
-        void Journal::journal(const AlignedBuilder& b) {
+        void Journal::journal(const AlignedBuilder& _b) {
+#if defined(_NOCOMPRESS)
+            unsigned w = _b.len();
+            const AlignedBuilder& b = _b;
+#else
+            static AlignedBuilder compressed(32*1024*1024);
+            compressed.reset( maxCompressedLength(_b.len()) );
+            size_t compressedLength = 0;
+            rawCompress(_b.buf(), _b.len(), compressed.atOfs(0), &compressedLength);
+
+            unsigned w = (compressedLength+8191)&(~8191);
+            const AlignedBuilder& b = compressed;
+#endif
+
             try {
                 mutex::scoped_lock lk(_curLogFileMutex);
 
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 assert( _curLogFile );
 
-                stats.curr->_journaledBytes += b.len();
-                _written += b.len();
-                _curLogFile->synchronousAppend((void *) b.buf(), b.len());
-
+                stats.curr->_uncompressedBytes += _b.len();
+                stats.curr->_journaledBytes += w;
+                _written += w;
+                _curLogFile->synchronousAppend((void *) b.buf(), w);
                 _rotate();
             }
             catch(std::exception& e) {

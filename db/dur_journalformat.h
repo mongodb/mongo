@@ -34,7 +34,11 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near
             // that.  simply incrementing the version # is safe on a fwd basis.
+#if defined(_NOCOMPRESS)
             enum { CurrentVersion = 0x4148 };
+#else
+            enum { CurrentVersion = 0x4149 };
+#endif
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
