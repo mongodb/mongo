@@ -685,14 +685,12 @@ namespace mongo {
             }
         }
 
-        CodeBlock durThreadMain;
-
         extern int groupCommitIntervalMs;
 
         void durThread() {
             Client::initThread("journal");
             while( !inShutdown() ) {
-                CodeBlock::Within w(durThreadMain);
+                RACECHECK
                 try {
                     int millis = groupCommitIntervalMs;
                     {

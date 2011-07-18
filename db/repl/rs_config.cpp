@@ -168,6 +168,7 @@ namespace mongo {
     }
 
     void ReplSetConfig::TagSubgroup::updateLast(const OpTime& op) {
+        RACECHECK
         if (last < op) {
             last = op;
 
@@ -178,6 +179,7 @@ namespace mongo {
     }
 
     void ReplSetConfig::TagClause::updateLast(const OpTime& op) {
+        RACECHECK
         if (last >= op) {
             return;
         }

@@ -653,6 +653,7 @@
     <ClInclude Include="..\pcre-7.4\config.h" />
     <ClInclude Include="..\pcre-7.4\pcre.h" />
     <ClInclude Include="..\util\alignedbuilder.h" />
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\race.h" />
     <ClInclude Include="..\util\concurrency\rwlock.h" />
     <ClInclude Include="..\util\concurrency\msg.h" />
