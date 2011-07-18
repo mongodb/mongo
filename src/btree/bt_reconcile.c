@@ -2100,7 +2100,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				 * Write out any record we're tracking and turn
 				 * off comparisons for the next item.
 				 */
-				if (tracking) {
+				if (can_compare) {
 					WT_RET(__rec_col_var_helper(session,
 					    last, last_deleted, 0, rle));
 					can_compare = 0;
