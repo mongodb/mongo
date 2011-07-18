@@ -25,15 +25,15 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 }
 
 static inline int
-__btcur_next_fix(
-    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_fix(WT_CURSOR_BTREE *cbt,
+    int newpage, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
 	int found;
 
 	/* Initialize for each new page. */
-	if (cbt->cip == NULL) {
+	if (newpage) {
 		cbt->cip = cbt->page->u.col_leaf.d;
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
@@ -63,15 +63,15 @@ __btcur_next_fix(
 }
 
 static inline int
-__btcur_next_rle(
-    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_rle(WT_CURSOR_BTREE *cbt,
+    int newpage, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
 	int found, newcell;
 
 	/* Initialize for each new page. */
-	if (cbt->cip == NULL) {
+	if (newpage) {
 		cbt->cip = cbt->page->u.col_leaf.d;
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
@@ -119,8 +119,8 @@ deleted:	if (--cbt->nitems == 0)
 }
 
 static inline int
-__btcur_next_var(
-    WT_CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+__btcur_next_var(WT_CURSOR_BTREE *cbt,
+    int newpage, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_SESSION_IMPL *session;
 	WT_CELL *cell;
@@ -132,7 +132,7 @@ __btcur_next_var(
 	unpack = &_unpack;
 
 	/* Initialize for each new page. */
-	if (cbt->cip == NULL) {
+	if (newpage) {
 		cbt->cip = cbt->page->u.col_leaf.d;
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
@@ -206,7 +206,7 @@ __btcur_next_var(
 }
 
 static inline int
-__btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
+__btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_IKEY *ikey;
@@ -218,7 +218,7 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* Initialize for each new page. */
-	if (cbt->rip == NULL) {
+	if (newpage) {
 		cbt->rip = cbt->page->u.row_leaf.d;
 		cbt->nitems = cbt->page->entries;
 		cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
@@ -298,7 +298,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int ret;
+	int newpage, ret;
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -311,23 +311,23 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	for (;;) {
+	for (newpage = 0;; newpage = 1) {
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
-				ret = __btcur_next_fix(cbt,
+				ret = __btcur_next_fix(cbt, newpage,
 				   &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_COL_RLE:
-				ret = __btcur_next_rle(cbt,
+				ret = __btcur_next_rle(cbt, newpage,
 				    &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __btcur_next_var(cbt,
+				ret = __btcur_next_var(cbt, newpage,
 				    &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __btcur_next_row(cbt,
+				ret = __btcur_next_row(cbt, newpage,
 				    &cursor->key, &cursor->value);
 				break;
 			WT_ILLEGAL_FORMAT_ERR(session);
@@ -335,8 +335,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			if (ret != WT_NOTFOUND)
 				break;
 		}
-		cbt->cip = NULL;
-		cbt->rip = NULL;
 
 		do {
 			WT_ERR(__wt_walk_next(session, &cbt->walk, &cbt->page));
