@@ -56,6 +56,9 @@
     <Filter Include="bson">
       <UniqueIdentifier>{e6652333-c77f-420c-af8e-72d55bc095fe}</UniqueIdentifier>
     </Filter>
+    <Filter Include="misc and third party\snappy">
+      <UniqueIdentifier>{fbc4416f-ca67-4e63-a1ea-49027de7e080}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -303,6 +306,30 @@
     </ClInclude>
     <ClInclude Include="..\server.h">
       <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\config.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy-c.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy-internal.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy-sinksource.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy-stubs-internal.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy-stubs-public.h">
+      <Filter>misc and third party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\compress.h">
+      <Filter>misc and third party</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -856,6 +883,15 @@
     </ClCompile>
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\snappy\snappy.cc">
+      <Filter>misc and third party\snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\compress.cpp">
+      <Filter>misc and third party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
+      <Filter>misc and third party\snappy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

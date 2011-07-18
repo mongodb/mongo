@@ -36,6 +36,7 @@
 #include "../util/checksum.h"
 #include "../util/version.h"
 #include "../db/key.h"
+#include "../util/compress.h"
 
 using namespace bson;
 
@@ -193,6 +194,8 @@ namespace PerfTests {
             catch(...) { }
         }
 
+        virtual unsigned batchSize() { return 50; }
+
         void say(unsigned long long n, int ms, string s) {
             unsigned long long rps = n*1000/ms;
             cout << "stats " << setw(33) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
@@ -281,9 +284,9 @@ namespace PerfTests {
 
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
-            Timer t;
+            mongo::Timer t;
             unsigned long long n = 0;
-            const unsigned Batch = 50;
+            const unsigned Batch = batchSize();
 
             if( hlm == 0 ) { 
                 // means just do once
@@ -321,7 +324,7 @@ namespace PerfTests {
                 const char *test2name = timed2();
                 if( test2name ) {
                     dur::stats.curr->reset();
-                    Timer t;
+                    mongo::Timer t;
                     unsigned long long n = 0;
                     while( 1 ) {
                         unsigned i;
@@ -603,6 +606,47 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
     };
 
+    class Compress : public B {
+    public:
+        const unsigned sz;
+        void *p;
+        Compress() : sz(1024*1024*100+3) { }
+        virtual unsigned batchSize() { return 1; }
+        string name() { return "compress"; }
+        virtual bool showDurStats() { return false; }
+        virtual int howLongMillis() { return 4000; } 
+        unsigned long long expectation() { return 1000000; }
+        void prep() { 
+            p = malloc(sz);
+            // this isn't a fair test as it is mostly rands but we just want a rough perf check
+            static int last;
+            for (unsigned i = 0; i<sz; i++) {
+                int r = rand();
+                if( (r & 0x300) == 0x300 )
+                    r = last;
+                ((char*)p)[i] = r;
+                last = r;
+            }
+        }
+        size_t last;
+        string res;
+        void timed() {
+            mongo::Timer t;
+            string out;
+            size_t len = compress((const char *) p, sz, &out);
+            bool ok = uncompress(out.c_str(), out.size(), &res);
+            ASSERT(ok);
+            static unsigned once;
+            if( once++ == 0 )
+                cout << "compress round trip " << sz/(1024.0*1024) / (t.millis()/1000.0) << "MB/sec\n";
+            //cout << len / (1024.0/1024) << " compressed" << endl;
+        }
+        void post() {
+            ASSERT( memcmp(res.c_str(), p, sz) == 0 );
+            free(p);
+        }
+    };
+
     // test speed of checksum method
     class ChecksumTest : public B {
     public:
@@ -612,6 +656,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 2000; } 
         int expectationTimeMillis() { return 5000; }
         virtual bool showDurStats() { return false; }
+        virtual unsigned batchSize() { return 1; }
 
         void *p;
 
@@ -827,6 +872,8 @@ namespace PerfTests {
             }
             else {
                 add< Dummy >();
+                add< ChecksumTest >();
+                add< Compress >();
                 add< TLS >();
                 add< Malloc >();
                 add< Timer >();
@@ -843,7 +890,6 @@ namespace PerfTests {
                 add< BSONIter >();
                 add< BSONGetFields1 >();
                 add< BSONGetFields2 >();
-                add< ChecksumTest >();
                 add< TaskQueueTest >();
                 add< InsertDup >();
                 add< Insert1 >();
