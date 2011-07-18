@@ -1295,7 +1295,7 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied;
+            ReplTime lastOpApplied = 0;
 
             {
                 // 4. do bulk of mods
