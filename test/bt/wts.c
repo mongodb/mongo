@@ -313,7 +313,7 @@ wts_dump(const char *tag, int dump_bdb)
 	}
 	if (system(cmd) != 0) {
 		fprintf(stderr,
-		    "%s: %s dump comparison failed\n", tag, g.progname);
+		    "%s: %s dump comparison failed\n", g.progname, tag);
 		return (1);
 	}
 
