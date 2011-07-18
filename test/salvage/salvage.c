@@ -79,19 +79,30 @@ main(int argc, char *argv[])
 
 	printf("salvage test run started\n");
 	if (r == 0) {
+		if (page_type == 0) {
+			page_type = WT_PAGE_COL_FIX;
+			for (r = 1; r <= 23; ++r)
+				run(r);
+
+			page_type = WT_PAGE_COL_VAR;
+			for (r = 1; r <= 23; ++r)
+				run(r);
+
+			page_type = WT_PAGE_ROW_LEAF;
+			for (r = 1; r <= 21; ++r)
+				run(r);
+		} else
+			for (r = 1; r <= 21; ++r)
+				run(r);
+	} else if (page_type == 0) {
 		page_type = WT_PAGE_COL_FIX;
-		for (r = 1; r <= 23; ++r)
-			run(r);
-
+		run(r);
 		page_type = WT_PAGE_COL_VAR;
-		for (r = 1; r <= 23; ++r)
-			run(r);
-
+		run(r);
 		page_type = WT_PAGE_ROW_LEAF;
-		for (r = 1; r <= 21; ++r)
-			run(r);
-	} else
-		run (r);
+		run(r);
+	}  else
+		run(r);
 
 	printf("salvage test run completed\n");
 	return (EXIT_SUCCESS);
