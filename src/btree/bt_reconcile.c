@@ -209,17 +209,17 @@ static int  __rec_cell_build_ovfl(
 static int  __rec_cell_build_val(
 		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
 static void __rec_col_extend_truncate(WT_PAGE *);
-static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
+static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_fix_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_col_rle(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
+static int  __rec_col_rle(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_rle_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
-static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
+static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_bulk(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_col_var_helper(
-		WT_SESSION_IMPL *, WT_BUF *, int, int, uint64_t);
+static int  __rec_col_var_helper(WT_SESSION_IMPL *,
+		WT_SALVAGE_COOKIE *, WT_BUF *, int, int, uint64_t);
 STATIN void __rec_copy_incr(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
 static int  __rec_discard_add(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, uint32_t);
 STATIN int  __rec_discard_add_ovfl(WT_SESSION_IMPL *, WT_CELL_UNPACK *);
@@ -239,7 +239,7 @@ static int  __rec_parent_update(WT_SESSION_IMPL *,
 		WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static void __rec_parent_update_clean(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
+static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
 static int  __rec_row_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
@@ -275,7 +275,7 @@ static int  __rec_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
  */
 int
 __wt_page_reconcile_int(WT_SESSION_IMPL *session,
-    WT_PAGE *page, uint64_t salvage_cookie, uint32_t flags)
+    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -354,7 +354,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 			WT_RET(__rec_col_fix_bulk(session, page));
 		else {
 			__rec_col_extend_truncate(page);
-			WT_RET(__rec_col_fix(session, page, salvage_cookie));
+			WT_RET(__rec_col_fix(session, page, salvage));
 		}
 		break;
 	case WT_PAGE_COL_RLE:
@@ -362,7 +362,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 			WT_RET(__rec_col_rle_bulk(session, page));
 		else {
 			__rec_col_extend_truncate(page);
-			WT_RET(__rec_col_rle(session, page, salvage_cookie));
+			WT_RET(__rec_col_rle(session, page, salvage));
 		}
 		break;
 	case WT_PAGE_COL_VAR:
@@ -370,7 +370,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 			WT_RET(__rec_col_var_bulk(session, page));
 		else {
 			__rec_col_extend_truncate(page);
-			WT_RET(__rec_col_var(session, page, salvage_cookie));
+			WT_RET(__rec_col_var(session, page, salvage));
 		}
 		break;
 	case WT_PAGE_COL_INT:
@@ -380,7 +380,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 		WT_RET(__rec_row_int(session, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__rec_row_leaf(session, page, salvage_cookie));
+		WT_RET(__rec_row_leaf(session, page, salvage));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -1607,13 +1607,15 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
  * run-length encoding).
  */
 static int
-__rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
+__rec_col_fix(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
+	uint64_t slvg_missing;
 	uint32_t i, len;
 	uint8_t *data;
 	int ret;
@@ -1641,6 +1643,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	 * The salvage code may be calling us to reconcile a page where there
 	 * were missing records in the column-store name space.
 	 */
+	slvg_missing = salvage == NULL ? 0 : salvage->missing;
 	for (; slvg_missing > 0; --slvg_missing) {
 		/* Boundary: split or write the page. */
 		while (len > r->space_avail)
@@ -1734,13 +1737,15 @@ __rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Reconcile a fixed-width, run-length encoded, column-store leaf page.
  */
 static int
-__rec_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
+__rec_col_rle(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_RECONCILE *r;
+	uint64_t slvg_missing;
 	uint32_t i, len;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *last_data;
@@ -1771,6 +1776,7 @@ __rec_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	 * The salvage code may be calling us to reconcile a page where there
 	 * were missing records in the column-store name space.
 	 */
+	slvg_missing = salvage == NULL ? 0 : salvage->missing;
 	for (; slvg_missing > 0; slvg_missing -= repeat_count) {
 		/* Boundary: split or write the page. */
 		while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
@@ -1974,13 +1980,45 @@ __rec_col_extend_truncate(WT_PAGE *page)
  */
 static int
 __rec_col_var_helper(
-    WT_SESSION_IMPL *session, WT_BUF *value, int deleted, int raw, uint64_t rle)
+    WT_SESSION_IMPL *session, WT_SALVAGE_COOKIE *salvage,
+    WT_BUF *value, int deleted, int raw, uint64_t rle)
 {
 	WT_RECONCILE *r;
 	WT_KV *val;
 
 	r = S2C(session)->cache->rec;
 	val = &r->v;
+
+	/*
+	 * Occasionally, salvage needs to discard records from the beginning or
+	 * end of the page, and because the items may be part of a RLE cell, do
+	 * the adjustments here.   It's not a mistake we don't bother telling
+	 * our caller we've handled all the records from the page we care about,
+	 * and can quit processing the page: salvage is a rare operation and I
+	 * don't want to complicate our caller's loop.
+	 */
+	if (salvage != NULL) {
+		if (salvage->done)
+			return (0);
+		if (salvage->skip != 0) {
+			if (rle <= salvage->skip) {
+				salvage->skip -= rle;
+				return (0);
+			}
+			salvage->skip = 0;
+			rle -= salvage->skip;
+		}
+		if (salvage->take != 0) {
+			if (rle <= salvage->take)
+				salvage->take -= rle;
+			else {
+				salvage->take = 0;
+				rle = salvage->take;
+			}
+			if (salvage->take == 0)
+				salvage->done = 1;
+		}
+	}
 
 	if (deleted) {
 		val->cell_len =
@@ -2003,7 +2041,7 @@ __rec_col_var_helper(
 	/* Copy the value onto the page. */
 	__rec_copy_incr(session, r, val);
 
-	/* Update the record number. */
+	/* Update the starting record number in case we split. */
 	r->recno += rle;
 
 	return (0);
@@ -2014,7 +2052,8 @@ __rec_col_var_helper(
  *	Reconcile a variable-width column-store leaf page.
  */
 static int
-__rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
+__rec_col_var(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BUF *last, orig;
 	WT_CELL *cell;
@@ -2023,7 +2062,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	WT_INSERT *ins;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
-	uint64_t n, nrepeat, repeat_count, rle, src_recno;
+	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
 	int can_compare, deleted, last_deleted, orig_deleted;
 	const void *data;
@@ -2040,14 +2079,24 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	    page->u.col_leaf.recno,
 	    session->btree->leafmax, session->btree->leafmin));
 
+	if (salvage != NULL)
+		fprintf(stderr, "missing: %llu, skip: %llu, take: %llu\n",
+		salvage->missing, salvage->skip, salvage->take);
+
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
 	 * were missing records in the column-store name space.  In this case
 	 * we write a single RLE element onto a new page, so we know it fits,
 	 * then update the starting record number.
+	 *
+	 * Note that we DO NOT pass the salvage cookie to our helper function
+	 * in this case, we're handling one of the salvage cookie fields on
+	 * our own, and we're don't want assistance from the helper function.
 	 */
+	slvg_missing = salvage == NULL ? 0 : salvage->missing;
 	if (slvg_missing)
-		WT_RET(__rec_col_var_helper(session, NULL, 1, 0, slvg_missing));
+		WT_RET(__rec_col_var_helper(
+		    session, NULL, NULL, 1, 0, slvg_missing));
 
 	/*
 	 * We track two data items through this loop: the previous (last) item
@@ -2101,7 +2150,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				 * off comparisons for the next item.
 				 */
 				if (can_compare) {
-					WT_RET(__rec_col_var_helper(session,
+					WT_RET(__rec_col_var_helper(
+					    session, salvage,
 					    last, last_deleted, 0, rle));
 					can_compare = 0;
 				}
@@ -2110,7 +2160,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				last->data = cell;
 				last->size = unpack->len;
 				WT_RET(__rec_col_var_helper(
-				    session, last, 0, 1, (uint64_t)1));
+				    session, salvage, last, 0, 1, (uint64_t)1));
 				src_recno += 1;
 				continue;
 			}
@@ -2192,8 +2242,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 					continue;
 				}
 
-				WT_RET(__rec_col_var_helper(
-				    session, last, last_deleted, 0, rle));
+				WT_RET(__rec_col_var_helper(session,
+				    salvage, last, last_deleted, 0, rle));
 			}
 
 			/* Swap the current/last state. */
@@ -2209,8 +2259,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 
 	/* If we were tracking a record, write it. */
 	if (can_compare)
-		WT_RET(
-		    __rec_col_var_helper(session, last, last_deleted, 0, rle));
+		WT_RET(__rec_col_var_helper(
+		    session, salvage, last, last_deleted, 0, rle));
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
@@ -2541,7 +2591,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Reconcile a row-store leaf page.
  */
 static int
-__rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
+__rec_row_leaf(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BUF *tmp;
 	WT_CELL *cell, *val_cell;
@@ -2552,12 +2603,14 @@ __rec_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_skip)
 	WT_RECONCILE *r;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
+	uint64_t slvg_skip;
 	uint32_t i;
 	int ovfl_key, ret;
 
 	r = S2C(session)->cache->rec;
-	unpack = &_unpack;
 	tmp = NULL;
+	unpack = &_unpack;
+	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 	ret = 0;
 
 	key = &r->k;

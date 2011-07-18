@@ -160,7 +160,19 @@ __wt_page_reconcile(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	/*
 	 * There's an internal version of page reconciliation that salvage uses,
-	 * everybody else just calls with a value of 0 as the 3rd argument.
+	 * everybody else just calls with a value of NULL as the 3rd argument.
 	 */
-	return (__wt_page_reconcile_int(session, page, (uint64_t)0, flags));
+	return (__wt_page_reconcile_int(session, page, NULL, flags));
+}
+
+/*
+ * __wt_page_out --
+ *	Release a reference to a page, unless it's the root page, which remains
+ * pinned for the life of the table handle.
+ */
+static inline void
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	if (page != NULL && !WT_PAGE_IS_ROOT(page))
+		__wt_hazard_clear(session, page);
 }

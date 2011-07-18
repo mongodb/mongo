@@ -1103,10 +1103,13 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 {
 	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
-	int ret;
-	uint64_t missing;
+	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint32_t i, n_repeat, skip, take, save_entries;
+	int ret;
 	void *cipdata;
+
+	cookie = &_cookie;
+	WT_CLEAR(*cookie);
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
@@ -1127,16 +1130,6 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	    trk->addr, skip, take);
 
 	switch (page->type) {
-	case WT_PAGE_COL_VAR:
-		/*
-		 * Discard backing overflow pages for any items being discarded
-		 * that reference overflow pages.
-		 */
-		WT_ERR(__slvg_col_merge_ovfl(
-		    session, trk->addr, page, 0, skip));
-		WT_ERR(__slvg_col_merge_ovfl(
-		    session, trk->addr, page, skip + take, page->entries - 1));
-		/* FALLTHROUGH */
 	case WT_PAGE_COL_FIX:
 		/*
 		 * Adjust the page information to "see" only keys we care about.
@@ -1190,6 +1183,19 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 		}
 		page->entries = WT_COL_SLOT(page, cip);
 		break;
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Discard backing overflow pages for any items being discarded
+		 * that reference overflow pages.
+		 */
+		WT_ERR(__slvg_col_merge_ovfl(
+		    session, trk->addr, page, 0, skip));
+		WT_ERR(__slvg_col_merge_ovfl(
+		    session, trk->addr, page, skip + take, page->entries - 1));
+
+		cookie->skip = skip;
+		cookie->take = take;
+		break;
 	}
 
 	/*
@@ -1197,16 +1203,15 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * trk->col_missing, else, it's in trk->col_start.  Update the parent's
 	 * reference as well as the page itself.
 	 */
-	if (trk->col_missing == 0) {
+	if (trk->col_missing == 0)
 		page->u.col_leaf.recno = trk->col_start;
-		missing = 0;
-	} else {
+	else {
 		page->u.col_leaf.recno = trk->col_missing;
-		missing = trk->col_start - trk->col_missing;
+		cookie->missing = trk->col_start - trk->col_missing;
 
 		WT_VERBOSE(session, SALVAGE,
 		    "[%" PRIu32 "] merge inserting %" PRIu64 " missing records",
-		    trk->addr, missing);
+		    trk->addr, cookie->missing);
 	}
 	cref->recno = page->u.col_leaf.recno;
 
@@ -1224,8 +1229,9 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 
 	/* Write the new version of the leaf page to disk. */
 	WT_PAGE_SET_MODIFIED(page);
+
 	ret = __wt_page_reconcile_int(session,
-	    page, missing, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+	    page, cookie, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 
 err:	/*
 	 * Reset the page.  (Don't reset the record number or RLE counts -- it
@@ -1624,6 +1630,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
+	WT_SALVAGE_COOKIE *cookie, _cookie;
 	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 	uint32_t i, skip_start, skip_stop;
 
@@ -1632,6 +1639,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	btree = session->btree;
 	page = NULL;
 	func = btree->btree_compare;
+
+	cookie = &_cookie;
+	WT_CLEAR(*cookie);
 
 	/* Allocate temporary space in which to instantiate the keys. */
 	WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1736,22 +1746,22 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		    trk->addr, page, page->entries - skip_stop, page->entries));
 
 		/*
-		 * Change the page to reflect the new record count: there is no
-		 * need to copy anything on the page itself, the entries value
-		 * limits the number of items on the page.
-		 */
-		page->entries -= skip_stop;
-
-		/*
 		 * If we take all of the keys, we don't write the page and we
 		 * clear the merge flags so that the underlying blocks are not
 		 * later freed (for merge pages re-written into the file, the
-		 * underlying blocks have to be freed -- well, this page never
-		 * gets written, so don't free the blocks).
+		 * underlying blocks have to be freed, but if this page never
+		 * gets written, we shouldn't free the blocks).
 		 */
 		if (skip_start == 0 && skip_stop == 0)
 			F_CLR(trk, WT_TRACK_MERGE);
 		else {
+			/*
+			 * Change the page to reflect the correct record count:
+			 * there is no need to copy anything on the page itself,
+			 * the entries value limits the number of page items.
+			 */
+			page->entries -= skip_stop;
+
 			/*
 			 * We can't discard the original blocks associated with
 			 * this page now.  (The problem is we don't want to
@@ -1768,9 +1778,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 
 			/* Write the new version of the leaf page to disk. */
 			WT_PAGE_SET_MODIFIED(page);
-			ret = __wt_page_reconcile_int(
-			    session, page, (uint64_t)skip_start,
+			cookie->skip = skip_start;
+			ret = __wt_page_reconcile_int(session, page, cookie,
 			    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+
 			page->entries += skip_stop;
 			if (ret != 0)
 				goto err;

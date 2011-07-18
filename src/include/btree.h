@@ -783,14 +783,6 @@ struct __wt_off_record {
 #endif
 
 /*
- * Release a reference to a page, unless it's the root page, which remains
- * pinned for the life of the table handle.
- */
-#define	WT_PAGE_OUT(session, p)						\
-	if ((p) != NULL && !WT_PAGE_IS_ROOT(p))				\
-		__wt_hazard_clear((session), (p));
-
-/*
  * WT_FREE_ENTRY  --
  *	Encapsulation of an entry on the Btree free list.
  */
@@ -800,6 +792,18 @@ struct __wt_free_entry {
 
 	uint32_t addr;				/* Disk offset */
 	uint32_t size;				/* Size */
+};
+
+/*
+ * WT_SALVAGE_COOKIE --
+ *	Encapsulation of salvage information for reconciliation.
+ */
+struct __wt_salvage_cookie {
+	uint64_t missing;			/* Initial items to create */
+	uint64_t skip;				/* Initial items to skip */
+	uint64_t take;				/* Items to take */
+
+	int	 done;				/* Ignore the rest */
 };
 
 #if defined(__cplusplus)
