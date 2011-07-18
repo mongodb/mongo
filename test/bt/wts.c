@@ -117,12 +117,12 @@ wts_startup(void)
 		 * XXX -- does some limit still apply?
 		 * Don't go past the WT limit of 20 objects per leaf page.
 		 *
-		 * if (20 * g.c_data_min > (1U << g.c_leaf_node_min))
-		 * 	g.c_data_min = (1U << g.c_leaf_node_min) / 20;
+		 * if (20 * g.c_data_fix > (1U << g.c_leaf_node_min))
+		 * 	g.c_data_fix = (1U << g.c_leaf_node_min) / 20;
 		 */
 
 		p += snprintf(p,
-		    (size_t)(end - p), ",value_format=%dt", g.c_data_min);
+		    (size_t)(end - p), ",value_format=%dt", g.c_data_fix);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
@@ -274,7 +274,7 @@ wts_dump(void)
 		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
 		    (ret = cursor->get_value(cursor, &value)) != 0)
 			break;
-		if (key.data != NULL &&
+		if (key.size != 0 &&
 		    (fwrite(key.data, 1, key.size, fp) != key.size ||
 		    fwrite("\n", 1, 1, fp) != 1)) {
 			ret = errno;

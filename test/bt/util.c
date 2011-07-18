@@ -110,7 +110,7 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 	case FIX:
 		/* Use the last decimal digit in the record number. */
 		p = buf + 9;
-		len = (g.c_data_min + 7) >> 3;
+		len = (g.c_data_fix + 7) >> 3;
 		break;
 	case VAR:
 		/*
