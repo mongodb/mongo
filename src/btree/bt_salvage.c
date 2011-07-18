@@ -486,7 +486,6 @@ __slvg_trk_leaf(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_COL *cip;
 	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint64_t stop_recno;
@@ -536,11 +535,8 @@ __slvg_trk_leaf(
 		 * WT_PAGE_DISK header, but the stop key requires walking the
 		 * page.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
-
 		stop_recno = dsk->recno;
-		WT_COL_FOREACH(page, cip, i) {
-			cell = WT_COL_PTR(page, cip);
+		WT_CELL_FOREACH(dsk, cell, unpack, i) {
 			__wt_cell_unpack(cell, unpack);
 			stop_recno += unpack->rle;
 		}
