@@ -608,7 +608,7 @@ __wt_debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 /*
  * __wt_debug_col_insert --
- *	Dump an RLE column-store insert array.
+ *	Dump a column-store insert array.
  */
 static void
 __wt_debug_col_insert(WT_DBG *ds, WT_INSERT *ins)
