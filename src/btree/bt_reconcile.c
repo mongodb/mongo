@@ -2012,8 +2012,8 @@ __rec_col_var_helper(
 			if (rle <= salvage->take)
 				salvage->take -= rle;
 			else {
-				salvage->take = 0;
 				rle = salvage->take;
+				salvage->take = 0;
 			}
 			if (salvage->take == 0)
 				salvage->done = 1;
@@ -2078,10 +2078,6 @@ __rec_col_var(
 	WT_RET(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,
 	    session->btree->leafmax, session->btree->leafmin));
-
-	if (salvage != NULL)
-		fprintf(stderr, "missing: %llu, skip: %llu, take: %llu\n",
-		salvage->missing, salvage->skip, salvage->take);
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
