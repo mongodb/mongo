@@ -302,7 +302,7 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
-        bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string&, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             cursorCache.appendInfo( result );
             if ( jsobj["setTimeout"].isNumber() )
                 CursorCache::TIMEOUT = jsobj["setTimeout"].numberLong();

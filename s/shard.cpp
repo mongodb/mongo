@@ -235,7 +235,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
 
-        virtual bool run(const string&, mongo::BSONObj&, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );
         }
     } cmdGetShardMap;

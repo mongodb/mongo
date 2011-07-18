@@ -46,9 +46,14 @@ namespace mongo {
 
            return value is true if succeeded.  if false, set errmsg text.
         */
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int options){
-            return run( db, cmdObj, errmsg, result, ( options & QueryOption_NoOplog ) > 0 );
+        // TODO: Consolidate into a single run function
+        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            return run( db, cmdObj, 0, errmsg, result, fromRepl );
+        }
+
+        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ){
+            massert( 15854, str::stream() << "Command " << name << " has not implemented the default run function.", false );
+            return false;
         }
 
         /*
