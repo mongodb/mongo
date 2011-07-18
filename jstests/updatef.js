@@ -1,7 +1,5 @@
 // Test unsafe management of nsdt on update command yield SERVER-3208
 
-if ( 0 ) { // SERVER-3208
-
 prefixNS = db.jstests_updatef;
 prefixNS.save( {} );
 
@@ -24,5 +22,3 @@ for( i=0; i < 20; ++i ) {
 }
 
 s();
-
-}

@@ -447,16 +447,29 @@ namespace mongo {
         return rec;
     }
 
-    bool ClientCursor::yieldSometimes( RecordNeeds need ) {
+    bool ClientCursor::yieldSometimes( RecordNeeds need, bool *yielded ) {
+        if ( yielded ) {
+            *yielded = false;   
+        }
         if ( ! _yieldSometimesTracker.ping() ) {
             Record* rec = _recordForYield( need );
-            if ( rec ) 
+            if ( rec ) {
+                if ( yielded ) {
+                    *yielded = true;   
+                }
                 return yield( yieldSuggest() , rec );
+            }
             return true;
         }
 
         int micros = yieldSuggest();
-        return ( micros > 0 ) ? yield( micros , _recordForYield( need ) ) : true;
+        if ( micros > 0 ) {
+            if ( yielded ) {
+                *yielded = true;   
+            }
+            return yield( micros , _recordForYield( need ) );
+        }
+        return true;
     }
 
     void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {

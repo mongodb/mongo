@@ -1060,11 +1060,10 @@ namespace mongo {
         
         debug.updateobj = updateobj;
 
-        /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
-        /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
+        // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
+        // The pointers may be left invalid on a failed yield recovery.
         NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
         NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
-        /* end note */
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
@@ -1105,6 +1104,9 @@ namespace mongo {
         shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
 
+        d = nsdetails(ns);
+        nsdt = &NamespaceDetailsTransient::get_w(ns);
+
         if( c->ok() ) {
             set<DiskLoc> seenObjects;
             MatchDetails details;
@@ -1120,12 +1122,18 @@ namespace mongo {
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
                 }
 
-                if ( ! cc->yieldSometimes( ClientCursor::WillNeed ) ) {
+                bool didYield;
+                if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
                     cc.release();
                     break;
                 }
                 if ( !c->ok() ) {
                     break;
+                }
+                
+                if ( didYield ) {
+                    d = nsdetails(ns);
+                    nsdt = &NamespaceDetailsTransient::get_w(ns);
                 }
                 // *****************
 
@@ -1146,6 +1154,8 @@ namespace mongo {
                         if ( !c->ok() ) {
                             break;
                         }
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
                     }
                     continue;
                 }
@@ -1276,6 +1286,8 @@ namespace mongo {
                         if ( !c->ok() ) {
                             break;
                         }
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
                     }
 
                     if (atomic)
