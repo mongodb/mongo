@@ -512,6 +512,11 @@ namespace mongo {
         cc().shutdown();
     }
 
+    void GhostSync::starting() {
+        Client::initThread("rsGhostSync");
+        replLocalAuth();
+    }
+
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
         const OID rid = id["_id"].OID();
         rwlock lk( _lock , true );
