@@ -240,7 +240,7 @@ done:	/*
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	WT_PAGE_OUT(session, page);
+err:	__wt_page_out(session, page);
 	return (ret);
 }
 

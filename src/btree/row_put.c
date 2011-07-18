@@ -107,7 +107,7 @@ err:		if (ins != NULL)
 	if (new_upd != NULL)
 		__wt_free(session, new_upd);
 
-	WT_PAGE_OUT(session, page);
+	__wt_page_out(session, page);
 
 	return (ret);
 }
