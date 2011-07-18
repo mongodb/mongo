@@ -2025,7 +2025,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, src_recno;
 	uint32_t i, size;
-	int deleted, last_deleted, orig_deleted, tracking;
+	int can_compare, deleted, last_deleted, orig_deleted;
 	const void *data;
 
 	r = S2C(session)->cache->rec;
@@ -2050,20 +2050,22 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 		WT_RET(__rec_col_var_helper(session, NULL, 1, 0, slvg_missing));
 
 	/*
-	 * To track repeated values, we cache the last before writing it to
-	 * the page.  The reconciled record number is tracked in r->recno to
-	 * get correct split points.  We only increment r->recno after writing
-	 * to the page (in __rec_col_var_helper).
-	 *
-	 * We track the current in-memory record number in src_recno, which
-	 * includes any repeats we have seen while the value is cached.
+	 * We track two data items through this loop: the previous (last) item
+	 * and the current item: if the last item is the same as the current
+	 * item, we increment the RLE count for the last item; if the last item
+	 * is different from the current item, we write the last item onto the
+	 * page, and replace it with the current item.  The r->recno counter
+	 * tracks records written to the page, and is incremented by the helper
+	 * function immediately after writing records to the page.  The record
+	 * number of our source record, that is, the current item, is maintained
+	 * in src_recno.
 	 */
 	src_recno = r->recno;
 
 	/* For each entry in the in-memory page... */
 	rle = 0;
 	deleted = last_deleted = 0;
-	tracking = 0;
+	can_compare = 0;
 	WT_COL_FOREACH(page, cip, i) {
 		/*
 		 * Review the original cell, and get its repeat count and
@@ -2095,13 +2097,13 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			 */
 			if (unpack->ovfl && ins == NULL) {
 				/*
-				 * Write out any record we're tracking and
-				 * reset tracking.
+				 * Write out any record we're tracking and turn
+				 * off comparisons for the next item.
 				 */
 				if (tracking) {
 					WT_RET(__rec_col_var_helper(session,
 					    last, last_deleted, 0, rle));
-					tracking = 0;
+					can_compare = 0;
 				}
 
 				/* Write out the overflow cell as a raw cell. */
@@ -2114,7 +2116,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			}
 
 			nrepeat = unpack->rle;
-			orig_deleted = (unpack->type == WT_CELL_DEL);
+			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
 
 			/* Get a copy of the cell. */
 			if (!orig_deleted)
@@ -2181,7 +2183,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			 * buffers: do NOT update the starting record number,
 			 * we've been doing that all along.
 			 */
-			if (tracking) {
+			if (can_compare) {
 				if ((deleted && last_deleted) ||
 				    (!last_deleted && !deleted &&
 				    last->size == size &&
@@ -2194,18 +2196,19 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 				    session, last, last_deleted, 0, rle));
 			}
 
-			/* Swap the current/last state, reset RLE counter. */
+			/* Swap the current/last state. */
 			last_deleted = deleted;
 			if (!last_deleted)
 				WT_RET(__wt_buf_set(session, last, data, size));
 
+			/* Reset RLE counter and turn on comparisons. */
 			rle = repeat_count;
-			tracking = 1;
+			can_compare = 1;
 		}
 	}
 
 	/* If we were tracking a record, write it. */
-	if (tracking)
+	if (can_compare)
 		WT_RET(
 		    __rec_col_var_helper(session, last, last_deleted, 0, rle));
 
