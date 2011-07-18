@@ -130,6 +130,7 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	unpack = &_unpack;
+	cell = NULL;
 
 	/* Initialize for each new page. */
 	if (newpage) {
@@ -141,11 +142,8 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 		newcell = 0;
 
 	/* This loop moves through a page. */
-	for (;; ++cbt->cip, --cbt->nitems, newcell = 1) {
-		/* Check for the end of the page */
-		if (cbt->nitems == 0)
-			break;
-
+	for (; cbt->rle > 0 || cbt->nitems > 0;
+	    ++cbt->cip, --cbt->nitems, newcell = 1) {
 		/* Unpack each cell, find out how many times it's repeated. */
 		if (newcell) {
 			if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
@@ -160,9 +158,9 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 			 * Skip deleted records, there might be a large number
 			 * of them.
 			 */
-			if (cbt->ins == NULL &&
-			    (cell == NULL || unpack->type == WT_CELL_DEL)) {
+			if (cbt->ins == NULL && unpack->type == WT_CELL_DEL) {
 				cbt->recno += cbt->rle;
+				cbt->rle = 0;
 				continue;
 			}
 
@@ -170,7 +168,10 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 			 * Get a copy of the item we're returning: it might be
 			 * encoded, and we don't want to repeatedly decode it.
 			 */
-			if (cell != NULL)
+			if (cell == NULL) {
+				cbt->value.data = NULL;
+				cbt->value.size = 0;
+			} else
 				WT_RET(__wt_cell_unpack_copy(
 				    session, unpack, &cbt->value));
 		}
@@ -194,8 +195,6 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 				value->data = WT_UPDATE_DATA(upd);
 				value->size = upd->size;
 			} else {
-				if (cell == NULL)
-					continue;
 				value->data = cbt->value.data;
 				value->size = cbt->value.size;
 			}

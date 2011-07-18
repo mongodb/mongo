@@ -2003,6 +2003,9 @@ __rec_col_var_helper(
 	/* Copy the value onto the page. */
 	__rec_copy_incr(session, r, val);
 
+	/* Update the record number. */
+	r->recno += rle;
+
 	return (0);
 }
 
@@ -2020,7 +2023,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	WT_INSERT *ins;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
-	uint64_t n, nrepeat, repeat_count, rle;
+	uint64_t n, nrepeat, repeat_count, rle, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, tracking;
 	const void *data;
@@ -2043,10 +2046,19 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 	 * we write a single RLE element onto a new page, so we know it fits,
 	 * then update the starting record number.
 	 */
-	if (slvg_missing) {
+	if (slvg_missing)
 		WT_RET(__rec_col_var_helper(session, NULL, 1, 0, slvg_missing));
-		r->recno += slvg_missing;
-	}
+
+	/*
+	 * To track repeated values, we cache the last before writing it to
+	 * the page.  The reconciled record number is tracked in r->recno to
+	 * get correct split points.  We only increment r->recno after writing
+	 * to the page (in __rec_col_var_helper).
+	 *
+	 * We track the current in-memory record number in src_recno, which
+	 * includes any repeats we have seen while the value is cached.
+	 */
+	src_recno = r->recno;
 
 	/* For each entry in the in-memory page... */
 	rle = 0;
@@ -2064,8 +2076,6 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			orig_deleted = 1;
 		} else {
 			__wt_cell_unpack(cell, unpack);
-			nrepeat = unpack->rle;
-			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
 
 			/*
 			 * The data may be Huffman encoded, which means we have
@@ -2085,9 +2095,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			 */
 			if (unpack->ovfl && ins == NULL) {
 				/*
-				 * Write out any record we're tracking and reset
-				 * tracking.  Do NOT update the starting record
-				 * number, we've been doing that all along.
+				 * Write out any record we're tracking and
+				 * reset tracking.
 				 */
 				if (tracking) {
 					WT_RET(__rec_col_var_helper(session,
@@ -2095,20 +2104,22 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 					tracking = 0;
 				}
 
-				/*
-				 * Write out the overflow cell as a raw cell and
-				 * update the starting record number.
-				 */
+				/* Write out the overflow cell as a raw cell. */
 				last->data = cell;
 				last->size = unpack->len;
 				WT_RET(__rec_col_var_helper(
 				    session, last, 0, 1, (uint64_t)1));
-				r->recno += 1;
+				src_recno += 1;
 				continue;
 			}
 
+			nrepeat = unpack->rle;
+			orig_deleted = (unpack->type == WT_CELL_DEL);
+
 			/* Get a copy of the cell. */
-			WT_RET(__wt_cell_unpack_copy(session, unpack, &orig));
+			if (!orig_deleted)
+				WT_RET(__wt_cell_unpack_copy(session,
+				    unpack, &orig));
 
 			/*
 			 * If we're re-writing a cell's reference of an overflow
@@ -2124,22 +2135,22 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 		 * lists are in sorted order, so only need check the next one.
 		 */
 		for (n = 0;
-		    n < nrepeat; n += repeat_count, r->recno += repeat_count) {
-			if (ins != NULL && WT_INSERT_RECNO(ins) == r->recno) {
+		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
+			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
 				upd = ins->upd;
 				ins = ins->next;
 
-				data = WT_UPDATE_DATA(upd);
-				size = upd->size;
-
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
+				if (!deleted) {
+					data = WT_UPDATE_DATA(upd);
+					size = upd->size;
+				}
+
 				repeat_count = 1;
 			} else {
 				upd = NULL;
-
-				if (cell == NULL)
-					deleted = orig_deleted;
-				else {
+				deleted = orig_deleted;
+				if (!deleted) {
 					data = orig.data;
 					size = orig.size;
 				}
@@ -2154,7 +2165,7 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 					repeat_count = nrepeat - n;
 				else
 					repeat_count =
-					    WT_INSERT_RECNO(ins) - r->recno;
+					    WT_INSERT_RECNO(ins) - src_recno;
 			}
 
 			/*
@@ -2172,7 +2183,8 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 			 */
 			if (tracking) {
 				if ((deleted && last_deleted) ||
-				    (last->size == size &&
+				    (!last_deleted && !deleted &&
+				    last->size == size &&
 				    memcmp(last->data, data, size) == 0)) {
 					rle += repeat_count;
 					continue;
@@ -2184,10 +2196,10 @@ __rec_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t slvg_missing)
 
 			/* Swap the current/last state, reset RLE counter. */
 			last_deleted = deleted;
-			WT_RET(__wt_buf_set(session, last, data, size));
+			if (!last_deleted)
+				WT_RET(__wt_buf_set(session, last, data, size));
 
 			rle = repeat_count;
-
 			tracking = 1;
 		}
 	}
