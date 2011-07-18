@@ -464,6 +464,7 @@ namespace ThreadedTests {
         }
     };
 
+#if 0
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
     public:
@@ -541,6 +542,7 @@ namespace ThreadedTests {
             cc().shutdown();
         }
     };
+#endif
 
     class WriteLocksAreGreedy : public ThreadedTest<3> {
     public:

@@ -483,6 +483,8 @@ namespace PerfTests {
             lk.unlock();
         }
     };
+    
+#if 0
     class ulock : public B { 
     public:
         string name() { return "ulock"; }
@@ -493,6 +495,7 @@ namespace PerfTests {
             lk.unlockFromUpgradable();
         }
     };
+#endif
 
     class CTM : public B { 
     public:
@@ -824,7 +827,7 @@ namespace PerfTests {
                 add< Timer >();
                 add< rlock >();
                 add< wlock >();
-                add< ulock >();
+                //add< ulock >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
                 add< spinlockspeed >();
