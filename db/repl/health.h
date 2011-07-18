@@ -33,9 +33,9 @@ namespace mongo {
         bool isDefault() const { return *this == HealthOptions(); }
 
         // see http://www.mongodb.org/display/DOCS/Replica+Set+Internals
-        const unsigned heartbeatSleepMillis;
-        const unsigned heartbeatTimeoutMillis;
-        const unsigned heartbeatConnRetries ;
+        unsigned heartbeatSleepMillis;
+        unsigned heartbeatTimeoutMillis;
+        unsigned heartbeatConnRetries ;
 
         void check() {
             uassert(13112, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
