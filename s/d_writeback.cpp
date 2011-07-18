@@ -129,7 +129,7 @@ namespace mongo {
 
         void help(stringstream& h) const { h<<"internal"; }
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ) {
@@ -168,7 +168,7 @@ namespace mongo {
                  << "This is an internal command";
         }
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             writeBackManager.appendStats( result );
             return true;
         }

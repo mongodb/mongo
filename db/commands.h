@@ -46,15 +46,7 @@ namespace mongo {
 
            return value is true if succeeded.  if false, set errmsg text.
         */
-        // TODO: Consolidate into a single run function
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            return run( db, cmdObj, 0, errmsg, result, fromRepl );
-        }
-
-        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ){
-            massert( 15854, str::stream() << "Command " << name << " has not implemented the default run function.", false );
-            return false;
-        }
+        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) = 0;
 
         /*
            note: logTheTop() MUST be false if READ
@@ -148,7 +140,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const;
         CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+        bool run(const string& dbname, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
     private:
         bool shutdownHelper();
     };

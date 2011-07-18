@@ -25,6 +25,7 @@ namespace mongo {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
     private:
+
         bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
             unsigned id = cmdObj["id"].Int();
             const Member* primary = theReplSet->box.getPrimary();
@@ -66,7 +67,7 @@ namespace mongo {
             return false;
         }
 
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
 
@@ -101,7 +102,7 @@ namespace mongo {
     public:
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
     private:
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             theReplSet->elect.electCmdReceived(cmdObj, &result);

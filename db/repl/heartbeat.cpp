@@ -51,7 +51,7 @@ namespace mongo {
     public:
         virtual bool adminOnly() const { return false; }
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( replSetBlind )
                 return false;
 

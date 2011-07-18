@@ -424,7 +424,7 @@ namespace mongo {
                 string errmsg;
 
                 BSONObjBuilder sub;
-                if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
+                if ( ! c->run( "admin.$cmd" , co , 0, errmsg , sub , false ) )
                     buf.append( cmd , errmsg );
                 else
                     buf.append( cmd , sub.obj() );

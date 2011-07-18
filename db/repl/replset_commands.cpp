@@ -45,7 +45,7 @@ namespace mongo {
             help << "Just for regression tests.\n";
         }
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
@@ -80,7 +80,7 @@ namespace mongo {
             // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
             rbid = (int) curTimeMillis64();
         }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             result.append("rbid",rbid);
@@ -108,7 +108,7 @@ namespace mongo {
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
@@ -128,17 +128,17 @@ namespace mongo {
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
-        virtual bool run(const string& a, BSONObj& b, string& errmsg, BSONObjBuilder& c, bool d) {
+        virtual bool run(const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
             try {
                 rwlock_try_write lk(mutex);
-                return _run(a,b,errmsg,c,d);
+                return _run(a,b,e,errmsg,c,d);
             }
             catch(rwlock_try_write::exception&) { }
             errmsg = "a replSetReconfig is already in progress";
             return false;
         }
     private:
-        bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -209,7 +209,7 @@ namespace mongo {
         }
 
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             int secs = (int) cmdObj.firstElement().numberInt();
@@ -233,7 +233,7 @@ namespace mongo {
         }
 
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             if( !theReplSet->box.getState().primary() ) {

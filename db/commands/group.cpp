@@ -140,7 +140,7 @@ namespace mongo {
             return true;
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             if ( !globalScriptEngine ) {
                 errmsg = "server-side JavaScript execution is disabled";

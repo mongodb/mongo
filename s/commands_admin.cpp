@@ -1148,7 +1148,7 @@ namespace mongo {
              << "either (1) ran from localhost or (2) authenticated.";
     }
 
-    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         return shutdownHelper();
     }
 

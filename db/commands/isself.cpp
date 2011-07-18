@@ -130,7 +130,7 @@ namespace mongo {
             help << "{ _isSelf : 1 } INTERNAL ONLY";
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             init();
             result.append( "id" , _id );
             return true;

@@ -932,7 +932,7 @@ namespace mongo {
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
             virtual LockType locktype() const { return NONE; }
-            bool run(const string& dbname , BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client::GodScope cg;
                 Client& client = cc();
@@ -1116,7 +1116,7 @@ namespace mongo {
             virtual bool slaveOverrideOk() { return true; }
 
             virtual LockType locktype() const { return NONE; }
-            bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
                 bool postProcessOnly = !(postProcessCollection.empty());

@@ -37,7 +37,7 @@ namespace mongo {
         virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             static DBDirectClient db;
 
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
