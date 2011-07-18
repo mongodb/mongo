@@ -1193,7 +1193,13 @@ namespace mongo {
             BSONObjExternalSorter::Data d = i->next();
 
             try {
-                btBuilder.addKey(d.first, d.second);
+                if ( !dupsAllowed && dropDups ) {
+                    LastError::Disabled led( lastError.get() );
+                    btBuilder.addKey(d.first, d.second);
+                }
+                else {
+                    btBuilder.addKey(d.first, d.second);                    
+                }
             }
             catch( AssertionException& e ) {
                 if ( dupsAllowed ) {
@@ -1201,8 +1207,9 @@ namespace mongo {
                     throw;
                 }
 
-                if( e.interrupted() )
-                    throw;
+                if( e.interrupted() ) {
+                    killCurrentOp.checkForInterrupt();
+                }
 
                 if ( ! dropDups )
                     throw;
@@ -1314,12 +1321,21 @@ namespace mongo {
             while ( cc->ok() ) {
                 BSONObj js = cc->current();
                 try {
-                    _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                    {
+                        if ( !dupsAllowed && dropDups ) {
+                            LastError::Disabled led( lastError.get() );
+                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                        }
+                        else {
+                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                        }
+                    }
                     cc->advance();
                 }
                 catch( AssertionException& e ) {
-                    if( e.interrupted() )
-                        throw;
+                    if( e.interrupted() ) {
+                        killCurrentOp.checkForInterrupt();
+                    }
 
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->currLoc();
