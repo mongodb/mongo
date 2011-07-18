@@ -31,10 +31,12 @@ void copy(u_int, u_int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
+void t(int, u_int, int);
 int  usage(void);
 
-u_int	 page_type;				/* Types of records */
 FILE	*res_fp;				/* Results file */
+u_int	 page_type;				/* File types */
+int	 value_unique;				/* Values are unique */
 int	 verbose;				/* -v flag */
 
 const char *progname;				/* Program name */
@@ -42,6 +44,7 @@ const char *progname;				/* Program name */
 int
 main(int argc, char *argv[])
 {
+	u_int ptype;
 	int ch, r;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -50,6 +53,7 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0;
+	ptype = 0;
 	while ((ch = getopt(argc, argv, "r:t:v")) != EOF)
 		switch (ch) {
 		case 'r':
@@ -59,11 +63,11 @@ main(int argc, char *argv[])
 			break;
 		case 't':
 			if (strcmp(optarg, "fix") == 0)
-				page_type = WT_PAGE_COL_FIX;
+				ptype = WT_PAGE_COL_FIX;
 			else if (strcmp(optarg, "var") == 0)
-				page_type = WT_PAGE_COL_VAR;
+				ptype = WT_PAGE_COL_VAR;
 			else if (strcmp(optarg, "row") == 0)
-				page_type = WT_PAGE_ROW_LEAF;
+				ptype = WT_PAGE_ROW_LEAF;
 			else
 				return (usage());
 			break;
@@ -76,10 +80,26 @@ main(int argc, char *argv[])
 		}
 	argc -= optind;
 	argv += optind;
+	if (argc != 0)
+		return (usage());
 
 	printf("salvage test run started\n");
+
+	t(r, ptype, 1);
+	t(r, ptype, 0);
+
+	printf("salvage test run completed\n");
+	return (EXIT_SUCCESS);
+}
+
+void
+t(int r, u_int ptype, int unique)
+{
+	printf("%sunique values\n", unique ? "" : "non-");
+	value_unique = unique;
+
 	if (r == 0) {
-		if (page_type == 0) {
+		if (ptype == 0) {
 			page_type = WT_PAGE_COL_FIX;
 			for (r = 1; r <= 23; ++r)
 				run(r);
@@ -89,23 +109,24 @@ main(int argc, char *argv[])
 				run(r);
 
 			page_type = WT_PAGE_ROW_LEAF;
-			for (r = 1; r <= 21; ++r)
+			for (r = 1; r <= 23; ++r)
 				run(r);
-		} else
-			for (r = 1; r <= 21; ++r)
+		} else {
+			page_type = ptype;
+			for (r = 1; r <= 23; ++r)
 				run(r);
-	} else if (page_type == 0) {
+		}
+	} else if (ptype == 0) {
 		page_type = WT_PAGE_COL_FIX;
 		run(r);
 		page_type = WT_PAGE_COL_VAR;
 		run(r);
 		page_type = WT_PAGE_ROW_LEAF;
 		run(r);
-	}  else
+	}  else {
+		page_type = ptype;
 		run(r);
-
-	printf("salvage test run completed\n");
-	return (EXIT_SUCCESS);
+	}
 }
 
 int
@@ -466,7 +487,8 @@ build(int ikey, int ivalue, int cnt)
 			break;
 		}
 							/* Build the value. */
-		snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", ivalue);
+		snprintf(vbuf, sizeof(vbuf),
+		    "%010d VALUE----", value_unique ? ivalue : 37);
 		value.data = vbuf;
 		value.size = 20;
 		cursor->set_value(cursor, &value);
@@ -591,6 +613,6 @@ print_res(int key, int value, int cnt)
 	for (; cnt > 0; ++key, ++value, --cnt) {
 		if (page_type == WT_PAGE_ROW_LEAF)
 			fprintf(res_fp, "%010d KEY------\n", key);
-		fprintf(res_fp, "%010d VALUE----\n", value);
+		fprintf(res_fp, "%010d VALUE----\n", value_unique ? value : 37);
 	}
 }
