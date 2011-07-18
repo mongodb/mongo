@@ -20,6 +20,7 @@ util_salvage(int argc, char *argv[])
 
 	conn = NULL;
 	name = NULL;
+	debug = 0;
 	while ((ch = getopt(argc, argv, "d")) != EOF)
 		switch (ch) {
 		case 'd':
@@ -39,7 +40,7 @@ util_salvage(int argc, char *argv[])
 		return (EXIT_FAILURE);
 
 	if ((ret = wiredtiger_open(home,
-	    verbose && !debug ? verbose_handler : NULL,
+	    verbose ? verbose_handler : NULL,
 	    debug ? "verbose=[salvage]" : NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
