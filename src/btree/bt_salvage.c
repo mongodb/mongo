@@ -484,14 +484,18 @@ __slvg_trk_leaf(
     WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
+	WT_COL *cip;
 	WT_PAGE *page;
 	WT_TRACK *trk;
-	int ret;
 	uint64_t stop_recno;
 	uint32_t i;
 	uint8_t *p;
+	int ret;
 
 	btree = session->btree;
+	unpack = &_unpack;
 	page = NULL;
 	trk = NULL;
 	ret = 0;
@@ -507,7 +511,6 @@ __slvg_trk_leaf(
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
 		/*
 		 * Column-store fixed-sized format: start and stop keys can be
 		 * taken from the WT_PAGE_DISK header, and they can't contain
@@ -526,6 +529,28 @@ __slvg_trk_leaf(
 
 		if (dsk->type == WT_PAGE_COL_VAR)
 			WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
+		break;
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Column-store RLE format: the start key can be taken from the
+		 * WT_PAGE_DISK header, but the stop key requires walking the
+		 * page.
+		 */
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
+
+		stop_recno = dsk->recno;
+		WT_COL_FOREACH(page, cip, i) {
+			cell = WT_COL_PTR(page, cip);
+			__wt_cell_unpack(cell, unpack);
+			stop_recno += unpack->rle;
+		}
+
+		trk->col_start = dsk->recno;
+		trk->col_stop = stop_recno - 1;
+
+		WT_VERBOSE(session, SALVAGE,
+		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
+		    addr, trk->col_start, trk->col_stop);
 		break;
 	case WT_PAGE_COL_RLE:
 		/*
