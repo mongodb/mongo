@@ -272,8 +272,11 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	const char *name, *treeconf;
 	int ret;
 
+	name = uri;
+	if (!WT_PREFIX_SKIP(name, "file:"))
+		return (EINVAL);
+
 	/* TODO: handle projections. */
-	name = uri + strlen("file:");
 
 	if ((ret = __wt_session_get_btree(session,
 	    name, strlen(name), &btree_session)) == 0)

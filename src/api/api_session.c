@@ -88,15 +88,15 @@ __session_open_cursor(WT_SESSION *wt_session,
 	/* Config parsing is done by each implementation. */
 	WT_UNUSED(cfg);
 
-	if (strncmp(uri, "config:", 7) == 0)
+	if (WT_PREFIX_MATCH(uri, "config:"))
 		ret = __wt_curconfig_open(session, uri, config, cursorp);
-	else if (strncmp(uri, "file:", 5) == 0)
+	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, config, cursorp);
-	else if (strncmp(uri, "index:", 6) == 0)
+	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, config, cursorp);
-	else if (strncmp(uri, "stat:", 5) == 0)
+	else if (WT_PREFIX_MATCH(uri, "stat:"))
 		ret = __wt_curstat_open(session, uri, config, cursorp);
-	else if (strncmp(uri, "table:", 6) == 0)
+	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, config, cursorp);
 	else {
 		__wt_errx(session, "Unknown cursor type '%s'", uri);
@@ -184,11 +184,10 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "file:", 5) != 0) {
+	if (!WT_PREFIX_SKIP(name, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("file:");
 
 	/*
 	 * Open a btree handle.
@@ -227,11 +226,10 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, sync, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "file:", 5) != 0) {
+	if (!WT_PREFIX_SKIP(name, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("file:");
 
 	ret = __wt_session_get_btree(session,
 	    name, strlen(name), &btree_session);
@@ -283,11 +281,10 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (strncmp(name, "file:", 5) != 0) {
+	if (!WT_PREFIX_SKIP(name, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("file:");
 
 	/*
 	 * Open a btree handle.
@@ -330,11 +327,10 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	(void)cfg;
 
-	if (strncmp(name, "file:", 5) != 0) {
+	if (!WT_PREFIX_SKIP(name, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
-	name += strlen("file:");
 
 	/*
 	 * Open a btree handle.

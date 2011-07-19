@@ -39,22 +39,20 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_BTREE *cg;
 	WT_TABLE *table;
 	char *namebuf;
-	const char *tablename;
+	const char *fullname;
 	int i, ret;
 
 	WT_UNUSED(config);
 
+	fullname = name;
 	namebuf = NULL;
 	ret = 0;
 
-	if (strncmp(name, "file:", 5) == 0) {
-		name += strlen("file:");
+	if (WT_PREFIX_SKIP(name, "file:")) {
 		WT_RET(__drop_file(session, name));
-	} else if (strncmp(name, "table:", 6) == 0) {
-		tablename = name + strlen("table:");
-
+	} else if (WT_PREFIX_SKIP(name, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
-		    tablename, strlen(tablename), &table));
+		    name, strlen(name), &table));
 
 		for (i = 0; i < table->ncolgroups; i++) {
 			if ((cg = table->colgroup[i]) == NULL)
@@ -79,9 +77,9 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 		/* TODO: open the indices. */
 
 		WT_ERR(__wt_schema_remove_table(session, table));
-		WT_ERR(__wt_schema_table_remove(session, name));
+		WT_ERR(__wt_schema_table_remove(session, fullname));
 	} else {
-		__wt_errx(session, "Unknown object type: %s", name);
+		__wt_errx(session, "Unknown object type: %s", fullname);
 		return (EINVAL);
 	}
 

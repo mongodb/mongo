@@ -52,7 +52,9 @@ __create_colgroup(
 	int ret;
 
 	cgconf = namebuf = NULL;
-	tablename = name + strlen("colgroup:");
+	tablename = name;
+	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
+		return (EINVAL);
 	cgname = strchr(tablename, ':');
 	if (cgname != NULL) {
 		tlen = (size_t)(cgname - tablename);
@@ -137,7 +139,9 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	int ret;
 
 	idxconf = namebuf = NULL;
-	tablename = name + strlen("index:");
+	tablename = name;
+	if (!WT_PREFIX_SKIP(tablename, "index:"))
+		return (EINVAL);
 	idxname = strchr(tablename, ':');
 	if (idxname == NULL) {
 		__wt_errx(session, "Invalid index name, "
@@ -232,17 +236,15 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	if (strncmp(name, "colgroup:", 6) == 0)
+	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
-	else if (strncmp(name, "file:", 5) == 0)
-		return (__create_file(session,
-		    name + strlen("file:"), 0, config));
-	else if (strncmp(name, "index:", 6) == 0)
+	else if (WT_PREFIX_SKIP(name, "file:"))
+		return (__create_file(session, name, 0, config));
+	else if (WT_PREFIX_MATCH(name, "index:"))
 		return (__create_index(session, name, config));
-	else if (strncmp(name, "schema:", 7) == 0)
-		return (__create_file(session,
-		    name + strlen("schema:"), 1, config));
-	else if (strncmp(name, "table:", 6) == 0)
+	else if (WT_PREFIX_SKIP(name, "schema:"))
+		return (__create_file(session, name, 1, config));
+	else if (WT_PREFIX_MATCH(name, "table:"))
 		return (__create_table(session, name, config));
 	else {
 		__wt_errx(session, "Unknown object type: %s", name);
