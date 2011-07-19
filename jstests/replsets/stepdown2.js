@@ -1,4 +1,4 @@
-
+print("\nstepdown2.js");
 
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();
@@ -17,12 +17,12 @@ printjson( locked.getDB("admin").runCommand({fsync : 1, lock : 1}) );
 
 print("\nwaiting 11ish seconds");
 
-sleep(2000);
+sleep(3003);
 
 for (var i = 0; i < 11; i++) {
     // do another write
     master.getDB("foo").bar.insert({x:i});
-    sleep(1000);
+    sleep(1008);
 }
 
 print("\n do stepdown that should not work");
@@ -123,8 +123,8 @@ catch (e) {
 }
 assert(thrown);
 
-print("\nOK 1");
+print("\nOK 1 stepdown2.js");
 
 replTest.stopSet();
 
-print("OK 2");
+print("\nOK 2 stepdown2.js");
