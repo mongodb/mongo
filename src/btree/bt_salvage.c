@@ -1122,8 +1122,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	skip = (uint32_t)(trk->col_start - page->u.col_leaf.recno);
-	take = (uint32_t)(trk->col_stop - trk->col_start) + 1;
+	skip = trk->col_start - page->u.col_leaf.recno;
+	take = (trk->col_stop - trk->col_start) + 1;
 
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] merge discarding first %" PRIu64 " records, "
@@ -1140,7 +1140,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 		 * to reference only the K/V pairs we care about.
 		 */
 		page->u.col_leaf.d += skip;
-		page->entries = take;
+		page->entries = (uint32_t)take;
 		break;
 	case WT_PAGE_COL_RLE:
 		/*
