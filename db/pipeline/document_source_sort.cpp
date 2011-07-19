@@ -91,7 +91,7 @@ namespace mongo {
     DocumentSourceSort::DocumentSourceSort(
 	const intrusive_ptr<ExpressionContext> &pTheCtx):
         populated(false),
-        limit(INT_MAX),
+        limit(LONG_MAX),
         skip(0),
         count(0),
         pCtx(pTheCtx) {
