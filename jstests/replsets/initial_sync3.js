@@ -91,6 +91,8 @@ assert.soon(function() {
     return true;
 });
 
+rs2.awaitReplication();
+
 // test partitioning
 master = rs2.bridge();
 rs2.partition(0, 2);
