@@ -950,6 +950,10 @@ printjsononeline = function(x){
     print( tojsononeline( x ) );
 }
 
+testLog = function(x){
+    print( TestData.testFile + " - " + x )
+}
+
 shellPrintHelper = function (x) {
 
     if (typeof (x) == "undefined") {
