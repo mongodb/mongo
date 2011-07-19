@@ -113,15 +113,24 @@ assert.eq(result.ok, 0);
 
 print("\nsend shutdown command");
 
-var thrown = false;
+var currentMaster = replTest.getMaster();
 try {
-    replTest.getMaster().getDB("admin").runCommand({shutdown : 1, force : true});
+    printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }
 catch (e) {
     print(e);
-    thrown = true;
 }
-assert(thrown);
+
+print("checking "+currentMaster+" is actually shutting down");
+assert.soon(function() {
+    try {
+        currentMaster.findOne();
+    }
+    catch(e) {
+        return true;
+    }
+    return false;
+});
 
 print("\nOK 1 stepdown2.js");
 
