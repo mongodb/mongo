@@ -1,4 +1,7 @@
-
+/* check that on a loss of primary, another node doesn't assume primary if it is stale 
+   we force a stepDown to test this
+   we use lock+fsync to force secondary to be stale
+*/
 
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();
