@@ -14,10 +14,10 @@ import wiredtiger
 from wiredtiger import WT_NOTFOUND
 import wttest
 
-class test_empty(wttest.WiredTigerTestCase):
+class test004(wttest.WiredTigerTestCase):
 	'''Test various tree types becoming empty'''
 
-	tablename = 'table:test_empty'
+	tablename = 'table:test004'
 
 	def reopen(self):
 		self.conn.close()

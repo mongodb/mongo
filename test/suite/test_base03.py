@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test003.py
+# test_base03.py
 # 	Cursor operations
 #
 
@@ -13,14 +13,14 @@ import unittest
 import wiredtiger
 import wttest
 
-class test003(wttest.WiredTigerTestCase):
+class test_base03(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test003a'
-    table_name2 = 'test003b'
-    table_name3 = 'test003c'
-    table_name4 = 'test003d'
+    table_name1 = 'test_base03a'
+    table_name2 = 'test_base03b'
+    table_name3 = 'test_base03c'
+    table_name4 = 'test_base03d'
     nentries = 10
 
     def create_table(self, tablename):

@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test001.py
+# test_base01.py
 # 	Basic operations
 #
 
@@ -13,12 +13,12 @@ import unittest
 import wiredtiger
 import wttest
 
-class test001(wttest.WiredTigerTestCase):
+class test_base01(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test001a.wt'
-    table_name2 = 'test001b.wt'
+    table_name1 = 'test_base01a.wt'
+    table_name2 = 'test_base01b.wt'
 
     def create_table(self, tablename):
         extra_params = ',internal_node_min=512,internal_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
@@ -77,7 +77,6 @@ class test001(wttest.WiredTigerTestCase):
         self.assertTrue(getcursor.get_value(), 'value1')
         self.pr('closing cursor')
         getcursor.close(None)
-
 
 if __name__ == '__main__':
     wttest.run()

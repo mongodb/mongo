@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test002.py
+# test_base02.py
 # 	Configuration
 #
 
@@ -16,21 +16,16 @@ import wiredtiger
 import wttest
 import json
 
-class test002(wttest.WiredTigerTestCase):
+class test_base02(wttest.WiredTigerTestCase):
     """
     Test configuration strings
     """
-    table_name1 = 'test002a'
+    table_name1 = 'test_base02a'
 
     def create_and_drop_table(self, tablename, confstr):
         self.pr('create_table with config:\n      ' + confstr)
         self.session.create('table:' + tablename, confstr)
-
-        #### Drop table not implemented, instead, we're able to explicitly remove the file
         self.session.drop('table:' + tablename, None)
-
-        import subprocess                          #### added
-        subprocess.call(["rm", "-f", tablename])   #### added
 
     def test_config_combinations(self):
         """
