@@ -1,6 +1,14 @@
 
 try {
 
+    function getProfileAString() {
+        var s = "\n";
+        db.system.profile.find().forEach( function(z){
+            s += tojson( z ) + " ,\n" ;
+        } );
+        return s;
+    }
+
     /* With pre-created system.profile (capped) */
     db.runCommand({profile: 0});
     db.getCollection("system.profile").drop();
@@ -58,14 +66,14 @@ try {
     db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
-    assert.eq( before + 1 , after , "X2" )
+    assert.eq( before + 1 , after , "X2 : " + getProfileAString() )
 
     db.setProfilingLevel(1,20);
     before = db.system.profile.count();
     db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
-    assert.eq( before + 2 , after , "X3" )
+    assert.eq( before + 2 , after , "X3 : " + getProfileAString() )
     
     
     db.profile.drop();
@@ -79,7 +87,6 @@ try {
     assert.eq( "update" , r.op , "Y3" );
     assert.eq( "test.profile1" , r.ns , "Y4" );
     
-
 } finally {
     // disable profiling for subsequent tests
     assert.commandWorked( db.runCommand( {profile:0} ) );
