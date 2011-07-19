@@ -33,6 +33,7 @@ assert.eq(modes.important.machine, 3);
 assert.eq(modes["a machine"]["machine"], 1);
 
 config.version++;
+config.members[1].priority = 1.5;
 config.members[2].priority = 2;
 modes.rack = {"dc.sf" : 1};
 modes.niceRack = {"dc.sf" : 2};
@@ -129,8 +130,11 @@ assert.eq(result.err, null);
 
 replTest.unPartition(1,3);
 
+replTest.partition(2, 0);
+replTest.partition(2, 1);
 replTest.stop(2);
 
+print("1 must become primary here because otherwise the other members will take too long timing out their old sync threads");
 master = replTest.getMaster();
 
 print("test6");
