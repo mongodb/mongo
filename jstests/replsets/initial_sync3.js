@@ -78,17 +78,18 @@ catch(e) {
 
 // wait for a heartbeat, too, just in case sync happens before hb
 assert.soon(function() {
-    var status = master.getDB("admin").runCommand({replSetGetStatus : 1});
-    for (var m in status.members) {
-        if (status.members[m].health == 0) {
-            print(status.members[m].name+" is down");
-            return false;
+    try {
+      for (var n in rs2.nodes) {
+        if (rs2.nodes[n].getDB("local").system.replset.findOne().version != 2) {
+          return false;
         }
+      }
+    }
+    catch (e) {
+      return false;
     }
     return true;
 });
-
-rs2.awaitReplication();
 
 // test partitioning
 master = rs2.bridge();
