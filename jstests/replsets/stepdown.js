@@ -1,4 +1,4 @@
-/* check that on a loss of primary, another node doesn't assume primary if it is stale 
+/* check that on a loss of primary, another node doesn't assume primary if it is stale
    we force a stepDown to test this
    we use lock+fsync to force secondary to be stale
 */
@@ -116,15 +116,24 @@ assert.eq(result.ok, 0);
 
 print("\nsend shutdown command");
 
-var thrown = false;
+var currentMaster = replTest.getMaster();
 try {
-    replTest.getMaster().getDB("admin").runCommand({shutdown : 1, force : true});
+    printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }
 catch (e) {
     print(e);
-    thrown = true;
 }
-assert(thrown);
+
+print("checking "+currentMaster+" is actually shutting down");
+assert.soon(function() {
+    try {
+        currentMaster.findOne();
+    }
+    catch(e) {
+        return true;
+    }
+    return false;
+});
 
 print("\nOK 1");
 
