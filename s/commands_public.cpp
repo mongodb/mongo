@@ -117,7 +117,7 @@ namespace mongo {
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, 0 ) );
                 }
 
                 vector<BSONObj> results;
@@ -850,7 +850,7 @@ namespace mongo {
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, options ) );
                     shardArray.append(i->getName());
                 }
 
@@ -1023,7 +1023,7 @@ namespace mongo {
                     for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                         shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , fullns ) );
                         assert( temp->get() );
-                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , temp->get() ) );
+                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , 0 , temp->get() ) );
                         shardConns.push_back( temp );
                     }
                     
@@ -1214,7 +1214,7 @@ namespace mongo {
                         BSONObj finalCmdObj = finalCmd.obj();
                         for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                             shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , outns ) );
-                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , temp->get() ) );
+                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , 0 , temp->get() ) );
                             shardConns.push_back( temp );
                         }
 

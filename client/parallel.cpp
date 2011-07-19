@@ -410,6 +410,7 @@ namespace mongo {
         }
     }
 
+    // TODO:  Merge with futures API?  We do a lot of error checking here that would be useful elsewhere.
     void ParallelSortClusteredCursor::_init() {
 
         // log() << "Starting parallel search..." << endl;
@@ -720,8 +721,8 @@ namespace mongo {
     // ---- Future -----
     // -----------------
 
-    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn )
-        :_server(server) ,_db(db) ,_cmd(cmd) ,_conn(conn) ,_done(false)
+    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn )
+        :_server(server) ,_db(db) , _options(options), _cmd(cmd) ,_conn(conn) ,_done(false)
     {
         try {
             if ( ! _conn ){
@@ -729,7 +730,7 @@ namespace mongo {
                 _conn = _connHolder->get();
             }
             
-            _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1/*limit*/, 0, NULL, 0, 0));
+            _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1/*limit*/, 0, NULL, _options, 0));
             _cursor->initLazy();
         }
         catch ( std::exception& e ) {
@@ -768,8 +769,8 @@ namespace mongo {
         return _ok;
     }
 
-    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
-        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , conn  ));
+    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn ) {
+        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , options , conn  ));
         return res;
     }
 
