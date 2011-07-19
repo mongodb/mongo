@@ -272,10 +272,10 @@ namespace mongo {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         if (!force && theReplSet && theReplSet->isPrimary()) {
-            int timeout, now, start;
+            long long timeout, now, start;
             timeout = now = start = curTimeMicros64()/1000000;
             if (cmdObj.hasField("timeoutSecs")) {
-                timeout += cmdObj["timeoutSecs"].numberInt();
+                timeout += cmdObj["timeoutSecs"].numberLong();
             }
 
             OpTime lastOp = theReplSet->lastOpTimeWritten;

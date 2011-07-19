@@ -272,6 +272,11 @@ uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
 }
 }  // end namespace internal
 
+#if defined(_WIN32)
+// signed/unsigned mismatch
+# pragma warning( disable : 4244 )
+#endif
+
 // For 0 <= offset <= 4, GetUint32AtOffset(UNALIGNED_LOAD64(p), offset) will
 // equal UNALIGNED_LOAD32(p + offset).  Motivation: On x86-64 hardware we have
 // empirically found that overlapping loads such as
