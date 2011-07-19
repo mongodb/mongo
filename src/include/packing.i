@@ -75,8 +75,9 @@ next:	if (pack->cur == pack->end)
 	pv->type = *pack->cur++;
 
 	switch (pv->type) {
-	case 'x':
 	case 'S':
+	case 's':
+	case 'x':
 		return (0);
 	case 't':
 		if (pv->size < 1 || pv->size > 8) {
@@ -160,6 +161,7 @@ next:	if (pack->cur == pack->end)
 static inline size_t
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 {
+	const char *p, *start, *end;
 	size_t s, pad;
 
 	switch (pv->type) {
@@ -171,14 +173,17 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		 * XXX if pv->havesize, only want to know if there is a
 		 * '\0' in the first pv->size characters.
 		 */
-		s = strlen(pv->u.s);
-		if ((pv->type == 's' || pv->havesize) && pv->size < s) {
-			s = pv->size;
-			pad = 0;
-		} else if (pv->havesize)
+		if (pv->type == 's' || pv->havesize) {
+			p = start = (const char *)pv->u.s;
+			end = start + pv->size;
+			while (p < end && *p != '\0')
+				p++;
+			s = (size_t)(p - start);
 			pad = pv->size - s;
-		else
+		} else {
+			s = strlen(pv->u.s);
 			pad = 1;
+		}
 		return (s + pad);
 	case 'U':
 	case 'u':
