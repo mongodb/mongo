@@ -221,6 +221,30 @@ namespace mongo {
         return pValue;
     }
 
+    Value::Value(const Date_t &value):
+        type(Date),
+        pDocumentValue(),
+        vpValue() {
+        dateValue = value;
+    }
+
+    shared_ptr<const Value> Value::createDate(const Date_t &value) {
+        shared_ptr<const Value> pValue(new Value(value));
+        return pValue;
+    }
+
+    Value::Value(const string &value):
+        type(String),
+        pDocumentValue(),
+        vpValue() {
+        stringValue = value;
+    }
+
+    shared_ptr<const Value> Value::createString(const string &value) {
+        shared_ptr<const Value> pValue(new Value(value));
+        return pValue;
+    }
+
     Value::Value(const shared_ptr<Document> &pDocument):
         type(Object),
         pDocumentValue(pDocument),
@@ -576,6 +600,56 @@ namespace mongo {
         } // switch(type)
 
         return (double)0;
+    }
+
+    Date_t Value::coerceToDate() const {
+        switch(type) {
+
+        case Date:
+            return dateValue; 
+
+	case jstNULL:
+	case Undefined:
+	    break;
+
+        default:
+            assert(false); // CW TODO no conversion available
+        } // switch(type)
+
+            assert(false); // CW TODO no conversion available
+        return jstNULL; 
+    }
+
+    string Value::coerceToString() const {
+        stringstream ss;
+        switch(type) {
+        case NumberDouble:
+            ss << simple.doubleValue;
+            return ss.str();
+
+        case NumberInt:
+            ss << simple.intValue;
+            return ss.str();
+
+        case NumberLong:
+            ss << simple.longValue;
+            return ss.str();
+
+        case String:
+            return stringValue;
+
+        case Date:
+            return dateValue.toString();
+
+	case jstNULL:
+	case Undefined:
+	    break;
+
+        default:
+            assert(false); // CW TODO no conversion available
+        } // switch(type)
+
+        return "";
     }
 
     int Value::compare(const shared_ptr<const Value> &rL,

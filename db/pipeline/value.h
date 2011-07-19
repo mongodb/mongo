@@ -94,6 +94,22 @@ namespace mongo {
         static shared_ptr<const Value> createDouble(double value);
 
         /*
+          Construct a string-valued Value.
+
+          @param value the value
+          @returns a Value with the given value
+        */
+        static shared_ptr<const Value> createString(const string &value);
+
+        /*
+          Construct a date-valued Value.
+
+          @param value the value
+          @returns a Value with the given value
+        */
+        static shared_ptr<const Value> createDate(const Date_t &value);
+
+        /*
           Construct a document-valued Value.
 
           @param value the value
@@ -198,6 +214,20 @@ namespace mongo {
         double coerceToDouble() const;
 
         /*
+          Coerce (cast) a value to a date, using JSON rules.
+
+          @returns the date value
+        */
+        Date_t coerceToDate() const;
+
+        /*
+          Coerce (cast) a value to a string, using JSON rules.
+
+          @returns the date value
+        */
+        string coerceToString() const;
+
+        /*
           Compare two Values.
 
           @param rL left value
@@ -253,6 +283,8 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
+        Value(const Date_t &dateValue);
+        Value(const string &stringValue);
         Value(const shared_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 

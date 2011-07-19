@@ -181,19 +181,32 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
+        {"$dayOfMonth", ExpressionDayOfMonth::create},
+        {"$dayOfWeek", ExpressionDayOfWeek::create},
+        {"$dayOfYear", ExpressionDayOfYear::create},
         {"$divide", ExpressionDivide::create},
         {"$eq", ExpressionCompare::createEq},
         {"$gt", ExpressionCompare::createGt},
         {"$gte", ExpressionCompare::createGte},
-        {"$ifnull", ExpressionIfNull::create},
+        {"$hour", ExpressionHour::create},
+        {"$ifNull", ExpressionIfNull::create},
         {"$lt", ExpressionCompare::createLt},
         {"$lte", ExpressionCompare::createLte},
+        {"$minute", ExpressionMinute::create},
         {"$mod", ExpressionMod::create},
+        {"$month", ExpressionMonth::create},
         {"$multiply", ExpressionMultiply::create},
         {"$ne", ExpressionCompare::createNe},
         {"$not", ExpressionNot::create},
         {"$or", ExpressionOr::create},
+        {"$second", ExpressionSecond::create},
+        {"$strcasecmp", ExpressionStrcasecmp::create},
+        {"$substr", ExpressionSubstr::create},
         {"$subtract", ExpressionSubtract::create},
+        {"$toLower", ExpressionToLower::create},
+        {"$toUpper", ExpressionToUpper::create},
+        {"$week", ExpressionWeek::create},
+        {"$year", ExpressionYear::create},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -311,11 +324,54 @@ namespace mongo {
           and integral types in parallel, tracking the current narrowest
           type.
          */
+        unsigned stringCount = 0;
+        unsigned dateCount = 0;
+        const size_t n = vpOperand.size();
+
+        for (size_t i = 0; i < n; ++i) {
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            if (pValue->getType() == String)
+                ++stringCount;
+            if (pValue->getType() == Date) {
+                ++dateCount;
+            }
+        }
+        /* 
+        We don't allow adding two dates because it doesn't make sense especially
+        since they are in epoch time. However, if there is a string present then
+        we would be appending the dates to a string so having many would not be 
+        not a problem.
+        */
+        if ((dateCount > 1) && !stringCount){
+            assert(false); // CW TODO user error: can't add two dates
+            return Value::getNull();
+        }
+            
+        
+        if (stringCount) {
+            stringstream stringTotal;
+            for (size_t i = 0; i < n; ++i) {
+                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                stringTotal << pValue->coerceToString();
+            }
+            return Value::createString(stringTotal.str());
+        }
+
+        if (dateCount) {
+            long long dateTotal = 0;
+            for (size_t i = 0; i < n; ++i) {
+                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                if (pValue->getType() == Date) 
+                    dateTotal += pValue->coerceToDate();
+                else 
+                    dateTotal += pValue->coerceToDouble()*24*60*60*1000;
+            }
+            return Value::createDate(Date_t(dateTotal));
+        }
+
         double doubleTotal = 0;
         long long longTotal = 0;
         BSONType totalType = NumberInt;
-
-        const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
 
@@ -751,6 +807,102 @@ namespace mongo {
 	return NULL;
     }
 
+    /* ------------------------- ExpressionDayOfMonth ----------------------------- */
+
+    ExpressionDayOfMonth::~ExpressionDayOfMonth() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
+        shared_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
+        return pExpression;
+    }
+
+    ExpressionDayOfMonth::ExpressionDayOfMonth():
+        ExpressionNary() {
+    }
+
+    void ExpressionDayOfMonth::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDayOfMonth::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_mday); 
+    }
+
+    const char *ExpressionDayOfMonth::getOpName() const {
+	return "$dayOfMonth";
+    }
+
+    /* ------------------------- ExpressionDayOfWeek ----------------------------- */
+
+    ExpressionDayOfWeek::~ExpressionDayOfWeek() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
+        shared_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
+        return pExpression;
+    }
+
+    ExpressionDayOfWeek::ExpressionDayOfWeek():
+        ExpressionNary() {
+    }
+
+    void ExpressionDayOfWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDayOfWeek::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
+    }
+
+    const char *ExpressionDayOfWeek::getOpName() const {
+	return "$dayofweek";
+    }
+
+    /* ------------------------- ExpressionDayOfYear ----------------------------- */
+
+    ExpressionDayOfYear::~ExpressionDayOfYear() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionDayOfYear::create() {
+        shared_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
+        return pExpression;
+    }
+
+    ExpressionDayOfYear::ExpressionDayOfYear():
+        ExpressionNary() {
+    }
+
+    void ExpressionDayOfYear::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionDayOfYear::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
+    }
+
+    const char *ExpressionDayOfYear::getOpName() const {
+	return "$dayOfYear";
+    }
+
     /* ----------------------- ExpressionDivide ---------------------------- */
 
     ExpressionDivide::~ExpressionDivide() {
@@ -821,7 +973,7 @@ namespace mongo {
 	const shared_ptr<Document> &pResult,
         const shared_ptr<Document> &pDocument) const {
 	const size_t pathSize = path.size();
-	set<string>::iterator end(path.end());
+	set<string>::const_iterator end(path.end());
 
 	/*
 	  Take care of inclusions or exclusions.  Note that _id is special,
@@ -1105,7 +1257,7 @@ namespace mongo {
 	  fields are listed in the result.  That comes from the underlying
 	  Document they are fetched from.
 	 */
-	for(set<string>::iterator end(path.end()),
+	for(set<string>::const_iterator end(path.end()),
 		iter(path.begin()); iter != end; ++iter) {
 
 	    /* find the matching field description */
@@ -1157,7 +1309,7 @@ namespace mongo {
 
 	/* then add any expressions */
 	const size_t nField = vFieldName.size();
-	const set<string>::iterator pathEnd(path.end());
+	const set<string>::const_iterator pathEnd(path.end());
 	for(size_t iField = 0; iField < nField; ++iField) {
 	    string fieldName(vFieldName[iField]);
 
@@ -1599,6 +1751,38 @@ namespace mongo {
 	return true;
     }
 
+    /* ------------------------- ExpressionMinute ----------------------------- */
+
+    ExpressionMinute::~ExpressionMinute() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMinute::create() {
+        shared_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
+        return pExpression;
+    }
+
+    ExpressionMinute::ExpressionMinute():
+        ExpressionNary() {
+    }
+
+    void ExpressionMinute::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMinute::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_min);
+    }
+
+    const char *ExpressionMinute::getOpName() const {
+	return "$minute";
+    }
+
     /* ----------------------- ExpressionMod ---------------------------- */
 
     ExpressionMod::~ExpressionMod() {
@@ -1640,6 +1824,38 @@ namespace mongo {
 
     const char *ExpressionMod::getOpName() const {
 	return "$mod";
+    }
+
+    /* ------------------------- ExpressionMonth ----------------------------- */
+
+    ExpressionMonth::~ExpressionMonth() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionMonth::create() {
+        shared_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
+        return pExpression;
+    }
+
+    ExpressionMonth::ExpressionMonth():
+        ExpressionNary() {
+    }
+
+    void ExpressionMonth::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionMonth::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_mon+1); // MySQL uses 1-12 tm uses 0-11
+    }
+
+    const char *ExpressionMonth::getOpName() const {
+	return "$month";
     }
 
     /* ------------------------- ExpressionMultiply ----------------------------- */
@@ -1692,6 +1908,38 @@ namespace mongo {
     return ExpressionMultiply::create;
     }
 
+    /* ------------------------- ExpressionHour ----------------------------- */
+
+    ExpressionHour::~ExpressionHour() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionHour::create() {
+        shared_ptr<ExpressionHour> pExpression(new ExpressionHour());
+        return pExpression;
+    }
+
+    ExpressionHour::ExpressionHour():
+        ExpressionNary() {
+    }
+
+    void ExpressionHour::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionHour::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_hour);
+    }
+
+    const char *ExpressionHour::getOpName() const {
+	return "$hour";
+    }
+
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
     ExpressionIfNull::~ExpressionIfNull() {
@@ -1726,7 +1974,7 @@ namespace mongo {
     }
 
     const char *ExpressionIfNull::getOpName() const {
-	return "$ifnull";
+	return "$ifNull";
     }
 
     /* ------------------------ ExpressionNary ----------------------------- */
@@ -2013,6 +2261,123 @@ namespace mongo {
 	return "$or";
     }
 
+    /* ------------------------- ExpressionSecond ----------------------------- */
+
+    ExpressionSecond::~ExpressionSecond() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSecond::create() {
+        shared_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
+        return pExpression;
+    }
+
+    ExpressionSecond::ExpressionSecond():
+        ExpressionNary() {
+    }
+
+    void ExpressionSecond::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSecond::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_sec);
+    }
+
+    const char *ExpressionSecond::getOpName() const {
+	return "$second";
+    }
+
+    /* ----------------------- ExpressionStrcasecmp ---------------------------- */
+
+    ExpressionStrcasecmp::~ExpressionStrcasecmp() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
+        shared_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
+        return pExpression;
+    }
+
+    ExpressionStrcasecmp::ExpressionStrcasecmp():
+        ExpressionNary() {
+    }
+
+    void ExpressionStrcasecmp::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 2); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionStrcasecmp::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 2); // CW TODO user error
+        shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
+
+        /* boost::iequals returns a bool not an int so strings must actually be allocated */
+        string str1 = boost::to_upper_copy( pString1->coerceToString() );
+        string str2 = boost::to_upper_copy( pString2->coerceToString() );
+        int result = str1.compare(str2);
+
+        if (result == 0)
+            return Value::getZero();
+        if (result > 0)
+            return Value::getOne();
+        return Value::getMinusOne();
+    }
+
+    const char *ExpressionStrcasecmp::getOpName() const {
+	return "$strcasecmp";
+    }
+
+    /* ----------------------- ExpressionSubstr ---------------------------- */
+
+    ExpressionSubstr::~ExpressionSubstr() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionSubstr::create() {
+        shared_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
+        return pExpression;
+    }
+
+    ExpressionSubstr::ExpressionSubstr():
+        ExpressionNary() {
+    }
+
+    void ExpressionSubstr::addOperand(
+	const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 3); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionSubstr::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 3); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
+        shared_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
+
+        string str = pString->coerceToString();
+        assert(pLower->getType() == NumberInt 
+            || pLower->getType() == NumberLong 
+            || pLower->getType() == NumberDouble); // CW TODO user error lower must be numeric
+        assert(pLength->getType() == NumberInt 
+            || pLength->getType() == NumberLong 
+            || pLength->getType() == NumberDouble); // CW TODO user error length must be numeric
+        long lower = pLower->coerceToLong();
+        long length = pLength->coerceToLong();
+        return Value::createString( str.substr(lower, length) );
+    }
+
+    const char *ExpressionSubstr::getOpName() const {
+	return "$substr";
+    }
+
     /* ----------------------- ExpressionSubtract ---------------------------- */
 
     ExpressionSubtract::~ExpressionSubtract() {
@@ -2035,18 +2400,179 @@ namespace mongo {
 
     shared_ptr<const Value> ExpressionSubtract::evaluate(
         const shared_ptr<Document> &pDocument) const {
+        BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        if (pLeft->getType() == Date) {
+            long right;
+            long left = pLeft->coerceToDate();
+            if (pRight->getType() == Date)
+                right = pRight->coerceToDate();
+            else 
+                right = pRight->coerceToDouble()*24*60*60*1000;
+            return Value::createDate(Date_t(left-right));
+        }
+            
+        if (pRight->getType() == Date){
+            assert(false); //CW TODO user error
+            return Value::getNull();
+        }
 
-        double right = pRight->coerceToDouble();
+        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+        
 
-        double left = pLeft->coerceToDouble();
+        if (productType == NumberDouble) {
+            double right = pRight->coerceToDouble();
+            double left = pLeft->coerceToDouble();
+            return Value::createDouble(left - right);
+        } 
 
-        return Value::createDouble(left - right);
+        long right = pRight->coerceToLong();
+        long left = pLeft->coerceToLong();
+        if (productType == NumberLong)
+            return Value::createLong(left - right);
+        return Value::createInt((int)(left - right));
     }
 
     const char *ExpressionSubtract::getOpName() const {
-	return "$divide";
+	return "$subtract";
+    }
+
+    /* ------------------------- ExpressionToLower ----------------------------- */
+
+    ExpressionToLower::~ExpressionToLower() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionToLower::create() {
+        shared_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
+        return pExpression;
+    }
+
+    ExpressionToLower::ExpressionToLower():
+        ExpressionNary() {
+    }
+
+    void ExpressionToLower::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionToLower::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        string str = pString->coerceToString();
+        boost::to_lower(str);
+        return Value::createString(str);
+    }
+
+    const char *ExpressionToLower::getOpName() const {
+	return "$toLower";
+    }
+
+    /* ------------------------- ExpressionToUpper ----------------------------- */
+
+    ExpressionToUpper::~ExpressionToUpper() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionToUpper::create() {
+        shared_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
+        return pExpression;
+    }
+
+    ExpressionToUpper::ExpressionToUpper():
+        ExpressionNary() {
+    }
+
+    void ExpressionToUpper::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionToUpper::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        string str = pString->coerceToString();
+        boost::to_upper(str);
+        return Value::createString(str);
+    }
+
+    const char *ExpressionToUpper::getOpName() const {
+	return "$toUpper";
+    }
+
+    /* ------------------------- ExpressionWeek ----------------------------- */
+
+    ExpressionWeek::~ExpressionWeek() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionWeek::create() {
+        shared_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
+        return pExpression;
+    }
+
+    ExpressionWeek::ExpressionWeek():
+        ExpressionNary() {
+    }
+
+    void ExpressionWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionWeek::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        int dayOfWeek = date.tm_wday+1;
+        int dayOfYear = date.tm_yday;
+        int week = 0;
+        int janFirst = 0;
+        int offset = 0;
+
+        janFirst = dayOfWeek - dayOfYear % 7;
+        offset = (janFirst + 6) % 7;
+        week = (dayOfYear + offset) / 7;
+        return Value::createInt(week);
+    }
+
+    const char *ExpressionWeek::getOpName() const {
+	return "$week";
+    }
+
+    /* ------------------------- ExpressionYear ----------------------------- */
+
+    ExpressionYear::~ExpressionYear() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionYear::create() {
+        shared_ptr<ExpressionYear> pExpression(new ExpressionYear());
+        return pExpression;
+    }
+
+    ExpressionYear::ExpressionYear():
+        ExpressionNary() {
+    }
+
+    void ExpressionYear::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionYear::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        tm date;
+        (pDate->coerceToDate()).toTm(&date);
+        return Value::createInt(date.tm_year+1900); // tm_year is years since 1900
+    }
+
+    const char *ExpressionYear::getOpName() const {
+	return "$year";
     }
 }

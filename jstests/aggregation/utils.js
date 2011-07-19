@@ -126,7 +126,8 @@ function arrayEq(al, ar, v) {
 	return false;
     }
 
-    var i, j = 0;
+    var i = 0;
+    var j = 0;
     while ( i < al.length ) {
         if (anyEq(al[i], ar[j], v) ) {
             j = 0;

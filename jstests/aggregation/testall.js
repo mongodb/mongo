@@ -27,7 +27,8 @@ var p1result = [
         "pageViews" : 5,
         "tags" : [
             "fun",
-            "good"
+            "good",
+            "fun"
         ]
     },
     {
@@ -73,6 +74,12 @@ var p2result = [
         "author" : "bob",
         "pageViews" : 5,
         "tag" : "good"
+    },
+    {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "pageViews" : 5,
+        "tag" : "fun"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
@@ -192,6 +199,14 @@ var p5result = [
         }
     },
     {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "subDocument" : {
+            "foo" : 5,
+            "bar" : "fun"
+        }
+    },
+    {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
         "author" : "dave",
         "subDocument" : {
@@ -265,6 +280,14 @@ var p6result = [
         "weLikeIt" : true
     },
     {
+        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "author" : "bob",
+        "pageViews" : 5,
+        "tag" : "fun",
+        "daveWroteIt" : false,
+        "weLikeIt" : false
+    },
+    {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
         "author" : "dave",
         "pageViews" : 7,
@@ -301,12 +324,12 @@ var p6result = [
 assert(arrayEq(p6.result, p6result), 'p6 failed');
 
 
-// slightly more complex computed expression; $ifnull
+// slightly more complex computed expression; $ifNull
 var p7 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theSum : { $add:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -364,6 +387,18 @@ var p8result = [
             }
         ],
         "tag" : "good"
+    },
+    {
+        "author" : "bob",
+        "comments" : [
+            {
+                "author" : "joe"
+            },
+            {
+                "author" : "sam"
+            }
+        ],
+        "tag" : "fun"
     },
     {
         "author" : "dave",
@@ -459,8 +494,9 @@ assert(arrayEq(p9.result, p9result), 'p9 failed');
 var p10 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $sort : {
-	title : 1
-    }}
+	key: {
+        title : 1
+    }}}
 ]});
 
 var p10result = [
@@ -472,7 +508,8 @@ var p10result = [
         "pageViews" : 5,
         "tags" : [
             "fun",
-            "good"
+            "good",
+            "fun"
         ],
         "comments" : [
             {
@@ -587,7 +624,7 @@ var p12 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theProduct : { $multiply:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -615,7 +652,7 @@ var p13 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	theDifference : { $subtract:["$pageViews",
-			 { $ifnull:["$other.foo",
+			 { $ifNull:["$other.foo",
 				    "$other.bar"] } ] }
     }}
 ]});
@@ -636,6 +673,232 @@ var p13result = [
 ];
 
 assert(arrayEq(p13.result, p13result), 'p13 failed');
+
+
+// mod test
+var p14 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	theRemainder : { $mod:[
+	    { $ifNull:["$other.foo",
+		    "$other.bar"] },
+                "$pageViews", ] }
+    }}
+]});
+
+var p14result = [
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce6"),
+        "theRemainder" : 0
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce7"),
+        "theRemainder" : 0
+    },
+    {
+        "_id" : ObjectId("4de54958bf1505139918fce8"),
+        "theRemainder" : 2
+    }
+];
+
+assert(arrayEq(p14.result, p14result), 'p14 failed');
+
+
+// toUpper test
+var p15 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$toUpper: "$author"},
+	pageViews : 1
+    }}
+]});
+
+var p15result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "pageViews" : 5,
+        "author" : "BOB"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "pageViews" : 7,
+        "author" : "DAVE"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "pageViews" : 6,
+        "author" : "JANE"
+    }
+];
+
+assert(arrayEq(p15.result, p15result), 'p15 failed');
+
+
+// toLower test
+var p16 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$toUpper: "$author"},
+	pageViews : 1
+    }},
+    { $project : {
+    author : {$toLower: "$author"},
+    pageViews : 1
+    }}
+]});
+
+var p16result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "pageViews" : 5,
+        "author" : "bob"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "pageViews" : 7,
+        "author" : "dave"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "pageViews" : 6,
+        "author" : "jane"
+    }
+];
+
+assert(arrayEq(p16.result, p16result), 'p16 failed');
+
+
+// substr test
+var p17 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : {$substr: ["$author", 1, 2]},
+    }}
+]});
+
+var p17result = [
+    {
+        "_id" : ObjectId("4e09d403278071aa11bd1560"),
+        "author" : "ob"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c4"),
+        "author" : "av"
+    },
+    {
+        "_id" : ObjectId("4e09d656c705acb9967683c5"),
+        "author" : "an"
+    }
+];
+
+assert(arrayEq(p17.result, p17result), 'p17 failed');
+
+
+// strcasecmp test
+var p18 = db.runCommand(
+{aggregate : "article", pipeline : [
+    { $project : {
+        tags : 1,
+        thisisalametest : {$strcasecmp: ["foo","bar"]},
+        thisisalamepass : {$strcasecmp: ["foo","foo"]}
+    }}
+]});
+
+var p18result = [
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c996e"),
+        "tags" : [
+            "fun",
+            "good",
+            "fun"
+        ],
+        "thisisalametest" : 1,
+        "thisisalamepass" : 0
+    },
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c996f"),
+        "tags" : [
+            "fun",
+            "nasty"
+        ],
+        "thisisalametest" : 1,
+        "thisisalamepass" : 0
+    },
+    {
+        "_id" : ObjectId("4e09ee2d75f2a257194c9970"),
+        "tags" : [
+            "nasty",
+            "filthy"
+        ],
+        "thisisalametest" : 1,
+        "thisisalamepass" : 0
+    }
+];
+
+assert(arrayEq(p18.result, p18result), 'p18 failed');
+
+
+// date tests
+var p19 = db.runCommand(
+{aggregate : "article", pipeline : [
+    { $project : {
+        authors : 1,
+        seconds: {$second: "$posted"},
+        minutes: {$minute: "$posted"},
+        hour: {$hour: "$posted"},
+        dayOfYear: {$dayOfYear: "$posted"},
+        dayOfMonth: {$dayOfMonth: "$posted"},
+        dayOfWeek: {$dayOfWeek: "$posted"},
+        month: {$month: "$posted"},
+        week: {$week: "$posted"},
+        year: {$year: "$posted"}
+    }}
+]});
+
+var p19result = [
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c69"),
+        "seconds" : 54,
+        "minutes" : 59,
+        "hour" : 18,
+        "dayOfYear" : 81,
+        "dayOfMonth" : 21,
+        "dayOfWeek" : 1,
+        "month" : 3,
+        "week" : 12,
+        "year" : 2004
+    },
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c6a"),
+        "seconds" : 10,
+        "minutes" : 11,
+        "hour" : 4,
+        "dayOfYear" : 220,
+        "dayOfMonth" : 8,
+        "dayOfWeek" : 1,
+        "month" : 8,
+        "week" : 32,
+        "year" : 2100
+    },
+    {
+        "_id" : ObjectId("4e14a3f1ffc569a332159c6b"),
+        "seconds" : 14,
+        "minutes" : 17,
+        "hour" : 5,
+        "dayOfYear" : 366,
+        "dayOfMonth" : 31,
+        "dayOfWeek" : 1,
+        "month" : 12,
+        "week" : 53,
+        "year" : 2000
+    }
+];
+
+assert(arrayEq(p19.result, p19result), 'p19 failed');
+
+
+
+
 
 
 // simple matching
@@ -756,8 +1019,8 @@ var g1result = [
         "_id" : {
             "tag" : "fun"
         },
-        "docsByTag" : 2,
-        "viewsByTag" : 12
+        "docsByTag" : 3,
+        "viewsByTag" : 17
     },
     {
         "_id" : {
@@ -811,11 +1074,11 @@ var g2result = [
         "avgByTag" : 6
     },
     {
-        "docsByTag" : 2,
-        "viewsByTag" : 12,
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
         "mostViewsByTag" : 7,
         "tag" : "fun",
-        "avgByTag" : 6
+        "avgByTag" : 5.666666666666667
     },
     {
         "docsByTag" : 1,
@@ -863,6 +1126,7 @@ var g3result = [
             "tag" : "fun"
         },
         "authors" : [
+            "bob",
             "bob",
             "dave"
         ]
@@ -918,9 +1182,9 @@ var g4result = [
         "_id" : {
             "tag" : "fun"
         },
-        "docsByTag" : 2,
-        "viewsByTag" : 12,
-        "avgByTag" : 6
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
+        "avgByTag" : 5.666666666666667
     },
     {
         "_id" : {
@@ -941,3 +1205,56 @@ var g4result = [
 ];
 
 assert(arrayEq(g4.result, g4result), 'g4 failed');
+
+
+// $addToSet as an accumulator; can pivot data
+var g5 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : 1,
+	tag : { $unwind : "tags" }
+    }},
+    { $group : {
+	_id : { tag : 1 },
+	authors : { $addToSet : "$author" }
+    }}
+]});
+
+var g5result = [
+    {
+        "_id" : {
+            "tag" : "filthy"
+        },
+        "authors" : [
+            "jane"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "fun"
+        },
+        "authors" : [
+            "bob",
+            "dave"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "good"
+        },
+        "authors" : [
+            "bob"
+        ]
+    },
+    {
+        "_id" : {
+            "tag" : "nasty"
+        },
+        "authors" : [
+            "dave",
+            "jane"
+        ]
+    }
+];
+
+assert(arrayEq(g5.result, g5result), 'g5 failed');
