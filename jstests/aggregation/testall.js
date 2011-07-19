@@ -812,7 +812,7 @@ var p18result = [
             "good",
             "fun"
         ],
-        "thisisalametest" : 4,
+        "thisisalametest" : 1,
         "thisisalamepass" : 0
     },
     {
@@ -821,7 +821,7 @@ var p18result = [
             "fun",
             "nasty"
         ],
-        "thisisalametest" : 4,
+        "thisisalametest" : 1,
         "thisisalamepass" : 0
     },
     {
@@ -830,7 +830,7 @@ var p18result = [
             "nasty",
             "filthy"
         ],
-        "thisisalametest" : 4,
+        "thisisalametest" : 1,
         "thisisalamepass" : 0
     }
 ];

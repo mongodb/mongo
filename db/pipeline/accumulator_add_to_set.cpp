@@ -29,7 +29,7 @@ namespace mongo {
 	if (prhs->getType() == Undefined)
 	    ; /* nothing to add to the array */
 	else if (!pCtx->getInRouter())
-	    vpValue.insert(prhs);
+	    set.insert(prhs);
 	else {
 	    /*
 	      If we're in the router, we need to take apart the arrays we
@@ -42,7 +42,7 @@ namespace mongo {
 	    shared_ptr<ValueIterator> pvi(prhs->getArray());
 	    while(pvi->more()) {
 		shared_ptr<const Value> pElement(pvi->next());
-		vpValue.insert(pElement);
+		set.insert(pElement);
 	    }
 	}
 
@@ -52,7 +52,7 @@ namespace mongo {
     shared_ptr<const Value> AccumulatorAddToSet::getValue() const {
         vector<shared_ptr<const Value> > valVec;
 
-        for (itr = vpValue.begin(); itr != vpValue.end(); ++itr) {
+        for (itr = set.begin(); itr != set.end(); ++itr) {
             valVec.push_back(*itr);
         }
         /* there is no issue of scope since createArray copy constructs */
@@ -62,7 +62,7 @@ namespace mongo {
     AccumulatorAddToSet::AccumulatorAddToSet(
 	const intrusive_ptr<ExpressionContext> &pTheCtx):
         Accumulator(),
-        vpValue(),
+        set(),
         pCtx(pTheCtx) {
     }
 

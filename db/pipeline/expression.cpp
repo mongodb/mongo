@@ -83,7 +83,7 @@ namespace mongo {
                 isOp = 1;
                 kind = OPERATOR;
 
-                if (strcasecmp(pFieldName, unwindName) != 0) {
+                if (strcmp(pFieldName, unwindName) != 0) {
                     pExpression = parseExpression(pFieldName, &fieldElement);
                 }
                 else {
@@ -170,7 +170,7 @@ namespace mongo {
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
-        return strcasecmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
+        return strcmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
     }
 
     /*
@@ -2322,7 +2322,13 @@ namespace mongo {
         /* boost::iequals returns a bool not an int so strings must actually be allocated */
         string str1 = boost::to_upper_copy( pString1->coerceToString() );
         string str2 = boost::to_upper_copy( pString2->coerceToString() );
-        return Value::createInt(str1.compare(str2));
+        int result = str1.compare(str2);
+
+        if (result == 0)
+            return Value::getZero();
+        if (result > 0)
+            return Value::getOne();
+        return Value::getMinusOne();
     }
 
     const char *ExpressionStrcasecmp::getOpName() const {
