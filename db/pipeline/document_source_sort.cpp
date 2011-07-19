@@ -118,16 +118,18 @@ namespace mongo {
 
             /* check for the limit field */
             if (!strcmp(pFieldName,"limit")) {
-                pSort->limit = sortVarField.numberInt();
+                pSort->limit = sortVarField.numberLong();
                 if (pSort->limit <= 0)
-                    pSort->limit = INT_MAX;
+                    pSort->limit = LONG_MAX;
+                continue;
             }
 
             /* check for the skip field */
             if (!strcmp(pFieldName,"skip")) {
-                pSort->skip = sortVarField.numberInt();
+                pSort->skip = sortVarField.numberLong();
                 if (pSort->skip <= 0)
                     pSort->skip = 0;
+                    continue;
             }
             
             /* check for then iterate over the key object */
@@ -159,6 +161,7 @@ namespace mongo {
                 assert(sortOrder != 0); // CW TODO illegal sort order value
                 pSort->addKey(pKeyFieldName, (sortOrder > 0));
                 }
+                continue;
             }
         }
 
