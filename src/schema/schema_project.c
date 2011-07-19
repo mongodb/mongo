@@ -67,18 +67,20 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
 				WT_RET(__pack_next(&pack, &pv));
-				/*
-				 * Another nasty case: if we are inserting
-				 * out-of-order, we may reach the end of the
-				 * data.  That's okay: we want to append in
-				 * that case, and we're positioned to do that.
-				 */
-				if (p < end)
-					WT_RET(__unpack_read(session, &pv,
-					    (const uint8_t **)&p,
-					    (size_t)(end - p)));
-				if (*proj == WT_PROJ_SKIP)
-					break;
+				if (*proj == WT_PROJ_SKIP) {
+					/*
+					 * A nasty case: if we are inserting
+					 * out-of-order, we may reach the end
+					 * of the data.  That's okay: we want
+					 * to append in that case, and we're
+					 * positioned to do that.
+					 */
+					if (p < end)
+						WT_RET(__unpack_read(session,
+						    &pv, (const uint8_t **)&p,
+						    (size_t)(end - p)));
+						break;
+				}
 				WT_PACK_GET(session, pv, ap);
 				/* FALLTHROUGH */
 
@@ -184,7 +186,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 	WT_PACK pack, vpack;
 	WT_PACK_VALUE pv, vpv;
 	char *proj;
-	uint8_t *p, *end, *vp, *vend;
+	uint8_t *p, *end;
+	const uint8_t *vp, *vend;
 	size_t len;
 	uint32_t arg, offset;
 
@@ -234,14 +237,23 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
 				WT_RET(__pack_next(&pack, &pv));
-				WT_RET(__unpack_read(session, &pv,
-				    (const uint8_t **)&p, (size_t)(end - p)));
-				if (*proj == WT_PROJ_SKIP)
-					break;
+				if (*proj == WT_PROJ_SKIP) {
+					/*
+					 * A nasty case: if we are inserting
+					 * out-of-order, we may reach the end
+					 * of the data.  That's okay: we want
+					 * to append in that case, and we're
+					 * positioned to do that.
+					 */
+					if (p < end)
+						WT_RET(__unpack_read(session,
+						    &pv, (const uint8_t **)&p,
+						    (size_t)(end - p)));
+						break;
+				}
 				WT_RET(__pack_next(&vpack, &vpv));
 				WT_RET(__unpack_read(session, &vpv,
-				    (const uint8_t **)&vp,
-				    (size_t)(vend - vp)));
+				    &vp, (size_t)(vend - vp)));
 				/* FALLTHROUGH */
 			case WT_PROJ_REUSE:
 				/*

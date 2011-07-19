@@ -115,7 +115,7 @@ extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name,
+    const char *filename,
     size_t namelen,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
@@ -214,10 +214,11 @@ extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
 extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
-extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
+    const char *filename,
     const char *config,
     uint32_t flags);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);

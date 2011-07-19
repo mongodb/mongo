@@ -42,7 +42,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
-	char *namebuf;
+	char *cgname, *filename;
 	const char *config, *config_copy;
 	uint32_t plansize;
 	int i, ret;
@@ -52,7 +52,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 	config_copy = NULL;
 	cursor = NULL;
-	namebuf = NULL;
+	cgname = filename = NULL;
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
@@ -66,10 +66,10 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			continue;
 		/* Get the filename from the schema table. */
 		WT_ERR(__wt_schema_colgroup_name(session, table,
-		    ckey.str, ckey.len, &namebuf));
+		    ckey.str, ckey.len, &cgname));
 
 		WT_ERR(__wt_schema_table_cursor(session, &cursor));
-		cursor->set_key(cursor, namebuf);
+		cursor->set_key(cursor, cgname);
 		if ((ret = cursor->search(cursor)) != 0) {
 			/*
 			 * It's okay at this point if the table is not
@@ -89,19 +89,18 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			goto end;
 		}
 
-		WT_ERR(__wt_realloc(session, NULL, cval.len + 1, &namebuf));
-		memcpy(namebuf, cval.str, cval.len);
+		WT_ERR(__wt_realloc(session, NULL, cval.len + 1, &filename));
+		memcpy(filename, cval.str, cval.len);
 
-		if (!__wt_exist(namebuf)) {
+		if (!__wt_exist(filename)) {
 			if (i == 0)
 				__wt_errx(session, "Primary column group "
 				    "for table '%s': file '%s' is missing",
-				    table->name, namebuf);
+				    table->name, filename);
 			else
-				__wt_errx(session, "Column group '%s.%.*s' "
+				__wt_errx(session, "Column group '%s' "
 				    "created but the file '%s' is missing",
-				    table->name, (int)ckey.len, ckey.str,
-				    namebuf);
+				    cgname, filename);
 			ret = ENOENT;
 			goto err;
 		}
@@ -111,7 +110,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		 * handle.
 		 */
 		WT_ERR(__wt_strdup(session, config, &config_copy));
-		WT_ERR(__wt_btree_open(session, namebuf, config_copy, 0));
+		WT_ERR(__wt_btree_open(session,
+		    cgname, filename, config_copy, 0));
 		config_copy = NULL;
 		WT_ERR(__wt_session_add_btree(session, NULL));
 		table->colgroup[i] = session->btree;
@@ -135,7 +135,8 @@ end:		if (cursor != NULL) {
 	table->is_complete = 1;
 
 err:	__wt_free(session, config_copy);
-	__wt_free(session, namebuf);
+	__wt_free(session, cgname);
+	__wt_free(session, filename);
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor, NULL));
 	return (ret);

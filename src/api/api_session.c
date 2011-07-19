@@ -175,7 +175,7 @@ static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *treeconf;
+	const char *filename, *treeconf;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -184,7 +184,8 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (!WT_PREFIX_SKIP(name, "file:")) {
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
@@ -197,9 +198,9 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 * it skips loading metadata such as the free list, which could be
 	 * corrupted.
 	 */
-	WT_ERR(__wt_btconf_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(
-	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
+	WT_ERR(__wt_btconf_read(session, filename, &treeconf));
+	WT_ERR(__wt_btree_open(session,
+	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
 
 	WT_TRET(__wt_salvage(session, config));
 
@@ -219,6 +220,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_SESSION_IMPL *session;
+	const char *filename;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -226,13 +228,14 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, sync, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (!WT_PREFIX_SKIP(name, "file:")) {
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
 
 	ret = __wt_session_get_btree(session,
-	    name, strlen(name), &btree_session);
+	    filename, strlen(filename), &btree_session);
 
 	/* If the tree isn't open, there's nothing to do. */
 	if (ret == WT_NOTFOUND)
@@ -272,7 +275,7 @@ static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *treeconf;
+	const char *filename, *treeconf;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -281,7 +284,8 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (!WT_PREFIX_SKIP(name, "file:")) {
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
@@ -297,9 +301,9 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_ERR(__wt_btconf_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(
-	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_ERR(__wt_btconf_read(session, filename, &treeconf));
+	WT_ERR(__wt_btree_open(session,
+	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
@@ -318,7 +322,7 @@ static int
 __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *treeconf;
+	const char *filename, *treeconf;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -327,7 +331,8 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	(void)cfg;
 
-	if (!WT_PREFIX_SKIP(name, "file:")) {
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
@@ -343,9 +348,9 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_RET(__wt_btconf_read(session, name, &treeconf));
-	WT_RET(__wt_btree_open(
-	    session, name, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_RET(__wt_btconf_read(session, filename, &treeconf));
+	WT_RET(__wt_btree_open(session,
+	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_dumpfile(session, config));
 

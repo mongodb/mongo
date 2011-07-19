@@ -8,31 +8,32 @@
 #include "wt_internal.h"
 
 static int
-__create_file(
-    WT_SESSION_IMPL *session, const char *name, int intable, const char *config)
+__create_file(WT_SESSION_IMPL *session,
+    const char *name, const char *filename, int intable, const char *config)
 {
 	const char *cfg[] = API_CONF_DEFAULTS(btree, meta, config);
 	const char *treeconf;
 	int exists;
 
-	if (__wt_session_get_btree(session, name, strlen(name), NULL) == 0)
+	if (__wt_session_get_btree(session,
+	    filename, strlen(filename), NULL) == 0)
 		return (0);
 
-	exists = __wt_exist(name);
+	exists = __wt_exist(filename);
 	if (!exists)
-		WT_RET(__wt_btree_create(session, name));
+		WT_RET(__wt_btree_create(session, filename));
 
 	if (intable)
 		WT_RET(__wt_strdup(session, config, &treeconf));
 	else if (exists)
-		WT_RET(__wt_btconf_read(session, name, &treeconf));
+		WT_RET(__wt_btconf_read(session, filename, &treeconf));
 	else {
 		WT_RET(__wt_config_collapse(session, cfg, &treeconf));
-		WT_RET(__wt_btconf_write(session, name, treeconf));
+		WT_RET(__wt_btconf_write(session, filename, treeconf));
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_RET(__wt_btree_open(session, name, treeconf, 0));
+	WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
 	WT_RET(__wt_session_add_btree(session, NULL));
 	return (0);
 }
@@ -117,7 +118,7 @@ __create_colgroup(
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
-	WT_ERR(__create_file(session, filename, 1, cgconf));
+	WT_ERR(__create_file(session, name, filename, 1, cgconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -174,7 +175,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
-	WT_ERR(__create_file(session, filename, 1, idxconf));
+	WT_ERR(__create_file(session, name, filename, 1, idxconf));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, namebuf);
@@ -236,14 +237,18 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
+	const char *fullname;
+
+	fullname = name;
+
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
 	else if (WT_PREFIX_SKIP(name, "file:"))
-		return (__create_file(session, name, 0, config));
+		return (__create_file(session, fullname, name, 0, config));
 	else if (WT_PREFIX_MATCH(name, "index:"))
 		return (__create_index(session, name, config));
 	else if (WT_PREFIX_SKIP(name, "schema:"))
-		return (__create_file(session, name, 1, config));
+		return (__create_file(session, fullname, name, 1, config));
 	else if (WT_PREFIX_MATCH(name, "table:"))
 		return (__create_table(session, name, config));
 	else {

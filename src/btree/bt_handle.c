@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static int __btree_conf(WT_SESSION_IMPL *);
-static int __btree_init(WT_SESSION_IMPL *, const char *);
+static int __btree_init(WT_SESSION_IMPL *, const char *, const char *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_type(WT_SESSION_IMPL *);
 
@@ -17,22 +17,22 @@ static int __btree_type(WT_SESSION_IMPL *);
  *	Create a Btree.
  */
 int
-__wt_btree_create(WT_SESSION_IMPL *session, const char *name)
+__wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_FH *fh;
 	int ret;
 
 	/* Check to see if the file exists -- we don't want to overwrite it. */
-	if (__wt_exist(name)) {
+	if (__wt_exist(filename)) {
 		__wt_errx(session,
 		    "the file %s already exists; to re-create it, remove it "
 		    "first, then create it",
-		    name);
+		    filename);
 		return (WT_ERROR);
 	}
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, name, 0666, 1, &fh));
+	WT_RET(__wt_open(session, filename, 0666, 1, &fh));
 
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_write(session, fh);
@@ -91,7 +91,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
  */
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *config, uint32_t flags)
+    const char *name, const char *filename, const char *config, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -108,10 +108,10 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	btree->config = config;
 
 	/* Initialize the WT_BTREE structure. */
-	WT_ERR(__btree_init(session, name));
+	WT_ERR(__btree_init(session, name, filename));
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, name, 0666, 1, &btree->fh));
+	WT_ERR(__wt_open(session, filename, 0666, 1, &btree->fh));
 
 	/*
 	 * Read the file's metadata and configure the WT_BTREE structure based
@@ -162,13 +162,14 @@ err:	if (btree->fh != NULL)
  *	Initialize the WT_BTREE structure, after an zero-filled allocation.
  */
 static int
-__btree_init(WT_SESSION_IMPL *session, const char *name)
+__btree_init(WT_SESSION_IMPL *session, const char *name, const char *filename)
 {
 	WT_BTREE *btree;
 
 	btree = session->btree;
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
+	WT_RET(__wt_strdup(session, filename, &btree->filename));
 
 	btree->root_page.addr = WT_ADDR_INVALID;
 
@@ -228,6 +229,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
+	__wt_free(session, btree->filename);
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
 

@@ -8,7 +8,8 @@
 struct __wt_btree {
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
-	const char *name;		/* File name */
+	const char *name;		/* Logical name */
+	const char *filename;		/* File name */
 
 	const char *config;		/* Configuration string */
 

@@ -60,24 +60,22 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 			table->colgroup[i] = NULL;
 
 			/* Remove the schema table entry. */
-			WT_ERR(__wt_schema_colgroup_name(session, table,
-			    cg->name, strlen(cg->name), &namebuf));
-			WT_ERR(__wt_schema_table_remove(session, namebuf));
+			WT_TRET(__wt_schema_table_remove(session, cg->name));
 
 			/*
 			 * Remove the file.  The btree handle will be closed
 			 * during the call, so we make a copy of the filename.
 			 */
 			WT_ERR(__wt_realloc(session, NULL,
-			    strlen(cg->name) + 1, &namebuf));
-			strcpy(namebuf, cg->name);
-			WT_ERR(__drop_file(session, namebuf));
+			    strlen(cg->filename) + 1, &namebuf));
+			strcpy(namebuf, cg->filename);
+			WT_TRET(__drop_file(session, namebuf));
 		}
 
-		/* TODO: open the indices. */
+		/* TODO: drop the indices. */
 
-		WT_ERR(__wt_schema_remove_table(session, table));
-		WT_ERR(__wt_schema_table_remove(session, fullname));
+		WT_TRET(__wt_schema_remove_table(session, table));
+		WT_TRET(__wt_schema_table_remove(session, fullname));
 	} else {
 		__wt_errx(session, "Unknown object type: %s", fullname);
 		return (EINVAL);

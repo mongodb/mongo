@@ -40,15 +40,15 @@ __wt_session_add_btree(
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_BTREE_SESSION **btree_sessionp)
+    const char *filename, size_t namelen, WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
-		if (strncmp(name, btree->name, namelen) == 0 &&
-		    btree->name[namelen] == '\0') {
+		if (strncmp(filename, btree->filename, namelen) == 0 &&
+		    btree->filename[namelen] == '\0') {
 			if (btree_sessionp != NULL)
 				*btree_sessionp = btree_session;
 			return (0);
