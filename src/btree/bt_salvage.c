@@ -685,8 +685,7 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
 
 /*
  * __slvg_col_range --
- *	Figure out the leaf pages we need and discard everything else.  At the
- * same time, tag the overflow pages they reference.
+ *	Figure out the leaf pages we need and free the leaf pages we don't.
  *
  * When pages split, the key range is split across multiple pages.  If not all
  * of the old versions of the page are overwritten, or not all of the new pages
