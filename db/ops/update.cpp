@@ -1116,26 +1116,28 @@ namespace mongo {
 
                 bool atomic = c->matcher()->docMatcher().atomic();
                 
-                // *****************
-                if ( cc.get() == 0 ) {
-                    shared_ptr< Cursor > cPtr = c;
-                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
-                }
-
-                bool didYield;
-                if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
-                    cc.release();
-                    break;
-                }
-                if ( !c->ok() ) {
-                    break;
-                }
+                if ( !atomic ) {
+                    // *****************
+                    if ( cc.get() == 0 ) {
+                        shared_ptr< Cursor > cPtr = c;
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                    }
+    
+                    bool didYield;
+                    if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
+                        cc.release();
+                        break;
+                    }
+                    if ( !c->ok() ) {
+                        break;
+                    }
                 
-                if ( didYield ) {
-                    d = nsdetails(ns);
-                    nsdt = &NamespaceDetailsTransient::get_w(ns);
+                    if ( didYield ) {
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
+                    }
+                    // *****************
                 }
-                // *****************
 
                 // May have already matched in UpdateOp, but do again to get details set correctly
                 if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
