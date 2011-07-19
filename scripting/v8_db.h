@@ -76,6 +76,11 @@ namespace mongo {
     v8::Handle<v8::Value> numberLongValueOf(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongToString(V8Scope* scope, const v8::Arguments& args);
 
+    v8::Handle<v8::Value> numberIntInit( V8Scope* scope, const v8::Arguments& args );
+    v8::Handle<v8::Value> numberIntToNumber(V8Scope* scope, const v8::Arguments& args);
+    v8::Handle<v8::Value> numberIntValueOf(V8Scope* scope, const v8::Arguments& args);
+    v8::Handle<v8::Value> numberIntToString(V8Scope* scope, const v8::Arguments& args);
+
     v8::Handle<v8::Value> dbQueryInit( V8Scope* scope, const v8::Arguments& args );
     v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info );
 

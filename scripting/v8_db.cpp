@@ -76,6 +76,16 @@ namespace mongo {
         return numberLong;
     }
 
+    v8::Handle<v8::FunctionTemplate> getNumberIntFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> numberInt = scope->createV8Function(numberIntInit);
+        v8::Local<v8::Template> proto = numberInt->PrototypeTemplate();
+        scope->injectV8Function("valueOf", numberIntValueOf, proto);
+        scope->injectV8Function("toNumber", numberIntToNumber, proto);
+        scope->injectV8Function("toString", numberIntToString, proto);
+
+        return numberInt;
+    }
+
     v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> binData = scope->createV8Function(binDataInit);
         binData->InstanceTemplate()->SetInternalFieldCount(1);
@@ -173,6 +183,7 @@ namespace mongo {
         global->Set( scope->getV8Str("MD5") , getMD5FunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("HexData") , getHexDataFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("NumberLong") , getNumberLongFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("NumberInt") , getNumberIntFunctionTemplate(scope)->GetFunction() );
         global->Set( scope->getV8Str("Timestamp") , getTimestampFunctionTemplate(scope)->GetFunction() );
 
         BSONObjBuilder b;
@@ -889,7 +900,7 @@ namespace mongo {
             it->Set( scope->getV8Str( "top" ) , args[1] );
             it->Set( scope->getV8Str( "bottom" ) , args[2] );
         }
-        it->SetHiddenValue( scope->getV8Str( "__NumberLong" ), v8::Number::New( 1 ) );
+        it->SetHiddenValue( scope->V8STR_NUMBERLONG, v8::Number::New( 1 ) );
 
         return it;
     }
@@ -904,15 +915,8 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> numberLongValueOf( V8Scope* scope, const v8::Arguments& args ) {
-
-        if (args.Length() != 0) {
-            return v8::ThrowException( v8::String::New( "toNumber needs 0 arguments" ) );
-        }
-
         v8::Handle<v8::Object> it = args.This();
-
         long long val = numberLongVal( it );
-
         return v8::Number::New( double( val ) );
     }
 
@@ -921,11 +925,6 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> numberLongToString( V8Scope* scope, const v8::Arguments& args ) {
-
-        if (args.Length() != 0) {
-            return v8::ThrowException( v8::String::New( "toString needs 0 arguments" ) );
-        }
-
         v8::Handle<v8::Object> it = args.This();
 
         stringstream ss;
@@ -936,6 +935,50 @@ namespace mongo {
             ss << "NumberLong(\"" << val << "\")";
         else
             ss << "NumberLong(" << val << ")";
+
+        string ret = ss.str();
+        return v8::String::New( ret.c_str() );
+    }
+
+    v8::Handle<v8::Value> numberIntInit( V8Scope* scope, const v8::Arguments& args ) {
+
+        if (args.Length() != 0 && args.Length() != 1) {
+            return v8::ThrowException( v8::String::New( "NumberInt needs 0, 1 argument" ) );
+        }
+
+        v8::Handle<v8::Object> it = args.This();
+
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function* f = scope->getNamedCons( "NumberInt" );
+            it = f->NewInstance();
+        }
+
+        if ( args.Length() == 0 ) {
+            it->SetHiddenValue( scope->V8STR_NUMBERINT, v8::Number::New( 0 ) );
+        }
+        else if ( args.Length() == 1 ) {
+            it->SetHiddenValue( scope->V8STR_NUMBERINT, args[0]->ToInt32() );
+        }
+
+        return it;
+    }
+
+    v8::Handle<v8::Value> numberIntValueOf( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        int val = it->GetHiddenValue( scope->V8STR_NUMBERINT )->Int32Value();
+        return v8::Number::New( double( val ) );
+    }
+
+    v8::Handle<v8::Value> numberIntToNumber( V8Scope* scope, const v8::Arguments& args ) {
+        return numberIntValueOf( scope, args );
+    }
+
+    v8::Handle<v8::Value> numberIntToString( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+
+        stringstream ss;
+        int val = it->GetHiddenValue( scope->V8STR_NUMBERINT )->Int32Value();
+        ss << "NumberInt(" << val << ")";
 
         string ret = ss.str();
         return v8::String::New( ret.c_str() );

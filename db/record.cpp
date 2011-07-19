@@ -3,12 +3,12 @@
 #include "pch.h"
 #include "pdfile.h"
 #include "../util/processinfo.h"
-#include "../util/message.h"
+#include "../util/net/listen.h"
 
 namespace mongo {
-    
-    namespace ps {
 
+    namespace ps {
+        
         enum State {
             In , Out, Unk
         };
@@ -129,8 +129,8 @@ namespace mongo {
 
                 RARELY {
                     long long now = Listener::getElapsedTimeMillis();
-                    OCCASIONALLY if ( now == 0 ) {
-                        warning() << "Listener::getElapsedTimeMillis returing 0" << endl;
+                    RARELY if ( now == 0 ) {
+                        tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
                     }
                     
                     if ( now - _lastRotate > ( 1000 * RotateTimeSecs ) ) {
@@ -177,21 +177,28 @@ namespace mongo {
         
     }
 
+    bool Record::MemoryTrackingEnabled = true;
     
 
-    int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
+    volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
     void Record::touch( bool entireRecrd ) {
 
         if ( lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             char * addr = data;
             char * end = data + netLength();
-            for ( ; addr <= end ; addr += 2048 )
+            for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
+                if ( ! entireRecrd )
+                    break;
+            }
         }
 
     }
 
     bool Record::likelyInPhysicalMemory() {
+        if ( ! MemoryTrackingEnabled )
+            return true;
+
         static bool blockSupported = ProcessInfo::blockCheckSupported();
 
         const size_t page = (size_t)data >> 12;
@@ -204,6 +211,18 @@ namespace mongo {
         if ( ! blockSupported )
             return false;
         return ProcessInfo::blockInMemory( data );
+    }
+
+    Record* Record::accessed() {
+        if ( ! MemoryTrackingEnabled ) 
+            return this;
+
+        const size_t page = (size_t)data >> 12;
+        const size_t region = page >> 6;
+        const size_t offset = page & 0x3f;
+
+        ps::rolling.access( region , offset );
+        return this;
     }
     
 }

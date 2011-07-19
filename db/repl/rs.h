@@ -21,7 +21,7 @@
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/msg.h"
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "../commands.h"
 #include "../oplogreader.h"
 #include "rs_exception.h"
@@ -102,7 +102,7 @@ namespace mongo {
 
     class GhostSync : public task::Server {
         struct GhostSlave {
-        GhostSlave() : last(0), slave(0), init(false) {}
+            GhostSlave() : last(0), slave(0), init(false) {}
             OplogReader reader;
             OpTime last;
             Member* slave;
@@ -111,11 +111,13 @@ namespace mongo {
         /**
          * This is a cache of ghost slaves
          */
-        map<BSONObj,GhostSlave> _ghostCache;
+        typedef map<mongo::OID,GhostSlave> MAP;
+        MAP _ghostCache;
+        RWLock _lock; // protects _ghostCache
         ReplSetImpl *rs;
         virtual void starting();
     public:
-        GhostSync(ReplSetImpl *_rs) : task::Server("rs ghost sync"), rs(_rs) {}
+        GhostSync(ReplSetImpl *_rs) : task::Server("rsGhostSync"), _lock("GhostSync"), rs(_rs) {}
         ~GhostSync() {
             log() << "~GhostSync() called" << rsLog;
         }
@@ -136,7 +138,7 @@ namespace mongo {
          */
         void percolate(const BSONObj& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
-        void updateSlave(const BSONObj& rid, const OpTime& last);
+        void updateSlave(const mongo::OID& id, const OpTime& last);
     };
 
     struct Target;
@@ -494,6 +496,7 @@ namespace mongo {
         bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() {
+            assert( _self );
             return _self->fullName();
         }
 

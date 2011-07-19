@@ -1,16 +1,16 @@
 // config saved on shutdown
 
 var compare_configs = function(c1, c2) {
-    assert(c1.version == c2.version, 'version same');
-    assert(c1._id == c2._id, '_id same');
+    assert.eq(c1.version, c2.version, 'version same');
+    assert.eq(c1._id, c2._id, '_id same');
 
     printjson(c1);
     printjson(c2);
 
     for (var i in c1.members) {
         assert(c2.members[i] !== undefined, 'field '+i+' exists in both configs');
-        assert(c1.members[i]._id == c2.members[i]._id, 'id is equal in both configs');
-        assert(c1.members[i].host == c2.members[i].host, 'id is equal in both configs');
+        assert.eq(c1.members[i]._id, c2.members[i]._id, 'id is equal in both configs');
+        assert.eq(c1.members[i].host, c2.members[i].host, 'id is equal in both configs');
     }
 }
 

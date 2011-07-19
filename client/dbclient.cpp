@@ -598,10 +598,10 @@ namespace mongo {
         if ( lastReconnectTry && time(0)-lastReconnectTry < 2 ) {
             // we wait a little before reconnect attempt to avoid constant hammering.
             // but we throw we don't want to try to use a connection in a bad state
-            throw SocketException(SocketException::FAILED_STATE);
+            throw SocketException( SocketException::FAILED_STATE , toString() );
         }
         if ( !autoReconnect )
-            throw SocketException(SocketException::FAILED_STATE);
+            throw SocketException( SocketException::FAILED_STATE , toString() );
 
         lastReconnectTry = time(0);
         log(_logLevel) << "trying reconnect to " << _serverString << endl;
@@ -610,7 +610,7 @@ namespace mongo {
         if ( ! _connect(errmsg) ) {
             _failed = true;
             log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
-            throw SocketException(SocketException::CONNECT_ERROR);
+            throw SocketException( SocketException::CONNECT_ERROR , toString() );
         }
 
         log(_logLevel) << "reconnect " << _serverString << " ok" << endl;

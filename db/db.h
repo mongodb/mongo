@@ -17,7 +17,7 @@
 #pragma once
 
 #include "../pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "concurrency.h"
 #include "pdfile.h"
 #include "curop.h"

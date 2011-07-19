@@ -217,9 +217,10 @@ namespace mongo {
                             // throttle logging
                             if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
                                 lastComplain = time(0);
-                                log() << "replSet warning DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
+                                warning() << "DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
                                 if( nComplains < 10 || nComplains % 10 == 0 ) {
-                                    wassert(!"replSet warning DR102 too much data written uncommitted");
+                                    // wassert makes getLastError show an error, so we just print stack trace
+                                    printStackTrace();
                                 }
                             }
                         }

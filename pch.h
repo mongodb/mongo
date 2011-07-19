@@ -37,6 +37,7 @@
 # ifndef NOMINMAX
 #  define NOMINMAX
 # endif
+#define WIN32_LEAN_AND_MEAN
 # include <winsock2.h> //this must be included before the first windows.h include
 # include <ws2tcpip.h>
 # include <wspiapi.h>

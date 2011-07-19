@@ -61,8 +61,12 @@ namespace mongo {
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
         _config = grid.getDBConfig( getns() );
-        if ( reload )
-            uassert( 10192 ,  "db config reload failed!" , _config->reload() );
+        if ( reload ) {
+            if ( _config->isSharded( getns() ) )
+                _config->getChunkManager( getns() , true );
+            else
+                _config->reload();
+        }
 
         if ( _config->isSharded( getns() ) ) {
             _chunkManager = _config->getChunkManager( getns() , reload );

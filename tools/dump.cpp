@@ -43,6 +43,7 @@ public:
         ("query,q", po::value<string>() , "json query" )
         ("oplog", "Use oplog for point-in-time snapshotting" )
         ("repair", "try to recover a crashed database" )
+        ("forceTableScan", "force a table scan (do not use $snapshot)" )
         ;
     }
 
@@ -77,7 +78,7 @@ public:
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-        else if ( _query.isEmpty() && !hasParam("dbpath"))
+        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
             q.snapshot();
         
         DBClientBase& connBase = conn(true);
@@ -393,13 +394,22 @@ public:
             auth( "admin" );
 
             BSONObj res = conn( true ).findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
-            BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
+            if ( ! res["databases"].isABSONObj() ) {
+                error() << "output of listDatabases isn't what we expected, no 'databases' field:\n" << res << endl;
+                return -2;
+            }
+            BSONObj dbs = res["databases"].embeddedObjectUserCheck();
             set<string> keys;
             dbs.getFieldNames( keys );
             for ( set<string>::iterator i = keys.begin() ; i != keys.end() ; i++ ) {
                 string key = *i;
+                
+                if ( ! dbs[key].isABSONObj() ) {
+                    error() << "database field not an object key: " << key << " value: " << dbs[key] << endl;
+                    return -3;
+                }
 
-                BSONObj dbobj = dbs.getField( key ).embeddedObjectUserCheck();
+                BSONObj dbobj = dbs[key].embeddedObjectUserCheck();
 
                 const char * dbName = dbobj.getField( "name" ).valuestr();
                 if ( (string)dbName == "local" )

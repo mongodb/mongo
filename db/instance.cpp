@@ -526,7 +526,13 @@ namespace mongo {
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
-            catch ( GetMoreWaitException& ) {
+            catch ( AssertionException& e ) {
+                exhaust = false;
+                curop.debug().exceptionInfo = e.getInfo();
+                msgdata = emptyMoreResult(cursorid);
+                ok = false;
+            }
+            if (msgdata == 0) {
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
                 if( pass == 0 ) {
@@ -546,12 +552,6 @@ namespace mongo {
                 else
                     sleepmillis(2);
                 continue;
-            }
-            catch ( AssertionException& e ) {
-                exhaust = false;
-                curop.debug().exceptionInfo = e.getInfo();
-                msgdata = emptyMoreResult(cursorid);
-                ok = false;
             }
             break;
         };
@@ -809,7 +809,7 @@ namespace mongo {
                with acquirePathLock().  */
 #ifdef _WIN32
             if( _chsize( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << getLastError() << endl;
+                log() << "couldn't remove fs lock " << WSAGetLastError() << endl;
             CloseHandle(lockFileHandle);
 #else
             if( ftruncate( lockFile , 0 ) )
@@ -830,7 +830,7 @@ namespace mongo {
     }
 
     /* not using log() herein in case we are already locked */
-    void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+    NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
         auto_ptr<writelocktry> wlt;
         if ( tryToGetLock ) {

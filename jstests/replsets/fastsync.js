@@ -33,7 +33,7 @@ var reconnect = function(a) {
     });
 };
 
-ports = allocatePorts( 3 );
+ports = allocatePorts( 4 );
 
 var basename = "jstests_fastsync";
 var basePath = "/data/db/" + basename;
@@ -82,48 +82,78 @@ print("total in foo: "+foo.bar.count());
 
 print("2");
 admin.runCommand( {fsync:1,lock:1} );
-copyDbpath( basePath + "-p", basePath + "-s" );
+copyDbpath( basePath + "-p", basePath + "-s"+1 );
 admin.$cmd.sys.unlock.findOne();
 
-
 print("3");
-var sargs = new MongodRunner( ports[ 1 ], basePath + "-s", false, false,
+var startSlave = function(n) {
+    var sargs = new MongodRunner( ports[ n ], basePath + "-s"+n, false, false,
                               ["--replSet", basename, "--fastsync",
                                "--oplogSize", 2], {no_bind : true} );
-var reuseData = true;
-sargs.start(reuseData);
+    var reuseData = true;
+    var conn = sargs.start(reuseData);
 
-config = local.system.replset.findOne();
-config.version++;
-config.members.push({_id:1, host:hostname+":"+ports[1]});
+    config = local.system.replset.findOne();
+    config.version++;
+    config.members.push({_id:n, host:hostname+":"+ports[n]});
 
-result = admin.runCommand({replSetReconfig : config});
-assert(result.ok, "reconfig worked");
-reconnect(p);
+    result = admin.runCommand({replSetReconfig : config});
+    assert(result.ok, "reconfig worked");
+    reconnect(p);
 
-print("4");
-var status = admin.runCommand({replSetGetStatus : 1});
-var count = 0;
-while (status.members[1].state != 2 && count < 200) {
-  print("not a secondary yet");
-  if (count % 10 == 0) {
-    printjson(status);
-  }
-  assert(!status.members[1].errmsg || !status.members[1].errmsg.match("^initial sync cloning db"));
+    print("4");
+    var status = admin.runCommand({replSetGetStatus : 1});
+    var count = 0;
+    while (status.members[n].state != 2 && count < 200) {
+        print("not a secondary yet");
+        if (count % 10 == 0) {
+            printjson(status);
+        }
+        assert(!status.members[n].errmsg || !status.members[n].errmsg.match("^initial sync cloning db"));
 
-  sleep(1000);
+        sleep(1000);
 
-  // disconnection could happen here
-  try {
-    status = admin.runCommand({replSetGetStatus : 1});
-  }
-  catch (e) {
-    print(e);
-  }
-  count++;
-}
+        // disconnection could happen here
+        try {
+            status = admin.runCommand({replSetGetStatus : 1});
+        }
+        catch (e) {
+            print(e);
+        }
+        count++;
+    }
 
-assert.eq(status.members[1].state, 2);
+    assert.eq(status.members[n].state, 2);
+
+    admin.foo.insert({x:1});
+    assert.soon(function() {
+        var last = local.oplog.rs.find().sort({$natural:-1}).limit(1).next();
+        var cur = conn.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
+        print("last: "+tojson(last)+" cur: "+tojson(cur));
+        return cur != null && last != null && cur.ts.t == last.ts.t && cur.ts.i == last.ts.i;
+    });
+
+    return conn;
+};
+
+var s1 = startSlave(1);
+
+var me1 = s1.getDB("local").me.findOne();
+
+print("me: " +me1._id);
+assert(me1._id != null);
+
+print("5");
+s1.getDB("admin").runCommand( {fsync:1,lock:1} );
+copyDbpath( basePath + "-s1", basePath + "-s2" );
+s1.getDB("admin").$cmd.sys.unlock.findOne();
+
+var s2 = startSlave(2);
+
+var me2 = s2.getDB("local").me.findOne();
+
+print("me: " +me2._id);
+assert(me1._id != me2._id);
 
 print("restart member with a different port and make it a new set");
 try {
@@ -134,7 +164,7 @@ catch(e) {
 }
 sleep(10000);
 
-pargs = new MongodRunner( ports[ 2 ], basePath + "-p", false, false,
+pargs = new MongodRunner( ports[ 3 ], basePath + "-p", false, false,
                           ["--replSet", basename, "--oplogSize", 2],
                           {no_bind : true} );
 p = pargs.start(true);
@@ -143,7 +173,7 @@ printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
 
 p.getDB("admin").runCommand({replSetReconfig : {
       _id : basename,
-      members : [{_id:0, host : hostname+":"+ports[2]}]
+      members : [{_id:0, host : hostname+":"+ports[3]}]
         }, force : true});
 
 print("start waiting for primary...");

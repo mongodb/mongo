@@ -21,7 +21,8 @@
 #pragma once
 
 #include "../pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/message_port.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
 #include <stack>
@@ -103,7 +104,10 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
-
+    
+    /** 
+     * need to put in DbMesssage::ReservedOptions as well
+     */
     enum InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
         InsertOption_KeepGoing = 1 << 0
@@ -464,12 +468,12 @@ namespace mongo {
         */
         bool createCollection(const string &ns, long long size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
-        /** Get error result from the last operation on this connection.
+        /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return error message text, or empty string if no error.
         */
         string getLastError();
 
-        /** Get error result from the last operation on this connection.
+        /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return full error object.
         */
         virtual BSONObj getLastErrorDetailed();
@@ -795,6 +799,8 @@ namespace mongo {
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
         
         virtual ConnectionString::ConnectionType type() const = 0;
+        
+        virtual double getSoTimeout() const = 0;
 
     }; // DBClientBase
 
@@ -913,6 +919,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
         void setSoTimeout(double to) { _so_timeout = to; }
+        double getSoTimeout() const { return _so_timeout; }
 
         static int getNumConnections() {
             return _numConnections;

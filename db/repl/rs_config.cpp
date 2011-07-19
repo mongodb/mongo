@@ -20,7 +20,7 @@
 #include "rs.h"
 #include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
 #include "../dbhelpers.h"
 #include "connections.h"
 #include "../oplog.h"
@@ -136,11 +136,11 @@ namespace mongo {
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
     }
-
+/*
     string ReplSetConfig::TagSubgroup::toString() const {
         bool first = true;
         string result = "\""+name+"\": [";
-        for (set<MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
+        for (set<const MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
             if (!first) {
                 result += ", ";
             }
@@ -149,12 +149,13 @@ namespace mongo {
         }
         return result+"]";
     }
-
+    */
     string ReplSetConfig::TagClause::toString() const {
         string result = name+": {";
         for (map<string,TagSubgroup*>::const_iterator i = subgroups.begin(); i != subgroups.end(); i++) {
-            result += (*i).second->toString()+", ";
+//TEMP?            result += (*i).second->toString()+", ";
         }
+        result += "TagClause toString TEMPORARILY DISABLED";
         return result + "}";
     }
 
@@ -327,8 +328,7 @@ namespace mongo {
 
                 TagSubgroup* subgroup;
                 if (clause.subgroups.find(perServerName) == clause.subgroups.end()) {
-                    clause.subgroups[perServerName] = subgroup = new TagSubgroup();
-                    subgroup->name = perServerName;
+                    clause.subgroups[perServerName] = subgroup = new TagSubgroup(perServerName);
                 }
                 else {
                     subgroup = clause.subgroups[perServerName];
@@ -345,7 +345,7 @@ namespace mongo {
         // "x.w" => {D} {E, F}
         for (map<string,TagClause>::iterator baseClause = tagMap.begin(); baseClause != tagMap.end(); baseClause++) {
             string prevPrefix = (*baseClause).first;
-            char *dot = strrchr((char*)prevPrefix.c_str(), '.');
+            const char *dot = strrchr(prevPrefix.c_str(), '.');
 
             while (dot) {
                 // get x.y
@@ -357,11 +357,14 @@ namespace mongo {
                 // get all of x.y.z's subgroups, add them as a single subgroup of x.y
                 TagSubgroup* condensedSubgroup;;
                 if (xyClause.subgroups.find(prevPrefix) == xyClause.subgroups.end()) {
-                    condensedSubgroup = new TagSubgroup();
+                    // label this subgroup one higher than the current, e.g.,
+                    // "x.y.z" if we're creating the "x.y" clause
+                    condensedSubgroup = new TagSubgroup(prevPrefix);
                     xyClause.subgroups[prevPrefix] = condensedSubgroup;
                 }
                 else {
                     condensedSubgroup = xyClause.subgroups[prevPrefix];
+                    assert(condensedSubgroup->name == prevPrefix);
                 }
 
                 TagClause& xyzClause = tagMap[prevPrefix];
@@ -376,13 +379,9 @@ namespace mongo {
                     }
                 }
 
-                // label this subgroup one higher than the current, e.g.,
-                // "x.y.z" if we're creating the "x.y" clause
-                condensedSubgroup->name = prevPrefix;
-
                 // advance: if we were handling "x.y", now do "x"
                 prevPrefix = xyTag;
-                dot = strrchr((char*)prevPrefix.c_str(), '.');
+                dot = strrchr(prevPrefix.c_str(), '.');
             }
         }
     }
@@ -429,17 +428,19 @@ namespace mongo {
                     (*sgs).second->clauses.push_back(node);
 
                     // if this subgroup contains the primary, it's automatically always up-to-date
-                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
-                         cfg != (*sgs).second->m.end(); cfg++) {
+                    for( set<MemberCfg*>::const_iterator cfg = (*sgs).second->m.begin();
+                         cfg != (*sgs).second->m.end(); 
+                         cfg++) 
+                    {
                         if ((*cfg)->h.isSelf()) {
                             node->actualTarget--;
                             foundMe = true;
                         }
                     }
 
-                    for (set<MemberCfg*>::iterator cfg = (*sgs).second->m.begin();
+                    for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
-                        (*cfg)->groups.insert((*sgs).second);
+                        (*cfg)->groupsw(this).insert((*sgs).second);
                     }
                 }
 
@@ -574,6 +575,7 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) {
+        _constructed = false;
         clear();
         from(cfg);
         if( force ) {
@@ -583,9 +585,11 @@ namespace mongo {
         if( version < 1 )
             version = 1;
         _ok = true;
+        _constructed = true;
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        _constructed = false;
         clear();
         int level = 2;
         DEV level = 0;
@@ -661,6 +665,7 @@ namespace mongo {
         checkRsConfig();
         _ok = true;
         log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        _constructed = true;
     }
 
 }

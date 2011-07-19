@@ -144,7 +144,7 @@ namespace mongo {
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
-        string name() const { return "ReplSetHealthPollTask"; }
+        string name() const { return "rsHealthPoll"; }
         void doWork() {
             if ( !theReplSet ) {
                 log(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
@@ -167,6 +167,9 @@ namespace mongo {
                 // we set this on any response - we don't get this far if
                 // couldn't connect because exception is thrown
                 time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
+
+                // weight new ping with old pings
+                mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
 
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();

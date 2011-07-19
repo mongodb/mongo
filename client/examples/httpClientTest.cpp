@@ -18,7 +18,7 @@
 #include <iostream>
 
 #include "client/dbclient.h"
-#include "util/httpclient.h"
+#include "util/net/httpclient.h"
 
 using namespace mongo;
 
@@ -39,5 +39,14 @@ int main( int argc, const char **argv ) {
     cout << "[" << url << "]" << endl;
 
     HttpClient c;
-    MONGO_assert( c.get( url ) == 200 );
+    HttpClient::Result r;
+    MONGO_assert( c.get( url , &r ) == 200 );
+
+    HttpClient::Headers h = r.getHeaders();
+    MONGO_assert( h["Content-Type"].find( "text/html" ) == 0 );
+
+    cout << "Headers" << endl;
+    for ( HttpClient::Headers::iterator i = h.begin() ; i != h.end(); ++i ) {
+        cout << i->first << "\t" << i->second << endl;
+    }
 }

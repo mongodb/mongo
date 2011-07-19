@@ -26,7 +26,8 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
+#include "../util/net/listen.h"
 #include "../util/processinfo.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"

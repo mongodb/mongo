@@ -32,7 +32,6 @@
 #include "../dbhelpers.h"
 
 namespace mongo {
-
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
@@ -45,7 +44,7 @@ namespace mongo {
 
     static RamLog * _rsLog = new RamLog( "rs" );
     Tee *rsLog = _rsLog;
-    extern bool replSetBlind;
+    extern bool replSetBlind; // for testing
 
     string ago(time_t t) {
         if( t == 0 ) return "";
@@ -195,8 +194,8 @@ namespace mongo {
 
         ss << "<style type=\"text/css\" media=\"screen\">"
            "table { font-size:75% }\n"
-//            "th { background-color:#bbb; color:#000 }\n"
-//            "td,th { padding:.25em }\n"
+           // "th { background-color:#bbb; color:#000 }\n"
+           // "td,th { padding:.25em }\n"
            "</style>\n";
 
         ss << table(h, true);

@@ -238,7 +238,9 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
+            bool nodur = false;
             if( params.count("nodur") ) {
+                nodur = true;
                 cmdLine.dur = false;
             }
             if( params.count("dur") || cmdLine.dur ) {
@@ -297,6 +299,13 @@ namespace mongo {
                 log() << "32bit" << endl;
             log() << "random seed: " << seed << endl;
 
+            if( time(0) % 3 == 0 && !nodur ) {
+                cmdLine.dur = true;
+                log() << "****************" << endl;
+                log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
+                log() << "****************" << endl;
+            }
+
             FileAllocator::get()->start();
 
             vector<string> suites;
@@ -312,8 +321,9 @@ namespace mongo {
             dur::startup();
 
             if( debug && cmdLine.dur ) {
-                cout << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
-//                cmdLine.durOptions |= 8;
+                log() << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
+                // this was commented out.  why too slow or something? : 
+                cmdLine.durOptions |= 8;
             }
 
             TestWatchDog twd;

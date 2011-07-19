@@ -41,7 +41,7 @@ namespace mongo {
 
         struct Ident {
 
-            Ident(BSONObj r,string h,string n) {
+            Ident(const BSONObj& r, const string& h, const string& n) {
                 BSONObjBuilder b;
                 b.appendElements( r );
                 b.append( "host" , h );
@@ -50,7 +50,7 @@ namespace mongo {
             }
 
             bool operator<( const Ident& other ) const {
-                return obj.woCompare( other.obj ) < 0;
+                return obj["_id"].OID() < other.obj["_id"].OID();
             }
 
             BSONObj obj;
@@ -124,7 +124,7 @@ namespace mongo {
             Info& i = _slaves[ ident ];
 
             if (theReplSet && theReplSet->isPrimary()) {
-                theReplSet->ghost->updateSlave(rid, last);
+                theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last);
             }
 
             if ( i.loc ) {

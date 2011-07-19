@@ -26,7 +26,7 @@ namespace mongo {
         ClockSkewException() : DBException( "clock skew exception" , 20001 ) {}
     };
 
-    /* replsets use RSOpTime.
+    /* replsets used to use RSOpTime.
        M/S uses OpTime.
        But this is useable from both.
        */
@@ -52,17 +52,21 @@ namespace mongo {
         }
         OpTime(Date_t date) {
             reinterpret_cast<unsigned long long&>(*this) = date.millis;
+            dassert( (int)secs >= 0 );
         }
         OpTime(ReplTime x) {
             reinterpret_cast<unsigned long long&>(*this) = x;
+            dassert( (int)secs >= 0 );
         }
         OpTime(unsigned a, unsigned b) {
             secs = a;
             i = b;
+            dassert( (int)secs >= 0 );
         }
         OpTime( const OpTime& other ) { 
             secs = other.secs;
             i = other.i;
+            dassert( (int)secs >= 0 );
         }
         OpTime() {
             secs = 0;

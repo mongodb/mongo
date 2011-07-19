@@ -32,15 +32,15 @@ namespace mongo {
         virtual void getMore( Request& r ) = 0;
         virtual void writeOp( int op , Request& r ) = 0;
 
-        virtual void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) = 0;
-        virtual void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags ) = 0;
+        virtual void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags, bool safe=false, const char* nsChunkLookup=0 ) = 0;
+        virtual void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags, bool safe=false ) = 0;
 
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );
 
-        void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 );
-        void update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags=0 );
+        void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 , bool safe=false );
+        void update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags=0, bool safe=false );
 
     };
 

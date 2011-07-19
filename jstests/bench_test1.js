@@ -2,8 +2,8 @@
 t = db.bench_test1;
 t.drop();
 
-t.insert( { _id : 1 } )
-t.insert( { _id : 2 } )
+t.insert( { _id : 1 , x : 1 } )
+t.insert( { _id : 2 , x : 1 } )
 
 ops = [
     { op : "findOne" , ns : t.getFullName() , query : { _id : 1 } } , 

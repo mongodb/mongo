@@ -141,7 +141,7 @@ namespace mongo {
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
 
-            ShardConnection conn( theShard , "" );
+            ShardConnection conn( theShard , "", true );
             
             BSONObj res;
             bool ok = false;
@@ -211,7 +211,7 @@ namespace mongo {
         for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ) {
             string theShard = *i;
             bbb.append( theShard );
-            ShardConnection conn( theShard , "" );
+            ShardConnection conn( theShard , "", true );
             BSONObj res;
             bool ok = false;
             try {

@@ -20,17 +20,16 @@
 
 #pragma once
 
-#include "../../util/hostandport.h"
+#include "../../util/net/hostandport.h"
+#include "../../util/concurrency/race.h"
 #include "health.h"
 
 namespace mongo {
 
-    /* singleton config object is stored here */
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
-    private:
         struct TagSubgroup;
     public:
         /**
@@ -63,14 +62,21 @@ namespace mongo {
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
             set<string> tags;     /* tagging for data center, rack, etc. */
-            set<TagSubgroup*> groups; // the subgroups this member belongs to
-
+        private:
+            set<TagSubgroup*> _groups; // the subgroups this member belongs to
+        public:
+            const set<TagSubgroup*>& groups() const { 
+                return _groups;
+            }
+            set<TagSubgroup*>& groupsw(ReplSetConfig *c) { 
+                assert(!c->_constructed);
+                return _groups;
+            }
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
-                log(5) << h.toString() << " updating to " << last.toString() << endl;
-                for (set<TagSubgroup*>::iterator it = groups.begin(); it != groups.end(); it++) {
+                for (set<TagSubgroup*>::iterator it = _groups.begin(); it != _groups.end(); it++) {
                     ((TagSubgroup*)(*it))->updateLast(last);
                 }
             }
@@ -109,6 +115,7 @@ namespace mongo {
 
         BSONObj asBson() const;
 
+        bool _constructed;
     private:
         bool _ok;
         void from(BSONObj);
@@ -126,8 +133,10 @@ namespace mongo {
          * point to this subgroup. When one of their oplog-tailing cursors is
          * updated, this subgroup is updated.
          */
-        struct TagSubgroup {
-            string name;
+        struct TagSubgroup : boost::noncopyable {
+            ~TagSubgroup(); // never called; not defined
+            TagSubgroup(string nm) : name(nm) { }
+            const string name;
             OpTime last;
             vector<TagClause*> clauses;
 
@@ -137,7 +146,8 @@ namespace mongo {
             set<MemberCfg*> m;
 
             void updateLast(const OpTime& op);
-            string toString() const;
+
+            //string toString() const;
 
             /**
              * If two tags have the same name, they should compare as equal so

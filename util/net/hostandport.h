@@ -18,8 +18,8 @@
 #pragma once
 
 #include "sock.h"
-#include "../db/cmdline.h"
-#include "mongoutils/str.h"
+#include "../../db/cmdline.h"
+#include "../mongoutils/str.h"
 
 namespace mongo {
 
@@ -88,24 +88,6 @@ namespace mongo {
         string _host;
         int _port; // -1 indicates unspecified
     };
-
-    /** returns true if strings seem to be the same hostname.
-        "nyc1", "nyc1.acme", and "nyc1.acme.com" are treated as the same.
-    */
-    inline bool sameHostname(const string& a, const string& b) {
-        size_t prefixLen = str::shareCommonPrefix(a.c_str(), b.c_str());
-
-        if (prefixLen == a.size()) { // (a == b) or (a isPrefixOf b)
-            if ( b[prefixLen] == '.' || b[prefixLen] == '\0')
-                return true;
-        }
-        else if(prefixLen == b.size()) {   // (b isPrefixOf a)
-            if ( a[prefixLen] == '.') // can't be '\0'
-                return true;
-        }
-
-        return false;
-    }
 
     inline HostAndPort HostAndPort::Me() {
         const char* ips = cmdLine.bind_ip.c_str();

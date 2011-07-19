@@ -112,7 +112,7 @@ namespace mongo {
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
-                               const string sname , v8::Handle<v8::Value> value , int depth = 0 );
+                               const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
@@ -144,10 +144,12 @@ namespace mongo {
         Handle<v8::String> V8STR_MINKEY;
         Handle<v8::String> V8STR_MAXKEY;
         Handle<v8::String> V8STR_NUMBERLONG;
+        Handle<v8::String> V8STR_NUMBERINT;
         Handle<v8::String> V8STR_DBPTR;
         Handle<v8::String> V8STR_BINDATA;
         Handle<v8::String> V8STR_WRAPPER;
         Handle<v8::String> V8STR_RO;
+        Handle<v8::String> V8STR_MODIFIED;
 
     private:
         void _startCall();

@@ -37,7 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"
-#include "../util/message_server.h"
+#include "../util/net/message_server.h"
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
@@ -139,7 +139,7 @@ namespace mongo {
 #endif
 
     void sysRuntimeInfo() {
-        out() << "sysinfo:\n";
+        out() << "sysinfo:" << endl;
 #if defined(_SC_PAGE_SIZE)
         out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
 #endif
@@ -582,11 +582,7 @@ int main(int argc, char* argv[]) {
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
-#if !defined(_WIN32)
-    ("nounixsocket", "disable listening on unix sockets")
-#endif
     ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-    ("objcheck", "inspect client data for validity on receipt")
     ("profile",po::value<int>(), "0=off 1=slow, 2=all")
     ("quota", "limits each database to a certain number of files (8 default)")
     ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
@@ -752,9 +748,6 @@ int main(int argc, char* argv[]) {
         if (params.count("journalOptions")) {
             cmdLine.durOptions = params["journalOptions"].as<int>();
         }
-        if (params.count("objcheck")) {
-            objcheck = true;
-        }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
@@ -802,10 +795,12 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         if (params.count("repair")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
             forceRepair = 1;
         }
         if (params.count("upgrade")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
         }
         if (params.count("notablescan")) {
@@ -908,16 +903,13 @@ int main(int argc, char* argv[]) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
             }
-            if ( params.count( "diaglog" ) == 0 )
-                _diaglog.level = 1;
+            if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
+                cmdLine.dur = true;
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
-        }
-        if (params.count("nounixsocket")) {
-            noUnixSocket = true;
         }
         if (params.count("ipv6")) {
             enableIPv6();

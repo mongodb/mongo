@@ -30,12 +30,15 @@
 
 namespace mongo {
 
+    inline bool isNaN(double d) { 
+        return d != d;
+    }
+
     /* must be same type when called, unless both sides are #s 
        this large function is in header to facilitate inline-only use of bson
     */
     inline int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
-        double x;
 
         switch ( l.type() ) {
         case EOO:
@@ -69,30 +72,28 @@ namespace mongo {
                 if( L == R ) return 0;
                 return 1;
             }
-            // else fall through
+            goto dodouble;
         case NumberInt:
-        case NumberDouble: {
-            double left = l.number();
-            double right = r.number();
-            bool lNan = !( left <= std::numeric_limits< double >::max() &&
-                           left >= -std::numeric_limits< double >::max() );
-            bool rNan = !( right <= numeric_limits< double >::max() &&
-                           right >= -numeric_limits< double >::max() );
-            if ( lNan ) {
-                if ( rNan ) {
-                    return 0;
-                }
-                else {
-                    return -1;
-                }
+            if( r.type() == NumberInt ) {
+                int L = l._numberInt();
+                int R = r._numberInt();
+                if( L < R ) return -1;
+                return L == R ? 0 : 1;
             }
-            else if ( rNan ) {
+            // else fall through
+        case NumberDouble: 
+dodouble:
+            {
+                double left = l.number();
+                double right = r.number();
+                if( left < right ) 
+                    return -1;
+                if( left == right )
+                    return 0;
+                if( isNaN(left) )
+                    return isNaN(right) ? 0 : -1;
                 return 1;
             }
-            x = left - right;
-            if ( x < 0 ) return -1;
-            return x == 0 ? 0 : 1;
-        }
         case jstOID:
             return memcmp(l.value(), r.value(), 12);
         case Code:
@@ -316,7 +317,7 @@ namespace mongo {
     }
 
 
-    inline bool BSONObj::isValid() {
+    inline bool BSONObj::isValid() const {
         int x = objsize();
         return x > 0 && x <= BSONObjMaxInternalSize;
     }
@@ -900,5 +901,88 @@ namespace mongo {
         BSONObjBuilder b;
         b.append( q , t );
         return BSONFieldValue<BSONObj>( _name , b.obj() );
+    }
+
+    // used by jsonString()
+    inline string escape( string s , bool escape_slash=false) {
+        StringBuilder ret;
+        for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
+            switch ( *i ) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << (escape_slash ? "\\/" : "/");
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if ( *i >= 0 && *i <= 0x1f ) {
+                    //TODO: these should be utf16 code-units not bytes
+                    char c = *i;
+                    ret << "\\u00" << toHexLower(&c, 1);
+                }
+                else {
+                    ret << *i;
+                }
+            }
+        }
+        return ret.str();
+    }
+
+    inline string BSONObj::hexDump() const {
+        stringstream ss;
+        const char *d = objdata();
+        int size = objsize();
+        for( int i = 0; i < size; ++i ) {
+            ss.width( 2 );
+            ss.fill( '0' );
+            ss << hex << (unsigned)(unsigned char)( d[ i ] ) << dec;
+            if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
+                ss << '\'' << d[ i ] << '\'';
+            if ( i != size - 1 )
+                ss << ' ';
+        }
+        return ss.str();
+    }
+
+    inline void BSONObjBuilder::appendKeys( const BSONObj& keyPattern , const BSONObj& values ) {
+        BSONObjIterator i(keyPattern);
+        BSONObjIterator j(values);
+
+        while ( i.more() && j.more() ) {
+            appendAs( j.next() , i.next().fieldName() );
+        }
+
+        assert( ! i.more() );
+        assert( ! j.more() );
+    }
+
+    inline BSONObj BSONObj::removeField(const StringData& name) const { 
+        BSONObjBuilder b;
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *fname = e.fieldName();
+            if( strcmp(name.data(), fname) )
+                b.append(e);
+        }
+        return b.obj();
     }
 }

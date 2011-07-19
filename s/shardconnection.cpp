@@ -43,6 +43,9 @@ namespace mongo {
 
     DBConnectionPool shardConnectionPool;
 
+    // Only print the non-top-level-shard-conn warning once if not verbose
+    volatile bool printedShardConnWarning = false;
+
     /**
      * holds all the actual db connections for a client to various servers
      * 1 per thread, so doesn't have to be thread safe
@@ -80,12 +83,12 @@ namespace mongo {
             _hosts.clear();
         }
 
-        DBClientBase * get( const string& addr , const string& ns ) {
+        DBClientBase * get( const string& addr , const string& ns, bool ignoreDirect = false ) {
             _check( ns );
 
             // Determine if non-shard conn is RS member for warning
             // All shards added to _hosts if not present in _check()
-            if( _hosts.find( addr ) == _hosts.end() ){
+            if( ( logLevel >= 1 || ! printedShardConnWarning ) && ! ignoreDirect && _hosts.find( addr ) == _hosts.end() ){
 
                 vector<Shard> all;
                 Shard::getAllShards( all );
@@ -102,6 +105,7 @@ namespace mongo {
                 }
 
                 if( isRSMember ){
+                    printedShardConnWarning = true;
                     warning() << "adding shard sub-connection " << addr << " (parent " << parentShard << ") as sharded, this is safe but unexpected" << endl;
                     printStackTrace();
                 }
@@ -196,24 +200,24 @@ namespace mongo {
 
     thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 
-    ShardConnection::ShardConnection( const Shard * s , const string& ns )
+    ShardConnection::ShardConnection( const Shard * s , const string& ns, bool ignoreDirect )
         : _addr( s->getConnString() ) , _ns( ns ) {
-        _init();
+        _init( ignoreDirect );
     }
 
-    ShardConnection::ShardConnection( const Shard& s , const string& ns )
+    ShardConnection::ShardConnection( const Shard& s , const string& ns, bool ignoreDirect )
         : _addr( s.getConnString() ) , _ns( ns ) {
-        _init();
+        _init( ignoreDirect );
     }
 
-    ShardConnection::ShardConnection( const string& addr , const string& ns )
+    ShardConnection::ShardConnection( const string& addr , const string& ns, bool ignoreDirect )
         : _addr( addr ) , _ns( ns ) {
-        _init();
+        _init( ignoreDirect );
     }
 
-    void ShardConnection::_init() {
+    void ShardConnection::_init( bool ignoreDirect ) {
         assert( _addr.size() );
-        _conn = ClientConnections::threadInstance()->get( _addr , _ns );
+        _conn = ClientConnections::threadInstance()->get( _addr , _ns, ignoreDirect );
         _finishedInit = false;
     }
 

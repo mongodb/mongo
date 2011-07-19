@@ -125,7 +125,7 @@ namespace mongo {
     }
 
     template< class V >
-    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict) const {
+    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict, unsigned depth) const {
         {
             bool f = false;
             assert( f = true );
@@ -136,8 +136,8 @@ namespace mongo {
         this->assertValid(order, true);
 
         if ( bt_dmp ) {
-            out() << thisLoc.toString() << ' ';
-            ((BtreeBucket *) this)->dump();
+            _log() << thisLoc.toString() << ' ';
+            ((BtreeBucket *) this)->dump(depth);
         }
 
         // keycount
@@ -163,7 +163,7 @@ namespace mongo {
                 else {
                     wassert( b->parent == thisLoc );
                 }
-                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict);
+                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict, depth+1);
             }
         }
         if ( !this->nextChild.isNull() ) {
@@ -175,7 +175,7 @@ namespace mongo {
             else {
                 wassert( b->parent == thisLoc );
             }
-            kc += b->fullValidate(this->nextChild, order, unusedCount, strict);
+            kc += b->fullValidate(this->nextChild, order, unusedCount, strict, depth+1);
         }
 
         return kc;
@@ -309,12 +309,12 @@ namespace mongo {
      *  does not bother returning that value.
      */
     template< class V >
-    void BucketBasics<V>::popBack(DiskLoc& recLoc, Key& key) {
+    void BucketBasics<V>::popBack(DiskLoc& recLoc, Key &key) {
         massert( 10282 ,  "n==0 in btree popBack()", this->n > 0 );
         assert( k(this->n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
         KeyNode kn = keyNode(this->n-1);
         recLoc = kn.recordLoc;
-        key = kn.key;
+        key.assign(kn.key);
         int keysize = kn.key.dataSize();
 
         massert( 10283 , "rchild not null in btree popBack()", this->nextChild.isNull());
@@ -341,8 +341,9 @@ namespace mongo {
             const KeyNode klast = keyNode(this->n-1);
             if(  klast.key.woCompare(key, order) > 0 ) { 
                 log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
-                //cout << keyNode(n-1).key.toString() << endl;
-                //cout << key.toString() << endl;
+                log() << "  klast: " << keyNode(this->n-1).key.toString() << endl;
+                log() << "  key:   " << key.toString() << endl;
+                DEV klast.key.woCompare(key, order);
                 assert(false);
             }
         }
@@ -1217,7 +1218,7 @@ namespace mongo {
         const Ordering ord = Ordering::make(id.keyPattern());
         DiskLoc loc = locate(id, thisLoc, key, ord, pos, found, recordLoc, 1);
         if ( found ) {
-            if ( key.objsize() > KeyMax ) {
+            if ( key.objsize() > this->KeyMax ) {
                 OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
             }            
             loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);            
@@ -1677,8 +1678,8 @@ namespace mongo {
     int BtreeBucket<V>::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
-        if ( key.dataSize() > KeyMax ) {
-            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
+        if ( key.dataSize() > this->KeyMax ) {
+            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << this->KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
             return 2;
         }
         assert( key.dataSize() > 0 );
@@ -1731,18 +1732,20 @@ namespace mongo {
     }
 
     template< class V >
-    void BtreeBucket<V>::dump() const {
-        out() << "DUMP btreebucket this->n:" << this->n;
-        out() << " this->parent:" << hex << this->parent.getOfs() << dec;
+    void BtreeBucket<V>::dump(unsigned depth) const {
+        string indent = string(depth, ' ');
+        _log() << "BUCKET n:" << this->n;
+        _log() << " parent:" << hex << this->parent.getOfs() << dec;
         for ( int i = 0; i < this->n; i++ ) {
-            out() << '\n';
+            _log() << '\n' << indent;
             KeyNode k = keyNode(i);
-            out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
-                  k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.toString() << dec;
+            string ks = k.key.toString();
+            _log() << "  " << hex << k.prevChildBucket.getOfs() << '\n';
+            _log() << indent << "    " << i << ' ' << ks.substr(0, 30) << " Loc:" << k.recordLoc.toString() << dec;
             if ( this->k(i).isUnused() )
-                out() << " UNUSED";
+                _log() << " UNUSED";
         }
-        out() << " right:" << hex << this->nextChild.getOfs() << dec << endl;
+        _log() << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
     }
 
     /** todo: meaning of return code unclear clean up */
@@ -1754,13 +1757,13 @@ namespace mongo {
         KeyOwned key(_key);
 
         if ( toplevel ) {
-            if ( key.dataSize() > KeyMax ) {
+            if ( key.dataSize() > this->KeyMax ) {
                 problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.dataSize() << ' ' << key.toString() << endl;
                 return 3;
             }
         }
 
-        int x = _insert(thisLoc, recordLoc, Key(key), order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+        int x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
         this->assertValid( order );
 
         return x;
@@ -1773,7 +1776,7 @@ namespace mongo {
 
     template< class V >
     int BtreeBucket<V>::getKeyMax() {
-        return KeyMax;
+        return V::KeyMax;
     }
 
     template< class V >

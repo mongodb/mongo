@@ -20,11 +20,13 @@
 #ifndef USE_ASIO
 
 #include "message.h"
+#include "message_port.h"
 #include "message_server.h"
+#include "listen.h"
 
-#include "../db/cmdline.h"
-#include "../db/lasterror.h"
-#include "../db/stats/counters.h"
+#include "../../db/cmdline.h"
+#include "../../db/lasterror.h"
+#include "../../db/stats/counters.h"
 
 namespace mongo {
 
@@ -38,7 +40,7 @@ namespace mongo {
             setThreadName( "conn" );
             
             assert( inPort );
-            inPort->_logLevel = 1;
+            inPort->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
             string otherSide;
@@ -48,7 +50,7 @@ namespace mongo {
                 LastError * le = new LastError();
                 lastError.reset( le ); // lastError now has ownership
 
-                otherSide = p->farEnd.toString();
+                otherSide = p->remoteString();
 
                 handler->connected( p.get() );
 

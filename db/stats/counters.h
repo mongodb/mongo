@@ -19,7 +19,7 @@
 
 #include "../../pch.h"
 #include "../jsobj.h"
-#include "../../util/message.h"
+#include "../../util/net/message.h"
 #include "../../util/processinfo.h"
 #include "../../util/concurrency/spin_lock.h"
 

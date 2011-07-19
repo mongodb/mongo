@@ -43,14 +43,14 @@ wait(function() {
     if (!status.members) {
       return false;
     }
-    
+
     for (i=0; i<7; i++) {
       if (status.members[i].state != 1 && status.members[i].state != 2) {
         return false;
       }
     }
     return true;
-    
+
   });
 
 replTest.awaitReplication();
@@ -75,6 +75,21 @@ try {
 catch(e) {
     print("trying to reconfigure: "+e);
 }
+
+// wait for a heartbeat, too, just in case sync happens before hb
+assert.soon(function() {
+    try {
+      for (var n in rs2.nodes) {
+        if (rs2.nodes[n].getDB("local").system.replset.findOne().version != 2) {
+          return false;
+        }
+      }
+    }
+    catch (e) {
+      return false;
+    }
+    return true;
+});
 
 rs2.awaitReplication();
 

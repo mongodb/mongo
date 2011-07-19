@@ -283,6 +283,7 @@ namespace mongo {
             void bailFromJS();
 
             const Config& _config;
+            DBDirectClient _db;
 
         protected:
 
@@ -290,8 +291,6 @@ namespace mongo {
 
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
-
-            DBDirectClient _db;
 
             scoped_ptr<InMemory> _temp;
             long _size; // bytes in _temp

@@ -46,6 +46,9 @@ namespace mongo {
 }
 
 namespace PerfTests {
+
+    const bool profiling = false;
+
     typedef DBDirectClient DBClientType;
     //typedef DBClientConnection DBClientType;
 
@@ -124,7 +127,7 @@ namespace PerfTests {
         virtual int expectationTimeMillis() { return -1; }
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
-        virtual int howLongMillis() { return 5000; } 
+        virtual int howLongMillis() { return profiling ? 60000 : 5000; } 
 
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
@@ -150,7 +153,13 @@ namespace PerfTests {
                     // no writing to perf db if dev
                 }
                 else if( !exists(fn) ) { 
-                    cout << "no ../../settings.py file found. will not write perf stats to db" << endl;
+                    static int once;
+                    if( exists("settings.py") )
+                        fn = "settings.py";
+                    else if( once++ == 0 ) {
+                        cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
+                        cout << "it is recommended this be enabled even on dev boxes" << endl;
+                    }
                 }
                 else {
                     try {
@@ -415,12 +424,78 @@ namespace PerfTests {
         string name() { return "Timer"; }
         virtual int howLongMillis() { return 1000; } 
         virtual bool showDurStats() { return false; }
-
         void timed() {
             mongo::Timer t;
             aaa += t.millis();
         }
     };
+
+    RWLock lk("testrw");
+    SimpleMutex m("simptst");
+    mongo::mutex mtest("mtest");
+    SpinLock s;
+
+    class mutexspeed : public B { 
+    public:
+        string name() { return "mutex"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            mongo::mutex::scoped_lock lk(mtest);
+        }
+    };    
+    class simplemutexspeed : public B { 
+    public:
+        string name() { return "simplemutex"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            SimpleMutex::scoped_lock lk(m);
+        }
+    };    
+    class spinlockspeed : public B { 
+    public:
+        string name() { return "spinlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            mongo::scoped_spinlock lk(s);
+        }
+    };    
+
+    class rlock : public B { 
+    public:
+        string name() { return "rlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lock_shared();
+            lk.unlock_shared();
+        }
+    };
+    class wlock : public B { 
+    public:
+        string name() { return "wlock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lock();
+            lk.unlock();
+        }
+    };
+    
+#if 0
+    class ulock : public B { 
+    public:
+        string name() { return "ulock"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            lk.lockAsUpgradable();
+            lk.unlockFromUpgradable();
+        }
+    };
+#endif
 
     class CTM : public B { 
     public:
@@ -486,7 +561,7 @@ namespace PerfTests {
     class Dummy : public B {
     public:
         Dummy() { }
-        virtual int howLongMillis() { return 4000; } 
+        virtual int howLongMillis() { return 3000; } 
         string name() { return "dummy"; }
         void timed() {
             dontOptimizeOutHopefully++;
@@ -499,7 +574,7 @@ namespace PerfTests {
     class TLS : public B {
     public:
         TLS() { }
-        virtual int howLongMillis() { return 4000; } 
+        virtual int howLongMillis() { return 3000; } 
         string name() { return "thread-local-storage"; }
         void timed() {
             if( &cc() )
@@ -614,7 +689,9 @@ namespace PerfTests {
             return "findOne_by_id";
         }
         void post() {
-            assert( client().count(ns()) > 100 );
+#if !defined(_DEBUG)
+            assert( client().count(ns()) > 50 );
+#endif
         }
         unsigned long long expectation() { return 1000; }
     };
@@ -689,8 +766,6 @@ namespace PerfTests {
             return s.c_str();
         }
 
-        void post() {
-        }
         unsigned long long expectation() { return 1000; }
     };
 
@@ -729,11 +804,8 @@ namespace PerfTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "perf" )
-        {
-        }
-        ~All() { 
-        }
+        All() : Suite( "perf" ) { }
+
         Result * run( const string& filter ) { 
             boost::thread a(t);
             Result * res = Suite::run(filter); 
@@ -745,26 +817,37 @@ namespace PerfTests {
             cout
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
-            add< Dummy >();
-            add< TLS >();
-            add< Malloc >();
-            add< Timer >();
-            add< CTM >();
-            add< KeyTest >();
-            add< Bldr >();
-            add< StkBldr >();
-            add< BSONIter >();
-            add< BSONGetFields1 >();
-            add< BSONGetFields2 >();
-            add< ChecksumTest >();
-            add< TaskQueueTest >();
-            add< InsertDup >();
-            add< Insert1 >();
-            add< InsertRandom >();
-            add< MoreIndexes<InsertRandom> >();
-            add< Update1 >();
-            add< MoreIndexes<Update1> >();
-            add< InsertBig >();
+            if( profiling ) { 
+                add< Update1 >();
+            }
+            else {
+                add< Dummy >();
+                add< TLS >();
+                add< Malloc >();
+                add< Timer >();
+                add< rlock >();
+                add< wlock >();
+                //add< ulock >();
+                add< mutexspeed >();
+                add< simplemutexspeed >();
+                add< spinlockspeed >();
+                add< CTM >();
+                add< KeyTest >();
+                add< Bldr >();
+                add< StkBldr >();
+                add< BSONIter >();
+                add< BSONGetFields1 >();
+                add< BSONGetFields2 >();
+                add< ChecksumTest >();
+                add< TaskQueueTest >();
+                add< InsertDup >();
+                add< Insert1 >();
+                add< InsertRandom >();
+                add< MoreIndexes<InsertRandom> >();
+                add< Update1 >();
+                add< MoreIndexes<Update1> >();
+                add< InsertBig >();
+            }
         }
     } myall;
 }

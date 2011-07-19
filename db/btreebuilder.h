@@ -17,7 +17,7 @@ namespace mongo {
         /** Number of keys added to btree. */
         unsigned long long n;
         /** Last key passed to addKey(). */
-        typename V::Key keyLast;
+        auto_ptr< typename V::KeyOwned > keyLast;
         BSONObj order;
         Ordering ordering;
         /** true iff commit() completed successfully. */

@@ -87,6 +87,8 @@ namespace mongo {
             dbresponse->responseTo = m.header()->id;
             return true;
         }
+        
+        uassert( 9517 , "writeback" , ( d.reservedField() & DbMessage::Reserved_FromWriteback ) == 0 );
 
         OID writebackID;
         writebackID.init();
@@ -96,7 +98,7 @@ namespace mongo {
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
 
         log(1) << "got write with an old config - writing back ns: " << ns << endl;
-        if ( logLevel ) log(1) << debugString( m ) << endl;
+        if ( logLevel ) log(1) << m.toString() << endl;
 
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );

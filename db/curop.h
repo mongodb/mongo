@@ -24,7 +24,7 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
-#include "../util/hostandport.h"
+#include "../util/net/hostandport.h"
 
 namespace mongo {
 
@@ -134,16 +134,9 @@ namespace mongo {
         }
 
         void append( BSONObjBuilder& b , const StringData& name ) {
-            _lock.lock();
-            try {
-                BSONObj temp = _get();
-                b.append( name , temp );
-                _lock.unlock();
-            }
-            catch ( ... ) {
-                _lock.unlock();
-                throw;
-            }
+            scoped_spinlock lk(_lock);
+            BSONObj temp = _get();
+            b.append( name , temp );
         }
 
     private:

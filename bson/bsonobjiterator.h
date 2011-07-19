@@ -26,6 +26,8 @@ namespace mongo {
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
        object, although next().eoo() will be true.
 
+       The BSONObj must stay in scope for the duration of the iterator's execution.
+
        todo: we may want to make a more stl-like iterator interface for this
              with things like begin() and end()
     */
@@ -106,6 +108,29 @@ namespace mongo {
         int _nfields;
         int _cur;
     };
+
+    /** transform a BSON array into a vector of BSONElements.
+        we match array # positions with their vector position, and ignore
+        any fields with non-numeric field names.
+        */
+    inline vector<BSONElement> BSONElement::Array() const {
+        chk(mongo::Array);
+        vector<BSONElement> v;
+        BSONObjIterator i(Obj());
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const char *f = e.fieldName();
+            try {
+                unsigned u = stringToNum(f);
+                assert( u < 1000000 );
+                if( u >= v.size() )
+                    v.resize(u+1);
+                v[u] = e;
+            }
+            catch(unsigned) { }
+        }
+        return v;
+    }
 
     /** Similar to BOOST_FOREACH
      *

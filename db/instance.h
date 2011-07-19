@@ -146,6 +146,7 @@ namespace mongo {
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
 
+        double getSoTimeout() const { return 0; }
     private:
         static HostAndPort _clientHost;
     };

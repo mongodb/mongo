@@ -45,7 +45,7 @@ assert.throws( function() { c.next() }, [], "unexpected: object found" );
 m.getDB( "local" ).getCollectionNames().forEach( function( x ) { assert( !x.match( /^temp/ ), "temp collection found" ); } );
 
 t.drop();
-m.getDB( baseName ).createCollection( baseName, { capped:true, size:100000, autoIdIndex:false } );
+m.getDB( baseName ).createCollection( baseName, { capped:true, size:100000, autoIndexId:false } );
 t = m.getDB( baseName ).getCollection( baseName );
 t.insert( {_id:"a"} );
 t.insert( {_id:"a"} );

@@ -25,6 +25,7 @@
 #include "../util/text.h"
 #include "../util/queue.h"
 #include "../util/paths.h"
+#include "../util/stringutils.h"
 #include "../db/db.h"
 
 namespace BasicTests {
@@ -227,7 +228,7 @@ namespace BasicTests {
                 {
                     int x = t.millis();
                     if ( x < 1000 || x > 2500 ) {
-                        cout << "sleeptest x: " << x << endl;
+                        cout << "sleeptest finds sleep accuracy to be not great. x: " << x << endl;
                         ASSERT( x >= 1000 );
                         ASSERT( x <= 20000 );
                     }
@@ -404,6 +405,12 @@ namespace BasicTests {
             ASSERT_EQUALS( -1, lexNumCmp( "a", "0a"));
             ASSERT_EQUALS( -1, lexNumCmp( "000a", "001a"));
             ASSERT_EQUALS( 0, lexNumCmp( "010a", "0010a"));
+            
+            ASSERT_EQUALS( -1 , lexNumCmp( "a0" , "a00" ) );
+            ASSERT_EQUALS( 0 , lexNumCmp( "a.0" , "a.00" ) );
+            ASSERT_EQUALS( -1 , lexNumCmp( "a.b.c.d0" , "a.b.c.d00" ) );
+            ASSERT_EQUALS( 1 , lexNumCmp( "a.b.c.0.y" , "a.b.c.00.x" ) );
+            
         }
     };
 

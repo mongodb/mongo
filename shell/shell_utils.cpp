@@ -302,7 +302,7 @@ namespace mongo {
             if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
             if ( port > 0 )
-                buf << "m" << port << "| " << line;
+                buf << " m" << port << "| " << line;
             else
                 buf << "sh" << pid << "| " << line;
             cout << buf.str() << endl;
@@ -810,20 +810,20 @@ namespace mongo {
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
-            assert( a.firstElement().isNumber() );
+            uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
-            return BSON( "" << code );
+            return BSON( "" << (double)code );
         }
 
         BSONObj StopMongoProgramByPid( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
-            assert( a.firstElement().isNumber() );
+            uassert( 15852 , "stopMongoByPid needs a number" , a.firstElement().isNumber() );
             int pid = int( a.firstElement().number() );
             int code = killDb( 0, pid, getSignal( a ) );
             cout << "shell: stopped mongo program on pid " << pid << endl;
-            return BSON( "" << code );
+            return BSON( "" << (double)code );
         }
 
         void KillMongoProgramInstances() {

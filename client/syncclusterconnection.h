@@ -92,6 +92,8 @@ namespace mongo {
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SYNC; }
 
         void setAllSoTimeouts( double socketTimeout );
+        double getSoTimeout() const { return _socketTimeout; }
+
         virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword);
 
     private:

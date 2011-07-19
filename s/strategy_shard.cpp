@@ -191,8 +191,10 @@ namespace mongo {
             }
         }
 
-        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags ) {
-            ChunkManagerPtr manager = conf->getChunkManager(ns);
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags, bool safe, const char* nsChunkLookup ) {
+            if (!nsChunkLookup)
+                nsChunkLookup = ns;
+            ChunkManagerPtr manager = conf->getChunkManager(nsChunkLookup);
             if ( ! manager->hasShardKey( o ) ) {
 
                 bool bad = true;
@@ -206,7 +208,7 @@ namespace mongo {
                 }
 
                 if ( bad ) {
-                    log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
+                    log() << "tried to insert object without shard key: " << nsChunkLookup << "  " << o << endl;
                     uasserted( 14842 , "tried to insert object without shard key" );
                 }
 
@@ -221,17 +223,12 @@ namespace mongo {
                 try {
                     ChunkPtr c = manager->findChunk( o );
                     log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                    insert( c->getShard() , ns , o , flags);
-
-//                    r.gotInsert();
-//                    if ( r.getClientInfo()->autoSplitOk() )
-                        c->splitIfShould( o.objsize() );
+                    insert( c->getShard() , ns , o , flags, safe);
                     break;
                 }
                 catch ( StaleConfigException& e ) {
                     int logLevel = i < ( maxTries / 2 );
                     LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
-//                    r.reset();
 
                     unsigned long long old = manager->getSequenceNumber();
                     manager = conf->getChunkManager(ns);
@@ -344,7 +341,7 @@ namespace mongo {
             }
         }
 
-        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags ) {
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags, bool safe ) {
             ChunkManagerPtr manager = conf->getChunkManager(ns);
             BSONObj chunkFinder = query;
 
@@ -410,7 +407,7 @@ namespace mongo {
 //                int * x = (int*)(r.d().afterNS());
 //                x[0] |= UpdateOption_Broadcast;
                 for ( set<Shard>::iterator i=shards.begin(); i!=shards.end(); i++) {
-                    update(*i, ns, query, toupdate, flags);
+                    update(*i, ns, query, toupdate, flags, safe);
                 }
             }
             else {
@@ -419,8 +416,6 @@ namespace mongo {
                     try {
                         ChunkPtr c = manager->findChunk( chunkFinder );
                         update(c->getShard(), ns, query, toupdate, flags);
-//                        if ( r.getClientInfo()->autoSplitOk() )
-                            c->splitIfShould( toupdate.objsize() );
                         break;
                     }
                     catch ( StaleConfigException& e ) {
@@ -429,7 +424,6 @@ namespace mongo {
                         left--;
                         log() << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << ns << " query: " << query << endl;
-//                        r.reset( false );
                         manager = conf->getChunkManager(ns);
                         uassert(14849, "collection no longer sharded", manager);
                     }

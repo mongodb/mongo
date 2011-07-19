@@ -22,6 +22,7 @@ import urllib
 import urllib2
 import buildscripts
 import buildscripts.bb
+import stat
 from buildscripts import utils
 
 buildscripts.bb.checkOk()
@@ -137,6 +138,7 @@ add_option( "usev8" , "use v8 for javascript" , 0 , True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
+add_option( "osnew", "use newer operating system API features" , 0 , False )
 
 # dev tools
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
@@ -226,7 +228,6 @@ if has_option( "cpppath" ):
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
 
-
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
 
@@ -310,21 +311,22 @@ if has_option( "full" ):
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
-commonFiles += [ "util/background.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" ,
-                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
+commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
+                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
                  "util/concurrency/synchronization.cpp" ]
-commonFiles += Glob( "util/*.c" )
+commonFiles += [ "util/net/sock.cpp" , "util/net/httpclient.cpp" , "util/net/message.cpp" , "util/net/message_port.cpp" , "util/net/listen.cpp" ]
+commonFiles += Glob( "util/*.c" ) 
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
 
 #mmap stuff
 
 coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/message_server_port.cpp" , 
+coreServerFiles = [ "util/net/message_server_port.cpp" , 
                     "client/parallel.cpp" , "db/common.cpp", 
-                    "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+                    "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
+                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp" ]
 
 mmapFiles = [ "util/mmap.cpp" ]
 
@@ -349,7 +351,7 @@ coreServerFiles += processInfoFiles
 
 
 if has_option( "asio" ):
-    coreServerFiles += [ "util/message_server_asio.cpp" ]
+    coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
 serverOnlyFiles = Split( "db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
@@ -531,6 +533,9 @@ elif "win32" == os.sys.platform:
     #if force64:
     #    release = True
 
+    if has_option( "osnew" ):
+        env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
+
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
 	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
             print( "found visual studio at " + pathdir )
@@ -690,6 +695,7 @@ if nix:
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
         
+    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used. 
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
@@ -764,6 +770,11 @@ try:
     umask = os.umask(022)
 except OSError:
     pass
+
+if not windows:
+    for keysuffix in [ "1" , "2" ]:
+        keyfile = "jstests/libs/key%s" % keysuffix
+        os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
 # --- check system ---
 
@@ -1496,7 +1507,7 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 
 #headers
 if installSetup.headers:
-    for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
+    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "db/ops/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
         env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.h" ) )
         env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.hpp" ) )
 

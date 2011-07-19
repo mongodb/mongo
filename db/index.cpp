@@ -28,15 +28,21 @@
 namespace mongo {
 
     /** old (<= v1.8) : 0
-        1 is temp new version but might move it to 2 for the real release TBD
+        1 is new version
     */
-    const int DefaultIndexVersionNumber = 0;
+    const int DefaultIndexVersionNumber = 1;
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
+
+/*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+            int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        */
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -61,6 +67,24 @@ namespace mongo {
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
                 uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
             }
+        }
+
+        // for geo:
+        virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
+        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
+            typename BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            key = kn.key.toBson();
+            recordLoc = kn.recordLoc;
+        }
+        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) {
+            return thisLoc.btree<V>()->keyAt(pos).toBson();
+        }
+        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) { 
+            return thisLoc.btree<V>()->advance(thisLoc,keyOfs,direction,caller);
         }
     };
 
@@ -324,8 +348,6 @@ namespace mongo {
             }
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
-            if( o.hasElement("_id") ) 
-                b.append( o["_id"] );
             if( !o["v"].eoo() ) {
                 double vv = o["v"].Number();
                 // note (one day) we may be able to fresh build less versions than we can use
@@ -340,7 +362,18 @@ namespace mongo {
             if( o["unique"].trueValue() )
                 b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
             b.append(o["ns"]);
-            b.appendElementsUnique(o);
+
+            {
+                // stripping _id
+                BSONObjIterator i(o);
+                while ( i.more() ) {
+                    BSONElement e = i.next();
+                    string s = e.fieldName();
+                    if( s != "_id" && s != "v" && s != "ns" && s != "unique" && s != "key" )
+                        b.append(e);
+                }
+            }
+        
             fixedIndexObject = b.obj();
         }
 

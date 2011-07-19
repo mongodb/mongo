@@ -145,7 +145,7 @@ namespace mongo {
                             continue;
 
                         if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
-                            throw GetMoreWaitException();
+                            return 0;
                         }
 
                         break;
@@ -161,7 +161,7 @@ namespace mongo {
                 // in some cases (clone collection) there won't be a matcher
                 if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
-                else if ( manager && ! manager->belongsToMe( c->currLoc().obj() ) ){
+                else if ( manager && ! manager->belongsToMe( cc ) ){
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
                 }
                 else {
@@ -592,7 +592,7 @@ namespace mongo {
             else {
                 _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
-                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ) {
+                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ) { // TODO: should make this covered at some point
                     _nChunkSkips++;
                     // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
                 }

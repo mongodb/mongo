@@ -23,6 +23,7 @@
 #include "../queryoptimizer.h"
 #include "../repl.h"
 #include "../btree.h"
+#include "../../util/stringutils.h"
 #include "update.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
@@ -743,6 +744,10 @@ namespace mongo {
         return ss.str();
     }
 
+    bool ModSetState::FieldCmp::operator()( const string &l, const string &r ) const {
+        return lexNumCmp( l.c_str(), r.c_str() ) < 0;
+    }
+
     BSONObj ModSet::createNewFromQuery( const BSONObj& query ) {
         BSONObj newObj;
 
@@ -1076,11 +1081,22 @@ namespace mongo {
             modsIsIndexed = mods->isIndexed();
         }
 
-        if( !upsert && !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
+        if( !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                return _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                if ( result.existing || ! upsert ) {
+                    return result;
+                }
+                else if ( upsert && ! isOperatorUpdate && ! logop) {
+                    // this handles repl inserts
+                    checkNoMods( updateobj );
+                    debug.upsert = true;
+                    BSONObj no = updateobj;
+                    theDataFileMgr.insertWithObjMod(ns, no, god);
+                    return UpdateResult( 0 , 0 , 1 , no );
+                }
             }
         }
 
@@ -1104,7 +1120,7 @@ namespace mongo {
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
                 }
 
-                if ( ! cc->yield() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::WillNeed ) ) {
                     cc.release();
                     break;
                 }
@@ -1291,6 +1307,7 @@ namespace mongo {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
+                checkNoMods( newObj );
                 debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )

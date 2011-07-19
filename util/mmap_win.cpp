@@ -18,7 +18,6 @@
 #include "pch.h"
 #include "mmap.h"
 #include "text.h"
-#include <windows.h>
 #include "../db/mongommf.h"
 #include "../db/concurrency.h"
 

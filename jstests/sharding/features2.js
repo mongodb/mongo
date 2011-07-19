@@ -97,7 +97,7 @@ doMR = function( n ){
     
     var res = db.mr.mapReduce( m , r , "smr1_out" );
     printjson( res );
-    assert.eq( new NumberLong(4) , res.counts.input , "MR T0 " + n );
+    assert.eq( 4 , res.counts.input , "MR T0 " + n );
 
     var x = db[res.result];
     assert.eq( 3 , x.find().count() , "MR T1 " + n );
@@ -115,7 +115,7 @@ doMR = function( n ){
 
     var res = db.mr.mapReduce( m , r , { out : { inline : 1 } } );
     printjson( res );
-    assert.eq( new NumberLong(4) , res.counts.input , "MR T6 " + n );
+    assert.eq( 4 , res.counts.input , "MR T6 " + n );
 
     var z = {};
     res.find().forEach( function(a){ z[a._id] = a.value.count; } );

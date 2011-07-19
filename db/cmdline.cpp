@@ -20,7 +20,7 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/processinfo.h"
-#include "../util/message.h"
+#include "../util/net/listen.h"
 #include "security_common.h"
 
 #ifdef _WIN32
@@ -53,11 +53,13 @@ namespace mongo {
         ("port", po::value<int>(&cmdLine.port), "specify port number")
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
         ("maxConns",po::value<int>(), "max number of simultaneous connections")
+        ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
+        ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
 #endif
@@ -179,6 +181,10 @@ namespace mongo {
             connTicketHolder.resize( newSize );
         }
 
+        if (params.count("objcheck")) {
+            cmdLine.objcheck = true;
+        }
+
         string logpath;
 
 #ifndef _WIN32
@@ -188,6 +194,10 @@ namespace mongo {
                 cout << cmdLine.socket << " must be a directory" << endl;
                 ::exit(-1);
             }
+        }
+
+        if (params.count("nounixsocket")) {
+            cmdLine.noUnixSocket = true;
         }
 
         if (params.count("fork")) {

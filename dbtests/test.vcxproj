@@ -219,6 +219,7 @@
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
     <ClInclude Include="..\pcre-7.4\pcrecpp.h" />
+    <ClInclude Include="..\server.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp" />
     <ClInclude Include="..\pcre-7.4\config.h" />
@@ -610,7 +611,9 @@
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
+    <ClCompile Include="..\util\concurrency\spin_lock.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\concurrency\synchronization.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
@@ -629,6 +632,7 @@
     <ClCompile Include="..\db\security_commands.cpp" />
     <ClCompile Include="..\db\tests.cpp" />
     <ClCompile Include="..\db\cmdline.cpp" />
+    <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\matcher_covered.cpp" />
     <ClCompile Include="..\db\oplog.cpp" />
     <ClCompile Include="..\db\queryutil.cpp" />
@@ -636,7 +640,6 @@
     <ClCompile Include="..\util\assert_util.cpp" />
     <ClCompile Include="..\util\background.cpp" />
     <ClCompile Include="..\util\base64.cpp" />
-    <ClCompile Include="..\util\httpclient.cpp" />
     <ClCompile Include="..\util\md5.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -652,13 +655,15 @@
       </PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\util\md5main.cpp" />
-    <ClCompile Include="..\util\message.cpp" />
-    <ClCompile Include="..\util\message_server_port.cpp" />
-    <ClCompile Include="..\util\miniwebserver.cpp" />
+    <ClCompile Include="..\util\net\message.cpp" />
+    <ClCompile Include="..\util\net\listen.cpp" />
+    <ClCompile Include="..\util\net\message_server_port.cpp" />
+    <ClCompile Include="..\util\net\message_port.cpp" />
+    <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
-    <ClCompile Include="..\util\sock.cpp" />
+    <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\util.cpp" />
@@ -695,6 +700,7 @@
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="repltests.cpp" />
     <ClCompile Include="socktests.cpp" />
+    <ClCompile Include="spin_lock_test.cpp" />
     <ClCompile Include="threadedtests.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4180;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4180;%(DisableSpecificWarnings)</DisableSpecificWarnings>

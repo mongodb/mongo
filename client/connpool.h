@@ -55,7 +55,7 @@ namespace mongo {
         /**
          * gets a connection or return NULL
          */
-        DBClientBase * get( DBConnectionPool * pool);
+        DBClientBase * get( DBConnectionPool * pool , double socketTimeout );
 
         void done( DBConnectionPool * pool , DBClientBase * c );
 
@@ -77,6 +77,7 @@ namespace mongo {
         };
 
         std::stack<StoredConnection> _pool;
+        
         long long _created;
         ConnectionString::ConnectionType _type;
 
@@ -141,11 +142,21 @@ namespace mongo {
     private:
         DBConnectionPool( DBConnectionPool& p );
         
-        DBClientBase* _get( const string& ident );
+        DBClientBase* _get( const string& ident , double socketTimeout );
 
-        DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
+        DBClientBase* _finishCreate( const string& ident , double socketTimeout, DBClientBase* conn );
         
-        typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
+        struct PoolKey {
+            PoolKey( string i , double t ) : ident( i ) , timeout( t ) {}
+            string ident;
+            double timeout;
+        };
+
+        struct poolKeyCompare {
+            bool operator()( const PoolKey& a , const PoolKey& b ) const;
+        };
+
+        typedef map<PoolKey,PoolForHost,poolKeyCompare> PoolMap; // servername -> pool
 
         mongo::mutex _mutex;
         string _name;

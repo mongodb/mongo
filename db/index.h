@@ -35,11 +35,19 @@ namespace mongo {
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
         virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
         virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                      IndexDetails& idx, bool toplevel = true) const = 0;
+            const BSONObj& key, const Ordering &order, bool dupsAllowed,
+            IndexDetails& idx, bool toplevel = true) const = 0;
         virtual DiskLoc addBucket(const IndexDetails&) = 0;
         virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, 
-                                   DiskLoc self, const Ordering& ordering) = 0;
+            DiskLoc self, const Ordering& ordering) = 0;
+
+        // these are for geo
+        virtual bool isUsed(DiskLoc thisLoc, int pos) = 0;
+        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj&, DiskLoc& recordLoc) = 0;
+        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) = 0;
+        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+                               int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) = 0;
+        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
     };
 
     /* Details about a particular index. There is one of these effectively for each object in
@@ -185,7 +193,7 @@ namespace mongo {
         /** @return the interface for this interface, which varies with the index version.
             used for backward compatibility of index versions/formats.
         */
-        IndexInterface& idxInterface() { 
+        IndexInterface& idxInterface() const { 
             int v = version();
             dassert( isASupportedIndexVersionNumber(v) );
             return *iis[v&1];

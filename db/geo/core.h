@@ -72,6 +72,14 @@ namespace mongo {
             init( hash );
         }
 
+        static GeoHash makeFromBinData(const char *bindata, unsigned bits) {
+            GeoHash h;
+            h._bits = bits;
+            h._copy( (char*)&h._hash , bindata );
+            h._fix();
+            return h;
+        }
+
         explicit GeoHash( const BSONElement& e , unsigned bits=32 ) {
             _bits = bits;
             if ( e.type() == BinData ) {
@@ -81,7 +89,7 @@ namespace mongo {
                 _bits = bits;
             }
             else {
-                cout << "GeoHash cons e : " << e << endl;
+                cout << "GeoHash bad element: " << e << endl;
                 uassert(13047,"wrong type for geo index. if you're using a pre-release version, need to rebuild index",0);
             }
             _fix();
@@ -335,7 +343,7 @@ namespace mongo {
 
     private:
 
-        void _copy( char * dst , const char * src ) const {
+        static void _copy( char * dst , const char * src ) {
             for ( unsigned a=0; a<8; a++ ) {
                 dst[a] = src[7-a];
             }

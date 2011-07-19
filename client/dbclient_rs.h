@@ -228,6 +228,11 @@ namespace mongo {
 
         // ----- informational ----
 
+        /**
+         * timeout not supported in DBClientReplicaSet yet
+         */
+        double getSoTimeout() const { return 0; }
+
         string toString() { return getServerAddress(); }
 
         string getServerAddress() const { return _monitor->getServerAddress(); }
@@ -238,6 +243,7 @@ namespace mongo {
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
+
 
     protected:
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }

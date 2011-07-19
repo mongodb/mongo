@@ -17,10 +17,10 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
-#include "../util/message_server.h"
+#include "../util/net/message_server.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"

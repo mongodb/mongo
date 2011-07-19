@@ -245,6 +245,26 @@ namespace JsobjTests {
                 ASSERT( BSON( "" << "b" << "" << "b" ).woCompare( BSON( "" << "c" ) , key ) < 0 );
 
                 {
+                    // test a big key
+                    string x(2000, 'z');
+                    BSONObj o = BSON( "q" << x );
+                    keyTest(o, false);
+                }
+                {
+                    string y(200, 'w');                 
+                    BSONObjBuilder b;
+                    for( int i = 0; i < 10; i++ ) {
+                        b.append("x", y);
+                    }
+                    keyTest(b.obj(), true);
+                }
+                {
+                    double nan = numeric_limits<double>::quiet_NaN();
+                    BSONObj o = BSON( "y" << nan );
+                    keyTest(o);
+                }
+
+                {
                     BSONObjBuilder b;
                     b.append( "" , "c" );
                     b.appendNull( "" );
@@ -316,21 +336,34 @@ namespace JsobjTests {
                 double inf = numeric_limits< double >::infinity();
                 double nan = numeric_limits< double >::quiet_NaN();
                 double nan2 = numeric_limits< double >::signaling_NaN();
+                ASSERT( isNaN(nan) );
+                ASSERT( isNaN(nan2) );
+                ASSERT( !isNaN(inf) );
 
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << inf ) ) == 0 );
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) < 0 );
-                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) > 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) > 0 );
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) < 0 );
 
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan ) ) == 0 );
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << 1 ) ) < 0 );
+
+                ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << 5000000000LL ) ) < 0 );
+
+                {
+                    KeyV1Owned a( BSON( "a" << nan ) );
+                    KeyV1Owned b( BSON( "a" << 1 ) );
+                    Ordering o = Ordering::make(BSON("a"<<1));
+                    ASSERT( a.woCompare(b, o) < 0 );
+                }
+
                 ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan ) ) > 0 );
 
                 ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << nan2 ) ) == 0 );
                 ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << 1 ) ) < 0 );
                 ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan2 ) ) > 0 );
 
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan ) ) == 0 );
-                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan2 ) ) == 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan ) ) > 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan2 ) ) > 0 );
                 ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan2 ) ) == 0 );
             }
         };

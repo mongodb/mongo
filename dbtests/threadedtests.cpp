@@ -464,13 +464,128 @@ namespace ThreadedTests {
         }
     };
 
+#if 0
+    class UpgradableTest : public ThreadedTest<7> {
+        RWLock m;
+    public:
+        UpgradableTest() : m("utest") {}
+    private:
+        virtual void validate() { }
+        virtual void subthread(int x) {
+            Client::initThread("utest");
+
+            /* r = read lock 
+               R = get a read lock and we expect it to be fast
+               w = write lock
+            */
+            //                    /-- verify upgrade can be done instantly while in a read lock already
+            //                    |  /-- verify upgrade acquisition isn't greedy
+            //                    |  | /-- verify writes aren't greedy while in upgradable
+            //                    v  v v
+            const char *what = " RURuRwR";
+
+            sleepmillis(100*x);
+
+            log() << x << what[x] << " request" << endl;
+            switch( what[x] ) { 
+            case 'w':
+                {
+                    m.lock();
+                    log() << x << " W got" << endl;
+                    sleepmillis(100);
+                    log() << x << " W unlock" << endl;
+                    m.unlock();
+                }
+                break;
+            case 'u':
+            case 'U':
+                {
+                    Timer t;
+                    m.lockAsUpgradable();
+                    log() << x << " U got" << endl;
+                    if( what[x] == 'U' ) {
+                        if( t.millis() > 20 ) {
+                            DEV {
+                                // a _DEBUG buildbot might be slow, try to avoid false positives
+                                log() << "warning lock upgrade was slow " << t.millis() << endl;
+                            }
+                            else {
+                                ASSERT( false );
+                            }
+                        }
+                    }
+                    sleepsecs(1);
+                    log() << x << " U unlock" << endl;
+                    m.unlockFromUpgradable();
+                }
+                break;
+            case 'r':
+            case 'R':
+                {
+                    Timer t;
+                    m.lock_shared();
+                    log() << x << " R got " << endl;
+                    if( what[x] == 'R' ) {
+                        if( t.millis() > 15 ) { 
+                            log() << "warning: when in upgradable write locks are still greedy on this platform" << endl;
+                        }
+                    }
+                    sleepmillis(200);
+                    log() << x << " R unlock" << endl;
+                    m.unlock_shared();
+                }
+                break;
+            default:
+                ASSERT(false);
+            }
+
+            cc().shutdown();
+        }
+    };
+#endif
+
+    class WriteLocksAreGreedy : public ThreadedTest<3> {
+    public:
+        WriteLocksAreGreedy() : m("gtest") {}
+    private:
+        RWLock m;
+        virtual void validate() { }
+        virtual void subthread(int x) {
+            Client::initThread("utest");
+            if( x == 1 ) { 
+                cout << mongo::curTimeMillis64() % 10000 << " 1" << endl;
+                rwlock_shared lk(m);
+                sleepmillis(300);
+                cout << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
+            }
+            if( x == 2 ) {
+                sleepmillis(100);
+                cout << mongo::curTimeMillis64() % 10000 << " 2" << endl;
+                rwlock lk(m, true);
+                //m._lock();
+                cout << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
+                //m.unlock();
+            }
+            if( x == 3 ) {
+                sleepmillis(200);
+                Timer t;
+                cout << mongo::curTimeMillis64() % 10000 << " 3" << endl;
+                rwlock_shared lk(m);
+                cout << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
+                cout << t.millis() << endl;
+                ASSERT( t.millis() > 50 );
+            }
+            cc().shutdown();
+        }
+    };
 
     class All : public Suite {
     public:
-        All() : Suite( "threading" ) {
-        }
+        All() : Suite( "threading" ) { }
 
         void setupTests() {
+            add< WriteLocksAreGreedy >();
+            //add< UpgradableTest >();
             add< List1Test >();
             add< List1Test2 >();
 

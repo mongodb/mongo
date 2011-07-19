@@ -90,8 +90,12 @@ function diff(){
     if ( le.err )
         print( "ELIOT ELIOT : " + tojson( le ) + "\t" + myid );
 
-    assert( le.updatedExisting , "GLE diff 1: " + tojson(le) )
-    assert.eq( 1 , le.n , "GLE diff 2: " + tojson(le) )
+    if ( ! le.updatedExisting || le.n != 1 ) {
+        print( "going to assert for id: " + myid + " correct count is: " + counts[myid] + " db says count is: " + db.foo.findOne( { _id : myid } ) );
+    }
+
+    assert( le.updatedExisting , "GLE diff myid: " + myid + " 1: " + tojson(le) )
+    assert.eq( 1 , le.n , "GLE diff myid: " + myid + " 2: " + tojson(le) )
 
 
     if ( Math.random() > .99 ){

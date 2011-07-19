@@ -594,9 +594,12 @@ namespace mongo {
                 result.append("dur", dur::stats.asObj());
             }
 
+            timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
-
+            
+            timeBuilder.appendNumber( "at end" , Listener::getElapsedTimeMillis() - start );
             if ( Listener::getElapsedTimeMillis() - start > 1000 ) {
                 BSONObj t = timeBuilder.obj();
                 log() << "serverStatus was very slow: " << t << endl;
@@ -929,7 +932,7 @@ namespace mongo {
             auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
             BSONObjBuilder b;
             while ( i->more() ) {
-                BSONObj o = i->next().getOwned();
+                BSONObj o = i->next().removeField("v").getOwned();
                 b.append( BSONObjBuilder::numStr( all.size() ) , o );
                 all.push_back( o );
             }
@@ -1766,6 +1769,7 @@ namespace mongo {
         }
 
         if ( cmdObj["help"].trueValue() ) {
+            client.curop()->ensureStarted();
             stringstream ss;
             ss << "help for: " << c->name << " ";
             c->help( ss );
@@ -1790,6 +1794,7 @@ namespace mongo {
 
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+            client.curop()->ensureStarted();
             string errmsg;
             int ok = c->run( dbname , cmdObj , errmsg , result , fromRepl );
             if ( ! ok )
@@ -1804,6 +1809,7 @@ namespace mongo {
         }
 
         mongolock lk( needWriteLock );
+        client.curop()->ensureStarted();
         Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
 
         try {
@@ -1837,7 +1843,6 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
-        cc().curop()->ensureStarted();
         string dbname = nsToDatabase( ns );
 
         if( logLevel >= 1 )

@@ -17,10 +17,7 @@
 
 #include "pch.h"
 #include "processinfo.h"
-
 #include <iostream>
-
-#include <windows.h>
 #include <psapi.h>
 
 using namespace std;

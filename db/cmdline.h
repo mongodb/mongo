@@ -86,6 +86,8 @@ namespace mongo {
         };
         int durOptions;          // --durOptions <n> for debugging
 
+        bool objcheck;         // --objcheck
+
         long long oplogSize;   // --oplogSize
         int defaultProfile;    // --profile
         int slowMS;            // --time in ms that is "slow"
@@ -94,6 +96,7 @@ namespace mongo {
         bool moveParanoia;     // for move chunk paranoia
         double syncdelay;      // seconds between fsyncs
 
+        bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
@@ -116,8 +119,8 @@ namespace mongo {
     inline CmdLine::CmdLine() :
         port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
         configsvr(false),
-        quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-        syncdelay(60), socket("/tmp") 
+        quota(false), quotaFiles(8), cpu(false), durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
+        syncdelay(60), noUnixSocket(false), socket("/tmp") 
     {
         // default may change for this later.
 #if defined(_DURABLEDEFAULTON)

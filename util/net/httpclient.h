@@ -17,12 +17,14 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "../../pch.h"
 
 namespace mongo {
 
     class HttpClient {
     public:
+
+        typedef map<string,string> Headers;
 
         class Result {
         public:
@@ -32,7 +34,7 @@ namespace mongo {
                 return _entireResponse;
             }
 
-            const map<string,string> getHeaders() const {
+            const Headers getHeaders() const {
                 return _headers;
             }
 
@@ -47,7 +49,7 @@ namespace mongo {
             int _code;
             string _entireResponse;
 
-            map<string,string> _headers;
+            Headers _headers;
             string _body;
 
             friend class HttpClient;

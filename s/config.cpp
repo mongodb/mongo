@@ -17,7 +17,7 @@
 */
 
 #include "pch.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
@@ -188,6 +188,7 @@ namespace mongo {
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
         BSONObj key;
         bool unique;
+        ShardChunkVersion oldVersion;
 
         {
             scoped_lock lk( _lock );
@@ -208,9 +209,28 @@ namespace mongo {
 
             key = ci.key().copy();
             unique = ci.unique();
+            if ( ci.getCM() )
+                oldVersion = ci.getCM()->getVersion();
         }
         
         assert( ! key.isEmpty() );
+        
+        if ( oldVersion > 0 ) {
+            ScopedDbConnection conn( configServer.modelServer() , 30.0 );
+            BSONObj newest = conn->findOne( ShardNS::chunk , 
+                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+            conn.done();
+            
+            if ( ! newest.isEmpty() ) {
+                ShardChunkVersion v = newest["lastmod"];
+                if ( v == oldVersion ) {
+                    scoped_lock lk( _lock );
+                    CollectionInfo& ci = _collections[ns];
+                    return ci.getCM();
+                }
+            }
+            
+        }
 
         // we are not locked now, and want to load a new ChunkManager
         
@@ -226,7 +246,12 @@ namespace mongo {
         CollectionInfo& ci = _collections[ns];
         massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
         
-        ci.resetCM( temp.release() );
+        if ( temp->getVersion() > ci.getCM()->getVersion() ) {
+            // we only want to reset if we're newer
+            // otherwise we go into a bad cycle
+            ci.resetCM( temp.release() );
+        }
+        
         return ci.getCM();
     }
 

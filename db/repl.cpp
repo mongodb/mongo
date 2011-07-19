@@ -35,7 +35,7 @@
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"
-#include "../util/message.h"
+#include "../util/net/message.h"
 #include "../util/background.h"
 #include "../client/dbclient.h"
 #include "../client/connpool.h"
@@ -1072,13 +1072,24 @@ namespace mongo {
 
     bool replHandshake(DBClientConnection *conn) {
 
+        string myname = getHostName();
+
         BSONObj me;
         {
+            
             dblock l;
             // local.me is an identifier for a server for getLastError w:2+
-            if ( ! Helpers::getSingleton( "local.me" , me ) ) {
+            if ( ! Helpers::getSingleton( "local.me" , me ) ||
+                 ! me.hasField("host") ||
+                 me["host"].String() != myname ) {
+
+                // clean out local.me
+                Helpers::emptyCollection("local.me");
+
+                // repopulate
                 BSONObjBuilder b;
                 b.appendOID( "_id" , 0 , true );
+                b.append( "host", myname );
                 me = b.obj();
                 Helpers::putSingleton( "local.me" , me );
             }

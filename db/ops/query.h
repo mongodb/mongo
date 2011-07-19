@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../../pch.h"
-#include "../../util/message.h"
+#include "../../util/net/message.h"
 #include "../dbmessage.h"
 #include "../jsobj.h"
 #include "../diskloc.h"
@@ -31,9 +31,6 @@
 namespace mongo {
 
     extern const int MaxBytesToReturnToClientAtOnce;
-
-    // for an existing query (ie a ClientCursor), send back additional information.
-    struct GetMoreWaitException { };
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 

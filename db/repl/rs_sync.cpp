@@ -63,7 +63,7 @@ namespace mongo {
                 return false;
             }
 
-            r.queryGTE( rsoplog, applyGTE );
+            r.tailingQueryGTE( rsoplog, applyGTE );
             if ( !r.haveCursor() ) {
                 log() << "replSet initial sync oplog query error" << rsLog;
                 return false;
@@ -161,7 +161,7 @@ namespace mongo {
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
                     r.resetCursor();
-                    r.queryGTE(rsoplog, ts);
+                    r.tailingQueryGTE(rsoplog, ts);
                     if( r.haveCursor() ) {
                         continue;
                     }
@@ -505,7 +505,7 @@ namespace mongo {
         }
         n++;
 
-        Client::initThread("replica set sync");
+        Client::initThread("rsSync");
         cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();
@@ -513,14 +513,16 @@ namespace mongo {
     }
 
     void GhostSync::starting() {
-        Client::initThread("rs ghost sync");
+        Client::initThread("rsGhostSync");
         replLocalAuth();
     }
 
-    void GhostSync::associateSlave(const BSONObj& rid, const int memberId) {
+    void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
+        const OID rid = id["_id"].OID();
+        rwlock lk( _lock , true );
         GhostSlave &slave = _ghostCache[rid];
         if (slave.init) {
-            log(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
+            LOG(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
             return;
         }
 
@@ -534,66 +536,85 @@ namespace mongo {
         }
     }
 
-    void GhostSync::updateSlave(const BSONObj& rid, const OpTime& last) {
-        GhostSlave& slave = _ghostCache[rid];
+    void GhostSync::updateSlave(const mongo::OID& rid, const OpTime& last) {
+        rwlock lk( _lock , false );
+        MAP::iterator i = _ghostCache.find( rid );
+        if ( i == _ghostCache.end() ) {
+            OCCASIONALLY log() << "couldn't update slave " << rid << " no entry" << rsLog;
+            return;
+        }
+        
+        GhostSlave& slave = i->second;
         if (!slave.init) {
-            log() << "couldn't update slave " << rid << rsLog;
+            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
             return;
         }
 
         ((ReplSetConfig::MemberCfg)slave.slave->config()).updateGroups(last);
     }
 
-    void GhostSync::percolate(const BSONObj& rid, const OpTime& last) {
-        GhostSlave &s = _ghostCache[rid];
-        if (!s.init) {
-            log() << "replSet couldn't find a slave with id " << rid
-                  << ", not faux syncing" << rsLog;
-            return;
+    void GhostSync::percolate(const BSONObj& id, const OpTime& last) {
+        const OID rid = id["_id"].OID();
+        GhostSlave* slave;
+        {
+            rwlock lk( _lock , false );
+
+            MAP::iterator i = _ghostCache.find( rid );
+            if ( i == _ghostCache.end() ) {
+                OCCASIONALLY log() << "couldn't percolate slave " << rid << " no entry" << rsLog;
+                return;
+            }
+
+            slave = &(i->second);
+            if (!slave->init) {
+                OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
+                return;
+            }
         }
-        assert(s.slave);
+
+        assert(slave->slave);
 
         const Member *target = rs->_currentSyncTarget;
         if (!target || rs->box.getState().primary()
             // we are currently syncing from someone who's syncing from us
             // the target might end up with a new Member, but s.slave never
             // changes so we'll compare the names
-            || target == s.slave || target->fullName() == s.slave->fullName()) {
+            || target == slave->slave || target->fullName() == slave->slave->fullName()) {
             log(1) << "replica set ghost target no good" << endl;
             return;
         }
 
         try {
-            if (!s.reader.haveCursor()) {
-                if (!s.reader.connect(rid, s.slave->id(), target->fullName())) {
+            if (!slave->reader.haveCursor()) {
+                if (!slave->reader.connect(id, slave->slave->id(), target->fullName())) {
                     // error message logged in OplogReader::connect
                     return;
                 }
-                s.reader.ghostQueryGTE(rsoplog, last);
+                slave->reader.ghostQueryGTE(rsoplog, last);
             }
 
-            log(1) << "last: " << s.last.toString() << " to " << last.toString() << rsLog;
-            
-            if (s.last > last) {
+            log(1) << "last: " << slave->last.toString() << " to " << last.toString() << rsLog;
+
+            if (slave->last > last) {
                 return;
             }
-            
-            while (s.last <= last) {
-                if (!s.reader.more()) {
+
+            while (slave->last <= last) {
+                if (!slave->reader.more()) {
                     // we'll be back
                     return;
                 }
-            
-                BSONObj o = s.reader.nextSafe();
-                s.last = o["ts"]._opTime();
+
+                BSONObj o = slave->reader.nextSafe();
+                slave->last = o["ts"]._opTime();
             }
-            log(2) << "now last is " << s.last.toString() << rsLog;
+            log(2) << "now last is " << slave->last.toString() << rsLog;
         }
         catch (DBException& e) {
             // we'll be back
             log(2) << "replSet ghost sync error: " << e.what() << " for "
-                   << s.slave->fullName() << rsLog;
-            s.reader.resetConnection();
+                   << slave->slave->fullName() << rsLog;
+            slave->reader.resetConnection();
         }
     }
 }

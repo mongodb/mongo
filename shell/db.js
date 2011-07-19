@@ -135,6 +135,8 @@ DB.prototype.auth = function( username , pass ){
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
     var cmd = { create: name, capped: options.capped, size: options.size, max: options.max };
+    if (options.autoIndexId != undefined)
+        cmd.autoIndexId = options.autoIndexId;
     var res = this._dbCommand(cmd);
     return res;
 }
@@ -712,7 +714,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         print("\t syncedTo: " + st.toString() );
         var ago = (now-st)/1000;
         var hrs = Math.round(ago/36)/100;
-        print("\t\t = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+        print("\t\t = " + Math.round(ago) + " secs ago (" + hrs + "hrs)");
     };
     
     function g(x) {
@@ -743,12 +745,13 @@ DB.prototype.printSlaveReplicationInfo = function() {
     };
     
     var L = this.getSiblingDB("local");
-    if( L.sources.count() != 0 ) { 
-        L.sources.find().forEach(g);
-    }
-    else if (L.system.replset.count() != 0) {
+
+    if (L.system.replset.count() != 0) {
         var status = this.adminCommand({'replSetGetStatus' : 1});
         status.members.forEach(r);
+    }
+    else if( L.sources.count() != 0 ) {
+        L.sources.find().forEach(g);
     }
     else {
         print("local.sources is empty; is this db a --slave?");

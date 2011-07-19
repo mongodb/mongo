@@ -171,6 +171,9 @@ namespace mongo {
         RARELY if ( bl.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
         }
+        if( bl.size() == 0 ) { 
+            DEV tlog() << "debug warning: no cursors found in informAboutToDeleteBucket()" << endl;
+        }
         for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
             i->second->_c->aboutToDeleteBucket(b);
     }
@@ -314,7 +317,7 @@ namespace mongo {
         }
     }
 
-    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret ) {
+    bool ClientCursor::getFieldsDotted( const string& name, BSONElementSet &ret, BSONObj& holder ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
@@ -324,7 +327,8 @@ namespace mongo {
 
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
@@ -334,18 +338,20 @@ namespace mongo {
         return true;
     }
 
-    BSONElement ClientCursor::getFieldDotted( const string& name , bool * fromKey ) {
+    BSONElement ClientCursor::getFieldDotted( const string& name , BSONObj& holder , bool * fromKey ) {
 
         map<string,int>::const_iterator i = _indexedFields.find( name );
         if ( i == _indexedFields.end() ) {
             if ( fromKey )
                 *fromKey = false;
-            return current().getFieldDotted( name );
+            holder = current();
+            return holder.getFieldDotted( name );
         }
         
         int x = i->second;
 
-        BSONObjIterator it( currKey() );
+        holder = currKey();
+        BSONObjIterator it( holder );
         while ( x && it.more() ) {
             it.next();
             x--;
@@ -357,6 +363,29 @@ namespace mongo {
         return it.next();
     }
 
+    BSONObj ClientCursor::extractFields(const BSONObj &pattern , bool fillWithNull ) {
+        BSONObjBuilder b( pattern.objsize() * 2 );
+
+        BSONObj holder;
+     
+        BSONObjIterator i( pattern ); 
+        while ( i.more() ) {
+            BSONElement key = i.next();
+            BSONElement value = getFieldDotted( key.fieldName() , holder );
+
+            if ( value.type() ) {
+                b.appendAs( value , key.fieldName() );
+                continue;
+            }
+
+            if ( fillWithNull ) 
+                b.appendNull( key.fieldName() );            
+            
+        }
+
+        return b.obj();
+    }
+    
 
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only
