@@ -55,7 +55,7 @@ namespace mongo {
 
             // Override if passthrough should also send query options
             // Safer as off by default, can slowly enable as we add more tests
-            virtual bool allowOptions() const { return false; }
+            virtual bool passOptions() const { return false; }
 
             // all grid commands are designed not to lock
             virtual LockType locktype() const { return NONE; }
@@ -80,7 +80,7 @@ namespace mongo {
             bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , int options , BSONObjBuilder& result ) {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
-                bool ok = conn->runCommand( db , cmdObj , res , allowOptions() ? options : 0 );
+                bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
                 if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
                     conn.done();
                     throw StaleConfigException("foo","command failed because of stale config");
@@ -382,7 +382,7 @@ namespace mongo {
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }
-            virtual bool allowOptions() const { return true; }
+            virtual bool passOptions() const { return true; }
             bool run(const string& dbName, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -716,7 +716,7 @@ namespace mongo {
         class GroupCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
             GroupCmd() : NotAllowedOnShardedCollectionCmd("group") {}
-            virtual bool allowOptions() const { return true; }
+            virtual bool passOptions() const { return true; }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
             }
@@ -729,7 +729,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
             }
-            virtual bool allowOptions() const { return true; }
+            virtual bool passOptions() const { return true; }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -825,7 +825,7 @@ namespace mongo {
         public:
             Geo2dFindNearCmd() : PublicGridCommand( "geoNear" ) {}
             void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
-            virtual bool allowOptions() const { return true; }
+            virtual bool passOptions() const { return true; }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
