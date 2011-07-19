@@ -422,8 +422,8 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 				 */
 				if (out == value && *conf->cur != ':') {
 					__wt_errx(conf->session,
-					    "Key / value pair already complete "
-					    "at position %d",
+					    "Configuration item already "
+					    "complete at position %d",
 					    (int)(conf->cur - conf->orig));
 					return (EINVAL);
 				}
