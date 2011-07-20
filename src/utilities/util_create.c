@@ -11,19 +11,16 @@
 static int usage(void);
 
 int
-util_create(int argc, char *argv[])
+util_create(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ch, ret, tret;
+	int ch;
 	const char *config, *uri;
 
-	conn = NULL;
 	config = NULL;
 
-	while ((ch = getopt(argc, argv, "c:f:T")) != EOF)
+	while ((ch = getopt(argc, argv, "c:")) != EOF)
 		switch (ch) {
-		case 'c':			/* command-line option */
+		case 'c':			/* command-line configuration */
 			config = optarg;
 			break;
 		case '?':
@@ -40,21 +37,7 @@ util_create(int argc, char *argv[])
 
 	uri = *argv;
 
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
-	if ((ret = session->create(session, uri, config)) != 0)
-		goto err;
-
-	if (0) {
-err:		ret = 1;
-	}
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
-
-	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (session->create(session, uri, config));
 }
 
 static int

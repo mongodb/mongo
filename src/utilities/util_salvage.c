@@ -11,21 +11,14 @@
 static int usage(void);
 
 int
-util_salvage(int argc, char *argv[])
+util_salvage(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ch, debug, ret, tret;
+	int ch, ret;
 	char *name;
 
-	conn = NULL;
 	name = NULL;
-	debug = 0;
-	while ((ch = getopt(argc, argv, "d")) != EOF)
+	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
-		case 'd':
-			debug = 1;
-			break;
 		case '?':
 		default:
 			return (usage());
@@ -39,12 +32,6 @@ util_salvage(int argc, char *argv[])
 	if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL,
-	    debug ? "verbose=[salvage]" : NULL, &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
 	if ((ret = session->salvage(session, name, NULL)) != 0) {
 		fprintf(stderr, "%s: salvage(%s): %s\n",
 		    progname, name, wiredtiger_strerror(ret));
@@ -56,13 +43,11 @@ util_salvage(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
 
 	if (name != NULL)
 		free(name);
 
-	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (ret);
 }
 
 static int
@@ -70,7 +55,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "salvage [-d] file\n",
+	    "salvage file\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

@@ -11,14 +11,11 @@
 static int usage(void);
 
 int
-util_verify(int argc, char *argv[])
+util_verify(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ch, ret, tret;
+	int ch, ret;
 	char *name;
 
-	conn = NULL;
 	name = NULL;
 	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
@@ -36,11 +33,6 @@ util_verify(int argc, char *argv[])
 	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
 	if ((ret = session->verify(session, name, NULL)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
 		    progname, name, wiredtiger_strerror(ret));
@@ -52,13 +44,11 @@ util_verify(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
 
 	if (name != NULL)
 		free(name);
 
-	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (ret);
 }
 
 static int

@@ -21,19 +21,16 @@ static int bulk_read_line(WT_ITEM *, size_t *, int, int *);
 static int usage(void);
 
 int
-util_load(int argc, char *argv[])
+util_load(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	WT_SESSION *session;
 	struct record_t record;
 	uint64_t insert_count;
-	int ch, debug, eof, ret, printable, tret;
+	int ch, debug, eof, ret, printable;
 	const char *table_config;
 	char cursor_config[100];
 	char *name;
 
-	conn = NULL;
 	table_config = NULL;
 	name = NULL;
 	debug = printable = 0;
@@ -79,11 +76,6 @@ util_load(int argc, char *argv[])
 	if ((name = util_name(*argv, "table", UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
 	if ((ret = session->drop(session, name, "force")) != 0)
 		goto err;
 
@@ -126,13 +118,11 @@ util_load(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
 
 	if (name != NULL)
 		free(name);
 
-	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (ret);
 }
 
 /*

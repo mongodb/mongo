@@ -20,19 +20,18 @@
 #define	UTIL_TABLE_OK	0x02		/* table: prefix OK */
 #define	UTIL_STAT_OK	0x04		/* stat: prefix OK */
 
-extern const char *home;		/* Home directory */
 extern const char *progname;		/* Program name */
 extern const char *usage_prefix;	/* Global arguments */
 extern int verbose;			/* Verbose flag */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
-int	 util_create(int, char *[]);
-int	 util_dump(int, char *[]);
-int	 util_dumpfile(int, char *[]);
-int	 util_load(int, char *[]);
+int	 util_create(WT_SESSION *, int, char *[]);
+int	 util_dump(WT_SESSION *, int, char *[]);
+int	 util_dumpfile(WT_SESSION *, int, char *[]);
+int	 util_load(WT_SESSION *, int, char *[]);
 char	*util_name(const char *, const char *, u_int);
-int	 util_printlog(int, char *[]);
-int	 util_salvage(int, char *[]);
-int	 util_stat(int, char *[]);
-int	 util_verify(int, char *[]);
+int	 util_printlog(WT_SESSION *, int, char *[]);
+int	 util_salvage(WT_SESSION *, int, char *[]);
+int	 util_stat(WT_SESSION *, int, char *[]);
+int	 util_verify(WT_SESSION *, int, char *[]);

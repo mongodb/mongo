@@ -8,9 +8,9 @@
 #include "wiredtiger.h"
 #include "util.h"
 
-const char *home = ".";				/* Home directory to open */
 const char *progname;				/* Program name */
-const char *usage_prefix = "[-Vv] [-h home]";	/* Global arguments */
+						/* Global arguments */
+const char *usage_prefix = "[-Vv] [-C config ][-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
@@ -20,7 +20,12 @@ static int usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, major_v,  minor_v;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	int ch, major_v, minor_v, ret, tret;
+	char *config;
+
+	conn = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -43,8 +48,12 @@ main(int argc, char *argv[])
 	}
 
 	/* Check for standard options. */
-	while ((ch = getopt(argc, argv, "h:Vv")) != EOF)
+	config = NULL;
+	while ((ch = getopt(argc, argv, "C:h:Vv")) != EOF)
 		switch (ch) {
+		case 'C':			/* wiredtiger_open config */
+			config = optarg;
+			break;
 		case 'h':			/* home directory */
 			if (chdir(optarg) != 0) {
 				fprintf(stderr, "%s: chdir %s: %s\n",
@@ -74,40 +83,50 @@ main(int argc, char *argv[])
 	optreset = 1;
 	optind = 1;
 
+	if ((ret = wiredtiger_open(".",
+	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
+		goto err;
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		goto err;
+
 	switch (command[0]) {
 	case 'c':
 		if (strcmp(command, "create") == 0)
-			return (util_create(argc, argv));
+			ret = util_create(session, argc, argv);
 		break;
 	case 'd':
 		if (strcmp(command, "dump") == 0)
-			return (util_dump(argc, argv));
+			ret = util_dump(session, argc, argv);
 		if (strcmp(command, "dumpfile") == 0)
-			return (util_dumpfile(argc, argv));
+			ret = util_dumpfile(session, argc, argv);
 		break;
 	case 'l':
 		if (strcmp(command, "load") == 0)
-			return (util_load(argc, argv));
+			ret = util_load(session, argc, argv);
 		break;
 	case 'p':
 		if (strcmp(command, "printlog") == 0)
-			return (util_printlog(argc, argv));
+			ret = util_printlog(session, argc, argv);
 		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
-			return (util_salvage(argc, argv));
+			ret = util_salvage(session, argc, argv);
 		if (strcmp(command, "stat") == 0)
-			return (util_stat(argc, argv));
+			ret = util_stat(session, argc, argv);
 		break;
 	case 'v':
 		if (strcmp(command, "verify") == 0)
-			return (util_verify(argc, argv));
+			ret = util_verify(session, argc, argv);
 		break;
 	default:
+		ret = usage();
 		break;
 	}
 
-	return (usage());
+err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
+		ret = tret;
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 static int
@@ -118,6 +137,7 @@ usage(void)
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"
+	    "\t-C\twiredtiger_open configuration\n"
 	    "\t-h\tdatabase directory\n"
 	    "\t-V\tdisplay library version and exit\n"
 	    "\t-v\tverbose\n");

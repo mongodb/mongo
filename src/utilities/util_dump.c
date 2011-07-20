@@ -11,17 +11,14 @@
 static int usage(void);
 
 int
-util_dump(int argc, char *argv[])
+util_dump(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
-	WT_SESSION *session;
 	char cursor_config[100];
-	int ch, printable, ret, tret;
+	int ch, printable, ret;
 	char *name;
 
-	conn = NULL;
 	name = NULL;
 	printable = 0;
 
@@ -51,14 +48,8 @@ util_dump(int argc, char *argv[])
 	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, NULL, &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
 	snprintf(cursor_config, sizeof(cursor_config),
 	    "dump,%s", printable ? "printable" : "raw");
-
 	if ((ret = session->open_cursor(
 	    session, name, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
@@ -91,13 +82,11 @@ util_dump(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
 
 	if (name != NULL)
 		free(name);
 
-	return ((ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (ret);
 }
 
 static int
