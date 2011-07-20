@@ -474,7 +474,7 @@ if "darwin" == os.sys.platform:
         env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
         env.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
-elif "linux2" == os.sys.platform:
+elif os.sys.platform in ('linux2', 'linux3'):
     linux = True
     platform = "linux"
 
