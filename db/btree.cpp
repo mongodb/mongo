@@ -29,11 +29,22 @@
 #include "dur_commitjob.h"
 #include "btreebuilder.h"
 #include "../util/unittest.h"
+#include "../server.h"
 
 namespace mongo {
 
     BOOST_STATIC_ASSERT( Record::HeaderSize == 16 );
     BOOST_STATIC_ASSERT( Record::HeaderSize + BtreeData_V1::BucketSize == 8192 );
+
+    NOINLINE_DECL void checkFailed(unsigned line) {
+        static time_t last;
+        if( time(0) - last >= 10 ) { 
+            msgasserted(0, str::stream() << "error in index possibly corruption consider repairing " << line);
+        }
+    }
+
+    /** data check. like assert, but gives a reasonable error message to the user. */
+#define check(expr) _IF(!(expr)) { checkFailed(__LINE__); }
 
 #define VERIFYTHISLOC dassert( thisLoc.btree<V>() == this );
 
@@ -369,7 +380,8 @@ namespace mongo {
     */
     template< class V >
     bool BucketBasics<V>::basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const Key& key, const Ordering &order) const {
-        assert( keypos >= 0 && keypos <= this->n );
+        check( this->n >= 0 && this->n < 1024 );
+        check( keypos >= 0 && keypos <= this->n );
         int bytesNeeded = key.dataSize() + sizeof(_KeyNode);
         if ( bytesNeeded > this->emptySize ) {
             _pack(thisLoc, order, keypos);
