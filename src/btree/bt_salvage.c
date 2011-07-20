@@ -27,7 +27,8 @@ struct __wt_stuff {
 
 	uint8_t    page_type;			/* Page type */
 
-	int	   range_merge;			/* If merged key ranges */
+	/* If need to free blocks backing merged page ranges. */
+	int	   merge_free;
 
 	int	   verbose;			/* If WT_VERB_SALVAGE set */
 	WT_BUF	  *vbuf;			/* Verbose print buffer */
@@ -281,7 +282,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 * final key range.  In other words, if the salvage run fails, we don't
 	 * want to overwrite data the next salvage run might need.
 	 */
-	 if (ss->range_merge)
+	 if (ss->merge_free)
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	if (0) {
@@ -804,7 +805,6 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
-			ss->range_merge = 1;
 		}
 	}
 	return (0);
@@ -927,12 +927,7 @@ __slvg_col_range_overlap(
 			a_trk->col_stop = b_trk->col_start - 1;
 			F_SET(a_trk, WT_TRACK_MERGE);
 		}
-
-merge:		ss->range_merge = 1;
-		WT_VERBOSE(session, SALVAGE,
-		    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
-		    a_trk->addr, b_trk->addr);
-		return (0);
+		goto merge;
 	}
 
 	/*
@@ -995,11 +990,9 @@ delete:		WT_RET(__slvg_trk_free(session,
 	a_trk->col_stop = b_trk->col_start - 1;
 	F_SET(a_trk, WT_TRACK_MERGE);
 
-	ss->range_merge = 1;
-	WT_VERBOSE(session, SALVAGE,
+merge:	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
 	    a_trk->addr, b_trk->addr);
-
 	return (0);
 }
 
@@ -1069,9 +1062,7 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * record range.
 			 */
 			trk->col_missing = r + 1;
-
 			F_SET(trk, WT_TRACK_MERGE);
-			ss->range_merge = 1;
 		}
 		r = trk->col_stop;
 	}
@@ -1135,10 +1126,14 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * (in other words, we didn't merge part of this page with
 		 * another page), we can use the page without change.  If we
 		 * did merge with another page, we must build a page reflecting
-		 * the updated key range.
+		 * the updated key range, and that requires an additional pass
+		 * to free its backing blocks.
 		 */
-		if (F_ISSET(trk, WT_TRACK_MERGE))
+		if (F_ISSET(trk, WT_TRACK_MERGE)) {
+			ss->merge_free = 1;
+
 			WT_ERR(__slvg_col_build_leaf(session, trk, page, cref));
+		}
 		++cref;
 	}
 
@@ -1393,7 +1388,6 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
-			ss->range_merge = 1;
 		}
 	}
 	return (0);
@@ -1535,12 +1529,7 @@ __slvg_row_range_overlap(
 			    session, A_TRK_STOP_BUF, B_TRK_START_BUF));
 			F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
 		}
-
-merge:		ss->range_merge = 1;
-		WT_VERBOSE(session, SALVAGE,
-		    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
-		    a_trk->addr, b_trk->addr);
-		return (0);
+		goto merge;
 	}
 
 	/*
@@ -1604,11 +1593,9 @@ delete:		WT_RET(__slvg_trk_free(session,
 	WT_RET(__slvg_key_copy(session, A_TRK_STOP_BUF, B_TRK_START_BUF));
 	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
 
-	ss->range_merge = 1;
-	WT_VERBOSE(session, SALVAGE,
+merge:	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
 	    a_trk->addr, b_trk->addr);
-
 	return (0);
 }
 
@@ -1772,9 +1759,12 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * (in other words, we didn't merge part of this page with
 		 * another page), we can use the page without change.  If we
 		 * did merge with another page, we must build a page reflecting
-		 * the updated key range.
+		 * the updated key range, and that requires an additional pass
+		 * to free its backing blocks.
 		 */
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
+			ss->merge_free = 1;
+
 			WT_ERR(__slvg_row_build_leaf(
 			    session, trk, page, rref, ss, &deleted));
 
