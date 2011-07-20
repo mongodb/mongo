@@ -99,6 +99,7 @@ static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
 static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
 static int  __slvg_load_byte_string(
 		WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_BUF *);
 static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
@@ -114,6 +115,8 @@ static int  __slvg_row_merge_ovfl(
 static int  __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
+static int  __slvg_row_trk_update_start(
+		WT_SESSION_IMPL *, WT_ITEM *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_compare_key(const void *, const void *);
 static int  __slvg_trk_compare_lsn(const void *, const void *);
 static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
@@ -816,14 +819,12 @@ __slvg_col_range_overlap(
     WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
 	WT_TRACK *a_trk, *b_trk, *new;
-	uint32_t i, j;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
 	 * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
 	 * BEING HANDLED.
 	 */
-
 	a_trk = ss->pages[a_slot];
 	b_trk = ss->pages[b_slot];
 
@@ -885,6 +886,7 @@ __slvg_col_range_overlap(
 		 * b_trk.
 		 */
 		b_trk->col_start = a_trk->col_stop + 1;
+		__slvg_col_trk_update_start(b_slot, ss);
 		F_SET(b_trk, WT_TRACK_MERGE);
 		goto merge;
 	}
@@ -915,6 +917,7 @@ __slvg_col_range_overlap(
 			 * key range from b_trk;
 			 */
 			b_trk->col_start = a_trk->col_stop + 1;
+			__slvg_col_trk_update_start(b_slot, ss);
 			F_SET(b_trk, WT_TRACK_MERGE);
 		} else {
 			/*
@@ -946,41 +949,99 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * First, create a copy of the original page's WT_TRACK information
+	 * (same LSN, addr and size), that we'll use to reference the key
+	 * range at the end of a_trk.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &new));
 	WT_TRACK_INIT(ss, new, a_trk->lsn, a_trk->addr, a_trk->size);
 
+	/*
+	 * Second, reallocate the array of pages if necessary, and then insert
+	 * the new element into the array after the existing element (that's
+	 * probably wrong, but we'll fix it up in a second).
+	 */
+	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
+		WT_RET(__wt_realloc(session, &ss->pages_allocated,
+		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
+	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
+	ss->pages[a_slot + 1] = new;
+	++ss->pages_next;
+
+	/*
+	 * Third, set its start key to be the first key after the stop key of
+	 * the middle chunk (that's b_trk), and its stop key to be the stop key
+	 * of the original chunk, and call __slvg_col_trk_update_start.  That
+	 * function will re-sort the WT_TRACK array as necessary to move our
+	 * new entry into the right sorted location.
+	 */
 	new->col_start = b_trk->col_stop + 1;
 	new->col_stop = a_trk->col_stop;
+	__slvg_col_trk_update_start(a_slot + 1, ss);
+
+	/*
+	 * Fourth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
 	F_SET(new, WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
 
+	/*
+	 * Finally, set the original WT_TRACK information to reference only
+	 * the initial key space in the page, that is, everything up to the
+	 * starting key of the middle chunk (that's b_trk).
+	 */
 	a_trk->col_stop = b_trk->col_start - 1;
 	F_SET(a_trk, WT_TRACK_MERGE);
+
+	ss->range_merge = 1;
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
 	    a_trk->addr, b_trk->addr);
 
-	/* Re-allocate the array of pages, as necessary. */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	return (0);
+}
+
+/*
+ * __slvg_col_trk_update_start --
+ *	Update a column-store page's start key after an overlap.
+ */
+static void
+__slvg_col_trk_update_start(uint32_t slot, WT_STUFF *ss)
+{
+	WT_TRACK *trk;
+	uint32_t i;
+
+	trk = ss->pages[slot];
 
 	/*
-	 * Figure out where this new entry goes.  (It's going to be close by,
-	 * but it could be a few slots away.)  Then shift all entries sorting
-	 * greater than the new entry up by one slot, and insert the new entry.
+	 * If we deleted an initial piece of the WT_TRACK name space, it may no
+	 * longer be in the right location.
+	 *
+	 * For example, imagine page #1 has the key range 30-50, it split, and
+	 * we wrote page #2 with key range 30-40, and page #3 key range with
+	 * 40-50, where pages #2 and #3 have larger LSNs than page #1.  When the
+	 * key ranges were sorted, page #2 came first, then page #1 (because of
+	 * their earlier start keys than page #3), and page #2 came before page
+	 * #1 because of its LSN.  When we resolve the overlap between page #2
+	 * and page #1, we truncate the initial key range of page #1, and it now
+	 * sorts after page #3, because it has the same starting key of 40, and
+	 * a lower LSN.
+	 *
+	 * We have already updated b_trk's start key; what we may have to do is
+	 * re-sort some number of elements in the list.
 	 */
-	for (i = a_slot + 1; i < ss->pages_next; ++i) {
+	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		if (__slvg_trk_compare_key(&new, &ss->pages[i]) <= 0)
+		if (ss->pages[i]->col_start > trk->col_stop)
 			break;
 	}
-	for (j = ss->pages_next; j > i; --j)
-		ss->pages[j] = ss->pages[j - 1];
-	ss->pages[i] = new;
-	++ss->pages_next;
-	return (0);
+	i -= slot;
+	if (i > 1)
+		qsort(ss->pages + slot, (size_t)i,
+		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 }
 
 /*
@@ -1348,7 +1409,6 @@ __slvg_row_range_overlap(
 {
 	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
-	uint32_t i, j;
 	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	/*
@@ -1356,7 +1416,6 @@ __slvg_row_range_overlap(
 	 * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
 	 * BEING HANDLED.
 	 */
-
 	btree = session->btree;
 	func = btree->btree_compare;
 
@@ -1397,13 +1456,15 @@ __slvg_row_range_overlap(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-#define	A_TRK_START	((WT_ITEM *)&a_trk->row_start)
-#define	A_TRK_STOP	((WT_ITEM *)&a_trk->row_stop)
-#define	B_TRK_START	((WT_ITEM *)&b_trk->row_start)
-#define	B_TRK_STOP	((WT_ITEM *)&b_trk->row_stop)
+#define	A_TRK_START	((WT_ITEM *)A_TRK_START_BUF)
+#define	A_TRK_START_BUF	(&a_trk->row_start)
+#define	A_TRK_STOP	((WT_ITEM *)A_TRK_STOP_BUF)
 #define	A_TRK_STOP_BUF	(&a_trk->row_stop)
 #define	B_TRK_START_BUF	(&b_trk->row_start)
+#define	B_TRK_START	((WT_ITEM *)B_TRK_START_BUF)
 #define	B_TRK_STOP_BUF	(&b_trk->row_stop)
+#define	B_TRK_STOP	((WT_ITEM *)B_TRK_STOP_BUF)
+#define	SLOT_START(i)	((WT_ITEM *)&ss->pages[i]->row_start)
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
@@ -1430,8 +1491,8 @@ __slvg_row_range_overlap(
 		 * desirable: keep both but delete a_trk's key range from
 		 * b_trk.
 		 */
-		WT_RET(
-		    __slvg_key_copy(session, B_TRK_START_BUF, A_TRK_STOP_BUF));
+		WT_RET(__slvg_row_trk_update_start(
+		    session, A_TRK_STOP, b_slot, ss));
 		F_SET(b_trk, WT_TRACK_CHECK_START | WT_TRACK_MERGE);
 		goto merge;
 	}
@@ -1462,8 +1523,8 @@ __slvg_row_range_overlap(
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
-			WT_RET(__slvg_key_copy(
-			    session, B_TRK_START_BUF, A_TRK_STOP_BUF));
+			WT_RET(__slvg_row_trk_update_start(
+			    session, A_TRK_STOP, b_slot, ss));
 			F_SET(b_trk, WT_TRACK_CHECK_START | WT_TRACK_MERGE);
 		} else {
 			/*
@@ -1496,43 +1557,163 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * First, create a copy of the original page's WT_TRACK information
+	 * (same LSN, addr and size), that we'll use to reference the key
+	 * range at the end of a_trk.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &new));
 	WT_TRACK_INIT(ss, new, a_trk->lsn, a_trk->addr, a_trk->size);
+
+	/*
+	 * Second, reallocate the array of pages if necessary, and then insert
+	 * the new element into the array after the existing element (that's
+	 * probably wrong, but we'll fix it up in a second).
+	 */
+	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
+		WT_RET(__wt_realloc(session, &ss->pages_allocated,
+		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
+	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
+	ss->pages[a_slot + 1] = new;
+	++ss->pages_next;
+
+	/*
+	 * Third, set its its stop key to be the stop key of the original chunk,
+	 * and call __slvg_row_trk_update_start.   That function will both set
+	 * the start key to be the first key after the stop key of the middle
+	 * chunk (that's b_trk), and re-sort the WT_TRACK array as necessary to
+	 * move our new entry into the right sorted location.
+	 */
+	WT_RET(__slvg_key_copy(session, &new->row_stop, A_TRK_STOP_BUF));
 	WT_RET(
-	    __slvg_key_copy(session, &new->row_start, B_TRK_STOP_BUF));
-	WT_RET(
-	    __slvg_key_copy(session, &new->row_stop, A_TRK_STOP_BUF));
+	    __slvg_row_trk_update_start(session, B_TRK_STOP, a_slot + 1, ss));
+
+	/*
+	 * Fourth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
 	F_SET(new,
 	    WT_TRACK_CHECK_START | WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
 
+	/*
+	 * Finally, set the original WT_TRACK information to reference only
+	 * the initial key space in the page, that is, everything up to the
+	 * starting key of the middle chunk (that's b_trk).
+	 */
 	WT_RET(__slvg_key_copy(session, A_TRK_STOP_BUF, B_TRK_START_BUF));
 	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
+
+	ss->range_merge = 1;
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] and [%" PRIu32 "] require merge",
 	    a_trk->addr, b_trk->addr);
 
-	/* Re-allocate the array of pages, as necessary. */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	return (0);
+}
+
+/*
+ * __slvg_row_trk_update_start --
+ *	Update a row-store page's start key after an overlap.
+ */
+static int
+__slvg_row_trk_update_start(
+    WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t slot, WT_STUFF *ss)
+{
+	WT_BTREE *btree;
+	WT_BUF *key, *dsk;
+	WT_IKEY *ikey;
+	WT_ITEM *item, _item;
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_TRACK *trk;
+	uint32_t i;
+	int found, ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+
+	btree = session->btree;
+	key = dsk = NULL;
+	page = NULL;
+	func = btree->btree_compare;
+	found = ret = 0;
+
+	trk = ss->pages[slot];
 
 	/*
-	 * Figure out where this new entry goes.  (It's going to be close by,
-	 * but it could be a few slots away.)  Then shift all entries sorting
-	 * greater than the new entry up by one slot, and insert the new entry.
+	 * If we deleted an initial piece of the WT_TRACK name space, it may no
+	 * longer be in the right location.
+	 *
+	 * For example, imagine page #1 has the key range 30-50, it split, and
+	 * we wrote page #2 with key range 30-40, and page #3 key range with
+	 * 40-50, where pages #2 and #3 have larger LSNs than page #1.  When the
+	 * key ranges were sorted, page #2 came first, then page #1 (because of
+	 * their earlier start keys than page #3), and page #2 came before page
+	 * #1 because of its LSN.  When we resolve the overlap between page #2
+	 * and page #1, we truncate the initial key range of page #1, and it now
+	 * sorts after page #3, because it has the same starting key of 40, and
+	 * a lower LSN.
+	 *
+	 * First, update the WT_TRACK start key based on the specified stop key.
+	 *
+	 * Read and instantiate the WT_TRACK page.
 	 */
-	for (i = a_slot + 1; i < ss->pages_next; ++i) {
+	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
+	WT_ERR(__wt_disk_read(session, dsk->mem, trk->addr, trk->size));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+
+	/*
+	 * Walk the page, looking for a key sorting greater than the specified
+	 * stop key -- that's our new start key.
+	 */
+	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_ROW_FOREACH(page, rip, i) {
+		if (__wt_off_page(page, rip->key)) {
+			ikey = rip->key;
+			_item.data = WT_IKEY_DATA(ikey);
+			_item.size = ikey->size;
+			item = &_item;
+		} else {
+			WT_ERR(__wt_row_key(session, page, rip, key));
+			item = (WT_ITEM *)key;
+		}
+		if  (func(btree, item, stop) > 0) {
+			found = 1;
+			break;
+		}
+	}
+
+	/*
+	 * We know that at least one key on the page sorts after the specified
+	 * stop key, otherwise the page would have entirely overlapped and we
+	 * would have discarded it, we wouldn't be here.  Therefore, this test
+	 * is safe.  (But, it never hurts to check.)
+	 */
+	WT_RET_TEST(!found, WT_ERROR);
+	WT_RET(__slvg_key_copy(session, &trk->row_start, item));
+
+	/*
+	 * We may need to re-sort some number of elements in the list.  Walk
+	 * forward in the list until reaching an entry which cannot overlap
+	 * the adjusted entry.  If it's more than a single slot, re-sort the
+	 * entries.
+	 */
+	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		if (__slvg_trk_compare_key(&new, &ss->pages[i]) <= 0)
+		if  (func(btree, SLOT_START(i), (WT_ITEM *)&trk->row_stop) > 0)
 			break;
 	}
-	for (j = ss->pages_next; j > i; --j)
-		ss->pages[j] = ss->pages[j - 1];
-	ss->pages[i] = new;
-	++ss->pages_next;
-	return (0);
+	i -= slot;
+	if (i > 1)
+		qsort(ss->pages + slot, (size_t)i,
+		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
+
+	if (page != NULL)
+		__wt_page_free(session, page, WT_PAGE_FREE_IGNORE_DISK);
+
+err:	__wt_scr_release(&dsk);
+	__wt_scr_release(&key);
+
+	return (ret);
 }
 
 /*
@@ -1660,23 +1841,19 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	page = WT_ROW_REF_PAGE(rref);
 
 	/*
-	 * Figure out how many entries we want to take and how many we want to
-	 * skip.  If we're checking the starting range key, keys on the page
-	 * must be greater-than the range key; if we're checking the stopping
-	 * range key, keys on the page must be less-than the range key.  This
-	 * is because we took a key from another page to define the the start
-	 * or stop of this page's range, and so that page owns the "equal to"
-	 * range space.
+	 * Figure out how many page keys we want to take and how many we want
+	 * to skip.
 	 *
-	 * If we're checking the starting range key, we may need to skip leading
-	 * records on the page.  In the column-store code we set the in-memory
-	 * WT_COL reference and we're done because the column-store leaf page
-	 * reconciliation doesn't care about the on-disk information.  Row-store
-	 * is harder because row-store leaf page reconciliation copies the key
-	 * values from the original on-disk page.  Building a copy of the page
-	 * and reconciling it is going to be a lot of work -- for now, drill a
-	 * hole into reconciliation and pass in a value that skips some number
-	 * of initial page records.
+	 * If checking the starting range key, the key we're searching for will
+	 * be equal to the starting range key.  This is because we figured out
+	 * the true merged-page start key as part of discarding initial keys
+	 * from the page (see the __slvg_row_range_overlap function, and its
+	 * calls to __slvg_row_trk_update_start for more information).
+	 *
+	 * If checking the stopping range key, we want the keys on the page that
+	 * are less-than the stopping range key.  This is because we copied a
+	 * key from another page to define this page's stop range: that page is
+	 * the page that owns the "equal to" range space.
 	 */
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
@@ -1691,8 +1868,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 				item = (WT_ITEM *)key;
 			}
 
+			/*
+			 * >= is correct: see the comment above.
+			 */
 			if  (func(btree,
-			    item, (WT_ITEM *)&trk->row_start) > 0)
+			    item, (WT_ITEM *)&trk->row_start) >= 0)
 				break;
 			if (ss->verbose) {
 				WT_ERR(__slvg_load_byte_string(session,
@@ -1716,6 +1896,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 				WT_ERR(__wt_row_key(session, page, rip, key));
 				item = (WT_ITEM *)key;
 			}
+
+			/*
+			 * < is correct: see the comment above.
+			 */
 			if  (func(btree,
 			    item, (WT_ITEM *)&trk->row_stop) < 0)
 				break;
@@ -1732,7 +1916,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		}
 
 	/*
-	 * Because the starting/stopping keys are boundaries, not exact matches,
+	 * Because the stopping key range is a boundary, not an exact match,
 	 * we may have just decided not to take all of the keys on the page, or
 	 * none of them.
 	 *
