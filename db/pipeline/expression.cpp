@@ -1812,11 +1812,11 @@ namespace mongo {
 
         productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
 
-        long right = pRight->coerceToLong();
+        long long right = pRight->coerceToLong();
 	if (right == 0)
 	    return Value::getUndefined();
 
-        long left = pLeft->coerceToLong();
+        long long left = pLeft->coerceToLong();
         if (productType == NumberLong)
             return Value::createLong(left % right);
         return Value::createInt((int)left % right);
@@ -2369,8 +2369,8 @@ namespace mongo {
         assert(pLength->getType() == NumberInt 
             || pLength->getType() == NumberLong 
             || pLength->getType() == NumberDouble); // CW TODO user error length must be numeric
-        long lower = pLower->coerceToLong();
-        long length = pLength->coerceToLong();
+        long long lower = pLower->coerceToLong();
+        long long length = pLength->coerceToLong();
         return Value::createString( str.substr(lower, length) );
     }
 
@@ -2405,8 +2405,8 @@ namespace mongo {
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
         if (pLeft->getType() == Date) {
-            long right;
-            long left = pLeft->coerceToDate();
+            long long right;
+            long long left = pLeft->coerceToDate();
             if (pRight->getType() == Date)
                 right = pRight->coerceToDate();
             else 
@@ -2428,8 +2428,8 @@ namespace mongo {
             return Value::createDouble(left - right);
         } 
 
-        long right = pRight->coerceToLong();
-        long left = pLeft->coerceToLong();
+        long long right = pRight->coerceToLong();
+        long long left = pLeft->coerceToLong();
         if (productType == NumberLong)
             return Value::createLong(left - right);
         return Value::createInt((int)(left - right));
