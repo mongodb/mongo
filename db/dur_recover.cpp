@@ -221,7 +221,10 @@ namespace mongo {
                 mmf = (MongoMMF*)file;
             }
             else {
-                assert(_recovering);
+                if( !_recovering ) {
+                    log() << "journal error applying writes, file " << fn << " is not open" << endl;
+                    assert(false);
+                }
                 boost::shared_ptr<MongoMMF> sp (new MongoMMF);
                 assert(sp->open(fn, false));
                 _mmfs.push_back(sp);
