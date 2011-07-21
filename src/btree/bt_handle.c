@@ -62,10 +62,6 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 		page->u.col_leaf.recno = 1;
 		page->type = WT_PAGE_COL_FIX;
 		break;
-	case BTREE_COL_RLE:
-		page->u.col_leaf.recno = 1;
-		page->type = WT_PAGE_COL_RLE;
-		break;
 	case BTREE_COL_VAR:
 		page->u.col_leaf.recno = 1;
 		page->type = WT_PAGE_COL_VAR;
@@ -439,7 +435,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
 		if (btree->leafmin / btree->fixed_len < 20) {
 			__wt_errx(session,
 			    "the configured leaf page size cannot store at "

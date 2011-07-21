@@ -330,12 +330,11 @@ struct __wt_page {
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
 #define	WT_PAGE_COL_INT		2	/* Col-store internal page */
-#define	WT_PAGE_COL_RLE		3	/* Col-store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
-#define	WT_PAGE_OVFL		5	/* Overflow page */
-#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	8	/* Free-list page */
+#define	WT_PAGE_COL_VAR		3	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		4	/* Overflow page */
+#define	WT_PAGE_ROW_INT		5	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	6	/* Row-store leaf page */
+#define	WT_PAGE_FREELIST	7	/* Free-list page */
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BULK_LOAD	0x01	/* Page bulk loaded */
@@ -609,19 +608,18 @@ struct __wt_update {
  * the first slot of the insert array holds keys smaller than any other key on
  * the page.
  *
- * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
- * pages), a single indx entry may reference a large number of records, because
- * there's a single on-page entry that represents many identical records.   (We
- * can't expand those entries when the page comes into memory, as that would
- * require resources as pages are moved to/from the cache, including read-only
- * files.)  Instead, a single indx entry represents all of the identical records
- * originally found on the page.
+ * In column-store variable-length run-length encoded pages, a single indx entry
+ * may reference a large number of records, because there's a single on-page
+ * entry representing many identical records.   (We don't expand those entries
+ * when the page comes into memory, as that would require resources as pages are
+ * moved to/from the cache, including read-only files.)  Instead, a single indx
+ * entry represents all of the identical records originally found on the page.
  *	Modifying (or deleting) run-length encoded column-store records is hard
  * because the page's entry no longer references a set of identical items.  We
- * handle this by "inserting" a new entry into the insert array.  This is the
- * only case where it's possible to "insert" into a column-store, it's normally
- * only possible to append to a column-store as insert requires re-numbering
- * subsequent records.  (Berkeley DB did support mutable records, but it won't
+ * handle this by "inserting" a new entry into the insert array, with its own
+ * record number.  (This is the only case where it's possible to insert into
+ * a column-store: only appends are allowed, as insert requires re-numbering
+ * subsequent records.  Berkeley DB did support mutable records, but it won't
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
@@ -742,30 +740,6 @@ struct __wt_off_record {
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (btree)->fixed_len)
-
-/*
- * WT_RLE_REPEAT_FOREACH is a loop that walks fixed-length, run-length encoded
- * entries on a page.
- */
-#define	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
-	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
-	    (p) = (uint8_t *)(p) + (btree)->fixed_len + sizeof(uint16_t))
-
-/*
- * WT_RLE_REPEAT_COUNT and WT_RLE_REPEAT_DATA reference the data and count
- * values for fixed-length, run-length encoded page entries.
- */
-#define	WT_RLE_REPEAT_COUNT(p)	(*(uint16_t *)(p))
-#define	WT_RLE_REPEAT_DATA(p)	((uint8_t *)(p) + sizeof(uint16_t))
-
-/*
- * WT_RLE_REPEAT_ITERATE is a loop that walks fixed-length, run-length encoded
- * references on a page, visiting each entry the appropriate number of times.
- */
-#define	WT_RLE_REPEAT_ITERATE(btree, dsk, p, i, j)			\
-	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
-		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
 /*
  * General purpose macros for the Btree implementation.

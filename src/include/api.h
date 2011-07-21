@@ -18,9 +18,8 @@ struct __wt_btree {
 	const char *value_format;
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
-		BTREE_COL_RLE=2,	/* Fixed-length, RLE column store */
-		BTREE_COL_VAR=3,	/* Variable-length column store */
-		BTREE_ROW=4		/* Row-store */
+		BTREE_COL_VAR=2,	/* Variable-length column store */
+		BTREE_ROW=3		/* Row-store */
 	} type;				/* Type */
 
 	uint64_t  lsn;			/* LSN file/offset pair */

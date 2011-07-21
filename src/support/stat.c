@@ -70,8 +70,6 @@ __wt_stat_alloc_btree_file_stats(WT_SESSION_IMPL *session, WT_BTREE_FILE_STATS *
 	stats->file_allocsize.desc = "page size allocation unit";
 	stats->file_col_fix.desc = "column-store fixed-size leaf pages";
 	stats->file_col_internal.desc = "column-store internal pages";
-	stats->file_col_rle.desc =
-	    "column-store repeat-count compressed fixed-size leaf pages";
 	stats->file_col_variable.desc =
 	    "column-store variable-size leaf pages";
 	stats->file_fixed_len.desc = "fixed-record size";
@@ -101,7 +99,6 @@ __wt_stat_clear_btree_file_stats(WT_BTREE_FILE_STATS *stats)
 	stats->file_allocsize.v = 0;
 	stats->file_col_fix.v = 0;
 	stats->file_col_internal.v = 0;
-	stats->file_col_rle.v = 0;
 	stats->file_col_variable.v = 0;
 	stats->file_fixed_len.v = 0;
 	stats->file_freelist_entries.v = 0;
@@ -126,7 +123,6 @@ __wt_stat_print_btree_file_stats(WT_BTREE_FILE_STATS *stats, FILE *stream)
 	__wt_stat_print(&stats->file_allocsize, stream);
 	__wt_stat_print(&stats->file_col_fix, stream);
 	__wt_stat_print(&stats->file_col_internal, stream);
-	__wt_stat_print(&stats->file_col_rle, stream);
 	__wt_stat_print(&stats->file_col_variable, stream);
 	__wt_stat_print(&stats->file_fixed_len, stream);
 	__wt_stat_print(&stats->file_freelist_entries, stream);

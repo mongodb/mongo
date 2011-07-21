@@ -248,7 +248,6 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	switch (ss->page_type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 		__slvg_col_range_missing(session, ss);
 		break;
 	case WT_PAGE_ROW_LEAF:
@@ -263,7 +262,6 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	switch (ss->page_type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 		WT_ERR(__slvg_col_build_internal(session, ss));
 		break;
 	case WT_PAGE_ROW_LEAF:
@@ -424,7 +422,6 @@ skip:			WT_VERBOSE(session, SALVAGE,
 
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
 			if (ss->page_type == WT_PAGE_INVALID)
@@ -487,17 +484,14 @@ static int
 __slvg_trk_leaf(
     WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, WT_STUFF *ss)
 {
-	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint64_t stop_recno;
 	uint32_t i;
-	uint8_t *p;
 	int ret;
 
-	btree = session->btree;
 	unpack = &_unpack;
 	page = NULL;
 	trk = NULL;
@@ -551,23 +545,6 @@ __slvg_trk_leaf(
 
 		/* Column-store pages can contain overflow items. */
 		WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
-		break;
-	case WT_PAGE_COL_RLE:
-		/*
-		 * Column-store RLE format: the start key can be taken from the
-		 * WT_PAGE_DISK header, but the stop key requires walking the
-		 * page.
-		 */
-		stop_recno = dsk->recno;
-		WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
-			stop_recno += WT_RLE_REPEAT_COUNT(p);
-
-		trk->col_start = dsk->recno;
-		trk->col_stop = stop_recno - 1;
-
-		WT_VERBOSE(session, SALVAGE,
-		    "[%" PRIu32 "] records %" PRIu64 "-%" PRIu64,
-		    addr, trk->col_start, trk->col_stop);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -1156,13 +1133,12 @@ static int
 __slvg_col_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref)
 {
-	WT_COL *cip, *save_col_leaf;
+	WT_COL *save_col_leaf;
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint64_t skip, take;
-	uint32_t i, n_repeat, save_entries;
+	uint32_t save_entries;
 	int ret;
-	void *cipdata;
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
@@ -1196,48 +1172,6 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 		 */
 		page->u.col_leaf.d += skip;
 		page->entries = (uint32_t)take;
-		break;
-	case WT_PAGE_COL_RLE:
-		/*
-		 * Adjust the page information to "see" only keys we care about.
-		 */
-		WT_COL_FOREACH(page, cip, i) {
-			cipdata = WT_COL_PTR(page, cip);
-			n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
-			if (skip > 0) {
-				/*
-				 * Initially, walk forward to the RLE entry that
-				 * has our first record number; adjust its count
-				 * count to reflect the right number of records.
-				 */
-				if (n_repeat <= skip) {
-					++page->u.col_leaf.d;
-					skip -= n_repeat;
-					continue;
-				}
-
-				/*
-				 * Switch to counting the records we're going
-				 * to keep.
-				 */
-				n_repeat -= skip;
-				WT_RLE_REPEAT_COUNT(cipdata) = n_repeat;
-				skip = 0;
-			}
-
-			/*
-			 * Next, walk forward to the RLE entry that has our last
-			 * record number; adjust its count to reflect the right
-			 * number of records.
-			 */
-			if (n_repeat <= take) {
-				take -= n_repeat;
-				continue;
-			}
-			WT_RLE_REPEAT_COUNT(cipdata) = take;
-			break;
-		}
-		page->entries = WT_COL_SLOT(page, cip);
 		break;
 	case WT_PAGE_COL_VAR:
 		/*
@@ -1287,10 +1221,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	ret = __wt_page_reconcile_int(session,
 	    page, cookie, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
 
-err:	/*
-	 * Reset the page.  (Don't reset the record number or RLE counts -- it
-	 * doesn't matter at the moment.)
-	 */
+err:	/* Reset the page. */
 	page->u.col_leaf.d = save_col_leaf;
 	page->entries = save_entries;
 
@@ -2151,7 +2082,6 @@ __slvg_trk_compare_key(const void *a, const void *b)
 	switch (a_trk->ss->page_type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 		a_recno = a_trk->col_start;
 		b_recno = b_trk->col_start;
 		if (a_recno == b_recno)

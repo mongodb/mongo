@@ -254,7 +254,6 @@ __wt_verify_tree(
 		recno = page->u.col_int.recno;
 		goto recno_chk;
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_leaf.recno;
 recno_chk:	if (parent_recno != recno) {
@@ -279,12 +278,6 @@ recno_chk:	if (parent_recno != recno) {
 				__wt_cell_unpack(cell, unpack);
 				recno += unpack->rle;
 			}
-		vs->record_total += recno;
-		break;
-	case WT_PAGE_COL_RLE:
-		recno = 0;
-		WT_COL_FOREACH(page, cip, i)
-			recno += WT_RLE_REPEAT_COUNT(WT_COL_PTR(page, cip));
 		vs->record_total += recno;
 		break;
 	}

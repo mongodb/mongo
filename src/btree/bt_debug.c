@@ -30,12 +30,10 @@ static int  __wt_debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __wt_debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __wt_debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
 static void __wt_debug_dsk_col_int(WT_DBG *, WT_PAGE_DISK *);
-static void __wt_debug_dsk_col_rle(WT_DBG *, WT_PAGE_DISK *);
 static void __wt_debug_ikey(WT_DBG *, WT_IKEY *);
 static void __wt_debug_item(WT_DBG *, const char *, const void *, uint32_t);
 static void __wt_debug_page_col_fix(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_col_int(WT_DBG *, WT_PAGE *, uint32_t);
-static void __wt_debug_page_col_rle(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_col_var(WT_DBG *, WT_PAGE *);
 static int  __wt_debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __wt_debug_page_row_leaf(WT_DBG *, WT_PAGE *);
@@ -200,7 +198,6 @@ __wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		__wt_dmsg(ds, "%s page: starting recno %" PRIu64
 		    ", entries %" PRIu32 ", lsn %" PRIu32 "/%" PRIu32 "\n",
@@ -230,9 +227,6 @@ __wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
 		break;
 	case WT_PAGE_COL_INT:
 		__wt_debug_dsk_col_int(ds, dsk);
-		break;
-	case WT_PAGE_COL_RLE:
-		__wt_debug_dsk_col_rle(ds, dsk);
 		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
@@ -347,7 +341,6 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		__wt_dmsg(ds, " recno %" PRIu64, page->u.col_int.recno);
 		break;
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		__wt_dmsg(ds, " recno %" PRIu64, page->u.col_leaf.recno);
 		break;
@@ -390,10 +383,6 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_debug_page_col_int(ds, page, flags));
-		break;
-	case WT_PAGE_COL_RLE:
-		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
-			__wt_debug_page_col_rle(ds, page);
 		break;
 	case WT_PAGE_COL_VAR:
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
@@ -463,37 +452,6 @@ __wt_debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 			WT_RET(__wt_debug_page_work(
 			    ds, WT_COL_REF_PAGE(cref), flags));
 	return (0);
-}
-
-/*
- * __wt_debug_page_col_rle --
- *	Dump an in-memory WT_PAGE_COL_RLE page.
- */
-static void
-__wt_debug_page_col_rle(WT_DBG *ds, WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_INSERT *ins;
-	uint32_t fixed_len, i;
-	void *cipvalue;
-
-	fixed_len = ds->session->btree->fixed_len;
-
-	WT_COL_FOREACH(page, cip, i) {
-		cipvalue = WT_COL_PTR(page, cip);
-		__wt_dmsg(ds,
-		    "\trepeat %" PRIu32 " {", WT_RLE_REPEAT_COUNT(cipvalue));
-		if (cipvalue == NULL ||
-		    WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipvalue)))
-			__wt_dmsg(ds, "deleted");
-		else
-			__wt_debug_byte_string(
-			    ds, WT_RLE_REPEAT_DATA(cipvalue), fixed_len);
-		__wt_dmsg(ds, "}\n");
-
-		if ((ins = WT_COL_INSERT(page, cip)) != NULL)
-			__wt_debug_col_insert(ds, ins);
-	}
 }
 
 /*
@@ -741,31 +699,6 @@ __wt_debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_DISK *dsk)
 			__wt_dmsg(ds, "deleted");
 		else
 			__wt_debug_byte_string(ds, p, fixed_len);
-		__wt_dmsg(ds, "}\n");
-	}
-}
-
-/*
- * __wt_debug_dsk_col_rle --
- *	Dump a WT_PAGE_COL_RLE page.
- */
-static void
-__wt_debug_dsk_col_rle(WT_DBG *ds, WT_PAGE_DISK *dsk)
-{
-	WT_BTREE *btree;
-	uint32_t fixed_len, i;
-	uint8_t *p;
-
-	btree = ds->session->btree;
-	fixed_len = ds->session->btree->fixed_len;
-
-	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i) {
-		__wt_dmsg(ds, "\trepeat %" PRIu32 " {", WT_RLE_REPEAT_COUNT(p));
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(p)))
-			__wt_dmsg(ds, "deleted");
-		else
-			__wt_debug_byte_string(
-			    ds, WT_RLE_REPEAT_DATA(p), fixed_len);
 		__wt_dmsg(ds, "}\n");
 	}
 }

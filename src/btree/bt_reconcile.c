@@ -213,8 +213,6 @@ static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_fix_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_col_rle(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
-static int  __rec_col_rle_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_bulk(WT_SESSION_IMPL *, WT_PAGE *);
@@ -355,14 +353,6 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 		else {
 			__rec_col_extend_truncate(page);
 			WT_RET(__rec_col_fix(session, page, salvage));
-		}
-		break;
-	case WT_PAGE_COL_RLE:
-		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-			WT_RET(__rec_col_rle_bulk(session, page));
-		else {
-			__rec_col_extend_truncate(page);
-			WT_RET(__rec_col_rle(session, page, salvage));
 		}
 		break;
 	case WT_PAGE_COL_VAR:
@@ -697,7 +687,6 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_INT:
-			case WT_PAGE_COL_RLE:
 				break;
 			case WT_PAGE_COL_VAR:
 				WT_RET(__rec_ovfl_delete(session, page));
@@ -1726,194 +1715,6 @@ __rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
-	}
-
-	/* Write the remnant page. */
-	return (__rec_split_finish(session));
-}
-
-/*
- * __rec_col_rle --
- *	Reconcile a fixed-width, run-length encoded, column-store leaf page.
- */
-static int
-__rec_col_rle(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
-{
-	WT_BTREE *btree;
-	WT_BUF *tmp;
-	WT_COL *cip;
-	WT_INSERT *ins;
-	WT_RECONCILE *r;
-	uint64_t slvg_missing;
-	uint32_t i, len;
-	uint16_t n, nrepeat, repeat_count;
-	uint8_t *data, *last_data;
-	int ret;
-	void *cipdata;
-
-	r = S2C(session)->cache->rec;
-	btree = session->btree;
-	tmp = NULL;
-	last_data = NULL;
-	ret = 0;
-
-	/*
-	 * We need a "deleted" data item to store on the page.  Make sure the
-	 * session's scratch buffer is big enough.  Clear the buffer's contents
-	 * and set the delete flag.
-	 */
-	len = btree->fixed_len;
-	WT_ERR(__wt_scr_alloc(session, len, &tmp));
-	memset(tmp->mem, 0, len);
-	WT_FIX_DELETE_SET(tmp->mem);
-
-	WT_RET(__rec_split_init(session, page,
-	    page->u.col_leaf.recno,
-	    session->btree->leafmax, session->btree->leafmin));
-
-	/*
-	 * The salvage code may be calling us to reconcile a page where there
-	 * were missing records in the column-store name space.
-	 */
-	slvg_missing = salvage == NULL ? 0 : salvage->missing;
-	for (; slvg_missing > 0; slvg_missing -= repeat_count) {
-		/* Boundary: split or write the page. */
-		while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
-			WT_ERR(__rec_split(session));
-
-		data = r->first_free;
-		repeat_count = (uint16_t)WT_MIN(UINT16_MAX, slvg_missing);
-		WT_RLE_REPEAT_COUNT(data) = repeat_count;
-		memcpy(WT_RLE_REPEAT_DATA(data), tmp->mem, len);
-		__rec_incr(session, r, len + WT_SIZEOF32(uint16_t));
-
-		/* Update the starting record number in case we split. */
-		r->recno += repeat_count;
-	}
-
-	/* For each entry in the in-memory page... */
-	WT_COL_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
-		ins = WT_COL_INSERT(page, cip),
-
-		/*
-		 * Generate entries for the new page: loop through the repeat
-		 * records, checking for WT_INSERT entries matching the record
-		 * number.
-		 *
-		 * Note the increment of recno in the for loop to update the
-		 * starting record number in case we split.
-		 */
-		nrepeat = cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
-		for (n = 0;
-		    n < nrepeat; n += repeat_count, r->recno += repeat_count) {
-			if (ins != NULL && WT_INSERT_RECNO(ins) == r->recno) {
-				/* Use the WT_INSERT's WT_UPDATE field. */
-				if (WT_UPDATE_DELETED_ISSET(ins->upd))
-					data = tmp->mem;
-				else
-					data = WT_UPDATE_DATA(ins->upd);
-				repeat_count = 1;
-
-				ins = ins->next;
-			} else {
-				if (cipdata == NULL ||
-				    WT_FIX_DELETE_ISSET(cipdata))
-					data = tmp->mem;
-				else
-					data = WT_RLE_REPEAT_DATA(cipdata);
-				/*
-				 * The repeat count is the number of records
-				 * up to the next WT_INSERT record, or up to
-				 * the end of this entry if we have no more
-				 * WT_INSERT records.
-				 */
-				if (ins == NULL)
-					repeat_count = nrepeat - n;
-				else
-					repeat_count = (uint16_t)
-					    (WT_INSERT_RECNO(ins) - r->recno);
-			}
-
-			/*
-			 * In all cases, check the last entry written on the
-			 * page to see if it's identical, and increment its
-			 * repeat count where possible.
-			 */
-			if (last_data != NULL && memcmp(
-			    WT_RLE_REPEAT_DATA(last_data), data, len) == 0 &&
-			    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
-				WT_RLE_REPEAT_COUNT(last_data) += repeat_count;
-				continue;
-			}
-
-			/* Boundary: split or write the page. */
-			while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
-				WT_ERR(__rec_split(session));
-
-			last_data = r->first_free;
-			WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
-			memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
-			__rec_incr(session, r, len + WT_SIZEOF32(uint16_t));
-		}
-	}
-
-	/* Write the remnant page. */
-	ret = __rec_split_finish(session);
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
-	return (ret);
-}
-
-/*
- * __rec_col_rle_bulk --
- *	Reconcile a bulk-loaded, fixed-width, run-length encoded, column-store
- *	leaf page.
- */
-static int
-__rec_col_rle_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-	WT_RECONCILE *r;
-	WT_UPDATE *upd;
-	uint32_t len;
-	uint8_t *data, *last_data;
-
-	r = S2C(session)->cache->rec;
-	btree = session->btree;
-	len = btree->fixed_len;
-	last_data = NULL;
-
-	WT_RET(__rec_split_init(session, page,
-	    page->u.bulk.recno,
-	    session->btree->leafmax, session->btree->leafmin));
-
-	/* For each entry in the update list... */
-	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next, ++r->recno) {
-		data = WT_UPDATE_DATA(upd);
-
-		/*
-		 * In all cases, check the last entry written on the page to
-		 * see if it's identical, and increment its repeat count where
-		 * possible.
-		 */
-		if (last_data != NULL && memcmp(
-		    WT_RLE_REPEAT_DATA(last_data), data, len) == 0 &&
-		    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
-			++WT_RLE_REPEAT_COUNT(last_data);
-			continue;
-		}
-
-		/* Boundary: split or write the page. */
-		while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
-			WT_RET(__rec_split(session));
-
-		last_data = r->first_free;
-		WT_RLE_REPEAT_COUNT(last_data) = 1;
-		memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
-		__rec_incr(session, r, len + WT_SIZEOF32(uint16_t));
 	}
 
 	/* Write the remnant page. */
@@ -2976,7 +2777,6 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_STAT_INCR(btree->stats, split_intl);
 			break;
 		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
 			WT_STAT_INCR(btree->stats, split_leaf);
@@ -2991,7 +2791,6 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			WT_RET(__rec_col_split(session, page, &replace));
 			break;

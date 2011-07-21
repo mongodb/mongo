@@ -288,7 +288,6 @@ eop:		e->visited = 1;
 		e->visited = 0;
 		return (__wt_walk_next(session, walk, pagep));
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_LEAF:
 		/* Return the page, it doesn't require further traversal. */

@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static int __wt_stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int __wt_stat_page_col_rle(WT_SESSION_IMPL *, WT_PAGE *);
 static int __wt_stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int __wt_stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
 
@@ -34,10 +33,6 @@ __wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, file_col_internal);
-		break;
-	case WT_PAGE_COL_RLE:
-		WT_STAT_INCR(stats, file_col_rle);
-		WT_RET(__wt_stat_page_col_rle(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, file_col_variable);
@@ -86,61 +81,6 @@ __wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 				WT_STAT_INCR(stats, file_item_col_deleted);
 			else
 				WT_STAT_INCR(stats, file_item_total_data);
-	return (0);
-}
-
-/*
- * __wt_stat_page_col_rle --
- *	Stat a WT_PAGE_COL_RLE page.
- */
-static int
-__wt_stat_page_col_rle(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE_FILE_STATS *stats;
-	WT_COL *cip;
-	WT_INSERT *ins;
-	WT_UPDATE *upd;
-	uint32_t i;
-	int orig_deleted;
-	void *cipdata;
-
-	stats = session->btree->fstats;
-
-	/* Walk the page, counting data items. */
-	WT_COL_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
-		if (cipdata == NULL ||
-		    WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata))) {
-			WT_STAT_INCRV(stats,
-			    file_item_col_deleted,
-			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata));
-			orig_deleted = 1;
-		} else {
-			WT_STAT_INCRV(stats,
-			    file_item_total_data, WT_RLE_REPEAT_COUNT(cipdata));
-			orig_deleted = 0;
-		}
-
-		/*
-		 * Walk the insert list, checking for changes.  For each insert
-		 * we find, correct the original count based on its state.
-		 */
-		for (ins =
-		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
-			upd = ins->upd;
-			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				if (orig_deleted)
-					continue;
-				WT_STAT_INCR(stats, file_item_col_deleted);
-				WT_STAT_DECR(stats, file_item_total_data);
-			} else {
-				if (!orig_deleted)
-					continue;
-				WT_STAT_DECR(stats, file_item_col_deleted);
-				WT_STAT_INCR(stats, file_item_total_data);
-			}
-		}
-	}
 	return (0);
 }
 

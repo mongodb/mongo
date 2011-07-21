@@ -116,10 +116,6 @@ __wt_return_data(
 			value_ret = cipdata;
 			size_ret = btree->fixed_len;
 			break;
-		case WT_PAGE_COL_RLE:
-			value_ret = WT_RLE_REPEAT_DATA(cipdata);
-			size_ret = btree->fixed_len;
-			break;
 		case WT_PAGE_COL_VAR:
 			cell = cipdata;
 

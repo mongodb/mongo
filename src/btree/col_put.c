@@ -95,7 +95,6 @@ __wt_col_modify(
 		}
 		goto simple_update;
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_COL_RLE:
 		/* Allocate an update array as necessary. */
 		if (session->srch_upd != NULL) {		/* #2 */
 simple_update:		WT_ERR(
@@ -470,7 +469,6 @@ __col_next_recno(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t *recnop)
 	WT_COL *cip;
 	uint32_t i;
 	uint64_t recno;
-	void *cipdata;
 
 	recno = page->u.col_leaf.recno;
 	unpack = &_unpack;
@@ -487,13 +485,6 @@ __col_next_recno(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t *recnop)
 				__wt_cell_unpack(cell, unpack);
 				recno += unpack->rle;
 			}
-		break;
-	case WT_PAGE_COL_RLE:
-		WT_COL_FOREACH(page, cip, i) {
-			cipdata = WT_COL_PTR(page, cip);
-			recno +=
-			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
-		}
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}

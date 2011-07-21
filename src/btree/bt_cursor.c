@@ -63,62 +63,6 @@ __btcur_next_fix(WT_CURSOR_BTREE *cbt,
 }
 
 static inline int
-__btcur_next_rle(WT_CURSOR_BTREE *cbt,
-    int newpage, wiredtiger_recno_t *recnop, WT_BUF *value)
-{
-	WT_CELL *cell;
-	WT_UPDATE *upd;
-	int found, newcell;
-
-	/* Initialize for each new page. */
-	if (newpage) {
-		cbt->cip = cbt->page->u.col_leaf.d;
-		cbt->nitems = cbt->page->entries;
-		cbt->recno = cbt->page->u.col_leaf.recno;
-		newcell = 1;
-	} else
-		newcell = 0;
-
-	for (;; ++cbt->cip, newcell = 1) {
-		if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) == NULL)
-			goto deleted;
-		if (newcell) {
-			cbt->rle = WT_RLE_REPEAT_COUNT(cell);
-			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
-		}
-
-		for (found = 0;
-		    !found && cbt->rle > 0;
-		    ++cbt->recno, --cbt->rle) {
-			*recnop = cbt->recno;
-			if (cbt->ins != NULL &&
-			    WT_INSERT_RECNO(cbt->ins) == *recnop) {
-				upd = cbt->ins->upd;
-				if (!WT_UPDATE_DELETED_ISSET(upd)) {
-					value->data = WT_UPDATE_DATA(upd);
-					value->size = upd->size;
-					found = 1;
-				}
-				cbt->ins = cbt->ins->next;
-			} else if (!WT_FIX_DELETE_ISSET(
-			    WT_RLE_REPEAT_DATA(cell))) {
-				value->data = WT_RLE_REPEAT_DATA(cell);
-				value->size = cbt->btree->fixed_len;
-				found = 1;
-			}
-		}
-
-		if (found)
-			return (0);
-
-deleted:	if (--cbt->nitems == 0)
-			return (WT_NOTFOUND);
-	}
-
-	/* NOTREACHED */
-}
-
-static inline int
 __btcur_next_var(WT_CURSOR_BTREE *cbt,
     int newpage, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
@@ -317,10 +261,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 				ret = __btcur_next_fix(cbt, newpage,
 				   &cursor->recno, &cursor->value);
 				break;
-			case WT_PAGE_COL_RLE:
-				ret = __btcur_next_rle(cbt, newpage,
-				    &cursor->recno, &cursor->value);
-				break;
 			case WT_PAGE_COL_VAR:
 				ret = __btcur_next_var(cbt, newpage,
 				    &cursor->recno, &cursor->value);
@@ -382,7 +322,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	*exact = 0;
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_search(
 		    session, cursor->recno, 0)) == WT_RESTART)
@@ -431,7 +370,6 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_modify(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
@@ -476,7 +414,6 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 			return (WT_ERROR);
 		}
 		/* FALLTHROUGH */
-	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_modify(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
@@ -512,7 +449,6 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_modify(
 		    session, cursor->recno, NULL, 0)) == WT_RESTART)

@@ -124,23 +124,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 			goto notfound;
 		}
 		break;
-
-	case WT_PAGE_COL_RLE:
-		/* Walk the page, counting records. */
-		record_cnt = page->u.col_leaf.recno - 1;
-		WT_COL_FOREACH(page, cip, i) {
-			cipdata = WT_COL_PTR(page, cip);
-			record_cnt +=
-			    cipdata == NULL ? 1 : WT_RLE_REPEAT_COUNT(cipdata);
-			if (record_cnt >= recno)
-				break;
-		}
-		if (record_cnt < recno) {
-			if (LF_ISSET(WT_WRITE))
-				goto append;
-			goto notfound;
-		}
-		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
 
@@ -221,50 +204,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 				goto notfound;
 		} else
 			if (cipdata != NULL && unpack->type == WT_CELL_DEL)
-				goto notfound;
-		break;
-	case WT_PAGE_COL_RLE:
-		/*
-		 * Search the WT_COL's insert list for the record's WT_INSERT
-		 * slot.  The insert list is a sorted, forward-linked list --
-		 * on average, we have to search half of it.
-		 *
-		 * Do an initial setup of the return information (we'll correct
-		 * it as needed depending on what we find).
-		 */
-		session->srch_slot = WT_COL_SLOT(page, cip);
-		if (page->u.col_leaf.ins != NULL)
-			session->srch_ins =
-			    &page->u.col_leaf.ins[session->srch_slot];
-
-		for (match = 0, ins =
-		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
-			if (WT_INSERT_RECNO(ins) == recno) {
-				match = 1;
-				session->srch_ins = NULL;
-				session->srch_vupdate = ins->upd;
-				session->srch_upd = &ins->upd;
-				break;
-			}
-			if (WT_INSERT_RECNO(ins) > recno)
-				break;
-			session->srch_ins = &ins->next;
-		}
-
-		/*
-		 * If we're not updating an existing data item, check to see if
-		 * the item has been deleted.   If we found a match, use the
-		 * WT_INSERT's WT_UPDATE value.   If we didn't find a match, use
-		 * use the original data.
-		 */
-		if (LF_ISSET(WT_WRITE))
-			break;
-
-		if (match) {
-			if (WT_UPDATE_DELETED_ISSET(ins->upd))
-				goto notfound;
-		} else
-			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;
 		break;
 	WT_ILLEGAL_FORMAT(session);

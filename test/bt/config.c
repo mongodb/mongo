@@ -31,44 +31,21 @@ config_setup(void)
 
 	/* Pick a file type next, other items depend on it. */
 	cp = config_find("file_type");
-	if (cp->flags & C_PERM) {
-		/*
-		 * If a file type was specified and it's fixed, but no repeat-
-		 * count was specified, go with RLE 50% of the time.
-		 */
-		if (g.c_file_type == FIX) {
-			cp = config_find("repeat_comp_pct");
-			if (!(cp->flags & C_PERM)) {
-				(void)snprintf(buf, sizeof(buf),
-				    "repeat_comp_pct=%d",
-				    MMRAND(0, 1) == 1 ? 0 : MMRAND(10, 90));
-				config_single(buf, 0);
-			}
-		}
-	} else
-		switch (MMRAND(0, 3)) {
+	if (!(cp->flags & C_PERM))
+		switch (MMRAND(0, 2)) {
 		case 0:
+#if 0
 			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
 			config_single(buf, 0);
-			(void)snprintf(buf, sizeof(buf), "repeat_comp_pct=0");
-			config_single(buf, 0);
 			break;
+#else
+			/* FALLTHROUGH */
+#endif
 		case 1:
-			/*
-			 * 25% of the time go with RLE, which is fixed-length
-			 * and a repeat count.
-			 */
-			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
-			config_single(buf, 0);
-			(void)snprintf(buf, sizeof(buf),
-			    "repeat_comp_pct=%d", MMRAND(10, 90));
-			config_single(buf, 0);
-			break;
-		case 2:
 			(void)snprintf(buf, sizeof(buf), "file_type=vlcs");
 			config_single(buf, 0);
 			break;
-		case 3:
+		case 2:
 			(void)snprintf(buf, sizeof(buf), "file_type=row");
 			config_single(buf, 0);
 			break;

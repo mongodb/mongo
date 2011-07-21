@@ -47,11 +47,6 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 		cbulk->updp = &cbulk->upd_base;
 		cbulk->page_type = WT_PAGE_COL_FIX;
 		break;
-	case BTREE_COL_RLE:
-		cbulk->recno = 1;
-		cbulk->updp = &cbulk->upd_base;
-		cbulk->page_type = WT_PAGE_COL_RLE;
-		break;
 	case BTREE_COL_VAR:
 		cbulk->recno = 1;
 		cbulk->updp = &cbulk->upd_base;
@@ -96,7 +91,6 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	 */
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_bulk_col(cbulk));
 		break;
@@ -207,7 +201,6 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	if (cbulk->ins_cnt != 0)
 		switch (cbulk->page_type) {
 		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			WT_RET(__wt_bulk_col_page(cbulk));
 			break;
@@ -227,7 +220,6 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		page->entries = cbulk->ref_next;
 		page->u.col_int.recno = 1;

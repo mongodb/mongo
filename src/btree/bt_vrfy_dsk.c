@@ -10,14 +10,11 @@
 static int __wt_err_cell_corrupted(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, uint8_t, WT_PAGE_DISK *, int);
-static int __wt_err_delfmt(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_err_eof(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __wt_verify_dsk_col_fix(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
 static int __wt_verify_dsk_col_int(
-	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
-static int __wt_verify_dsk_col_rle(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
 static int __wt_verify_dsk_col_var(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
@@ -41,7 +38,6 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
@@ -60,7 +56,6 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		if (dsk->recno != 0)
 			break;
@@ -112,9 +107,6 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_FIX:
 		return (
 		    __wt_verify_dsk_col_fix(session, dsk, addr, size, quiet));
-	case WT_PAGE_COL_RLE:
-		return (
-		    __wt_verify_dsk_col_rle(session, dsk, addr, size, quiet));
 	case WT_PAGE_COL_VAR:
 		return (
 		    __wt_verify_dsk_col_var(session, dsk, addr, size, quiet));
@@ -459,76 +451,11 @@ __wt_verify_dsk_col_fix(WT_SESSION_IMPL *session,
 
 	return (0);
 
-delfmt:	return (__wt_err_delfmt(session, entry_num, addr, quiet));
-}
-
-/*
- * __wt_verify_dsk_col_rle --
- *	Walk a WT_PAGE_COL_RLE disk page and verify it.
- */
-static int
-__wt_verify_dsk_col_rle(WT_SESSION_IMPL *session,
-    WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, int quiet)
-{
-	WT_BTREE *btree;
-	u_int len;
-	uint32_t i, j, entry_num;
-	uint8_t *data, *end, *last_data, *p;
-
-	btree = session->btree;
-	end = (uint8_t *)dsk + size;
-
-	last_data = NULL;
-	len = btree->fixed_len + WT_SIZEOF32(uint16_t);
-
-	entry_num = 0;
-	WT_RLE_REPEAT_FOREACH(btree, dsk, data, i) {
-		++entry_num;
-
-		/* Check if this entry is entirely on the page. */
-		if (data + len > end)
-			return (__wt_err_eop(session, entry_num, addr, quiet));
-
-		/* Count must be non-zero. */
-		if (WT_RLE_REPEAT_COUNT(data) == 0) {
-			WT_VRFY_ERR(session, quiet,
-			    "fixed-length entry %" PRIu32 " on page at addr %"
-			    PRIu32 " has a repeat count of 0",
-			    entry_num, addr);
-			return (WT_ERROR);
-		}
-
-		/* Deleted items are entirely nul bytes. */
-		p = WT_RLE_REPEAT_DATA(data);
-		if (WT_FIX_DELETE_ISSET(p)) {
-			if (*p != WT_FIX_DELETE_BYTE)
-				goto delfmt;
-			for (j = 1; j < btree->fixed_len; ++j)
-				if (*++p != '\0')
-					goto delfmt;
-		}
-
-		/*
-		 * If the previous data is the same as this data, we
-		 * missed an opportunity for compression -- complain.
-		 */
-		if (last_data != NULL &&
-		    memcmp(WT_RLE_REPEAT_DATA(last_data),
-		    WT_RLE_REPEAT_DATA(data), btree->fixed_len) == 0 &&
-		    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
-			WT_VRFY_ERR(session, quiet,
-			    "fixed-length entries %" PRIu32 " and %" PRIu32
-			    " on page at addr %" PRIu32 " are identical and "
-			    "should have been compressed",
-			    entry_num, entry_num - 1, addr);
-			return (WT_ERROR);
-		}
-		last_data = data;
-	}
-
-	return (0);
-
-delfmt:	return (__wt_err_delfmt(session, entry_num, addr, quiet));
+delfmt:	WT_VRFY_ERR(session, quiet,
+	    "deleted fixed-length entry %"
+	    PRIu32 " on page at addr %" PRIu32 " has non-nul bytes",
+	    entry_num, addr);
+	return (WT_ERROR);
 }
 
 /*
@@ -679,22 +606,6 @@ __wt_err_eof(WT_SESSION_IMPL *session,
 	WT_VRFY_ERR(session, quiet,
 	    "off-page item %" PRIu32
 	    " on page at addr %" PRIu32 " references non-existent file pages",
-	    entry_num, addr);
-	return (WT_ERROR);
-}
-
-/*
- * __wt_err_delfmt --
- *	WT_PAGE_COL_FIX and WT_PAGE_COL_RLE error where a deleted item has
- *	non-nul bytes.
- */
-static int
-__wt_err_delfmt(WT_SESSION_IMPL *session,
-    uint32_t entry_num, uint32_t addr, int quiet)
-{
-	WT_VRFY_ERR(session, quiet,
-	    "deleted fixed-length entry %"
-	    PRIu32 " on page at addr %" PRIu32 " has non-nul bytes",
 	    entry_num, addr);
 	return (WT_ERROR);
 }

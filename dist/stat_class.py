@@ -64,7 +64,6 @@ btree_file_stats = {
 	'file_allocsize' : Stat('page size allocation unit'),
 	'file_col_fix' : Stat('column-store fixed-size leaf pages'),
 	'file_col_internal' : Stat('column-store internal pages'),
-	'file_col_rle' : Stat('column-store repeat-count compressed fixed-size leaf pages'),
 	'file_col_variable' : Stat('column-store variable-size leaf pages'),
 	'file_fixed_len' : Stat('fixed-record size'),
 	'file_freelist_entries' : Stat('number of entries in the freelist'),

@@ -153,7 +153,6 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 
 	switch (btree->type) {		/* Check file type compatibility. */
 	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
 		__wt_errx(session,
 		    "fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);

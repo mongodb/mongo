@@ -62,7 +62,6 @@ struct __wt_btree_file_stats {
 	struct __wt_stats file_allocsize;
 	struct __wt_stats file_col_fix;
 	struct __wt_stats file_col_internal;
-	struct __wt_stats file_col_rle;
 	struct __wt_stats file_col_variable;
 	struct __wt_stats file_fixed_len;
 	struct __wt_stats file_freelist_entries;
