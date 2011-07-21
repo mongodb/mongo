@@ -88,6 +88,7 @@ namespace mongo {
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
         assert(_fd);
+        assert(_len % 4096 == 0);
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
@@ -96,7 +97,7 @@ namespace mongo {
             if( !WriteFile(_fd, buf, toWrite, &written, NULL) ) {
                 DWORD e = GetLastError();
                 if( e == 87 )
-                    msgasserted(13519, "error 87 appending to file - misaligned direct write?");
+                    msgasserted(13519, "error 87 appending to file - invalid parameter");
                 else
                     uasserted(13517, str::stream() << "error appending to file " << _name << ' ' << _len << ' ' << toWrite << ' ' << errnoWithDescription(e));
             }
