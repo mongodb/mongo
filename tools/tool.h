@@ -29,6 +29,7 @@
 #include "client/dbclient.h"
 #include "db/instance.h"
 #include "db/matcher.h"
+#include "db/projection.h"
 
 using std::string;
 
@@ -139,6 +140,7 @@ namespace mongo {
     class BSONTool : public Tool {
         bool _objcheck;
         auto_ptr<Matcher> _matcher;
+        auto_ptr<Projection> _projection;
 
     public:
         BSONTool( const char * name , DBAccess access=ALL, bool objcheck = false );

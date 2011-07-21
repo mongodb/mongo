@@ -32,16 +32,16 @@ namespace po = boost::program_options;
 
 class BSONDump : public BSONTool {
 
-    enum OutputType { JSON , DEBUG } _type;
+    enum OutputType { BSON, JSON , DEBUG } _type;
 
 public:
 
     BSONDump() : BSONTool( "bsondump", NONE ) {
         add_options()
-        ("type" , po::value<string>()->default_value("json") , "type of output: json,debug" )
+        ("type" , po::value<string>()->default_value("json") , "type of output: bson,json,debug" )
         ;
         add_hidden_options()
-        ("file" , po::value<string>() , ".bson file" )
+        ("file" , po::value<string>() , ".bson file (use '-' for stdin" )
         ;
         addPositionArg( "file" , 1 );
         _noconnection = true;
@@ -56,12 +56,19 @@ public:
             string t = getParam( "type" );
             if ( t == "json" )
                 _type = JSON;
+            else if ( t == "bson" )
+                _type = BSON;
             else if ( t == "debug" )
                 _type = DEBUG;
             else {
                 cerr << "bad type: " << t << endl;
                 return 1;
             }
+        }
+
+        if ( _type == BSON && logLevel > 0 ) {
+            cerr << "refusing to output BSON with verbosity enabled" << endl;
+            return 1;
         }
 
         path root = getParam( "file" );
@@ -123,6 +130,9 @@ public:
         switch ( _type ) {
         case JSON:
             cout << o.jsonString( TenGen ) << endl;
+            break;
+        case BSON:
+            cout.write( o.objdata(), o.objsize() );
             break;
         case DEBUG:
             debug(o);

@@ -18,6 +18,7 @@
 
 #include "tool.h"
 
+#include <cstdio>
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
@@ -401,6 +402,7 @@ namespace mongo {
         add_options()
         ("objcheck" , "validate object before inserting" )
         ("filter" , po::value<string>() , "filter to apply before inserting" )
+        ("project" , po::value<string>() , "projection to apply before inserting" )
         ;
     }
 
@@ -411,31 +413,45 @@ namespace mongo {
         if ( hasParam( "filter" ) )
             _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
 
+        if ( hasParam( "project" ) ) {
+            _projection.reset( new Projection );
+            _projection->init( fromjson( getParam( "project" ) ) );
+        }
+
         return doRun();
     }
 
     long long BSONTool::processFile( const path& root ) {
-        _fileName = root.string();
 
-        unsigned long long fileLength = file_size( root );
+        FILE* file = NULL;
+        unsigned long long fileLength = 0;
 
-        if ( fileLength == 0 ) {
-            out() << "file " << _fileName << " empty, skipping" << endl;
-            return 0;
+        if ( root == "-" ) {
+            _fileName = "stdin";
+            file = stdin;
         }
+        else {
+            _fileName = root.string();
+            fileLength = file_size( root );
 
+            if ( fileLength == 0 ) {
+                out() << "file " << _fileName << " empty, skipping" << endl;
+                return 0;
+            }
 
-        FILE* file = fopen( _fileName.c_str() , "rb" );
-        if ( ! file ) {
-            log() << "error opening file: " << _fileName << endl;
-            return 0;
+            file = fopen( _fileName.c_str() , "rb" );
+            if ( ! file ) {
+                log() << "error opening file: " << _fileName << endl;
+                return 0;
+            }
         }
 
 #if !defined(__sunos__) && defined(POSIX_FADV_SEQUENTIAL)
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        log(1) << "\t file size: " << fileLength << endl;
+        if ( fileLength > 0 )
+            log(1) << "\t file size: " << fileLength << endl;
 
         unsigned long long read = 0;
         unsigned long long num = 0;
@@ -445,10 +461,17 @@ namespace mongo {
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
-        ProgressMeter m( fileLength );
+        boost::scoped_ptr<ProgressMeter> m;
+        if ( fileLength > 0 && logLevel > 0 )
+            m.reset( new ProgressMeter( fileLength ) );
 
-        while ( read < fileLength ) {
+        while ( ( fileLength == 0 || read < fileLength ) ) {
             size_t amt = fread(buf, 1, 4, file);
+
+            if ( fileLength == 0 && amt == 0 )
+                if ( feof( file ) )
+                    break;
+
             assert( amt == 4 );
 
             int size = ((int*)buf)[0];
@@ -476,22 +499,27 @@ namespace mongo {
             }
 
             if ( _matcher.get() == 0 || _matcher->matches( o ) ) {
-                gotObject( o );
+                gotObject( _projection.get() ? _projection->transform( o ) : o );
                 processed++;
             }
 
             read += o.objsize();
             num++;
 
-            m.hit( o.objsize() );
+            if ( m )
+                m->hit( o.objsize() );
         }
 
         fclose( file );
 
-        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        out() << "\t "  << m.hits() << " objects found" << endl;
+        if ( m && fileLength > 0)
+            uassert( 10265 ,  "counts don't match" , m->done() == fileLength );
+
+        log(1) << "\t " << (m ? m->hits() : num ) << " objects found" << endl;
+
         if ( _matcher.get() )
-            out() << "\t "  << processed << " objects processed" << endl;
+            log(1) << "\t "  << processed << " objects processed" << endl;
+
         return processed;
     }
 
