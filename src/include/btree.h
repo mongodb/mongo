@@ -306,7 +306,7 @@ struct __wt_page {
 		/* Bulk-loaded linked list. */
 		struct {
 			uint64_t   recno;	/* Starting recno */
-			WT_INSERT *ins;		/* Bulk-loaded K/V or V items */
+			WT_INSERT *ins;		/* Bulk-loaded K/V pairs */
 			WT_UPDATE *upd;		/* Bulk-loaded V items */
 		} bulk;
 	} u;
