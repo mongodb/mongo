@@ -124,7 +124,7 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
-		cursor->recno = va_arg(ap, wiredtiger_recno_t);
+		cursor->recno = va_arg(ap, uint64_t);
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else if (fmt[0] == 'S' && fmt[1] == '\0') {

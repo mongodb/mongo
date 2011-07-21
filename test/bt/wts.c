@@ -758,7 +758,7 @@ wts_col_put(uint64_t keyno)
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 	
-	cursor->set_key(cursor, (wiredtiger_recno_t)keyno);
+	cursor->set_key(cursor, keyno);
 	if (g.c_file_type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value.data);
 	else

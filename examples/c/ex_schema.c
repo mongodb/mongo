@@ -40,7 +40,7 @@ int main(void)
 	WT_CURSOR *cursor;
 	POP_RECORD *p, *endp;
 	const char *country;
-	wiredtiger_recno_t recno;
+	uint64_t recno;
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0)

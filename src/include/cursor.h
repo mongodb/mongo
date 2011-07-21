@@ -17,7 +17,7 @@ struct __wt_cursor_btree {
 	WT_ROW	  *rip;				/* Row-store page slot ref */
 	WT_INSERT *ins;				/* Insert chain */
 
-	wiredtiger_recno_t recno;		/* Cursor record number */
+	uint64_t recno;				/* Cursor record number */
 	/*
 	 * Column-store variable length items are optionally run-length encoded.
 	 * WT_CURSOR_BTREE->rle is the count of items to return, decremented to

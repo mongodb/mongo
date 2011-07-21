@@ -148,7 +148,7 @@ SELFHELPER(struct wt_cursor)
                 $self->set_key($self, &k);
         }
 
-        void _set_recno(wiredtiger_recno_t recno) {
+        void _set_recno(uint64_t recno) {
                 $self->set_key($self, recno);
         }
 
@@ -165,8 +165,8 @@ SELFHELPER(struct wt_cursor)
                 return SWIG_FromCharPtrAndSize(k.data, k.size);
         }
 
-        wiredtiger_recno_t _get_recno() {
-                wiredtiger_recno_t r;
+        uint64_t _get_recno() {
+                uint64_t r;
                 $self->get_key($self, &r);
                 return r;
         }

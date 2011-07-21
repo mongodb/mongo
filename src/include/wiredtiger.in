@@ -66,12 +66,6 @@ extern "C" {
  */
 
 /*******************************************
- * Exported types
- *******************************************/
-/*! Logical record numbers. */
-typedef uint64_t wiredtiger_recno_t;
-
-/*******************************************
  * Forward structure declarations
  *******************************************/
 struct wt_buf;		    typedef struct wt_buf WT_BUF;
@@ -365,7 +359,7 @@ struct wt_cursor {
 		WT_CURSOR **tqe_prev;
 	} q;                            /* Linked list of WT_CURSORs. */
 
-	wiredtiger_recno_t recno;
+	uint64_t recno;
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 

@@ -23,8 +23,11 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	ret = __wt_struct_unpackv(session,
-	    cursor->key.data, cursor->key.size, fmt, ap);
+	if (fmt[0] == 'r' && fmt[1] == '\0')
+		*va_arg(ap, uint64_t *) = cursor->recno;
+	else
+		ret = __wt_struct_unpackv(session,
+		    cursor->key.data, cursor->key.size, fmt, ap);
 	va_end(ap);
 
 	API_END(session);
@@ -76,7 +79,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
-		cursor->recno = va_arg(ap, wiredtiger_recno_t);
+		cursor->recno = va_arg(ap, uint64_t);
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else if (fmt[0] == 'S' && fmt[1] == '\0') {

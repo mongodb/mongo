@@ -34,7 +34,7 @@ const char *home = "WT_TEST";
 
 /* Customer records. */
 typedef struct {
-	wiredtiger_recno_t id;
+	uint64_t id;
 	char *name;
 	char *address;
 	char *phone;
@@ -42,10 +42,10 @@ typedef struct {
 
 /* Call records. */
 typedef struct {
-	wiredtiger_recno_t id;
+	uint64_t id;
 	uint64_t call_date;
-	wiredtiger_recno_t cust_id;
-	wiredtiger_recno_t emp_id;
+	uint64_t cust_id;
+	uint64_t emp_id;
 	char *call_type;
 	char *notes;
 } CALL;

@@ -37,7 +37,7 @@ Format characters:
 @row{L, unsigned long, int, integer, 4}
 @row{q, long long, long, integer, 8}
 @row{Q, unsigned long long, long, integer, 8}
-@row{r, ::wiredtiger_recno_t, long, integer, 8}
+@row{r, uint64_t, long, integer, 8}
 @row{s, char[], String, string, fixed length}
 @row{S, char[], String, string, variable}
 @row{t, unsigned char, byte, integer, fixed bit length}
