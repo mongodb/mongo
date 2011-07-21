@@ -11,15 +11,28 @@ extern "C" {
 
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 
-#ifdef HAVE_DIAGNOSTIC
-#define	WT_ASSERT(session, exp)						\
-	((exp) ? (void)0 : __wt_failure(session, #exp, __FILE__, __LINE__))
-#define	WT_FAILURE(session, str)					\
-	__wt_failure(session, str, __FILE__, __LINE__)
-#else
-#define	WT_ASSERT(session, exp)		do {} while (0)
-#define	WT_FAILURE(session, str)	do {} while (0)
-#endif
+/*
+ * WT_ASSERT, WT_ASSERT_RET --
+ *	Assert an expression, abort in diagnostic mode, otherwise, optionally
+ * return an error.
+ */
+#define	WT_ASSERT(session, exp) do {					\
+	if (!(exp))							\
+		WT_FAILURE(session, "%s", #exp);			\
+} while (0)
+#define	WT_ASSERT_RET(session, exp) do {				\
+	if (!(exp))							\
+		WT_FAILURE_RET(session, WT_ERROR, "%s", #exp);		\
+} while (0)
+
+/*
+ * WT_FAILURE, WT_FAILURE_RET --
+ *	Abort in diagnostic mode, otherwise, optionally return an error.
+ */
+#define	WT_FAILURE(session, ...)					\
+	(void)__wt_failure(session, 0, __FILE__, __LINE__, __VA_ARGS__)
+#define	WT_FAILURE_RET(session, error, ...)				\
+	return (__wt_failure(session, error, __FILE__, __LINE__, __VA_ARGS__))
 
 #if defined(__cplusplus)
 }

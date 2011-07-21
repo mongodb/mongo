@@ -118,25 +118,37 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 	va_end(ap);
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_failure --
- *	Assert and other failures.
+ *	Assert and other unexpected failures, includes file/line information
+ * for debugging.
  */
-void
+int
 __wt_failure(WT_SESSION_IMPL *session,
-    const char *msg, const char *file_name, int line_number)
+    int error, const char *file_name, int line_number, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 5, 6)))
 {
-	if (msg == NULL)
-		__wt_errx(session, "failure: %s/%d", file_name, line_number);
-	else
-		__wt_errx(session, "failure: %s/%d: %s",
-		    file_name, line_number, msg == NULL ? "" : msg);
+	va_list ap;
+	/*
+	 * !!!
+	 * SECURITY:
+	 * Buffer placed at the end of the stack in case snprintf overflows.
+	 */
+	char s[2048];
 
+	va_start(ap, fmt);
+	(void)vsnprintf(s, sizeof(s), fmt, ap);
+	va_end(ap);
+
+	__wt_err(session, error,
+	    "%s: %d: %s", file_name, line_number, s);
+
+#ifdef HAVE_DIAGNOSTIC
 	__wt_abort(session);
 	/* NOTREACHED */
-}
 #endif
+	return (error);
+}
 
 /*
  * __wt_file_format --

@@ -112,10 +112,10 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					    (int)k.len, k.str);
 					return (EINVAL);
 				}
-			} else {
-				WT_FAILURE(session, NULL);
-				return (EINVAL);
-			}
+			} else
+				WT_FAILURE_RET(session, EINVAL,
+				    "unexpected configuration description "
+				    "keyword %.*s", (int)ck.len, ck.str);
 		}
 	}
 

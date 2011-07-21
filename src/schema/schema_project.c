@@ -98,7 +98,10 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				break;
 
 			default:
-				WT_FAILURE(session, NULL);
+				WT_FAILURE(session,
+				    "unexpected projection plan: %c",
+				    (int)*proj);
+				return (0);
 			}
 		}
 	}
@@ -240,7 +243,6 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 				    (const uint8_t **)&vp,
 				    (size_t)(vend - vp)));
 				/* FALLTHROUGH */
-
 			case WT_PROJ_REUSE:
 				/*
 				 * There is subtlety here: the value format
@@ -264,9 +266,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 				    &pv, &p, (size_t)(end - p)));
 				buf->size += (uint32_t)len;
 				break;
-
 			default:
-				WT_FAILURE(session, NULL);
+				WT_FAILURE(session,
+				    "unexpected projection plan: %c",
+				    (int)*proj);
 			}
 		}
 	}

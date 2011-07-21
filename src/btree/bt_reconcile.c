@@ -328,7 +328,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * clean page if not to evict it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
-		WT_ASSERT(session, LF_ISSET(WT_REC_EVICT));
+		WT_ASSERT_RET(session, LF_ISSET(WT_REC_EVICT));
 
 		WT_STAT_INCR(cache->stats, cache_evict_unmodified);
 
@@ -622,9 +622,8 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_ASSERT(
-			    session, WT_COL_REF_STATE(cref) != WT_REF_LOCKED);
-			return (1);
+			WT_FAILURE_RET(session,
+			    WT_ERROR, "subtree page locked during eviction");
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}
@@ -747,9 +746,8 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_ASSERT(
-			    session, WT_ROW_REF_STATE(rref) != WT_REF_LOCKED);
-			return (1);
+			WT_FAILURE_RET(session,
+			    WT_ERROR, "subtree page locked during eviction");
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}
@@ -925,8 +923,8 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
 	 * check for overflow in diagnostic mode.
 	 */
 	WT_ASSERT(session, r->space_avail >= size);
-	WT_ASSERT(session, WT_PTRDIFF32(
-	    r->first_free + size, r->dsk.mem) <= r->page_size);
+	WT_ASSERT(session,
+	    WT_PTRDIFF32(r->first_free + size, r->dsk.mem) <= r->page_size);
 
 	++r->entries;
 	r->space_avail -= size;
@@ -1245,7 +1243,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	 * delete it.
 	 */
 	if (r->entries == 0) {
-		WT_ASSERT(session, r->bnd_next == 0);
+		WT_ASSERT_RET(session, r->bnd_next == 0);
 		return (0);
 	}
 
@@ -1340,7 +1338,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	WT_ASSERT(session, len < r->split_size - WT_PAGE_DISK_SIZE);
+	WT_ASSERT_RET(session, len < r->split_size - WT_PAGE_DISK_SIZE);
 
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_DISK_BYTE(dsk);
@@ -1384,7 +1382,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 */
 #define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
-		WT_ASSERT(session, buf->size < buf->mem_size);
+		WT_ASSERT_RET(session, buf->size < buf->mem_size);
 
 		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
 		(void)__wt_cell_pack_type(cell, WT_CELL_KEY, (uint64_t)0);
@@ -1459,7 +1457,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		 */
 		cell = WT_PAGE_DISK_BYTE(r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
-		WT_ASSERT(session,
+		WT_ASSERT_RET(session,
 		    unpack->prefix == 0 || unpack->type == WT_CELL_KEY_OVFL);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
@@ -1560,7 +1558,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_COL_REF_STATE(cref) != WT_REF_DISK) {
 			rp = WT_COL_REF_PAGE(cref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
-				WT_ASSERT(
+				WT_ASSERT_RET(
 				    session, !F_ISSET(rp, WT_PAGE_DELETED));
 				if (F_ISSET(rp, WT_PAGE_MERGE))
 					WT_RET(__rec_col_merge(session, rp));
@@ -1579,7 +1577,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Copy a new WT_OFF_RECORD structure onto the page; any
 		 * off-page reference must be a valid disk address.
 		 */
-		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
+		WT_ASSERT_RET(
+		    session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
 		off.addr = WT_COL_REF_ADDR(cref);
 		off.size = WT_COL_REF_SIZE(cref);
 		WT_RECNO(&off) = cref->recno;
@@ -2285,7 +2284,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Copy the off-page reference onto the page; any off-page
 		 * reference must be a valid disk address.
 		 */
-		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
+		WT_ASSERT_RET(
+		    session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 		val->off.addr = WT_ROW_REF_ADDR(rref);
 		val->off.size = WT_ROW_REF_SIZE(rref);
 		__rec_copy_incr(session, r, val);
@@ -2371,7 +2371,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Copy the off-page reference onto the page; any off-page
 		 * reference must be a valid disk address.
 		 */
-		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
+		WT_ASSERT_RET(
+		    session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 		val->off.addr = WT_ROW_REF_ADDR(rref);
 		val->off.size = WT_ROW_REF_SIZE(rref);
 		__rec_copy_incr(session, r, val);
@@ -2856,9 +2857,9 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_REF *parent_ref;
 
-	WT_ASSERT(session,
+	WT_ASSERT_RET(session,
 	    replace == NULL || page->parent == replace->parent);
-	WT_ASSERT(session,
+	WT_ASSERT_RET(session,
 	    replace == NULL || page->parent_ref == replace->parent_ref);
 
 	parent_ref = page->parent_ref;
@@ -3201,7 +3202,7 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * We should have connected the same number of in-memory references as
 	 * we found originally.
 	 */
-	WT_ASSERT(session, r->imref_found == r->imref_next);
+	WT_ASSERT_RET(session, r->imref_found == r->imref_next);
 
 	*splitp = page;
 	return (0);
@@ -3278,7 +3279,7 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * We should have connected the same number of in-memory references as
 	 * we found originally.
 	 */
-	WT_ASSERT(session, r->imref_found == r->imref_next);
+	WT_ASSERT_RET(session, r->imref_found == r->imref_next);
 
 	*splitp = page;
 	return (0);

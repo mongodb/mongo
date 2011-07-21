@@ -513,10 +513,14 @@ extern void __wt_msg(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE ((format (printf,
     2,
     3)));
-extern void __wt_failure(WT_SESSION_IMPL *session,
-    const char *msg,
+extern int __wt_failure(WT_SESSION_IMPL *session,
+    int error,
     const char *file_name,
-    int line_number);
+    int line_number,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    5,
+    6)));
 extern int __wt_file_format(WT_SESSION_IMPL *session);
 extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
 extern int

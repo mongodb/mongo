@@ -120,8 +120,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 */
 			return;
 		}
-	__wt_errx(session, "hazard reference not found");
-	WT_FAILURE(session, NULL);
+	WT_FAILURE(session, "hazard reference not found");
 }
 
 /*
@@ -149,11 +148,12 @@ __wt_hazard_empty(WT_SESSION_IMPL *session, const char *name)
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			__wt_errx(session,
 #ifdef HAVE_DIAGNOSTIC
+			WT_FAILURE(session,
 			    "%s: hazard reference lost: (%p: %s, line %d)",
 			    name, hp->page, hp->file, hp->line);
 #else
+			WT_FAILURE(session,
 			    "%s: hazard reference lost: (%p)",
 			    name, hp->page);
 #endif
@@ -178,14 +178,12 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
 		for (hp = session->hazard;
-		    hp < session->hazard + S2C(session)->hazard_size; ++hp) {
-			if (hp->page != page)
-				continue;
-			__wt_errx(session,
-			    "discarded page has hazard reference: "
-			    "(%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
-			WT_FAILURE(session, NULL);
-		}
+		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
+			if (hp->page == page) {
+				WT_FAILURE(session,
+				    "discarded page has hazard reference: "
+				    "(%p: %s, line %d)",
+				    hp->page, hp->file, hp->line);
+			}
 }
 #endif

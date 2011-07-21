@@ -110,7 +110,7 @@ __wt_return_data(
 			goto page_cell;
 	} else {
 		cipdata = WT_COL_PTR(page, cip);
-		WT_ASSERT(session, cipdata != NULL);
+		WT_ASSERT_RET(session, cipdata != NULL);
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 			value_ret = cipdata;

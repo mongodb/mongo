@@ -23,7 +23,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 
 	btree = session->btree;
 
-	WT_ASSERT(session, size % btree->allocsize == 0);
+	WT_ASSERT_RET(session, size % btree->allocsize == 0);
 
 	WT_STAT_INCR(btree->stats, alloc);
 

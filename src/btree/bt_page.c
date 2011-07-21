@@ -61,8 +61,7 @@ __wt_page_in_func(
 			__wt_yield();
 			break;
 		default:
-			WT_FAILURE(session, "invalid page state");
-			return (WT_ERROR);
+			WT_FAILURE_RET(session, WT_ERROR, "invalid page state");
 		}
 	/* NOTREACHED */
 }
@@ -78,7 +77,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	int ret;
 
-	WT_ASSERT(session, dsk->u.entries > 0);
+	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
 	*pagep = NULL;
 
