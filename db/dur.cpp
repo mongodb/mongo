@@ -504,12 +504,11 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return true;
             }
-
             PREPLOGBUFFER();
 
             RWLockRecursive::Shared lk3(MongoFile::mmmutex);
 
-            unsigned abLen = commitJob._ab.len();
+            unsigned abLen = commitJob._ab.len() + sizeof(JSectFooter);
             commitJob.reset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
@@ -517,7 +516,6 @@ namespace mongo {
             lk1.reset();
 
             // ****** now other threads can do writes ******
-
             WRITETOJOURNAL(commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 

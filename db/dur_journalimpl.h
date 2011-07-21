@@ -35,7 +35,7 @@ namespace mongo {
 
             /** write to journal
             */
-            void journal(const AlignedBuilder& b);
+            void journal(AlignedBuilder& b);
 
             boost::filesystem::path getFilePathFor(int filenumber) const;
 

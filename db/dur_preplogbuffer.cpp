@@ -130,7 +130,7 @@ namespace mongo {
 
             // JSectHeader
             JSectHeader h;
-            h.len = (unsigned) 0xffffffff;  // total length, will fill in later
+            h.setSectionLen(0xffffffff);  // total length, will fill in later
             h.seqNumber = getLastDataFileFlushTime();
             h.fileId = j.curFileId();
 
@@ -153,7 +153,7 @@ namespace mongo {
             }
 
             AlignedBuilder& bb = commitJob._ab;
-            resetLogBuffer(bb);
+            resetLogBuffer(bb); // adds JSectHeader
 
             // ops other than basic writes (DurOp's)
             {
@@ -162,27 +162,7 @@ namespace mongo {
                 }
             }
 
-            {
-                prepBasicWrites(bb);
-            }
-
-            // pad to alignment, and set the total section length in the JSectHeader
-            assert( 0xffffe000 == (~(Alignment-1)) );
-            unsigned lenWillBe = bb.len() + sizeof(JSectFooter);
-            unsigned L = (lenWillBe + Alignment-1) & (~(Alignment-1));
-            dassert( L >= lenWillBe );
-            *((unsigned*)bb.atOfs(0)) = L;
-
-            {
-                JSectFooter f(bb.buf(), bb.len());
-                bb.appendStruct(f);
-            }
-
-            {
-                unsigned padding = L - bb.len();
-                bb.skip(padding);
-                dassert( bb.len() % Alignment == 0 );
-            }
+            prepBasicWrites(bb);
 
             return;
         }

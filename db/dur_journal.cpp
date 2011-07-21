@@ -95,6 +95,11 @@ namespace mongo {
             assert(false);
         }
 
+        JSectFooter::JSectFooter() { 
+            memset(this, 0, sizeof(*this));
+            sentinel = JEntry::OpCode_Footer;
+        }
+
         JSectFooter::JSectFooter(const void* begin, int len) { // needs buffer to compute hash
             sentinel = JEntry::OpCode_Footer;
             reserved = 0;
@@ -629,24 +634,52 @@ namespace mongo {
             }
         }
 
-        /** write to journal
+        /** write to journal (called by WRITETOJOURNAL)
         */
-        void journal(const AlignedBuilder& b) {
+        void journal(AlignedBuilder& b) {
             j.journal(b);
         }
-        void Journal::journal(const AlignedBuilder& _b) {
-#if defined(_NOCOMPRESS)
+        void Journal::journal(AlignedBuilder& _b) {
+            RACECHECK
+#if 0
             unsigned w = _b.len();
             const AlignedBuilder& b = _b;
-#else
-            static AlignedBuilder compressed(32*1024*1024);
-            compressed.reset( maxCompressedLength(_b.len()) );
-            size_t compressedLength = 0;
-            rawCompress(_b.buf(), _b.len(), compressed.atOfs(0), &compressedLength);
-
-            unsigned w = (compressedLength+8191)&(~8191);
-            const AlignedBuilder& b = compressed;
 #endif
+            static AlignedBuilder cb(32*1024*1024);
+            const unsigned headTailSize = sizeof(JSectHeader) + sizeof(JSectFooter);
+            cb.reset( maxCompressedLength(_b.len()) + headTailSize );
+
+            {
+                JSectHeader *h = (JSectHeader *) _b.buf();
+                dassert( h->sectionLen() == (unsigned) 0xffffffff );
+                cb.appendStruct(*h);
+            }
+
+            size_t compressedLength = 0;
+            rawCompress(_b.buf(), _b.len() - headTailSize, cb.cur(), &compressedLength);
+            assert( compressedLength < 0xffffffff );
+            cb.skip(compressedLength);
+
+            // footer
+            unsigned L = 0xffffffff;
+            {
+                // pad to alignment, and set the total section length in the JSectHeader
+                assert( 0xffffe000 == (~(Alignment-1)) );
+                unsigned lenUnpadded = cb.len() + sizeof(JSectFooter);
+                L = (lenUnpadded + Alignment-1) & (~(Alignment-1));
+                dassert( L >= lenUnpadded );
+
+                ((JSectHeader*)cb.atOfs(0))->setSectionLen(lenUnpadded);
+
+                JSectFooter f(cb.buf(), cb.len()); // computes checksum
+                cb.appendStruct(f);
+
+                // need a footer for uncompressed buffer too so that WRITETODATAFILES is happy.
+                // done this way as we do not need a checksum for that.
+                JSectFooter uncompressedFooter;
+                _b.appendStruct(uncompressedFooter);
+                ((JSectHeader*)_b.atOfs(0))->setSectionLen(_b.len());
+            }
 
             try {
                 mutex::scoped_lock lk(_curLogFileMutex);
@@ -655,9 +688,11 @@ namespace mongo {
                 assert( _curLogFile );
 
                 stats.curr->_uncompressedBytes += _b.len();
-                stats.curr->_journaledBytes += w;
+                unsigned w = cb.len();
                 _written += w;
-                _curLogFile->synchronousAppend((void *) b.buf(), w);
+                assert( w <= L );
+                stats.curr->_journaledBytes += L;
+                _curLogFile->synchronousAppend((void *) cb.buf(), L);
                 _rotate();
             }
             catch(std::exception& e) {

@@ -27,6 +27,7 @@
 #include "namespace.h"
 #include "../util/mongoutils/str.h"
 #include "../util/bufreader.h"
+#include "../util/concurrency/race.h"
 #include "pdfile.h"
 #include "database.h"
 #include "db.h"
@@ -35,6 +36,7 @@
 #include "cmdline.h"
 #include "curop.h"
 #include "mongommf.h"
+#include "../util/compress.h"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -92,15 +94,38 @@ namespace mongo {
             throws
         */
         class JournalSectionIterator : boost::noncopyable {
+            unique_ptr<BufReader> _br;
+            const JSectHeader* _sectHead;
+            const char *_lastDbName; // pointer into mmaped journal file
+            const bool _doDurOps;
+            string _uncompressed;
         public:
-            JournalSectionIterator(const void *p, unsigned len, bool doDurOps)
-                : _br(p, len)
-                , _sectHead(static_cast<const JSectHeader*>(_br.skip(sizeof(JSectHeader))))
-                , _lastDbName(NULL)
-                , _doDurOps(doDurOps)
-            {}
+            JournalSectionIterator(const void *p, unsigned len, bool doDurOpsRecovering)
+                : 
+                  _sectHead(static_cast<const JSectHeader*>(p))
+                , _lastDbName(0)
+                , _doDurOps(doDurOpsRecovering)
+            {
+                if( doDurOpsRecovering ) { 
+                    // compressed case
+                    assert( sizeof(JSectHeader) + sizeof(JSectFooter) >= len );
+                    // this could be done in a streaming manner which would be better in terms of memory use - probably not worth the extra code complexity though
+                    bool ok = uncompress((const char *)p, len - sizeof(JSectHeader) - sizeof(JSectFooter), &_uncompressed);
+                    if( !ok ) { 
+                        // it should always be ok (i think?) as there is a previous check to see that the JSectFooter is ok
+                        log() << "fatal error couldn't uncompress section during journal recovery" << endl;
+                        mongoAbort("journal recovery uncompress failure");
+                    }
+                    _br = unique_ptr<BufReader>( new BufReader(_uncompressed.c_str(), _uncompressed.size()) );
+                }
+                else { 
+                    // we work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
+                    _br = unique_ptr<BufReader>( new BufReader(p, len) );
+                    _br->skip(sizeof(JSectHeader));
+                }
+            }
 
-            bool atEof() const { return _br.atEof(); }
+            bool atEof() const { return _br->atEof(); }
 
             unsigned long long seqNumber() const { return _sectHead->seqNumber; }
 
@@ -110,20 +135,27 @@ namespace mongo {
              */
             bool next(ParsedJournalEntry& e) {
                 unsigned lenOrOpCode;
-                _br.read(lenOrOpCode);
+                _br->read(lenOrOpCode);
 
                 if (lenOrOpCode > JEntry::OpCode_Min) {
                     switch( lenOrOpCode ) {
 
                     case JEntry::OpCode_Footer: {
                         if (_doDurOps) {
-                            const char* pos = (const char*) _br.pos();
+                            const char* pos = (const char*) _br->pos();
                             pos -= sizeof(lenOrOpCode); // rewind to include OpCode
                             const JSectFooter& footer = *(const JSectFooter*)pos;
                             int len = pos - (char*)_sectHead;
-                            if (!footer.checkHash(_sectHead, len)) {
-                                massert(13594, "journal checksum doesn't match", false);
+                            if( _doDurOps ) {
+                                if (!footer.checkHash(_sectHead, len)) {
+                                    massert(13594, "journal checksum doesn't match", false);
+                                }
                             }
+                            else { 
+                                // no need to check on WRITEDODATAFILES.  we check a little to self test
+                                RARELY assert( footer.checkHash(_sectHead, len) ); 
+                            }
+                            footer.checkMagic();
                         }
                         return false; // false return value denotes end of section
                     }
@@ -131,7 +163,7 @@ namespace mongo {
                     case JEntry::OpCode_FileCreated:
                     case JEntry::OpCode_DropDb: {
                         e.dbName = 0;
-                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, _br);
+                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, *_br);
                         if (_doDurOps) {
                             e.op = op;
                         }
@@ -139,12 +171,12 @@ namespace mongo {
                     }
 
                     case JEntry::OpCode_DbContext: {
-                        _lastDbName = (const char*) _br.pos();
-                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
+                        _lastDbName = (const char*) _br->pos();
+                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br->remaining());
                         const unsigned len = strnlen(_lastDbName, limit);
                         massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
-                        _br.skip(len+1); // skip '\0' too
-                        _br.read(lenOrOpCode);
+                        _br->skip(len+1); // skip '\0' too
+                        _br->read(lenOrOpCode);
                     }
                     // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
 
@@ -156,18 +188,13 @@ namespace mongo {
 
                 // JEntry - a basic write
                 assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
-                _br.rewind(4);
-                e.e = (JEntry *) _br.skip(sizeof(JEntry));
+                _br->rewind(4);
+                e.e = (JEntry *) _br->skip(sizeof(JEntry));
                 e.dbName = e.e->isLocalDbContext() ? "local" : _lastDbName;
                 assert( e.e->len == lenOrOpCode );
-                _br.skip(e.e->len);
+                _br->skip(e.e->len);
                 return true;
             }
-        private:
-            BufReader _br;
-            const JSectHeader* _sectHead;
-            const char *_lastDbName; // pointer into mmaped journal file
-            const bool _doDurOps;
         };
 
         static string fileName(const char* dbName, int fileNo) {
@@ -287,9 +314,22 @@ namespace mongo {
         }
 
         void RecoveryJob::processSection(const void *p, unsigned len) {
-            scoped_lock lk(_mx);
+            JSectHeader *h = (JSectHeader *) p;
 
-            vector<ParsedJournalEntry> entries;
+            scoped_lock lk(_mx);
+            RACECHECK
+
+            // we use a static so that we don't have to reallocate every time through.  occasionally we 
+            // go back to a small allocation so that if there were a spiky growth it won't stick forever.
+            static vector<ParsedJournalEntry> entries;
+            entries.clear();
+            RARELY OCCASIONALLY {
+                if( entries.capacity() > 2048 ) {
+                    entries.shrink_to_fit();
+                    entries.reserve(2048);
+                }
+            }
+
             JournalSectionIterator i(p, len, _recovering);
 
             //DEV log() << "recovery processSection seq:" << i.seqNumber() << endl;
@@ -342,11 +382,11 @@ namespace mongo {
                     if( h.fileId != fileId ) {
                         if( debug || (cmdLine.durOptions & CmdLine::DurDumpJournal) ) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
-                            log() << "  sect len:" << h.len << " seqnum:" << h.seqNumber << endl;
+                            log() << "  sect len:" << h.sectionLen() << " seqnum:" << h.seqNumber << endl;
                         }
                         return true;
                     }
-                    processSection(br.skip(h.len), h.len);
+                    processSection(br.skip(h.sectionLenWithPadding()), h.sectionLen());
 
                     // ctrl c check
                     killCurrentOp.checkForInterrupt(false);
@@ -439,6 +479,8 @@ namespace mongo {
         }
 
         extern mutex groupCommitMutex;
+
+        boost::mutex foo;
 
         /** recover from a crash
             called during startup

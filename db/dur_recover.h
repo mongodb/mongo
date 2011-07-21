@@ -18,7 +18,10 @@ namespace mongo {
             RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
             void go(vector<path>& files);
             ~RecoveryJob();
+
+            /** @param recovering indicates we are doing recovery and not a WRITETODATAFILES */
             void processSection(const void *, unsigned len);
+
             void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }

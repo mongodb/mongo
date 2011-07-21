@@ -42,12 +42,14 @@ namespace mongo {
     /** reset with a hint as to the upcoming needed size specified */
     void AlignedBuilder::reset(unsigned sz) { 
         _len = 0;
-        unsigned Q = 64 * 1024 * 1024 - 1;
+        unsigned Q = 32 * 1024 * 1024 - 1;
         unsigned want = (sz+Q) & (~Q);
         if( _p._size == want ) {
             return;
         }        
-        if( _p._size > want ) { 
+        if( _p._size > want ) {
+            if( _p._size <= 64 * 1024 * 1024 )
+                return;
             bool downsize = false;
             RARELY { downsize = true; }
             if( !downsize )
