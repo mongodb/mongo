@@ -1,0 +1,74 @@
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ */
+
+#include "wt_internal.h"
+
+/*
+ * __wt_config_concat --
+ *	Given a NULL-terminated list of configuration strings, concatenate them
+ *	into a newly allocated buffer.  Nothing special is assumed about any
+ *	of the config strings, they are simply combined in order.
+ *
+ *	This code deals with the case where some of the config strings are
+ *	wrapped in brackets but others aren't: the resulting string does not
+ *	have brackets.
+ */
+int
+__wt_config_concat(WT_SESSION_IMPL *session,
+    const char **cfg, const char **config_ret)
+{
+	char *config, *end, *p;
+	const char **cp;
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM k, v;
+	int ret;
+	size_t len;
+
+	/*
+	 * Be conservative when allocating the buffer: it can't be longer
+	 * than the sum of the lengths of the layered configurations.
+	 * Add 2 to allow for a trailing comma and NUL.
+	 */
+	for (cp = cfg, len = 2; *cp != NULL; ++cp)
+		len += strlen(*cp);
+
+	WT_RET(__wt_calloc_def(session, len, &config));
+	p = config;
+	end = config + len;
+
+	for (cp = cfg; *cp != NULL; ++cp) {
+		WT_RET(__wt_config_init(session, &cparser, *cp));
+		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+			if (k.type != ITEM_STRING && k.type != ITEM_ID) {
+				__wt_errx(session,
+				    "Invalid configuration key found: '%s'\n",
+				    k.str);
+				return (EINVAL);
+			}
+			WT_ERR(__wt_config_get(session, cfg, &k, &v));
+			/* Include the quotes around string values. */
+			if (v.type == ITEM_STRING) {
+				--v.str;
+				v.len += 2;
+			}
+			p += snprintf(p, (size_t)(end - p), "%.*s=%.*s,",
+			    (int)k.len, k.str, (int)v.len, v.str);
+		}
+	}
+
+	if (ret == WT_NOTFOUND) {
+		ret = 0;
+		/* Strip off the trailing comma and NUL-terminate. */
+		if (p > config)
+			--p;
+		*p = '\0';
+		*config_ret = config;
+	} else {
+err:		__wt_free(session, config);
+	}
+	return (ret);
+}

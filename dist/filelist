@@ -8,6 +8,7 @@ src/api/api_version.c
 src/api/config.c
 src/api/config_check.c
 src/api/config_collapse.c
+src/api/config_concat.c
 src/api/config_def.c
 src/api/event_handler.c
 src/api/session_btree.c

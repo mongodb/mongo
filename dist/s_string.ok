@@ -155,6 +155,7 @@ clr
 cmp
 colgroup
 colgroups
+concat
 cond
 conf
 config
