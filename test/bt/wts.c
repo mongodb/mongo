@@ -331,7 +331,6 @@ wts_salvage(void)
 	track("salvage", 0ULL);
 
 	/* Save a copy of the file before we salvage it. */
-	(void)system("cp __" WT_PREFIX ".conf __wt.salvage.conf");
 	(void)system("cp __" WT_PREFIX " __wt.salvage");
 
 	snprintf(config, sizeof(config),

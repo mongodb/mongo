@@ -26,10 +26,10 @@ __create_file(WT_SESSION_IMPL *session,
 	if (intable)
 		WT_RET(__wt_strdup(session, config, &treeconf));
 	else if (exists)
-		WT_RET(__wt_btconf_read(session, filename, &treeconf));
+		WT_RET(__wt_schema_table_read(session, name, &treeconf));
 	else {
 		WT_RET(__wt_config_collapse(session, cfg, &treeconf));
-		WT_RET(__wt_btconf_write(session, filename, treeconf));
+		WT_RET(__wt_schema_table_insert(session, name, treeconf));
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */

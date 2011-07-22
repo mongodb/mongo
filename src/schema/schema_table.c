@@ -10,6 +10,10 @@
 #define	SCHEMATAB_NAME	"__schema.wt"
 static const char *schematab_config = "key_format=S,value_format=S";
 
+/*
+ * __open_schema_table --
+ *	Opens the schema table, sets session->schematab.
+ */
 static inline int
 __open_schema_table(WT_SESSION_IMPL *session)
 {
@@ -31,6 +35,10 @@ err:	__wt_free(session, schemaconf);
 	return (ret);
 }
 
+/*
+ * __wt_schema_table_cursor --
+ *	Opens a cursor on the schema table.
+ */
 int
 __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
@@ -39,6 +47,10 @@ __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	return (__wt_curfile_create(session, 0, NULL, cursorp));
 }
 
+/*
+ * __wt_schema_table_insert --
+ *	Inserts a row into the schema table.
+ */
 int
 __wt_schema_table_insert(
     WT_SESSION_IMPL *session, const char *key, const char *value)
@@ -55,6 +67,10 @@ __wt_schema_table_insert(
 	return (ret);
 }
 
+/*
+ * __wt_schema_table_remove --
+ *	Removes a row from the schema table.
+ */
 int
 __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 {
@@ -68,3 +84,27 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_TRET(cursor->close(cursor, NULL));
 	return (ret);
 }
+
+/*
+ * __wt_schema_table_read --
+ *	Reads and copies a row from the schema table.
+ *	The caller is responsible for freeing the allocated memory.
+ */
+int
+__wt_schema_table_read(
+    WT_SESSION_IMPL *session, const char *key, const char **valuep)
+{
+	WT_CURSOR *cursor;
+	const char *value;
+	int ret;
+
+	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	cursor->set_key(cursor, key);
+	WT_ERR(cursor->search(cursor));
+	WT_ERR(cursor->get_value(cursor, &value));
+	WT_ERR(__wt_strdup(session, value, valuep));
+
+err:    WT_TRET(cursor->close(cursor, NULL));
+	return (ret);
+}
+

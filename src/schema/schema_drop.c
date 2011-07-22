@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static int
-__drop_file(WT_SESSION_IMPL *session, const char *filename)
+__drop_file(WT_SESSION_IMPL *session, const char *name, const char *filename)
 {
 	WT_BTREE_SESSION *btree_session;
 	int ret;
@@ -26,11 +26,14 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 
 		F_SET(btree_session->btree, WT_BTREE_NO_EVICTION);
 		WT_TRET(__wt_session_remove_btree(session, btree_session));
-	} else if (ret != 0)
+	} else if (ret != WT_NOTFOUND)
 		return (ret);
 
 	/* TODO: use the connection home directory. */
-	return (__wt_remove(session, filename));
+	WT_TRET(__wt_schema_table_remove(session, name));
+	if (__wt_exist(filename))
+		WT_TRET(__wt_remove(session, filename));
+	return (ret);
 }
 
 int
@@ -49,7 +52,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 	ret = 0;
 
 	if (WT_PREFIX_SKIP(name, "file:")) {
-		WT_RET(__drop_file(session, name));
+		WT_RET(__drop_file(session, fullname, name));
 	} else if (WT_PREFIX_SKIP(name, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
 		    name, strlen(name), &table));
@@ -69,7 +72,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 			WT_ERR(__wt_realloc(session, NULL,
 			    strlen(cg->filename) + 1, &namebuf));
 			strcpy(namebuf, cg->filename);
-			WT_TRET(__drop_file(session, namebuf));
+			WT_TRET(__drop_file(session, cg->name, namebuf));
 		}
 
 		/* TODO: drop the indices. */

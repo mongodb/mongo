@@ -266,13 +266,13 @@ err:		__wt_free(session, cbt);
  */
 int
 __wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, WT_CURSOR **cursorp)
+    const char *name, const char *config, WT_CURSOR **cursorp)
 {
 	WT_BTREE_SESSION *btree_session;
 	const char *filename, *treeconf;
 	int ret;
 
-	filename = uri;
+	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
@@ -282,8 +282,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	    filename, strlen(filename), &btree_session)) == 0)
 		session->btree = btree_session->btree;
 	else if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_btconf_read(session, filename, &treeconf));
-		WT_RET(__wt_btree_open(session, uri, filename, treeconf, 0));
+		WT_RET(__wt_schema_table_read(session, name, &treeconf));
+		WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
 		WT_RET(__wt_session_add_btree(session, &btree_session));
 	} else
 		return (ret);

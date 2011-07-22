@@ -131,7 +131,7 @@ extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
 extern int __wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *uri,
+    const char *name,
     const char *config,
     WT_CURSOR **cursorp);
 extern int __wt_curindex_open(WT_SESSION_IMPL *session,
@@ -174,12 +174,6 @@ extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
 extern int __wt_bt_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
-extern int __wt_btconf_read( WT_SESSION_IMPL *session,
-    const char *name,
-    const char **configp);
-extern int __wt_btconf_write( WT_SESSION_IMPL *session,
-    const char *name,
-    const char *config);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
@@ -490,6 +484,9 @@ extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
+    const char *key,
+    const char **valuep);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_errv(WT_SESSION_IMPL *session,
     int error,

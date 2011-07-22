@@ -434,11 +434,12 @@ build(int ikey, int ivalue, int cnt)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	char config[256], kbuf[64], vbuf[64];
-
-	(void)remove(LOAD);
+	int new_slvg;
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+	assert(session->drop(session, "file:" LOAD, "force") == 0);
+
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
 		/*
@@ -495,8 +496,21 @@ build(int ikey, int ivalue, int cnt)
 		assert(cursor->insert(cursor) == 0);
 	}
 
-	assert(session->sync(session, "file:" LOAD, NULL) == 0);
+	/* Put a matching entry in the schema table for the salvage file. */
+	new_slvg = (access(SLVG, F_OK) != 0);
+	if (new_slvg) {
+		assert(session->drop(session, "file:" SLVG, "force") == 0);
+		assert(session->create(session, "file:" SLVG, config) == 0);
+	}
+
 	assert(conn->close(conn, 0) == 0);
+
+	/*
+	 * We created the salvage file above, but all we want is the schema
+	 * table entry.
+	 */
+	if (new_slvg)
+		(void)remove(SLVG);
 }
 
 /*
@@ -513,13 +527,11 @@ copy(u_int lsn, u_int recno)
 	assert((ifp = fopen(LOAD, "r")) != NULL);
 
 	/*
-	 * If the file doesn't exist, then we're creating it: copy the .conf
-	 * file and the first sector (the file description).  Otherwise, we
-	 * are appending to an existing file.
+	 * If the salvage file doesn't exist, then we're creating it:
+	 * copy the first sector (the file description).
+	 * Otherwise, we are appending to an existing file.
 	 */
 	if (access(SLVG, F_OK)) {
-		assert(system("cp " LOAD ".conf " SLVG ".conf") == 0);
-
 		assert((ofp = fopen(SLVG, "w")) != NULL);
 		assert(fread(buf, 1, 512, ifp) == 512);
 		assert(fwrite(buf, 1, 512, ofp) == 512);
