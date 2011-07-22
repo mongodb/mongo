@@ -156,13 +156,28 @@ namespace mongo {
         string toString() const {
             return str::stream() << ns << " from " << min << " -> " << max;
         }
-
+        
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
-            writelock lk(ns);
-            RemoveSaver rs("moveChunk",ns,"post-cleanup");
-            long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
-            log() << "moveChunk deleted: " << num << migrateLog;
+            {
+                writelock lk(ns);
+                RemoveSaver rs("moveChunk",ns,"post-cleanup");
+                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                log() << "moveChunk deleted: " << numDeleted << migrateLog;
+            }
+            
+            ReplTime lastOpApplied = cc().getLastOp();
+            
+            Timer t;
+            for ( int i=0; i<3600; i++ ) {
+                if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
+                    LOG(t.seconds() < 30 ) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
+                    return;
+                }
+                sleepsecs(1);
+            }
+            
+            warning() << "moveChunk repl sync timed out after " << t.seconds() << " seconds" << migrateLog;
         }
 
     };
