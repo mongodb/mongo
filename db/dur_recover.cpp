@@ -364,6 +364,17 @@ namespace mongo {
         /** apply a specific journal file */
         bool RecoveryJob::processFile(path journalfile) {
             log() << "recover " << journalfile.string() << endl;
+
+            try { 
+                if( boost::filesystem::file_size( journalfile.string() ) == 0 ) {
+                    log() << "recover info " << journalfile.string() << " has zero length" << endl;
+                    return true;
+                }
+            } catch(...) { 
+                // if something weird like a permissions problem keep going so the massert down below can happen (presumably)
+                log() << "recover exception checking filesize" << endl;
+            }
+
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
             massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
