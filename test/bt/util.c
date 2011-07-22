@@ -67,13 +67,13 @@ key_gen_setup(void)
 }
 
 void
-value_gen(void *valuep, uint32_t *sizep, int grow_ok)
+value_gen(void *valuep, uint32_t *sizep)
 {
 	static size_t blen = 0;
 	static u_int r = 0;
+	static const char *dup_data = "duplicate data item";
 	static char *buf = NULL;
-	size_t i, len;
-	char *p;
+	size_t i;
 
 	/*
 	 * Set initial buffer contents to reconizable text.
@@ -98,47 +98,46 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 	}
 
 	/*
-	 * The data always starts with a 10-digit number.  Change the leading
-	 * number to ensure every data item is unique.
+	 * Fixed-length records: use the last decimal digit in the record
+	 * number.
 	 */
-	snprintf(buf, blen, "%010u", ++r);
-	buf[10] = '/';
-
-	p = buf;
-	len = 0;
-	switch (g.c_file_type) {
-	case FIX:
-		/* Use the last decimal digit in the record number. */
-		p = buf + 9;
-		len = (g.c_data_fix + 7) >> 3;
-		break;
-	case VAR:
-		/*
-		 * If testing run-length encoding, use different data some
-		 * percentage of the time, otherwise we'd end up with a single
-		 * chunk of repeated data.   To do that, we just jump forward
-		 * in the buffer by a small, random number of bytes.
-		 */
-		if (g.c_repeat_comp_pct != 0 &&
-		    (u_int)wts_rand() % 100 > g.c_repeat_comp_pct)
-			p += wts_rand() % 7;
-		/* FALLTHROUGH */
-	case ROW:
-		/*
-		 * WiredTiger doesn't store zero-length data items in row-store
-		 * files, and I want to test that: records divisible by 63 are
-		 * always zero-length.
-		 */
-		if (r % 63 == 0)
-			len = 0;
-		else
-			len = grow_ok ?
-			    MMRAND(g.c_data_min, g.c_data_max) : g.c_data_max;
-		break;
+	if (g.c_file_type == FIX) {
+		snprintf(buf, blen, "%010u", ++r);
+		*(void **)valuep = &buf[9];
+		*sizep = (g.c_data_fix + 7) >> 3;
+		return;
 	}
 
-	*(void **)valuep = p;
-	*sizep = len;
+	/*
+	 * WiredTiger doesn't store zero-length data items in row-store files,
+	 * test that by inserting a zero-length data item every so often.
+	 */
+	if (++r % 63 == 0) {
+		*(void **)valuep = buf;
+		*sizep = 0;
+		return;
+	}
+
+	/*
+	 * Start the data with a 10-digit number.
+	 *
+	 * For row and non-repeated variable-length column-stores, change the
+	 * leading number to ensure every data item is unique.  For repeated
+	 * variable-length column-stores (that is, to test run-length encoding),
+	 * use the same data value all the time.
+	 */
+	if (g.c_file_type == VAR &&
+	    g.c_repeat_data_pct != 0 &&
+	    (u_int)wts_rand() % 100 > g.c_repeat_data_pct) {
+		*(void **)valuep = (void *)dup_data;
+		*sizep = strlen(dup_data);
+		return;
+	}
+
+	snprintf(buf, blen, "%010u", r);
+	buf[10] = '/';
+	*(void **)valuep = buf;
+	*sizep = MMRAND(g.c_data_min, g.c_data_max);
 }
 
 void

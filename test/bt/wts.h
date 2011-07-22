@@ -74,7 +74,7 @@ typedef struct {
 	uint32_t c_leaf_node_max;
 	uint32_t c_leaf_node_min;
 	uint32_t c_ops;
-	uint32_t c_repeat_comp_pct;
+	uint32_t c_repeat_data_pct;
 	uint32_t c_rows;
 	uint32_t c_runs;
 	uint32_t c_write_pct;
@@ -97,7 +97,7 @@ void	 config_names(void);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(char *, int);
-void	 value_gen(void *, uint32_t *, int);
+void	 value_gen(void *, uint32_t *);
 char	*fname(const char *);
 void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);

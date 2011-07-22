@@ -310,6 +310,8 @@ wts_dump(const char *tag, int dump_bdb)
 		snprintf(cmd, sizeof(cmd),
 		    "sh ./s_dumpcmp%s", dump_bdb ? " -b" : "");
 		break;
+	default:
+		return (1);
 	}
 	if (system(cmd) != 0) {
 		fprintf(stderr,
@@ -494,7 +496,7 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	}
 
 	key_gen(&key.data, &key.size, (uint64_t)g.key_cnt, 0);
-	value_gen(&value.data, &value.size, 1);
+	value_gen(&value.data, &value.size);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -709,7 +711,7 @@ wts_row_put(uint64_t keyno, int insert)
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, insert);
-	value_gen(&value.data, &value.size, 0);
+	value_gen(&value.data, &value.size);
 
 	/* Log the operation */
 	if (g.logging)
@@ -747,7 +749,7 @@ wts_col_put(uint64_t keyno)
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, 0);
-	value_gen(&value.data, &value.size, 0);
+	value_gen(&value.data, &value.size);
 
 	/* Log the operation */
 	if (g.logging)
