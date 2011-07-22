@@ -38,21 +38,22 @@ int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_BTREE_SESSION *btree_session;
-	WT_BUF plan;
+	WT_BUF keybuf, plan;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
 	char *cgname, *filename;
-	const char *config, *config_copy;
+	const char *cgconf, *fileconf;
 	uint32_t plansize;
 	int i, ret;
 
 	if (table->is_complete)
 		return (0);
 
-	config_copy = NULL;
 	cursor = NULL;
+	cgconf = fileconf = NULL;
 	cgname = filename = NULL;
+	WT_CLEAR(keybuf);
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
@@ -80,9 +81,9 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 				ret = 0;
 			goto err;
 		}
-		cursor->get_value(cursor, &config);
+		cursor->get_value(cursor, &cgconf);
 
-		WT_ERR(__wt_config_getones(session, config, "filename", &cval));
+		WT_ERR(__wt_config_getones(session, cgconf, "filename", &cval));
 		if ((ret = __wt_session_get_btree(session,
 		    cval.str, cval.len, &btree_session)) == 0) {
 			table->colgroup[i] = btree_session->btree;
@@ -105,14 +106,11 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			goto err;
 		}
 
-		/*
-		 * The config string we pass in is freed along with the btree
-		 * handle.
-		 */
-		WT_ERR(__wt_strdup(session, config, &config_copy));
-		WT_ERR(__wt_btree_open(session,
-		    cgname, filename, config_copy, 0));
-		config_copy = NULL;
+		(void)__wt_buf_init(session, &keybuf, 0);
+		WT_ERR(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
+		WT_ERR(__wt_schema_table_read(session, keybuf.data, &fileconf));
+		WT_ERR(__wt_btree_open(session, cgname, filename, fileconf, 0));
+		fileconf = NULL;
 		WT_ERR(__wt_session_add_btree(session, NULL));
 		table->colgroup[i] = session->btree;
 
@@ -134,9 +132,10 @@ end:		if (cursor != NULL) {
 
 	table->is_complete = 1;
 
-err:	__wt_free(session, config_copy);
-	__wt_free(session, cgname);
+err:	__wt_free(session, cgname);
+	__wt_free(session, fileconf);
 	__wt_free(session, filename);
+	__wt_buf_free(session, &keybuf);
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor, NULL));
 	return (ret);

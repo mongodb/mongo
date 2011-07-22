@@ -24,6 +24,7 @@ class Config:
 	def __cmp__(self, other):
 		return cmp(self.name, other.name)
 
+# All schema objects have key/value formats and optionally column names
 format_meta = [
 	Config('key_format', 'u', r'''
 		the format of the data packed into key items.  See @ref packing
@@ -39,8 +40,16 @@ format_meta = [
 		\c 't' are bitfields, and in column stores will be stored using
 		a fixed-length store''',
 		type='format'),
+	Config('columns', '', r'''
+		list of the column names.  Comma-separated list of the form
+		<code>(column[,...])</code>.  For tables, the number of entries
+		must match the total number of values in \c key_format and \c
+		value_format.  For colgroups and indices, all column names must
+		appear in the list of columns for the table''',
+		type='list'),
 ]
 
+# Per-file configuration
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes''',
@@ -102,17 +111,7 @@ file_meta = format_meta + [
 		choices=['btree']),
 ]
 
-columns_meta = [
-	Config('columns', '', r'''
-		list of the column names.  Comma-separated list of the form
-		<code>(column[,...])</code>.  For tables, the number of entries
-		must match the total number of values in \c key_format and \c
-		value_format.  For colgroups and indices, all column names must
-		appear in the list of columns for the table''',
-		type='list'),
-]
-
-filename_meta = [
+schema_file_meta = format_meta + [
 	Config('filename', '', r'''
 		override the default filename derived from the object name'''),
 ]
@@ -128,14 +127,14 @@ table_only_meta = [
 		WT_SESSION::create'''),
 ]
 
-colgroup_meta = file_meta + columns_meta + filename_meta
+colgroup_meta = schema_file_meta
 
-index_meta = colgroup_meta
+index_meta = schema_file_meta
 
-table_meta = format_meta + columns_meta + table_only_meta
+table_meta = schema_file_meta + table_only_meta
 
 methods = {
-'btree.meta' : Method(file_meta),
+'file.meta' : Method(file_meta),
 
 'colgroup.meta' : Method(colgroup_meta),
 
@@ -147,7 +146,7 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.create' : Method(index_meta + table_only_meta + [
+'session.create' : Method(table_meta + file_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified

@@ -18,7 +18,7 @@ static inline int
 __open_schema_table(WT_SESSION_IMPL *session)
 {
 	WT_BTREE_SESSION *btree_session;
-	const char *cfg[] = API_CONF_DEFAULTS(btree, meta, schematab_config);
+	const char *cfg[] = API_CONF_DEFAULTS(file, meta, schematab_config);
 	const char *schemaconf;
 	int ret;
 

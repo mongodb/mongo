@@ -59,8 +59,6 @@ extern int __wt_config_collapse(WT_SESSION_IMPL *session,
 extern int __wt_config_concat(WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
-extern const char *__wt_confdfl_btree_meta;
-extern const char *__wt_confchk_btree_meta;
 extern const char *__wt_confdfl_colgroup_meta;
 extern const char *__wt_confchk_colgroup_meta;
 extern const char *__wt_confdfl_connection_add_collator;
@@ -79,6 +77,8 @@ extern const char *__wt_confdfl_connection_open_session;
 extern const char *__wt_confchk_connection_open_session;
 extern const char *__wt_confdfl_cursor_close;
 extern const char *__wt_confchk_cursor_close;
+extern const char *__wt_confdfl_file_meta;
+extern const char *__wt_confchk_file_meta;
 extern const char *__wt_confdfl_index_meta;
 extern const char *__wt_confchk_index_meta;
 extern const char *__wt_confdfl_session_begin_transaction;

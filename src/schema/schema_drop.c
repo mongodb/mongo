@@ -8,10 +8,13 @@
 #include "wt_internal.h"
 
 static int
-__drop_file(WT_SESSION_IMPL *session, const char *name, const char *filename)
+__drop_file(WT_SESSION_IMPL *session, const char *filename)
 {
+	WT_BUF keybuf;
 	WT_BTREE_SESSION *btree_session;
 	int ret;
+
+	WT_CLEAR(keybuf);
 
 	/* If open, close the btree handle. */
 	if ((ret = __wt_session_get_btree(session,
@@ -29,10 +32,15 @@ __drop_file(WT_SESSION_IMPL *session, const char *name, const char *filename)
 	} else if (ret != WT_NOTFOUND)
 		return (ret);
 
+	WT_TRET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
+	if (ret == 0)
+		ret = __wt_schema_table_remove(session, keybuf.data);
+
 	/* TODO: use the connection home directory. */
-	WT_TRET(__wt_schema_table_remove(session, name));
 	if (__wt_exist(filename))
 		WT_TRET(__wt_remove(session, filename));
+
+	__wt_buf_free(session, &keybuf);
 	return (ret);
 }
 
@@ -52,7 +60,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 	ret = 0;
 
 	if (WT_PREFIX_SKIP(name, "file:")) {
-		WT_RET(__drop_file(session, fullname, name));
+		WT_RET(__drop_file(session, name));
 	} else if (WT_PREFIX_SKIP(name, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
 		    name, strlen(name), &table));
@@ -72,7 +80,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 			WT_ERR(__wt_realloc(session, NULL,
 			    strlen(cg->filename) + 1, &namebuf));
 			strcpy(namebuf, cg->filename);
-			WT_TRET(__drop_file(session, cg->name, namebuf));
+			WT_TRET(__drop_file(session, namebuf));
 		}
 
 		/* TODO: drop the indices. */
