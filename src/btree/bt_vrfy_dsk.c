@@ -470,13 +470,20 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	off_t file_size;
-	uint32_t cell_num, cell_type, i;
+	uint32_t cell_num, cell_type, i, last_size;
+	int last_deleted, ret;
+	const uint8_t *last_data;
 	uint8_t *end;
 
 	btree = session->btree;
 	unpack = &_unpack;
 	file_size = btree->fh->file_size;
 	end = (uint8_t *)dsk + size;
+	ret = 0;
+
+	last_data = NULL;
+	last_size = 0;
+	last_deleted = 0;
 
 	cell_num = 0;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
@@ -507,8 +514,50 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 				return (__wt_err_eof(
 				    session, cell_num, addr, quiet));
 		}
+
+		/*
+		 * Compare the last two items and see if reconciliation missed
+		 * a chance for RLE encoding.  We don't have to care about data
+		 * encoding or anything else, a byte comparison is enough.
+		 */
+		if (last_deleted == 1) {
+			if (cell_type == WT_CELL_DEL)
+				goto match_err;
+		} else
+			if ((cell_type == WT_CELL_DATA ||
+			    cell_type == WT_CELL_DATA_SHORT) &&
+			    last_data != NULL &&
+			    last_size == unpack->size &&
+			    memcmp(last_data, unpack->data, last_size) == 0) {
+match_err:			ret = WT_ERROR;
+				WT_VRFY_ERR(session, quiet,
+				    "data entries %" PRIu32 " and %" PRIu32
+				    " on page at addr %" PRIu32 " are "
+				    "identical and should have been "
+				    "run-length encoded",
+				    cell_num - 1, cell_num, addr);
+				break;
+			}
+
+		switch (cell_type) {
+		case WT_CELL_DATA:
+		case WT_CELL_DATA_SHORT:
+			last_deleted = 0;
+			last_data = unpack->data;
+			last_size = unpack->size;
+			break;
+		case WT_CELL_DATA_OVFL:
+			last_deleted = 0;
+			last_data = NULL;
+			break;
+		case WT_CELL_DEL:
+			last_deleted = 1;
+			last_data = NULL;
+			break;
+		}
 	}
-	return (0);
+
+	return (ret);
 }
 
 /*
