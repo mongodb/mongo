@@ -155,6 +155,9 @@ namespace mongo {
                         }
                     }
                     boost::to_upper(test);
+                    if ( test.find( "FASTSYNC" ) != string::npos )
+                        cout << "warning \fastsync\" should not be put in your configuration file" << endl;
+
                     if ( test[0] == '#' ) {
                     } else if ( test.find( "=FALSE" ) == string::npos ) {
                         ss << line << endl;
