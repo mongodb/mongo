@@ -78,10 +78,17 @@ for line in open(f, 'r'):
 
 	w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
 			break_on_hyphens=False)
+	lastname = None
 	for c in sorted(api_data.methods[config_name].config):
 		name = c.name
 		if '.' in name:
 			print >>sys.stderr, "Bad config key " + name
+		# Deal with duplicates: with complex configurationso
+		# (like WT_SESSION::create), it's simpler to deal with duplicates
+		# here than in config_data.py.
+		if name == lastname:
+			continue
+		lastname = name
 		desc = textwrap.dedent(c.desc)
 		desc += typedesc(c)
 		desc = desc.replace(',', '\\,')
