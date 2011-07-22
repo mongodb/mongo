@@ -185,8 +185,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             for( var param in rsParams ){
                 rsDefaults[param] = rsParams[param]
             }
-            
-            var rs = new ReplSetTest( { name : setName , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
+
+            var numReplicas = otherParams.numReplicas || 3
+            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ) } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsParams ) , url : rs.getURL() };
             rs.initiate();
             
