@@ -223,9 +223,9 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
 
 	/*
-	 * Walk the page, building references: the page contains unsorted data
-	 * items.  The data items are on-page data (WT_CELL_DATA), overflow
-	 * (WT_CELL_DATA_OVFL) or deleted (WT_CELL_DEL) items.
+	 * Walk the page, building references: the page contains unsorted value
+	 * items.  The value items are on-page (WT_CELL_VALUE), overflow items
+	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
 	cip = page->u.col_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
@@ -409,7 +409,7 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
 	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
-	 * (WT_CELL_DATA) or overflow (WT_CELL_DATA_OVFL) item.
+	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
@@ -423,8 +423,8 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 				++rip;
 			rip->key = cell;
 			break;
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}

@@ -45,12 +45,6 @@ const char *
 __wt_cell_type_string(uint8_t type)
 {
 	switch (type) {
-	case WT_CELL_DATA:
-		return ("data");
-	case WT_CELL_DATA_OVFL:
-		return ("data-overflow");
-	case WT_CELL_DATA_SHORT:
-		return ("short-data");
 	case WT_CELL_DEL:
 		return ("deleted");
 	case WT_CELL_KEY:
@@ -61,6 +55,12 @@ __wt_cell_type_string(uint8_t type)
 		return ("short-key");
 	case WT_CELL_OFF:
 		return ("off-page");
+	case WT_CELL_VALUE:
+		return ("value");
+	case WT_CELL_VALUE_OVFL:
+		return ("value-overflow");
+	case WT_CELL_VALUE_SHORT:
+		return ("short-value");
 	default:
 		return ("illegal");
 	}

@@ -171,12 +171,12 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 		/* Check the cell type. */
 		cell_type = unpack->raw;
 		switch (cell_type) {
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
-		case WT_CELL_DATA_SHORT:
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY_SHORT:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+		case WT_CELL_VALUE_SHORT:
 			break;
 		case WT_CELL_OFF:
 			if (dsk->type == WT_PAGE_ROW_INT)
@@ -218,9 +218,9 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 			}
 			last_cell_type = WAS_KEY;
 			break;
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
 		case WT_CELL_OFF:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
 			switch (last_cell_type) {
 			case FIRST:
 				WT_VRFY_ERR(session, quiet,
@@ -242,9 +242,9 @@ __wt_verify_dsk_row(WT_SESSION_IMPL *session,
 
 		/* Check if any referenced item is entirely in the file. */
 		switch (cell_type) {
-		case WT_CELL_DATA_OVFL:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
+		case WT_CELL_VALUE_OVFL:
 			if (WT_ADDR_TO_OFF(btree,
 			    unpack->off.addr) + unpack->off.size > file_size)
 				goto eof;
@@ -497,10 +497,10 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 		/* Check the cell type. */
 		cell_type = unpack->raw;
 		switch (cell_type) {
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_OVFL:
-		case WT_CELL_DATA_SHORT:
 		case WT_CELL_DEL:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+		case WT_CELL_VALUE_SHORT:
 			break;
 		default:
 			return (__wt_err_cell_type(
@@ -508,7 +508,7 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 		}
 
 		/* Check if any referenced item is entirely in the file. */
-		if (cell_type == WT_CELL_DATA_OVFL) {
+		if (cell_type == WT_CELL_VALUE_OVFL) {
 			if (WT_ADDR_TO_OFF(btree,
 			    unpack->off.addr) + unpack->off.size > file_size)
 				return (__wt_err_eof(
@@ -524,8 +524,8 @@ __wt_verify_dsk_col_var(WT_SESSION_IMPL *session,
 			if (cell_type == WT_CELL_DEL)
 				goto match_err;
 		} else
-			if ((cell_type == WT_CELL_DATA ||
-			    cell_type == WT_CELL_DATA_SHORT) &&
+			if ((cell_type == WT_CELL_VALUE ||
+			    cell_type == WT_CELL_VALUE_SHORT) &&
 			    last_data != NULL &&
 			    last_size == unpack->size &&
 			    memcmp(last_data, unpack->data, last_size) == 0) {
@@ -540,19 +540,19 @@ match_err:			ret = WT_ERROR;
 			}
 
 		switch (cell_type) {
-		case WT_CELL_DATA:
-		case WT_CELL_DATA_SHORT:
-			last_deleted = 0;
-			last_data = unpack->data;
-			last_size = unpack->size;
-			break;
-		case WT_CELL_DATA_OVFL:
-			last_deleted = 0;
-			last_data = NULL;
-			break;
 		case WT_CELL_DEL:
 			last_deleted = 1;
 			last_data = NULL;
+			break;
+		case WT_CELL_VALUE_OVFL:
+			last_deleted = 0;
+			last_data = NULL;
+			break;
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_SHORT:
+			last_deleted = 0;
+			last_data = unpack->data;
+			last_size = unpack->size;
 			break;
 		}
 	}

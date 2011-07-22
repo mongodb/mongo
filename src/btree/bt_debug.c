@@ -642,17 +642,17 @@ __wt_debug_cell(WT_DBG *ds, WT_CELL_UNPACK *unpack)
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
 	switch (unpack->type) {
-	case WT_CELL_DATA:
 	case WT_CELL_DEL:
+	case WT_CELL_VALUE:
 		if (unpack->rle != 0)
 			__wt_dmsg(ds, ", rle: %" PRIu64, unpack->rle);
 		break;
 	case WT_CELL_KEY:
 		__wt_dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
 		break;
-	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_OFF:
+	case WT_CELL_VALUE_OVFL:
 		__wt_dmsg(ds, ", offpage: addr %" PRIu32 ", size %" PRIu32,
 		    unpack->off.addr, unpack->off.size);
 		break;
@@ -728,10 +728,10 @@ __wt_debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 		goto deleted;
 
 	switch (unpack->type) {
-	case WT_CELL_DATA:
-	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
+	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_OVFL:
 		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
 		p = tmp->data;

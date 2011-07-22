@@ -37,12 +37,12 @@ __wt_cell_unpack_copy(
 
 	/* Get the cell's data. */
 	switch (unpack->type) {
-	case WT_CELL_DATA:
 	case WT_CELL_KEY:
+	case WT_CELL_VALUE:
 		WT_RET(__wt_buf_set(session, retb, unpack->data, unpack->size));
 		break;
-	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
+	case WT_CELL_VALUE_OVFL:
 		WT_RET(__wt_ovfl_in(session, &unpack->off, retb));
 		break;
 	WT_ILLEGAL_FORMAT(session);
@@ -50,15 +50,15 @@ __wt_cell_unpack_copy(
 
 	/* Select a Huffman encoding function. */
 	switch (unpack->type) {
-	case WT_CELL_DATA:
-	case WT_CELL_DATA_OVFL:
-		if ((huffman = btree->huffman_value) == NULL)
-			return (0);
-		break;
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
-	default:
 		if ((huffman = btree->huffman_key) == NULL)
+			return (0);
+		break;
+	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_OVFL:
+	default:
+		if ((huffman = btree->huffman_value) == NULL)
 			return (0);
 		break;
 	}

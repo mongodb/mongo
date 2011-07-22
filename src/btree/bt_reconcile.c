@@ -3027,7 +3027,7 @@ __rec_cell_build_val(
 			WT_STAT_INCR(btree->stats, overflow_data);
 
 			return (__rec_cell_build_ovfl(
-			    session, val, WT_CELL_DATA_OVFL, rle));
+			    session, val, WT_CELL_VALUE_OVFL, rle));
 		}
 	}
 	val->cell_len = __wt_cell_pack_data(&val->cell, rle, val->buf.size);

@@ -1257,7 +1257,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, unpack);
 		recno += unpack->rle;
 
-		if (unpack->type != WT_CELL_DATA_OVFL)
+		if (unpack->type != WT_CELL_VALUE_OVFL)
 			continue;
 		if (recno >= start && recno <= stop)
 			continue;
@@ -1962,7 +1962,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 		if ((cell = __wt_row_value(page, rip)) == NULL)
 			continue;
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_DATA_OVFL) {
+		if (unpack->type == WT_CELL_VALUE_OVFL) {
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] merge discard freed overflow "
 			    "reference [%" PRIu32 "/%" PRIu32 "]",

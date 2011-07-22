@@ -495,7 +495,7 @@ __wt_verify_overflow_cell(
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
-		case WT_CELL_DATA_OVFL:
+		case WT_CELL_VALUE_OVFL:
 			WT_RET(__wt_verify_overflow(
 			    session, unpack->off.addr, unpack->off.size, vs));
 			break;

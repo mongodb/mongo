@@ -121,7 +121,7 @@ __wt_return_data(
 
 page_cell:		__wt_cell_unpack(cell, unpack);
 			if (btree->huffman_value != NULL ||
-			    unpack->type != WT_CELL_DATA) {
+			    unpack->type != WT_CELL_VALUE) {
 				WT_RET(__wt_cell_unpack_copy(
 				    session, unpack, &cursor->value));
 				value_ret = cursor->value.data;
