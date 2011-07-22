@@ -171,7 +171,7 @@ namespace mongo {
             Timer t;
             for ( int i=0; i<3600; i++ ) {
                 if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
-                    LOG(t.seconds() < 30 ) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
+                    LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
                     return;
                 }
                 sleepsecs(1);
