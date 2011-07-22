@@ -648,7 +648,7 @@ __wt_debug_cell(WT_DBG *ds, WT_CELL_UNPACK *unpack)
 			__wt_dmsg(ds, ", rle: %" PRIu64, unpack->rle);
 		break;
 	case WT_CELL_KEY:
-		__wt_dmsg(ds, ", pfx: " PRIu8, unpack->prefix);
+		__wt_dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
 		break;
 	case WT_CELL_DATA_OVFL:
 	case WT_CELL_KEY_OVFL:
