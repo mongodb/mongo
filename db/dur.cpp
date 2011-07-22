@@ -486,6 +486,7 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
+        // lock order: dbMutex first, then this
         mutex groupCommitMutex("groupCommit");
 
         bool _groupCommitWithLimitedLocks() {
@@ -773,6 +774,13 @@ namespace mongo {
 
         void DurableImpl::syncDataAndTruncateJournal() {
             dbMutex.assertWriteLocked();
+
+            // a commit from the commit thread won't begin while we are in the write lock,
+            // but it may already be in progress and the end of that work is done outside 
+            // (dbMutex) locks. This line waits for that to complete if already underway.
+            {
+                scoped_lock lk(groupCommitMutex);
+            }
 
             groupCommit();
             MongoFile::flushAll(true);
