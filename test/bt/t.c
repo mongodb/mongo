@@ -15,7 +15,7 @@ static void usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, reps;
+	int ch, reps, ret;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -139,16 +139,18 @@ main(int argc, char *argv[])
 		track("\n", 0ULL);
 	}
 
+	if (0) {
+err:		ret = EXIT_FAILURE;
+	}
+
 	if (g.rand_log != NULL)
 		(void)fclose(g.rand_log);
 
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	return (EXIT_SUCCESS);
-
-err:	config_print(1);
-	return (EXIT_FAILURE);
+	config_print(ret ? 1 : 0);
+	return (ret);
 }
 
 /*
