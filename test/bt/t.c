@@ -149,7 +149,7 @@ err:		ret = EXIT_FAILURE;
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	config_print(ret ? 1 : 0);
+	config_print(ret == EXIT_FAILURE ? 1 : 0);
 	return (ret);
 }
 
