@@ -79,19 +79,32 @@ try {
     }
     print();
 
+    function evalSleepMoreThan(millis,max){
+        var start = new Date();
+        db.eval("sleep("+millis+")");
+        var end = new Date();
+        var actual = end.getTime() - start.getTime();
+        if ( actual > ( millis + 5 ) ) {
+            print( "warning wanted to sleep for: " + millis + " but took: " + actual );
+        }
+        return actual >= max ? 1 : 0;
+    }
+
     db.setProfilingLevel(1,100);
     before = db.system.profile.count();
-    db.eval( "sleep(15)" )
-    db.eval( "sleep(120)" )
+    var delta = 0;
+    delta += evalSleepMoreThan( 15 , 100 );
+    delta += evalSleepMoreThan( 120 , 100 );
     after = db.system.profile.count()
-    assert.eq( before + 1 , after , "X2 : " + getProfileAString() )
+    assert.eq( before + delta , after , "X2 : " + getProfileAString() )
 
     db.setProfilingLevel(1,20);
     before = db.system.profile.count();
-    db.eval( "sleep(25)" )
-    db.eval( "sleep(120)" )
+    delta = 0;
+    delta += evalSleepMoreThan( 5 , 20 );
+    delta += evalSleepMoreThan( 120 , 20 );
     after = db.system.profile.count()
-    assert.eq( before + 2 , after , "X3 : " + getProfileAString() )
+    assert.eq( before + delta , after , "X3 : " + getProfileAString() )
         
     db.profile.drop();
     db.setProfilingLevel(2)
