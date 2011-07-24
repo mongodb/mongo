@@ -30,6 +30,8 @@ namespace mongo {
         Timer( unsigned long long startMicros ) { old = startMicros; }
         int seconds() const { return (int)(micros() / 1000000); }
         int millis() const { return (int)(micros() / 1000); }
+        int minutes() const { return seconds() / 60; }
+        
 
         /** gets time interval and resets at the same time.  this way we can call curTimeMicros
               once instead of twice if one wanted millis() and then reset().
