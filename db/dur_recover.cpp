@@ -440,6 +440,8 @@ namespace mongo {
             _lastDataSyncedFromLastRun = journalReadLSN();
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
+            // todo: we could truncate the journal file at rotation time to the right length, then this abruptEnd 
+            // check can be turned back on.  this is relevant when prealloc is being used.
             for( unsigned i = 0; i != files.size(); ++i ) {
 	      bool abruptEnd = processFile(files[i]);
                 if( abruptEnd && i+1 < files.size() ) {
