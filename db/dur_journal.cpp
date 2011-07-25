@@ -345,10 +345,11 @@ namespace mongo {
                             {
                                 // zero the header
                                 File f;
-                                f.open(temppath.string().c_str(), false, true);
+                                f.open(temppath.string().c_str(), false, false);
                                 char buf[8192];
                                 memset(buf, 0, 8192);
                                 f.write(0, buf, 8192);
+                                f.fsync();
                             }
                             boost::filesystem::rename(temppath, filepath);
                             return;
