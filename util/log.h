@@ -298,6 +298,9 @@ namespace mongo {
         }
     public:
         static Logstream& get() {
+            if ( StaticObserver::_destroyingStatics ) {
+                cout << "Logstream::get called in uninitialized state" << endl;
+            }
             Logstream *p = tsp.get();
             if( p == 0 )
                 tsp.reset( p = new Logstream() );
