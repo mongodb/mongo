@@ -64,8 +64,14 @@ namespace mongo {
         }
         ~Where() {
 
-            if ( scope.get() )
-                scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+            if ( scope.get() ){
+                try {
+                    scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+                }
+                catch( DBException& e ){
+                    warning() << "javascript scope cleanup interrupted" << causedBy( e ) << endl;
+                }
+            }
 
             if ( jsScope ) {
                 delete jsScope;
