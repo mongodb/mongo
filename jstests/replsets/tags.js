@@ -75,7 +75,10 @@ replTest.partition(3, 4);
 print("done bridging");
 
 print("test1");
+print("2 should be primary");
 master = replTest.getMaster();
+
+printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
 var timeout = 20000;
 
