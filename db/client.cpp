@@ -122,10 +122,13 @@ namespace mongo {
             error() << "Client::shutdown not called: " << _desc << endl;
         }
 
-        scoped_lock bl(clientsMutex);
-        if ( ! _shutdown )
-            clients.erase(this);
-        delete _curOp;
+        if ( ! inShutdown() ) {
+            // we can't clean up safely once we're in shutdown
+            scoped_lock bl(clientsMutex);
+            if ( ! _shutdown )
+                clients.erase(this);
+            delete _curOp;
+        }
     }
 
     bool Client::shutdown() {
