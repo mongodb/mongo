@@ -81,7 +81,7 @@ namespace mongo {
                     }
                 }
 
-                string commandName = q.query.firstElement().fieldName();
+                string commandName = q.query.firstElementFieldName();
 
                 uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
             }
@@ -260,6 +260,14 @@ namespace mongo {
             BSONObj x = b.done();
             replyToQuery(0, r.p(), r.m(), x);
             return true;
+        }
+
+        void insertSharded( DBConfigPtr conf, const char* ns, BSONObj& o, int flags, bool safe, const char* nsChunkLookup ) {
+            // only useful for shards
+        }
+
+        void updateSharded( DBConfigPtr conf, const char* ns, BSONObj& query, BSONObj& toupdate, int flags, bool safe ) {
+            // only useful for shards
         }
 
         set<string> _commandsSafeToPass;

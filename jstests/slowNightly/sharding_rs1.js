@@ -59,6 +59,12 @@ assert.soon( function(){
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 
+sleep( 1000 );
+
+while ( sh.isBalancerRunning() ){
+    sleep( 1000 );
+}
+
 for ( i=0; i<s._rs.length; i++ ){
     r = s._rs[i];
     r.test.awaitReplication();

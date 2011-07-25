@@ -20,27 +20,32 @@
 
 #pragma once
 
+#include "indexkey.h"
+#include "queryutil.h"
+
 namespace mongo {
 
     /* todo:
-       _ handle compound keys with differing directions.  we don't handle this yet: neither here nor in indexes i think!!!
        _ limit amount of data
     */
 
-    /* see also IndexDetails::getKeysFromObject, which needs some merging with this. */
-
     class KeyType : boost::noncopyable {
     public:
-        BSONObj pattern; // e.g., { ts : -1 }
+        IndexSpec _spec;
+        FieldRangeVector _keyCutter;
     public:
-        KeyType(BSONObj _keyPattern) {
-            pattern = _keyPattern;
-            assert( !pattern.isEmpty() );
+        KeyType(BSONObj pattern, const FieldRangeSet &frs):
+        _spec((assert(!pattern.isEmpty()),pattern)),
+        _keyCutter(frs, _spec, 1) {
         }
 
-        // returns the key value for o
+        /**
+         * @return first key of the object that would be encountered while
+         * scanning index with keySpec 'pattern' using constraints 'frs', or
+         * BSONObj() if no such key.
+         */
         BSONObj getKeyFromObject(BSONObj o) {
-            return o.extractFields(pattern,true);
+            return _keyCutter.firstMatch(o);
         }
     };
 
@@ -71,63 +76,60 @@ namespace mongo {
 
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
-        BestMap best; // key -> full object
-        int startFrom;
-        int limit;   // max to send back.
-        KeyType order;
-        unsigned approxSize;
-
         void _add(BSONObj& k, BSONObj o, DiskLoc* loc) {
             if (!loc) {
-                best.insert(make_pair(k.getOwned(),o.getOwned()));
+                _best.insert(make_pair(k.getOwned(),o.getOwned()));
             }
             else {
                 BSONObjBuilder b;
                 b.appendElements(o);
                 b.append("$diskLoc", loc->toBSONObj());
-                best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
+                _best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
             }
         }
 
         void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
-            /* todo : we don't correct approxSize here. */
+            /* todo : we don't correct _approxSize here. */
             const BSONObj& worstBestKey = i->first;
-            int c = worstBestKey.woCompare(k, order.pattern);
+            int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
             if ( c > 0 ) {
                 // k is better, 'upgrade'
-                best.erase(i);
+                _best.erase(i);
                 _add(k, o, loc);
             }
         }
 
     public:
-        ScanAndOrder(int _startFrom, int _limit, BSONObj _order) :
-            best( BSONObjCmp( _order ) ),
-            startFrom(_startFrom), order(_order) {
-            limit = _limit > 0 ? _limit + startFrom : 0x7fffffff;
-            approxSize = 0;
+        ScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs) :
+            _best( BSONObjCmp( order ) ),
+            _startFrom(startFrom), _order(order, frs) {
+            _limit = limit > 0 ? limit + _startFrom : 0x7fffffff;
+            _approxSize = 0;
         }
 
         int size() const {
-            return best.size();
+            return _best.size();
         }
 
         void add(BSONObj o, DiskLoc* loc) {
             assert( o.isValid() );
-            BSONObj k = order.getKeyFromObject(o);
-            if ( (int) best.size() < limit ) {
-                approxSize += k.objsize();
-                approxSize += o.objsize();
+            BSONObj k = _order.getKeyFromObject(o);
+            if ( k.isEmpty() ) {
+                return;   
+            }
+            if ( (int) _best.size() < _limit ) {
+                _approxSize += k.objsize();
+                _approxSize += o.objsize();
 
                 /* note : adjust when bson return limit adjusts. note this limit should be a bit higher. */
-                uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", approxSize < 32 * 1024 * 1024 );
+                uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", _approxSize < 32 * 1024 * 1024 );
 
                 _add(k, o, loc);
                 return;
             }
             BestMap::iterator i;
-            assert( best.end() != best.begin() );
-            i = best.end();
+            assert( _best.end() != _best.begin() );
+            i = _best.end();
             i--;
             _addIfBetter(k, o, i, loc);
         }
@@ -137,12 +139,12 @@ namespace mongo {
             int nFilled = 0;
             for ( BestMap::iterator i = begin; i != end; i++ ) {
                 n++;
-                if ( n <= startFrom )
+                if ( n <= _startFrom )
                     continue;
                 BSONObj& o = i->second;
                 fillQueryResultFromObj(b, filter, o);
                 nFilled++;
-                if ( nFilled >= limit )
+                if ( nFilled >= _limit )
                     break;
                 uassert( 10129 ,  "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
             }
@@ -151,9 +153,14 @@ namespace mongo {
 
         /* scanning complete. stick the query result in b for n objects. */
         void fill(BufBuilder& b, Projection *filter, int& nout) {
-            _fill(b, filter, nout, best.begin(), best.end());
+            _fill(b, filter, nout, _best.begin(), _best.end());
         }
-
+        
+        BestMap _best; // key -> full object
+        int _startFrom;
+        int _limit;   // max to send back.
+        KeyType _order;
+        unsigned _approxSize;
     };
 
 } // namespace mongo

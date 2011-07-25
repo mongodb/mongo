@@ -26,27 +26,47 @@
 
 namespace mongo {
 
-
     /**
-       for sorting by BSONObj and attaching a value
+       for external (disk) sorting by BSONObj and attaching a value
      */
     class BSONObjExternalSorter : boost::noncopyable {
     public:
-
+        BSONObjExternalSorter( IndexInterface &i, const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
+        ~BSONObjExternalSorter();
         typedef pair<BSONObj,DiskLoc> Data;
-
+ 
     private:
-        static BSONObj extSortOrder;
+        IndexInterface& _idxi;
 
-        static int extSortComp( const void *lv, const void *rv ) {
+        static int _compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
             RARELY killCurrentOp.checkForInterrupt();
             _compares++;
+            int x = i.keyCompare(l.first, r.first, order);
+            if ( x )
+                return x;
+            return l.second.compare( r.second );
+        }
+
+        class MyCmp {
+        public:
+            MyCmp( IndexInterface& i, BSONObj order = BSONObj() ) : _i(i), _order( Ordering::make(order) ) {}
+            bool operator()( const Data &l, const Data &r ) const {
+                return _compare(_i, l, r, _order) < 0;
+            };
+        private:
+            IndexInterface& _i;
+            const Ordering _order;
+        };
+
+        static IndexInterface *extSortIdxInterface;
+        static Ordering extSortOrder;
+        static int extSortComp( const void *lv, const void *rv ) {
+            DEV RARELY {                 
+                dbMutex.assertWriteLocked(); // must be as we use a global var
+            }
             Data * l = (Data*)lv;
             Data * r = (Data*)rv;
-            int cmp = l->first.woCompare( r->first , extSortOrder );
-            if ( cmp )
-                return cmp;
-            return l->second.compare( r->second );
+            return _compare(*extSortIdxInterface, *l, *r, extSortOrder);
         };
 
         class FileIterator : boost::noncopyable {
@@ -59,22 +79,6 @@ namespace mongo {
             MemoryMappedFile _file;
             char * _buf;
             char * _end;
-        };
-
-        class MyCmp {
-        public:
-            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
-            bool operator()( const Data &l, const Data &r ) const {
-                RARELY killCurrentOp.checkForInterrupt();
-                _compares++;
-                int x = l.first.woCompare( r.first , _order );
-                if ( x )
-                    return x < 0;
-                return l.second.compare( r.second ) < 0;
-            };
-
-        private:
-            BSONObj _order;
         };
 
     public:
@@ -98,9 +102,6 @@ namespace mongo {
             InMemory::iterator _it;
 
         };
-
-        BSONObjExternalSorter( const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
-        ~BSONObjExternalSorter();
 
         void add( const BSONObj& o , const DiskLoc & loc );
         void add( const BSONObj& o , int a , int b ) {

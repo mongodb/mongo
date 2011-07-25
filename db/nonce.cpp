@@ -23,7 +23,9 @@ extern int do_md5_test(void);
 
 namespace mongo {
 
-    BOOST_STATIC_ASSERT( sizeof(nonce) == 8 );
+    BOOST_STATIC_ASSERT( sizeof(nonce64) == 8 );
+
+    static Security security; // needs to be static so _initialized is preset to false (see initsafe below)
 
     Security::Security() {
         static int n;
@@ -31,7 +33,7 @@ namespace mongo {
         init();
     }
 
-    void Security::init() {
+    NOINLINE_DECL void Security::init() {
         if( _initialized ) return;
         _initialized = true;
 
@@ -39,7 +41,7 @@ namespace mongo {
         _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
         massert( 10353 ,  "can't open dev/urandom", _devrandom->is_open() );
 #elif defined(_WIN32)
-        srand(curTimeMicros());
+        srand(curTimeMicros()); // perhaps not relevant for rand_s but we might want elsewhere anyway
 #else
         srandomdev();
 #endif
@@ -50,21 +52,12 @@ namespace mongo {
 #endif
     }
 
-    nonce Security::getNonce() {
-        static mongo::mutex m("getNonce");
-        scoped_lock lk(m);
-        
-        if ( ! _initialized )
-            init();
-
-        /* question/todo: /dev/random works on OS X.  is it better
-           to use that than random() / srandom()?
-        */
-
-        nonce n;
+    nonce64 Security::__getNonce() { 
+        dassert( _initialized );
+        nonce64 n;
 #if defined(__linux__) || defined(__sunos__) || defined(__APPLE__)
         _devrandom->read((char*)&n, sizeof(n));
-        massert( 10355 , "devrandom failed", !_devrandom->fail());
+        massert(10355 , "devrandom failed", !_devrandom->fail());
 #elif defined(_WIN32)
         unsigned a=0, b=0;
         assert( rand_s(&a) == 0 );
@@ -75,9 +68,28 @@ namespace mongo {
 #endif
         return n;
     }
-    unsigned getRandomNumber() { return (unsigned) security.getNonce(); }
 
-    bool Security::_initialized;
-    Security security;
+    SimpleMutex nonceMutex("nonce");
+    nonce64 Security::_getNonce() {
+        // not good this is a static as gcc will mutex protect it which costs time
+        SimpleMutex::scoped_lock lk(nonceMutex);
+        if( !_initialized )
+            init();
+        return __getNonce();
+    }
+
+    nonce64 Security::getNonceDuringInit() {
+        // the mutex might not be inited yet.  init phase should be one thread anyway (hopefully we don't spawn threads therein)
+        if( !security._initialized )
+            security.init();
+        return security.__getNonce();
+    }
+
+    nonce64 Security::getNonce() {
+        return security._getNonce();
+    }
+
+    // name warns us this might be a little slow (see code above)
+    unsigned goodRandomNumberSlow() { return (unsigned) Security::getNonce(); }
 
 } // namespace mongo

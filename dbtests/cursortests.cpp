@@ -151,7 +151,7 @@ namespace CursorTests {
             void check( const BSONObj &spec ) {
                 {
                     BSONObj keypat = idx();
-                    cout << keypat.toString() << endl;
+                    //cout << keypat.toString() << endl;
                     _c.ensureIndex( ns(), idx() );
                 }
 

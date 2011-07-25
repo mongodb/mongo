@@ -11,6 +11,9 @@ test = new SyncCCTest( "sync6", { logpath : "/dev/null" } )
 var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {})//{ logpath : "/dev/null" } )//{verbose : ""} )
 // { logpath : "/data/db/syncCommander/mongod.log" } );
 
+// Up the log level for this test
+commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 1 } )
+
 // Have lots of threads, so use larger i
 // Can't test too many, we get socket exceptions... possibly due to the 
 // javascript console.

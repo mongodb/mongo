@@ -123,7 +123,7 @@ namespace JSTests {
             s->invoke( "return x == 1.79; " , 0, 0 );
             ASSERT( ! s->getBoolean( "return" ) );
 
-            BSONObj obj = BSON( "" << 11 );
+            BSONObj obj = BSON( "" << 11.0 );
             s->invoke( "function( z ){ return 5 + z; }" , &obj, 0 );
             ASSERT_EQUALS( 16 , s->getNumber( "return" ) );
 
@@ -136,7 +136,7 @@ namespace JSTests {
         void run() {
             Scope * s = globalScriptEngine->newScope();
 
-            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
+            BSONObj o = BSON( "x" << 17.0 << "y" << "eliot" << "z" << "sara" );
             s->setObject( "blah" , o );
 
             s->invoke( "return blah.x;" , 0, 0 );
@@ -895,7 +895,7 @@ namespace JSTests {
     class Speed1 {
     public:
         void run() {
-            BSONObj start = BSON( "x" << 5 );
+            BSONObj start = BSON( "x" << 5.0 );
             BSONObj empty;
 
             auto_ptr<Scope> s;

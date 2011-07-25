@@ -192,14 +192,23 @@ namespace mongo {
         return ret;
     }
 
-    MongoDataFile* Database::suitableFile( int sizeNeeded, bool preallocate ) {
+    MongoDataFile* Database::suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota ) {
 
         // check existing files
         for ( int i=numFiles()-1; i>=0; i-- ) {
             MongoDataFile* f = getFile( i );
-            if ( f->getHeader()->unusedLength >= sizeNeeded )
-                return f;
+            if ( f->getHeader()->unusedLength >= sizeNeeded ) {
+                // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
+                // rejecting an index insert after inserting the main record.
+                if( cmdLine.quota && enforceQuota && i > cmdLine.quotaFiles && !NamespaceString::special(ns) )
+                    ;
+                else
+                    return f;
+            }
         }
+
+        if( cmdLine.quota && enforceQuota && numFiles() >= cmdLine.quotaFiles && !NamespaceString::special(ns) )
+            uasserted(12501, "quota exceeded");
 
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
@@ -212,6 +221,7 @@ namespace mongo {
                 return f;
         }
 
+        uasserted(14810, "couldn't allocate space (suitableFile)"); // callers don't check for null return code
         return 0;
     }
 
@@ -223,11 +233,11 @@ namespace mongo {
     }
 
 
-    Extent* Database::allocExtent( const char *ns, int size, bool capped ) {
+    Extent* Database::allocExtent( const char *ns, int size, bool capped, bool enforceQuota ) {
         Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
         if( e )
             return e;
-        return suitableFile( size, !capped )->createExtent( ns, size, capped );
+        return suitableFile( ns, size, !capped, enforceQuota )->createExtent( ns, size, capped );
     }
 
 

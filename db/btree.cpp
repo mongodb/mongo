@@ -28,6 +28,7 @@
 #include "stats/counters.h"
 #include "dur_commitjob.h"
 #include "btreebuilder.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -36,15 +37,10 @@ namespace mongo {
 
 #define VERIFYTHISLOC dassert( thisLoc.btree<V>() == this );
 
-    _KeyNode& _KeyNode::writing() const {
-        return *getDur().writing( const_cast< _KeyNode* >( this ) );
+    template< class Loc >
+    __KeyNode<Loc> & __KeyNode<Loc>::writing() const {
+        return *getDur().writing( const_cast< __KeyNode<Loc> * >( this ) );
     }
-
-    template< class V >
-    BucketBasics<V>::KeyNode::KeyNode(const BucketBasics<V>& bb, const _KeyNode &k) :
-        prevChildBucket(k.prevChildBucket),
-        recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
-    { }
 
     // BucketBasics::lowWaterMark()
     //
@@ -67,8 +63,6 @@ namespace mongo {
 
     static const int split_debug = 0;
     static const int insert_debug = 0;
-
-    extern int otherTraceLevel;
 
     /**
      * this error is ok/benign when doing a background indexing -- that logic in pdfile checks explicitly
@@ -131,7 +125,7 @@ namespace mongo {
     }
 
     template< class V >
-    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict) const {
+    long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict, unsigned depth) const {
         {
             bool f = false;
             assert( f = true );
@@ -142,8 +136,8 @@ namespace mongo {
         this->assertValid(order, true);
 
         if ( bt_dmp ) {
-            out() << thisLoc.toString() << ' ';
-            ((BtreeBucket *) this)->dump();
+            _log() << thisLoc.toString() << ' ';
+            ((BtreeBucket *) this)->dump(depth);
         }
 
         // keycount
@@ -169,7 +163,7 @@ namespace mongo {
                 else {
                     wassert( b->parent == thisLoc );
                 }
-                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict);
+                kc += b->fullValidate(kn.prevChildBucket, order, unusedCount, strict, depth+1);
             }
         }
         if ( !this->nextChild.isNull() ) {
@@ -181,7 +175,7 @@ namespace mongo {
             else {
                 wassert( b->parent == thisLoc );
             }
-            kc += b->fullValidate(this->nextChild, order, unusedCount, strict);
+            kc += b->fullValidate(this->nextChild, order, unusedCount, strict, depth+1);
         }
 
         return kc;
@@ -227,9 +221,9 @@ namespace mongo {
                 }
                 else if ( z == 0 ) {
                     if ( !(k(i).recordLoc < k(i+1).recordLoc) ) {
-                        out() << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
-                        out() << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
-                        out() << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
+                        out() << "ERROR: btree key order corrupt (recordloc's wrong):" << endl;
+                        out() << " k(" << i << ")" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
+                        out() << " k(" << i+1 << ")" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
                         wassert( k(i).recordLoc < k(i+1).recordLoc );
                     }
                 }
@@ -315,12 +309,12 @@ namespace mongo {
      *  does not bother returning that value.
      */
     template< class V >
-    void BucketBasics<V>::popBack(DiskLoc& recLoc, Key& key) {
+    void BucketBasics<V>::popBack(DiskLoc& recLoc, Key &key) {
         massert( 10282 ,  "n==0 in btree popBack()", this->n > 0 );
         assert( k(this->n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
         KeyNode kn = keyNode(this->n-1);
         recLoc = kn.recordLoc;
-        key = kn.key;
+        key.assign(kn.key);
         int keysize = kn.key.dataSize();
 
         massert( 10283 , "rchild not null in btree popBack()", this->nextChild.isNull());
@@ -347,8 +341,9 @@ namespace mongo {
             const KeyNode klast = keyNode(this->n-1);
             if(  klast.key.woCompare(key, order) > 0 ) { 
                 log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
-                //cout << keyNode(n-1).key.toString() << endl;
-                //cout << key.toString() << endl;
+                log() << "  klast: " << keyNode(this->n-1).key.toString() << endl;
+                log() << "  key:   " << key.toString() << endl;
+                DEV klast.key.woCompare(key, order);
                 assert(false);
             }
         }
@@ -734,8 +729,10 @@ namespace mongo {
      * note result might be an Unused location!
      */
     template< class V >
-    bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, 
+    bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &rl, 
 			      const Ordering &order, int& pos, bool assertIfDup) const {
+        Loc recordLoc;
+        recordLoc = rl;
         globalIndexCounters.btree( (char*)this );
 
         // binary search for this key
@@ -744,7 +741,7 @@ namespace mongo {
         int h=this->n-1;
         while ( l <= h ) {
             int m = (l+h)/2;
-	    KeyNode M = this->keyNode(m);
+            KeyNode M = this->keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) {
                 if( assertIfDup ) {
@@ -770,7 +767,7 @@ namespace mongo {
                 }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
-                DiskLoc unusedRL = M.recordLoc;
+                Loc unusedRL = M.recordLoc;
                 unusedRL.GETOFS() &= ~1; // so we can test equality without the used bit messing us up
                 x = recordLoc.compare(unusedRL);
             }
@@ -790,7 +787,13 @@ namespace mongo {
             Key keyatpos = keyNode(pos).key;
             wassert( key.woCompare(keyatpos, order) <= 0 );
             if ( pos > 0 ) {
-                wassert( keyNode(pos-1).key.woCompare(key, order) <= 0 );
+                if( !( keyNode(pos-1).key.woCompare(key, order) <= 0 ) ) {
+                    DEV {
+                        log() << key.toString() << endl;
+                        log() << keyNode(pos-1).key.toString() << endl;
+                    }
+                    wassert(false);
+                }
             }
         }
 
@@ -908,8 +911,10 @@ namespace mongo {
         advanceLoc.btreemod<V>()->delKeyAtPos( advanceLoc, id, advanceKeyOfs, order );
     }
 
-#define BTREE(loc) (static_cast<DiskLoc>(loc).btree<V>())
-#define BTREEMOD(loc) (static_cast<DiskLoc>(loc).btreemod<V>())
+//#define BTREE(loc) (static_cast<DiskLoc>(loc).btree<V>())
+#define BTREE(loc) (loc.template btree<V>())
+//#define BTREEMOD(loc) (static_cast<DiskLoc>(loc).btreemod<V>())
+#define BTREEMOD(loc) (loc.template btreemod<V>())
 
     template< class V >
     void BtreeBucket<V>::replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id ) {
@@ -923,7 +928,9 @@ namespace mongo {
             ll.btree<V>()->childForPos( indexInParent( thisLoc ) ).writing() = this->nextChild;
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
-        (static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
+
+        BTREE(this->nextChild)->parent.writing() = this->parent;
+        //(static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
         ClientCursor::informAboutToDeleteBucket( thisLoc );
         deallocBucket( thisLoc, id );
     }
@@ -1208,15 +1215,13 @@ namespace mongo {
     bool BtreeBucket<V>::unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc ) const {
         int pos;
         bool found;
-        DiskLoc loc = locate(id, thisLoc, key, Ordering::make(id.keyPattern()), pos, found, recordLoc, 1);
+        const Ordering ord = Ordering::make(id.keyPattern());
+        DiskLoc loc = locate(id, thisLoc, key, ord, pos, found, recordLoc, 1);
         if ( found ) {
-
-            if ( key.objsize() > KeyMax ) {
+            if ( key.objsize() > this->KeyMax ) {
                 OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
-            }
-            
-            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, Ordering::make(id.keyPattern()));
-            
+            }            
+            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);            
             return true;
         }
         return false;
@@ -1233,7 +1238,7 @@ namespace mongo {
     inline void BtreeBucket<V>::fix(const DiskLoc thisLoc, const DiskLoc child) {
         if ( !child.isNull() ) {
             if ( insert_debug )
-                out() << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
+                out() << "     fix " << child.toString() << ".parent=" << thisLoc.toString() << endl;
             child.btree<V>()->parent.writing() = thisLoc;
         }
     }
@@ -1329,8 +1334,8 @@ namespace mongo {
                     dump();
                     assert(false);
                 }
-                const DiskLoc *pc = &k(keypos+1).prevChildBucket;
-                *getDur().alreadyDeclared((DiskLoc*) pc) = rchild; // declared in basicInsert()
+                const Loc *pc = &k(keypos+1).prevChildBucket;
+                *getDur().alreadyDeclared( const_cast<Loc*>(pc) ) = rchild; // declared in basicInsert()
                 if ( !rchild.isNull() )
                     rchild.btree<V>()->parent.writing() = thisLoc;
             }
@@ -1507,7 +1512,7 @@ namespace mongo {
         DiskLoc child = this->childForPos(p);
 
         if ( !child.isNull() ) {
-	  DiskLoc l = BTREE(child)->locate(idx, child, key, order, pos, found, recordLoc, direction);
+            DiskLoc l = BTREE(child)->locate(idx, child, key, order, pos, found, recordLoc, direction);
             if ( !l.isNull() )
                 return l;
         }
@@ -1673,8 +1678,8 @@ namespace mongo {
     int BtreeBucket<V>::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
-        if ( key.dataSize() > KeyMax ) {
-            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
+        if ( key.dataSize() > this->KeyMax ) {
+            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << this->KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
             return 2;
         }
         assert( key.dataSize() > 0 );
@@ -1710,7 +1715,8 @@ namespace mongo {
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
-        DiskLoc child = this->childForPos(pos);
+        Loc ch = this->childForPos(pos);
+        DiskLoc child = ch;
         if ( insert_debug )
             out() << "    getChild(" << pos << "): " << child.toString() << endl;
         // In current usage, rChild isNull() for a this->new key and false when we are
@@ -1726,18 +1732,20 @@ namespace mongo {
     }
 
     template< class V >
-    void BtreeBucket<V>::dump() const {
-        out() << "DUMP btreebucket this->n:" << this->n;
-        out() << " this->parent:" << hex << this->parent.getOfs() << dec;
+    void BtreeBucket<V>::dump(unsigned depth) const {
+        string indent = string(depth, ' ');
+        _log() << "BUCKET n:" << this->n;
+        _log() << " parent:" << hex << this->parent.getOfs() << dec;
         for ( int i = 0; i < this->n; i++ ) {
-            out() << '\n';
+            _log() << '\n' << indent;
             KeyNode k = keyNode(i);
-            out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
-                  k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.toString() << dec;
+            string ks = k.key.toString();
+            _log() << "  " << hex << k.prevChildBucket.getOfs() << '\n';
+            _log() << indent << "    " << i << ' ' << ks.substr(0, 30) << " Loc:" << k.recordLoc.toString() << dec;
             if ( this->k(i).isUnused() )
-                out() << " UNUSED";
+                _log() << " UNUSED";
         }
-        out() << " right:" << hex << this->nextChild.getOfs() << dec << endl;
+        _log() << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
     }
 
     /** todo: meaning of return code unclear clean up */
@@ -1749,13 +1757,13 @@ namespace mongo {
         KeyOwned key(_key);
 
         if ( toplevel ) {
-            if ( key.dataSize() > KeyMax ) {
+            if ( key.dataSize() > this->KeyMax ) {
                 problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.dataSize() << ' ' << key.toString() << endl;
                 return 3;
             }
         }
 
-        int x = _insert(thisLoc, recordLoc, Key(key), order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+        int x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
         this->assertValid( order );
 
         return x;
@@ -1768,7 +1776,7 @@ namespace mongo {
 
     template< class V >
     int BtreeBucket<V>::getKeyMax() {
-        return KeyMax;
+        return V::KeyMax;
     }
 
     template< class V >
@@ -1835,25 +1843,45 @@ namespace mongo {
 
         b->dumpTree(id.head, orderObj);
 
-        /*        b->bt_insert(id.head, B, key, order, false, id);
+        /* b->bt_insert(id.head, B, key, order, false, id);
         b->k(1).setUnused();
-
         b->dumpTree(id.head, order);
-
         b->bt_insert(id.head, A, key, order, false, id);
-
         b->dumpTree(id.head, order);
         */
 
         // this should assert.  does it? (it might "accidentally" though, not asserting proves a problem, asserting proves nothing)
         b->bt_insert(id.head, C, key, order, false, id);
 
-//        b->dumpTree(id.head, order);
+        // b->dumpTree(id.head, order);
     }
 
     template class BucketBasics<V0>;
     template class BucketBasics<V1>;
     template class BtreeBucket<V0>;
     template class BtreeBucket<V1>;
+
+    struct BTUnitTest : public UnitTest {
+        void run() {
+            DiskLoc big(0xf12312, 0x70001234);
+            DiskLoc56Bit bigl;
+            {
+                bigl = big;
+                assert( big == bigl );
+                DiskLoc e = bigl;
+                assert( big == e );
+            }
+            {
+                DiskLoc d;
+                assert( d.isNull() );
+                DiskLoc56Bit l;
+                l = d;
+                assert( l.isNull() );
+                d = l;
+                assert( d.isNull() );
+                assert( l < bigl );
+            }
+        }
+    } btunittest;
 
 }

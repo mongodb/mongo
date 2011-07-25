@@ -22,6 +22,7 @@
 #include "../db/querypattern.h"
 #include "../db/queryutil.h"
 #include "../util/unittest.h"
+#include "../util/timer.h"
 
 #include "chunk.h"
 #include "config.h"
@@ -280,7 +281,7 @@ namespace mongo {
             warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
-            // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
+            // reloading won't strictly solve all problems, e.g. the collection's metadata lock can be taken
             // but we issue here so that mongos may refresh without needing to be written/read against
             _manager->reload();
 
@@ -343,7 +344,7 @@ namespace mongo {
                 return false;
 
             // this is a bit ugly
-            // we need it so that mongos blocks for the writes to actually be commited
+            // we need it so that mongos blocks for the writes to actually be committed
             // this does mean mongos has more back pressure than mongod alone
             // since it nots 100% tcp queue bound
             // this was implicit before since we did a splitVector on the same socket
@@ -364,7 +365,7 @@ namespace mongo {
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
                   << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
-                  << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
+                  << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
                   << endl;
 
@@ -503,7 +504,16 @@ namespace mongo {
         while (tries--) {
             ChunkMap chunkMap;
             set<Shard> shards;
-            _load(chunkMap, shards);
+            ShardVersionMap shardVersions;
+            Timer t;
+            _load(chunkMap, shards, shardVersions);
+            {
+                int ms = t.millis();
+                log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms" 
+                      << " sequenceNumber: " << _sequenceNumber 
+                      << " version: " << _version.toString() 
+                      << endl;
+            }
 
             if (_isValid(chunkMap)) {
                 // These variables are const for thread-safety. Since the
@@ -511,13 +521,16 @@ namespace mongo {
                 // to worry about that here.
                 const_cast<ChunkMap&>(_chunkMap).swap(chunkMap);
                 const_cast<set<Shard>&>(_shards).swap(shards);
+                const_cast<ShardVersionMap&>(_shardVersions).swap(shardVersions);
                 const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
                 return;
             }
-
+            
             if (_chunkMap.size() < 10) {
                 _printChunks();
             }
+            
+            warning() << "ChunkManager loaded an invalid config, trying again" << endl;
 
             sleepmillis(10 * (3-tries));
         }
@@ -530,11 +543,11 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
-    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards) const {
+    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions) {
         ScopedDbConnection conn( configServer.modelServer() );
 
         // TODO really need the sort?
-        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",1), 0, 0, 0, 0,
+        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",-1), 0, 0, 0, 0,
                                           (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
         assert( cursor.get() );
         while ( cursor->more() ) {
@@ -547,7 +560,16 @@ namespace mongo {
 
             chunkMap[c->getMax()] = c;
             shards.insert(c->getShard());
+            
 
+            // set global max
+            if ( c->getLastmod() > _version )
+                _version = c->getLastmod();
+            
+            // set shard max
+            ShardChunkVersion& shardMax = shardVersions[c->getShard()];
+            if ( c->getLastmod() > shardMax )
+                shardMax = c->getLastmod();
         }
         conn.done();
     }
@@ -691,7 +713,7 @@ namespace mongo {
             boost::scoped_ptr<FieldRangeSetPair> frsp (org.topFrsp());
             {
                 // special case if most-significant field isn't in query
-                FieldRange range = frsp->singleKeyRange(_key.key().firstElement().fieldName());
+                FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
                 if ( !range.nontrivial() ) {
                     DEV PRINT(range.nontrivial());
                     getAllShards(shards);
@@ -833,31 +855,14 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
-        // TODO: cache or something?
-
-        ShardChunkVersion max = 0;
-
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
-            ChunkPtr c = i->second;
-            DEV assert( c );
-            if ( c->getShard() != shard )
-                continue;
-            if ( c->getLastmod() > max )
-                max = c->getLastmod();
-        }
-        return max;
+        ShardVersionMap::const_iterator i = _shardVersions.find( shard );
+        if ( i == _shardVersions.end() )
+            return 0;
+        return i->second;
     }
 
     ShardChunkVersion ChunkManager::getVersion() const {
-        ShardChunkVersion max = 0;
-
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
-            ChunkPtr c = i->second;
-            if ( c->getLastmod() > max )
-                max = c->getLastmod();
-        }
-
-        return max;
+        return _version;
     }
 
     string ChunkManager::toString() const {

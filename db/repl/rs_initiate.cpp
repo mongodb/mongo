@@ -37,8 +37,8 @@ namespace mongo {
        throws
        @param initial true when initiating
     */
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
-        int failures = 0, majority = 0;
+    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial) {
+        int failures = 0, allVotes = 0, allowableFailures = 0;
         int me = 0;
         stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
@@ -50,11 +50,11 @@ namespace mongo {
                 if( !i->potentiallyHot() ) {
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
-                majority += i->votes;
             }
+            allVotes += i->votes;
         }
-        majority = (majority / 2) + 1;
-        
+        allowableFailures = allVotes - (allVotes/2 + 1);
+
         uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
@@ -64,6 +64,7 @@ namespace mongo {
             uasserted(13279, ss.str());
         }
 
+        vector<string> down;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             // we know we're up
             if (i->h.isSelf()) {
@@ -103,6 +104,8 @@ namespace mongo {
                     }
                 }
                 if( !ok && !res["rs"].trueValue() ) {
+                    down.push_back(i->h.toString());
+
                     if( !res.isEmpty() ) {
                         /* strange.  got a response, but not "ok". log it. */
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
@@ -110,7 +113,7 @@ namespace mongo {
 
                     bool allowFailure = false;
                     failures += i->votes;
-                    if( res.isEmpty() && !initial && failures >= majority ) {
+                    if( res.isEmpty() && !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
                             assert( m->h().toString() == i->h.toString() );
@@ -133,6 +136,9 @@ namespace mongo {
                 uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.",
                         !hasData || i->h.isSelf());
             }
+        }
+        if (down.size() > 0) {
+            result.append("down", down);
         }
     }
 
@@ -205,6 +211,7 @@ namespace mongo {
                 b.append("_id", name);
                 bob members;
                 members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::Me().toString() ));
+                result.append("me", HostAndPort::Me().toString());
                 for( unsigned i = 0; i < seeds.size(); i++ )
                     members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
                 b.appendArray("members", members.obj());
@@ -227,7 +234,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkMembersUpForConfigChange(newConfig, true);
+                checkMembersUpForConfigChange(newConfig, result, true);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 

@@ -47,7 +47,7 @@ namespace mongo {
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
-            void cleanup(bool log);
+            void cleanup(bool log); // closes and removes journal files
 
             unsigned long long curFileId() const { return _curFileId; }
 
@@ -67,8 +67,10 @@ namespace mongo {
 
             unsigned long long _written; // bytes written so far to the current journal (log) file
             unsigned _nextFileNumber;
-
+        public:
             mutex _curLogFileMutex;
+            bool _ageOut;
+        private:
 
             LogFile *_curLogFile; // use _curLogFileMutex
             unsigned long long _curFileId; // current file id see JHeader::fileId

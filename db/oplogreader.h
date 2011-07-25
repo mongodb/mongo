@@ -40,7 +40,7 @@ namespace mongo {
         /* ok to call if already connected */
         bool connect(string hostname);
 
-        bool connect(const string& from, const string& to);
+        bool connect(const BSONObj& rid, const int from, const string& to);
 
 
         void tailCheck() {
@@ -110,17 +110,13 @@ namespace mongo {
 
         BSONObj nextSafe() { return cursor->nextSafe(); }
 
-        BSONObj next() {
-            return cursor->next();
-        }
+        BSONObj next() { return cursor->next(); }
 
-        void putBack(BSONObj op) {
-            cursor->putBack(op);
-        }
+        void putBack(BSONObj op) { cursor->putBack(op); }
 
     private:
         bool commonConnect(const string& hostName);
-        bool passthroughHandshake(const string& f);
+        bool passthroughHandshake(const BSONObj& rid, const int f);
     };
 
 }

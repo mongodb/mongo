@@ -22,6 +22,163 @@
 
 namespace mongo {
 
+    extern const Ordering nullOrdering = Ordering::make(BSONObj());
+
+    // KeyBson is for V0 (version #0) indexes
+
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o);
+
+    // "old" = pre signed dates & such; i.e. btree V0
+    /* must be same canon type when called */
+    int oldCompareElementValues(const BSONElement& l, const BSONElement& r) {
+        dassert( l.canonicalType() == r.canonicalType() );
+        int f;
+        double x;
+
+        switch ( l.type() ) {
+        case EOO:
+        case Undefined: // EOO and Undefined are same canonicalType
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+            return 0;
+        case Bool:
+            return *l.value() - *r.value();
+        case Timestamp:
+        case Date:
+            // unsigned dates for old version
+            if ( l.date() < r.date() )
+                return -1;
+            return l.date() == r.date() ? 0 : 1;
+        case NumberLong:
+            if( r.type() == NumberLong ) {
+                long long L = l._numberLong();
+                long long R = r._numberLong();
+                if( L < R ) return -1;
+                if( L == R ) return 0;
+                return 1;
+            }
+            // else fall through
+        case NumberInt:
+        case NumberDouble: {
+            double left = l.number();
+            double right = r.number();
+            bool lNan = !( left <= numeric_limits< double >::max() &&
+                           left >= -numeric_limits< double >::max() );
+            bool rNan = !( right <= numeric_limits< double >::max() &&
+                           right >= -numeric_limits< double >::max() );
+            if ( lNan ) {
+                if ( rNan ) {
+                    return 0;
+                }
+                else {
+                    return -1;
+                }
+            }
+            else if ( rNan ) {
+                return 1;
+            }
+            x = left - right;
+            if ( x < 0 ) return -1;
+            return x == 0 ? 0 : 1;
+        }
+        case jstOID:
+            return memcmp(l.value(), r.value(), 12);
+        case Code:
+        case Symbol:
+        case String:
+            // nulls not allowed in the middle of strings in the old version
+            return strcmp(l.valuestr(), r.valuestr());
+        case Object:
+        case Array:
+            return oldCompare(l.embeddedObject(), r.embeddedObject(), nullOrdering);
+        case DBRef: {
+            int lsz = l.valuesize();
+            int rsz = r.valuesize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value(), r.value(), lsz);
+        }
+        case BinData: {
+            int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
+            int rsz = r.objsize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value()+4, r.value()+4, lsz+1);
+        }
+        case RegEx: {
+            int c = strcmp(l.regex(), r.regex());
+            if ( c )
+                return c;
+            return strcmp(l.regexFlags(), r.regexFlags());
+        }
+        case CodeWScope : {
+            f = l.canonicalType() - r.canonicalType();
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            if ( f )
+                return f;
+            return 0;
+        }
+        default:
+            out() << "oldCompareElementValues: bad type " << (int) l.type() << endl;
+            assert(false);
+        }
+        return -1;
+    }
+
+    int oldElemCompare(const BSONElement&l , const BSONElement& r) { 
+        int lt = (int) l.canonicalType();
+        int rt = (int) r.canonicalType();
+        int x = lt - rt;
+        if( x )
+            return x;
+        return oldCompareElementValues(l, r);
+    }
+
+    // pre signed dates & such
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o) {
+        BSONObjIterator i(l);
+        BSONObjIterator j(r);
+        unsigned mask = 1;
+        while ( 1 ) {
+            // so far, equal...
+
+            BSONElement l = i.next();
+            BSONElement r = j.next();
+            if ( l.eoo() )
+                return r.eoo() ? 0 : -1;
+            if ( r.eoo() )
+                return 1;
+
+            int x;
+            {
+                x = oldElemCompare(l, r);
+                if( o.descending(mask) )
+                    x = -x;
+            }
+            if ( x != 0 )
+                return x;
+            mask <<= 1;
+        }
+        return -1;
+    }
+
+    /* old style compares:
+       - dates are unsigned 
+       - strings no nulls
+    */
+    int KeyBson::woCompare(const KeyBson& r, const Ordering &o) const { 
+        return oldCompare(_o, r._o, o); 
+    }
+
+    // woEqual could be made faster than woCompare but this is for backward compatibility so not worth a big effort
+    bool KeyBson::woEqual(const KeyBson& r) const { 
+        return oldCompare(_o, r._o, nullOrdering) == 0;
+    }
+
     // [ ][HASMORE][x][y][canontype_4bits]
     enum CanonicalsEtc { 
         cminkey=1,
@@ -78,7 +235,6 @@ namespace mongo {
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
         BSONObj::iterator i(obj);
-        assert( i.more() );
         unsigned char bits = 0;
         while( 1 ) { 
             BSONElement e = i.next();
@@ -158,14 +314,13 @@ namespace mongo {
             case NumberDouble:
                 {
                     double d = e._numberDouble();
-                    bool nan = !( d <= numeric_limits< double >::max() &&
-                        d >= -numeric_limits< double >::max() );
-                    if( !nan ) { 
-                        b.appendUChar(cdouble|bits);
-                        b.appendNum(d);
-                        break;
+                    if( isNaN(d) ) {
+                        traditional(obj);
+                        return;
                     }
-                    // else fall through and return a traditional BSON obj so our compressed keys need not check for nan
+                    b.appendUChar(cdouble|bits);
+                    b.appendNum(d);
+                    break;
                 }
             default:
                 // if other types involved, store as traditional BSON
@@ -269,7 +424,7 @@ namespace mongo {
                 double R = *((double *) r);
                 if( L < R )
                     return -1;
-                if( L > R )
+                if( L != R )
                     return 1;
                 l += 8; r += 8;
                 break;
@@ -289,14 +444,6 @@ namespace mongo {
                 if( diff ) 
                     return diff;
                 l += lsz; r += lsz;
-                break;
-            }
-        case coid:
-            {
-                int res = memcmp(l, r, sizeof(OID));
-                if( res ) 
-                    return res;
-                l += 12; r += 12;
                 break;
             }
         case cbindata:
@@ -324,6 +471,14 @@ namespace mongo {
                 if( L > R )
                     return 1;
                 l += 8; r += 8;
+                break;
+            }
+        case coid:
+            {
+                int res = memcmp(l, r, sizeof(OID));
+                if( res ) 
+                    return res;
+                l += 12; r += 12;
                 break;
             }
         default:
@@ -429,7 +584,7 @@ namespace mongo {
         const unsigned char *r = right._keyData;
 
         if( (*l|*r) == IsBSON ) {
-            return toBson().woEqual(right.toBson());
+            return toBson().equal(right.toBson());
         }
 
         while( 1 ) { 

@@ -191,11 +191,11 @@ namespace mongo {
         /** throws userassertion "no master found" */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        virtual void insert( const string &ns , BSONObj obj );
+        virtual void insert( const string &ns , BSONObj obj , int flags=0);
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
         virtual void remove( const string &ns , Query obj , bool justOne = 0 );
 
@@ -210,17 +210,28 @@ namespace mongo {
 
         // ---- callback pieces -------
 
-        virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
+        virtual void say( Message &toSend, bool isRetry = false );
+        virtual bool recv( Message &toRecv );
+        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL );
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster();
+
+        /* this is used to indicate we got a "not master or secondary" error from a secondary.
+         */
+        void isntSecondary();
 
         // ----- status ------
 
         virtual bool isFailed() const { return ! _master || _master->isFailed(); }
 
         // ----- informational ----
+
+        /**
+         * timeout not supported in DBClientReplicaSet yet
+         */
+        double getSoTimeout() const { return 0; }
 
         string toString() { return getServerAddress(); }
 
@@ -231,15 +242,16 @@ namespace mongo {
         // ---- low level ------
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
-        virtual DBClientBase* callLazy( Message& toSend );
 
 
     protected:
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
+
+        // Used to simplify slave-handling logic on errors
+        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();
@@ -272,6 +284,22 @@ namespace mongo {
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
         list<AuthInfo> _auths;
+
+    protected:
+
+        /**
+         * for storing (non-threadsafe) information between lazy calls
+         */
+        class LazyState {
+        public:
+            LazyState() : _lastClient( NULL ), _lastOp( -1 ), _slaveOk( false ), _retries( 0 ) {}
+            DBClientConnection* _lastClient;
+            int _lastOp;
+            bool _slaveOk;
+            int _retries;
+
+        } _lazyState;
+
     };
 
 

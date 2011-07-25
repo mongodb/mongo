@@ -15,8 +15,7 @@
  *    limitations under the License.
  */
 
-#ifndef BSON_STRINDATA_HEADER
-#define BSON_STRINDATA_HEADER
+#pragma once
 
 #include <string>
 #include <cstring>
@@ -25,29 +24,31 @@ namespace mongo {
 
     using std::string;
 
-    // A StringData object wraps a 'const string&' or a 'const char*' without
-    // copying its contents. The most common usage is as a function argument that
-    // takes any of the two forms of strings above. Fundamentally, this class tries
-    // go around the fact that string literals in C++ are char[N]'s.
-    //
-    // Note that the object StringData wraps around must be alive while the StringData
-    // is.
-
+    /** A StringData object wraps a 'const string&' or a 'const char*' without
+     * copying its contents. The most common usage is as a function argument that
+     * takes any of the two forms of strings above. Fundamentally, this class tries
+     * go around the fact that string literals in C++ are char[N]'s.
+     *
+     * Note that the object StringData wraps around must be alive while the StringData
+     * is.
+    */
     class StringData {
     public:
-        // Construct a StringData explicilty, for the case where the lenght of
-        // string is not known. 'c' must be a pointer to a null-terminated string.
+        /** Construct a StringData, for the case where the length of
+         * string is not known. 'c' must be a pointer to a null-terminated string.
+         */
         StringData( const char* c )
             : _data(c), _size((unsigned) strlen(c)) {}
 
-        // Construct a StringData explicitly, for the case where the length of the string
-        // is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc
-        // must be the length that std::strlen(c) would return, a.k.a the index of the
-        // terminator in c.
-        StringData( const char* c, size_t strlenOfc )
-            : _data(c), _size((unsigned) strlenOfc) {}
+        /** Construct a StringData explicitly, for the case where the length of the string
+         * is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc
+         * must be the length that std::strlen(c) would return, a.k.a the index of the
+         * terminator in c.
+         */
+        StringData( const char* c, unsigned len )
+            : _data(c), _size(len) {}
 
-        // Construct a StringData explicitly, for the case of a std::string.
+        /** Construct a StringData, for the case of a std::string. */
         StringData( const string& s )
             : _data(s.c_str()), _size((unsigned) s.size()) {}
 
@@ -59,19 +60,12 @@ namespace mongo {
             : _data(&val[0]), _size(N-1) {}
 
         // accessors
-
         const char* const data() const { return _data; }
         const unsigned size() const { return _size; }
 
     private:
-        // There are two assumptions we use bellow.
-        // '_data' *always* finishes with a null terminator
-        // 'size' does *not* account for the null terminator
-        // These assumptions may make it easier to minimize changes to existing code.
-        const char* const _data;
-        const unsigned    _size;
+        const char* const _data;  // is always null terminated
+        const unsigned    _size;  // 'size' does not include the null terminator
     };
 
 } // namespace mongo
-
-#endif  // BSON_STRINGDATA_HEADER

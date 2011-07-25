@@ -23,6 +23,7 @@
 #include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"
+#include "ops/query.h"
 
 namespace mongo {
 

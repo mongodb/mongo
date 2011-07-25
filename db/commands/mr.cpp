@@ -69,7 +69,7 @@ namespace mongo {
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             assert( s );
-            if ( s->invoke( _func.func() , &_params, &o , 0 , true ) )
+            if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
 
@@ -267,7 +267,7 @@ namespace mongo {
             }
 
             if ( outType != INMEMORY ) { // setup names
-                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
+                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << JOB_NUMBER++;
 
                 incLong = tempLong + "_inc";
 
@@ -320,10 +320,25 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            _db.dropCollection( _config.tempLong );
+            if (_config.incLong != _config.tempLong) {
+                // create the inc collection and make sure we have index on "0" key
+                _db.dropCollection( _config.incLong );
+                {
+                    writelock l( _config.incLong );
+                    Client::Context ctx( _config.incLong );
+                    string err;
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+                    }
+                }
 
+                BSONObj sortKey = BSON( "0" << 1 );
+                _db.ensureIndex( _config.incLong , sortKey );
+            }
+
+            // create temp collection
+            _db.dropCollection( _config.tempLong );
             {
-                // create
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
@@ -331,7 +346,6 @@ namespace mongo {
                     uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
                 }
             }
-
 
             {
                 // copy indexes
@@ -479,6 +493,15 @@ namespace mongo {
         }
 
         /**
+         * Insert doc into the inc collection, taking proper lock
+         */
+        void State::insertToInc( BSONObj& o ) {
+            writelock l(_config.incLong);
+            Client::Context ctx(_config.incLong);
+            _insertToInc(o);
+        }
+
+        /**
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
@@ -553,26 +576,6 @@ namespace mongo {
             _reduceAndEmit = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; } emit(key, ret); }; delete _mrMap;");
             _reduceAndFinalize = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
             _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } _nativeToTemp({_id: key, value: ret}); }");
-
-            if ( _onDisk ) {
-                // clear temp collections
-                _db.dropCollection( _config.tempLong );
-                _db.dropCollection( _config.incLong );
-
-                // create the inc collection and make sure we have index on "0" key
-                {
-                    writelock l( _config.incLong );
-                    Client::Context ctx( _config.incLong );
-                    string err;
-                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
-                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
-                    }
-                }
-
-                BSONObj sortKey = BSON( "0" << 1 );
-                _db.ensureIndex( _config.incLong , sortKey );
-
-            }
 
         }
 
@@ -716,8 +719,16 @@ namespace mongo {
                 }
 
                 ClientCursor::YieldLock yield (cursor.get());
-                // reduce an finalize array
-                finalReduce( all );
+
+                try {
+                    // reduce a finalize array
+                    finalReduce( all );
+                }
+                catch (...) {
+                    yield.relock();
+                    cursor.release();
+                    throw;
+                }
 
                 all.clear();
                 prev = o;
@@ -955,6 +966,7 @@ namespace mongo {
 
                 try {
                     state.init();
+                    state.prepTempCollection();
 
                     {
                         State** s = new State*();
@@ -1047,7 +1059,6 @@ namespace mongo {
                     state.reduceInMemory();
                     // if not inline: dump the in memory map to inc collection, all data is on disk
                     state.dumpToInc();
-                    state.prepTempCollection();
                     // final reduce
                     state.finalReduce( op , pm );
                     inReduce += t.micros();
@@ -1107,111 +1118,125 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
+                string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
+                bool postProcessOnly = !(postProcessCollection.empty());
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
+                State state(config);
+                state.init();
+                if (postProcessOnly) {
+                    // the temp collection has been decided by mongos
+                    config.tempLong = dbname + "." + postProcessCollection;
+                }
+                // no need for incremental collection because records are already sorted
                 config.incLong = config.tempLong;
 
-                set<ServerAndQuery> servers;
-
-                BSONObjBuilder shardCounts;
-                map<string,long long> counts;
-
                 BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
-                vector< auto_ptr<DBClientCursor> > shardCursors;
+                BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
+                BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
-                {
-                    // parse per shard results
-                    BSONObjIterator i( shards );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        string shard = e.fieldName();
+                if (postProcessOnly) {
+                    if (!state._db.exists(config.tempLong)) {
+                        // nothing to do
+                        return 1;
+                    }
+                } else {
+                    set<ServerAndQuery> servers;
+                    vector< auto_ptr<DBClientCursor> > shardCursors;
 
-                        BSONObj res = e.embeddedObjectUserCheck();
+                    {
+                        // parse per shard results
+                        BSONObjIterator i( shards );
+                        while ( i.more() ) {
+                            BSONElement e = i.next();
+                            string shard = e.fieldName();
 
-                        uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
-                        servers.insert( shard );
-                        shardCounts.appendAs( res["counts"] , shard );
+                            BSONObj res = e.embeddedObjectUserCheck();
 
-                        BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
-                        while ( j.more() ) {
-                            BSONElement temp = j.next();
-                            counts[temp.fieldName()] += temp.numberLong();
+                            uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
+                            servers.insert( shard );
+
                         }
 
                     }
 
+                    state.prepTempCollection();
+
+                    {
+                        // reduce from each stream
+
+                        BSONObj sortKey = BSON( "_id" << 1 );
+
+                        ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
+                                                            Query().sort( sortKey ) );
+                        cursor.init();
+
+                        BSONList values;
+                        if (!config.outDB.empty()) {
+                            BSONObjBuilder loc;
+                            if ( !config.outDB.empty())
+                                loc.append( "db" , config.outDB );
+                            if ( !config.finalShort.empty() )
+                                loc.append( "collection" , config.finalShort );
+                            result.append("result", loc.obj());
+                        }
+                        else {
+                            if ( !config.finalShort.empty() )
+                                result.append( "result" , config.finalShort );
+                        }
+
+                        while ( cursor.more() || !values.empty() ) {
+                            BSONObj t;
+                            if (cursor.more()) {
+                                t = cursor.next().getOwned();
+
+                                if ( values.size() == 0 ) {
+                                    values.push_back( t );
+                                    continue;
+                                }
+
+                                if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
+                                    values.push_back( t );
+                                    continue;
+                                }
+                            }
+
+                            BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                            if (state.isOnDisk())
+                                state.insertToInc(res);
+                            else
+                                state.emit(res);
+                            values.clear();
+                            if (!t.isEmpty())
+                                values.push_back( t );
+                        }
+                    }
+
+                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn( i->_server );
+                        conn->dropCollection( dbname + "." + shardedOutputCollection );
+                        conn.done();
+                    }
+
+                    result.append( "shardCounts" , shardCounts );
                 }
 
-                State state(config);
-                state.prepTempCollection();
-
-                {
-                    // reduce from each stream
-
-                    BSONObj sortKey = BSON( "_id" << 1 );
-
-                    ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
-                                                        Query().sort( sortKey ) );
-                    cursor.init();
-                    state.init();
-
-                    BSONList values;
-                    if (!config.outDB.empty()) {
-                        BSONObjBuilder loc;
-                        if ( !config.outDB.empty())
-                            loc.append( "db" , config.outDB );
-                        if ( !config.finalShort.empty() )
-                            loc.append( "collection" , config.finalShort );
-                        result.append("result", loc.obj());
-                    }
-                    else {
-                        if ( !config.finalShort.empty() )
-                            result.append( "result" , config.finalShort );
-                    }
-
-                    while ( cursor.more() ) {
-                        BSONObj t = cursor.next().getOwned();
-
-                        if ( values.size() == 0 ) {
-                            values.push_back( t );
-                            continue;
-                        }
-
-                        if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                            values.push_back( t );
-                            continue;
-                        }
-
-
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
-                        values.clear();
-                        values.push_back( t );
-                    }
-
-                    if ( values.size() )
-                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
-                }
-
-
-                state.dumpToInc();
-                state.postProcessCollection();
+                long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
 
-                for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                    ScopedDbConnection conn( i->_server );
-                    conn->dropCollection( dbname + "." + shardedOutputCollection );
-                    conn.done();
+                // fix the global counts
+                BSONObjBuilder countsB(32);
+                BSONObjIterator j(counts);
+                while (j.more()) {
+                    BSONElement elmt = j.next();
+                    if (!strcmp(elmt.fieldName(), "reduce"))
+                        countsB.append("reduce", elmt.numberLong() + state.numReduces());
+                    else if (!strcmp(elmt.fieldName(), "output"))
+                        countsB.append("output", finalCount);
+                    else
+                        countsB.append(elmt);
                 }
-
-                result.append( "shardCounts" , shardCounts.obj() );
-
-                {
-                    BSONObjBuilder c;
-                    for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); i++ ) {
-                        c.append( i->first , i->second );
-                    }
-                    result.append( "counts" , c.obj() );
-                }
+                result.append( "counts" , countsB.obj() );
 
                 return 1;
             }

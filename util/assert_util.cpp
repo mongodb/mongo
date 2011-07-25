@@ -62,11 +62,10 @@ namespace mongo {
             b.append( c , code );
     }
 
-
     string getDbContext();
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
-    void wasserted(const char *msg, const char *file, unsigned line) {
+    NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
         problem() << "warning Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
@@ -78,7 +77,7 @@ namespace mongo {
 #endif
     }
 
-    void asserted(const char *msg, const char *file, unsigned line) {
+    NOINLINE_DECL void asserted(const char *msg, const char *file, unsigned line) {
         assertionCount.condrollover( ++assertionCount.regular );
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
@@ -95,17 +94,35 @@ namespace mongo {
         throw e;
     }
 
+    NOINLINE_DECL void verifyFailed( int msgid ) {
+        assertionCount.condrollover( ++assertionCount.regular );
+        problem() << "Assertion failure " << msgid << endl;
+        sayDbContext();
+        raiseError(0,"assertion failure");
+        stringstream temp;
+        temp << msgid;
+        AssertionException e(temp.str(),0);
+        breakpoint();
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+        // this is so we notice in buildbot
+        log() << "\n\n***aborting after verify() failure in a debug/test build\n\n" << endl;
+        abort();
+#endif
+        throw e;
+    }
+
     void uassert_nothrow(const char *msg) {
         raiseError(0,msg);
     }
 
-    void uasserted(int msgid, const char *msg) {
+    NOINLINE_DECL void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
+        LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg);
         throw UserException(msgid, msg);
     }
 
-    void msgasserted(int msgid, const char *msg) {
+    NOINLINE_DECL void msgasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         tlog() << "Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg && *msg ? msg : "massert failure");
@@ -114,14 +131,14 @@ namespace mongo {
         throw MsgAssertionException(msgid, msg);
     }
 
-    void msgassertedNoTrace(int msgid, const char *msg) {
+    NOINLINE_DECL void msgassertedNoTrace(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         log() << "Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
     }
 
-    void streamNotGood( int code , string msg , std::ios& myios ) {
+    NOINLINE_DECL void streamNotGood( int code , string msg , std::ios& myios ) {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here
@@ -151,6 +168,23 @@ namespace mongo {
         free(niceName);
         return s;
 #endif
+    }
+
+    NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, char ch) {
+        int l = strlen(msg);
+        assert( l < 128);
+        memcpy(buf, msg, l);
+        char *p = buf + l;
+        p[0] = ch;
+        p[1] = 0;
+    }
+
+    NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, unsigned val) {
+        int l = strlen(msg);
+        assert( l < 128);
+        memcpy(buf, msg, l);
+        char *p = buf + l;
+        sprintf(p, "%u", val);
     }
 
 }

@@ -52,6 +52,7 @@ namespace mongo {
             RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len());
         }
 
+#if 0
         // the old implementation.  doesn't work with groupCommitWithLimitedLocks()
         void WRITETODATAFILES_Impl2() {
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
@@ -62,6 +63,7 @@ namespace mongo {
                 memcpy(intent.w_ptr, intent.start(), intent.length());
             }
         }
+#endif
 
 #if defined(_EXPERIMENTAL)
         // doesn't work with groupCommitWithLimitedLocks()

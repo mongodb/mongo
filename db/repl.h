@@ -30,7 +30,6 @@
 #include "pdfile.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "query.h"
 #include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "oplog.h"
@@ -58,8 +57,11 @@ namespace mongo {
 
         int slavedelay;
 
+        set<string> discoveredSeeds;
+        BSONObj reconfig;
+
         ReplSettings()
-            : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay() {
+            : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay(), discoveredSeeds() {
         }
 
     };
@@ -83,7 +85,7 @@ namespace mongo {
        not done (always use main for now).
     */
     class ReplSource {
-        auto_ptr<ThreadPool> tp;
+        shared_ptr<ThreadPool> tp;
 
         void resync(string db);
 

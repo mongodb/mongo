@@ -20,7 +20,7 @@
 
 #include "../db/commands.h"
 #include "../util/queue.h"
-#include "../util/message.h"
+#include "../util/net/listen.h"
 
 #include "d_writeback.h"
 
@@ -165,7 +165,7 @@ namespace mongo {
 
         void help(stringstream& help) const {
             help << "Returns whether there are operations in the writeback queue at the time the command was called. "
-                 << "This is an internal comand";
+                 << "This is an internal command";
         }
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {

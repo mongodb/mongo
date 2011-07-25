@@ -21,6 +21,11 @@ function g() {
     t.save( { x:[7,8,9], z:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
 
     t.remove( {x : {$gte:3}, $atomic:x++ } );
+    
+    assert( !db.getLastError() );
+    // $atomic within $and is not allowed.
+    t.remove( {x : {$gte:3}, $and:[{$atomic:true}] } );
+    assert( db.getLastError() );
 
     assert( t.findOne({x:3}) == null );
     assert( t.findOne({x:8}) == null );

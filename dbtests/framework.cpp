@@ -180,6 +180,8 @@ namespace mongo {
             }
         };
 
+        unsigned perfHist = 1;
+
         int Suite::run( int argc , char** argv , string default_dbpath ) {
             unsigned long long seed = time( 0 );
             string dbpathSpec;
@@ -202,6 +204,7 @@ namespace mongo {
             ("dur", "enable journaling")
             ("nodur", "disable journaling (currently the default)")
             ("seed", po::value<unsigned long long>(&seed), "random number seed")
+            ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
             ;
 
             hidden_options.add_options()
@@ -235,7 +238,9 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
+            bool nodur = false;
             if( params.count("nodur") ) {
+                nodur = true;
                 cmdLine.dur = false;
             }
             if( params.count("dur") || cmdLine.dur ) {
@@ -289,7 +294,17 @@ namespace mongo {
             srand( (unsigned) seed );
             printGitVersion();
             printSysInfo();
+            DEV log() << "_DEBUG build" << endl;
+            if( sizeof(void*)==4 )
+                log() << "32bit" << endl;
             log() << "random seed: " << seed << endl;
+
+            if( time(0) % 3 == 0 && !nodur ) {
+                cmdLine.dur = true;
+                log() << "****************" << endl;
+                log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
+                log() << "****************" << endl;
+            }
 
             FileAllocator::get()->start();
 
@@ -306,8 +321,9 @@ namespace mongo {
             dur::startup();
 
             if( debug && cmdLine.dur ) {
-                cout << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
-//                cmdLine.durOptions |= 8;
+                log() << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
+                // this was commented out.  why too slow or something? : 
+                cmdLine.durOptions |= 8;
             }
 
             TestWatchDog twd;
@@ -351,8 +367,6 @@ namespace mongo {
 
             Logstream::get().flush();
 
-            cout << "**************************************************" << endl;
-            cout << "**************************************************" << endl;
             cout << "**************************************************" << endl;
 
             int rc = 0;

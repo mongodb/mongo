@@ -9,10 +9,24 @@ chatty = function(s){
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
+    
+    a = tojson(a,false,true);
+    b = tojson(b,false,true);
 
-    if ( tojson( a ) == tojson( b ) )
+    if ( a == b )
         return true;
 
+    var clean = function( s ){
+        s = s.replace( /NumberInt\((\-?\d+)\)/g , "$1" );
+        return s;
+    }
+    
+    a = clean(a);
+    b = clean(b);
+
+    if ( a == b )
+        return true;
+    
     return false;
 }
 
@@ -35,10 +49,8 @@ doassert = function (msg) {
 
 assert = function( b , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
-
     if ( b )
-        return;
-    
+        return;    
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
@@ -370,20 +382,25 @@ Array.shuffle = function( arr ){
 }
 
 
-Array.tojson = function( a , indent ){
+Array.tojson = function( a , indent , nolint ){
+    var lineEnding = nolint ? " " : "\n";
+
     if (!indent) 
+        indent = "";
+    
+    if ( nolint )
         indent = "";
 
     if (a.length == 0) {
         return "[ ]";
     }
 
-    var s = "[\n";
+    var s = "[" + lineEnding;
     indent += "\t";
     for ( var i=0; i<a.length; i++){
-        s += indent + tojson( a[i], indent );
+        s += indent + tojson( a[i], indent , nolint );
         if ( i < a.length - 1 ){
-            s += ",\n";
+            s += "," + lineEnding;
         }
     }
     if ( a.length == 0 ) {
@@ -391,7 +408,7 @@ Array.tojson = function( a , indent ){
     }
 
     indent = indent.substring(1);
-    s += "\n"+indent+"]";
+    s += lineEnding+indent+"]";
     return s;
 }
 
@@ -456,6 +473,14 @@ if ( ! NumberLong.prototype ) {
 }
 
 NumberLong.prototype.tojson = function() {
+    return this.toString();
+}
+
+if ( ! NumberInt.prototype ) {
+    NumberInt.prototype = {}
+}
+
+NumberInt.prototype.tojson = function() {
     return this.toString();
 }
 
@@ -533,16 +558,24 @@ if ( typeof( BinData ) != "undefined" ){
         //return "BinData type: " + this.type + " len: " + this.len;
         return this.toString();
     }
+    
+    BinData.prototype.subtype = function () {
+        return this.type;
+    }
+    
+    BinData.prototype.length = function () {
+        return this.len;
+    }    
 }
 else {
     print( "warning: no BinData class" );
 }
 
-if ( typeof( UUID ) != "undefined" ){
+/*if ( typeof( UUID ) != "undefined" ){
     UUID.prototype.tojson = function () {
         return this.toString();
     }
-}
+}*/
 
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
@@ -667,7 +700,9 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/killop.js",
                                    "jstests/run_program1.js",
                                    "jstests/notablescan.js",
-                                   "jstests/drop2.js"] );
+                                   "jstests/drop2.js",
+                                   "jstests/dropdb_race.js",
+                                   "jstests/bench_test1.js"] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
@@ -956,7 +991,6 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
 
     builtinMethods[Mongo] = "find update insert remove".split(' ');
     builtinMethods[BinData] = "hex base64 length subtype".split(' ');
-    builtinMethods[NumberLong] = "toNumber".split(' ');
 
     var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
 
@@ -1390,9 +1424,13 @@ rs._runCmd = function (c) {
     }
     return res;
 }
-rs.reconfig = function (cfg) {
+rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
-    return this._runCmd({ replSetReconfig: cfg });
+    cmd = { replSetReconfig: cfg };
+    for (var i in options) {
+        cmd[i] = options[i];
+    }
+    return this._runCmd(cmd);
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1419,6 +1457,7 @@ rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs 
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
+rs.config = function () { return rs.conf(); }
 
 rs.remove = function (hn) {
     var local = db.getSisterDB("local");
@@ -1486,6 +1525,10 @@ help = shellHelper.help = function (x) {
         print("\tb.hex()                             the data as a hex encoded string");
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
+        print();
+        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
+        print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");

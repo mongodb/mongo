@@ -245,6 +245,10 @@ def skipTest(path):
     return False
 
 def runTest(test):
+    # test is a tuple of ( filename , usedb<bool> )
+    # filename should be a js file to run
+    # usedb is true if the test expects a mongod to be running
+
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
     if skipTest(path):

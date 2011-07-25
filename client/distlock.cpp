@@ -110,11 +110,11 @@ namespace mongo {
                     // replace it for a quite a while)
                     // if the lock is taken, the take-over mechanism should handle the situation
                     auto_ptr<DBClientCursor> c = conn->query( DistributedLock::locksNS , BSONObj() );
-                    vector<string> pids;
+                    set<string> pids;
                     while ( c->more() ) {
                         BSONObj lock = c->next();
                         if ( ! lock["process"].eoo() ) {
-                            pids.push_back( lock["process"].valuestrsafe() );
+                            pids.insert( lock["process"].valuestrsafe() );
                         }
                     }
 
@@ -523,7 +523,7 @@ namespace mongo {
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
                     bool recPingChange = o["state"].numberInt() == 2 && ( _lastPingCheck.get<0>() != lastPing["_id"].String() || _lastPingCheck.get<1>() != lastPing["ping"].Date() );
-                    bool recTSChange = o["state"].numberInt() == 1 && _lastPingCheck.get<3>() != o["ts"].OID();
+                    bool recTSChange = _lastPingCheck.get<3>() != o["ts"].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
@@ -848,7 +848,7 @@ namespace mongo {
 
         // Log our lock results
         if(gotLock)
-            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, now : " << currLock << endl;
+            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
         else
             log( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 

@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"
@@ -38,7 +37,7 @@
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"
-#include "../util/message_server.h"
+#include "../util/net/message_server.h"
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
@@ -140,7 +139,7 @@ namespace mongo {
 #endif
 
     void sysRuntimeInfo() {
-        out() << "sysinfo:\n";
+        out() << "sysinfo:" << endl;
 #if defined(_SC_PAGE_SIZE)
         out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
 #endif
@@ -429,6 +428,7 @@ namespace mongo {
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
+        printCommandLineOpts();
 
         {
             stringstream ss;
@@ -549,6 +549,7 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
+    doPreServerStatupInits();
     getcurns = ourgetns;
 
     po::options_description general_options("General options");
@@ -576,17 +577,12 @@ int main(int argc, char* argv[]) {
     ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
-    ("maxConns",po::value<int>(), "max number of simultaneous connections")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
-#if !defined(_WIN32)
-    ("nounixsocket", "disable listening on unix sockets")
-#endif
     ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-    ("objcheck", "inspect client data for validity on receipt")
     ("profile",po::value<int>(), "0=off 1=slow, 2=all")
     ("quota", "limits each database to a certain number of files (8 default)")
     ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
@@ -595,6 +591,9 @@ int main(int argc, char* argv[]) {
     ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
     ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
     ("smallfiles", "use a smaller default file size")
+#if defined(__linux__)
+    ("shutdown", "kill a running server (for init scripts)")
+#endif
     ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
@@ -606,7 +605,6 @@ int main(int argc, char* argv[]) {
 
     replication_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("autoresync", "automatically resync if slave data is stale")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
     ;
 
@@ -616,6 +614,7 @@ int main(int argc, char* argv[]) {
     ("source", po::value<string>(), "when slave: specify master as <server:port>")
     ("only", po::value<string>(), "when slave: specify a single database to replicate")
     ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
+    ("autoresync", "automatically resync if slave data is stale")
     ;
 
     rs_options.add_options()
@@ -749,9 +748,6 @@ int main(int argc, char* argv[]) {
         if (params.count("journalOptions")) {
             cmdLine.durOptions = params["journalOptions"].as<int>();
         }
-        if (params.count("objcheck")) {
-            objcheck = true;
-        }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
@@ -799,10 +795,12 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         if (params.count("repair")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
             forceRepair = 1;
         }
         if (params.count("upgrade")) {
+            Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
         }
         if (params.count("notablescan")) {
@@ -822,6 +820,11 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
+            if( params.count("replSet") ) {
+                out() << "--autoresync is not used with --replSet" << endl;
+                out() << "see http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -900,28 +903,13 @@ int main(int argc, char* argv[]) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
             }
-            if ( params.count( "diaglog" ) == 0 )
-                _diaglog.level = 1;
+            if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
+                cmdLine.dur = true;
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
-        }
-        if ( params.count( "maxConns" ) ) {
-            int newSize = params["maxConns"].as<int>();
-            if ( newSize < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            else if ( newSize >= 10000000 ) {
-                out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            connTicketHolder.resize( newSize );
-        }
-        if (params.count("nounixsocket")) {
-            noUnixSocket = true;
         }
         if (params.count("ipv6")) {
             enableIPv6();
@@ -970,6 +958,67 @@ int main(int argc, char* argv[]) {
 
         if( cmdLine.pretouch )
             log() << "--pretouch " << cmdLine.pretouch << endl;
+
+#ifdef __linux__
+        if (params.count("shutdown")){
+            bool failed = false;
+
+            string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+            if ( !boost::filesystem::exists( name ) || boost::filesystem::file_size( name ) == 0 )
+                failed = true;
+
+            pid_t pid;
+            string procPath;
+            if (!failed){
+                try {
+                    ifstream f (name.c_str());
+                    f >> pid;
+                    procPath = (str::stream() << "/proc/" << pid);
+                    if (!boost::filesystem::exists(procPath))
+                        failed = true;
+
+                    string exePath = procPath + "/exe";
+                    if (boost::filesystem::exists(exePath)){
+                        char buf[256];
+                        int ret = readlink(exePath.c_str(), buf, sizeof(buf)-1);
+                        buf[ret] = '\0'; // readlink doesn't terminate string
+                        if (ret == -1) {
+                            int e = errno;
+                            cerr << "Error resolving " << exePath << ": " << errnoWithDescription(e);
+                            failed = true;
+                        }
+                        else if (!endsWith(buf, "mongod")){
+                            cerr << "Process " << pid << " is running " << buf << " not mongod" << endl;
+                            ::exit(-1);
+                        }
+                    }
+                }
+                catch (const std::exception& e){
+                    cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
+                    failed = true;
+                }
+            }
+
+            if (failed) {
+                cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
+                ::exit(-1);
+            }
+
+            cout << "killing process with pid: " << pid << endl;
+            int ret = kill(pid, SIGTERM);
+            if (ret) {
+                int e = errno;
+                cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
+                ::exit(-1);
+            }
+
+            while (boost::filesystem::exists(procPath)) {
+                sleepsecs(1);
+            }
+
+            ::exit(0);
+        }
+#endif
 
 #if defined(_WIN32)
         if (serviceParamsCheck( params, dbpath, argc, argv )) {

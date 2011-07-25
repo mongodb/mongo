@@ -121,5 +121,5 @@ for (var i=0; i<10000; i++) {
 
 
 print("11. Everyone happy eventually");
-replTest.awaitReplication(60000);
+replTest.awaitReplication(300000);
 

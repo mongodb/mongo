@@ -15,6 +15,14 @@
  *    limitations under the License.
  */
 
+#if defined(_WIN32)
+/** this is a hack - v8stdint.h defined uint16_t etc. on _WIN32 only, and that collides with 
+    our usage of boost */
+#include "boost/cstdint.hpp"
+using namespace boost;
+#define V8STDINT_H_
+#endif
+
 #include "engine_v8.h"
 
 #include "v8_wrapper.h"
@@ -33,20 +41,46 @@ namespace mongo {
      */
     static BSONObj* unwrapBSONObj(const Handle<v8::Object>& obj) {
       Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
-//      if (field.IsEmpty() || !field->IsExternal())
-//          return 0;
+      if (field.IsEmpty() || !field->IsExternal())
+          return 0;
       void* ptr = field->Value();
       return (BSONObj*)ptr;
     }
 
-    static void weakRefCallback(v8::Persistent<v8::Value> p, void* scope) {
+    static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
         // should we lock here? no idea, and no doc from v8 of course
         HandleScope handle_scope;
         if (!p.IsNearDeath())
             return;
-        BSONObj* obj = unwrapBSONObj(v8::Persistent<v8::Object>::Cast(p));
-        delete obj;
+        Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
+        BSONObj* data = (BSONObj*) field->Value();
+        delete data;
         p.Dispose();
+    }
+
+    Persistent<v8::Object> V8Scope::wrapBSONObject(Local<v8::Object> obj, BSONObj* data) {
+        obj->SetInternalField(0, v8::External::New(data));
+        Persistent<v8::Object> p = Persistent<v8::Object>::New(obj);
+        p.MakeWeak(this, weakRefBSONCallback);
+        return p;
+    }
+
+    static void weakRefArrayCallback(v8::Persistent<v8::Value> p, void* scope) {
+        // should we lock here? no idea, and no doc from v8 of course
+        HandleScope handle_scope;
+        if (!p.IsNearDeath())
+            return;
+        Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
+        char* data = (char*) field->Value();
+        delete [] data;
+        p.Dispose();
+    }
+
+    Persistent<v8::Object> V8Scope::wrapArrayObject(Local<v8::Object> obj, char* data) {
+        obj->SetInternalField(0, v8::External::New(data));
+        Persistent<v8::Object> p = Persistent<v8::Object>::New(obj);
+        p.MakeWeak(this, weakRefArrayCallback);
+        return p;
     }
 
     static Handle<v8::Value> namedGet(Local<v8::String> name, const v8::AccessorInfo &info) {
@@ -69,6 +103,12 @@ namespace mongo {
       V8Scope* scope = (V8Scope*)(scp->Value());
       val = scope->mongoToV8Element(elmt, false);
       info.This()->ForceSet(name, val);
+
+      if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+          // if accessing a subobject, it may get modified and base obj would not know
+          // have to set base as modified, which means some optim is lost
+          info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+      }
       return val;
     }
 
@@ -84,25 +124,35 @@ namespace mongo {
       return val;
     }
 
-//    static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-//      return Handle<Value>();
-//    }
+    static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Value>();
+    }
 
-//    static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
-//        BSONObj *obj = unwrapBSONObj(info.Holder());
-//        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj->nFields()));
-//        int i = 0;
-//        Local< External > scp = External::Cast( *info.Data() );
-//        V8Scope* scope = (V8Scope*)(scp->Value());
-//        // note here that if keys are parseable number, v8 will access them using index
-//        for ( BSONObjIterator it(*obj); it.more(); ++i) {
-//            const BSONElement& f = it.next();
-////            arr->Set(i, v8::String::NewExternal(new ExternalString(f.fieldName())));
-//            Handle<v8::String> name = scope->getV8Str(f.fieldName());
-//            arr->Set(i, name);
-//        }
-//        return arr;
-//    }
+    static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
+        BSONObj *obj = unwrapBSONObj(info.Holder());
+        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj->nFields()));
+        int i = 0;
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        // note here that if keys are parseable number, v8 will access them using index
+        for ( BSONObjIterator it(*obj); it.more(); ++i) {
+            const BSONElement& f = it.next();
+//            arr->Set(i, v8::String::NewExternal(new ExternalString(f.fieldName())));
+            Handle<v8::String> name = scope->getV8Str(f.fieldName());
+            arr->Set(i, name);
+        }
+        return arr;
+    }
+
+    Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Boolean>();
+    }
 
 //    v8::Handle<v8::Integer> namedQuery(Local<v8::String> property, const AccessorInfo& info) {
 //      string key = ToString(property);
@@ -133,7 +183,20 @@ namespace mongo {
             return Handle<Value>();
         Handle<Value> val = scope->mongoToV8Element(elmt, false);
 //        info.This()->ForceSet(name, val);
+
+        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+            // if accessing a subobject, it may get modified and base obj would not know
+            // have to set base as modified, which means some optim is lost
+            info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        }
         return val;
+    }
+
+    Handle<Boolean> indexedDelete( uint32_t index, const AccessorInfo& info ) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Boolean>();
     }
 
     static Handle<v8::Value> indexedGetRO(uint32_t index, const v8::AccessorInfo &info) {
@@ -159,9 +222,12 @@ namespace mongo {
         return val;
     }
 
-//    static Handle<v8::Value> indexedSet(uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-//      return Handle<Value>();
-//    }
+    static Handle<v8::Value> indexedSet(uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
+        Local< External > scp = External::Cast( *info.Data() );
+        V8Scope* scope = (V8Scope*)(scp->Value());
+        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        return Handle<Value>();
+    }
 
 //    static Handle<v8::Array> indexedEnumerator(const AccessorInfo &info) {
 //        BSONObj *obj = unwrapBSONObj(info.Holder());
@@ -178,22 +244,24 @@ namespace mongo {
 //    }
 
     Handle<Value> NamedReadOnlySet( Local<v8::String> property, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only object" << endl;
+        string key = toSTLString(property);
+        cout << "cannot write property " << key << " to read-only object" << endl;
         return value;
     }
 
     Handle<Boolean> NamedReadOnlyDelete( Local<v8::String> property, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only object" << endl;
+        string key = toSTLString(property);
+        cout << "cannot delete property " << key << " from read-only object" << endl;
         return Boolean::New( false );
     }
 
     Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only array" << endl;
+        cout << "cannot write property " << index << " to read-only array" << endl;
         return value;
     }
 
     Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only array" << endl;
+        cout << "cannot delete property " << index << " from read-only array" << endl;
         return Boolean::New( false );
     }
 
@@ -244,13 +312,12 @@ namespace mongo {
         // initialize lazy object template
         lzObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         lzObjectTemplate->SetInternalFieldCount( 1 );
-        lzObjectTemplate->SetNamedPropertyHandler(namedGet, 0, 0, 0, 0, v8::External::New(this));
-        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0, v8::External::New(this));
+        lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete, 0, v8::External::New(this));
+        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete, 0, v8::External::New(this));
 
         roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         roObjectTemplate->SetInternalFieldCount( 1 );
-        roObjectTemplate->SetNamedPropertyHandler(0);
-        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, 0, v8::External::New(this));
+        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, namedEnumerator, v8::External::New(this));
         roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0, IndexedReadOnlyDelete, 0, v8::External::New(this));
 
         // initialize lazy array template
@@ -267,6 +334,8 @@ namespace mongo {
         V8STR_CONN = getV8Str( "_conn" );
         V8STR_ID = getV8Str( "_id" );
         V8STR_LENGTH = getV8Str( "length" );
+        V8STR_LEN = getV8Str( "len" );
+        V8STR_TYPE = getV8Str( "type" );
         V8STR_ISOBJECTID = getV8Str( "isObjectId" );
         V8STR_RETURN = getV8Str( "return" );
         V8STR_ARGS = getV8Str( "args" );
@@ -276,11 +345,14 @@ namespace mongo {
         V8STR_MINKEY = getV8Str( "$MinKey" );
         V8STR_MAXKEY = getV8Str( "$MaxKey" );
         V8STR_NUMBERLONG = getV8Str( "__NumberLong" );
+        V8STR_NUMBERINT = getV8Str( "__NumberInt" );
         V8STR_DBPTR = getV8Str( "__DBPointer" );
         V8STR_BINDATA = getV8Str( "__BinData" );
         V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
         V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
+        V8STR_RO = getV8Str( "_ro" );
+        V8STR_MODIFIED = getV8Str( "_mod" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -436,7 +508,7 @@ namespace mongo {
         V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
-        _global->Set( getV8Str( field ) , mongoToV8( obj, false, readOnly) );
+        _global->Set( getV8Str( field ) , mongoToLZV8( obj, false, readOnly) );
     }
 
     int V8Scope::type( const char *field ) {
@@ -454,8 +526,9 @@ namespace mongo {
             return Array;
         if ( v->IsBoolean() )
             return Bool;
-        if ( v->IsInt32() )
-            return NumberInt;
+        // needs to be explicit NumberInt to use integer
+//        if ( v->IsInt32() )
+//            return NumberInt;
         if ( v->IsNumber() )
             return NumberDouble;
         if ( v->IsExternal() ) {
@@ -598,7 +671,7 @@ namespace mongo {
         _global->Set( f , v8::Undefined() );
     }
 
-    int V8Scope::invoke( ScriptingFunction func , const BSONObj* argsObject, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+    int V8Scope::invoke( ScriptingFunction func , const BSONObj* argsObject, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
         V8_SIMPLE_HEADER
         Handle<Value> funcValue = _funcs[func-1];
 
@@ -610,9 +683,9 @@ namespace mongo {
             BSONObjIterator it( *argsObject );
             for ( int i=0; i<nargs; i++ ) {
                 BSONElement next = it.next();
-                args[i] = mongoToV8Element( next );
+                args[i] = mongoToV8Element( next, readOnlyArgs );
             }
-            setObject( "args", *argsObject, false); // for backwards compatibility
+            setObject( "args", *argsObject, readOnlyArgs); // for backwards compatibility
         }
         else {
             _global->Set( V8STR_ARGS, v8::Undefined() );
@@ -626,7 +699,7 @@ namespace mongo {
         }
         Handle<v8::Object> v8recv;
         if (recv != 0)
-            v8recv = mongoToLZV8(*recv, false);
+            v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
         else
             v8recv = _emptyObj;
 
@@ -917,6 +990,16 @@ namespace mongo {
                 o->Set( name , v8::Number::New( f.number() ) );
                 break;
 
+//            case mongo::NumberInt: {
+//                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+//                int val = f.numberInt();
+//                v8::Function* numberInt = getNamedCons( "NumberInt" );
+//                v8::Handle<v8::Value> argv[1];
+//                argv[0] = v8::Int32::New( val );
+//                o->Set( name, numberInt->NewInstance( 1, argv ) );
+//                break;
+//            }
+
             case mongo::Array:
                 sub = f.embeddedObject();
                 o->Set( name , mongoToV8( sub , true, readOnly ) );
@@ -927,7 +1010,7 @@ namespace mongo {
                 break;
 
             case mongo::Date:
-                o->Set( name , v8::Date::New( f.date() ) );
+                o->Set( name , v8::Date::New( (double) ((long long)f.date().millis) ));
                 break;
 
             case mongo::Bool:
@@ -1047,6 +1130,7 @@ namespace mongo {
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
+            o->SetHiddenValue(V8STR_RO, v8::Boolean::New(true));
         } else {
             if (array) {
                 o = lzArrayTemplate->NewInstance();
@@ -1076,10 +1160,7 @@ namespace mongo {
 
         BSONObj* own = new BSONObj(m.getOwned());
 //        BSONObj* own = new BSONObj(m);
-        o->SetInternalField(0, v8::External::New(own));
-
-        Persistent<v8::Object> p = Persistent<v8::Object>::New(o);
-        p.MakeWeak(this, weakRefCallback);
+        Persistent<v8::Object> p = wrapBSONObject(o, own);
         return p;
     }
 
@@ -1119,7 +1200,7 @@ namespace mongo {
             return mongoToLZV8( f.embeddedObject() , false, readOnly);
 
         case mongo::Date:
-            return v8::Date::New( f.date() );
+            return v8::Date::New( (double) ((long long)f.date().millis) );
 
         case mongo::Bool:
             return v8::Boolean::New( f.boolean() );
@@ -1180,6 +1261,15 @@ namespace mongo {
             }
         }
 
+//        case mongo::NumberInt: {
+//            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+//            int val = f.numberInt();
+//            v8::Function* numberInt = getNamedCons( "NumberInt" );
+//            v8::Handle<v8::Value> argv[1];
+//            argv[0] = v8::Int32::New(val);
+//            return numberInt->NewInstance( 1, argv );
+//        }
+
         case mongo::MinKey: {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
             sub->Set( V8STR_MINKEY, v8::Boolean::New( true ) );
@@ -1220,7 +1310,7 @@ namespace mongo {
         v8ToMongoElement(builder, v8name, fieldName, value);
     }
 
-    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ) {
+    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
 
         if ( value->IsString() ) {
 //            Handle<v8::String> str = Handle<v8::String>::Cast(value);
@@ -1236,10 +1326,18 @@ namespace mongo {
         }
 
         if ( value->IsNumber() ) {
-            if ( value->IsInt32() )
-                b.append( sname, int( value->ToInt32()->Value() ) );
-            else
-                b.append( sname , value->ToNumber()->Value() );
+            double val = value->ToNumber()->Value();
+            // if previous type was integer, keep it
+            int intval = (int)val;
+            if (val == intval && originalParent) {
+                BSONElement elmt = originalParent->getField(sname);
+                if (elmt.type() == mongo::NumberInt) {
+                    b.append( sname , intval );
+                    return;
+                }
+            }
+
+            b.append( sname , val );
             return;
         }
 
@@ -1250,7 +1348,8 @@ namespace mongo {
         }
 
         if ( value->IsDate() ) {
-            b.appendDate( sname , Date_t( (unsigned long long)(v8::Date::Cast( *value )->NumberValue())) );
+            long long dateval = (long long)(v8::Date::Cast( *value )->NumberValue());
+            b.appendDate( sname , Date_t( (unsigned long long) dateval ) );
             return;
         }
 
@@ -1309,6 +1408,10 @@ namespace mongo {
 
                 b.append( sname, val );
             }
+            else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERINT ).IsEmpty() ) {
+                v8::Handle< v8::Object > it = value->ToObject();
+                b.append(sname, it->GetHiddenValue(V8STR_NUMBERINT)->Int32Value());
+            }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_DBPTR ).IsEmpty() ) {
                 OID oid;
                 oid.init( toSTLString( value->ToObject()->Get( getV8Str( "id" ) ) ) );
@@ -1317,9 +1420,8 @@ namespace mongo {
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_BINDATA ).IsEmpty() ) {
                 int len = obj->Get( getV8Str( "len" ) )->ToInt32()->Value();
-                v8::String::Utf8Value data( obj->Get( getV8Str( "data" ) ) );
-                const char *dataArray = *data;
-                assert( data.length() == len );
+                Local<External> c = External::Cast( *(obj->GetInternalField( 0 )) );
+                const char* dataArray = (char*)(c->Value());;
                 b.appendBinData( sname,
                                  len,
                                  mongo::BinDataType( obj->Get( getV8Str( "type" ) )->ToInt32()->Value() ),
@@ -1351,11 +1453,23 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
+        BSONObj* originalBSON = 0;
+        if (o->HasNamedLookupInterceptor()) {
+            originalBSON = unwrapBSONObj(o);
+        }
+
+        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
+                (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
+            // object was readonly, use bson as is
+            if (originalBSON)
+                return *originalBSON;
+        }
+
         BSONObjBuilder b;
 
         if ( depth == 0 ) {
             if ( o->HasRealNamedProperty( V8STR_ID ) ) {
-                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ) );
+                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
             }
         }
 
@@ -1373,7 +1487,7 @@ namespace mongo {
             if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , name , sname , value , depth + 1 );
+            v8ToMongoElement( b , name , sname , value , depth + 1, originalBSON );
         }
         return b.obj();
     }

@@ -22,6 +22,7 @@
 #include "diskloc.h"
 #include "jsobj.h"
 #include "indexkey.h"
+#include "key.h"
 
 namespace mongo {
 
@@ -29,15 +30,24 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
         virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
         virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                      IndexDetails& idx, bool toplevel = true) const = 0;
+            const BSONObj& key, const Ordering &order, bool dupsAllowed,
+            IndexDetails& idx, bool toplevel = true) const = 0;
         virtual DiskLoc addBucket(const IndexDetails&) = 0;
         virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, 
-                                   DiskLoc self, const Ordering& ordering) = 0;
+            DiskLoc self, const Ordering& ordering) = 0;
+
+        // these are for geo
+        virtual bool isUsed(DiskLoc thisLoc, int pos) = 0;
+        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj&, DiskLoc& recordLoc) = 0;
+        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) = 0;
+        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+                               int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) = 0;
+        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
     };
 
     /* Details about a particular index. There is one of these effectively for each object in
@@ -83,7 +93,7 @@ namespace mongo {
            only when it's a "multikey" array.
            keys will be left empty if key not found in the object.
         */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
+        void getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const;
 
         /* get the key pattern for this object.
            e.g., { lastname:1, firstname:1 }
@@ -150,6 +160,7 @@ namespace mongo {
             return v;
         }
 
+        /** @return true if index has unique constraint */
         bool unique() const {
             BSONObj io = info.obj();
             return io["unique"].trueValue() ||
@@ -157,13 +168,13 @@ namespace mongo {
                    isIdIndex();
         }
 
-        /* if set, when building index, if any duplicates, drop the duplicating object */
+        /** return true if dropDups was set when building index (if any duplicates, dropdups drops the duplicating objects) */
         bool dropDups() const {
             return info.obj().getBoolField( "dropDups" );
         }
 
-        /* delete this index.  does NOT clean up the system catalog
-           (system.indexes or system.namespaces) -- only NamespaceIndex.
+        /** delete this index.  does NOT clean up the system catalog
+            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill_idx();
 
@@ -177,21 +188,23 @@ namespace mongo {
                     it may not mean we can build the index version in question: we may not maintain building 
                     of indexes in old formats in the future.
         */
-        static bool isASupportedIndexVersionNumber(int v) { return v == 0 || v == 1; }
+        static bool isASupportedIndexVersionNumber(int v) { return (v&1)==v; } // v == 0 || v == 1
 
-        IndexInterface& idxInterface() { 
+        /** @return the interface for this interface, which varies with the index version.
+            used for backward compatibility of index versions/formats.
+        */
+        IndexInterface& idxInterface() const { 
             int v = version();
             dassert( isASupportedIndexVersionNumber(v) );
             return *iis[v&1];
         }
 
-    private:
         static IndexInterface *iis[];
     };
 
     struct IndexChanges { /*on an update*/
-        BSONObjSetDefaultOrder oldkeys;
-        BSONObjSetDefaultOrder newkeys;
+        BSONObjSet oldkeys;
+        BSONObjSet newkeys;
         vector<BSONObj*> removed; // these keys were removed as part of the change
         vector<BSONObj*> added;   // these keys were added as part of the change
 

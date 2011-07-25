@@ -33,7 +33,8 @@ sh.help = function() {
     print( "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
     
     print( "\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off" );
-    print( "\tsh.getBalancerState()   return true if on, off if not" );
+    print( "\tsh.getBalancerState()                     return true if on, off if not" );
+    print( "\tsh.isBalancerRunning()                    return true if the balancer is running on any mongos" );
     
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
@@ -89,4 +90,9 @@ sh.getBalancerState = function() {
     if ( x == null )
         return true;
     return ! x.stopped;
+}
+
+sh.isBalancerRunning = function() {
+    var x = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
+    return x.state > 0;
 }

@@ -19,12 +19,13 @@
 #include "pch.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "query.h"
 #include "json.h"
 #include "queryoptimizer.h"
 #include "btree.h"
 #include "pdfile.h"
 #include "oplog.h"
+#include "ops/update.h"
+#include "ops/delete.h"
 
 namespace mongo {
 
@@ -63,7 +64,7 @@ namespace mongo {
     public:
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
         virtual void _init() {
-            if ( requireIndex_ && strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) == 0 )
+            if ( requireIndex_ && strcmp( qp().indexKey().firstElementFieldName(), "$natural" ) == 0 )
                 throw MsgAssertionException( 9011 , "Not an index cursor" );
             c_ = qp().newCursor();
             if ( !c_->ok() ) {
@@ -258,6 +259,16 @@ namespace mongo {
         cc->setDoingDeletes( true );
 
         while ( c->ok() ) {
+
+            if ( yield && ! cc->yieldSometimes( ClientCursor::WillNeed) ) {
+                // cursor got finished by someone else, so we're done
+                cc.release(); // if the collection/db is dropped, cc may be deleted
+                break;
+            }
+
+            if ( ! c->ok() )
+                break;
+
             DiskLoc rloc = c->currLoc();
 
             if ( callback )
@@ -274,11 +285,7 @@ namespace mongo {
 
             getDur().commitIfNeeded();
 
-            if ( yield && ! cc->yieldSometimes() ) {
-                // cursor got finished by someone else, so we're done
-                cc.release(); // if the collection/db is dropped, cc may be deleted
-                break;
-            }
+
         }
 
         return num;

@@ -615,6 +615,7 @@ namespace mongo {
 
     // UUID **************************
 
+#if 0
     JSBool uuid_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
 
@@ -638,6 +639,8 @@ namespace mongo {
             for( int i = 0; i < 16; i++ ) {
                 buf[i] = fromHex(encoded.c_str() + i * 2);
             }
+
+zzz
 
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
             c.setProperty( obj, "len", c.toval( (double)16 ) );
@@ -683,6 +686,8 @@ namespace mongo {
         { "toString" , uuid_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
+
+#endif
 
     // BinData **************************
 
@@ -752,25 +757,15 @@ namespace mongo {
         assert( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
-        ss << hex;
+        ss.setf (ios_base::hex , ios_base::basefield);
+        ss.fill ('0');
+        ss.setf (ios_base::right , ios_base::adjustfield);
         for( int i = 0; i < len; i++ ) {
             unsigned v = (unsigned char) data[i];
-            ss << v;
+            ss << setw(2) << v;
         }
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
-    }
-
-    JSBool bindataLength(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int len = (int)c.getNumber( obj, "len" );
-        return *rval = c.toval((double) len);
-    }
-
-    JSBool bindataSubtype(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int t = (int)c.getNumber( obj, "type" );
-        return *rval = c.toval((double) t);
     }
 
     void bindata_finalize( JSContext * cx , JSObject * obj ) {
@@ -793,8 +788,6 @@ namespace mongo {
         { "toString" , bindata_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "hex", bindataAsHex, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "base64", bindataBase64, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "length", bindataLength, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "subtype", bindataSubtype, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
 
@@ -945,6 +938,79 @@ namespace mongo {
         { 0 }
     };
 
+    JSClass numberint_class = {
+        "NumberInt" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSBool numberint_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        smuassert( cx , "NumberInt needs 0 or 1 args" , argc == 0 || argc == 1 );
+
+        if ( ! JS_InstanceOf( cx , obj , &numberint_class , 0 ) ) {
+            obj = JS_NewObject( cx , &numberint_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "numberint_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        Convertor c( cx );
+        if ( argc == 0 ) {
+            c.setProperty( obj, "floatApprox", c.toval( 0.0 ) );
+        }
+        else if ( JSVAL_IS_NUMBER( argv[ 0 ] ) ) {
+            c.setProperty( obj, "floatApprox", argv[ 0 ] );
+        }
+        else {
+            string num = c.toString( argv[ 0 ] );
+            //PRINT(num);
+            const char *numStr = num.c_str();
+            int n;
+            try {
+                n = (int) parseLL( numStr );
+                //PRINT(n);
+            }
+            catch ( const AssertionException & ) {
+                smuassert( cx , "could not convert string to integer" , false );
+            }
+            c.makeIntObj( n, obj );
+        }
+
+        return JS_TRUE;
+    }
+
+    JSBool numberint_valueof(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        return *rval = c.toval( double( c.toNumberInt( obj ) ) );
+    }
+
+    JSBool numberint_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        return numberint_valueof( cx, obj, argc, argv, rval );
+    }
+
+    JSBool numberint_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        int val = c.toNumberInt( obj );
+        string ret = str::stream() << "NumberInt(" << val << ")";
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    JSBool numberint_tojson(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        int val = c.toNumberInt( obj );
+        string ret = str::stream() << val;
+        return *rval = c.toval( ret.c_str() );
+    }
+
+
+    JSFunctionSpec numberint_functions[] = {
+        { "valueOf" , numberint_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "toNumber" , numberint_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "toString" , numberint_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "tojson" , numberint_tojson , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
     JSClass minkey_class = {
         "MinKey" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -1047,10 +1113,11 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
+//        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &numberint_class , numberint_constructor , 0 , 0 , numberint_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
@@ -1095,6 +1162,11 @@ namespace mongo {
             return true;
         }
 
+        if ( JS_InstanceOf( c->_context , o , &numberint_class , 0 ) ) {
+            b.append( name , c->toNumberInt( o ) );
+            return true;
+        }
+
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ) {
             b.appendDBRef( name , c->getString( o , "ns" ) , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
@@ -1128,8 +1200,8 @@ namespace mongo {
 #else
         if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ) {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            //TODO: make signed
-            b.appendDate( name , Date_t((unsigned long long)d) );
+            long long d2 = (long long)d;
+            b.appendDate( name , Date_t((unsigned long long)d2) );
             return true;
         }
 #endif

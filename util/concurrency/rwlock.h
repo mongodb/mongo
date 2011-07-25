@@ -57,6 +57,7 @@ namespace mongo {
 
 #if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
+    // Windows RWLock implementation (requires newer versions of windows thus the above macro)
     class RWLock : boost::noncopyable {
     public:
         RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
@@ -102,38 +103,51 @@ namespace mongo {
     };
 
 #elif defined(BOOST_RWLOCK)
+
+    // Boost based RWLock implementation
     class RWLock : boost::noncopyable {
         shared_mutex _m;
-        int _lowPriorityWaitMS;
+        const int _lowPriorityWaitMS;
     public:
-#if defined(_DEBUG)
-        const char *_name;
+        const char * const _name;
+
         RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { }
-#else
-        RWLock(const char *, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) { }
-#endif
 
         const char * implType() const { return "boost"; }
 
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
         void lock() {
-            _m.lock();
-#if defined(_DEBUG)
-            mutexDebugger.entering(_name);
-#endif
+             _m.lock();
+            DEV mutexDebugger.entering(_name);
         }
+
+        /*void lock() {
+            // This sequence gives us the lock semantics we want: specifically that write lock acquisition is 
+            // greedy EXCEPT when someone already is in upgradable state.
+            lockAsUpgradable();
+            upgrade();
+            DEV mutexDebugger.entering(_name);
+        }*/
+
         void unlock() {
-#if defined(_DEBUG)
-            mutexDebugger.leaving(_name);
-#endif
+            DEV mutexDebugger.leaving(_name);
             _m.unlock();
+        }
+
+        void lockAsUpgradable() { 
+            _m.lock_upgrade();
+        }
+        void unlockFromUpgradable() { // upgradable -> unlocked
+            _m.unlock_upgrade();
+        }
+        void upgrade() { // upgradable -> exclusive lock
+            _m.unlock_upgrade_and_lock();
         }
 
         void lock_shared() {
             _m.lock_shared();
         }
-
         void unlock_shared() {
             _m.unlock_shared();
         }
@@ -147,34 +161,29 @@ namespace mongo {
 
         bool lock_try( int millis = 0 ) {
             if( _m.timed_lock( boost::posix_time::milliseconds(millis) ) ) {
-#if defined(_DEBUG)
-                mutexDebugger.entering(_name);
-#endif
+                DEV mutexDebugger.entering(_name);
                 return true;
             }
             return false;
         }
-
-
     };
+
 #else
+
+    // Posix RWLock implementation
     class RWLock : boost::noncopyable {
         pthread_rwlock_t _lock;
-        int _lowPriorityWaitMS;    
-        inline static void check( int x ) {
-            if( x == 0 )
+        const int _lowPriorityWaitMS;    
+        static void check( int x ) {
+            MONGOIF( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
             assert( x == 0 );
         }
         
     public:
-#if defined(_DEBUG)
         const char *_name;
         RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name)
-#else
-        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS )
-#endif
         {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
@@ -191,14 +200,10 @@ namespace mongo {
 
         void lock() {
             check( pthread_rwlock_wrlock( &_lock ) );
-#if defined(_DEBUG)
-            mutexDebugger.entering(_name);
-#endif
+            DEV mutexDebugger.entering(_name);
         }
         void unlock() {
-#if defined(_DEBUG)
             mutexDebugger.leaving(_name);
-#endif
             check( pthread_rwlock_unlock( &_lock ) );
         }
 
@@ -216,9 +221,7 @@ namespace mongo {
 
         bool lock_try( int millis = 0 ) {
             if( _try( millis , true ) ) {
-#if defined(_DEBUG)
-                mutexDebugger.entering(_name);
-#endif
+                DEV mutexDebugger.entering(_name);
                 return true;
             }
             return false;
@@ -279,14 +282,10 @@ namespace mongo {
          * @param write acquire write lock if true sharable if false
          * @param lowPriority if > 0, will try to get the lock non-greedily for that many ms
          */
-        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false , int lowPriorityWaitMS = 0 )
+        rwlock( const RWLock& lock , bool write, /* bool alreadyHaveLock = false , */int lowPriorityWaitMS = 0 )
             : _lock( (RWLock&)lock ) , _write( write ) {
             
-            // alreadyHaveLock should probably go away.  this as a starter in that direction:
-            dassert(!alreadyHaveLock);
-
-            if ( ! alreadyHaveLock ) {
-                
+            {
                 if ( _write ) {
                     
                     if ( ! lowPriorityWaitMS && lock.lowPriorityWaitMS() )
@@ -338,12 +337,14 @@ namespace mongo {
         RWLock _lk;
         friend class Exclusive;
     public:
-        RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
+        /** @param lpwaitms lazy wait */
+        RWLockRecursive(const char *name, int lpwaitms) : _lk(name, lpwaitms) { }
 
         void assertExclusivelyLocked() {
             dassert( _state.get() < 0 );
         }
 
+        // RWLockRecursive::Exclusive scoped lock
         class Exclusive : boost::noncopyable { 
             RWLockRecursive& _r;
             rwlock *_scopedLock;
@@ -363,6 +364,7 @@ namespace mongo {
             }
         };
 
+        // RWLockRecursive::Shared scoped lock
         class Shared : boost::noncopyable { 
             RWLockRecursive& _r;
             bool _alreadyExclusive;

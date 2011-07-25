@@ -25,7 +25,7 @@
 #include "../util/logfile.h"
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
-#include "../util/message.h" // getelapsedtimemillis
+#include "../util/net/listen.h" // getelapsedtimemillis
 #include "../util/concurrency/race.h"
 #include <boost/static_assert.hpp>
 #undef assert
@@ -41,14 +41,20 @@ namespace mongo {
 
     class AlignedBuilder;
 
+    unsigned goodRandomNumberSlow();
+
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
         // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
         // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
         // work.  (and should as-is)
         // --smallfiles makes the limit small.
+
 #if defined(_DEBUG)
         unsigned long long DataLimitPerJournalFile = 128 * 1024 * 1024;
+#elif defined(__APPLE__)
+        // assuming a developer box if OS X
+        unsigned long long DataLimitPerJournalFile = 256 * 1024 * 1024;
 #else
         unsigned long long DataLimitPerJournalFile = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
 #endif
@@ -118,14 +124,12 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)getRandomNumber()) << 32;
+                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
             n1 = n2 = n3 = n4 = '\n';
         }
-
-        // class Journal
 
         Journal j;
 
@@ -133,6 +137,7 @@ namespace mongo {
 
         Journal::Journal() :
             _curLogFileMutex("JournalLfMutex") {
+            _ageOut = true;
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -579,6 +584,17 @@ namespace mongo {
 
                 _oldJournalFiles.pop_front();
             }
+        }
+
+        int getAgeOutJournalFiles() {
+            mutex::try_lock lk(j._curLogFileMutex, 4000);
+            if( !lk.ok )
+                return -1;
+            return j._ageOut ? 1 : 0;
+        }
+        void setAgeOutJournalFiles(bool a) {
+            scoped_lock lk(j._curLogFileMutex);
+            j._ageOut = a;
         }
 
         /** check if time to rotate files.  assure a file is open.

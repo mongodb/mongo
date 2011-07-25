@@ -92,7 +92,7 @@ namespace mongo {
 
         virtual ScriptingFunction _createFunction( const char * code );
         Local< v8::Function > __createFunction( const char * code );
-        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false );
+        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false );
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError() { return _error; }
 
@@ -112,13 +112,16 @@ namespace mongo {
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
-                               const string sname , v8::Handle<v8::Value> value , int depth = 0 );
+                               const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();
         Local< v8::Value > newId( const OID &id );
+
+        Persistent<v8::Object> wrapBSONObject(Local<v8::Object> obj, BSONObj* data);
+        Persistent<v8::Object> wrapArrayObject(Local<v8::Object> obj, char* data);
 
         v8::Handle<v8::String> getV8Str(string str);
 //        inline v8::Handle<v8::String> getV8Str(string str) { return v8::String::New(str.c_str()); }
@@ -127,6 +130,8 @@ namespace mongo {
         Handle<v8::String> V8STR_CONN;
         Handle<v8::String> V8STR_ID;
         Handle<v8::String> V8STR_LENGTH;
+        Handle<v8::String> V8STR_LEN;
+        Handle<v8::String> V8STR_TYPE;
         Handle<v8::String> V8STR_ISOBJECTID;
         Handle<v8::String> V8STR_NATIVE_FUNC;
         Handle<v8::String> V8STR_NATIVE_DATA;
@@ -139,9 +144,12 @@ namespace mongo {
         Handle<v8::String> V8STR_MINKEY;
         Handle<v8::String> V8STR_MAXKEY;
         Handle<v8::String> V8STR_NUMBERLONG;
+        Handle<v8::String> V8STR_NUMBERINT;
         Handle<v8::String> V8STR_DBPTR;
         Handle<v8::String> V8STR_BINDATA;
         Handle<v8::String> V8STR_WRAPPER;
+        Handle<v8::String> V8STR_RO;
+        Handle<v8::String> V8STR_MODIFIED;
 
     private:
         void _startCall();

@@ -20,7 +20,8 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/processinfo.h"
-#include "security_key.h"
+#include "../util/net/listen.h"
+#include "security_common.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -33,7 +34,8 @@ namespace mongo {
 
     void setupSignals( bool inFork );
     string getHostNameCached();
-    BSONArray argvArray;
+    static BSONArray argvArray;
+    static BSONObj parsedOpts;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general ,
                                     boost::program_options::options_description& hidden ) {
@@ -50,11 +52,14 @@ namespace mongo {
         ("quiet", "quieter output")
         ("port", po::value<int>(&cmdLine.port), "specify port number")
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
+        ("maxConns",po::value<int>(), "max number of simultaneous connections")
+        ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
+        ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
 #endif
@@ -163,6 +168,23 @@ namespace mongo {
             cmdLine.quiet = true;
         }
 
+        if ( params.count( "maxConns" ) ) {
+            int newSize = params["maxConns"].as<int>();
+            if ( newSize < 5 ) {
+                out() << "maxConns has to be at least 5" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+            else if ( newSize >= 10000000 ) {
+                out() << "maxConns can't be greater than 10000000" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+            connTicketHolder.resize( newSize );
+        }
+
+        if (params.count("objcheck")) {
+            cmdLine.objcheck = true;
+        }
+
         string logpath;
 
 #ifndef _WIN32
@@ -173,7 +195,11 @@ namespace mongo {
                 ::exit(-1);
             }
         }
-        
+
+        if (params.count("nounixsocket")) {
+            cmdLine.noUnixSocket = true;
+        }
+
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ) {
                 cout << "--fork has to be used with --logpath" << endl;
@@ -237,6 +263,7 @@ namespace mongo {
             setupCoreSignals();
             setupSignals( true );
         }
+
 #endif
         if (params.count("logpath")) {
             if ( logpath.size() == 0 )
@@ -262,6 +289,41 @@ namespace mongo {
 
 
         {
+            BSONObjBuilder b;
+            for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){
+                if (!it->second.defaulted()){
+                    const string& key = it->first;
+                    const po::variable_value& value = it->second;
+                    const type_info& type = value.value().type();
+
+                    if (type == typeid(string)){
+                        if (value.as<string>().empty())
+                            b.appendBool(key, true); // boost po uses empty string for flags like --quiet
+                        else
+                            b.append(key, value.as<string>());
+                    }
+                    else if (type == typeid(int))
+                        b.append(key, value.as<int>());
+                    else if (type == typeid(double))
+                        b.append(key, value.as<double>());
+                    else if (type == typeid(bool))
+                        b.appendBool(key, value.as<bool>());
+                    else if (type == typeid(long))
+                        b.appendNumber(key, (long long)value.as<long>());
+                    else if (type == typeid(unsigned))
+                        b.appendNumber(key, (long long)value.as<unsigned>());
+                    else if (type == typeid(unsigned long long))
+                        b.appendNumber(key, (long long)value.as<unsigned long long>());
+                    else if (type == typeid(vector<string>))
+                        b.append(key, value.as<vector<string> >());
+                    else
+                        b.append(key, "UNKNOWN TYPE: " + demangleName(type));
+                }
+            }
+            parsedOpts = b.obj();
+        }
+
+        {
             BSONArrayBuilder b;
             for (int i=0; i < argc; i++)
                 b << argv[i];
@@ -269,6 +331,10 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    void printCommandLineOpts() {
+        log() << "options: " << parsedOpts << endl;
     }
 
     void ignoreSignal( int sig ) {}
@@ -290,6 +356,7 @@ namespace mongo {
 
         virtual bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             result.append("argv", argvArray);
+            result.append("parsed", parsedOpts);
             return true;
         }
 

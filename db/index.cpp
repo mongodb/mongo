@@ -1,4 +1,4 @@
-// index.cpp
+/** @file index.cpp */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -20,21 +20,29 @@
 #include "namespace-inl.h"
 #include "index.h"
 #include "btree.h"
-#include "query.h"
 #include "background.h"
 #include "repl/rs.h"
+#include "ops/delete.h"
+
 
 namespace mongo {
 
     /** old (<= v1.8) : 0
-        1 is temp new version but might move it to 2 for the real release TBD
+        1 is new version
     */
-    const int DefaultIndexVersionNumber = 0;
+    const int DefaultIndexVersionNumber = 1;
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
+
+/*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+            int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        */
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -57,13 +65,44 @@ namespace mongo {
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
                 KeyOwned k(**i);
                 bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
-                uassert( 11001 , "E11001 duplicate key on update", !dup);
+                uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
             }
+        }
+
+        // for geo:
+        virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
+        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
+            typename BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            key = kn.key.toBson();
+            recordLoc = kn.recordLoc;
+        }
+        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) {
+            return thisLoc.btree<V>()->keyAt(pos).toBson();
+        }
+        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
+                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) { 
+            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
+        }
+        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) { 
+            return thisLoc.btree<V>()->advance(thisLoc,keyOfs,direction,caller);
         }
     };
 
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    template <>
+    int IndexInterfaceImpl< V0 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return oldCompare(l, r, ordering);
+    }
+
+    template <>
+    int IndexInterfaceImpl< V1 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
+        return l.woCompare(r, ordering, /*considerfieldname*/false);
+    }
+
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;
+
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
@@ -106,7 +145,7 @@ namespace mongo {
     }
 
     const IndexSpec& IndexDetails::getSpec() const {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
@@ -144,13 +183,15 @@ namespace mongo {
         }
     }
 
-    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
+    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const {
         getSpec().getKeys( obj, keys );
     }
 
-    void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
-        BSONObjSetDefaultOrder::iterator i = l.begin();
-        BSONObjSetDefaultOrder::iterator j = r.begin();
+    void setDifference(BSONObjSet &l, BSONObjSet &r, vector<BSONObj*> &diff) {
+        // l and r must use the same ordering spec.
+        verify( 14819, l.key_comp().order() == r.key_comp().order() );
+        BSONObjSet::iterator i = l.begin();
+        BSONObjSet::iterator j = r.begin();
         while ( 1 ) {
             if ( i == l.end() )
                 break;
@@ -307,8 +348,6 @@ namespace mongo {
             }
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
-            if( o.hasElement("_id") ) 
-                b.append( o["_id"] );
             if( !o["v"].eoo() ) {
                 double vv = o["v"].Number();
                 // note (one day) we may be able to fresh build less versions than we can use
@@ -323,7 +362,18 @@ namespace mongo {
             if( o["unique"].trueValue() )
                 b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
             b.append(o["ns"]);
-            b.appendElementsUnique(o);
+
+            {
+                // stripping _id
+                BSONObjIterator i(o);
+                while ( i.more() ) {
+                    BSONElement e = i.next();
+                    string s = e.fieldName();
+                    if( s != "_id" && s != "v" && s != "ns" && s != "unique" && s != "key" )
+                        b.append(e);
+                }
+            }
+        
             fixedIndexObject = b.obj();
         }
 

@@ -19,7 +19,6 @@
 
 #include "pch.h"
 #include "db.h"
-#include "query.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -39,6 +38,9 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
+#include "ops/update.h"
+#include "ops/delete.h"
+#include "ops/query.h"
 
 namespace mongo {
 
@@ -297,7 +299,7 @@ namespace mongo {
             char *p = m.singleData()->_data;
             int len = strlen(p);
             if ( len > 400 )
-                out() << curTimeMillis() % 10000 <<
+                out() << curTimeMillis64() % 10000 <<
                       " long msg received, len:" << len << endl;
 
             Message *resp = new Message();
@@ -355,7 +357,7 @@ namespace mongo {
 
         //DEV log = true;
         if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
@@ -524,7 +526,13 @@ namespace mongo {
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
-            catch ( GetMoreWaitException& ) {
+            catch ( AssertionException& e ) {
+                exhaust = false;
+                curop.debug().exceptionInfo = e.getInfo();
+                msgdata = emptyMoreResult(cursorid);
+                ok = false;
+            }
+            if (msgdata == 0) {
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
                 if( pass == 0 ) {
@@ -545,12 +553,6 @@ namespace mongo {
                     sleepmillis(2);
                 continue;
             }
-            catch ( AssertionException& e ) {
-                exhaust = false;
-                curop.debug().exceptionInfo = e.getInfo();
-                msgdata = emptyMoreResult(cursorid);
-                ok = false;
-            }
             break;
         };
 
@@ -570,6 +572,42 @@ namespace mongo {
         return ok;
     }
 
+    void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
+        uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        {
+            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
+            BSONObjIterator i( js );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
+            }
+        }
+        theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
+        logOp("i", ns, js);
+    }
+
+    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
+        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
+        int n = 0;
+        BSONObj js(_js);
+        while( 1 ) {
+            try {
+                checkAndInsert(ns, js);
+                ++n;
+                getDur().commitIfNeeded();
+            } catch (const UserException&) {
+                if (!keepGoing || !d.moreJSObjs()){
+                    globalOpCounters.incInsertInWriteLock(n);
+                    throw;
+                }
+                // otherwise ignore and keep going
+            }
+            if( !d.moreJSObjs() )
+                break;
+            js = d.nextJsObj();
+        }
+    }
+
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
@@ -578,38 +616,25 @@ namespace mongo {
         writelock lk(ns);
 
         // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10058 ,  "not master", isMasterNs( ns ) );        
+        uassert( 10058 , "not master", isMasterNs(ns) );
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
         Client::Context ctx(ns);
-        if( d.moreJSObjs() ) { 
-            int n = 0;
-            while ( 1 ) {
-                BSONObj js = d.nextJsObj();
-                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-                {
-                    // check no $ modifiers
-                    BSONObjIterator i( js );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
-                    }
-                }
-
-                theDataFileMgr.insertWithObjMod(ns, js, false);
-                logOp("i", ns, js);
-                ++n;
-
-                if( !d.moreJSObjs() )
-                    break;
-
-                getDur().commitIfNeeded();
-            }
-            globalOpCounters.incInsertInWriteLock(n);
+        if( !d.moreJSObjs() ) { 
+            // strange.  should we complain?
+            return;
         }
+        BSONObj js = d.nextJsObj();
+        if( d.moreJSObjs() ) { 
+            insertMulti(d, ns, js);
+            return;
+        }
+
+        checkAndInsert(ns, js);
+        globalOpCounters.incInsertInWriteLock(1);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
@@ -664,7 +689,7 @@ namespace mongo {
         return true;
     }
 
-    void DBDirectClient::say( Message &toSend ) {
+    void DBDirectClient::say( Message &toSend, bool isRetry ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
@@ -784,7 +809,7 @@ namespace mongo {
                with acquirePathLock().  */
 #ifdef _WIN32
             if( _chsize( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << getLastError() << endl;
+                log() << "couldn't remove fs lock " << WSAGetLastError() << endl;
             CloseHandle(lockFileHandle);
 #else
             if( ftruncate( lockFile , 0 ) )
@@ -805,7 +830,7 @@ namespace mongo {
     }
 
     /* not using log() herein in case we are already locked */
-    void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+    NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
         auto_ptr<writelocktry> wlt;
         if ( tryToGetLock ) {

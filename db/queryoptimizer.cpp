@@ -55,6 +55,7 @@ namespace mongo {
         const FieldRangeSetPair &frsp, const FieldRangeSetPair &originalFrsp, const BSONObj &originalQuery, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
+        _frsMulti( frsp.frsForIndex( _d, -1 ) ),
         _originalQuery( originalQuery ),
         _order( order ),
         _index( 0 ),
@@ -78,7 +79,7 @@ namespace mongo {
         }
             
         if ( willScanTable() ) {
-            if ( _order.isEmpty() || !strcmp( _order.firstElement().fieldName(), "$natural" ) )
+            if ( _order.isEmpty() || !strcmp( _order.firstElementFieldName(), "$natural" ) )
                 _scanAndOrderRequired = false;
             return;                
         }
@@ -184,7 +185,7 @@ doneCheckOrder:
         }
 
         if ( ( _scanAndOrderRequired || _order.isEmpty() ) &&
-                !_frs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
+                !_frs.range( idxKey.firstElementFieldName() ).nontrivial() ) {
             _unhelpful = true;
         }
     }
@@ -244,7 +245,7 @@ doneCheckOrder:
     void QueryPlan::registerSelf( long long nScanned ) const {
         // FIXME SERVER-2864 Otherwise no query pattern can be generated.
         if ( _frs.matchPossible() ) {
-            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+            SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
         }
     }
@@ -347,7 +348,7 @@ doneCheckOrder:
         else if( hint.type() == Object ) {
             BSONObj hintobj = hint.embeddedObject();
             uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
-            if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
+            if ( !strcmp( hintobj.firstElementFieldName(), "$natural" ) ) {
                 return 0;
             }
             NamespaceDetails::IndexIterator i = d->ii();
@@ -442,7 +443,7 @@ doneCheckOrder:
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
-                if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                if ( !strcmp( bestIndex.firstElementFieldName(), "$natural" ) ) {
                     // Table scan plan
                     p.reset( new QueryPlan( d, -1, *_frsp, *_originalFrsp, _originalQuery, _order ) );
                 }
@@ -477,7 +478,7 @@ doneCheckOrder:
 
         // If table scan is optimal or natural order requested or tailable cursor requested
         if ( !_frsp->matchPossible() || ( _frsp->noNontrivialRanges() && _order.isEmpty() ) ||
-                ( !_order.isEmpty() && !strcmp( _order.firstElement().fieldName(), "$natural" ) ) ) {
+                ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
             // Table scan plan
             addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, *_originalFrsp, _originalQuery, _order ) ), checkFirst );
             return;
@@ -625,18 +626,21 @@ doneCheckOrder:
     }
     
     void QueryPlanSet::Runner::mayYield() {
-        if ( _plans._mayYield ) {
-            if ( _plans._yieldSometimesTracker.ping() ) {
-                int micros = ClientCursor::yieldSuggest();
-                if ( micros > 0 ) {
-                    if ( !prepareToYield() ) {
-                        return;   
-                    }
-                    ClientCursor::staticYield( micros , _plans._ns );
-                    recoverFromYield();
-                }
-            }
-        }
+        if ( ! _plans._mayYield ) 
+            return;
+        
+        if ( ! _plans._yieldSometimesTracker.ping() ) 
+            return;
+        
+        int micros = ClientCursor::yieldSuggest();
+        if ( micros <= 0 ) 
+            return;
+        
+        if ( !prepareToYield() ) 
+            return;   
+        
+        ClientCursor::staticYield( micros , _plans._ns , 0 );
+        recoverFromYield();
     }
 
     shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
@@ -687,8 +691,8 @@ doneCheckOrder:
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
         mayYield();
-        OpHolder holder = _queue.top();
-        _queue.pop();
+        dassert( !_queue.empty() );
+        OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
         if ( op.complete() ) {
@@ -934,6 +938,9 @@ doneCheckOrder:
         if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
             return shared_ptr<Cursor>();
         }
+        // If there is only one plan and it does not require an in memory
+        // sort, we do not expect its cursor op to throw an exception and
+        // so do not need a QueryOptimizerCursor to handle this case.
         return _currentQps->firstPlan()->newCursor();
     }
 
@@ -1163,7 +1170,7 @@ doneCheckOrder:
             return true;
 
         if ( e.type() == Object )
-            return e.Obj().firstElement().fieldName()[0] != '$';
+            return e.Obj().firstElementFieldName()[0] != '$';
 
         return false;
     }
@@ -1201,14 +1208,14 @@ doneCheckOrder:
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
         nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
     }
     
     pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.

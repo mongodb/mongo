@@ -29,13 +29,12 @@
 
 #include "../db/commands.h"
 #include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../db/query.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
 #include "../db/repl_block.h"
 #include "../db/dur.h"
+#include "../db/clientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -133,7 +132,7 @@ namespace mongo {
     };
 
     struct OldDataCleanup {
-        static AtomicUInt _numThreads; // how many threads are doing async cleanusp
+        static AtomicUInt _numThreads; // how many threads are doing async cleanup
 
         string ns;
         BSONObj min;
@@ -154,12 +153,31 @@ namespace mongo {
             _numThreads--;
         }
 
+        string toString() const {
+            return str::stream() << ns << " from " << min << " -> " << max;
+        }
+        
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
-            writelock lk(ns);
-            RemoveSaver rs("moveChunk",ns,"post-cleanup");
-            long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
-            log() << "moveChunk deleted: " << num << migrateLog;
+            {
+                writelock lk(ns);
+                RemoveSaver rs("moveChunk",ns,"post-cleanup");
+                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                log() << "moveChunk deleted: " << numDeleted << migrateLog;
+            }
+            
+            ReplTime lastOpApplied = cc().getLastOp();
+            
+            Timer t;
+            for ( int i=0; i<3600; i++ ) {
+                if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
+                    LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
+                    return;
+                }
+                sleepsecs(1);
+            }
+            
+            warning() << "moveChunk repl sync timed out after " << t.seconds() << " seconds" << migrateLog;
         }
 
     };
@@ -167,59 +185,6 @@ namespace mongo {
     AtomicUInt OldDataCleanup::_numThreads = 0;
 
     static const char * const cleanUpThreadName = "cleanupOldData";
-
-    void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
-        log() << " (start) waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
-
-        int loops = 0;
-        Timer t;
-        while ( t.seconds() < 900 ) { // 15 minutes
-            assert( dbMutex.getState() == 0 );
-            sleepmillis( 20 );
-
-            set<CursorId> now;
-            ClientCursor::find( cleanup.ns , now );
-
-            set<CursorId> left;
-            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                CursorId id = *i;
-                if ( now.count(id) )
-                    left.insert( id );
-            }
-
-            if ( left.size() == 0 )
-                break;
-            cleanup.initial = left;
-
-            if ( ( loops++ % 200 ) == 0 ) {
-                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
-
-                stringstream ss;
-                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                    CursorId id = *i;
-                    ss << id << " ";
-                }
-                log() << " cursors: " << ss.str() << migrateLog;
-            }
-        }
-
-        cleanup.doRemove();
-
-        cc().shutdown();
-    }
-
-    void cleanupOldData( OldDataCleanup cleanup ) {
-        try {
-            _cleanupOldData( cleanup );
-        }
-        catch ( std::exception& e ) {
-            log() << " error cleaning old data:" << e.what() << migrateLog;
-        }
-        catch ( ... ) {
-            log() << " unknown error cleaning old data" << migrateLog;
-        }
-    }
 
     class ChunkCommandHelper : public Command {
     public:
@@ -246,13 +211,14 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _m("MigrateFromStatus") {
+        MigrateFromStatus() : _m("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ) {
+            scoped_lock ll(_workLock);
             scoped_lock l(_m); // reads and writes _active
 
             assert( ! _active );
@@ -439,7 +405,7 @@ namespace mongo {
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
-            // there's a fair amout of slack before we determine a chunk is too large because object sizes will vary
+            // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
             const long long totalRecs = d->stats.nrecords;
@@ -453,8 +419,6 @@ namespace mongo {
                 maxRecsWhenFull = numeric_limits<long long>::max();
             }
 
-            scoped_spinlock lk( _trackerLocks );
-
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
@@ -462,13 +426,14 @@ namespace mongo {
             while ( cc->ok() ) {
                 DiskLoc dl = cc->currLoc();
                 if ( ! isLargeChunk ) {
+                    scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
                 }
                 cc->advance();
 
                 // we can afford to yield here because any change to the base data that we might miss is already being
                 // queued and will be migrated in the 'transferMods' stage
-                if ( ! cc->yieldSometimes() ) {
+                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
                     cc.release();
                     break;
                 }
@@ -479,7 +444,7 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
                           << " because maximum size allowed to move is " << maxChunkSize
                           << " ns: " << _ns << " " << _min << " -> " << _max
                           << migrateLog;
@@ -489,7 +454,10 @@ namespace mongo {
                 return false;
             }
 
-            log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            {
+                scoped_spinlock lk( _trackerLocks );
+                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            }
             return true;
         }
 
@@ -569,6 +537,21 @@ namespace mongo {
         void setInCriticalSection( bool b ) { scoped_lock l(_m); _inCriticalSection = b; }
 
         bool isActive() const { return _getActive(); }
+        
+        void doRemove( OldDataCleanup& cleanup ) {
+            int it = 0;
+            while ( true ) { 
+                if ( it > 20 && it % 10 == 0 ) log() << "doRemote iteration " << it << " for: " << cleanup << endl;
+                {
+                    scoped_lock ll(_workLock);
+                    if ( ! _active ) {
+                        cleanup.doRemove();
+                        return;
+                    }
+                }
+                sleepmillis( 1000 );
+            }
+        }
 
     private:
         mutable mongo::mutex _m; // protect _inCriticalSection and _active
@@ -593,6 +576,9 @@ namespace mongo {
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
+        mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
+                                        // for now, this means migrate or removing old chunk data
+
         bool _getActive() const { scoped_lock l(_m); return _active; }
         void _setActive( bool b ) { scoped_lock l(_m); _active = b; }
 
@@ -606,6 +592,62 @@ namespace mongo {
             migrateFromStatus.done();
         }
     };
+
+    void _cleanupOldData( OldDataCleanup cleanup ) {
+        Client::initThread( cleanUpThreadName );
+        if (!noauth) {
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
+        log() << " (start) waiting to cleanup " << cleanup << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+        int loops = 0;
+        Timer t;
+        while ( t.seconds() < 900 ) { // 15 minutes
+            assert( dbMutex.getState() == 0 );
+            sleepmillis( 20 );
+
+            set<CursorId> now;
+            ClientCursor::find( cleanup.ns , now );
+
+            set<CursorId> left;
+            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                CursorId id = *i;
+                if ( now.count(id) )
+                    left.insert( id );
+            }
+
+            if ( left.size() == 0 )
+                break;
+            cleanup.initial = left;
+
+            if ( ( loops++ % 200 ) == 0 ) {
+                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+                stringstream ss;
+                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
+                    CursorId id = *i;
+                    ss << id << " ";
+                }
+                log() << " cursors: " << ss.str() << migrateLog;
+            }
+        }
+
+        migrateFromStatus.doRemove( cleanup );
+
+        cc().shutdown();
+    }
+
+    void cleanupOldData( OldDataCleanup cleanup ) {
+        try {
+            _cleanupOldData( cleanup );
+        }
+        catch ( std::exception& e ) {
+            log() << " error cleaning old data:" << e.what() << migrateLog;
+        }
+        catch ( ... ) {
+            log() << " unknown error cleaning old data" << migrateLog;
+        }
+    }
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
         migrateFromStatus.logOp( opstr , ns , obj , patt );
@@ -856,7 +898,7 @@ namespace mongo {
                 log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
-                    warning() << "moveChunk error transfering data caused migration abort: " << res << migrateLog;
+                    warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
                     errmsg = "data transfer error";
                     result.append( "cause" , res );
                     return false;
@@ -1150,7 +1192,7 @@ namespace mongo {
 
     class MigrateStatus {
     public:
-
+        
         MigrateStatus() : m_active("MigrateStatus") { active = false; }
 
         void prepare() {
@@ -1268,7 +1310,7 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied;
+            ReplTime lastOpApplied = cc().getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -1318,9 +1360,19 @@ namespace mongo {
                 timing.done(4);
             }
 
+            { 
+                // pause to wait for replication
+                // this will prevent us from going into critical section until we're ready
+                Timer t;
+                while ( t.minutes() < 600 ) {
+                    if ( flushPendingWrites( lastOpApplied ) )
+                        break;
+                    sleepsecs(1);
+                }
+            }
+
             {
                 // 5. wait for commit
-                Timer timeWaitingForCommit;
 
                 state = STEADY;
                 while ( state == STEADY || state == COMMIT_START ) {
@@ -1336,20 +1388,21 @@ namespace mongo {
                     if ( res["size"].number() > 0 && apply( res , &lastOpApplied ) )
                         continue;
 
-                    if ( state == COMMIT_START && flushPendingWrites( lastOpApplied ) )
-                        break;
-
+                    if ( state == ABORT ) {
+                        timing.note( "aborted" );
+                        return;
+                    }
+                    
+                    if ( state == COMMIT_START ) {
+                        if ( flushPendingWrites( lastOpApplied ) )
+                            break;
+                    }
+                    
                     sleepmillis( 10 );
                 }
 
-                if ( state == ABORT ) {
-                    timing.note( "aborted" );
-                    return;
-                }
-
-                if ( timeWaitingForCommit.seconds() > 86400 ) {
-                    state = FAIL;
-                    errmsg = "timed out waiting for commit";
+                if ( state == FAIL ) {
+                    errmsg = "imted out waiting for commit";
                     return;
                 }
 
@@ -1445,10 +1498,14 @@ namespace mongo {
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
             if ( ! opReplicatedEnough( lastOpApplied ) ) {
-                warning() << "migrate commit attempt timed out contacting " << slaveCount
-                          << " slaves for '" << ns << "' " << min << " -> " << max << migrateLog;
+                OpTime op( lastOpApplied );
+                OCCASIONALLY warning() << "migrate commit waiting for " << slaveCount 
+                                       << " slaves for '" << ns << "' " << min << " -> " << max 
+                                       << " waiting for: " << op
+                                       << migrateLog;
                 return false;
             }
+
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
@@ -1483,12 +1540,14 @@ namespace mongo {
                 return false;
             state = COMMIT_START;
             
-            // we wait 5 minutes for the commit to succeed before giving up
-            for ( int i=0; i<5*60*1000; i++ ) {
+            Timer t;
+            // we wait for the commit to succeed before giving up
+            while ( t.minutes() <= 5 ) {
                 sleepmillis(1);
                 if ( state == DONE )
                     return true;
             }
+            state = FAIL;
             log() << "startCommit never finished!" << migrateLog;
             return false;
         }
@@ -1524,6 +1583,10 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
+        if (!noauth) {
+            ShardedConnectionInfo::addHook();
+            cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+        }
         migrateStatus.go();
         cc().shutdown();
     }

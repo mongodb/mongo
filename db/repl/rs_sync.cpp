@@ -20,28 +20,28 @@
 #include "rs.h"
 #include "../repl.h"
 #include "connections.h"
+
 namespace mongo {
 
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
+    void NOINLINE_DECL blank(const BSONObj& o) {
+        if( *o.getStringField("op") != 'n' ) {
+            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
+        }
+    }
+
     /* apply the log op that is in param o */
     void ReplSetImpl::syncApply(const BSONObj &o) {
-        char db[MaxDatabaseNameLen];
         const char *ns = o.getStringField("ns");
-        nsToDatabase(ns, db);
-
         if ( *ns == '.' || *ns == 0 ) {
-            if( *o.getStringField("op") == 'n' )
-                return;
-            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
+            blank(o);
             return;
         }
 
         Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
-
-        /* todo : if this asserts, do we want to ignore or not? */
         applyOperation_inlock(o);
     }
 
@@ -63,7 +63,7 @@ namespace mongo {
                 return false;
             }
 
-            r.queryGTE( rsoplog, applyGTE );
+            r.tailingQueryGTE( rsoplog, applyGTE );
             if ( !r.haveCursor() ) {
                 log() << "replSet initial sync oplog query error" << rsLog;
                 return false;
@@ -79,7 +79,7 @@ namespace mongo {
                 OpTime t = op["ts"]._opTime();
                 r.putBack(op);
 
-                if( op.firstElement().fieldName() == string("$err") ) {
+                if( op.firstElementFieldName() == string("$err") ) {
                     log() << "replSet initial sync error querying " << rsoplog << " on " << hn << " : " << op.toString() << rsLog;
                     return false;
                 }
@@ -161,7 +161,7 @@ namespace mongo {
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
                     r.resetCursor();
-                    r.queryGTE(rsoplog, ts);
+                    r.tailingQueryGTE(rsoplog, ts);
                     if( r.haveCursor() ) {
                         continue;
                     }
@@ -207,35 +207,35 @@ namespace mongo {
         return golive;
     }
 
-    /**
-     * Checks if the oplog given is too far ahead to read from.
-     *
-     * @param r the oplog
-     * @param hn the hostname (for log messages)
-     *
-     * @return if we are stale compared to the oplog on hn
-     */
     bool ReplSetImpl::_isStale(OplogReader& r, const string& hn) {
         BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
         OpTime ts = remoteOldestOp["ts"]._opTime();
         DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
         else log(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
         DEV {
-            // debugging sync1.js...
             log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
             log() << "replSet our state: " << state().toString() << rsLog;
         }
-        if( lastOpTimeWritten < ts ) {
-            log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
-            log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-            log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
-            log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-            sethbmsg("error RS102 too stale to catch up");
-            changeState(MemberState::RS_RECOVERING);
-            sleepsecs(120);
-            return true;
+        if( lastOpTimeWritten >= ts ) {
+            return false;
         }
-        return false;
+
+        // we're stale
+        log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
+        log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
+        log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
+        log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+
+        // reset minvalid so that we can't become primary prematurely
+        {
+            writelock lk("local.replset.minvalid");
+            Helpers::putSingleton("local.replset.minvalid", remoteOldestOp);
+        }
+
+        sethbmsg("error RS102 too stale to catch up");
+        changeState(MemberState::RS_RECOVERING);
+        sleepsecs(120);
+        return true;
     }
 
     /**
@@ -383,11 +383,11 @@ namespace mongo {
                         long long sleeptime = sd - lag;
                         if( sleeptime > 0 ) {
                             uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
-                            log() << "replSet temp slavedelay sleep:" << sleeptime << rsLog;
                             if( sleeptime < 60 ) {
                                 sleepsecs((int) sleeptime);
                             }
                             else {
+                                log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
                                 // sleep(hours) would prevent reconfigs from taking effect & such!
                                 long long waitUntil = b + sleeptime;
                                 while( 1 ) {
@@ -419,7 +419,7 @@ namespace mongo {
                         }
 
                         syncApply(o);
-                        _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too: */
+                        _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
                     }
                 }
             }
@@ -443,7 +443,7 @@ namespace mongo {
             sleepsecs(1);
             return;
         }
-        if( sp.state.fatal() ) {
+        if( sp.state.fatal() || sp.state.startup() ) {
             sleepsecs(5);
             return;
         }
@@ -463,8 +463,11 @@ namespace mongo {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
-            if( ! _self || myConfig().arbiterOnly ){
-            	if( ! _self ) log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
+            if( ! _self ) {
+            	log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
+                return;
+            }
+            if( myConfig().arbiterOnly ) {
                 return;
             }
 
@@ -474,7 +477,7 @@ namespace mongo {
             catch(DBException& e) {
                 sethbmsg(str::stream() << "syncThread: " << e.toString() <<
                          ", try 'use local; db.oplog.rs.findOne({ts : {$gt : new Timestamp(" <<
-                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")});' on the primary");
+                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")}});' on the primary");
                 sleepsecs(10);
             }
             catch(...) {
@@ -502,98 +505,116 @@ namespace mongo {
         }
         n++;
 
-        Client::initThread("replica set sync");
-        cc().iAmSyncThread();
+        Client::initThread("rsSync");
+        cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();
         cc().shutdown();
     }
 
-    bool ReplSetImpl::_getSlave(const BSONObj& rid, GhostSlave& slave) {
-        log(1) << "cache miss for " << rid << ", reloading slave info" << rsLog;
-        
-        for( Member *m = _members.head(); m; m=m->next() ) {
-            // no point in loading arbiters
-            if (!m->state().readable()) {
-                continue;
-            }
-            
-            try {
-                ScopedConn conn(m->fullName());
-                BSONObj me = conn.findOne("local.me", BSONObj(), 0, 0);
-                if (me.isEmpty() || !me.hasField("_id")) {
-                    continue;
-                }
-                log(1) << "adding " << me << " -> " << m->fullName() << endl;
-                
-                GhostSlave& someSlave = _ghostCache[me];
-                if (!someSlave.init) {
-                    someSlave.init = true;
-                    someSlave.slave = m;
-                }
-                if (rid == me) {
-                    return true;
-                }
-            }
-            catch (DBException& e) {
-                log() << "error adding member " << m->fullName()
-                      << " to ghost list: " << e.what() << rsLog;
-            }
-        }
-            
-        // if rid doesn't refer to a member of the set, this still might not
-        // be inited
-        return slave.init;
+    void GhostSync::starting() {
+        Client::initThread("rsGhostSync");
+        replLocalAuth();
     }
-    
-    void ReplSetImpl::percolate(const BSONObj& rid, const OpTime& last) {
-        GhostSlave &s = _ghostCache[rid];
-        if (!s.init  && !_getSlave(rid, s)) {
-            log() << "replSet couldn't find a slave with id " << rid
-                  << ", not faux syncing" << rsLog;
+
+    void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
+        const OID rid = id["_id"].OID();
+        rwlock lk( _lock , true );
+        GhostSlave &slave = _ghostCache[rid];
+        if (slave.init) {
+            LOG(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
             return;
         }
-        assert(s.slave);
 
-        const Member *target = _currentSyncTarget;
-        if (!target || box.getState().primary()
+        slave.slave = (Member*)rs->findById(memberId);
+        if (slave.slave != 0) {
+            slave.init = true;
+        }
+        else {
+            log() << "replset couldn't find a slave with id " << memberId
+                  << ", not tracking " << rid << rsLog;
+        }
+    }
+
+    void GhostSync::updateSlave(const mongo::OID& rid, const OpTime& last) {
+        rwlock lk( _lock , false );
+        MAP::iterator i = _ghostCache.find( rid );
+        if ( i == _ghostCache.end() ) {
+            OCCASIONALLY log() << "couldn't update slave " << rid << " no entry" << rsLog;
+            return;
+        }
+        
+        GhostSlave& slave = i->second;
+        if (!slave.init) {
+            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
+            return;
+        }
+
+        ((ReplSetConfig::MemberCfg)slave.slave->config()).updateGroups(last);
+    }
+
+    void GhostSync::percolate(const BSONObj& id, const OpTime& last) {
+        const OID rid = id["_id"].OID();
+        GhostSlave* slave;
+        {
+            rwlock lk( _lock , false );
+
+            MAP::iterator i = _ghostCache.find( rid );
+            if ( i == _ghostCache.end() ) {
+                OCCASIONALLY log() << "couldn't percolate slave " << rid << " no entry" << rsLog;
+                return;
+            }
+
+            slave = &(i->second);
+            if (!slave->init) {
+                OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
+                return;
+            }
+        }
+
+        assert(slave->slave);
+
+        const Member *target = rs->_currentSyncTarget;
+        if (!target || rs->box.getState().primary()
             // we are currently syncing from someone who's syncing from us
             // the target might end up with a new Member, but s.slave never
             // changes so we'll compare the names
-            || target == s.slave || target->fullName() == s.slave->fullName()) {
+            || target == slave->slave || target->fullName() == slave->slave->fullName()) {
+            log(1) << "replica set ghost target no good" << endl;
             return;
         }
 
         try {
-            if (!s.reader.haveCursor()) {
-                if (!s.reader.connect(s.slave->fullName(), target->fullName())) {
+            if (!slave->reader.haveCursor()) {
+                if (!slave->reader.connect(id, slave->slave->id(), target->fullName())) {
                     // error message logged in OplogReader::connect
                     return;
                 }
-                s.reader.ghostQueryGTE(rsoplog, last);
+                slave->reader.ghostQueryGTE(rsoplog, last);
             }
 
-            log(1) << "last: " << s.last.toString() << " to " << last.toString() << rsLog;
-            
-            if (s.last > last) {
+            log(1) << "last: " << slave->last.toString() << " to " << last.toString() << rsLog;
+
+            if (slave->last > last) {
                 return;
             }
-            
-            while (s.last <= last) {
-                if (!s.reader.more()) {
+
+            while (slave->last <= last) {
+                if (!slave->reader.more()) {
                     // we'll be back
                     return;
                 }
-            
-                BSONObj o = s.reader.nextSafe();
-                s.last = o["ts"]._opTime();
+
+                BSONObj o = slave->reader.nextSafe();
+                slave->last = o["ts"]._opTime();
             }
-            log(2) << "now last is " << s.last.toString() << rsLog;
+            log(2) << "now last is " << slave->last.toString() << rsLog;
         }
         catch (DBException& e) {
             // we'll be back
-            log() << "replSet ghost sync error: " << e.what() << " for "
-                  << s.slave->fullName() << rsLog;
+            log(2) << "replSet ghost sync error: " << e.what() << " for "
+                   << slave->slave->fullName() << rsLog;
+            slave->reader.resetConnection();
         }
     }
 }

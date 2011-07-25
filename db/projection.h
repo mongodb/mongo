@@ -94,6 +94,8 @@ namespace mongo {
          */
         KeyOnly* checkKey( const BSONObj& keyPattern ) const;
 
+        bool includeID() const { return _includeID; }
+
     private:
 
         /**

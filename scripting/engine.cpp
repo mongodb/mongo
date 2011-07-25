@@ -417,7 +417,7 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
             return _real->invoke( func , args , recv, timeoutMs , ignoreReturn );
         }
 

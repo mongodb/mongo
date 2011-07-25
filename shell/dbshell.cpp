@@ -442,18 +442,6 @@ namespace mongo {
     extern DBClientWithCommands *latestConn;
 }
 
-string stateToString(MemberState s) {
-    if( s.s == MemberState::RS_STARTUP ) return "STARTUP";
-    if( s.s == MemberState::RS_PRIMARY ) return "PRIMARY";
-    if( s.s == MemberState::RS_SECONDARY ) return "SECONDARY";
-    if( s.s == MemberState::RS_RECOVERING ) return "RECOVERING";
-    if( s.s == MemberState::RS_FATAL ) return "FATAL";
-    if( s.s == MemberState::RS_STARTUP2 ) return "STARTUP2";
-    if( s.s == MemberState::RS_ARBITER ) return "ARBITER";
-    if( s.s == MemberState::RS_DOWN ) return "DOWN";
-    if( s.s == MemberState::RS_ROLLBACK ) return "ROLLBACK";
-    return "";
-}
 string sayReplSetMemberState() {
     try {
         if( latestConn ) {
@@ -463,8 +451,7 @@ string sayReplSetMemberState() {
                 ss << info["set"].String() << ':';
                 int s = info["myState"].Int();
                 MemberState ms(s);
-                ss << stateToString(ms);
-                return ss.str();
+                return ms.toString();
             }
             else if( str::equals(info.getStringField("info"), "mongos") ) { 
                 return "mongos";
@@ -493,6 +480,7 @@ int _main(int argc, char* argv[]) {
 
     bool runShell = false;
     bool nodb = false;
+    bool norc = false;
 
     string script;
 
@@ -504,6 +492,7 @@ int _main(int argc, char* argv[]) {
     shell_options.add_options()
     ("shell", "run the shell after executing files")
     ("nodb", "don't connect to mongod on startup - no 'db address' arg expected")
+    ("norc", "will not run the \".mongorc.js\" file on start up")
     ("quiet", "be less chatty" )
     ("port", po::value<string>(&port), "port to connect to")
     ("host", po::value<string>(&dbhost), "server to connect to")
@@ -565,6 +554,9 @@ int _main(int argc, char* argv[]) {
     }
     if (params.count("nodb")) {
         nodb = true;
+    }
+    if (params.count("norc")) {
+        norc = true;
     }
     if (params.count("help")) {
         show_help_text(argv[0], shell_options);
@@ -680,7 +672,27 @@ int _main(int argc, char* argv[]) {
 
         mongo::shellUtils::MongoProgramScope s;
 
+        if (!norc) {
+            string rcLocation;
+#ifndef _WIN32
+            if ( getenv("HOME") != NULL )
+                rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js" ;
+#else
+            if ( getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL )
+                rcLocation = str::stream() << getenv("HOMEDRIVE") << getenv("HOMEPATH") << "\\.mongorc.js";
+#endif
+            if ( !rcLocation.empty() && fileExists(rcLocation) ) {
+                if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
+                    cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
+                    return -5;
+                }
+            }
+        }
+
         shellHistoryInit();
+
+        string prompt;
+        int promptType; 
 
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
@@ -690,7 +702,15 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            string prompt(sayReplSetMemberState()+"> ");
+            promptType = scope->type("prompt");
+            if (promptType == String){
+                prompt = scope->getString("prompt");
+            } else if (promptType  == Code) {
+                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
+                prompt = scope->getString("__prompt__");
+            } else {
+                prompt = sayReplSetMemberState()+"> ";
+            }
 
             char * line = shellReadline( prompt.c_str() );
 

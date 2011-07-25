@@ -49,6 +49,7 @@ namespace mongo {
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
         explicit MemberState(int ms) : s((MS) ms) { }
 
+        bool startup() const { return s == RS_STARTUP; }
         bool primary() const { return s == RS_PRIMARY; }
         bool secondary() const { return s == RS_SECONDARY; }
         bool recovering() const { return s == RS_RECOVERING; }
@@ -103,6 +104,22 @@ namespace mongo {
     inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const {
         return health != old.health ||
                hbstate != old.hbstate;
+    }
+
+    inline string MemberState::toString() const {
+        switch ( s ) {
+        case RS_STARTUP: return "STARTUP";
+        case RS_PRIMARY: return "PRIMARY";
+        case RS_SECONDARY: return "SECONDARY";
+        case RS_RECOVERING: return "RECOVERING";
+        case RS_FATAL: return "FATAL";
+        case RS_STARTUP2: return "STARTUP2";
+        case RS_ARBITER: return "ARBITER";
+        case RS_DOWN: return "DOWN";
+        case RS_ROLLBACK: return "ROLLBACK";
+        case RS_UNKNOWN: return "UNKNOWN";
+        }
+        return "";
     }
 
 }

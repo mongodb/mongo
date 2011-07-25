@@ -298,7 +298,7 @@ public:
                     break;
             }
             else {
-                while (isspace( buf[0] )) {
+                while ((_type != TSV || buf[0] != '\t') && isspace( buf[0] )) {
                     len++;
                     buf++;
                 }

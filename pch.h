@@ -37,6 +37,7 @@
 # ifndef NOMINMAX
 #  define NOMINMAX
 # endif
+#define WIN32_LEAN_AND_MEAN
 # include <winsock2.h> //this must be included before the first windows.h include
 # include <ws2tcpip.h>
 # include <wspiapi.h>
@@ -154,6 +155,11 @@ namespace mongo {
 
     using boost::uint32_t;
     using boost::uint64_t;
+
+    /** called by mongos, mongod, test. do not call from clients and such. 
+        invoked before about everything except global var construction.
+     */
+    void doPreServerStatupInits();
 
 } // namespace mongo
 

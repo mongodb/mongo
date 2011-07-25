@@ -21,7 +21,7 @@
 
 #include "../../client/dbclient.h"
 #include "../../db/instance.h"
-#include "../../db/query.h"
+#include "../../db/ops/query.h"
 #include "../../db/queryoptimizer.h"
 #include "../../util/file_allocator.h"
 

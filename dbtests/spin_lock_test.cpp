@@ -16,9 +16,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../pch.h"
+#include "pch.h"
 #include <boost/thread/thread.hpp>
-
 #include "dbtests.h"
 #include "../util/concurrency/spin_lock.h"
 

@@ -22,7 +22,7 @@ Description: An object/document-oriented database
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Auto-sharding for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.

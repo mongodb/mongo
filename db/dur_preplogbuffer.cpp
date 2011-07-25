@@ -35,6 +35,7 @@
 #include "../util/alignedbuilder.h"
 #include "../util/timer.h"
 #include "dur_stats.h"
+#include "../server.h"
 
 using namespace mongoutils;
 
@@ -58,9 +59,8 @@ namespace mongo {
         void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
-            dassert( i->w_ptr == 0 );
 
-            if( !mmf->willNeedRemap() ) {
+            _IF( !mmf->willNeedRemap() ) {
                 // tag this mmf as needed a remap of its private view later.
                 // usually it will already be dirty/already set, so we do the if above first
                 // to avoid possibility of cpu cache line contention
@@ -69,8 +69,13 @@ namespace mongo {
 
             // since we have already looked up the mmf, we go ahead and remember the write view location
             // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
+            // 
+            // this was for WRITETODATAFILES_Impl2 so commented out now
+            //
+            /*
             dassert( i->w_ptr == 0 );
             i->w_ptr = ((char*)mmf->view_write()) + ofs;
+            */
 
             JEntry e;
             e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
@@ -92,7 +97,7 @@ namespace mongo {
 #endif
             bb.appendBuf(i->start(), e.len);
 
-            if (e.len != (unsigned)i->length()) {
+            _IF (e.len != (unsigned)i->length()) {
                 log() << "journal info splitting prepBasicWrite at boundary" << endl;
 
                 // This only happens if we write to the last byte in a file and
@@ -118,6 +123,7 @@ namespace mongo {
             for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
                 prepBasicWrite_inlock(bb, &(*i), lastDbPath);
             }
+
         }
 
         void resetLogBuffer(AlignedBuilder& bb) {

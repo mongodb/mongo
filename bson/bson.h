@@ -23,7 +23,7 @@
  */
 
 /**
-   bo and its helpers
+   Main include file for C++ BSON module when using standalone (sans MongoDB client).
 
    "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
    represented in JSON (plus a few extensions useful for databases & other languages).
@@ -105,19 +105,6 @@ namespace mongo {
 #include "oid.h"
 #include "bsonelement.h"
 #include "bsonobj.h"
-#include "bsonmisc.h"
 #include "bsonobjbuilder.h"
 #include "bsonobjiterator.h"
 #include "bson-inl.h"
-
-namespace mongo {
-
-    inline unsigned getRandomNumber() {
-#if defined(_WIN32)
-        return rand();
-#else
-        return random();
-#endif
-    }
-
-}

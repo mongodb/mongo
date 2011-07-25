@@ -22,6 +22,7 @@
 #include "../db/queryutil.h"
 #include "../db/commands.h"
 #include "../util/concurrency/task.h"
+#include "../util/net/listen.h"
 
 namespace mongo {
 
@@ -184,7 +185,7 @@ namespace mongo {
 
     long long CursorCache::genId() {
         while ( true ) {
-            long long x = security.getNonce();
+            long long x = Security::getNonce();
             if ( x == 0 )
                 continue;
             if ( x < 0 )

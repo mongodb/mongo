@@ -44,6 +44,21 @@ namespace mongo {
         NamespaceString( const string& ns ) { init(ns.c_str()); }
         string ns() const { return db + '.' + coll; }
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
+
+        /**
+         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
+         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
+         */
+        static bool normal(const char* ns) {
+            const char *p = strchr(ns, '$');
+            if( p == 0 )
+                return true;
+            return strcmp( ns, "local.oplog.$main" ) == 0;
+        }
+
+        static bool special(const char *ns) { 
+            return !normal(ns) || strstr(ns, ".system.");
+        }
     private:
         void init(const char *ns) {
             const char *p = strchr(ns, '.');
@@ -344,6 +359,10 @@ namespace mongo {
             return -1;
         }
 
+        bool haveIdIndex() { 
+            return (flags & NamespaceDetails::Flag_HaveIdIndex) || findIdIndex() >= 0;
+        }
+
         /* return which "deleted bucket" for this size object */
         static int bucket(int n) {
             for ( int i = 0; i < Buckets; i++ )
@@ -419,9 +438,12 @@ namespace mongo {
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
+    private:
         /* _get() is not threadsafe -- see get_inlock() comments */
         static NamespaceDetailsTransient& _get(const char *ns);
-        /* use get_w() when doing write operations */
+    public:
+        /* use get_w() when doing write operations. this is safe as there is only 1 write op and it's exclusive to everything else.  
+           for reads you must lock and then use get_inlock() instead. */
         static NamespaceDetailsTransient& get_w(const char *ns) {
             DEV assertInWriteLock();
             return _get(ns);
@@ -473,12 +495,12 @@ namespace mongo {
         /* IndexSpec caching */
     private:
         map<const IndexDetails*,IndexSpec> _indexSpecs;
-        static mongo::mutex _isMutex;
+        static SimpleMutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ) {
             IndexSpec& spec = _indexSpecs[details];
             if ( ! spec._finishedInit ) {
-                scoped_lock lk(_isMutex);
+                SimpleMutex::scoped_lock lk(_isMutex);
                 if ( ! spec._finishedInit ) {
                     spec.reset( details );
                     assert( spec._finishedInit );
@@ -492,7 +514,7 @@ namespace mongo {
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
-        static mongo::mutex _qcMutex;
+        static SimpleMutex _qcMutex;
         /* you must be in the qcMutex when calling this (and using the returned val): */
         static NamespaceDetailsTransient& get_inlock(const char *ns) {
             return _get(ns);
@@ -505,7 +527,7 @@ namespace mongo {
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
-            if ( ++_qcWriteCount >= 100 )
+            if ( ++_qcWriteCount >= 1000 )
                 clearQueryCache();
         }
         BSONObj indexForPattern( const QueryPattern &pattern ) {

@@ -24,11 +24,11 @@ namespace mongo {
     bool requestHeartbeat(string setname, string fromHost, string memberFullName, BSONObj& result, int myConfigVersion, int& theirConfigVersion, bool checkEmpty = false);
 
     struct HealthOptions {
-        HealthOptions() {
-            heartbeatSleepMillis = 2000;
-            heartbeatTimeoutMillis = 10000;
-            heartbeatConnRetries  = 2;
-        }
+        HealthOptions() :  
+            heartbeatSleepMillis(2000), 
+            heartbeatTimeoutMillis( 10000 ),
+            heartbeatConnRetries(2) 
+        { }
 
         bool isDefault() const { return *this == HealthOptions(); }
 
@@ -46,5 +46,5 @@ namespace mongo {
             return heartbeatSleepMillis==r.heartbeatSleepMillis && heartbeatTimeoutMillis==r.heartbeatTimeoutMillis && heartbeatConnRetries==r.heartbeatConnRetries;
         }
     };
-
+    
 }

@@ -78,6 +78,10 @@ DB.prototype.addUser = function( username , pass, readOnly ){
     print( tojson( u ) );
 }
 
+DB.prototype.logout = function(){
+    return this.runCommand({logout : 1});
+}
+
 DB.prototype.removeUser = function( username ){
     this.getCollection( "system.users" ).remove( { user : username } );
 }
@@ -131,6 +135,8 @@ DB.prototype.auth = function( username , pass ){
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
     var cmd = { create: name, capped: options.capped, size: options.size, max: options.max };
+    if (options.autoIndexId != undefined)
+        cmd.autoIndexId = options.autoIndexId;
     var res = this._dbCommand(cmd);
     return res;
 }
@@ -140,7 +146,7 @@ DB.prototype.createCollection = function(name, opt) {
  *  Returns the current profiling level of this database
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingLevel  = function() { 
+DB.prototype.getProfilingLevel  = function() {
     var res = this._dbCommand( { profile: -1 } );
     return res ? res.was : null;
 }
@@ -150,7 +156,7 @@ DB.prototype.getProfilingLevel  = function() {
  *  example { was : 0, slowms : 100 }
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingStatus  = function() { 
+DB.prototype.getProfilingStatus  = function() {
     var res = this._dbCommand( { profile: -1 } );
     if ( ! res.ok )
         throw "profile command failed: " + tojson( res );
@@ -161,24 +167,37 @@ DB.prototype.getProfilingStatus  = function() {
 
 /**
   Erase the entire database.  (!)
- 
+
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
 */
-DB.prototype.dropDatabase = function() { 	
+DB.prototype.dropDatabase = function() {
     if ( arguments.length )
         throw "dropDatabase doesn't take arguments";
     return this._dbCommand( { dropDatabase: 1 } );
 }
 
-
-DB.prototype.shutdownServer = function() { 
+/**
+ * Shuts down the database.  Must be run while using the admin database.
+ * @param opts Options for shutdown. Possible options are:
+ *   - force: (boolean) if the server should shut down, even if there is no
+ *     up-to-date slave
+ *   - timeoutSecs: (number) the server will continue checking over timeoutSecs
+ *     if any other servers have caught up enough for it to shut down.
+ */
+DB.prototype.shutdownServer = function(opts) {
     if( "admin" != this._name ){
 	return "shutdown command only works with the admin database; try 'use admin'";
     }
 
+    cmd = {"shutdown" : 1};
+    opts = opts || {};
+    for (var o in opts) {
+        cmd[o] = opts[o];
+    }
+
     try {
-        var res = this._dbCommand("shutdown");
-	if( res ) 
+        var res = this.runCommand(cmd);
+	if( res )
 	    throw "shutdownServer failed: " + res.errmsg;
 	throw "shutdownServer failed";
     }
@@ -305,6 +324,7 @@ DB.prototype.help = function() {
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
+    print("\tdb.logout()");
     print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
@@ -694,7 +714,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         print("\t syncedTo: " + st.toString() );
         var ago = (now-st)/1000;
         var hrs = Math.round(ago/36)/100;
-        print("\t\t = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+        print("\t\t = " + Math.round(ago) + " secs ago (" + hrs + "hrs)");
     };
     
     function g(x) {
@@ -725,12 +745,13 @@ DB.prototype.printSlaveReplicationInfo = function() {
     };
     
     var L = this.getSiblingDB("local");
-    if( L.sources.count() != 0 ) { 
-        L.sources.find().forEach(g);
-    }
-    else if (L.system.replset.count() != 0) {
+
+    if (L.system.replset.count() != 0) {
         var status = this.adminCommand({'replSetGetStatus' : 1});
         status.members.forEach(r);
+    }
+    else if( L.sources.count() != 0 ) {
+        L.sources.find().forEach(g);
     }
     else {
         print("local.sources is empty; is this db a --slave?");

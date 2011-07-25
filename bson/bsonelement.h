@@ -20,6 +20,14 @@
 #include <vector>
 #include <string.h>
 #include "util/builder.h"
+#include "bsontypes.h"
+
+namespace mongo {
+    class OpTime;
+    class BSONObj;
+    class BSONElement;
+    class BSONObjBuilder;
+}
 
 namespace bson {
     typedef mongo::BSONElement be;
@@ -28,9 +36,6 @@ namespace bson {
 }
 
 namespace mongo {
-
-    class OpTime;
-    class BSONElement;
 
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
@@ -155,6 +160,8 @@ namespace mongo {
         bool boolean() const {
             return *value() ? true : false;
         }
+
+        bool booleanSafe() const { return isBoolean() && boolean(); }
 
         /** Retrieve a java style date value from the element.
             Ensure element is of type Date before calling.
@@ -363,6 +370,7 @@ namespace mongo {
             return *reinterpret_cast< const mongo::OID* >( start );
         }
 
+        /** this does not use fieldName in the comparison, just the value */
         bool operator<( const BSONElement& other ) const {
             int x = (int)canonicalType() - (int)other.canonicalType();
             if ( x < 0 ) return true;
@@ -495,7 +503,7 @@ namespace mongo {
         return true;
     }
 
-    /** True if element is of a numeric type. */
+    /** @return true if element is of a numeric type. */
     inline bool BSONElement::isNumber() const {
         switch( type() ) {
         case NumberLong:

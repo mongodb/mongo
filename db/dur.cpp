@@ -17,7 +17,7 @@
 */
 
 /*
-   phases
+   phases:
 
      PREPLOGBUFFER
        we will build an output buffer ourself and then use O_DIRECT
@@ -35,6 +35,22 @@
          to be too frequent.
        there could be a slow down immediately after remapping as fresh copy-on-writes for commonly written pages will
          be required.  so doing these remaps fractionally is helpful. 
+
+   mutexes:
+
+     READLOCK dbMutex
+     LOCK groupCommitMutex
+       PREPLOGBUFFER()
+     READLOCK mmmutex
+       commitJob.reset()
+     UNLOCK dbMutex                                     // now other threads can write
+       WRITETOJOURNAL()
+       WRITETODATAFILES()
+     UNLOCK mmmutex
+     UNLOCK groupCommitMutex
+
+     on the next write lock acquisition for dbMutex:    // see MongoMutex::_acquiredWriteLock()
+       REMAPPRIVATEVIEW()
 
      @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
@@ -106,8 +122,10 @@ namespace mongo {
             return ss.str();
         }
 
+        int getAgeOutJournalFiles();
         BSONObj Stats::S::_asObj() {
-            return BSON(
+            BSONObjBuilder b;
+            b << 
                        "commits" << _commits <<
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
@@ -119,8 +137,13 @@ namespace mongo {
                              "writeToJournal" << (unsigned) (_writeToJournalMicros/1000) <<
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
-                           )
-                   );
+                           );
+            int r = getAgeOutJournalFiles();
+            if( r == -1 )
+                b << "ageOutJournalFiles" << "mutex timeout";
+            if( r == 0 )
+                b << "ageOutJournalFiles" << false;
+            return b.obj();
         }
 
         BSONObj Stats::asObj() {
@@ -463,6 +486,7 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
+        // lock order: dbMutex first, then this
         mutex groupCommitMutex("groupCommit");
 
         bool _groupCommitWithLimitedLocks() {
@@ -574,7 +598,7 @@ namespace mongo {
                 // this needs done in a write lock (as there is a short window during remapping when each view 
                 // might not exist) thus we do it on the next acquisition of that instead of here (there is no 
                 // rush if you aren't writing anyway -- but it must happen, if it is done, before any uncommitted 
-                // writes occur).  If desired, perhpas this can be eliminated on posix as it may be that the remap 
+                // writes occur).  If desired, perhaps this can be eliminated on posix as it may be that the remap 
                 // is race-free there.
                 //
                 dbMutex._remapPrivateViewRequested = true;
@@ -750,6 +774,13 @@ namespace mongo {
 
         void DurableImpl::syncDataAndTruncateJournal() {
             dbMutex.assertWriteLocked();
+
+            // a commit from the commit thread won't begin while we are in the write lock,
+            // but it may already be in progress and the end of that work is done outside 
+            // (dbMutex) locks. This line waits for that to complete if already underway.
+            {
+                scoped_lock lk(groupCommitMutex);
+            }
 
             groupCommit();
             MongoFile::flushAll(true);
