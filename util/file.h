@@ -60,10 +60,11 @@ namespace mongo {
     class File : public FileInterface {
         HANDLE fd;
         bool _bad;
+        string _name;
         void err(BOOL b=false) { /* false = error happened */
             if( !b && !_bad ) {
                 _bad = true;
-                log() << "File I/O error " << GetLastError() << '\n';
+                log() << "File " << _name << "I/O error " << GetLastError() << '\n';
             }
         }
     public:
@@ -76,6 +77,7 @@ namespace mongo {
             fd = INVALID_HANDLE_VALUE;
         }
         void open(const char *filename, bool readOnly=false , bool direct=false) {
+            _name = filename;
             fd = CreateFile(
                      toNativeString(filename).c_str(),
                      ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_WRITE|FILE_SHARE_READ,
