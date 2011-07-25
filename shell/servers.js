@@ -1379,62 +1379,76 @@ ReplSetTest.prototype.reInitiate = function() {
     this.initiate( config , 'replSetReconfig' );
 }
 
+ReplSetTest.prototype.getLastOpTimeWritten = function() {
+    this.getMaster();
+    this.attempt({context : this, desc : "awaiting oplog query"},
+                 function() {
+                     try {
+                         this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                     }
+                     catch(e) {
+                         print("ReplSetTest caught exception " + e);
+                         return false;
+                     }
+                     return true;
+                 });
+};
+
 ReplSetTest.prototype.awaitReplication = function(timeout) {
-   this.getMaster();
-   timeout = timeout || 30000;
+    timeout = timeout || 30000;
 
-   this.attempt({context : this, desc : "awaiting oplog query"},
-                function() {
-                    try {
-                        latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
-                    }
-                    catch(e) {
-                        print("ReplSetTest caught exception " + e);
-                        return false;
-                    }
-                    return true;
-                });
-   
-   print("ReplSetTest " + latest);
+    this.getLastOpTimeWritten();
 
-   this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
-       function() {
-           var synced = true;
-           for(var i=0; i<this.liveNodes.slaves.length; i++) {
-             var slave = this.liveNodes.slaves[i];
+    print("ReplSetTest " + this.latest);
 
-             // Continue if we're connected to an arbiter
-             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
-                 if(res.myState == 7) {
-                     continue;
-                 }
-             }
+    this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
+                 function() {
+                     try {
+                         var synced = true;
+                         for(var i=0; i<this.liveNodes.slaves.length; i++) {
+                             var slave = this.liveNodes.slaves[i];
 
-             slave.getDB("admin").getMongo().setSlaveOk();
-             var log = slave.getDB("local")['oplog.rs'];
-             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
-               var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
-               printjson( entry );
-               var ts = entry['ts'];
-               print("ReplSetTest await TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + latest.t+":"+latest.i);
-               
-               if (latest.t < ts.t || (latest.t == ts.t && latest.i < ts.i)) {
-                   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
-               }
-               
-               print("ReplSetTest await oplog size for " + slave + " is " + log.count());
-               synced = (synced && friendlyEqual(latest,ts))
-             }
-             else {
-               synced = false;
-             }
-           }
+                             // Continue if we're connected to an arbiter
+                             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
+                                 if(res.myState == 7) {
+                                     continue;
+                                 }
+                             }
 
-           if(synced) {
-                print("ReplSetTest await synced=" + synced);
-           }
-           return synced;
-   });
+                             slave.getDB("admin").getMongo().setSlaveOk();
+                             var log = slave.getDB("local")['oplog.rs'];
+                             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
+                                 var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
+                                 printjson( entry );
+                                 var ts = entry['ts'];
+                                 print("ReplSetTest await TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + this.latest.t+":"+this.latest.i);
+
+                                 if (this.latest.t < ts.t || (this.latest.t == ts.t && this.latest.i < ts.i)) {
+                                     this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                                 }
+
+                                 print("ReplSetTest await oplog size for " + slave + " is " + log.count());
+                                 synced = (synced && friendlyEqual(this.latest,ts))
+                             }
+                             else {
+                                 synced = false;
+                             }
+                         }
+
+                         if(synced) {
+                             print("ReplSetTest await synced=" + synced);
+                         }
+                         return synced;
+                     }
+                     catch (e) {
+                         print("ReplSetTest.awaitReplication: caught exception "+e);
+
+                         // we might have a new master now
+                         this.getLastOpTimeWritten();
+
+                         return false;
+                     }
+                 });
 }
 
 ReplSetTest.prototype.getHashes = function( db ){
