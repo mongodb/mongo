@@ -63,14 +63,7 @@ namespace mongo {
                 return false;
             }
 
-            {
-                BSONObjBuilder q;
-                q.appendDate("$gte", applyGTE.asDate());
-                BSONObjBuilder query;
-                query.append("ts", q.done());
-                BSONObj queryObj = query.done();
-                r.query(rsoplog, queryObj);
-            }
+            r.tailingQueryGTE(rsoplog, applyGTE);
             assert( r.haveCursor() );
 
             {
