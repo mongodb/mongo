@@ -28,6 +28,7 @@ namespace mongo {
     public:
         class eof : public std::exception {
         public:
+            eof() { }
             virtual const char * what() { return "BufReader eof"; }
         };
 
@@ -88,6 +89,7 @@ namespace mongo {
         }
 
         const void* pos() { return _pos; }
+        const void* start() { return _start; }
 
     private:
         const void *_start;

@@ -125,23 +125,20 @@ namespace mongo {
             }
         }
 
-        void resetLogBuffer(AlignedBuilder& bb) {
+        void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
             bb.reset();
 
-            // JSectHeader
-            JSectHeader h;
             h.setSectionLen(0xffffffff);  // total length, will fill in later
             h.seqNumber = getLastDataFileFlushTime();
             h.fileId = j.curFileId();
-
-            bb.appendStruct(h);
         }
 
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
+            @return partially populated sectheader and _ab set
         */
-        void _PREPLOGBUFFER() {
+        void _PREPLOGBUFFER(JSectHeader& h) {
             assert( cmdLine.dur );
 
             {
@@ -153,7 +150,7 @@ namespace mongo {
             }
 
             AlignedBuilder& bb = commitJob._ab;
-            resetLogBuffer(bb); // adds JSectHeader
+            resetLogBuffer(h, bb); // adds JSectHeader
 
             // ops other than basic writes (DurOp's)
             {
@@ -166,10 +163,10 @@ namespace mongo {
 
             return;
         }
-        void PREPLOGBUFFER() {
+        void PREPLOGBUFFER(/*out*/ JSectHeader& h) {
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
-            _PREPLOGBUFFER();
+            _PREPLOGBUFFER(h);
             stats.curr->_prepLogBufferMicros += t.micros();
         }
 

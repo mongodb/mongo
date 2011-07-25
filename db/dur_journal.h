@@ -37,11 +37,12 @@ namespace mongo {
         /** assure journal/ dir exists. throws */
         void journalMakeDir();
 
-        /** write/append to journal file *
-            @param buf - a buffer that will be written to the journal.
-            will not return until on disk
-        */
-        void journal(AlignedBuilder& buf);
+        /** check if time to rotate files; assure a file is open.
+             done separately from the journal() call as we can do this part
+             outside of lock.
+            only called by durThread.
+         */
+        void journalRotate();
 
         /** flag that something has gone wrong during writing to the journal
             (not for recovery mode)

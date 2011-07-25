@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "dur_journalformat.h"
 #include "../util/logfile.h"
 
 namespace mongo {
@@ -33,9 +34,16 @@ namespace mongo {
             /** call during startup by journalMakeDir() */
             void init();
 
-            /** write to journal
+            /** check if time to rotate files.  assure a file is open.
+                done separately from the journal() call as we can do this part
+                outside of lock.
+                thread: durThread()
+             */
+            void rotate();
+
+            /** append to the journal file
             */
-            void journal(AlignedBuilder& b);
+            void journal(const JSectHeader& h, const AlignedBuilder& b);
 
             boost::filesystem::path getFilePathFor(int filenumber) const;
 

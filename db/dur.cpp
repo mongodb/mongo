@@ -62,11 +62,11 @@
 #include "dur_journal.h"
 #include "dur_commitjob.h"
 #include "dur_recover.h"
+#include "dur_stats.h"
 #include "../util/concurrency/race.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
-#include "dur_stats.h"
 
 using namespace mongoutils;
 
@@ -74,8 +74,9 @@ namespace mongo {
 
     namespace dur {
 
-        void WRITETODATAFILES();
-        void PREPLOGBUFFER();
+        void PREPLOGBUFFER(JSectHeader& outParm);
+        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
+        void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
 
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
@@ -326,15 +327,6 @@ namespace mongo {
         }
 #endif
 
-        /** write the buffer we have built to the journal and fsync it.
-            outside of lock as that could be slow.
-        */
-        static void WRITETOJOURNAL(AlignedBuilder& ab) {
-            Timer t;
-            journal(ab);
-            stats.curr->_writeToJournalMicros += t.micros();
-        }
-
         // Functor to be called over all MongoFiles
 
         class validateSingleMapMatches {
@@ -504,11 +496,12 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return true;
             }
-            PREPLOGBUFFER();
+            JSectHeader h;
+            PREPLOGBUFFER(h);
 
             RWLockRecursive::Shared lk3(MongoFile::mmmutex);
 
-            unsigned abLen = commitJob._ab.len() + sizeof(JSectFooter);
+            unsigned abLen = commitJob._ab.len();
             commitJob.reset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
@@ -516,15 +509,15 @@ namespace mongo {
             lk1.reset();
 
             // ****** now other threads can do writes ******
-            WRITETOJOURNAL(commitJob._ab);
+            WRITETOJOURNAL(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES();
-            assert( abLen == commitJob._ab.len() ); // WRITETODATAFILES uses _ab also
+            WRITETODATAFILES(h, commitJob._ab);
+            assert( abLen == commitJob._ab.len() ); // check again wasn't modded
             commitJob._ab.reset();
 
             // can't : dbMutex._remapPrivateViewRequested = true;
@@ -570,18 +563,19 @@ namespace mongo {
             // (and we are only read locked in the dbMutex, so it could happen)
             scoped_lock lk(groupCommitMutex);
 
-            PREPLOGBUFFER();
+            JSectHeader h;
+            PREPLOGBUFFER(h);
 
             // todo : write to the journal outside locks, as this write can be slow.
             //        however, be careful then about remapprivateview as that cannot be done 
             //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(commitJob._ab);
+            WRITETOJOURNAL(h, commitJob._ab);
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES();
+            WRITETODATAFILES(h, commitJob._ab);
             debugValidateAllMapsMatch();
 
             commitJob.reset();

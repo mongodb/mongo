@@ -111,6 +111,10 @@ namespace mongo {
         }
 
         bool JSectFooter::checkHash(const void* begin, int len) const {
+            if( !magicOk() ) { 
+                log() << "journal footer not valid" << endl;
+                return false;
+            }
             Checksum c;
             c.gen(begin, len);
             DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(c.bytes, 16) << endl;
@@ -634,51 +638,56 @@ namespace mongo {
             }
         }
 
-        /** write to journal (called by WRITETOJOURNAL)
+        /** write (append) the buffer we have built to the journal and fsync it.
+            outside of lock as that could be slow.
+            @param uncompressed - a buffer that will be written to the journal after compression
+            will not return until on disk
         */
-        void journal(AlignedBuilder& b) {
-            j.journal(b);
+        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed) {
+            Timer t;
+            j.journal(h, uncompressed);
+            stats.curr->_writeToJournalMicros += t.micros();
         }
-        void Journal::journal(AlignedBuilder& _b) {
+        void Journal::journal(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             RACECHECK
-#if 0
-            unsigned w = _b.len();
-            const AlignedBuilder& b = _b;
-#endif
-            static AlignedBuilder cb(32*1024*1024);
+            static AlignedBuilder b(32*1024*1024);
+            /* buffer to journal will be
+               JSectHeader
+               compressed operations
+               JSectFooter
+            */
             const unsigned headTailSize = sizeof(JSectHeader) + sizeof(JSectFooter);
-            cb.reset( maxCompressedLength(_b.len()) + headTailSize );
+            const unsigned max = maxCompressedLength(uncompressed.len()) + headTailSize;
+            b.reset(max);
 
             {
-                JSectHeader *h = (JSectHeader *) _b.buf();
-                dassert( h->sectionLen() == (unsigned) 0xffffffff );
-                cb.appendStruct(*h);
+                dassert( h.sectionLen() == (unsigned) 0xffffffff ); // we will backfill later
+                b.appendStruct(h);
             }
 
             size_t compressedLength = 0;
-            rawCompress(_b.buf(), _b.len() - headTailSize, cb.cur(), &compressedLength);
+            rawCompress(uncompressed.buf(), uncompressed.len(), b.cur(), &compressedLength);
             assert( compressedLength < 0xffffffff );
-            cb.skip(compressedLength);
+            assert( compressedLength < max );
+            b.skip(compressedLength);
 
             // footer
             unsigned L = 0xffffffff;
             {
                 // pad to alignment, and set the total section length in the JSectHeader
                 assert( 0xffffe000 == (~(Alignment-1)) );
-                unsigned lenUnpadded = cb.len() + sizeof(JSectFooter);
+                unsigned lenUnpadded = b.len() + sizeof(JSectFooter);
                 L = (lenUnpadded + Alignment-1) & (~(Alignment-1));
                 dassert( L >= lenUnpadded );
 
-                ((JSectHeader*)cb.atOfs(0))->setSectionLen(lenUnpadded);
+                ((JSectHeader*)b.atOfs(0))->setSectionLen(lenUnpadded);
 
-                JSectFooter f(cb.buf(), cb.len()); // computes checksum
-                cb.appendStruct(f);
+                JSectFooter f(b.buf(), b.len()); // computes checksum
+                b.appendStruct(f);
+                dassert( b.len() == lenUnpadded );
 
-                // need a footer for uncompressed buffer too so that WRITETODATAFILES is happy.
-                // done this way as we do not need a checksum for that.
-                JSectFooter uncompressedFooter;
-                _b.appendStruct(uncompressedFooter);
-                ((JSectHeader*)_b.atOfs(0))->setSectionLen(_b.len());
+                b.skip(L - lenUnpadded);
+                dassert( b.len() % Alignment == 0 );
             }
 
             try {
@@ -687,16 +696,16 @@ namespace mongo {
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 assert( _curLogFile );
 
-                stats.curr->_uncompressedBytes += _b.len();
-                unsigned w = cb.len();
+                stats.curr->_uncompressedBytes += b.len();
+                unsigned w = b.len();
                 _written += w;
                 assert( w <= L );
                 stats.curr->_journaledBytes += L;
-                _curLogFile->synchronousAppend((void *) cb.buf(), L);
+                _curLogFile->synchronousAppend((const void *) b.buf(), L);
                 _rotate();
             }
             catch(std::exception& e) {
-                log() << "warning exception in dur::journal " << e.what() << endl;
+                log() << "error exception in dur::journal " << e.what() << endl;
                 throw;
             }
         }
