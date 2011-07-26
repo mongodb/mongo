@@ -158,6 +158,17 @@ myPort = function() {
  * * useHostname to use the hostname (instead of localhost)
  */
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
+    
+    // Check if testName is an object, if so, pull params from there
+    if( testName && ! testName.charAt ){
+        var params = testName
+        testName = params.name || "test"
+        numShards = params.shards || 2
+        verboseLevel = params.verbose || 0
+        numMongos = params.mongos || 1
+        otherParams = params.other || {} 
+    }
+    
     this._testName = testName;
 
     if ( ! otherParams )
@@ -747,6 +758,8 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
     assert( result.ok )
     
 };
+
+ShardingTest.prototype.shardColl = ShardingTest.prototype.shardGo
 
 ShardingTest.prototype.setBalancer = function( balancer ){
     if( balancer || balancer == undefined ){

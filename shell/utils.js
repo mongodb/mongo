@@ -950,8 +950,27 @@ printjsononeline = function(x){
     print( tojsononeline( x ) );
 }
 
+if ( typeof TestData == "undefined" ){
+    TestData = undefined
+}
+
+jsTestName = function(){
+    if( TestData ) return TestData.testName
+    return "__unknown_name__"
+}
+
+jsTestFile = function(){
+    if( TestData ) return TestData.testFile
+    return "__unknown_file__"
+}
+
+jsTestPath = function(){
+    if( TestData ) return TestData.testPath
+    return "__unknown_path__"
+}
+
 testLog = function(x){
-    print( TestData.testFile + " - " + x )
+    print( jsTestFile() + " - " + x )
 }
 
 shellPrintHelper = function (x) {

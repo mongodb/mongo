@@ -1,9 +1,6 @@
-// Tests the dropping of a sharded database SERVER-3471
+// Tests the dropping of a sharded database SERVER-3471 SERVER-1726
 
-var st = new ShardingTest( testName = "dropShardedDb",
-                           numShards = 2,
-                           verboseLevel = 0,
-                           numMongos = 1 )
+var st = new ShardingTest({ name : jsTestName() })
 
 var mongos = st.s0
 var config = mongos.getDB( "config" )
@@ -27,32 +24,32 @@ print( "2: shard the colls ")
 
 for( var i = 0; i < numColls; i++ ){
     
-    var splitAt = { _id : numDocs / 2 }
-    st.shardGo( dbA.getCollection( "data" + i ), splitAt )
-    st.shardGo( dbB.getCollection( "data" + i ), splitAt )
-    st.shardGo( dbC.getCollection( "data" + i ), splitAt )
+    var key = { _id : 1 }
+    st.shardColl( dbA.getCollection( "data" + i ), key )
+    st.shardColl( dbB.getCollection( "data" + i ), key )
+    st.shardColl( dbC.getCollection( "data" + i ), key )
 
 }
 
 print( "3: drop the non-suffixed db ")
 
-dbA.drop()
+dbA.dropDatabase()
 
-/*
+
 print( "3: ensure only the non-suffixed db was dropped ")
 
-var dbs = mongos.getDBs()
+var dbs = mongos.getDBNames()
 for( var i = 0; i < dbs.length; i++ ){
-    assert.ne( dbs, "" + dbA )
+    assert.neq( dbs, "" + dbA )
 }
 
 assert.eq( 0, config.databases.find({ _id : "" + dbA }).toArray().length )
 assert.eq( 1, config.databases.find({ _id : "" + dbB }).toArray().length )
 assert.eq( 1, config.databases.find({ _id : "" + dbC }).toArray().length )
 
-assert.eq( 0, config.collections.find({ db : "" + dbA }).toArray().length )
-assert.eq( numColls, config.collections.find({ db : "" + dbB }).toArray().length )
-assert.eq( numColls, config.collections.find({ db : "" + dbC }).toArray().length )
+assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbA + "\\..*" ), dropped : true }).toArray().length )
+assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbB + "\\..*" ), dropped : false }).toArray().length )
+assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbC + "\\..*" ), dropped : false }).toArray().length )
 
 for( var i = 0; i < numColls; i++ ){
     
@@ -61,8 +58,5 @@ for( var i = 0; i < numColls; i++ ){
     
 }
 
-
-
 // Finish
 st.stop()
-*/
