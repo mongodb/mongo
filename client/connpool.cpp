@@ -238,13 +238,16 @@ namespace mongo {
     }
 
     void DBConnectionPool::appendInfo( BSONObjBuilder& b ) {
-        BSONObjBuilder bb( b.subobjStart( "hosts" ) );
+
         int avail = 0;
         long long created = 0;
 
 
         map<ConnectionString::ConnectionType,long long> createdByType;
 
+        set<string> replicaSets;
+        
+        BSONObjBuilder bb( b.subobjStart( "hosts" ) );
         {
             scoped_lock lk( _mutex );
             for ( PoolMap::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
@@ -263,9 +266,33 @@ namespace mongo {
 
                 long long& x = createdByType[i->second.type()];
                 x += i->second.numCreated();
+
+                {
+                    string setName = i->first.ident;
+                    if ( setName.find( "/" ) != string::npos ) {
+                        setName = setName.substr( 0 , setName.find( "/" ) );
+                        replicaSets.insert( setName );
+                    }
+                }
             }
         }
         bb.done();
+        
+        
+        BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
+        for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {
+            string rs = *i;
+            ReplicaSetMonitorPtr m = ReplicaSetMonitor::get( rs );
+            if ( ! m ) {
+                warning() << "no monitor for set: " << rs << endl;
+                continue;
+            }
+            
+            BSONObjBuilder temp( setBuilder.subobjStart( rs ) );
+            m->appendInfo( temp );
+            temp.done();
+        }
+        setBuilder.done();
 
         {
             BSONObjBuilder temp( bb.subobjStart( "createdByType" ) );

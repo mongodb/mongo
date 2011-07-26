@@ -125,6 +125,15 @@ namespace mongo {
         return m;
     }
 
+    ReplicaSetMonitorPtr ReplicaSetMonitor::get( const string& name ) {
+        scoped_lock lk( _setsLock );
+        map<string,ReplicaSetMonitorPtr>::const_iterator i = _sets.find( name );
+        if ( i == _sets.end() ) 
+            return ReplicaSetMonitorPtr();
+        return i->second;
+    }
+
+
     void ReplicaSetMonitor::checkAll() {
         set<string> seen;
 
@@ -420,6 +429,20 @@ namespace mongo {
         return -1;
     }
 
+    void ReplicaSetMonitor::appendInfo( BSONObjBuilder& b ) const {
+        scoped_lock lk( _lock );
+        BSONArrayBuilder hosts( b.subarrayStart( "hosts" ) );
+        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+            hosts.append( BSON( "addr" << _nodes[i].addr <<
+                                "ok" << _nodes[i].ok ) );
+            
+        }
+        hosts.done();
+        
+        b.append( "master" , _master );
+        b.append( "nextSlave" , _nextSlave );
+    }
+    
 
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;

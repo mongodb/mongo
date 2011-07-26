@@ -43,6 +43,12 @@ namespace mongo {
         static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
 
         /**
+         * gets a cached Monitor per name or will return none if it doesn't exist
+         */
+        static ReplicaSetMonitorPtr get( const string& name );
+
+
+        /**
          * checks all sets for current master and new secondaries
          * usually only called from a BackgroundJob
          */
@@ -88,6 +94,8 @@ namespace mongo {
         string getServerAddress() const;
         
         bool contains( const string& server ) const;
+        
+        void appendInfo( BSONObjBuilder& b ) const;
 
     private:
         /**
