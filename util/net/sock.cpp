@@ -315,19 +315,19 @@ namespace mongo {
         ERR_load_crypto_strings();
         
         _context = SSL_CTX_new( client ? SSLv3_client_method() : SSLv3_server_method() );
-        massert( 15854 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
+        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
         
         SSL_CTX_set_options( _context, SSL_OP_ALL);   
     }
 
     void SSLManager::setupPubPriv( const string& privateKeyFile , const string& publicKeyFile ) {
-        massert( 15855 , 
+        massert( 15865 , 
                  mongoutils::str::stream() << "Can't read SSL certificate from file " 
                  << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
                  SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM) );
   
 
-        massert( 15856 , 
+        massert( 15866 , 
                  mongoutils::str::stream() << "Can't read SSL private key from file " 
                  << privateKeyFile << " : " << ERR_error_string(ERR_get_error(), NULL) ,
                  SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM) );
@@ -344,12 +344,12 @@ namespace mongo {
     void SSLManager::setupPEM( const string& keyFile , const string& password ) {
         _password = password;
         
-        massert( 15857 , "Can't read certificate file" , SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) );
+        massert( 15867 , "Can't read certificate file" , SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) );
         
         SSL_CTX_set_default_passwd_cb_userdata( _context , this );
         SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
         
-        massert( 15858 , "Can't read key file" , SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) );
+        massert( 15868 , "Can't read key file" , SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) );
     }
         
     SSL * SSLManager::secure( int fd ) {
