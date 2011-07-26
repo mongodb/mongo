@@ -16,6 +16,7 @@ function testReadLoadBalancing(numReplicas) {
 
     for (var i = 0; i < secondaries.length; i++) {
         // For some reason I need to this twice on the slave connections to get it to work.  :(
+        assert.soon( function(){ return secondaries[i].getDB("test").foo.count() > 0; } )
         secondaries[i].getDB('test').setProfilingLevel(2)
         secondaries[i].getDB('test').setProfilingLevel(2)
     }
