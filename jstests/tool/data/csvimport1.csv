@@ -1,0 +1,8 @@
+a,b,c
+1,"this is some text.
+This text spans multiple lines, and just for fun
+contains a comma",    "This has leading and trailing whitespace!"  
+2, "When someone says something you ""put it in quotes""", I like embedded quotes/slashes\backslashes  
+  3  , "  This line contains the empty string and has leading and trailing whitespace inside the quotes!  ", ""
+ "4" ,,  How are empty entries handled?  
+"5","""""", """This string is in quotes and contains empty quotes ("""")"""

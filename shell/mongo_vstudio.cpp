@@ -1634,7 +1634,8 @@ const StringData _jscode_raw_utils_sh =
 "print( \"\\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)\");\n" 
 "\n" 
 "print( \"\\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off\" );\n" 
-"print( \"\\tsh.getBalancerState()   return true if on, off if not\" );\n" 
+"print( \"\\tsh.getBalancerState()                     return true if on, off if not\" );\n" 
+"print( \"\\tsh.isBalancerRunning()                    return true if the balancer is running on any mongos\" );\n" 
 "\n" 
 "print( \"\\tsh.status()                               prints a general overview of the cluster\" )\n" 
 "}\n" 
@@ -1690,6 +1691,11 @@ const StringData _jscode_raw_utils_sh =
 "if ( x == null )\n" 
 "return true;\n" 
 "return ! x.stopped;\n" 
+"}\n" 
+"\n" 
+"sh.isBalancerRunning = function() {\n" 
+"var x = db.getSisterDB( \"config\" ).locks.findOne( { _id : \"balancer\" } );\n" 
+"return x.state > 0;\n" 
 "}\n" 
 ;
 extern const JSFile utils_sh;

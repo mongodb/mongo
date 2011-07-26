@@ -1407,6 +1407,7 @@ namespace mongo {
 
     void newRepl();
     void oldRepl();
+    void startReplSets(ReplSetCmdline*);
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
         if( !cmdLine._replSet.empty() ) {
@@ -1416,6 +1417,11 @@ namespace mongo {
                 log() << "***" << endl;
             }
             newRepl();
+
+            replSet = true;
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
+            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
+
             return;
         }
 

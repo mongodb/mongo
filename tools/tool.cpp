@@ -380,8 +380,15 @@ namespace mongo {
         if ( ! dbname.size() )
             dbname = _db;
 
-        if ( ! ( _username.size() || _password.size() ) )
+        if ( ! ( _username.size() || _password.size() ) ) {
+            // Make sure that we don't need authentication to connect to this db
+            // findOne throws an AssertionException if it's not authenticated.
+            if (_coll.size() > 0) {
+                // BSONTools don't have a collection
+                conn().findOne(getNS(), Query("{}"));
+            }
             return;
+        }
 
         string errmsg;
         if ( _conn->auth( dbname , _username , _password , errmsg ) )
@@ -396,7 +403,7 @@ namespace mongo {
     }
 
     BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )
-        : Tool( name , access , "" , "" ) , _objcheck( objcheck ) {
+        : Tool( name , access , "" , "" , false ) , _objcheck( objcheck ) {
 
         add_options()
         ("objcheck" , "validate object before inserting" )
@@ -489,9 +496,9 @@ namespace mongo {
         fclose( file );
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        out() << "\t "  << m.hits() << " objects found" << endl;
+        (_usesstdout ? cout : cerr ) << m.hits() << " objects found" << endl;
         if ( _matcher.get() )
-            out() << "\t "  << processed << " objects processed" << endl;
+            (_usesstdout ? cout : cerr ) << processed << " objects processed" << endl;
         return processed;
     }
 

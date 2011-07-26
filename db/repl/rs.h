@@ -115,7 +115,7 @@ namespace mongo {
         MAP _ghostCache;
         RWLock _lock; // protects _ghostCache
         ReplSetImpl *rs;
-
+        virtual void starting();
     public:
         GhostSync(ReplSetImpl *_rs) : task::Server("rsGhostSync"), _lock("GhostSync"), rs(_rs) {}
         ~GhostSync() {

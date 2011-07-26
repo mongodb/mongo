@@ -70,7 +70,6 @@ namespace mongo {
     extern string repairpath;
 
     void setupSignals( bool inFork );
-    void startReplSets(ReplSetCmdline*);
     void startReplication();
     void exitCleanly( ExitCode code );
 
@@ -482,12 +481,6 @@ namespace mongo {
         snapshotThread.go();
         clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
-
-        if( !cmdLine._replSet.empty() ) {
-            replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
-            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
-        }
 
         listen(listenPort);
 

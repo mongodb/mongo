@@ -47,7 +47,7 @@ namespace mongo {
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
-            void cleanup(bool log);
+            void cleanup(bool log); // closes and removes journal files
 
             unsigned long long curFileId() const { return _curFileId; }
 

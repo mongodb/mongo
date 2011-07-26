@@ -120,21 +120,10 @@ namespace mongo {
             // each time events switch to a different database we journal a JDbContext
             RelativePath lastDbPath;
 
-            set<WriteIntent>::iterator i = commitJob.writes().begin();
+            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
+                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
+            }
 
-            const WriteIntent *w = &(*i);
-            while(1) {
-                i++;
-                const WriteIntent *next = 0;
-                IF( i != commitJob.writes().end() ) {
-                    next = &(*i);
-                    PREFETCH(next);
-                }
-                prepBasicWrite_inlock(bb, w, lastDbPath);
-                _IF( next == 0 )
-                    break;
-                w = next;
-            };
         }
 
         void resetLogBuffer(AlignedBuilder& bb) {

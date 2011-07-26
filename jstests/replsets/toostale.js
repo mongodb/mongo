@@ -111,16 +111,12 @@ replTest.restart(2);
 
 
 print("8: check s2.state == 3");
-status = master.getDB("admin").runCommand({replSetGetStatus:1});
-while (status.state == 0) {
-  print("state is 0: ");
-  printjson(status);
-  sleep(1000);
-  status = master.getDB("admin").runCommand({replSetGetStatus:1});
-}
+assert.soon(function() {
+    var status = master.getDB("admin").runCommand({replSetGetStatus:1});
+    printjson(status);
+    return status.members && status.members[2].state == 3;
+});
 
-printjson(status);
-assert.eq(status.members[2].state, 3, 'recovering');
 
 print("make sure s2 doesn't become primary");
 replTest.stop(0);

@@ -26,7 +26,7 @@ function op( drop ) {
     return null;
 }
 
-s1 = startParallelShell( "db.jstests_drop2.count( { $where: function() { while( 1 ) { ; } } } )" );
+s1 = startParallelShell( "db.jstests_drop2.count( { $where: function() { while( 1 ) { sleep( 1 ); } } } )" );
 countOp = null;
 assert.soon( function() { countOp = op( false ); return countOp; } );
 

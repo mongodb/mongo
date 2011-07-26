@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    void printStackTrace( ostream &o );
+
     class mutex;
 
     inline boost::xtime incxtimemillis( long long s ) {
@@ -169,9 +171,6 @@ namespace mongo {
             }
         }
 
-        void lock() { _m->lock(); }
-        void unlock() { _m->unlock(); }
-
         class try_lock : boost::noncopyable {
         public:
             try_lock( mongo::mutex &m , int millis = 0 )
@@ -191,6 +190,16 @@ namespace mongo {
         class scoped_lock : boost::noncopyable {
         public:
 #if defined(_DEBUG)
+            struct PostStaticCheck {
+                PostStaticCheck() {
+                    if ( StaticObserver::_destroyingStatics ) {
+                        cout << "trying to lock a mongo::mutex during static shutdown" << endl;
+                        printStackTrace( cout );
+                    }
+                }
+            };
+
+            PostStaticCheck _check;
             mongo::mutex * const _mut;
 #endif
             scoped_lock( mongo::mutex &m ) : 
@@ -243,18 +252,28 @@ namespace mongo {
     };
 #else
     class SimpleMutex : boost::noncopyable {
-        mongo::mutex _m;
     public:
-        SimpleMutex(const char *name) : _m(name) { }
+        SimpleMutex(const char* name) { assert( pthread_mutex_init(&_lock,0) == 0 ); }
+        ~SimpleMutex(){ 
+            if ( ! StaticObserver::_destroyingStatics ) { 
+                assert( pthread_mutex_destroy(&_lock) == 0 ); 
+            }
+        }
+
+        void lock() { assert( pthread_mutex_lock(&_lock) == 0 ); }
+        void unlock() { assert( pthread_mutex_unlock(&_lock) == 0 ); }
+        
         class scoped_lock : boost::noncopyable {
-            mongo::mutex::scoped_lock _lk;
+            SimpleMutex& _m;
         public:
-            scoped_lock( SimpleMutex &m ) : _lk(m._m) { }
+            scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
+            ~scoped_lock() { _m.unlock(); }
         };
 
-        void lock()   { _m.lock(); }
-        void unlock() { _m.unlock(); }
+    private:
+        pthread_mutex_t _lock;
     };
+    
 #endif
 
 }

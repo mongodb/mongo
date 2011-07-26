@@ -52,6 +52,16 @@ namespace mongo {
         return buf;
     }
 
+    inline string timeToISOString(time_t time) {
+        struct tm t;
+        time_t_to_Struct( time, &t );
+
+        const char* fmt = "%Y-%m-%dT%H:%M:%SZ";
+        char buf[32];
+        assert(strftime(buf, sizeof(buf), fmt, &t) == 20);
+        return buf;
+    }
+
     inline boost::gregorian::date currentDate() {
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         return now.date();
