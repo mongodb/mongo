@@ -53,10 +53,10 @@ function doIt( ev, wait, where ) {
 
 }
 
-doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { ; } } } )", true, true );
-doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { ; } } } )", false, true );
-doIt( "while( true ) {;}", false );
-doIt( "while( true ) {;}", true );
+doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { sleep(1); } } } )", true, true );
+doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { sleep(1); } } } )", false, true );
+doIt( "while( true ) { sleep(1);}", false );
+doIt( "while( true ) { sleep(1);}", true );
 
 // the for loops are currently required, as a spawned op masks the parent op - see SERVER-1931
 doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count( {i:10} ); }", true );
@@ -65,4 +65,4 @@ doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(
 doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", false );
 
 doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
-doIt( "while( 1 ) { try { while( 1 ) { ; } } catch ( e ) { } }", true );
+doIt( "while( 1 ) { try { while( 1 ) { sleep(1); } } catch ( e ) { } }", true );
