@@ -349,6 +349,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual bool maintenanceMode() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "repair database.  also compacts. note: slow.";
         }
@@ -1792,6 +1793,10 @@ namespace mongo {
         if ( c->adminOnly() )
             log( 2 ) << "command: " << cmdObj << endl;
 
+        if (c->maintenanceMode() && theReplSet && theReplSet->isSecondary()) {
+            theReplSet->setMaintenanceMode(true);
+        }
+
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
             client.curop()->ensureStarted();
@@ -1799,6 +1804,11 @@ namespace mongo {
             int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
             if ( ! ok )
                 result.append( "errmsg" , errmsg );
+
+            if (c->maintenanceMode() && theReplSet) {
+                theReplSet->setMaintenanceMode(false);
+            }
+
             return ok;
         }
 
@@ -1812,11 +1822,13 @@ namespace mongo {
         client.curop()->ensureStarted();
         Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
 
+        bool retval = true;
+
         try {
             string errmsg;
             if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
                 result.append( "errmsg" , errmsg );
-                return false;
+                retval = false;
             }
         }
         catch ( DBException& e ) {
@@ -1824,14 +1836,18 @@ namespace mongo {
             ss << "exception: " << e.what();
             result.append( "errmsg" , ss.str() );
             result.append( "code" , e.getCode() );
-            return false;
+            retval = false;
         }
 
-        if ( c->logTheOp() && ! fromRepl ) {
+        if ( retval && c->logTheOp() && ! fromRepl ) {
             logOp("c", cmdns, cmdObj);
         }
 
-        return true;
+        if (c->maintenanceMode() && theReplSet) {
+            theReplSet->setMaintenanceMode(false);
+        }
+
+        return retval;
     }
 
 

@@ -95,6 +95,11 @@ namespace mongo {
         */
         virtual bool requiresAuth() { return true; }
 
+        /* Return true if a replica set secondary should go into "recovering"
+           (unreadable) state while running this command.
+         */
+        virtual bool maintenanceMode() const { return false; }
+
         /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */

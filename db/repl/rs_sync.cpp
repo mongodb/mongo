@@ -188,6 +188,16 @@ namespace mongo {
     */
     bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) {
         bool golive = false;
+
+        {
+            lock lk( this );
+
+            if (_maintenanceMode > 0) {
+                // we're not actually going live
+                return true;
+            }
+        }
+
         {
             readlock lk("local.replset.minvalid");
             BSONObj mv;

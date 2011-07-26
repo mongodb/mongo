@@ -446,11 +446,20 @@ namespace mongo {
         List1<Member> _members; // all members of the set EXCEPT _self.
         ReplSetConfig::MemberCfg _config; // config of _self
         unsigned _id; // _id of _self
+
+        int _maintenanceMode; // if we should stay in recovering state
     public:
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
         GhostSync *ghost;
+        /**
+         * This forces a secondary to go into recovering state and stay there
+         * until this is called again, passing in "false".  Multiple threads can
+         * call this and it will leave maintenance mode once all of the callers
+         * have called it again, passing in false.
+         */
+        void setMaintenanceMode(const bool inc);
     private:
         Member* head() const { return _members.head(); }
     public:

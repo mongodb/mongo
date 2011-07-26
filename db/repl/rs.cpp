@@ -70,10 +70,27 @@ namespace mongo {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
+    void ReplSetImpl::setMaintenanceMode(const bool inc) {
+        lock lk(this);
+
+        if (inc) {
+            log() << "replSet going into maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+
+            _maintenanceMode++;
+            changeState(MemberState::RS_RECOVERING);
+        }
+        else {
+            _maintenanceMode--;
+            // no need to change state, syncTail will try to go live as a secondary soon
+
+            log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+        }
+    }
+
     Member* ReplSetImpl::getMostElectable() {
         lock lk(this);
-        
-        Member *max = 0;        
+
+        Member *max = 0;
 
         for (set<unsigned>::iterator it = _electableSet.begin(); it != _electableSet.end(); it++) {
             const Member *temp = findById(*it);
@@ -298,8 +315,10 @@ namespace mongo {
         _currentSyncTarget(0),
         _hbmsgTime(0),
         _self(0),
+        _maintenanceMode(0),
         mgr( new Manager(this) ),
         ghost( new GhostSync(this) ) {
+
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         strcpy( _hbmsg , "initial startup" );

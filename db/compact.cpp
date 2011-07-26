@@ -263,6 +263,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
+        virtual bool maintenanceMode() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
