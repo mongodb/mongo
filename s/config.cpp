@@ -267,7 +267,7 @@ namespace mongo {
         unserialize( o );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + _name + "." );
+        b.appendRegex( "_id" , (string)"^" + _name + "\\." );
 
         auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
         assert( cursor.get() );
