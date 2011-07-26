@@ -504,6 +504,9 @@ int _main(int argc, char* argv[]) {
     ("version", "show version information")
     ("verbose", "increase verbosity")
     ("ipv6", "enable IPv6 support (disabled by default)")
+#ifdef MONGO_SSL
+    ("ssl", "use all for connections")
+#endif
     ;
 
     hidden_options.add_options()
@@ -572,12 +575,19 @@ int _main(int argc, char* argv[]) {
     if (params.count("quiet")) {
         mongo::cmdLine.quiet = true;
     }
+#ifdef MONGO_SSL
+    if (params.count("ssl")) {
+        mongo::cmdLine.sslOnNormalPorts = true;
+    }
+#endif
     if (params.count("nokillop")) {
         mongo::shellUtils::_nokillop = true;
     }
     if (params.count("autokillop")) {
         autoKillOp = true;
     }
+
+    
 
     /* This is a bit confusing, here are the rules:
      *

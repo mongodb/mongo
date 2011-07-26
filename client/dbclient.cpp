@@ -589,6 +589,13 @@ namespace mongo {
             _failed = true;
             return false;
         }
+
+#ifdef MONGO_SSL
+        if ( cmdLine.sslOnNormalPorts ) {
+            p->secure( sslManager() );
+        }
+#endif
+
         return true;
     }
 
@@ -997,9 +1004,18 @@ namespace mongo {
             say(m);
     }
 
+    SSLManager* DBClientConnection::sslManager() {
+        if ( _sslManager )
+            return _sslManager;
+        
+        SSLManager* s = new SSLManager(true);
+        _sslManager = s;
+        return s;
+    }
+
     AtomicUInt DBClientConnection::_numConnections;
     bool DBClientConnection::_lazyKillCursor = true;
-
+    SSLManager* DBClientConnection::_sslManager = 0;
 
     bool serverAlive( const string &uri ) {
         DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts

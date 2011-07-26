@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "cmdline.h"
 #include "commands.h"
+#include "../util/password.h"
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "security_common.h"
@@ -62,6 +63,14 @@ namespace mongo {
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
+#endif
+        ;
+        
+        hidden.add_options()
+#ifdef MONGO_SSL
+        ("sslOnNormalPorts" , "use ssl on configured ports" )
+        ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
+        ("sslPEMKeyPassword" , new PasswordValue(&cmdLine.sslPEMKeyPassword) , "PEM file password" )
 #endif
         ;
 
@@ -287,7 +296,25 @@ namespace mongo {
             noauth = false;
         }
 
+#ifdef MONGO_SSL
+        if (params.count("sslOnNormalPorts") ) {
+            cmdLine.sslOnNormalPorts = true;
 
+            if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
+                log() << "need sslPEMKeyPassword" << endl;
+                dbexit(EXIT_BADOPTIONS);
+            }
+            
+            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
+                log() << "need sslPEMKeyFile" << endl;
+                dbexit(EXIT_BADOPTIONS);
+            }
+            
+            cmdLine.sslServerManager = new SSLManager( false );
+            cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword );
+        }
+#endif
+        
         {
             BSONObjBuilder b;
             for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){

@@ -101,6 +101,10 @@ namespace mongo {
 #ifdef MONGO_SSL
         _ssl = 0;
         _sslPort = 0;
+
+        if ( cmdLine.sslOnNormalPorts && cmdLine.sslServerManager ) {
+            secure( cmdLine.sslServerManager );
+        }
 #endif
     }
     

@@ -21,6 +21,12 @@
 
 namespace mongo {
 
+#ifdef MONGO_SSL
+    class SSLManager;
+#endif
+
+
+
     /* command line options
     */
     /* concurrency: OK/READ */
@@ -99,6 +105,14 @@ namespace mongo {
         bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
+#ifdef MONGO_SSL
+        bool sslOnNormalPorts;      // --sslOnNormalPorts
+        string sslPEMKeyFile;       // --sslPEMKeyFile
+        string sslPEMKeyPassword;   // --sslPEMKeyPassword
+
+        SSLManager* sslServerManager; // currently leaks on close
+#endif
+
         static void addGlobalOptions( boost::program_options::options_description& general ,
                                       boost::program_options::options_description& hidden );
 
@@ -127,6 +141,11 @@ namespace mongo {
         dur = true;
 #else
         dur = false;
+#endif
+
+#ifdef MONGO_SSL
+        sslOnNormalPorts = false;
+        sslServerManager = 0;
 #endif
     }
             
