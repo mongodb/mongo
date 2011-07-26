@@ -262,7 +262,7 @@ namespace mongo {
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", 131072.0 );
-            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , true ) ) {
+            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , false /* we don't replica profile messages */ ) ) {
                 return false;
             }
         }
