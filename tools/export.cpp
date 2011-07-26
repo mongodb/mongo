@@ -50,7 +50,7 @@ public:
     // characters of the string, if it's false, add a double quote character
     // around the whole string.
     string csvEscape(string str, bool hasSurroundingQuotes = false) {
-        int index = hasSurroundingQuotes ? 1 : 0;
+        size_t index = hasSurroundingQuotes ? 1 : 0;
         while (((index = str.find('"', index)) != string::npos)
                && (index < (hasSurroundingQuotes ? str.size() - 1 : str.size()))) {
             str.replace(index, 1, "\"\"");
