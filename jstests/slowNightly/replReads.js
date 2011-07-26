@@ -1,8 +1,8 @@
-// Test that doing slaveOk reads from secondaries hits all the secondaries evenly
+2// Test that doing slaveOk reads from secondaries hits all the secondaries evenly
 
 function testReadLoadBalancing(numReplicas) {
 
-    s = new ShardingTest( "replReads" , 1 /* numShards */, 1 /* verboseLevel */, 1 /* numMongos */, { rs : true , numReplicas : numReplicas, chunksize : 1 } )
+    s = new ShardingTest( "replReads" , 1 /* numShards */, 0 /* verboseLevel */, 1 /* numMongos */, { rs : true , numReplicas : numReplicas, chunksize : 1 } )
 
     s.adminCommand({enablesharding : "test"})
     s.config.settings.find().forEach(printjson)
@@ -14,10 +14,23 @@ function testReadLoadBalancing(numReplicas) {
     primary = s._rs[0].test.liveNodes.master
     secondaries = s._rs[0].test.liveNodes.slaves
 
+    function rsStats() {
+        return s.getDB( "admin" ).runCommand( "connPoolStats" )["replicaSets"]["replReads-rs0"];
+    }
+    
+    assert.eq( numReplicas , rsStats().hosts.length );
+    assert.soon( 
+        function() {
+            var x = rsStats().hosts;
+            for ( var i=0; i<x.length; i++ ) 
+                if ( ! x[i].ok )
+                    return false;
+            return true;
+        } 
+    );
+    
     for (var i = 0; i < secondaries.length; i++) {
-        // For some reason I need to this twice on the slave connections to get it to work.  :(
         assert.soon( function(){ return secondaries[i].getDB("test").foo.count() > 0; } )
-        secondaries[i].getDB('test').setProfilingLevel(2)
         secondaries[i].getDB('test').setProfilingLevel(2)
     }
 
@@ -28,7 +41,8 @@ function testReadLoadBalancing(numReplicas) {
     }
 
     for (var i = 0; i < secondaries.length; i++) {
-        assert.eq(10, secondaries[i].getDB('test').system.profile.find().count(), "Wrong number of read queries sent to secondary " + i)
+        var profileCollection = secondaries[i].getDB('test').system.profile;
+        assert.eq(10, profileCollection.find().count(), "Wrong number of read queries sent to secondary " + i + " " + tojson( profileCollection.find().toArray() ))
     }
 
     s.stop()
