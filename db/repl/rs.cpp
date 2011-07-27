@@ -25,8 +25,10 @@
 #include "connections.h"
 #include "../repl.h"
 
-namespace mongo {
+using namespace std;
 
+namespace mongo {
+    
     using namespace bson;
 
     bool replSet = false;
