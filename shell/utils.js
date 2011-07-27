@@ -214,7 +214,7 @@ assert.gte = function( a , b , msg ){
 assert.between = function( a, b, c, msg, inclusive ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 
-    if( ( inclusive == undefined || inclusive = true ) &&
+    if( ( inclusive == undefined || inclusive == true ) &&
         a <= b && b <= c ) return;
     else if( a < b && b < c ) return;
     
