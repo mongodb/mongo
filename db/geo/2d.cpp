@@ -933,7 +933,9 @@ namespace mongo {
             // Exact check with particular data fields
             ////
             // Can add multiple points
-            _found += addSpecific( node , keyP, keyOk == BORDER, keyD, newDoc );
+            int diff = addSpecific( node , keyP, keyOk == BORDER, keyD, newDoc );
+            if( diff > 0 ) _found += diff;
+            else _found -= -diff;
 
         }
 
@@ -1722,7 +1724,9 @@ namespace mongo {
 
             _points.erase( startErase, _points.end() );
 
-            _found += _points.size() - prevSize;
+            int diff = _points.size() - prevSize;
+            if( diff > 0 ) _found += diff;
+            else _found -= -diff;
 
         }
 
