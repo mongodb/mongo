@@ -48,10 +48,10 @@ class Import : public Tool {
     static const int BUF_SIZE = 1024 * 1024 * 4;
 
     string trimWhitespace(const string& str) {
-        int begin = 0;
-        int end = str.size() - 1;
-        while (isspace(str[begin])) { ++begin; } // Finds index of first non-whitespace character
-        while (isspace(str[end])) { --end; } // Finds index of last non-whitespace character
+        size_t begin = 0;
+        size_t end = str.size() - 1;
+        while (begin < str.size() && isspace(str[begin])) { ++begin; } // Finds index of first non-whitespace character
+        while (end > 0 && isspace(str[end])) { --end; } // Finds index of last non-whitespace character
         return str.substr(begin, end - begin + 1);
     }
 
@@ -178,7 +178,7 @@ class Import : public Tool {
         if (_type == JSON) {
             // Strip out trailing whitespace
             char * end = ( line + strlen( line ) ) - 1;
-            while ( isspace(*end) ) {
+            while ( end >= line && isspace(*end) ) {
                 *end = 0;
                 end--;
             }
