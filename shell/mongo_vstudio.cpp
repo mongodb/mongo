@@ -3168,7 +3168,7 @@ const StringData _jscode_raw_collection =
 "throw \"can't save a DBQuery object\";\n" 
 "}\n" 
 "\n" 
-"DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };\n" 
+"DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 , $MinKey : 1, $MaxKey : 1 };\n" 
 "\n" 
 "DBCollection.prototype._validateForStorage = function( o ){\n" 
 "this._validateObject( o );\n" 
