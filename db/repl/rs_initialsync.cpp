@@ -85,6 +85,7 @@ namespace mongo {
         // find the member with the lowest ping time that has more data than me
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->hbinfo().up() &&
+                HeartbeatInfo::numPings > config().members.size()*2 &&
                 (m->state() == MemberState::RS_PRIMARY ||
                  (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
                 (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
