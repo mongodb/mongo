@@ -24,7 +24,7 @@ __convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 	if (buf->size == 0)
 		return (0);
 
-	WT_RET(__wt_scr_alloc(session, buf->size * 2, &tmp));
+	WT_RET(__wt_scr_alloc(session, buf->size * 3, &tmp));
 	for (p = buf->data,
 	    i = buf->size, t = tmp->mem, size = 0; i > 0; --i, ++p)
 		if (isprint((int)*p)) {
