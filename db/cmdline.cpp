@@ -87,27 +87,29 @@ namespace mongo {
     }
 #endif
 
-    string CmdLine::parseConfigFile( ifstream &f ) {
-        stringstream ss;
+    void CmdLine::parseConfigFile( ifstream &f, stringstream &ss ) {
         string s;
         char line[MAX_LINE_LENGTH];
+
         while ( f ) {
             f.getline(line, MAX_LINE_LENGTH);
             s = line;
             std::remove(s.begin(), s.end(), ' ');
             std::remove(s.begin(), s.end(), '\t');
             boost::to_upper(s);
+
             if ( s.find( "FASTSYNC" ) != string::npos )
                 cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
 
-            if ( s[0] == '#' ) { // skipping comment
+            if ( s[0] == '#' ) { 
+                // skipping commented line
             } else if ( s.find( "=FALSE" ) == string::npos ) {
                 ss << line << endl;
             } else {
                 cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
             }
         }
-        return ss.str();
+        return;
     }
 
 
@@ -166,8 +168,9 @@ namespace mongo {
                     cout << visible << endl;
                     return false;
                 }
+
                 stringstream ss;
-                ss << CmdLine::parseConfigFile( f );
+                CmdLine::parseConfigFile( f, ss );
                 po::store( po::parse_config_file( ss , all ) , params );
                 f.close();
             }
