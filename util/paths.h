@@ -23,9 +23,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-using namespace mongoutils;
-
 namespace mongo {
+    
+    using namespace mongoutils;
 
     extern string dbpath;
 
