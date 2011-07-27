@@ -314,7 +314,7 @@ namespace mongo {
         SSL_load_error_strings();
         ERR_load_crypto_strings();
         
-        _context = SSL_CTX_new( client ? SSLv3_client_method() : SSLv3_server_method() );
+        _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
         massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
         
         SSL_CTX_set_options( _context, SSL_OP_ALL);   
