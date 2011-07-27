@@ -407,7 +407,7 @@ namespace mongo {
 
                     }
 
-                    {
+                    try {
                         writelock lk("");
 
                         /* if we have become primary, we dont' want to apply things from elsewhere
@@ -420,6 +420,11 @@ namespace mongo {
 
                         syncApply(o);
                         _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
+                    }
+                    catch (DBException& e) {
+                        sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
+                        sleepsecs(30);
+                        return;
                     }
                 }
             }
@@ -475,9 +480,7 @@ namespace mongo {
                 _syncThread();
             }
             catch(DBException& e) {
-                sethbmsg(str::stream() << "syncThread: " << e.toString() <<
-                         ", try 'use local; db.oplog.rs.findOne({ts : {$gt : new Timestamp(" <<
-                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")}});' on the primary");
+                sethbmsg(str::stream() << "syncThread: " << e.toString());
                 sleepsecs(10);
             }
             catch(...) {
