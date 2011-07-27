@@ -1,5 +1,6 @@
 #! /bin/sh
 
+wt=../../build_posix
 bdb=db/build_unix
 
 colflag=0
@@ -42,7 +43,7 @@ if test $dump_bdb -eq 1; then
 	fi
 fi
 
-wt dump -p file:__wt > __wt.wt_dump
+$wt/wt dump -p file:__wt > __wt.wt_dump
 cmp __wt.wt_dump __wt.bdb_dump > /dev/null
 
 exit $?
