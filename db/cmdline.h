@@ -106,6 +106,7 @@ namespace mongo {
                                        boost::program_options::options_description& hidden );
 
 
+        static string parseConfigFile( ifstream &f );
         /**
          * @return true if should run program, false if should exit
          */

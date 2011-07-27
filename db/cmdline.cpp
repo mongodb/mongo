@@ -87,6 +87,30 @@ namespace mongo {
     }
 #endif
 
+    string CmdLine::parseConfigFile( ifstream &f ) {
+        stringstream ss;
+        string s;
+        char line[MAX_LINE_LENGTH];
+        while ( f ) {
+            f.getline(line, MAX_LINE_LENGTH);
+            s = line;
+            std::remove(s.begin(), s.end(), ' ');
+            std::remove(s.begin(), s.end(), '\t');
+            boost::to_upper(s);
+            if ( s.find( "FASTSYNC" ) != string::npos )
+                cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
+
+            if ( s[0] == '#' ) { // skipping comment
+            } else if ( s.find( "=FALSE" ) == string::npos ) {
+                ss << line << endl;
+            } else {
+                cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
+            }
+        }
+        return ss.str();
+    }
+
+
 
     bool CmdLine::store( int argc , char ** argv ,
                          boost::program_options::options_description& visible,
@@ -142,30 +166,8 @@ namespace mongo {
                     cout << visible << endl;
                     return false;
                 }
-
                 stringstream ss;
-                char line[MAX_LINE_LENGTH];
-                string test;
-                while ( f ) {
-                    f.getline(line, MAX_LINE_LENGTH);
-                    stringstream internalss;
-                    for ( unsigned i = 0; i < strlen(line); i++ ) {
-                        if ( line[i] != ' ' && line[i] !='\t' ){
-                            internalss << line[i];
-                        }
-                    }
-                    test = internalss.str();
-                    boost::to_upper(test);
-                    if ( test.find( "FASTSYNC" ) != string::npos )
-                        cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
-
-                    if ( test[0] == '#' ) { // skipping comment
-                    } else if ( test.find( "=FALSE" ) == string::npos ) {
-                        ss << line << endl;
-                    } else {
-                        cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
-                    }
-                }
+                ss << CmdLine::parseConfigFile( f );
                 po::store( po::parse_config_file( ss , all ) , params );
                 f.close();
             }
