@@ -61,26 +61,10 @@ static int
 __wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE_FILE_STATS *stats;
-	WT_COL *cip;
-	WT_UPDATE *upd;
-	uint32_t i;
-	void *cipdata;
 
 	stats = session->btree->fstats;
 
-	/* Walk the page, counting data items. */
-	WT_COL_FOREACH(page, cip, i)
-		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
-			cipdata = WT_COL_PTR(page, cip);
-			if (cipdata == NULL || WT_FIX_DELETE_ISSET(cipdata))
-				WT_STAT_INCR(stats, file_item_col_deleted);
-			else
-				WT_STAT_INCR(stats, file_item_total_data);
-		} else
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				WT_STAT_INCR(stats, file_item_col_deleted);
-			else
-				WT_STAT_INCR(stats, file_item_total_data);
+	WT_STAT_INCRV(stats, file_item_total_data, page->entries);
 	return (0);
 }
 

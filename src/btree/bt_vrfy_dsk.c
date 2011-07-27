@@ -115,7 +115,8 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 		return (__wt_verify_dsk_row(session, dsk, addr, size, quiet));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
-		return (__wt_verify_dsk_chunk(session, dsk, addr, size, quiet));
+		return (__wt_verify_dsk_chunk(
+		    session, dsk, addr, dsk->u.datalen, size, quiet));
 	WT_ILLEGAL_FORMAT(session);
 	}
 	/* NOTREACHED */
@@ -422,40 +423,13 @@ __wt_verify_dsk_col_fix(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, int quiet)
 {
 	WT_BTREE *btree;
-	u_int len;
-	uint32_t i, j, entry_num;
-	uint8_t *data, *end, *p;
+	uint32_t datalen;
 
 	btree = session->btree;
-	len = btree->fixed_len;
-	end = (uint8_t *)dsk + size;
 
-	entry_num = 0;
-	WT_FIX_FOREACH(btree, dsk, data, i) {
-		++entry_num;
-
-		/* Check if this entry is entirely on the page. */
-		if (data + len > end)
-			return (__wt_err_eop(session, entry_num, addr, quiet));
-
-		/* Deleted items are entirely nul bytes. */
-		p = data;
-		if (WT_FIX_DELETE_ISSET(data)) {
-			if (*p != WT_FIX_DELETE_BYTE)
-				goto delfmt;
-			for (j = 1; j < btree->fixed_len; ++j)
-				if (*++p != '\0')
-					goto delfmt;
-		}
-	}
-
-	return (0);
-
-delfmt:	WT_VRFY_ERR(session, quiet,
-	    "deleted fixed-length entry %"
-	    PRIu32 " on page at addr %" PRIu32 " has non-nul bytes",
-	    entry_num, addr);
-	return (WT_ERROR);
+	datalen = bitstr_size(btree->bitcnt * dsk->u.entries);
+	return (
+	    __wt_verify_dsk_chunk(session, dsk, addr, datalen, size, quiet));
 }
 
 /*
@@ -562,31 +536,39 @@ match_err:			ret = WT_ERROR;
 
 /*
  * __wt_verify_dsk_chunk --
- *	Verify the WT_PAGE_FREELIST and WT_PAGE_OVFL disk pages.
+ *	Verify a Chunk O' Data on a Btree page.
  */
 int
-__wt_verify_dsk_chunk(WT_SESSION_IMPL *session,
-    WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, int quiet)
+__wt_verify_dsk_chunk(
+    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
+    uint32_t addr, uint32_t data_len, uint32_t size, int quiet)
 {
-	uint32_t len;
-	uint8_t *p;
+	uint8_t *p, *end;
+
+	end = (uint8_t *)dsk + size;
 
 	/*
-	 * Overflow and freelist pages are roughly identical, both are simply
-	 * chunks of data.   This routine should also be used for any chunks
-	 * of data we store in the file in the future.
+	 * Fixed-length column-store, overflow and freelist pages are simple
+	 * chunks of data.
 	 */
-	if (dsk->u.datalen == 0) {
+	if (data_len == 0) {
 		WT_VRFY_ERR(session, quiet,
 		    "%s page at addr %" PRIu32 " has no data",
 		    __wt_page_type_string(dsk->type), addr);
 		return (WT_ERROR);
 	}
 
-	/* Any data after the data chunk should be nul bytes. */
-	p = (uint8_t *)WT_PAGE_DISK_BYTE(dsk) + dsk->u.datalen;
-	len = size - (WT_PAGE_DISK_SIZE + dsk->u.datalen);
-	for (; len > 0; ++p, --len)
+	/* Verify the data doesn't overflow the end of the page. */
+	p = (uint8_t *)WT_PAGE_DISK_BYTE(dsk);
+	if (p + data_len > end) {
+		WT_VRFY_ERR(session, quiet,
+		    "data on page at addr %" PRIu32 " extends past the "
+		    "end of the page", addr);
+		return (WT_ERROR);
+	}
+
+	/* Any bytes after the data chunk should be nul bytes. */
+	for (p += data_len; p < end; ++p)
 		if (*p != '\0') {
 			WT_VRFY_ERR(session, quiet,
 			    "%s page at addr %"

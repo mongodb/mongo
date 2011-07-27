@@ -75,6 +75,7 @@ Mutexes
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
+NRECS
 NUL
 NULLs
 NoAddr
@@ -226,6 +227,7 @@ getoneraw
 getones
 getonesn
 getraw
+getv
 gobare
 goesc
 gostring
@@ -239,6 +241,7 @@ iSh
 ikey
 imref
 incr
+incrv
 indices
 indx
 init
@@ -317,6 +320,7 @@ scr
 searchable
 serializable
 sessionp
+setv
 sizeof
 sizev
 slvg

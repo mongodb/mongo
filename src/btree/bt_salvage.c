@@ -232,6 +232,17 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 * and a per WT_TRACK flag on the pages requiring modification.
 	 *
 	 * This requires sorting the page list by key, and secondarily by LSN.
+	 *
+	 * !!!
+	 * It's vanishingly unlikely and probably impossible for fixed-length
+	 * column-store files to have overlapping key ranges.  It's possible
+	 * for an entire key range to go missing (if a page is corrupted and
+	 * lost), but because pages can't split, it shouldn't be possible to
+	 * find pages where the key ranges overlap.  That said, we check for
+	 * it and clean up after it in reconciliation because it doesn't cost
+	 * much and future column-store formats or operations might allow for
+	 * fixed-length format ranges to overlap during salvage, and I don't
+	 * want to have to retrofit the code later.
 	 */
 	qsort(ss->pages,
 	    (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare_key);
@@ -246,8 +257,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
 	switch (ss->page_type) {
-	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
 		__slvg_col_range_missing(session, ss);
 		break;
 	case WT_PAGE_ROW_LEAF:
@@ -260,8 +271,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 * write it, as well as any merged pages, to the file.
 	 */
 	switch (ss->page_type) {
-	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
 		WT_ERR(__slvg_col_build_internal(session, ss));
 		break;
 	case WT_PAGE_ROW_LEAF:
@@ -510,12 +521,8 @@ __slvg_trk_leaf(
 	case WT_PAGE_COL_FIX:
 		/*
 		 * Column-store fixed-sized format: start and stop keys can be
-		 * taken from the WT_PAGE_DISK header, and they can't contain
-		 * overflow items.
-		 *
-		 * Column-store variable-sized format: start and stop keys can
-		 * be taken from the WT_PAGE_DISK header, but they can contain
-		 * overflow items.
+		 * taken from the WT_PAGE_DISK header, doesn't contain overflow
+		 * items.
 		 */
 		trk->col_start = dsk->recno;
 		trk->col_stop = dsk->recno + (dsk->u.entries - 1);
@@ -526,9 +533,9 @@ __slvg_trk_leaf(
 		break;
 	case WT_PAGE_COL_VAR:
 		/*
-		 * Column-store RLE format: the start key can be taken from the
-		 * WT_PAGE_DISK header, but the stop key requires walking the
-		 * page.
+		 * Column-store variable-length format: the start key can be
+		 * taken from the WT_PAGE_DISK header, the stop key requires
+		 * walking the page.
 		 */
 		stop_recno = dsk->recno;
 		WT_CELL_FOREACH(dsk, cell, unpack, i) {
@@ -1153,38 +1160,21 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	skip = trk->col_start - page->u.col_leaf.recno;
-	take = (trk->col_stop - trk->col_start) + 1;
+	cookie->skip = skip = trk->col_start - page->u.col_leaf.recno;
+	cookie->take = take = (trk->col_stop - trk->col_start) + 1;
 
 	WT_VERBOSE(session, SALVAGE,
 	    "[%" PRIu32 "] merge discarding first %" PRIu64 " records, "
 	    "then taking %" PRIu64 " records",
 	    trk->addr, skip, take);
 
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		/*
-		 * Adjust the page information to "see" only keys we care about.
-		 *
-		 * Each WT_COL entry in a variable-length or fixed-length column
-		 * store maps to a single K/V pair.  Adjust the in-memory values
-		 * to reference only the K/V pairs we care about.
-		 */
-		page->u.col_leaf.d += skip;
-		page->entries = (uint32_t)take;
-		break;
-	case WT_PAGE_COL_VAR:
-		/*
-		 * Discard backing overflow pages for any items being discarded
-		 * that reference overflow pages.
-		 */
+	/*
+	 * Discard backing overflow pages for any items being discarded that
+	 * reference overflow pages.
+	 */
+	if (page->type == WT_PAGE_COL_VAR)
 		WT_ERR(__slvg_col_merge_ovfl(
 		    session, trk->addr, page, skip, take));
-
-		cookie->skip = skip;
-		cookie->take = take;
-		break;
-	}
 
 	/*
 	 * If we're missing some part of the range, the real start range is in
@@ -2080,8 +2070,8 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		return (-1);
 
 	switch (a_trk->ss->page_type) {
-	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
 		a_recno = a_trk->col_start;
 		b_recno = b_trk->col_start;
 		if (a_recno == b_recno)

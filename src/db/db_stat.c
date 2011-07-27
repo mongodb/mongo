@@ -42,7 +42,7 @@ __wt_btree_stat_print(WT_SESSION_IMPL *session, FILE *stream)
 	WT_STAT_SET(btree->fstats, file_intlmin, btree->intlmin);
 	WT_STAT_SET(btree->fstats, file_leafmax, btree->leafmax);
 	WT_STAT_SET(btree->fstats, file_leafmin, btree->leafmin);
-	WT_STAT_SET(btree->fstats, file_fixed_len, btree->fixed_len);
+	WT_STAT_SET(btree->fstats, file_fixed_len, btree->bitcnt);
 
 	/*
 	 * Note we do not have a hazard reference for the root page, and that's

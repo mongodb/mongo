@@ -54,14 +54,11 @@ __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 		switch (page->type) {
-		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			__wt_free_update_list(session, page->u.bulk.upd);
-			page->u.bulk.upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
 			__wt_free_insert_list(session, page->u.bulk.ins);
-			page->u.bulk.ins = NULL;
 			break;
 		}
 	else
@@ -95,14 +92,15 @@ __wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 static void
 __wt_free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_INSERT *ins;
+
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
 		__wt_free(session, page->u.col_leaf.d);
 
-	/* Free the update array. */
-	if (page->u.col_leaf.upd != NULL)
-		__wt_free_update(session,
-		    page->u.col_leaf.upd, page->entries);
+	/* Free the insert array. */
+	if ((ins = WT_COL_INSERT_SINGLE(page)) != NULL)
+		__wt_free_insert_list(session, ins);
 }
 
 /*

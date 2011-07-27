@@ -250,22 +250,14 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
-	 * If the page requires an update array (RLE pages never use the update
-	 * array, inserted items in row-store pages don't use the update array),
-	 * and does not yet have an update array, our caller passed us one of
-	 * the correct size.
+	 * If the page needs an update array (column-store pages and inserts on
+	 * row-store pages do not use the update array), our caller passed us
+	 * one of the correct size.   Check the page still needs one (the write
+	 * generation test should have caught that, though).
 	 */
-	if (new_upd != NULL) {
-		if (page->type == WT_PAGE_ROW_LEAF) {
-			if (page->u.row_leaf.upd == NULL) {
-				page->u.row_leaf.upd = new_upd;
-				__wt_update_new_upd_taken(session, page);
-			}
-		} else
-			if (page->u.col_leaf.upd == NULL) {
-				page->u.col_leaf.upd = new_upd;
-				__wt_update_new_upd_taken(session, page);
-			}
+	if (new_upd != NULL && page->u.row_leaf.upd == NULL) {
+		page->u.row_leaf.upd = new_upd;
+		__wt_update_new_upd_taken(session, page);
 	}
 
 	/*

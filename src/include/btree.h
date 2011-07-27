@@ -298,9 +298,9 @@ struct __wt_page {
 		/* Column-store leaf page. */
 		struct {
 			uint64_t    recno;	/* Starting recno */
-			WT_COL	   *d;		/* V objects */
+			uint8_t	   *bitf;	/* COL_FIX bits */
+			WT_COL	   *d;		/* COL_VAR objects */
 			WT_INSERT **ins;	/* Inserts (RLE) */
-			WT_UPDATE **upd;	/* Updates */
 		} col_leaf;
 
 		/* Bulk-loaded linked list. */
@@ -308,6 +308,8 @@ struct __wt_page {
 			uint64_t   recno;	/* Starting recno */
 			WT_INSERT *ins;		/* Bulk-loaded K/V pairs */
 			WT_UPDATE *upd;		/* Bulk-loaded V items */
+			uint8_t	  *bitf;	/* Bulk-loaded bit fields */
+
 		} bulk;
 	} u;
 
@@ -515,19 +517,17 @@ struct __wt_row {
 
 /*
  * WT_COL --
- * Each in-memory column-store leaf page has an array of WT_COL structures:
- * this is created from on-page data when a page is read from the file.
- * It's fixed in size, and references data on the page.
+ * Each in-memory variable-length column-store leaf page has an array of WT_COL
+ * structures: this is created from on-page data when a page is read from the
+ * file.  It's fixed in size, and references data on the page.
  */
 struct __wt_col {
 	/*
-	 * Col-store data references are page offsets, not pointers (we boldly
-	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
-	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
-	 *
-	 * The on-page data is untyped for column-store pages -- if the page
-	 * has variable-length objects, it's a WT_CELL (like row-store pages).
-	 * If the page has fixed-length objects, it's untyped bytes.
+	 * Variable-length column-store data references are page offsets, not
+	 * pointers (we boldly re-invent short pointers).  The trade-off is 4B
+	 * per K/V pair on a 64-bit machine vs. a single cycle for the addition
+	 * of a base pointer.  The on-page data is a WT_CELL (same as row-store
+	 * pages).
 	 *
 	 * If the value is 0, it's a single, deleted record.   While this might
 	 * be marginally faster than looking at the page, the real reason for
@@ -650,28 +650,46 @@ struct __wt_insert {
  * pointers to structures, and may not exist.  The following macros return an
  * array entry if the array of pointers and the specific structure exist, else
  * NULL.
- */
-#define	WT_COL_UPDATE(page, ip)						\
-	((page)->u.col_leaf.upd == NULL ?				\
-	    NULL : (page)->u.col_leaf.upd[WT_COL_SLOT(page, ip)])
-#define	WT_COL_INSERT(page, ip)						\
-	((page)->u.col_leaf.ins == NULL ?				\
-	    NULL : (page)->u.col_leaf.ins[WT_COL_SLOT(page, ip)])
-/*
+ *
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
  * requires an extra slot to hold keys that sort before any key found on the
  * original page.
  */
-#define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[(page)->entries])
 #define	WT_ROW_INSERT(page, ip)						\
 	((page)->u.row_leaf.ins == NULL ?				\
 	    NULL : (page)->u.row_leaf.ins[WT_ROW_SLOT(page, ip)])
+#define	WT_ROW_INSERT_SMALLEST(page)					\
+	((page)->u.row_leaf.ins == NULL ?				\
+	    NULL : (page)->u.row_leaf.ins[(page)->entries])
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
+
+/*
+ * WT_COL_INSERT_SINGLE references a single WT_INSERT list, which is used for
+ * fixed-length column-store updates.
+ */
+#define	WT_COL_INSERT(page, ip)						\
+	((page)->u.col_leaf.ins == NULL ?				\
+	    NULL : (page)->u.col_leaf.ins[WT_COL_SLOT(page, ip)])
+#define	WT_COL_INSERT_SINGLE(page)					\
+	((page)->u.col_leaf.ins == NULL ? NULL : (page)->u.col_leaf.ins[0])
+
+/* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
+#define	WT_FIX_FOREACH(btree, dsk, v, i)				\
+	for ((i) = 0,							\
+	    (v) = (i) < (dsk)->u.entries ?				\
+	    __wt_fix_getv(btree, 0, WT_PAGE_DISK_BYTE(dsk)) : 0;	\
+	    (i) < (dsk)->u.entries; ++(i),				\
+	    (v) = __wt_fix_getv(btree, i, WT_PAGE_DISK_BYTE(dsk)))
+
+/*
+ * WT_FIX_NRECS --
+ *	Return the number of bitfield records that fit on a fixed-length page.
+ */
+#define	WT_FIX_NRECS(btree)						\
+	(((btree)->leafmax - WT_PAGE_DISK_SIZE) / (btree)->bitcnt)
 
 /*
  * WT_OFF --
@@ -726,20 +744,6 @@ struct __wt_off_record {
 #define	WT_OFF_FOREACH(dsk, offp, i)					\
 	for ((offp) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; ++(offp), --(i))
-
-/*
- * On-page "deleted" flags for fixed-length column-store data cells -- steal
- * the top bit of the data.
- */
-#define	WT_FIX_DELETE_BYTE	0x80
-#define	WT_FIX_DELETE_ISSET(b)	(((uint8_t *)(b))[0] & WT_FIX_DELETE_BYTE)
-#define	WT_FIX_DELETE_SET(b)	(((uint8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
-
-/* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
-#define	WT_FIX_FOREACH(btree, dsk, p, i)				\
-	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
-	    (p) = (uint8_t *)(p) + (btree)->fixed_len)
 
 /*
  * General purpose macros for the Btree implementation.

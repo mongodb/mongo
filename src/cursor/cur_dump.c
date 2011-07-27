@@ -15,8 +15,35 @@
 static int
 __convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(buf);
+	static const char hex[] = "0123456789abcdef";
+	WT_BUF *tmp;
+	uint32_t i, size;
+	const uint8_t *p;
+	uint8_t *t;
+
+	if (buf->size == 0)
+		return (0);
+
+	WT_RET(__wt_scr_alloc(session, buf->size * 2, &tmp));
+	for (p = buf->data,
+	    i = buf->size, t = tmp->mem, size = 0; i > 0; --i, ++p)
+		if (isprint((int)*p)) {
+			if (*p == '\\') {
+				*t++ = '\\';
+				++size;
+			}
+			*t++ = *p;
+			++size;
+		} else {
+			*t++ = '\\';
+			*t++ = hex[(*p & 0xf0) >> 4];
+			*t++ = hex[*p & 0x0f];
+			size += 3;
+		}
+	tmp->size = size;
+
+	__wt_buf_swap(buf, tmp);
+	__wt_scr_release(&tmp);
 
 	return (0);
 }
@@ -51,10 +78,8 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
-	if (F_ISSET(cursor, WT_CURSTD_KEY_RAW)) {
+	if (F_ISSET(cursor, WT_CURSTD_PRINT))
 		WT_RET(__convert_to_dump(session, &cursor->key));
-		F_CLR(cursor, WT_CURSTD_KEY_RAW);
-	}
 
 	va_start(ap, cursor);
 	key = va_arg(ap, WT_ITEM *);
@@ -82,10 +107,8 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
-	if (F_ISSET(cursor, WT_CURSTD_VALUE_RAW)) {
+	if (F_ISSET(cursor, WT_CURSTD_PRINT))
 		WT_RET(__convert_to_dump(session, &cursor->value));
-		F_SET(cursor, WT_CURSTD_VALUE_RAW);
-	}
 	va_start(ap, cursor);
 	value = va_arg(ap, WT_ITEM *);
 	value->data = cursor->value.data;

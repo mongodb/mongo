@@ -58,10 +58,10 @@ typedef struct {
 
 	char *key_gen_buf;
 
+	uint32_t c_bitcnt;
 	uint32_t c_cache;			/* Config values */
 	uint32_t c_data_max;
 	uint32_t c_data_min;
-	uint32_t c_data_fix;
 	uint32_t c_delete_pct;
 	uint32_t c_file_type;
 	uint32_t c_huffman_key;

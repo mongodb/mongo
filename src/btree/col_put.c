@@ -22,15 +22,14 @@ __wt_col_modify(
 {
 	WT_PAGE *page;
 	WT_INSERT **new_ins, *ins;
-	WT_UPDATE **new_upd, *upd;
-	uint32_t ins_size, new_ins_size, new_upd_size, upd_size;
+	WT_UPDATE *upd;
+	uint32_t ins_size, new_ins_size, upd_size;
 	int hazard_ref, ret;
 
 	new_ins = NULL;
 	ins = NULL;
-	new_upd = NULL;
 	upd = NULL;
-	ins_size = new_ins_size = new_upd_size = upd_size = 0;
+	ins_size = new_ins_size = upd_size = 0;
 	ret = 0;
 
 	/* Search the btree for the key. */
@@ -61,67 +60,50 @@ __wt_col_modify(
 	/*
 	 * Delete or update a column-store entry.
 	 *
-	 * Run-length encoded (RLE) column-store changes are hard because each
-	 * original on-disk index for an RLE can represent a large number of
-	 * records, and we're only changing a single one of those records,
-	 * which means working in the WT_INSERT array.  All other column-store
-	 * modifications are simple, adding a new WT_UPDATE entry to the page's
-	 * modification array.  There are three code paths:
-	 *
-	 * 1: column-store changes other than RLE column stores: update the
-	 * original on-disk page entry by creating a new WT_UPDATE entry and
-	 * linking it into the WT_UPDATE array.
-	 *
-	 * 2: RLE column-store changes of an already changed record: create
-	 * a new WT_UPDATE entry, and link it to an existing WT_INSERT entry's
-	 * WT_UPDATE list.
-	 *
-	 * 3: RLE column-store change of not-yet-changed record: create a new
-	 * WT_INSERT/WT_UPDATE pair and link it into the WT_INSERT array.
+	 * Column-store changes mean working in a WT_INSERT list.
 	 */
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:					/* #1 */
-		/* Allocate an update array as necessary. */
-		if (session->srch_upd == NULL) {
-			WT_ERR(__wt_calloc_def(
-			    session, page->entries, &new_upd));
-			new_upd_size =
-			    page->entries * WT_SIZEOF32(WT_UPDATE *);
-			/*
-			 * If there was no update array, the search function
-			 * could not have set the WT_UPDATE location.
-			 */
-			session->srch_upd = &new_upd[session->srch_slot];
-		}
-		goto simple_update;
-	case WT_PAGE_COL_VAR:
-		/* Allocate an update array as necessary. */
-		if (session->srch_upd != NULL) {		/* #2 */
-simple_update:		WT_ERR(
-			    __wt_update_alloc(session, value, &upd, &upd_size));
+	if (session->srch_upd != NULL) {
+		/*
+		 * If changing an already changed record, create a new WT_UPDATE
+		 * entry and have the workQ link it into an existing WT_INSERT
+		 * entry's WT_UPDATE list.
+		 */
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
-			/* workQ: insert the WT_UPDATE structure. */
-			ret = __wt_update_serial(
-			    session, page, session->srch_write_gen,
-			    &new_upd, new_upd_size,
-			    session->srch_upd, &upd, upd_size);
-			break;
-		}
-								/* #3 */
-		/* Allocate an insert array as necessary. */
-		if (session->srch_ins == NULL) {
-			WT_ERR(__wt_calloc_def(
-			    session, page->entries, &new_ins));
-			new_ins_size =
-			    page->entries * WT_SIZEOF32(WT_INSERT *);
-			/*
-			 * If there was no insert array, the search function
-			 * could not have set the WT_INSERT location.
-			 */
-			session->srch_ins = &new_ins[session->srch_slot];
-		}
+		/* workQ: insert the WT_UPDATE structure. */
+		ret = __wt_update_serial(
+		    session, page, session->srch_write_gen,
+		    NULL, 0, session->srch_upd, &upd, upd_size);
+	} else {
+		/*
+		 * We may not have an WT_INSERT array (in the case of variable
+		 * length column store) or WT_INSERT slot (in the case of fixed
+		 * length column store).  Allocate as necessary.
+		 *
+		 * If there was no insert array, the search function could not
+		 * have set the WT_INSERT location.
+		 */
+		if (session->srch_ins == NULL)
+			switch (page->type) {
+			case WT_PAGE_COL_FIX:
+				WT_ERR(__wt_calloc_def(session, 1, &new_ins));
+				new_ins_size = 1 * WT_SIZEOF32(WT_INSERT *);
+				session->srch_ins = &new_ins[0];
+				break;
+			case WT_PAGE_COL_VAR:
+				WT_ERR(__wt_calloc_def(
+				    session, page->entries, &new_ins));
+				new_ins_size =
+				    page->entries * WT_SIZEOF32(WT_INSERT *);
+				session->srch_ins =
+				    &new_ins[session->srch_slot];
+				break;
+			}
 
-		/* Allocate a WT_INSERT/WT_UPDATE pair. */
+		/*
+		 * If changing a not-yet-changed record, then allocate a new
+		 * WT_INSERT/WT_UPDATE pair, link it into the WT_INSERT array.
+		 */
 		WT_ERR(__col_insert_alloc(session, recno, &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
@@ -131,7 +113,6 @@ simple_update:		WT_ERR(
 		ret = __wt_insert_serial(
 		    session, page, session->srch_write_gen,
 		    &new_ins, new_ins_size, session->srch_ins, &ins, ins_size);
-		break;
 	}
 
 	if (ret != 0) {
@@ -144,10 +125,6 @@ err:		if (ins != NULL)
 	/* Free any insert array. */
 	if (new_ins != NULL)
 		__wt_free(session, new_ins);
-
-	/* Free any update array. */
-	if (new_upd != NULL)
-		__wt_free(session, new_upd);
 
 	__wt_page_out(session, page);
 
@@ -188,26 +165,26 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 static int
 __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 {
+	WT_BTREE *btree;
 	WT_COL *d;
 	WT_COL_REF *t;
 	WT_CONFIG_ITEM cval;
 	WT_PAGE *new_intl, *new_leaf, *parent;
 	uint64_t next;
-	uint32_t d_size, new_intl_size, new_leaf_size, t_size;
+	uint32_t entries_size, new_intl_size, new_leaf_size, t_size;
 	uint32_t internal_extend, leaf_extend;
+	uint8_t *bitf;
 	int ret;
+	void *entries;
 
+	btree = session->btree;
 	d = NULL;
 	t = NULL;
 	new_intl = new_leaf = NULL;
-	d_size = new_intl_size = new_leaf_size = t_size = 0;
+	entries_size = new_intl_size = new_leaf_size = t_size = 0;
 	internal_extend = leaf_extend = 0;
+	bitf = NULL;
 	ret = 0;
-
-	/* Find out by how much we'll extend the leaf key space. */
-	WT_RET(__wt_config_getones(session,
-	    session->btree->config, "column_leaf_extend", &cval));
-	leaf_extend = (uint32_t)cval.val;
 
 	/*
 	 * Another thread may have already done the work, or a default extension
@@ -217,12 +194,44 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	WT_RET(__col_next_recno(session, page, &next));
 	if (recno < next)			/* Fits on the current page. */
 		return (WT_RESTART);
-	if (recno >= next + leaf_extend)	/* Fits in default extension. */
-		leaf_extend = (uint32_t)(recno - next) + 100;
 
-	/* We always need a new entries array, allocate it. */
-	WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &d));
-	d_size = leaf_extend * WT_SIZEOF32(WT_COL);
+	/*
+	 * Figure out how much we'll extend the leaf key space.
+	 *
+	 * If it's a fixed-length store, we can't allocate more than maximum
+	 * leaf page size number of bits, because we can't ever split those
+	 * pages.
+	 *
+	 * If it's a variable-length store, we can split those pages so we
+	 * can allocate whatever we need.
+	 *
+	 * XXX
+	 * If the application is extending the file by more than will reasonably
+	 * fit on a page, insert an RLE record that gets us all the way to the
+	 * insert record.
+	 *
+	 * We always need a new bitfield or entries array, allocate them.
+	 */
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		leaf_extend = WT_FIX_NRECS(btree);
+
+		WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &bitf));
+		entries = bitf;
+		entries_size = leaf_extend;
+		break;
+	case WT_PAGE_COL_VAR:
+		WT_RET(__wt_config_getones(session,
+		    session->btree->config, "column_leaf_extend", &cval));
+		leaf_extend = (uint32_t)cval.val;
+		if (recno >= next + leaf_extend)
+			leaf_extend = (uint32_t)(recno - next) + 100;
+
+		WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &d));
+		entries = d;
+		entries_size = leaf_extend * WT_SIZEOF32(WT_COL);
+		break;
+	}
 
 	/*
 	 * Check if the page is a newly created page: all we'll need is a new
@@ -251,18 +260,20 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	t_size = internal_extend * WT_SIZEOF32(WT_COL_REF);
 
 done:	return (__wt_col_extend_serial(session, page, &new_intl, new_intl_size,
-	    &t, t_size, internal_extend, &new_leaf, new_leaf_size, &d, d_size,
-	    leaf_extend, recno));
+	    &t, t_size, internal_extend, &new_leaf, new_leaf_size, &entries,
+	    entries_size, leaf_extend, recno));
 
 err:
-	if (new_intl != NULL)
-		__wt_free(session, new_intl);
-	if (t != NULL)
-		__wt_free(session, t);
-	if (new_leaf != NULL)
-		__wt_free(session, new_leaf);
 	if (d != NULL)
 		__wt_free(session, d);
+	if (t != NULL)
+		__wt_free(session, t);
+	if (new_intl != NULL)
+		__wt_free(session, new_intl);
+	if (new_leaf != NULL)
+		__wt_free(session, new_leaf);
+	if (bitf != NULL)
+		__wt_free(session, bitf);
 	return (ret);
 }
 
@@ -274,15 +285,15 @@ int
 __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_COL_REF *cref, *t;
-	WT_COL *d;
 	WT_PAGE *new_leaf, *new_intl, *page, *parent;
 	WT_REF *orig_ref;
 	uint64_t next, recno;
 	uint32_t internal_extend, leaf_extend;
 	int ret;
+	void *entries;
 
 	__wt_col_extend_unpack(session, &page, &new_intl,
-	    &t, &internal_extend, &new_leaf, &d, &leaf_extend, &recno);
+	    &t, &internal_extend, &new_leaf, &entries, &leaf_extend, &recno);
 
 	ret = 0;
 
@@ -296,10 +307,11 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 * This is safe because the reconciliation code can't touch the subtree
 	 * we're in: we have a hazard reference on the lowest page, that fixes
 	 * the tree into memory.
+	 *
+	 * We need a new entries array or bitfield, make sure our caller passed
+	 * us one.
 	 */
-
-	/* We need a new entries array, make sure our caller passed us one. */
-	if (d == NULL)
+	if (entries == NULL)
 		goto done;
 
 	/*
@@ -307,13 +319,23 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	 *
 	 * Setting the page's entries value turns on the change.
 	 */
-	if (page->u.col_leaf.d == NULL) {
-		page->u.col_leaf.d = d;
-		__wt_col_extend_d_taken(session, page);
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		if (page->u.col_leaf.bitf == NULL) {
+			page->u.col_leaf.bitf = entries;
+			goto entries;
+		}
+		break;
+	case WT_PAGE_COL_VAR:
+		if (page->u.col_leaf.d == NULL) {
+			page->u.col_leaf.d = entries;
 
-		WT_MEMORY_FLUSH;
-		page->entries = leaf_extend;
-		goto done;
+entries:		__wt_col_extend_entries_taken(session, page);
+			WT_MEMORY_FLUSH;
+			page->entries = leaf_extend;
+			goto done;
+		}
+		break;
 	}
 
 	/* We need a new leaf page, make sure our caller passed us one. */
@@ -348,7 +370,8 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 		new_leaf->parent_ref = &cref->ref;
 		new_leaf->read_gen = __wt_cache_read_gen(session);
 		new_leaf->u.col_leaf.recno = next;
-		new_leaf->u.col_leaf.d = d;
+		new_leaf->u.col_leaf.d = entries;
+		new_leaf->u.col_leaf.bitf = entries;
 		new_leaf->dsk = NULL;
 		new_leaf->entries = leaf_extend;
 		new_leaf->type = page->type;
@@ -359,7 +382,7 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 		++parent->entries;
 
 		__wt_col_extend_new_leaf_taken(session, new_leaf);
-		__wt_col_extend_d_taken(session, new_leaf);
+		__wt_col_extend_entries_taken(session, new_leaf);
 
 		goto done;
 	}
@@ -426,7 +449,8 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	new_leaf->parent_ref = &new_intl->u.col_int.t[1].ref;
 	new_leaf->read_gen = __wt_cache_read_gen(session);
 	new_leaf->u.col_leaf.recno = next;
-	new_leaf->u.col_leaf.d = d;
+	new_leaf->u.col_leaf.d = entries;
+	new_leaf->u.col_leaf.bitf = entries;
 	new_leaf->dsk = NULL;
 	new_leaf->entries = leaf_extend;
 	new_leaf->type = page->type;
@@ -436,7 +460,7 @@ __wt_col_extend_serial_func(WT_SESSION_IMPL *session)
 	__wt_col_extend_new_intl_taken(session, new_intl);
 	__wt_col_extend_t_taken(session, new_intl);
 	__wt_col_extend_new_leaf_taken(session, new_leaf);
-	__wt_col_extend_d_taken(session, new_leaf);
+	__wt_col_extend_entries_taken(session, new_leaf);
 
 	/*
 	 * Make the switch: set the addr/size pair then update the pointer (we

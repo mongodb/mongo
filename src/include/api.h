@@ -45,7 +45,7 @@ struct __wt_btree {
 	uint32_t key_gap;		/* Btree instantiated key gap */
 	WT_BUF   key_srch;		/* Search key buffer */
 
-	uint32_t fixed_len;		/* Fixed-length record size */
+	u_int	 bitcnt;		/* Fixed-length field size in bits */
 
 	int btree_compare_int;		/* Integer keys */
 					/* Comparison function */
@@ -156,13 +156,17 @@ struct __wt_session_impl {
 
 					/* Search return values: */
 	WT_PAGE		*srch_page;	/* page */
-	uint32_t	 srch_write_gen;/* page's write-generation */
+	uint32_t	 srch_write_gen;/* leaf page's write-generation */
 	int		 srch_match;	/* an exact match */
-	void		*srch_ip;	/* WT_{COL,ROW} index */
+	void		*srch_ip;	/* WT_{COL,ROW} reference */
+	uint32_t	 srch_slot;	/* WT_{COL,ROW} slot */
+
+	WT_UPDATE      **srch_upd;	/* WT_UPDATE base insert node */
 	WT_UPDATE	*srch_vupdate;	/* WT_UPDATE value node */
+
 	WT_INSERT      **srch_ins;	/* WT_INSERT insert node */
-	WT_UPDATE      **srch_upd;	/* WT_UPDATE insert node */
-	uint32_t	 srch_slot;	/* WT_INSERT/WT_UPDATE slot */
+
+	uint8_t		 srch_v;	/* Bitfield search value */
 
 	WT_EVENT_HANDLER *event_handler;
 

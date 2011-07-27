@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_bulk_col(WT_CURSOR_BULK *);
+static int __wt_bulk_col_fix(WT_CURSOR_BULK *);
 static int __wt_bulk_col_page(WT_CURSOR_BULK *);
+static int __wt_bulk_col_var(WT_CURSOR_BULK *);
 static int __wt_bulk_row(WT_CURSOR_BULK *);
 static int __wt_bulk_row_page(WT_CURSOR_BULK *);
 
@@ -21,6 +22,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
+	uint32_t nrecs;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
@@ -44,20 +46,24 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		cbulk->recno = 1;
-		cbulk->updp = &cbulk->upd_base;
 		cbulk->page_type = WT_PAGE_COL_FIX;
+
+		nrecs = WT_FIX_NRECS(btree);
+		WT_RET(__wt_calloc_def(session, nrecs, &cbulk->bitf));
+		cbulk->ipp = nrecs;
+		break;
+	case BTREE_ROW:
+		cbulk->page_type = WT_PAGE_ROW_LEAF;
+		cbulk->insp = &cbulk->ins_base;
+		cbulk->ipp = 50000;			/* XXX */
 		break;
 	case BTREE_COL_VAR:
 		cbulk->recno = 1;
-		cbulk->updp = &cbulk->upd_base;
 		cbulk->page_type = WT_PAGE_COL_VAR;
-		break;
-	case BTREE_ROW:
-		cbulk->insp = &cbulk->ins_base;
-		cbulk->page_type = WT_PAGE_ROW_LEAF;
+		cbulk->updp = &cbulk->upd_base;
+		cbulk->ipp = 50000;			/* XXX */
 		break;
 	}
-	cbulk->ipp = 50000;			/* XXX */
 
 	return (0);
 }
@@ -91,8 +97,10 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	 */
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
+		WT_RET(__wt_bulk_col_fix(cbulk));
+		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bulk_col(cbulk));
+		WT_RET(__wt_bulk_col_var(cbulk));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_bulk_row(cbulk));
@@ -105,11 +113,37 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_bulk_col --
- *	Column-store bulk load.
+ * __wt_bulk_col_fix --
+ *	Fixed-length column-store bulk load.
  */
 static int
-__wt_bulk_col(WT_CURSOR_BULK *cbulk)
+__wt_bulk_col_fix(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	btree = session->btree;
+	cursor = &cbulk->cbt.iface;
+
+	__wt_fix_setv(btree,
+	    cbulk->ins_cnt, cbulk->bitf, ((uint8_t *)cursor->value.data)[0]);
+	++cbulk->ins_cnt;
+
+	/* If the page is full, reconcile it and reset the insert list. */
+	if (cbulk->ins_cnt == cbulk->ipp)
+		WT_RET(__wt_bulk_col_page(cbulk));
+
+	return (0);
+}
+
+/*
+ * __wt_bulk_col_var --
+ *	Variable-length column-store bulk load.
+ */
+static int
+__wt_bulk_col_var(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -209,6 +243,10 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 			break;
 		}
 
+	/* Discard any fixed-length column-store bulk buffer. */
+	if (cbulk->page_type == WT_PAGE_COL_FIX && cbulk->bitf != NULL)
+		__wt_free(session, cbulk->bitf);
+
 	root_page = &session->btree->root_page;
 
 	/* Allocate an internal page and initialize it. */
@@ -290,6 +328,7 @@ __wt_bulk_row_page(WT_CURSOR_BULK *cbulk)
 	page->u.bulk.recno = 0;
 	page->u.bulk.ins = cbulk->ins_base;
 	page->dsk = NULL;
+	page->entries = cbulk->ins_cnt;
 	page->type = WT_PAGE_ROW_LEAF;
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
@@ -343,8 +382,16 @@ __wt_bulk_col_page(WT_CURSOR_BULK *cbulk)
 	page->parent_ref = parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = cbulk->recno;
-	page->u.bulk.upd = cbulk->upd_base;
+	switch (cbulk->page_type) {
+	case WT_PAGE_COL_FIX:
+		page->u.bulk.bitf = cbulk->bitf;
+		break;
+	case WT_PAGE_COL_VAR:
+		page->u.bulk.upd = cbulk->upd_base;
+		break;
+	}
 	page->dsk = NULL;
+	page->entries = cbulk->ins_cnt;
 	page->type = cbulk->page_type;
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);

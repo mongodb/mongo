@@ -29,7 +29,7 @@ serial = {
 		[ 'WT_COL_REF *', 't', 1 ],
 		[ 'uint32_t', 'internal_extend', 0 ],
 		[ 'WT_PAGE *', 'new_leaf', 1 ],
-		[ 'WT_COL *', 'd', 1 ],
+		[ 'void *', 'entries', 1 ],
 		[ 'uint32_t', 'leaf_extend', 0 ],
 		[ 'uint64_t', 'recno', 0 ],
 	]),

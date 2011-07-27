@@ -25,36 +25,50 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 }
 
 static inline int
-__btcur_next_fix(WT_CURSOR_BTREE *cbt,
-    int newpage, uint64_t *recnop, WT_BUF *value)
+__btcur_next_fix(
+    WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
 {
-	WT_CELL *cell;
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	int found;
+	uint8_t v;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	btree = session->btree;
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->ins = WT_COL_INSERT_SINGLE(cbt->page);
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
 	}
 
 	/* This loop moves through a page, including after reading a record. */
-	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+	for (found = 0; !found; ++cbt->recno, --cbt->nitems) {
 		if (cbt->nitems == 0)
 			return (WT_NOTFOUND);
 
 		*recnop = cbt->recno;
-		if ((upd = WT_COL_UPDATE(cbt->page, cbt->cip)) == NULL) {
-			cell = WT_COL_PTR(cbt->page, cbt->cip);
-			if (cell != NULL && !WT_FIX_DELETE_ISSET(cell)) {
-				value->data = cell;
-				value->size = cbt->btree->fixed_len;
-				found = 1;
-			}
-		} else if (!WT_UPDATE_DELETED_ISSET(upd)) {
+		/*
+		 * Check any insert list for a matching record (insert
+		 * lists are in sorted order, we check the next entry).
+		 */
+		if (cbt->ins != NULL &&
+		    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
+			upd = cbt->ins->upd;
+			cbt->ins = cbt->ins->next;
+
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				continue;
 			value->data = WT_UPDATE_DATA(upd);
-			value->size = cbt->btree->fixed_len;
+			value->size = 1;
+			found = 1;
+		} else {
+			v = __wt_fix_getv_recno(btree, cbt->page, cbt->recno);
+			WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
+			value->data = cbt->value.data;
+			value->size = 1;
 			found = 1;
 		}
 	}
@@ -405,12 +419,11 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (((WT_ITEM *)&cursor->value)->size != btree->fixed_len) {
-			__wt_errx(session, "length of %" PRIu32
-			    " does not match fixed-length file configuration "
-			    "of %" PRIu32,
-			    ((WT_ITEM *)&cursor->value)->size,
-			    btree->fixed_len);
+		if (cursor->value.size != 1) {
+			__wt_errx(session, "item size of %" PRIu32
+			    " does not match fixed-length file requirement "
+			    " of 1 byte",
+			    cursor->value.size);
 			return (WT_ERROR);
 		}
 		/* FALLTHROUGH */
@@ -440,6 +453,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_ITEM zero;
 	WT_SESSION_IMPL *session;
 	int ret;
 
@@ -449,6 +463,12 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
+		zero.data = "";		/* A zero-byte means delete. */
+		zero.size = 1;
+		while ((ret = __wt_col_modify(
+		    session, cursor->recno, &zero, 0)) == WT_RESTART)
+			;
+		break;
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_modify(
 		    session, cursor->recno, NULL, 0)) == WT_RESTART)

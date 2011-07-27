@@ -17,6 +17,8 @@ main(int argc, char *argv[])
 {
 	int ch, reps, ret;
 
+	ret = 0;
+
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
 	else
@@ -140,7 +142,7 @@ main(int argc, char *argv[])
 	}
 
 	if (0) {
-err:		ret = EXIT_FAILURE;
+err:		ret = 1;
 	}
 
 	if (g.rand_log != NULL)
@@ -149,8 +151,8 @@ err:		ret = EXIT_FAILURE;
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	config_print(ret == EXIT_FAILURE ? 1 : 0);
-	return (ret);
+	config_print(ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 /*

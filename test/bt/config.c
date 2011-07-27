@@ -223,14 +223,17 @@ config_translate(char *s)
 		return (uint32_t)atoi(s);
 
 	/* Currently, all we translate are the file type names. */
-	if (strcmp(s, "row") == 0 || strcmp(s, "row-store") == 0)
-		return ((uint32_t)ROW);
-	if (strcmp(s, "vlcs") == 0 ||
-	    strcmp(s, "variable-length column-store") == 0)
-		return ((uint32_t)VAR);
-	if (strcmp(s, "flcs") == 0 ||
+	if (strcmp(s, "fix") == 0 ||
+	    strcmp(s, "flcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "fixed-length column-store") == 0)
 		return ((uint32_t)FIX);
+	if (strcmp(s, "var") == 0 ||
+	    strcmp(s, "vlcs") == 0 ||		/* Deprecated */
+	    strcmp(s, "variable-length column-store") == 0)
+		return ((uint32_t)VAR);
+	if (strcmp(s, "row") == 0 ||
+	    strcmp(s, "row-store") == 0)
+		return ((uint32_t)ROW);
 
 	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
 	exit(EXIT_FAILURE);

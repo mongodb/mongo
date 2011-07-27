@@ -208,9 +208,11 @@ static int  __rec_cell_build_ovfl(
 		WT_SESSION_IMPL *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(
 		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
-static void __rec_col_extend_truncate(WT_PAGE *);
+static void __rec_col_extend_truncate(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_fix_bulk(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_col_fix_helper(
+		WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint8_t *);
 static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
@@ -229,7 +231,7 @@ static int  __rec_imref_fixup(WT_SESSION_IMPL *,
 		WT_BOUNDARY *, WT_PAGE *, WT_REF *, WT_PAGE **);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
-STATIN void __rec_incr(WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t);
+STATIN void __rec_incrv(WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t, uint32_t);
 static int  __rec_init(WT_SESSION_IMPL *, uint32_t);
 STATIN void __rec_key_state_update(WT_RECONCILE *, int);
 static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
@@ -350,18 +352,14 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_FIX:
 		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 			WT_RET(__rec_col_fix_bulk(session, page));
-		else {
-			__rec_col_extend_truncate(page);
+		else
 			WT_RET(__rec_col_fix(session, page, salvage));
-		}
 		break;
 	case WT_PAGE_COL_VAR:
 		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 			WT_RET(__rec_col_var_bulk(session, page));
-		else {
-			__rec_col_extend_truncate(page);
+		else
 			WT_RET(__rec_col_var(session, page, salvage));
-		}
 		break;
 	case WT_PAGE_COL_INT:
 		WT_RET(__rec_col_int(session, page));
@@ -882,6 +880,33 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __rec_incr --
+ *	Update the memory tracking structure for one new entry.
+ */
+#define	__rec_incr(session, r, size)	__rec_incrv(session, r, 1, size)
+
+/*
+ * __rec_incrv --
+ *	Update the memory tracking structure for a set of new entries.
+ */
+static inline void
+__rec_incrv(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
+{
+	/*
+	 * The buffer code is fragile and prone to off-by-one errors -- check
+	 * for overflow in diagnostic mode.
+	 */
+	WT_ASSERT(session, r->space_avail >= size);
+	WT_ASSERT(session,
+	    WT_PTRDIFF32(r->first_free + size, r->dsk.mem) <= r->page_size);
+
+	r->entries += v;
+	r->space_avail -= size;
+	r->first_free += size;
+}
+
+/*
  * __rec_copy_incr --
  *	Copy a key/value cell and buffer pair onto a page.
  */
@@ -909,26 +934,6 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 
 	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
 	__rec_incr(session, r, kv->len);
-}
-
-/*
- * __rec_incr --
- *	Update the memory tracking structure for a new entry.
- */
-static inline void
-__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t size)
-{
-	/*
-	 * The buffer code is fragile and prone to off-by-one errors --
-	 * check for overflow in diagnostic mode.
-	 */
-	WT_ASSERT(session, r->space_avail >= size);
-	WT_ASSERT(session,
-	    WT_PTRDIFF32(r->first_free + size, r->dsk.mem) <= r->page_size);
-
-	++r->entries;
-	r->space_avail -= size;
-	r->first_free += size;
 }
 
 /*
@@ -1590,145 +1595,19 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_col_fix --
- *	Reconcile a fixed-width, column-store leaf page (does not handle
- * run-length encoding).
- */
-static int
-__rec_col_fix(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
-{
-	WT_BTREE *btree;
-	WT_BUF *tmp;
-	WT_COL *cip;
-	WT_RECONCILE *r;
-	WT_UPDATE *upd;
-	uint64_t slvg_missing;
-	uint32_t i, len;
-	uint8_t *data;
-	int ret;
-	void *cipdata;
-
-	r = S2C(session)->cache->rec;
-	btree = session->btree;
-	tmp = NULL;
-	ret = 0;
-
-	/*
-	 * We need a "deleted" data item to store on the page; get a scratch
-	 * buffer, clear the contents and set the delete flag.
-	 */
-	len = btree->fixed_len;
-	WT_ERR(__wt_scr_alloc(session, len, &tmp));
-	memset(tmp->mem, 0, len);
-	WT_FIX_DELETE_SET(tmp->mem);
-
-	WT_ERR(__rec_split_init(session, page,
-	    page->u.col_leaf.recno,
-	    session->btree->leafmax, session->btree->leafmin));
-
-	/*
-	 * The salvage code may be calling us to reconcile a page where there
-	 * were missing records in the column-store name space.
-	 */
-	slvg_missing = salvage == NULL ? 0 : salvage->missing;
-	for (; slvg_missing > 0; --slvg_missing) {
-		/* Boundary: split or write the page. */
-		while (len > r->space_avail)
-			WT_RET(__rec_split(session));
-
-		memcpy(r->first_free, tmp->mem, len);
-		__rec_incr(session, r, len);
-
-		/* Update the starting record number in case we split. */
-		++r->recno;
-	}
-
-	/* For each entry in the in-memory page... */
-	WT_COL_FOREACH(page, cip, i) {
-		/*
-		 * Get a reference to the data, on- or off- page, and see if
-		 * it's been deleted.
-		 */
-		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				data = tmp->mem;	/* Deleted */
-			else				/* Updated */
-				data = WT_UPDATE_DATA(upd);
-		} else {
-			cipdata = WT_COL_PTR(page, cip);
-			if (cipdata == NULL || WT_FIX_DELETE_ISSET(cipdata))
-				data = tmp->mem;	/* Deleted */
-			else
-				data = cipdata;		/* On-disk data */
-		}
-
-		/* Boundary: split or write the page. */
-		while (len > r->space_avail)
-			WT_RET(__rec_split(session));
-
-		memcpy(r->first_free, data, len);
-		__rec_incr(session, r, len);
-
-		/* Update the starting record number in case we split. */
-		++r->recno;
-	}
-
-	/* Write the remnant page. */
-	ret = __rec_split_finish(session);
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
-	return (ret);
-}
-
-/*
- * __rec_col_fix_bulk --
- *	Reconcile a bulk-loaded, fixed-width column-store leaf page (does not
- * handle run-length encoding).
- */
-static int
-__rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-	WT_RECONCILE *r;
-	WT_UPDATE *upd;
-	uint32_t len;
-
-	r = S2C(session)->cache->rec;
-	btree = session->btree;
-	len = btree->fixed_len;
-
-	WT_RET(__rec_split_init(session, page,
-	    page->u.bulk.recno,
-	    session->btree->leafmax, session->btree->leafmin));
-
-	/* For each entry in the update list... */
-	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
-		/* Boundary: split or write the page. */
-		while (len > r->space_avail)
-			WT_RET(__rec_split(session));
-
-		memcpy(r->first_free, WT_UPDATE_DATA(upd), len);
-		__rec_incr(session, r, len);
-
-		/* Update the starting record number in case we split. */
-		++r->recno;
-	}
-
-	/* Write the remnant page. */
-	return (__rec_split_finish(session));
-}
-
-/*
  * __rec_col_extend_truncate --
  *	Discard deleted entries from the end of the name space.
  */
 static void
-__rec_col_extend_truncate(WT_PAGE *page)
+__rec_col_extend_truncate(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_COL *cip;
+	WT_INSERT *ins;
 	WT_PAGE *t, *parent;
+	uint64_t max_update;
+
+	btree = session->btree;
 
 	/*
 	 * Extending a column-store file can result in thousands of deleted
@@ -1765,12 +1644,163 @@ __rec_col_extend_truncate(WT_PAGE *page)
 	 * the end of the file.  Close is a relatively rare operation, slowing
 	 * it down shouldn't be too awful.
 	 */
-	cip = &page->u.col_leaf.d[page->entries - 1];
-	for (; page->entries > 1; --cip, --page->entries)
-		if (WT_COL_PTR(page, cip) != NULL ||
-		    WT_COL_UPDATE(page, cip) != NULL ||
-		    WT_COL_INSERT(page, cip) != NULL)
-			return;
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		/* Find the largest updated record for this page. */
+		for (ins = WT_COL_INSERT_SINGLE(page);
+		    ins != NULL && ins->next != NULL; ins = ins->next)
+			;
+		max_update = ins == NULL ? 0 : WT_INSERT_RECNO(ins);
+
+		/* Discard any 0-valued entries. */
+		for (;; --page->entries) {
+			if (page->entries <= 1)
+				break;
+			if (max_update >=
+			    page->u.col_leaf.recno + (page->entries - 1))
+				break;
+			if (__wt_fix_getv(btree,
+			    page->entries - 1, page->u.col_leaf.bitf) != 0)
+				break;
+		}
+		break;
+	case WT_PAGE_COL_VAR:
+		/* Discard any entries for which there's no data. */
+		cip = &page->u.col_leaf.d[page->entries - 1];
+		for (; page->entries > 1; --cip, --page->entries)
+			if (WT_COL_PTR(page, cip) != NULL ||
+			    WT_COL_INSERT(page, cip) != NULL)
+				return;
+		break;
+	}
+}
+
+/*
+ * __rec_col_fix --
+ *	Reconcile a fixed-width, column-store leaf page.
+ */
+static int
+__rec_col_fix(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+{
+	WT_BTREE *btree;
+	WT_INSERT *ins;
+	WT_RECONCILE *r;
+	uint64_t page_start, page_take;
+	uint32_t entry, nrecs;
+
+	r = S2C(session)->cache->rec;
+	btree = session->btree;
+
+	/*
+	 * Unlike most of the reconciliation code, we handle fixed-length pages
+	 * in two parts, salvage and non-salvage, because the salvage work to
+	 * handle skipped and missing records is complicated, and non-salvage
+	 * is trivial.
+	 */
+	if (salvage == NULL) {
+		/* Discard any empty entries appended to the page. */
+		__rec_col_extend_truncate(session, page);
+
+		/* Update any changes to the original on-page data items. */
+		for (ins =
+		    WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next)
+			__wt_fix_setv_recno(btree, page,
+			    WT_INSERT_RECNO(ins),
+			    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+
+		return (__rec_col_fix_helper(session, page,
+		    page->u.col_leaf.recno, page->u.col_leaf.bitf));
+	}
+
+	/*
+	 * !!!
+	 * It's vanishingly unlikely and probably impossible for fixed-length
+	 * column-store files to have overlapping key ranges.  It's possible
+	 * for an entire key range to go missing (if a page is corrupted and
+	 * lost), but because pages can't split, it shouldn't be possible to
+	 * find pages where the key ranges overlap.  That said, we check for
+	 * it during salvage and clean up after it here because it doesn't
+	 * cost much and future column-store formats or operations might allow
+	 * for fixed-length format ranges to overlap during salvage, and I
+	 * don't want to have to retrofit the code later.
+	 */
+	WT_RET(__rec_split_init(session,
+	    page, page->u.col_leaf.recno, btree->leafmax, btree->leafmax));
+
+	/* We may not be taking all of the entries on the original page. */
+	page_take = salvage->take == 0 ? page->entries : salvage->take;
+	page_start = salvage->skip == 0 ? 0 : salvage->skip;
+	for (;;) {
+		/* Calculate the number of entries we can put into each page. */
+		entry = 0;
+		nrecs = r->space_avail / btree->bitcnt;
+
+		for (; nrecs > 0 && salvage->missing > 0;
+		    --nrecs, --salvage->missing, ++r->recno, ++entry)
+			__wt_fix_setv(btree, entry, r->first_free, 0);
+
+		for (; nrecs > 0 && page_take > 0;
+		    --nrecs, --page_take, ++page_start, ++r->recno, ++entry)
+			__wt_fix_setv(btree, entry, r->first_free,
+			    __wt_fix_getv(btree,
+				(uint32_t)page_start, page->u.col_leaf.bitf));
+
+		__rec_incrv(
+		    session, r, entry, bitstr_size(entry * btree->bitcnt));
+
+		/*
+		 * If everything didn't fit, then we have to force a split and
+		 * keep going.
+		 *
+		 * Boundary: split or write the page.
+		 */
+		if (salvage->missing == 0 && page_take == 0)
+			break;
+		WT_RET(__rec_split(session));
+	}
+
+	/* Write the remnant page. */
+	return (__rec_split_finish(session));
+}
+
+/*
+ * __rec_col_fix_bulk --
+ *	Reconcile a bulk-loaded, fixed-width column-store leaf page.
+ */
+static int
+__rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	return (__rec_col_fix_helper(
+	    session, page, page->u.bulk.recno, page->u.bulk.bitf));
+}
+
+static int
+__rec_col_fix_helper(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, uint8_t *bitf)
+{
+	WT_BTREE *btree;
+	WT_RECONCILE *r;
+	uint32_t len;
+
+	r = S2C(session)->cache->rec;
+	btree = session->btree;
+
+	/*
+	 * We never allocate a bit field that won't fit into a maximum Btree
+	 * leaf page size, and the page never grows.
+	 */
+	WT_RET(__rec_split_init(
+	    session, page, recno, btree->leafmax, btree->leafmax));
+
+	/* Copy the bytes into place. */
+	len = bitstr_size(page->entries * btree->bitcnt);
+	memcpy(r->first_free, bitf, len);
+	__rec_incrv(session, r, page->entries, len);
+	r->recno += page->entries;
+
+	/* Write the page. */
+	return (__rec_split_finish(session));
 }
 
 /*
@@ -1874,6 +1904,10 @@ __rec_col_var(
 	WT_CLEAR(orig);
 	data = NULL;
 	size = 0;
+
+	/* Discard any empty entries appended to the page. */
+	if (salvage == NULL)
+		__rec_col_extend_truncate(session, page);
 
 	WT_RET(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,

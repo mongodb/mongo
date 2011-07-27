@@ -9,7 +9,7 @@
 
 static int  bulk(WT_ITEM **, WT_ITEM **);
 static int  wts_col_del(uint64_t);
-static int  wts_col_put(uint64_t);
+static int  wts_col_put(uint64_t, int);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
 static int  wts_read(uint64_t);
 static int  wts_row_del(uint64_t);
@@ -67,7 +67,7 @@ wts_startup(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int ret;
-	char config[200], *end, *p;
+	char config[512], *end, *p;
 
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
@@ -113,30 +113,20 @@ wts_startup(void)
 
 	switch (g.c_file_type) {
 	case FIX:
-		/*
-		 * XXX -- does some limit still apply?
-		 * Don't go past the WT limit of 20 objects per leaf page.
-		 *
-		 * if (20 * g.c_data_fix > (1U << g.c_leaf_node_min))
-		 * 	g.c_data_fix = (1U << g.c_leaf_node_min) / 20;
-		 */
-
-		p += snprintf(p,
-		    (size_t)(end - p), ",value_format=%dt", g.c_data_fix);
+		p += snprintf(
+		    p, (size_t)(end - p), ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(p, (size_t)(end - p),
-			    ",huffman_key=english");
+			p += snprintf(
+			    p, (size_t)(end - p), ",huffman_key=english");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
-			p += snprintf(p, (size_t)(end - p),
-			    ",huffman_value=english");
+			p += snprintf(
+			    p, (size_t)(end - p), ",huffman_value=english");
 		break;
 	}
-
-	WT_ASSERT((WT_SESSION_IMPL *)session, p < end);
 
 	if ((ret = session->create(session, WT_TABLENAME, config)) != 0) {
 		fprintf(stderr, "%s: create table: %s\n",
@@ -239,67 +229,9 @@ err:	(void)cursor->close(cursor, NULL);
 int
 wts_dump(const char *tag, int dump_bdb)
 {
-	WT_CURSOR *cursor;
-	WT_ITEM key, value;
-	WT_SESSION *session;
-	FILE *fp;
-	int ret;
-	uint64_t row_count;
-	const char *p;
-	char cmd[64];
+	char cmd[128];
 
-	track("dump WT", 0ULL);
-
-	/* Dump the WiredTiger file. */
-	session = g.wts_session;
-	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
-	    "dump,printable", &cursor)) != 0) {
-		fprintf(stderr, "%s: cursor open failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-
-	p = fname("wt_dump");
-	if ((fp = fopen(p, "w")) == NULL) {
-		fprintf(stderr, "%s: fopen: %s\n",
-		    g.progname, wiredtiger_strerror(errno));
-		return (1);
-	}
-
-        fprintf(fp, "VERSION=1\n");
-        fprintf(fp, "HEADER=END\n");
-
-	row_count = 0;
-	while ((ret = cursor->next(cursor)) == 0) {
-		if (++row_count % 100 == 0)
-			track("dump", row_count);
-		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
-		    (ret = cursor->get_value(cursor, &value)) != 0)
-			break;
-		if (key.size != 0 &&
-		    (fwrite(key.data, 1, key.size, fp) != key.size ||
-		    fwrite("\n", 1, 1, fp) != 1)) {
-			ret = errno;
-			break;
-		}
-		if (fwrite(value.data, 1, value.size, fp) != value.size ||
-		    fwrite("\n", 1, 1, fp) != 1) {
-			ret = errno;
-			break;
-		}
-	}
-	WT_TRET(cursor->close(cursor, NULL));
-
-	if (ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: dump failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-
-	fprintf(fp, "DATA=END\n");
-	(void)fclose(fp);
-
-	track("dump BDB and compare", 0ULL);
+	track("dump files and compare", 0ULL);
 	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
@@ -500,22 +432,35 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 
 	switch (g.c_file_type) {
 	case FIX:
+		*keyp = NULL;
+		*valuep = &value;
+		if (g.logging)
+			(void)session->msg_printf(session,
+			    "%-10s %" PRIu32 " {0x%02" PRIx8 "}",
+			    "bulk V",
+			    g.key_cnt, ((uint8_t *)value.data)[0]);
+		break;
 	case VAR:
 		*keyp = NULL;
+		*valuep = &value;
+		if (g.logging)
+			(void)session->msg_printf(session,
+			    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+			    g.key_cnt, (int)value.size, (char *)value.data);
 		break;
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
 			(void)session->msg_printf(session,
-                            "%-10s %" PRIu32 " {%.*s}", "bulk K",
-                            g.key_cnt, (int)key.size, (char *)key.data);
+			    "%-10s %" PRIu32 " {%.*s}", "bulk K",
+		    g.key_cnt, (int)key.size, (char *)key.data);
+		*valuep = &value;
+		if (g.logging)
+			(void)session->msg_printf(session,
+			    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+			    g.key_cnt, (int)value.size, (char *)value.data);
 		break;
 	}
-	*valuep = &value;
-	if (g.logging)
-		(void)session->msg_printf(session,
-                    "%-10s %" PRIu32 " {%.*s}", "bulk V",
-                    g.key_cnt, (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, value.data, value.size);
@@ -566,7 +511,7 @@ wts_ops(void)
 			case VAR:
 				/* Column-store tables only support append. */
 				keyno = ++g.c_rows;
-				if (wts_col_put(keyno))
+				if (wts_col_put(keyno, 1))
 					return (1);
 				break;
 			}
@@ -579,7 +524,7 @@ wts_ops(void)
 				break;
 			case FIX:
 			case VAR:
-				if (wts_col_put(keyno))
+				if (wts_col_put(keyno, 0))
 					return (1);
 				break;
 			}
@@ -657,13 +602,13 @@ wts_read(uint64_t keyno)
 
 	/* Retrieve the key/value pair by key. */
 	switch (g.c_file_type) {
-	case ROW:
-		key_gen(&key.data, &key.size, keyno, 0);
-		cursor->set_key(cursor, &key);
-		break;
 	case FIX:
 	case VAR:
 		cursor->set_key(cursor, keyno);
+		break;
+	case ROW:
+		key_gen(&key.data, &key.size, keyno, 0);
+		cursor->set_key(cursor, &key);
 		break;
 	}
 
@@ -687,9 +632,10 @@ wts_read(uint64_t keyno)
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
-		fprintf(stderr, "wts_read: read row %" PRIu64 ":\n", keyno);
+		fprintf(stderr,
+		    "wts_read: read row mismatch %" PRIu64 ":\n", keyno);
 		wts_stream_item("bdb", &bdb_value);
-		wts_stream_item("wt", &value);
+		wts_stream_item(" wt", &value);
 		return (1);
 	}
 	return (0);
@@ -716,8 +662,10 @@ wts_row_put(uint64_t keyno, int insert)
 	/* Log the operation */
 	if (g.logging)
 		(void)session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
-		    "put key", (int)key.size, (char *)key.data,
-		    "put data", (int)value.size, (char *)value.data);
+		    insert ? "insertK" : "putK",
+		    (int)key.size, (char *)key.data,
+		    insert ? "insertV" : "putV",
+		    (int)value.size, (char *)value.data);
 
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
@@ -726,8 +674,9 @@ wts_row_put(uint64_t keyno, int insert)
 	cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_row_put: put row %" PRIu64 " by key: %s\n",
-		    g.progname, keyno, wiredtiger_strerror(ret));
+                    "%s: wts_row_put: %s row %" PRIu64 " by key: %s\n",
+		    g.progname,
+		    insert ? "insert" : "put", keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -738,7 +687,7 @@ wts_row_put(uint64_t keyno, int insert)
  *	Replace an element in a column-store file.
  */
 static int
-wts_col_put(uint64_t keyno)
+wts_col_put(uint64_t keyno, int insert)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -752,9 +701,18 @@ wts_col_put(uint64_t keyno)
 	value_gen(&value.data, &value.size);
 
 	/* Log the operation */
-	if (g.logging)
-		(void)session->msg_printf(session, "%-10s%" PRIu64 " {%.*s}",
-		    "put", keyno, (int)value.size, (char *)value.data);
+	if (g.logging) {
+		if (g.c_file_type == FIX)
+			(void)session->msg_printf(session,
+			    "%-10s%" PRIu64 " {0x%02x}",
+			    insert ? "insert" : "put",
+			    keyno, ((char *)value.data)[0]);
+		else
+			(void)session->msg_printf(session,
+			    "%-10s%" PRIu64 " {%.*s}",
+			    insert ? "insert" : "put",
+			    keyno, (int)value.size, (char *)value.data);
+	}
 
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
@@ -766,8 +724,9 @@ wts_col_put(uint64_t keyno)
 		cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_col_put: put col %" PRIu64 " by key: %s\n",
-		    g.progname, keyno, wiredtiger_strerror(ret));
+                    "%s: wts_col_put: %s col %" PRIu64 " by key: %s\n",
+		    g.progname,
+		    insert ? "insert" : "put", keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -816,6 +775,7 @@ wts_row_del(uint64_t keyno)
 static int
 wts_col_del(uint64_t keyno)
 {
+	static WT_ITEM key;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
@@ -828,8 +788,17 @@ wts_col_del(uint64_t keyno)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "delete", keyno);
 
-	if (bdb_del(keyno, &notfound))
-		return (1);
+	/*
+	 * Deleting a fixed-length item is the same as setting the bits to 0;
+	 * do the same thing for the BDB store.
+	 */
+	if (g.c_file_type == FIX) {
+		key_gen(&key.data, &key.size, keyno, 0);
+		if (bdb_put(key.data, key.size, "\0", 1, &notfound))
+			return (1);
+	} else
+		if (bdb_del(keyno, &notfound))
+			return (1);
 
 	cursor->set_key(cursor, keyno);
 	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
@@ -881,14 +850,21 @@ wts_stream_item(const char *tag, WT_ITEM *item)
 	uint32_t size;
 	int ch;
 
+	data = item->data;
+	size = item->size;
+
 	fprintf(stderr, "\t%s {", tag);
-	for (data = item->data, size = item->size; size > 0; --size, ++data) {
-		ch = data[0];
-		if (isprint(ch))
-			fprintf(stderr, "%c", ch);
-		else
-			fprintf(stderr, "%x%x",
-			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
-	}
+	if (g.c_file_type == FIX)
+		fprintf(stderr, "0x%02x", data[0]);
+	else
+		for (; size > 0; --size, ++data) {
+			ch = data[0];
+			if (isprint(ch))
+				fprintf(stderr, "%c", ch);
+			else
+				fprintf(stderr, "%x%x",
+				    hex[(data[0] & 0xf0) >> 4],
+				    hex[data[0] & 0x0f]);
+		}
 	fprintf(stderr, "}\n");
 }

@@ -35,12 +35,12 @@ typedef struct {
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->max)
 
 static CONFIG c[] = {
+	{ "bitcnt",  C_FIX,  0,  1, 8,  &g.c_bitcnt },
 	{ "cache", 0, 0, 1, 30, &g.c_cache },
 	{ "data_max",  C_ROW|C_VAR, 0,  32, 4096,  &g.c_data_max },
 	{ "data_min",  C_ROW|C_VAR,  0,  1, 20,  &g.c_data_min },
-	{ "data_fix",  C_FIX,  0,  1, 8,  &g.c_data_fix },
-	{ "file_type", 0,  C_IGNORE, 1, 3,  &g.c_file_type },
 	{ "delete_pct",  0,  0,  0, 45,  &g.c_delete_pct },
+	{ "file_type", 0,  C_IGNORE, 1, 3,  &g.c_file_type },
 	{ "huffman_key", C_ROW,  C_BOOL,  0, 10,  &g.c_huffman_key },
 	{ "huffman_value", C_ROW|C_VAR, C_BOOL,  0, 10,  &g.c_huffman_value },
 	{ "insert_pct",  0,  0,  0, 45,  &g.c_insert_pct },

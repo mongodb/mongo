@@ -9,7 +9,7 @@
 
 static int  __page_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
 static void __page_row_leaf_slots( bitstr_t *, uint32_t, uint32_t, uint32_t);
-static int  __wt_page_inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __wt_page_inmem_col_fix(WT_PAGE *);
 static int  __wt_page_inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __wt_page_inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __wt_page_inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -95,7 +95,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_leaf.recno = dsk->recno;
-		WT_ERR(__wt_page_inmem_col_fix(session, page));
+		WT_ERR(__wt_page_inmem_col_fix(page));
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
@@ -127,32 +127,13 @@ err:	if (page != NULL)
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__wt_page_inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_inmem_col_fix(WT_PAGE *page)
 {
-	WT_BTREE *btree;
-	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	uint32_t i;
-	uint8_t *p;
 
-	btree = session->btree;
 	dsk = page->dsk;
 
-	/*
-	 * Column-store page entries map one-to-one to the number of physical
-	 * entries on the page (each physical entry is a data item).
-	 */
-	WT_RET(__wt_calloc_def(
-	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
-
-	/*
-	 * Walk the page, building references: the page contains fixed-length
-	 * objects.
-	 */
-	cip = page->u.col_leaf.d;
-	WT_FIX_FOREACH(btree, dsk, p, i)
-		(cip++)->__value = WT_DISK_OFFSET(dsk, p);
-
+	page->u.col_leaf.bitf = WT_PAGE_DISK_BYTE(dsk);
 	page->entries = dsk->u.entries;
 	return (0);
 }

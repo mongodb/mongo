@@ -1,9 +1,10 @@
 # Configuration keywords:
+# bitcnt
 # cache
 # data_max
 # data_min
 # delete_pct
-# file_type
+# file_type: fix|var|row
 # huffman_key
 # huffman_value
 # insert_pct
@@ -14,7 +15,7 @@
 # leaf_node_max
 # leaf_node_min
 # ops
-# repeat_comp_pct
+# repeat_data_pct
 # rows
 # runs
 # write_pct

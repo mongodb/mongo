@@ -267,9 +267,10 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
     int quiet);
-extern int __wt_verify_dsk_chunk(WT_SESSION_IMPL *session,
+extern int __wt_verify_dsk_chunk( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
+    uint32_t data_len,
     uint32_t size,
     int quiet);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session,
@@ -566,6 +567,7 @@ extern void __wt_buf_steal( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const void *datap,
     uint32_t *sizep);
+extern void __wt_buf_swap(WT_BUF *a, WT_BUF *b);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
 extern int __wt_buf_sprintf(WT_SESSION_IMPL *session,
     WT_BUF *buf,

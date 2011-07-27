@@ -138,6 +138,20 @@ __wt_buf_steal(
 }
 
 /*
+ * __wt_buf_swap --
+ *	Swap a pair of buffers.
+ */
+void
+__wt_buf_swap(WT_BUF *a, WT_BUF *b)
+{
+	WT_BUF tmp;
+
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+/*
  * __wt_buf_free --
  *	Free a buffer.
  */

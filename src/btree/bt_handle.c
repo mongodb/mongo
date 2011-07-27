@@ -300,18 +300,14 @@ __btree_type(WT_SESSION_IMPL *session)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
 	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
-	WT_RET(__wt_struct_check(session,
-	    cval.str, cval.len, &fixed, &btree->fixed_len));
-	if (btree->type == BTREE_COL_VAR && fixed) {
-		btree->type = BTREE_COL_FIX;
-		/*
-		 * TODO: the size we get back is in bits.  When bitfields
-		 * are supported, we'll know what to do with that.  For now,
-		 * turn it into a number of bytes.
-		 */
-		btree->fixed_len = (btree->fixed_len + 7) >> 3;
-	}
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
+
+	if (btree->type == BTREE_COL_VAR) {
+		WT_RET(__wt_struct_check(session,
+		    cval.str, cval.len, &fixed, &btree->bitcnt));
+		if (fixed)
+			btree->type = BTREE_COL_FIX;
+	}
 	return (0);
 }
 
@@ -430,24 +426,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * and so on, roughly doubling for each power-of-two.
 	 */
 	btree->leafitemsize = btree->leafmin <= 4096 ? 80 : btree->leafmin / 20;
-
-	/*
-	 * A fixed-size column-store should be able to store at least 20
-	 * objects on a page, otherwise it just doesn't make sense.
-	 */
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-		if (btree->leafmin / btree->fixed_len < 20) {
-			__wt_errx(session,
-			    "the configured leaf page size cannot store at "
-			    "least 20 fixed-length objects");
-			return (WT_ERROR);
-		}
-		break;
-	case BTREE_COL_VAR:
-	case BTREE_ROW:
-		break;
-	}
 
 	return (0);
 }

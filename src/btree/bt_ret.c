@@ -28,7 +28,6 @@ __wt_return_data(
 	const void *value_ret;
 	uint32_t size_ret;
 	int (*callback)(WT_BTREE *, WT_ITEM *, WT_ITEM *), ret;
-	void *cipdata;
 
 	btree = session->btree;
 	cursor = session->cursor;
@@ -62,9 +61,8 @@ __wt_return_data(
 	 * application's WT_ITEM instead, it is discarded when the session is
 	 * closed.
 	 *
-	 * Key return implies a reference to a WT_ROW index (we don't return
-	 * record number keys yet, that will probably change when I add cursor
-	 * support).
+	 * XXX
+	 * Key return implies a reference to a WT_ROW index.
 	 */
 	if (key_return) {
 		if (__wt_off_page(page, rip->key)) {
@@ -109,16 +107,13 @@ __wt_return_data(
 		} else
 			goto page_cell;
 	} else {
-		cipdata = WT_COL_PTR(page, cip);
-		WT_ASSERT_RET(session, cipdata != NULL);
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
-			value_ret = cipdata;
-			size_ret = btree->fixed_len;
+			value_ret = &session->srch_v;
+			size_ret = 1;
 			break;
 		case WT_PAGE_COL_VAR:
-			cell = cipdata;
-
+			cell = WT_COL_PTR(page, cip);
 page_cell:		__wt_cell_unpack(cell, unpack);
 			if (btree->huffman_value != NULL ||
 			    unpack->type != WT_CELL_VALUE) {

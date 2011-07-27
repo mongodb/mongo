@@ -22,6 +22,9 @@ typedef struct {
 } WT_DBG;
 
 #ifdef HAVE_DIAGNOSTIC
+#undef	STATIN
+#define	STATIN	static inline
+
 static void __wt_debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
 static int  __wt_debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __wt_debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
@@ -30,6 +33,7 @@ static int  __wt_debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __wt_debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __wt_debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
 static void __wt_debug_dsk_col_int(WT_DBG *, WT_PAGE_DISK *);
+STATIN void __wt_debug_hex_byte(WT_DBG *, uint8_t);
 static void __wt_debug_ikey(WT_DBG *, WT_IKEY *);
 static void __wt_debug_item(WT_DBG *, const char *, const void *, uint32_t);
 static void __wt_debug_page_col_fix(WT_DBG *, WT_PAGE *);
@@ -408,24 +412,45 @@ __wt_debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 static void
 __wt_debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 {
-	WT_COL *cip;
-	WT_UPDATE *upd;
-	uint32_t fixed_len, i;
-	void *cipvalue;
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_INSERT *ins;
+	WT_PAGE_DISK *dsk;
+	WT_SESSION_IMPL *session;
+	uint64_t recno;
+	uint32_t i;
+	uint8_t v;
 
-	fixed_len = ds->session->btree->fixed_len;
+	session = ds->session;
+	btree = session->btree;
+	conn = S2C(session);
+	dsk = page->dsk;
+	recno = page->u.col_leaf.recno;
 
-	WT_COL_FOREACH(page, cip, i) {
-		cipvalue = WT_COL_PTR(page, cip);
-		__wt_dmsg(ds, "\tV {");
-		if (cipvalue == NULL || WT_FIX_DELETE_ISSET(cipvalue))
-			__wt_dmsg(ds, "deleted");
-		else
-			__wt_debug_byte_string(ds, cipvalue, fixed_len);
-		__wt_dmsg(ds, "}\n");
+	if (dsk != NULL) {
+		ins = WT_COL_INSERT_SINGLE(page);
+		WT_FIX_FOREACH(btree, dsk, v, i) {
+			__wt_dmsg(ds, "\t{");
+			__wt_debug_hex_byte(ds, v);
+			__wt_dmsg(ds, "}\n");
 
-		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
-			__wt_debug_update(ds, upd);
+			/* Check for a match on the insert list. */
+			if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
+				__wt_dmsg(ds,
+				    "\tinsert %" PRIu64 "\n",
+				    WT_INSERT_RECNO(ins));
+				__wt_debug_update(ds, ins->upd);
+				ins = ins->next;
+			}
+			++recno;
+		}
+	}
+	__wt_dmsg(ds, "%s\n", conn->sep);
+	for (ins = WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next) {
+		__wt_dmsg(ds,
+		    "\tinsert %" PRIu64 "\n",
+		    WT_INSERT_RECNO(ins));
+		__wt_debug_update(ds, ins->upd);
 	}
 }
 
@@ -687,18 +712,14 @@ static void
 __wt_debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_DISK *dsk)
 {
 	WT_BTREE *btree;
-	uint32_t fixed_len, i;
-	uint8_t *p;
+	uint32_t i;
+	uint8_t v;
 
 	btree = ds->session->btree;
-	fixed_len = ds->session->btree->fixed_len;
 
-	WT_FIX_FOREACH(btree, dsk, p, i) {
+	WT_FIX_FOREACH(btree, dsk, v, i) {
 		__wt_dmsg(ds, "\t{");
-		if (WT_FIX_DELETE_ISSET(p))
-			__wt_dmsg(ds, "deleted");
-		else
-			__wt_debug_byte_string(ds, p, fixed_len);
+		__wt_debug_hex_byte(ds, v);
 		__wt_dmsg(ds, "}\n");
 	}
 }
@@ -820,7 +841,6 @@ __wt_debug_ref(WT_DBG *ds, WT_REF *ref)
 static void
 __wt_debug_byte_string(WT_DBG *ds, const uint8_t *data, uint32_t size)
 {
-	static const char hex[] = "0123456789abcdef";
 	int ch;
 
 	for (; size > 0; --size, ++data) {
@@ -828,8 +848,19 @@ __wt_debug_byte_string(WT_DBG *ds, const uint8_t *data, uint32_t size)
 		if (isprint(ch))
 			__wt_dmsg(ds, "%c", ch);
 		else
-			__wt_dmsg(ds, "%x%x",
-			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
+			__wt_debug_hex_byte(ds, data[0]);
 	}
+}
+
+/*
+ * __wt_debug_hex_byte --
+ *	Output a single byte in hex.
+ */
+static inline void
+__wt_debug_hex_byte(WT_DBG *ds, uint8_t v)
+{
+	static const char hex[] = "0123456789abcdef";
+
+	__wt_dmsg(ds, "#%c%c", hex[(v & 0xf0) >> 4], hex[v & 0x0f]);
 }
 #endif

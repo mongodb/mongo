@@ -72,7 +72,7 @@ value_gen(void *valuep, uint32_t *sizep)
 	static size_t blen = 0;
 	static u_int r = 0;
 	static const char *dup_data = "duplicate data item";
-	static char *buf = NULL;
+	static u_char *buf = NULL;
 	size_t i;
 
 	/*
@@ -94,17 +94,27 @@ value_gen(void *valuep, uint32_t *sizep)
 			exit(EXIT_FAILURE);
 		}
 		for (i = 0; i < blen; ++i)
-			buf[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
+			buf[i] = (u_char)"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 	}
 
 	/*
-	 * Fixed-length records: use the last decimal digit in the record
-	 * number.
+	 * Fixed-length records: take the low N bits from the last digit of
+	 * the record number.
 	 */
 	if (g.c_file_type == FIX) {
-		snprintf(buf, blen, "%010u", ++r);
-		*(void **)valuep = &buf[9];
-		*sizep = (g.c_data_fix + 7) >> 3;
+		snprintf((char *)buf, blen, "%010u", ++r);
+		switch (g.c_bitcnt) {
+		case 8: buf[0] = MMRAND(0, 0xff); break;
+		case 7: buf[0] = MMRAND(0, 0x7f); break;
+		case 6: buf[0] = MMRAND(0, 0x3f); break;
+		case 5: buf[0] = MMRAND(0, 0x1f); break;
+		case 4: buf[0] = MMRAND(0, 0x0f); break;
+		case 3: buf[0] = MMRAND(0, 0x07); break;
+		case 2: buf[0] = MMRAND(0, 0x03); break;
+		case 1: buf[0] = MMRAND(0, 0x01); break;
+		}
+		*(void **)valuep = buf;
+		*sizep = 1;
 		return;
 	}
 
@@ -134,7 +144,7 @@ value_gen(void *valuep, uint32_t *sizep)
 		return;
 	}
 
-	snprintf(buf, blen, "%010u", r);
+	snprintf((char *)buf, blen, "%010u", r);
 	buf[10] = '/';
 	*(void **)valuep = buf;
 	*sizep = MMRAND(g.c_data_min, g.c_data_max);

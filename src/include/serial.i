@@ -51,9 +51,9 @@ typedef struct {
 	WT_PAGE *new_leaf;
 	uint32_t new_leaf_size;
 	int new_leaf_taken;
-	WT_COL *d;
-	uint32_t d_size;
-	int d_taken;
+	void *entries;
+	uint32_t entries_size;
+	int entries_taken;
 	uint32_t leaf_extend;
 	uint64_t recno;
 } __wt_col_extend_args;
@@ -62,8 +62,9 @@ static inline int
 __wt_col_extend_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE **new_intlp, uint32_t
 	new_intl_size, WT_COL_REF **tp, uint32_t t_size, uint32_t
-	internal_extend, WT_PAGE **new_leafp, uint32_t new_leaf_size, WT_COL
-	**dp, uint32_t d_size, uint32_t leaf_extend, uint64_t recno)
+	internal_extend, WT_PAGE **new_leafp, uint32_t new_leaf_size, void
+	**entriesp, uint32_t entries_size, uint32_t leaf_extend, uint64_t
+	recno)
 {
 	__wt_col_extend_args _args, *args = &_args;
 	int ret;
@@ -99,14 +100,14 @@ __wt_col_extend_serial(
 	}
 	args->new_leaf_taken = 0;
 
-	if (dp == NULL)
-		args->d = NULL;
+	if (entriesp == NULL)
+		args->entries = NULL;
 	else {
-		args->d = *dp;
-		*dp = NULL;
-		args->d_size = d_size;
+		args->entries = *entriesp;
+		*entriesp = NULL;
+		args->entries_size = entries_size;
 	}
-	args->d_taken = 0;
+	args->entries_taken = 0;
 
 	args->leaf_extend = leaf_extend;
 
@@ -121,16 +122,16 @@ __wt_col_extend_serial(
 		__wt_free(session, args->t);
 	if (!args->new_leaf_taken)
 		__wt_free(session, args->new_leaf);
-	if (!args->d_taken)
-		__wt_free(session, args->d);
+	if (!args->entries_taken)
+		__wt_free(session, args->entries);
 	return (ret);
 }
 
 static inline void
 __wt_col_extend_unpack(
 	WT_SESSION_IMPL *session, WT_PAGE **pagep, WT_PAGE **new_intlp,
-	WT_COL_REF **tp, uint32_t *internal_extendp, WT_PAGE **new_leafp,
-	WT_COL **dp, uint32_t *leaf_extendp, uint64_t *recnop)
+	WT_COL_REF **tp, uint32_t *internal_extendp, WT_PAGE **new_leafp, void
+	**entriesp, uint32_t *leaf_extendp, uint64_t *recnop)
 {
 	__wt_col_extend_args *args =
 	    (__wt_col_extend_args *)session->wq_args;
@@ -140,7 +141,7 @@ __wt_col_extend_unpack(
 	*tp = args->t;
 	*internal_extendp = args->internal_extend;
 	*new_leafp = args->new_leaf;
-	*dp = args->d;
+	*entriesp = args->entries;
 	*leaf_extendp = args->leaf_extend;
 	*recnop = args->recno;
 }
@@ -182,15 +183,15 @@ __wt_col_extend_new_leaf_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 static inline void
-__wt_col_extend_d_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_col_extend_entries_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	__wt_col_extend_args *args =
 	    (__wt_col_extend_args *)session->wq_args;
 
-	args->d_taken = 1;
+	args->entries_taken = 1;
 
-	WT_ASSERT(session, args->d_size != 0);
-	__wt_cache_page_workq_incr(session, page, args->d_size);
+	WT_ASSERT(session, args->entries_size != 0);
+	__wt_cache_page_workq_incr(session, page, args->entries_size);
 }
 
 typedef struct {

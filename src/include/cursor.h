@@ -49,6 +49,7 @@ struct __wt_cursor_bulk {
 	WT_INSERT **insp;			/* Next insert link */
 	WT_UPDATE  *upd_base;			/* Base update link */
 	WT_UPDATE **updp;			/* Next update link */
+	uint8_t	   *bitf;			/* Bit field */
 	uint32_t   ins_cnt;			/* Inserts on the list */
 
 	/*
