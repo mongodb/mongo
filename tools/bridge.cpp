@@ -88,7 +88,7 @@ set<MessagingPort*> ports;
 
 class MyListener : public Listener {
 public:
-    MyListener( int port ) : Listener( "", port ) {}
+    MyListener( int port ) : Listener( "bridge" , "", port ) {}
     virtual void accepted(MessagingPort *mp) {
         ports.insert( mp );
         Forwarder f( *mp );
