@@ -74,7 +74,7 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
 
 /*
  * __wt_curbulk_init --
- *	initialize a bulk cursor.
+ *	Initialize a bulk cursor.
  */
 int
 __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
