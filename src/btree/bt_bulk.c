@@ -197,11 +197,11 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	 * page's insert list.
 	 */
 	WT_RET(__wt_row_insert_alloc(
-	    session, (WT_ITEM *)&cursor->key, &ins, &not_used));
+	    session, (WT_ITEM *)&cursor->key, 1, &ins, &not_used));
 	WT_ERR(__wt_update_alloc(
 	    session, (WT_ITEM *)&cursor->value, &ins->upd, &not_used));
-	(*cbulk->insp) = ins;
-	cbulk->insp = &ins->next;
+	*cbulk->insp = ins;
+	cbulk->insp = &WT_SKIP_NEXT(ins);
 
 	/* If the page is full, reconcile it and reset the insert list. */
 	if (++cbulk->ins_cnt == cbulk->ipp)

@@ -284,7 +284,7 @@ struct __wt_page {
 		/* Row-store leaf page. */
 		struct {
 			WT_ROW	   *d;		/* K/V object pairs */
-			WT_INSERT **ins;	/* Inserts */
+			WT_INSERT_HEAD **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
 
@@ -300,7 +300,7 @@ struct __wt_page {
 			uint64_t    recno;	/* Starting recno */
 			uint8_t	   *bitf;	/* COL_FIX bits */
 			WT_COL	   *d;		/* COL_VAR objects */
-			WT_INSERT **ins;	/* Inserts (RLE) */
+			WT_INSERT_HEAD **ins;	/* Inserts (RLE) */
 		} col_leaf;
 
 		/* Bulk-loaded linked list. */
@@ -625,24 +625,35 @@ struct __wt_update {
 struct __wt_insert {
 	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
 
-	WT_INSERT *next;		/* forward-linked list */
-
 	WT_UPDATE *upd;			/* value */
 
-	/*
-	 * In a row-store leaf page, the WT_INSERT structure is immediately
-	 * followed by a key-size/key pair.
-	 */
-#define	WT_INSERT_KEY_SIZE(ins)						\
-	(*(uint32_t *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
+	union {
+		uint64_t recno;
+		struct {
+			uint32_t offset;	/* start of key data */
+			uint32_t size;          /* size of key data */
+		} key;
+	} u;
+
+#define	WT_INSERT_KEY_SIZE(ins) ((ins)->u.key.size)
 #define	WT_INSERT_KEY(ins)						\
-	((void *)((uint8_t *)(ins) + (sizeof(WT_INSERT) + sizeof(uint32_t))))
-	/*
-	 * In a column-store leaf page, the WT_INSERT structure is immediately
-	 * followed by a record number.
-	 */
-#define	WT_INSERT_RECNO(ins)						\
-	(*(uint64_t *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
+	((void *)((uint8_t *)(ins) + (ins)->u.key.offset))
+#define	WT_INSERT_RECNO(ins)	((ins)->u.recno)
+
+	WT_INSERT *next[0];		/* forward-linked skip list */
+};
+
+/* 12 level skip lists, 1/4 have a link 4 elements ahead. */
+#define	WT_SKIP_MAXDEPTH        12
+#define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 4)
+
+/*
+ * WT_INSERT_HEAD --
+ * 	The head of a skip list of WT_INSERT items.
+ */
+struct __wt_insert_head {
+	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
+	WT_INSERT *head[WT_SKIP_MAXDEPTH];	/* first item on skiplists */
 };
 
 /*
@@ -665,6 +676,21 @@ struct __wt_insert {
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
+
+/*
+ * Skiplist helper macros.
+ */
+#define	WT_SKIP_FIRST(__inshead)					\
+	(((__inshead) == NULL) ? NULL : (__inshead)->head[0])
+#define	WT_SKIP_NEXT(__ins)  ((__ins)->next[0])
+#define	WT_SKIP_FOREACH(__ins, __inshead)				\
+	for (__ins = WT_SKIP_FIRST(__inshead);				\
+	    __ins != NULL;						\
+	    __ins = WT_SKIP_NEXT(__ins))
+#define	WT_SKIP_CHOOSE_DEPTH(__d)					\
+	for (__d = 1;							\
+	    __d < WT_SKIP_MAXDEPTH && __wt_random() < WT_SKIP_PROBABILITY;\
+	    __d++)							\
 
 /*
  * WT_COL_INSERT_SINGLE references a single WT_INSERT list, which is used for

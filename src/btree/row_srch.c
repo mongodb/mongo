@@ -7,10 +7,54 @@
 
 #include "wt_internal.h"
 
-#undef	STATIN
-#define	STATIN	static inline
+/*
+ * __wt_row_ins_search --
+ *	Search the slot's insert list.
+ */
+static inline int
+__insert_search(
+    WT_SESSION_IMPL *session, WT_INSERT_HEAD *inshead, WT_ITEM *key)
+{
+	WT_BTREE *btree;
+	WT_INSERT **ins;
+	WT_ITEM insert_key;
+	int cmp, i, (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-STATIN int __insert_search(WT_SESSION_IMPL *, WT_INSERT *, WT_ITEM *);
+	/* If there's no insert chain to search, we're done. */
+	if (inshead == NULL)
+		return (1);
+
+	btree = session->btree;
+	compare = btree->btree_compare;
+
+	/*
+	 * The insert list is a skip list: start at the highest skip level,
+	 * then go as far as possible at each level before stepping down to the
+	 * next one.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
+		if (*ins == NULL)
+			cmp = -1;
+		else {
+			insert_key.data = WT_INSERT_KEY(*ins);
+			insert_key.size = WT_INSERT_KEY_SIZE(*ins);
+			cmp = compare(btree, key, &insert_key);
+		}
+		if (cmp == 0) {
+			WT_CLEAR(session->srch.ins);
+			session->srch.vupdate = (*ins)->upd;
+			session->srch.upd = &(*ins)->upd;
+			return (0);
+		} else if (cmp > 0)
+			/* Keep going on this level. */
+			ins = &(*ins)->next[i];
+		else
+			/* Go down a level in the skiplist. */
+			session->srch.ins[i--] = ins--;
+	}
+
+	return (1);
+}
 
 /*
  * __wt_row_search --
@@ -21,27 +65,29 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
-	WT_INSERT *ins;
+	WT_INSERT_HEAD *inshead;
 	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	uint32_t base, indx, limit, slot, write_gen;
-	int cmp, ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, ret;
+	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	session->srch_page = NULL;			/* Return values. */
-	session->srch_write_gen = 0;
-	session->srch_match = 0;
-	session->srch_ip = NULL;
-	session->srch_vupdate = NULL;
-	session->srch_ins = NULL;
-	session->srch_upd = NULL;
-	session->srch_slot = UINT32_MAX;
+	session->srch.page = NULL;			/* Return values. */
+	session->srch.write_gen = 0;
+	session->srch.match = 0;
+	session->srch.ip = NULL;
+	session->srch.vupdate = NULL;
+	session->srch.inshead = NULL;
+	WT_CLEAR(session->srch.ins);
+	session->srch.upd = NULL;
+	session->srch.slot = UINT32_MAX;
 
 	btree = session->btree;
 	item = &_item;
 	rip = NULL;
-	func = btree->btree_compare;
+	compare = btree->btree_compare;
 
 	cmp = -1;				/* Assume we don't match. */
 
@@ -65,7 +111,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
-				cmp = func(btree, key, item);
+				cmp = compare(btree, key, item);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -104,11 +150,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	 * There are 4 pieces of information regarding updates and inserts
 	 * that are set in the next few lines of code.
 	 *
-	 * For an update, we set session->srch_upd and session->srch_slot.
-	 * For an insert, we set session->srch_ins and session->srch_slot.
-	 * For an exact match, we set session->srch_vupdate.
+	 * For an update, we set session->srch.upd and session->srch.slot.
+	 * For an insert, we set session->srch.ins and session->srch.slot.
+	 * For an exact match, we set session->srch.vupdate.
 	 *
-	 * The session->srch_slot only serves a single purpose, indicating the
+	 * The session->srch.slot only serves a single purpose, indicating the
 	 * slot in the WT_ROW array where a new update/insert entry goes when
 	 * entering the first such item for the page (that is, the slot to use
 	 * when allocating the update/insert array itself).
@@ -139,7 +185,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 			item = (WT_ITEM *)&btree->key_srch;
 		}
 
-		cmp = func(btree, key, item);
+		cmp = compare(btree, key, item);
 		if (cmp == 0)
 			break;
 		if (cmp < 0)
@@ -155,10 +201,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	 */
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
-		session->srch_slot = slot = WT_ROW_SLOT(page, rip);
+		session->srch.slot = slot = WT_ROW_SLOT(page, rip);
 		if (page->u.row_leaf.upd != NULL) {
-			session->srch_upd = &page->u.row_leaf.upd[slot];
-			session->srch_vupdate = page->u.row_leaf.upd[slot];
+			session->srch.upd = &page->u.row_leaf.upd[slot];
+			session->srch.vupdate = page->u.row_leaf.upd[slot];
 		}
 		goto done;
 	}
@@ -177,7 +223,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		rip += base - 1;
 
 	/*
-	 *
 	 * Figure out which insert chain to search, and do initial setup of the
 	 * return information for the insert chain (we'll correct it as needed
 	 * depending on what we find.)
@@ -187,41 +232,30 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	 * one-to-one mapping.
 	 */
 	if (base == 0) {
-		ins = WT_ROW_INSERT_SMALLEST(page);
-		session->srch_slot = page->entries;
+		inshead = WT_ROW_INSERT_SMALLEST(page);
+		session->srch.slot = page->entries;
 	} else {
-		ins = WT_ROW_INSERT(page, rip);
-		session->srch_slot = WT_ROW_SLOT(page, rip);
+		inshead = WT_ROW_INSERT(page, rip);
+		session->srch.slot = WT_ROW_SLOT(page, rip);
 	}
 	if (page->u.row_leaf.ins != NULL)
-		session->srch_ins = &page->u.row_leaf.ins[session->srch_slot];
+		session->srch.inshead =
+		    &page->u.row_leaf.ins[session->srch.slot];
 
 	/*
-	 * If there's no insert chain to search, we're done.
+	 * Search the insert tree for a match -- if we don't find a match, we
+	 * fail, unless we're inserting new data.
 	 *
-	 * If not doing an insert, we've failed.
-	 * If doing an insert, srch_slot and srch_ins have been set, we're done.
+	 * No matter how things turn out, __wt_row_ins_search resets
+	 * session->srch appropriately, there's no more work to be done.
 	 */
-	if (ins == NULL) {
+	if ((cmp = __insert_search(session, inshead, key)) != 0) {
+		/*
+		 * No match found.
+		 * If not doing an insert, we've failed.
+		 */
 		if (!LF_ISSET(WT_WRITE))
 			goto notfound;
-	} else {
-		/*
-		 * Search the insert tree for a match -- if we don't find a
-		 * match, we fail, unless we're inserting new data.
-		 *
-		 * No matter how things turn out, __insert_search resets the
-		 * session->srch_XXX fields appropriately, there's no more
-		 * work to be done.
-		 */
-		if ((cmp = __insert_search(session, ins, key)) != 0) {
-			/*
-			 * No match found.
-			 * If not doing an insert, we've failed.
-			 */
-			if (!LF_ISSET(WT_WRITE))
-				goto notfound;
-		}
 	}
 
 done:	/*
@@ -229,15 +263,15 @@ done:	/*
 	 * updates to the key's value: a deleted object returns not-found.
 	 */
 	if (!LF_ISSET(WT_WRITE) &&
-	    session->srch_upd != NULL &&
-	    *session->srch_upd != NULL &&
-	    WT_UPDATE_DELETED_ISSET(*session->srch_upd))
+	    session->srch.upd != NULL &&
+	    *session->srch.upd != NULL &&
+	    WT_UPDATE_DELETED_ISSET(*session->srch.upd))
 		goto notfound;
 
-	session->srch_page = page;
-	session->srch_write_gen = write_gen;
-	session->srch_match = (cmp == 0);
-	session->srch_ip = rip;
+	session->srch.page = page;
+	session->srch.write_gen = write_gen;
+	session->srch.match = (cmp == 0);
+	session->srch.ip = rip;
 	return (0);
 
 notfound:
@@ -245,39 +279,4 @@ notfound:
 
 err:	__wt_page_release(session, page);
 	return (ret);
-}
-
-/*
- * __insert_search --
- *	Search the slot's insert list.
- */
-static inline int
-__insert_search(WT_SESSION_IMPL *session, WT_INSERT *ins, WT_ITEM *key)
-{
-	WT_ITEM insert_key;
-	WT_BTREE *btree;
-	int cmp, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
-
-	btree = session->btree;
-	func = btree->btree_compare;
-
-	/*
-	 * The insert list is a sorted, forward-linked list -- on average, we
-	 * have to search half of it.
-	 */
-	for (; ins != NULL; ins = ins->next) {
-		insert_key.data = WT_INSERT_KEY(ins);
-		insert_key.size = WT_INSERT_KEY_SIZE(ins);
-		cmp = func(btree, key, &insert_key);
-		if (cmp == 0) {
-			session->srch_ins = NULL;
-			session->srch_vupdate = ins->upd;
-			session->srch_upd = &ins->upd;
-			return (0);
-		}
-		if (cmp < 0)
-			break;
-		session->srch_ins = &ins->next;
-	}
-	return (1);
 }

@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static void __free_insert(WT_SESSION_IMPL *, WT_INSERT **, uint32_t);
+static void __free_insert(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_insert_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -98,7 +98,7 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the insert array. */
-	if ((ins = WT_COL_INSERT_SINGLE(page)) != NULL)
+	if ((ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page))) != NULL)
 		__free_insert_list(session, ins);
 }
 
@@ -197,17 +197,20 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static void
 __free_insert(
-    WT_SESSION_IMPL *session, WT_INSERT **insert_head, uint32_t entries)
+    WT_SESSION_IMPL *session, WT_INSERT_HEAD **insert_head, uint32_t entries)
 {
-	WT_INSERT **insp;
+	WT_INSERT_HEAD **insheadp;
 
 	/*
 	 * For each non-NULL slot in the page's array of inserts, free the
 	 * linked list anchored in that slot.
 	 */
-	for (insp = insert_head; entries > 0; --entries, ++insp)
-		if (*insp != NULL)
-			__free_insert_list(session, *insp);
+	for (insheadp = insert_head; entries > 0; --entries, ++insheadp)
+		if (*insheadp != NULL) {
+			__free_insert_list(session,
+			    WT_SKIP_FIRST(*insheadp));
+			__wt_sb_free(session, (*insheadp)->sb);
+		}
 
 	/* Free the page's array of inserts. */
 	__wt_free(session, insert_head);
@@ -226,7 +229,7 @@ __free_insert_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	do {
 		__free_update_list(session, ins->upd);
 
-		next = ins->next;
+		next = WT_SKIP_NEXT(ins);
 		__wt_sb_free(session, ins->sb);
 	} while ((ins = next) != NULL);
 }

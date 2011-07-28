@@ -50,7 +50,7 @@ __btcur_next_fix(
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->ins = WT_COL_INSERT_SINGLE(cbt->page);
+		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
 	}
@@ -68,7 +68,7 @@ __btcur_next_fix(
 		if (cbt->ins != NULL &&
 		    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
 			upd = cbt->ins->upd;
-			cbt->ins = cbt->ins->next;
+			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
@@ -126,7 +126,8 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 			} else
 				cbt->rle = 1;
 
-			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
+			cbt->ins = WT_SKIP_FIRST(
+			    WT_COL_INSERT(cbt->page, cbt->cip));
 
 			/*
 			 * Skip deleted records, there might be a large number
@@ -162,7 +163,7 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 			if (cbt->ins != NULL &&
 			    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
 				upd = cbt->ins->upd;
-				cbt->ins = cbt->ins->next;
+				cbt->ins = WT_SKIP_NEXT(cbt->ins);
 
 				if (WT_UPDATE_DELETED_ISSET(upd))
 					continue;
@@ -198,16 +199,16 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 	if (newpage) {
 		cbt->rip = cbt->page->u.row_leaf.d;
 		cbt->nitems = cbt->page->entries;
-		cbt->ins = WT_ROW_INSERT_SMALLEST(cbt->page);
+		cbt->ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(cbt->page));
 	}
 
 	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found;
-	    cbt->ins = WT_ROW_INSERT(cbt->page, cbt->rip),
+	    cbt->ins = WT_SKIP_FIRST(WT_ROW_INSERT(cbt->page, cbt->rip)),
 	    ++cbt->rip, --cbt->nitems) {
 		/* Continue traversing any insert list. */
 		while ((ins = cbt->ins) != NULL) {
-			cbt->ins = cbt->ins->next;
+			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 			upd = ins->upd;
 			if (!WT_UPDATE_DELETED_ISSET(upd)) {
 				key->data = WT_INSERT_KEY(ins);
@@ -363,7 +364,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		if (ret == 0) {
 			ret = __wt_return_data(session,
 			    NULL, (WT_ITEM *)&cursor->value, 0);
-			__wt_page_release(session, session->srch_page);
+			__wt_page_release(session, session->srch.page);
 		}
 		break;
 	case BTREE_ROW:
@@ -374,7 +375,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 			ret = __wt_return_data(session,
 			    (WT_ITEM *)&cursor->key,
 			    (WT_ITEM *)&cursor->value, 0);
-			__wt_page_release(session, session->srch_page);
+			__wt_page_release(session, session->srch.page);
 		}
 		break;
 	WT_ILLEGAL_FORMAT(session);

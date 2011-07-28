@@ -102,6 +102,7 @@ SCHED
 SLIST
 STAILQ
 SYS
+Skiplist
 Solaris
 Split's
 Subtree
@@ -336,6 +337,8 @@ sessionp
 setv
 sizeof
 sizev
+skiplist
+skiplists
 slvg
 snprintf
 sp

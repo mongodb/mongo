@@ -1647,8 +1647,9 @@ __rec_col_extend_truncate(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		/* Find the largest updated record for this page. */
-		for (ins = WT_COL_INSERT_SINGLE(page);
-		    ins != NULL && ins->next != NULL; ins = ins->next)
+		for (ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
+		    ins != NULL && WT_SKIP_NEXT(ins) != NULL;
+		    ins = WT_SKIP_NEXT(ins))
 			;
 		max_update = ins == NULL ? 0 : WT_INSERT_RECNO(ins);
 
@@ -1703,8 +1704,7 @@ __rec_col_fix(
 		__rec_col_extend_truncate(session, page);
 
 		/* Update any changes to the original on-page data items. */
-		for (ins =
-		    WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next)
+		WT_SKIP_FOREACH(ins, WT_COL_INSERT_SINGLE(page))
 			__bit_setv_recno(
 			    page, WT_INSERT_RECNO(ins), btree->bitcnt,
 			    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
@@ -1951,7 +1951,7 @@ __rec_col_var(
 		 * insert list.
 		 */
 		cell = WT_COL_PTR(page, cip);
-		ins = WT_COL_INSERT(page, cip);
+		ins = WT_SKIP_FIRST(WT_COL_INSERT(page, cip));
 		if (cell == NULL) {
 			nrepeat = 1;
 			orig_deleted = 1;
@@ -2020,7 +2020,7 @@ __rec_col_var(
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
 				upd = ins->upd;
-				ins = ins->next;
+				ins = WT_SKIP_NEXT(ins);
 
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
@@ -2469,7 +2469,7 @@ __rec_row_leaf(
 	 * Write any K/V pairs inserted into the page before the first from-disk
 	 * key on the page.
 	 */
-	if ((ins = WT_ROW_INSERT_SMALLEST(page)) != NULL)
+	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL)
 		WT_RET(__rec_row_leaf_insert(session, ins));
 
 	/*
@@ -2613,7 +2613,7 @@ __rec_row_leaf(
 		__rec_key_state_update(r, ovfl_key);
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
-		if ((ins = WT_ROW_INSERT(page, rip)) != NULL)
+		if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
 			WT_ERR(__rec_row_leaf_insert(session, ins));
 	}
 
@@ -2641,7 +2641,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	key = &r->k;
 	val = &r->v;
 
-	for (; ins != NULL; ins = ins->next) {
+	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		upd = ins->upd;				/* Build value cell. */
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			continue;

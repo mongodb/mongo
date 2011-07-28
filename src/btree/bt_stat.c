@@ -128,8 +128,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Walk the insert list, checking for changes.  For each insert
 		 * we find, correct the original count based on its state.
 		 */
-		for (ins =
-		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
+		WT_SKIP_FOREACH(ins, WT_COL_INSERT(page, cip)) {
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (orig_deleted)
@@ -166,7 +165,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 	 * key on the page.
 	 */
 	cnt = 0;
-	for (ins = WT_ROW_INSERT_SMALLEST(page); ins != NULL; ins = ins->next)
+	WT_SKIP_FOREACH(ins, WT_ROW_INSERT_SMALLEST(page))
 		if (!WT_UPDATE_DELETED_ISSET(ins->upd))
 			++cnt;
 
@@ -177,8 +176,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 			++cnt;
 
 		/* Stat inserted K/V pairs. */
-		for (ins =
-		    WT_ROW_INSERT(page, rip); ins != NULL; ins = ins->next)
+		WT_SKIP_FOREACH(ins, WT_ROW_INSERT(page, rip))
 			if (!WT_UPDATE_DELETED_ISSET(ins->upd))
 				++cnt;
 	}

@@ -8,6 +8,50 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_col_ins_search --
+ *	Search the slot's insert list.
+ */
+static inline int
+__wt_col_ins_search(
+    WT_SESSION_IMPL *session, WT_INSERT_HEAD *inshead, uint64_t recno)
+{
+	WT_INSERT **ins;
+	uint64_t ins_recno;
+	int cmp, i;
+
+	if (inshead == NULL)
+		return (1);
+
+	/*
+	 * The insert list is a skip list: start at the highest skip level,
+	 * then go as far as possible at each level before stepping down to the
+	 * next one.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
+		if (*ins == NULL)
+			cmp = -1;
+		else {
+			ins_recno = WT_INSERT_RECNO(*ins);
+			cmp = (recno == ins_recno) ? 0 :
+			    (recno < ins_recno) ? -1 : 1;
+		}
+		if (cmp == 0) {
+			WT_CLEAR(session->srch.ins);
+			session->srch.vupdate = (*ins)->upd;
+			session->srch.upd = &(*ins)->upd;
+			return (0);
+		} else if (cmp > 0)
+			/* Keep going on this level. */
+			ins = &(*ins)->next[i];
+		else
+			/* Go down a level in the skiplist. */
+			session->srch.ins[i--] = ins--;
+	}
+
+	return (1);
+}
+
+/*
  * __wt_col_search --
  *	Search a column-store tree for a specific record-based key.
  */
@@ -19,7 +63,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_COL_REF *cref;
-	WT_INSERT *ins;
 	WT_PAGE *page;
 	uint64_t record_cnt, start_recno;
 	uint32_t base, i, indx, limit, match, write_gen;
@@ -30,13 +73,14 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	cref = NULL;
 	start_recno = 0;
 
-	session->srch_page = NULL;			/* Return values. */
-	session->srch_write_gen = 0;
-	session->srch_ip = NULL;
-	session->srch_vupdate = NULL;
-	session->srch_ins = NULL;
-	session->srch_upd = NULL;
-	session->srch_slot = UINT32_MAX;
+	session->srch.page = NULL;			/* Return values. */
+	session->srch.write_gen = 0;
+	session->srch.ip = NULL;
+	session->srch.vupdate = NULL;
+	session->srch.inshead = NULL;
+	WT_CLEAR(session->srch.ins);
+	session->srch.upd = NULL;
+	session->srch.slot = UINT32_MAX;
 
 	btree = session->btree;
 
@@ -103,27 +147,14 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 
 		/*
 		 * Search the WT_COL's insert list for the record's WT_INSERT
-		 * slot.  The insert list is a sorted, forward-linked list: on
-		 * average, we have to search half of it.
-		 *
-		 * Do an initial setup of the return information (we'll correct
-		 * it as needed depending on what we find).
+		 * slot.
 		 */
-		if (page->u.col_leaf.ins != NULL)
-			session->srch_ins = &page->u.col_leaf.ins[0];
-
-		for (match = 0, ins =
-		    WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next) {
-			if (WT_INSERT_RECNO(ins) == recno) {
-				match = 1;
-				session->srch_ins = NULL;
-				session->srch_vupdate = ins->upd;
-				session->srch_upd = &ins->upd;
-				break;
-			}
-			if (WT_INSERT_RECNO(ins) > recno)
-				break;
-			session->srch_ins = &ins->next;
+		if (page->u.col_leaf.ins == NULL)
+			match = 0;
+		else {
+			session->srch.inshead = page->u.col_leaf.ins;
+			match = (__wt_col_ins_search(session,
+			    *session->srch.inshead, recno) == 0);
 		}
 
 		/*
@@ -132,7 +163,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		 * the original value.
 		 */
 		if (!match)
-			session->srch_v =
+			session->srch.v =
 			    __bit_getv_recno(page, recno, btree->bitcnt);
 		break;
 	case WT_PAGE_COL_VAR:
@@ -156,8 +187,8 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 
 		/*
 		 * We have the right WT_COL slot: if it's a write, set up the
-		 * return information in session->{srch_upd,slot}.  If it's a
-		 * read, set up the return information in session->srch_vupdate.
+		 * return information in session->{srch.upd,slot}.  If it's a
+		 * read, set up the return information in session->srch.vupdate.
 		 *
 		 * Search the WT_COL's insert list for the record's WT_INSERT
 		 * slot.  The insert list is a sorted, forward-linked list: on
@@ -166,28 +197,19 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		 * Do an initial setup of the return information (we'll correct
 		 * it as needed depending on what we find).
 		 */
-		session->srch_slot = WT_COL_SLOT(page, cip);
-		if (page->u.col_leaf.ins != NULL)
-			session->srch_ins =
-			    &page->u.col_leaf.ins[session->srch_slot];
-
-		for (match = 0, ins =
-		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
-			if (WT_INSERT_RECNO(ins) == recno) {
-				match = 1;
-				session->srch_ins = NULL;
-				session->srch_vupdate = ins->upd;
-				session->srch_upd = &ins->upd;
-				break;
-			}
-			if (WT_INSERT_RECNO(ins) > recno)
-				break;
-			session->srch_ins = &ins->next;
+		session->srch.slot = WT_COL_SLOT(page, cip);
+		if (page->u.col_leaf.ins == NULL)
+			match = 0;
+		else {
+			session->srch.inshead =
+			    &page->u.col_leaf.ins[session->srch.slot];
+			match = (__wt_col_ins_search(session,
+			    *session->srch.inshead, recno) == 0);
 		}
 
 		/*
 		 * If we're not updating an existing data item, check to see if
-		 * the item has been deleted.   If we found a match, use the
+		 * the item has been deleted.	If we found a match, use the
 		 * WT_INSERT's WT_UPDATE value.   If we didn't find a match, use
 		 * use the original data.
 		 */
@@ -195,7 +217,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 			break;
 
 		if (match) {
-			if (WT_UPDATE_DELETED_ISSET(ins->upd))
+			if (WT_UPDATE_DELETED_ISSET(session->srch.vupdate))
 				goto notfound;
 		} else
 			if (cell != NULL && unpack->type == WT_CELL_DEL)
@@ -204,13 +226,13 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	session->srch_match = 1;
+	session->srch.match = 1;
 	if (0) {
-append:		session->srch_match = 0;
+append:		session->srch.match = 0;
 	}
-	session->srch_page = page;
-	session->srch_write_gen = write_gen;
-	session->srch_ip = cip;
+	session->srch.page = page;
+	session->srch.write_gen = write_gen;
+	session->srch.ip = cip;
 	return (0);
 
 notfound:

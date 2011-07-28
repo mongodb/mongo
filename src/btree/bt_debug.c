@@ -28,7 +28,7 @@ typedef struct {
 static void __debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
-static void __debug_col_insert(WT_DBG *, WT_INSERT *);
+static void __debug_col_insert(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
@@ -43,7 +43,7 @@ static int  __debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __debug_page_work(WT_DBG *, WT_PAGE *, uint32_t);
 static void __debug_ref(WT_DBG *, WT_REF *);
-static void __debug_row_insert(WT_DBG *, WT_INSERT *);
+static void __debug_row_insert(WT_DBG *, WT_INSERT_HEAD *);
 static void __debug_update(WT_DBG *, WT_UPDATE *);
 static void __dmsg(WT_DBG *, const char *, ...);
 static void __dmsg_wrapup(WT_DBG *);
@@ -428,7 +428,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	recno = page->u.col_leaf.recno;
 
 	if (dsk != NULL) {
-		ins = WT_COL_INSERT_SINGLE(page);
+		ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
 		WT_FIX_FOREACH(btree, dsk, v, i) {
 			__dmsg(ds, "\t{");
 			__debug_hex_byte(ds, v);
@@ -440,13 +440,15 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 				    "\tinsert %" PRIu64 "\n",
 				    WT_INSERT_RECNO(ins));
 				__debug_update(ds, ins->upd);
-				ins = ins->next;
+				ins = WT_SKIP_NEXT(ins);
 			}
 			++recno;
 		}
 	}
 	__dmsg(ds, "%s\n", conn->sep);
-	for (ins = WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next) {
+	for (ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
+	    ins != NULL;
+	    ins = WT_SKIP_NEXT(ins)) {
 		__dmsg(ds,
 		    "\tinsert %" PRIu64 "\n",
 		    WT_INSERT_RECNO(ins));
@@ -489,7 +491,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	WT_INSERT *ins;
+	WT_INSERT_HEAD *inshead;
 	uint32_t i;
 	char tag[64];
 
@@ -508,8 +510,8 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		}
 		WT_RET(__debug_cell_data(ds, tag, unpack));
 
-		if ((ins = WT_COL_INSERT(page, cip)) != NULL)
-			__debug_col_insert(ds, ins);
+		if ((inshead = WT_COL_INSERT(page, cip)) != NULL)
+			__debug_col_insert(ds, inshead);
 	}
 	return (0);
 }
@@ -549,7 +551,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_INSERT *ins;
+	WT_INSERT_HEAD *inshead;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -560,8 +562,8 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	 * Dump any K/V pairs inserted into the page before the first from-disk
 	 * key on the page.
 	 */
-	if ((ins = WT_ROW_INSERT_SMALLEST(page)) != NULL)
-		__debug_row_insert(ds, ins);
+	if ((inshead = WT_ROW_INSERT_SMALLEST(page)) != NULL)
+		__debug_row_insert(ds, inshead);
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -582,8 +584,8 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
 			__debug_update(ds, upd);
 
-		if ((ins = WT_ROW_INSERT(page, rip)) != NULL)
-			__debug_row_insert(ds, ins);
+		if ((inshead = WT_ROW_INSERT(page, rip)) != NULL)
+			__debug_row_insert(ds, inshead);
 	}
 
 	return (0);
@@ -594,9 +596,11 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
  *	Dump a column-store insert array.
  */
 static void
-__debug_col_insert(WT_DBG *ds, WT_INSERT *ins)
+__debug_col_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
 {
-	for (; ins != NULL; ins = ins->next) {
+	WT_INSERT *ins;
+
+	WT_SKIP_FOREACH(ins, inshead) {
 		__dmsg(ds,
 		    "\tinsert %" PRIu64 "\n", WT_INSERT_RECNO(ins));
 		__debug_update(ds, ins->upd);
@@ -608,9 +612,11 @@ __debug_col_insert(WT_DBG *ds, WT_INSERT *ins)
  *	Dump an insert array.
  */
 static void
-__debug_row_insert(WT_DBG *ds, WT_INSERT *ins)
+__debug_row_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
 {
-	for (; ins != NULL; ins = ins->next) {
+	WT_INSERT *ins;
+
+	WT_SKIP_FOREACH(ins, inshead) {
 		__debug_item(ds,
 		    "insert", WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins));
 		__debug_update(ds, ins->upd);

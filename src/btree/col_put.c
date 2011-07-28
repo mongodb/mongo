@@ -9,7 +9,7 @@
 
 static int __col_extend(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int __col_insert_alloc(
-		WT_SESSION_IMPL *, uint64_t, WT_INSERT **, uint32_t *);
+		WT_SESSION_IMPL *, uint64_t, int, WT_INSERT **, uint32_t *);
 static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
 
 /*
@@ -21,20 +21,23 @@ __wt_col_modify(
     WT_SESSION_IMPL *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
-	WT_INSERT **new_ins, *ins;
+	WT_INSERT_HEAD **new_inslist, *new_inshead;
+	WT_INSERT *ins;
+	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
-	uint32_t ins_size, new_ins_size, upd_size;
-	int hazard_ref, ret;
+	uint32_t ins_size, new_inslist_size, new_inshead_size, upd_size;
+	int hazard_ref, i, ret, skipdepth;
 
-	new_ins = NULL;
+	new_inshead = NULL;
+	new_inslist = NULL;
 	ins = NULL;
 	upd = NULL;
-	ins_size = new_ins_size = upd_size = 0;
-	ret = 0;
+	ins_size = new_inslist_size = new_inshead_size = upd_size = 0;
+	ret = skipdepth = 0;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(session, recno, is_write ? WT_WRITE : 0));
-	page = session->srch_page;
+	page = session->srch.page;
 
 	/*
 	 * Append a column-store entry (the only place you can insert into a
@@ -42,7 +45,7 @@ __wt_col_modify(
 	 * are immutable).  If we don't have an exact match, it's an append
 	 * and we need to extend the file.
 	 */
-	if (!session->srch_match) {
+	if (!session->srch.match) {
 		/*
 		 * We may have, and need to hold, a hazard reference on a page,
 		 * but we're possibly doing some page shuffling of the root,
@@ -62,7 +65,7 @@ __wt_col_modify(
 	 *
 	 * Column-store changes mean working in a WT_INSERT list.
 	 */
-	if (session->srch_upd != NULL) {
+	if (session->srch.upd != NULL) {
 		/*
 		 * If changing an already changed record, create a new WT_UPDATE
 		 * entry and have the workQ link it into an existing WT_INSERT
@@ -72,47 +75,77 @@ __wt_col_modify(
 
 		/* workQ: insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(
-		    session, page, session->srch_write_gen,
-		    NULL, 0, session->srch_upd, &upd, upd_size);
+		    session, page, session->srch.write_gen,
+		    NULL, 0, session->srch.upd, &upd, upd_size);
 	} else {
 		/*
-		 * We may not have an WT_INSERT array (in the case of variable
-		 * length column store) or WT_INSERT slot (in the case of fixed
-		 * length column store).  Allocate as necessary.
+		 * We may not have an WT_INSERT_HEAD array (in the case of
+		 * variable length column store) or WT_INSERT_HEAD slot (in the
+		 * case of fixed length column store).  Also, there may be an
+		 * insert array but no list at the point we are inserting.
+		 * Allocate as necessary.
 		 *
 		 * If there was no insert array, the search function could not
 		 * have set the WT_INSERT location.
 		 */
-		if (session->srch_ins == NULL)
+		if (session->srch.inshead == NULL) {
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
-				WT_ERR(__wt_calloc_def(session, 1, &new_ins));
-				new_ins_size = 1 * WT_SIZEOF32(WT_INSERT *);
-				session->srch_ins = &new_ins[0];
+				new_inslist_size =
+				    WT_SIZEOF32(WT_INSERT_HEAD *) +
+				    WT_SIZEOF32(WT_INSERT_HEAD);
+				WT_ERR(__wt_calloc(session,
+				    new_inslist_size, 1, &new_inslist));
+				new_inshead = (WT_INSERT_HEAD *)&new_inslist[1];
+				*new_inslist = new_inshead;
+				session->srch.inshead = new_inslist;
 				break;
 			case WT_PAGE_COL_VAR:
-				WT_ERR(__wt_calloc_def(
-				    session, page->entries, &new_ins));
-				new_ins_size =
-				    page->entries * WT_SIZEOF32(WT_INSERT *);
-				session->srch_ins =
-				    &new_ins[session->srch_slot];
+				WT_ERR(__wt_calloc_def(session, page->entries,
+				    &new_inslist));
+				new_inslist_size = page->entries *
+				    WT_SIZEOF32(WT_INSERT_HEAD *);
+				session->srch.inshead =
+				    &new_inslist[session->srch.slot];
 				break;
 			}
+		}
+
+		if (*session->srch.inshead == NULL) {
+			WT_ASSERT(session, page->type == WT_PAGE_COL_VAR);
+			WT_RET(__wt_sb_alloc(session, sizeof(WT_INSERT_HEAD),
+			    &new_inshead, &sb));
+			new_inshead->sb = sb;
+			new_inshead_size = WT_SIZEOF32(WT_INSERT_HEAD);
+		}
+
+		if (new_inshead != NULL)
+			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
+				session->srch.ins[i] = &new_inshead->head[i];
 
 		/*
 		 * If changing a not-yet-changed record, then allocate a new
 		 * WT_INSERT/WT_UPDATE pair, link it into the WT_INSERT array.
 		 */
-		WT_ERR(__col_insert_alloc(session, recno, &ins, &ins_size));
+		WT_SKIP_CHOOSE_DEPTH(skipdepth);
+		WT_ERR(__col_insert_alloc(session, recno, skipdepth,
+		    &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
 		ins_size += upd_size;
 
-		/* workQ: insert the WT_INSERT structure. */
-		ret = __wt_insert_serial(
-		    session, page, session->srch_write_gen,
-		    &new_ins, new_ins_size, session->srch_ins, &ins, ins_size);
+		/*
+		 * workQ: insert the WT_INSERT structure.
+		 *
+		 * For fixed-width stores, we are installing a single insert
+		 * head for the page.  Pass NULL to the insert serialization
+		 * function, there is no need to set it again, and we only want
+		 * to account for it once.
+		 */
+		ret = __wt_insert_serial(session, &session->srch,
+		    &new_inslist, new_inslist_size,
+		    (page->type == WT_PAGE_COL_FIX) ? NULL : &new_inshead,
+		    new_inshead_size, &ins, ins_size, skipdepth);
 	}
 
 	if (ret != 0) {
@@ -123,8 +156,12 @@ err:		if (ins != NULL)
 	}
 
 	/* Free any insert array. */
-	if (new_ins != NULL)
-		__wt_free(session, new_ins);
+	if (new_inslist != NULL) {
+		if (page->type == WT_PAGE_COL_VAR)
+			__wt_free(session, new_inslist);
+		else
+			__wt_free(session, *new_inslist);
+	}
 
 	__wt_page_release(session, page);
 
@@ -138,23 +175,25 @@ err:		if (ins != NULL)
  */
 static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_INSERT **insp, uint32_t *ins_sizep)
+    uint64_t recno, int skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
+	uint32_t ins_size;
 
 	/*
-	 * Allocate the WT_INSERT structure and room for the key, then copy
-	 * the key into place.
+	 * Allocate the WT_INSERT structure and skiplist pointers, then copy
+	 * the record number into place.
 	 */
-	WT_RET(__wt_sb_alloc(
-	    session, sizeof(WT_INSERT) + sizeof(uint64_t), &ins, &sb));
+	ins_size = WT_SIZEOF32(WT_INSERT) +
+	    skipdepth * WT_SIZEOF32(WT_INSERT *);
+	WT_RET(__wt_sb_alloc(session, ins_size, &ins, &sb));
 
 	ins->sb = sb;
 	WT_INSERT_RECNO(ins) = recno;
 
 	*insp = ins;
-	*ins_sizep = sizeof(WT_INSERT) + sizeof(uint64_t);
+	*ins_sizep = ins_size;
 	return (0);
 }
 

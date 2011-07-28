@@ -35,10 +35,10 @@ __wt_return_data(
 	unpack = &_unpack;
 	ret = 0;
 
-	page = session->srch_page;
-	cip = session->srch_ip;
-	rip = session->srch_ip;
-	upd = session->srch_vupdate;
+	page = session->srch.page;
+	cip = session->srch.ip;
+	rip = session->srch.ip;
+	upd = session->srch.vupdate;
 
 	/*
 	 * Handle the key item -- the key may be unchanged, in which case we
@@ -109,7 +109,7 @@ __wt_return_data(
 	} else {
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
-			value_ret = &session->srch_v;
+			value_ret = &session->srch.v;
 			size_ret = 1;
 			break;
 		case WT_PAGE_COL_VAR:
