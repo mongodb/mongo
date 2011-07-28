@@ -250,6 +250,11 @@ Object.extend = function( dst , src , deep ){
     return dst;
 }
 
+Object.merge = function( dst, src, deep ){
+    var clone = Object.extend( {}, dst, deep )
+    return Object.extend( clone, src, deep )
+}
+
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )

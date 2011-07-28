@@ -141,8 +141,8 @@ namespace mongo {
                         }
 
                         if ( bad ) {
-                            log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
-                            uasserted( 8011 , "tried to insert object without shard key" );
+                            log() << "tried to insert object with no valid shard key: " << r.getns() << "  " << o << endl;
+                            uasserted( 8011 , "tried to insert object with no valid shard key" );
                         }
 
                     }
@@ -210,8 +210,8 @@ namespace mongo {
                 }
 
                 if ( bad ) {
-                    log() << "tried to insert object without shard key: " << nsChunkLookup << "  " << o << endl;
-                    uasserted( 14842 , "tried to insert object without shard key" );
+                    log() << "tried to insert object with no valid shard key: " << nsChunkLookup << "  " << o << endl;
+                    uasserted( 14842 , "tried to insert object with no valid shard key" );
                 }
 
             }
@@ -258,7 +258,7 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(8012, "can't upsert something without shard key",
+                uassert(8012, "can't upsert something without valid shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
@@ -273,7 +273,8 @@ namespace mongo {
                 if ( multi ) {
                 }
                 else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
-                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have the shard key" );
+                    log() << "Query " << query << endl;
+                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have a valid shard key" );
                 }
                 else {
                     save = true;
@@ -306,7 +307,7 @@ namespace mongo {
                 }
                 else {
                     uasserted(12376,
-                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
+                              str::stream() << "valid shard key must be in update object for collection: " << manager->getns() );
                 }
             }
 
@@ -351,7 +352,7 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(14854, "can't upsert something without shard key",
+                uassert(14854, "can't upsert something without valid shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
@@ -366,7 +367,7 @@ namespace mongo {
                 if ( multi ) {
                 }
                 else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
-                    throw UserException( 14850 , "can't do non-multi update with query that doesn't have the shard key" );
+                    throw UserException( 14850 , "can't do non-multi update with query that doesn't have a valid shard key" );
                 }
                 else {
                     save = true;
@@ -399,7 +400,7 @@ namespace mongo {
                 }
                 else {
                     uasserted(14857,
-                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
+                              str::stream() << "valid shard key must be in update object for collection: " << manager->getns() );
                 }
             }
 

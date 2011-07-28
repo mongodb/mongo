@@ -177,6 +177,11 @@ namespace mongo {
                 return false;
             }
 
+            if( d->isMultikey( d->idxNo( *idx ) ) ) {
+                errmsg = "index is multikey, cannot use for sharding";
+                return false;
+            }
+
             BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
             auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );

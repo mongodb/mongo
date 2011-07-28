@@ -55,7 +55,8 @@ namespace mongo {
            */
 
         for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
-            if(obj.getFieldDotted(it->c_str()).eoo())
+            BSONElement e = obj.getFieldDotted(it->c_str());
+            if(e.eoo() || e.type() == Array)
                 return false;
         }
         return true;

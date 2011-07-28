@@ -746,18 +746,30 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
     if( collName.getDB )
         c = "" + collName
 
+    var isEmpty = this.s.getCollection( c ).count() == 0
+        
     if( ! this.isSharded( dbName ) )
         this.s.adminCommand( { enableSharding : dbName } )
     
-    this.s.adminCommand( { shardcollection : c , key : key } );
-    this.s.adminCommand( { split : c , middle : split } );
+    var result = this.s.adminCommand( { shardcollection : c , key : key } )
+    if( ! result.ok ){
+        printjson( result )
+        assert( false )
+    }
     
+    result = this.s.adminCommand( { split : c , middle : split } );
+    if( ! result.ok ){
+        printjson( result )
+        assert( false )
+    }
+        
     var result = null
     for( var i = 0; i < 5; i++ ){
         result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
         if( result.ok ) break;
         sleep( 5 * 1000 );
     }
+    printjson( result )
     assert( result.ok )
     
 };
