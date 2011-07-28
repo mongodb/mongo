@@ -34,7 +34,7 @@ __wt_disk_read(
 	}
 
 	WT_STAT_INCR(btree->stats, page_read);
-	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_read);
+	WT_STAT_INCR(S2C(session)->stats, cache_page_read);
 
 	WT_VERBOSE(session, READ,
 	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
@@ -84,7 +84,7 @@ __wt_disk_write(
 	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 
 	WT_STAT_INCR(btree->stats, page_write);
-	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_write);
+	WT_STAT_INCR(S2C(session)->stats, cache_page_write);
 
 	WT_VERBOSE(session, WRITE,
 	    "write addr/size %" PRIu32 "/%" PRIu32 ": %s",

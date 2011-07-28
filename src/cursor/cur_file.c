@@ -213,15 +213,27 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_BTREE *btree;
-	WT_CURSOR_BTREE *cbt;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
-	int bulk, dump, printable, raw, ret;
+	WT_CURSOR_BTREE *cbt;
 	size_t csize;
+	int bulk, dump, printable, raw, ret, stats;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
+
+	cbt = NULL;
+	ret = 0;
 
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
+
+	/*
+	 * If we're a statistics cursor on a file, call the statistics cursor
+	 * code.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
+	stats = (cval.val != 0);
+	if (stats)
+		return (__wt_curstat_open(session, NULL, config, cursorp));
 
 	WT_ERR(__wt_config_gets(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
@@ -254,7 +266,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		__wt_free(session, cbt);
+err:		if (cbt != NULL)
+			__wt_free(session, cbt);
 	}
 
 	return (ret);

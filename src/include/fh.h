@@ -18,8 +18,6 @@ struct __wt_fh {
 	int	fd;				/* POSIX file handle */
 
 	u_int	refcnt;				/* Reference count */
-
-	WT_FILE_STATS *stats;			/* Statistics */
 };
 
 #if defined(__cplusplus)

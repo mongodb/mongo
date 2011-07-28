@@ -116,7 +116,7 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	 * issue (when closing the environment), run the eviction server.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = WT_STAT(cache->stats, cache_bytes_max);
+	bytes_max = WT_STAT(conn->stats, cache_bytes_max);
 	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
@@ -258,10 +258,12 @@ static int
 __evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	uint64_t bytes_start, bytes_inuse, bytes_max;
 	int loop;
 
-	cache = S2C(session)->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 
 	/* Evict pages from the cache. */
 	for (loop = 0;;) {
@@ -294,7 +296,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * soon as we get under the maximum cache.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		bytes_max = WT_STAT(cache->stats, cache_bytes_max);
+		bytes_max = WT_STAT(conn->stats, cache_bytes_max);
 		if (cache->read_lockout) {
 			if (bytes_inuse <= bytes_max - (bytes_max / 20))
 				break;

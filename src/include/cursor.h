@@ -78,6 +78,11 @@ struct __wt_cursor_index {
 
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
+
+	WT_BTREE *btree;			/* Enclosing btree */
+	WT_STATS *stats;			/* Statistics reference */
+
+	int	  notfound;			/* If reached the end */
 };
 
 struct __wt_cursor_table {

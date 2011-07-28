@@ -377,27 +377,47 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	
-	if ((ret = session->open_cursor(session, "stat:" WT_TABLENAME, NULL,
-	    "printable", &cursor)) != 0) {
+
+	/* Connection statistics. */
+	if ((ret = session->open_cursor(session,
+	    "statistics:", NULL, "printable", &cursor)) != 0) {
 		fprintf(stderr, "%s: stat cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
 		    (ret = cursor->get_value(cursor, &value)) != 0)
 			break;
-		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1 ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1) {
+		if (fwrite(key.data, 1, key.size, fp) != key.size ||
+		    fwrite("=", 1, 1, fp) != 1 ||
+		    fwrite(value.data, 1, value.size, fp) != value.size ||
+		    fwrite("\n", 1, 1, fp) != 1) {
 			ret = errno;
 			break;
 		}
 	}
-	(void)fclose(fp);
+	(void)cursor->close(cursor, NULL);
+	
+	/* File statistics. */
+	if ((ret = session->open_cursor(session,
+	    WT_TABLENAME, NULL, "statistics,printable", &cursor)) != 0) {
+		fprintf(stderr, "%s: stat cursor open failed: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	while ((ret = cursor->next(cursor)) == 0) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+		    (ret = cursor->get_value(cursor, &value)) != 0)
+			break;
+		if (fwrite(key.data, 1, key.size, fp) != key.size ||
+		    fwrite("=", 1, 1, fp) != 1 ||
+		    fwrite(value.data, 1, value.size, fp) != value.size ||
+		    fwrite("\n", 1, 1, fp) != 1) {
+			ret = errno;
+			break;
+		}
+	}
 	(void)cursor->close(cursor, NULL);
 
 	if (ret != WT_NOTFOUND) {
@@ -405,6 +425,8 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	(void)fclose(fp);
 
 	return (0);
 }

@@ -278,11 +278,11 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	int ret;
 
 	btree = session->btree;
-	cache = S2C(session)->cache;
+	conn = S2C(session);
 	ret = 0;
 
 	WT_VERBOSE(session, RECONCILE,
@@ -332,7 +332,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	if (!WT_PAGE_IS_MODIFIED(page)) {
 		WT_ASSERT_RET(session, LF_ISSET(WT_REC_EVICT));
 
-		WT_STAT_INCR(cache->stats, cache_evict_unmodified);
+		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 
 		WT_RET(__rec_discard_add_page(session, page));
 		__rec_parent_update_clean(session, page);
@@ -345,7 +345,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * reconciling, so it doesn't matter when we do it.
 	 */
 	F_CLR(page, WT_PAGE_MODIFIED);
-	WT_STAT_INCR(cache->stats, cache_evict_modified);
+	WT_STAT_INCR(conn->stats, cache_evict_modified);
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -413,20 +413,23 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 static int
 __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
+	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_RECONCILE *r;
 
+	conn = S2C(session);
+	cache = conn->cache;
+
 	/* Allocate a reconciliation structure if we don't already have one. */
-	if ((r = S2C(session)->cache->rec) == NULL) {
+	if ((r = cache->rec) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
-		S2C(session)->cache->rec = r;
+		cache->rec = r;
 
 		/*
 		 * Allocate memory for a copy of the hazard references -- it's
 		 * a fixed size so doesn't need run-time adjustments.
 		 */
-		conn = S2C(session);
 		WT_RET(__wt_calloc_def(session,
 		    conn->session_size * conn->hazard_size, &r->hazard));
 

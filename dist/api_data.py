@@ -183,6 +183,9 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u"''',
 		type='boolean'),
+	Config('statistics', 'false', r'''
+		configure the cursor for statistics''',
+		type='boolean'),
 ]),
 
 'session.rename' : Method([]),

@@ -60,8 +60,7 @@ struct __wt_btree {
 	uint32_t leafmin;		/* Min/max leaf page size */
 	uint32_t leafmax;
 
-	WT_BTREE_STATS *stats;		/* Btree handle statistics */
-	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
+	WT_BTREE_STATS *stats;		/* Btree statistics */
 
 #define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
 #define	WT_BTREE_SALVAGE	0x02	/* Handle is for salvage */

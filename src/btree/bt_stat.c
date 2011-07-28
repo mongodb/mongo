@@ -7,20 +7,98 @@
 
 #include "wt_internal.h"
 
+static int __wt_btree_stat_init(WT_SESSION_IMPL *);
+static int __wt_stat_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
 static int __wt_stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static int __wt_stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int __wt_stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
 
 /*
- * __wt_page_stat --
- *	Stat any Btree page.
+ * __wt_btree_stat_init --
+ *	Initialize the Btree statistics.
+ */
+static int
+__wt_btree_stat_init(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_STAT_SET(btree->stats, file_allocsize, btree->allocsize);
+	WT_STAT_SET(btree->stats, file_fixed_len, btree->bitcnt);
+	WT_STAT_SET(btree->stats,
+	    file_freelist_entries, btree->freelist_entries);
+	WT_STAT_SET(btree->stats, file_intlmax, btree->intlmax);
+	WT_STAT_SET(btree->stats, file_intlmin, btree->intlmin);
+	WT_STAT_SET(btree->stats, file_leafmax, btree->leafmax);
+	WT_STAT_SET(btree->stats, file_leafmin, btree->leafmin);
+	WT_STAT_SET(btree->stats, file_magic, WT_BTREE_MAGIC);
+	WT_STAT_SET(btree->stats, file_major, WT_BTREE_MAJOR_VERSION);
+	WT_STAT_SET(btree->stats, file_minor, WT_BTREE_MINOR_VERSION);
+
+	WT_RET(__wt_tree_walk(session, NULL, __wt_stat_page, NULL));
+
+	return (0);
+}
+
+/*
+ * __wt_btree_stat_first --
+ *	Initialize a walk of a Btree statistics cursor.
  */
 int
-__wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
+__wt_btree_stat_first(WT_CURSOR_STAT *cst)
 {
-	WT_BTREE_FILE_STATS *stats;
+	cst->stats = NULL;
+	cst->notfound = 0;
+	return (__wt_btree_stat_next(cst));
+}
 
-	stats = session->btree->fstats;
+/*
+ * __wt_btree_stat_next --
+ *	Return next entry in a Btree statistics cursor.
+ */
+int
+__wt_btree_stat_next(WT_CURSOR_STAT *cst)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	WT_STATS *s;
+
+	session = (WT_SESSION_IMPL *)cst->iface.session;
+	btree = session->btree;
+	cursor = &cst->iface;
+
+	if (cst->notfound)
+		return (WT_NOTFOUND);
+	if (cst->stats == NULL) {
+		WT_RET(__wt_btree_stat_init(session));
+		cst->stats = (WT_STATS *)btree->stats;
+	}
+	s = cst->stats++;
+
+	if (s->desc == NULL) {
+		cst->notfound = 1;
+		return (WT_NOTFOUND);
+	}
+	WT_RET(__wt_buf_set(session, &cursor->key, s->desc, strlen(s->desc)));
+	F_SET(cursor, WT_CURSTD_KEY_SET);
+	WT_RET(__wt_buf_set(session, &cursor->value, &s->v, sizeof(s->v)));
+	F_SET(cursor, WT_CURSTD_VALUE_SET);
+
+	return (0);
+}
+
+/*
+ * __wt_stat_page --
+ *	Stat any Btree page.
+ */
+static int
+__wt_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
+{
+	WT_BTREE_STATS *stats;
+
+	stats = session->btree->stats;
 
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
@@ -60,9 +138,9 @@ __wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 static int
 __wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE_FILE_STATS *stats;
+	WT_BTREE_STATS *stats;
 
-	stats = session->btree->fstats;
+	stats = session->btree->stats;
 
 	WT_STAT_INCRV(stats, file_item_total_data, page->entries);
 	return (0);
@@ -75,7 +153,7 @@ __wt_stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE_FILE_STATS *stats;
+	WT_BTREE_STATS *stats;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -84,7 +162,7 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 	int orig_deleted;
 
-	stats = session->btree->fstats;
+	stats = session->btree->stats;
 	unpack = &_unpack;
 
 	/*
@@ -135,14 +213,14 @@ __wt_stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __wt_stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
 {
-	WT_BTREE_FILE_STATS *stats;
+	WT_BTREE_STATS *stats;
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t cnt, i;
 
 	WT_UNUSED(arg);
-	stats = session->btree->fstats;
+	stats = session->btree->stats;
 
 	/*
 	 * Stat any K/V pairs inserted into the page before the first from-disk

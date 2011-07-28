@@ -29,7 +29,7 @@ __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 	 * rare.
 	 */
 	WT_STAT_INCR(btree->stats, overflow_read);
-	WT_STAT_INCR(conn->cache->stats, cache_overflow_read);
+	WT_STAT_INCR(conn->stats, cache_overflow_read);
 
 	/*
 	 * The only caller that wants a copy of the overflow pages (as opposed

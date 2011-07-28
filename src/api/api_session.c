@@ -94,7 +94,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		ret = __wt_curfile_open(session, uri, config, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, config, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "stat:"))
+	else if (WT_PREFIX_MATCH(uri, "statistics:"))
 		ret = __wt_curstat_open(session, uri, config, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, config, cursorp);

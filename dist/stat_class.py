@@ -6,87 +6,67 @@
 #	perm	-- Field is not cleared by the stat clear function.
 
 class Stat:
-	def __init__(self, str, config=None):
+	def __init__(self, name, desc, config=None):
+		self.name = name
+		self.desc = desc
 		self.config = config or []
-		self.str = str
 
 ##########################################
-# CONNECTION handle statistics
+# CONNECTION statistics
 ##########################################
-conn_stats = {
-	'file_open' : Stat('file open'),
-	'memalloc' : Stat('memory allocations'),
-	'memfree' : Stat('memory frees'),
-	'mtx_lock' : Stat('mutex lock calls'),
-	'total_read_io' : Stat('total read I/Os'),
-	'total_write_io' : Stat('total write I/Os'),
-	'workq_passes' : Stat('workQ queue passes'),
-	'workq_yield' : Stat('workQ yields'),
-}
+conn_stats = [
+	Stat('cache_bytes_inuse', 'cache: bytes currently held in the cache', 'perm'),
+	Stat('cache_bytes_max', 'cache: maximum bytes configured', 'perm'),
+	Stat('cache_evict_hazard', 'cache: pages selected for eviction not evicted because of a hazard reference'),
+	Stat('cache_evict_modified', 'cache: modified pages selected for eviction'),
+	Stat('cache_evict_unmodified', 'cache: unmodified pages selected for eviction'),
+	Stat('cache_overflow_read', 'cache: overflow pages read from the file'),
+	Stat('cache_page_read', 'cache: pages read from a file'),
+	Stat('cache_page_write', 'cache: pages written to a file'),
+	Stat('cache_pages_inuse', 'cache: pages currently held in the cache', 'perm'),
+	Stat('file_open', 'file open'),
+	Stat('memalloc', 'memory allocations'),
+	Stat('memfree', 'memory frees'),
+	Stat('mtx_lock', 'mutex lock calls'),
+	Stat('total_read_io', 'total read I/Os'),
+	Stat('total_write_io', 'total write I/Os'),
+	Stat('workq_passes', 'workQ queue passes'),
+	Stat('workq_yield', 'workQ yields'),
+]
 
 ##########################################
-# Cache handle statistics
+# BTREE statistics
 ##########################################
-cache_stats = {
-	'cache_bytes_inuse' : Stat('cache: bytes currently held in the cache', ['perm']),
-	'cache_bytes_max' : Stat('cache: maximum bytes configured', ['perm']),
-	'cache_evict_hazard' : Stat('cache: pages selected for eviction not evicted because of a hazard reference'),
-	'cache_evict_modified' : Stat('cache: modified pages selected for eviction'),
-	'cache_evict_unmodified' : Stat('cache: unmodified pages selected for eviction'),
-	'cache_overflow_read' : Stat('cache: overflow pages read from the file'),
-	'cache_page_read' : Stat('cache: pages read from a file'),
-	'cache_page_write' : Stat('cache: pages written to a file'),
-	'cache_pages_inuse' : Stat('cache: pages currently held in the cache', ['perm']),
-}
-
-##########################################
-# BTREE handle statistics
-##########################################
-btree_stats = {
-	'alloc' : Stat('file: block allocations'),
-	'extend' : Stat('file: block allocations require file extension'),
-	'free' : Stat('file: block frees'),
-	'items_inserted' : Stat('file: key/value pairs inserted'),
-	'overflow_data' : Stat('file: overflow values inserted'),
-	'overflow_key' : Stat('file: overflow key items inserted'),
-	'overflow_read' : Stat('file: overflow pages read from the file'),
-	'page_delete' : Stat('file: pages deleted'),
-	'page_read' : Stat('file: pages read from a file'),
-	'page_write' : Stat('file: pages written to a file'),
-	'split_intl' : Stat('split internal pages'),
-	'split_leaf' : Stat('split leaf pages'),
-}
-
-##########################################
-# BTREE file statistics
-##########################################
-btree_file_stats = {
-	'file_allocsize' : Stat('page size allocation unit'),
-	'file_col_fix' : Stat('column-store fixed-size leaf pages'),
-	'file_col_internal' : Stat('column-store internal pages'),
-	'file_col_variable' : Stat('column-store variable-size leaf pages'),
-	'file_fixed_len' : Stat('fixed-record size'),
-	'file_freelist_entries' : Stat('number of entries in the freelist'),
-	'file_intlmax' : Stat('maximum internal page size'),
-	'file_intlmin' : Stat('minimum internal page size'),
-	'file_item_col_deleted' : Stat('column-store deleted data items'),
-	'file_item_total_data' : Stat('total data items'),
-	'file_item_total_key' : Stat('total keys'),
-	'file_leafmax' : Stat('maximum leaf page size'),
-	'file_leafmin' : Stat('minimum leaf page size'),
-	'file_magic' : Stat('magic number'),
-	'file_major' : Stat('major version number'),
-	'file_minor' : Stat('minor version number'),
-	'file_overflow' : Stat('overflow pages'),
-	'file_row_internal' : Stat('row-store internal pages'),
-	'file_row_leaf' : Stat('row-store leaf pages'),
-}
-
-##########################################
-# FH handle statistics
-##########################################
-fh_stats = {
-	'fsync' : Stat('fsyncs'),
-	'read_io' : Stat('read I/Os'),
-	'write_io' : Stat('write I/Os'),
-}
+btree_stats = [
+	Stat('alloc', 'file: block allocations'),
+	Stat('extend', 'file: block allocations require file extension'),
+	Stat('file_allocsize', 'page size allocation unit'),
+	Stat('file_col_fix', 'column-store fixed-size leaf pages'),
+	Stat('file_col_internal', 'column-store internal pages'),
+	Stat('file_col_variable', 'column-store variable-size leaf pages'),
+	Stat('file_fixed_len', 'fixed-record size'),
+	Stat('file_freelist_entries', 'number of entries in the freelist'),
+	Stat('file_intlmax', 'maximum internal page size'),
+	Stat('file_intlmin', 'minimum internal page size'),
+	Stat('file_item_col_deleted', 'column-store deleted data items'),
+	Stat('file_item_total_data', 'total data items'),
+	Stat('file_item_total_key', 'total keys'),
+	Stat('file_leafmax', 'maximum leaf page size'),
+	Stat('file_leafmin', 'minimum leaf page size'),
+	Stat('file_magic', 'magic number'),
+	Stat('file_major', 'major version number'),
+	Stat('file_minor', 'minor version number'),
+	Stat('file_overflow', 'overflow pages'),
+	Stat('file_row_internal', 'row-store internal pages'),
+	Stat('file_row_leaf', 'row-store leaf pages'),
+	Stat('free', 'file: block frees'),
+	Stat('items_inserted', 'file: key/value pairs inserted'),
+	Stat('overflow_data', 'file: overflow values inserted'),
+	Stat('overflow_key', 'file: overflow key items inserted'),
+	Stat('overflow_read', 'file: overflow pages read from the file'),
+	Stat('page_delete', 'file: pages deleted'),
+	Stat('page_read', 'file: pages read from a file'),
+	Stat('page_write', 'file: pages written to a file'),
+	Stat('split_intl', 'split internal pages'),
+	Stat('split_leaf', 'split leaf pages'),
+]

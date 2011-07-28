@@ -100,8 +100,6 @@ struct __wt_cache {
 	uint64_t pages_workq;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
-
-	WT_CACHE_STATS *stats;		/* Cache statistics */
 };
 #if defined(__cplusplus)
 }

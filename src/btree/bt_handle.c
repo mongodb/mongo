@@ -181,7 +181,6 @@ __btree_init(WT_SESSION_IMPL *session, const char *name, const char *filename)
 	btree->btree_compare = __wt_bt_lex_compare;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
-	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
 
 	return (0);
 }
@@ -240,7 +239,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_walk_end(session, &btree->evict_walk);
 
 	__wt_free(session, btree->stats);
-	__wt_free(session, btree->fstats);
 
 	__wt_free(session, session->btree);
 

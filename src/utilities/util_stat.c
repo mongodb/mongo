@@ -15,16 +15,14 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
-	int ch, debug, ret;
-	char cursor_config[100], *name;
+	int ch, name_free, ret;
+	const char *cursor_config;
+	char *name;
 
 	name = NULL;
-	debug = 0;
-	while ((ch = getopt(argc, argv, "d")) != EOF)
+	name_free = 0;
+	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
-		case 'd':
-			debug = 1;
-			break;
 		case '?':
 		default:
 			return (usage());
@@ -32,14 +30,26 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the stat name. */
-	if (argc != 1)
+	/*
+	 * If there are no arguments, the statistics cursor operates on the
+	 * connection, otherwise, the optional remaining argument is a file
+	 * name.
+	 */
+	switch (argc) {
+	case 0:
+		name = (char *)"statistics:";
+		cursor_config = "printable";
+		break;
+	case 1:
+		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
+			return (EXIT_FAILURE);
+		name_free = 1;
+		cursor_config = "printable,statistics";
+		break;
+	default:
 		return (usage());
-	if ((name = util_name(*argv, "stat", UTIL_STAT_OK)) == NULL)
-		return (EXIT_FAILURE);
+	}
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump%s",
-	    debug ? ",debug" : "");
 	if ((ret = session->open_cursor(
 	    session, name, NULL, cursor_config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
@@ -53,7 +63,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			break;
 		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1 ||
+		    fwrite("=", 1, 1, stdout) != 1 ||
 		    fwrite(value.data, 1, value.size, stdout) != value.size ||
 		    fwrite("\n", 1, 1, stdout) != 1) {
 			ret = errno;
@@ -72,7 +82,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (name != NULL)
+	if (name_free)
 		free(name);
 
 	return (ret);
@@ -83,7 +93,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "stat [-d] file\n",
+	    "stat [file]\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

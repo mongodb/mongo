@@ -1,10 +1,11 @@
 # Read the source files and output the statistics #defines and allocation code.
 
 import re, string, sys
+from operator import attrgetter
 from dist import compare_srcfile
 from dist import source_paths_list
 
-# Read the source files and build a dictionary of handles and stat counters.
+# Read the source files.
 from stat_class import *
 
 # print_def --
@@ -14,8 +15,13 @@ def print_struct(title, name, list):
 	f.write(' * Statistics entries for ' + title + ' handle.\n')
 	f.write(' */\n')
 	f.write('struct __wt_' + name + '_stats {\n')
-	for l in sorted(list.items()):
-		f.write('\tstruct __wt_stats ' + l[0] + ';\n')
+
+	# Sort the structure fields by their description, so the eventual
+	# disply is sorted by string.
+	for l in sorted(list, key=attrgetter('desc')):
+		f.write('\tWT_STATS ' + l.name + ';\n')
+
+	f.write('\tWT_STATS __end;\n')
 	f.write('};\n\n')
 
 # Update the #defines in the stat.h file.
@@ -32,10 +38,7 @@ for line in open('../src/include/stat.h', 'r'):
 		f.write('\n')
 		skip = 1
 		print_struct('BTREE', 'btree', btree_stats)
-		print_struct('BTREE FILE', 'btree_file', btree_file_stats)
-		print_struct('CACHE', 'cache', cache_stats)
 		print_struct('CONNECTION', 'conn', conn_stats)
-		print_struct('FH', 'file', fh_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
 
@@ -51,8 +54,8 @@ def print_func(name, list):
 	f.write('\tWT_' + name.upper() + '_STATS *stats;\n\n')
 	f.write('\tWT_RET(__wt_calloc_def(session, 1, &stats));\n\n')
 
-	for l in sorted(list.items()):
-		o = '\tstats->' + l[0] + '.desc = "' + l[1].str + '";\n'
+	for l in sorted(list):
+		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
 		f.write(o)
@@ -65,32 +68,20 @@ def print_func(name, list):
 	f.write('__wt_stat_clear_' +
 	    name + '_stats(WT_' + name.upper() + '_STATS *stats)\n')
 	f.write('{\n')
-	for l in sorted(list.items()):
+	for l in sorted(list):
 		# Items marked permanent aren't cleared by the stat clear
 		# methods.
-		if not l[1].config.count('perm'):
-			f.write('\tstats->' + l[0] + '.v = 0;\n');
-	f.write('}\n\n')
-
-	f.write('void\n')
-	f.write('__wt_stat_print_' + name +
-	    '_stats(WT_' + name.upper() + '_STATS *stats, FILE *stream)\n')
-	f.write('{\n')
-	for l in sorted(list.items()):
-		f.write('\t__wt_stat_print(&stats->' +
-		    l[0] + ', stream);\n');
+		if not l.config.count('perm'):
+			f.write('\tstats->' + l.name + '.v = 0;\n');
 	f.write('}\n')
 
-# Write the stat allocation, clear and print routines to the stat.c file.
+# Write the stat allocation and clear routines to the stat.c file.
 f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
 print_func('btree', btree_stats)
-print_func('btree_file', btree_file_stats)
-print_func('cache', cache_stats)
 print_func('conn', conn_stats)
-print_func('file', fh_stats)
 
 f.close()
 

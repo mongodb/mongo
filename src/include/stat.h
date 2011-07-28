@@ -41,81 +41,62 @@ struct __wt_stats {
  * Statistics entries for BTREE handle.
  */
 struct __wt_btree_stats {
-	struct __wt_stats alloc;
-	struct __wt_stats extend;
-	struct __wt_stats free;
-	struct __wt_stats items_inserted;
-	struct __wt_stats overflow_data;
-	struct __wt_stats overflow_key;
-	struct __wt_stats overflow_read;
-	struct __wt_stats page_delete;
-	struct __wt_stats page_read;
-	struct __wt_stats page_write;
-	struct __wt_stats split_intl;
-	struct __wt_stats split_leaf;
-};
-
-/*
- * Statistics entries for BTREE FILE handle.
- */
-struct __wt_btree_file_stats {
-	struct __wt_stats file_allocsize;
-	struct __wt_stats file_col_fix;
-	struct __wt_stats file_col_internal;
-	struct __wt_stats file_col_variable;
-	struct __wt_stats file_fixed_len;
-	struct __wt_stats file_freelist_entries;
-	struct __wt_stats file_intlmax;
-	struct __wt_stats file_intlmin;
-	struct __wt_stats file_item_col_deleted;
-	struct __wt_stats file_item_total_data;
-	struct __wt_stats file_item_total_key;
-	struct __wt_stats file_leafmax;
-	struct __wt_stats file_leafmin;
-	struct __wt_stats file_magic;
-	struct __wt_stats file_major;
-	struct __wt_stats file_minor;
-	struct __wt_stats file_overflow;
-	struct __wt_stats file_row_internal;
-	struct __wt_stats file_row_leaf;
-};
-
-/*
- * Statistics entries for CACHE handle.
- */
-struct __wt_cache_stats {
-	struct __wt_stats cache_bytes_inuse;
-	struct __wt_stats cache_bytes_max;
-	struct __wt_stats cache_evict_hazard;
-	struct __wt_stats cache_evict_modified;
-	struct __wt_stats cache_evict_unmodified;
-	struct __wt_stats cache_overflow_read;
-	struct __wt_stats cache_page_read;
-	struct __wt_stats cache_page_write;
-	struct __wt_stats cache_pages_inuse;
+	WT_STATS file_item_col_deleted;
+	WT_STATS file_col_fix;
+	WT_STATS file_col_internal;
+	WT_STATS file_col_variable;
+	WT_STATS alloc;
+	WT_STATS extend;
+	WT_STATS free;
+	WT_STATS items_inserted;
+	WT_STATS overflow_key;
+	WT_STATS overflow_read;
+	WT_STATS overflow_data;
+	WT_STATS page_delete;
+	WT_STATS page_read;
+	WT_STATS page_write;
+	WT_STATS file_fixed_len;
+	WT_STATS file_magic;
+	WT_STATS file_major;
+	WT_STATS file_intlmax;
+	WT_STATS file_leafmax;
+	WT_STATS file_intlmin;
+	WT_STATS file_leafmin;
+	WT_STATS file_minor;
+	WT_STATS file_freelist_entries;
+	WT_STATS file_overflow;
+	WT_STATS file_allocsize;
+	WT_STATS file_row_internal;
+	WT_STATS file_row_leaf;
+	WT_STATS split_intl;
+	WT_STATS split_leaf;
+	WT_STATS file_item_total_data;
+	WT_STATS file_item_total_key;
+	WT_STATS __end;
 };
 
 /*
  * Statistics entries for CONNECTION handle.
  */
 struct __wt_conn_stats {
-	struct __wt_stats file_open;
-	struct __wt_stats memalloc;
-	struct __wt_stats memfree;
-	struct __wt_stats mtx_lock;
-	struct __wt_stats total_read_io;
-	struct __wt_stats total_write_io;
-	struct __wt_stats workq_passes;
-	struct __wt_stats workq_yield;
-};
-
-/*
- * Statistics entries for FH handle.
- */
-struct __wt_file_stats {
-	struct __wt_stats fsync;
-	struct __wt_stats read_io;
-	struct __wt_stats write_io;
+	WT_STATS cache_bytes_inuse;
+	WT_STATS cache_bytes_max;
+	WT_STATS cache_evict_modified;
+	WT_STATS cache_overflow_read;
+	WT_STATS cache_pages_inuse;
+	WT_STATS cache_page_read;
+	WT_STATS cache_evict_hazard;
+	WT_STATS cache_page_write;
+	WT_STATS cache_evict_unmodified;
+	WT_STATS file_open;
+	WT_STATS memalloc;
+	WT_STATS memfree;
+	WT_STATS mtx_lock;
+	WT_STATS total_read_io;
+	WT_STATS total_write_io;
+	WT_STATS workq_passes;
+	WT_STATS workq_yield;
+	WT_STATS __end;
 };
 
 /* Statistics section: END */

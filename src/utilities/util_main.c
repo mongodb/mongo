@@ -93,30 +93,42 @@ main(int argc, char *argv[])
 	case 'c':
 		if (strcmp(command, "create") == 0)
 			ret = util_create(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	case 'd':
 		if (strcmp(command, "dump") == 0)
 			ret = util_dump(session, argc, argv);
-		if (strcmp(command, "dumpfile") == 0)
+		else if (strcmp(command, "dumpfile") == 0)
 			ret = util_dumpfile(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	case 'l':
 		if (strcmp(command, "load") == 0)
 			ret = util_load(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	case 'p':
 		if (strcmp(command, "printlog") == 0)
 			ret = util_printlog(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
 			ret = util_salvage(session, argc, argv);
-		if (strcmp(command, "stat") == 0)
+		else if (strcmp(command, "stat") == 0)
 			ret = util_stat(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	case 'v':
 		if (strcmp(command, "verify") == 0)
 			ret = util_verify(session, argc, argv);
+		else
+			ret = usage();
 		break;
 	default:
 		ret = usage();
@@ -171,14 +183,6 @@ util_name(const char *s, const char *type, u_int flags)
 		if (!(flags & UTIL_FILE_OK)) {
 			fprintf(stderr,
 			    "%s: %s: \"file\" type not supported\n",
-			    progname, command);
-			return (NULL);
-		}
-		copy = 1;
-	} else if (strncmp(s, "stat:", strlen("stat:")) == 0) {
-		if (!(flags & UTIL_STAT_OK)) {
-			fprintf(stderr,
-			    "%s: %s: \"stat\" type not supported\n",
 			    progname, command);
 			return (NULL);
 		}

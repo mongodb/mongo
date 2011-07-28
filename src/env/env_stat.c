@@ -7,70 +7,66 @@
 
 #include "wt_internal.h"
 
+static void __wt_conn_stat_init(WT_SESSION_IMPL *);
+
 /*
- * __wt_connection_stat_print --
- *	Print WT_CONNECTION_IMPL handle statistics to a stream.
- *
- * XXX this will become a statistics cursor.
+ * __wt_conn_stat_init --
+ *	Initialize the Btree statistics.
  */
-int
-__wt_connection_stat_print(WT_CONNECTION_IMPL *conn, FILE *stream)
+static void
+__wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 
-	session = &conn->default_session;
+	conn = S2C(session);
 
-	fprintf(stream, "Database statistics:\n");
-	__wt_stat_print_conn_stats(conn->stats, stream);
-	fprintf(stream, "%s\n", conn->sep);
-
-	fprintf(stream, "Database cache statistics:\n");
 	__wt_cache_stats_update(conn);
-	__wt_stat_print_cache_stats(conn->cache->stats, stream);
-	fprintf(stream, "%s\n", conn->sep);
-
-	TAILQ_FOREACH(btree, &conn->dbqh, q) {
-		session->btree = btree;
-		WT_RET(__wt_btree_stat_print(session, stream));
-	}
-	return (0);
 }
 
 /*
- * __wt_connection_stat_clear --
- *	Clear WT_CONNECTION_IMPL handle statistics.
+ * __wt_conn_stat_first --
+ *	Initialize a walk of a connection statistics cursor.
  */
 int
-__wt_connection_stat_clear(WT_CONNECTION_IMPL *conn)
+__wt_conn_stat_first(WT_CURSOR_STAT *cst)
 {
-	WT_BTREE *btree;
-	int ret;
-
-	ret = 0;
-
-	TAILQ_FOREACH(btree, &conn->dbqh, q)
-		WT_TRET(__wt_btree_stat_clear(btree));
-
-	__wt_stat_clear_conn_stats(conn->stats);
-	__wt_stat_clear_cache_stats(conn->cache->stats);
-
-	return (ret);
+	cst->stats = NULL;
+	cst->notfound = 0;
+	return (__wt_conn_stat_next(cst));
 }
 
 /*
- * __wt_stat_print --
- *	Print out a statistics table value.
+ * __wt_conn_stat_next --
+ *	Return next entry in a connection statistics cursor.
  */
-void
-__wt_stat_print(WT_STATS *s, FILE *stream)
+int
+__wt_conn_stat_next(WT_CURSOR_STAT *cst)
 {
-	if (s->v >= WT_BILLION)
-		fprintf(stream, "%" PRIu64 "B\t%s (%" PRIu64 " bytes)\n",
-		    s->v / WT_BILLION, s->desc, s->v);
-	else if (s->v >= WT_MILLION)
-		fprintf(stream, "%" PRIu64 "M\t%s (%" PRIu64 " bytes)\n",
-		    s->v / WT_MILLION, s->desc, s->v);
-	else
-		fprintf(stream, "%" PRIu64 "\t%s\n", s->v, s->desc);
+	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	WT_STATS *s;
+
+	cursor = &cst->iface;
+	session = (WT_SESSION_IMPL *)cst->iface.session;
+	conn = S2C(session);
+
+	if (cst->notfound)
+		return (WT_NOTFOUND);
+	if (cst->stats == NULL) {
+		__wt_conn_stat_init(session);
+		cst->stats = (WT_STATS *)conn->stats;
+	}
+	s = cst->stats++;
+
+	if (s->desc == NULL) {
+		cst->notfound = 1;
+		return (WT_NOTFOUND);
+	}
+	WT_RET(__wt_buf_set(session, &cursor->key, s->desc, strlen(s->desc)));
+	F_SET(cursor, WT_CURSTD_KEY_SET);
+	WT_RET(__wt_buf_set(session, &cursor->value, &s->v, sizeof(s->v)));
+	F_SET(cursor, WT_CURSTD_VALUE_SET);
+
+	return (0);
 }

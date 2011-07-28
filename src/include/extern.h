@@ -258,7 +258,8 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
-extern int __wt_page_stat(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg);
+extern int __wt_btree_stat_first(WT_CURSOR_STAT *cst);
+extern int __wt_btree_stat_next(WT_CURSOR_STAT *cst);
 extern int __wt_bt_sync(WT_SESSION_IMPL *session);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *config);
@@ -323,8 +324,6 @@ extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *key,
     uint32_t flags);
-extern int __wt_btree_stat_print(WT_SESSION_IMPL *session, FILE *stream);
-extern int __wt_btree_stat_clear(WT_BTREE *btree);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
@@ -336,9 +335,8 @@ extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
-extern int __wt_connection_stat_print(WT_CONNECTION_IMPL *conn, FILE *stream);
-extern int __wt_connection_stat_clear(WT_CONNECTION_IMPL *conn);
-extern void __wt_stat_print(WT_STATS *s, FILE *stream);
+extern int __wt_conn_stat_first(WT_CURSOR_STAT *cst);
+extern int __wt_conn_stat_next(WT_CURSOR_STAT *cst);
 extern void *__wt_workq_srvr(void *arg);
 extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
@@ -598,24 +596,9 @@ extern void __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,
     WT_BTREE_STATS **statsp);
 extern void __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats);
-extern void __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream);
-extern int __wt_stat_alloc_btree_file_stats(WT_SESSION_IMPL *session,
-    WT_BTREE_FILE_STATS **statsp);
-extern void __wt_stat_clear_btree_file_stats(WT_BTREE_FILE_STATS *stats);
-extern void __wt_stat_print_btree_file_stats(WT_BTREE_FILE_STATS *stats,
-    FILE *stream);
-extern int __wt_stat_alloc_cache_stats(WT_SESSION_IMPL *session,
-    WT_CACHE_STATS **statsp);
-extern void __wt_stat_clear_cache_stats(WT_CACHE_STATS *stats);
-extern void __wt_stat_print_cache_stats(WT_CACHE_STATS *stats, FILE *stream);
 extern int __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session,
     WT_CONN_STATS **statsp);
 extern void __wt_stat_clear_conn_stats(WT_CONN_STATS *stats);
-extern void __wt_stat_print_conn_stats(WT_CONN_STATS *stats, FILE *stream);
-extern int __wt_stat_alloc_file_stats(WT_SESSION_IMPL *session,
-    WT_FILE_STATS **statsp);
-extern void __wt_stat_clear_file_stats(WT_FILE_STATS *stats);
-extern void __wt_stat_print_file_stats(WT_FILE_STATS *stats, FILE *stream);
 
 #ifdef __GNUC__
 #undef	WT_GCC_ATTRIBUTE

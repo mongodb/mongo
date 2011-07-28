@@ -18,7 +18,6 @@
 
 #define	UTIL_FILE_OK	0x01		/* file: prefix OK */
 #define	UTIL_TABLE_OK	0x02		/* table: prefix OK */
-#define	UTIL_STAT_OK	0x04		/* stat: prefix OK */
 
 extern const char *progname;		/* Program name */
 extern const char *usage_prefix;	/* Global arguments */

@@ -465,6 +465,8 @@ struct wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u". The value must be a boolean flag.,\c
 	 * false}
+	 * @config{statistics, configure the cursor for statistics. The value
+	 * must be a boolean flag.,\c false}
 	 * @configend
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors

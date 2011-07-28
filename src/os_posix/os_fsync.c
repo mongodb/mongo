@@ -15,8 +15,6 @@ int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 
-	WT_STAT_INCR(fh->stats, fsync);
-
 	WT_VERBOSE(session, FILEOPS, "fileops: %s: fsync", fh->name);
 
 	if (fsync(fh->fd) == 0)
