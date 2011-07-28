@@ -280,10 +280,11 @@ def runTest(test):
     t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    argv = argv + [ '--eval', 'TestData = new Object();' + 
-                              'TestData.testPath = "' + path + '";' + 
-                              'TestData.testFile = "' + os.path.basename( path ) + '";' +
-                              'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' ]
+    if argv[0].endswith( 'mongo' ) :
+        argv = argv + [ '--eval', 'TestData = new Object();' + 
+                                  'TestData.testPath = "' + path + '";' + 
+                                  'TestData.testFile = "' + os.path.basename( path ) + '";' +
+                                  'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' ]
     print argv
     r = call(argv, cwd=test_path)
     t2 = time.time()
