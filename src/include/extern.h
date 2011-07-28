@@ -555,7 +555,7 @@ extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size);
 extern int __wt_buf_set( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const void *data,
-    uint32_t size);
+    size_t size);
 extern void __wt_buf_steal( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const void *datap,

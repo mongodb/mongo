@@ -89,7 +89,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
  */
 int
 __wt_buf_set(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const void *data, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BUF *buf, const void *data, size_t size)
 {
 	/* Ensure the buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
