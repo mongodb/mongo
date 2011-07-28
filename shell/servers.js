@@ -1299,7 +1299,8 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
             }
         }
         return false;
-    })
+    }, "timed out waiting for replica set client to recognize hosts",
+       3 * 20 * 1000 /* ReplicaSetMonitorWatcher updates every 20s */ )
     
 }
 
