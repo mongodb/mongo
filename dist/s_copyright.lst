@@ -23,5 +23,5 @@ skip	src/include/queue.h
 skip	src/include/serial.i
 skip	src/log/log_desc.c
 skip	src/support/cksum.c
+skip	src/support/rand.c
 skip	src/support/stat.c
-skip	src/support/cksum.c
