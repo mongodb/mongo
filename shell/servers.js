@@ -1286,9 +1286,11 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
     
     print( "Awaiting " + host + " to be " + ( hostOk ? "ok" : " not ok " ) + " for " + conn + " (rs: " + rs + ")" )
     
+    var tests = 0
     assert.soon( function() {
         var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
-        printjson( rsClientHosts )
+        if( tests % 10 == 0 ) printjson( rsClientHosts )
+        tests++
         
         for ( rsName in rsClientHosts ){
             if( rs && rs != rsName ) continue
