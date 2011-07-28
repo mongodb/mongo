@@ -96,7 +96,7 @@ namespace mongo {
     }
 #endif
 
-    void CmdLine::parseConfigFile( ifstream &f, stringstream &ss ) {
+    void CmdLine::parseConfigFile( istream &f, stringstream &ss ) {
         string s;
         char line[MAX_LINE_LENGTH];
 
