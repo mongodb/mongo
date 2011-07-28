@@ -224,7 +224,7 @@ namespace mongo {
         bool wasFound = false;
 
         // This is always true, since checked in port()
-        assert( prev.port() > 0 );
+        assert( prev.port() >= 0 );
         if( prev.host().size() ){
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
