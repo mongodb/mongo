@@ -62,6 +62,7 @@ function doCounts( name , total , onlyItCounts ){
 
 var total = doCounts( "before wrong save" )
 secondary.save( { num : -3 } );
+printjson( secondary.getDB().getLastError() )
 doCounts( "after wrong save" , total , true )
 e = a.find().explain();
 assert.eq( 3 , e.n , "ex1" )
