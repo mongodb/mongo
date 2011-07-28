@@ -56,9 +56,52 @@ __convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 static int
 __convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(buf);
+	uint8_t *dest, *end, *src;
+	int i;
 
+	WT_UNUSED(session);
+
+	if (buf->size == 0)
+		return (0);
+
+	/*
+	 * Overwrite in place: the converted string will always be smaller
+	 * than the printable representation, so dest <= src in this loop.
+	 */
+	dest = src = (uint8_t *)buf->data;
+	end = src + buf->size;
+	while (src < end) {
+		if (*src == '\\') {
+			if (src + 1 < end && *++src == '\\') {
+				*dest++ = '\\';
+				continue;
+			}
+
+			if (src + 2 > end) {
+				__wt_errx(session, "Unexpected end of input "
+				    "in an escaped value");
+				return (EINVAL);
+			}
+
+			*dest = 0;
+			for (i = 0; i < 2; i++) {
+				*dest <<= 4;
+				if ('0' <= *src && *src <= '9')
+					*dest = (*src++ - '0');
+				else if ('a' <= *src && *src <= 'f')
+					*dest = (*src++ - 'a');
+				else {
+					__wt_errx(session,
+					    "Invalid escaped value: "
+					    "expecting a hexadecimal value");
+					return (EINVAL);
+				}
+			}
+		} else
+			*dest++ = *src++;
+	}
+
+	buf->size = (uint32_t)(dest - (uint8_t *)buf->data);
 	return (0);
 }
 
