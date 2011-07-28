@@ -223,7 +223,9 @@ namespace mongo {
 
         bool wasFound = false;
 
-        if ( prev.port() > 0 ) {
+        // This is always true, since checked in port()
+        assert( prev.port() > 0 );
+        if( prev.host().size() ){
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
                 if ( prev != _nodes[i].addr ) 
@@ -238,11 +240,11 @@ namespace mongo {
             }
         }
         
-        if( prev.port() > 0 ){
+        if( prev.host().size() ){
             if( wasFound ){ LOG(1) << "slave '" << prev << "' is no longer ok to use" << endl; }
-            else{ LOG(1) << "slave '" << prev.toString( true ) << "' was not found in the replica set" << endl; }
+            else{ LOG(1) << "slave '" << prev << "' was not found in the replica set" << endl; }
         }
-        else LOG(1) << "slave '" << prev << "' has an invalid port" << endl;
+        else LOG(1) << "slave '" << prev << "' is not initialized or invalid" << endl;
 
         return getSlave();
     }
