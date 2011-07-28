@@ -48,7 +48,7 @@ var admin = p.getDB("admin");
 var foo = p.getDB("foo");
 var local = p.getDB("local");
 
-var config = {_id : basename, members : [{_id : 0, host : hostname+":"+ports[0]}]};
+var config = {_id : basename, members : [{_id : 0, host : hostname+":"+ports[0], priority:2}]};
 printjson(config);
 var result = admin.runCommand({replSetInitiate : config});
 print("result:");
@@ -125,6 +125,10 @@ var startSlave = function(n) {
     }
 
     assert.eq(status.members[n].state, 2);
+
+    assert.soon(function() {
+        return admin.runCommand({isMaster : 1}).ismaster;
+    });
 
     admin.foo.insert({x:1});
     assert.soon(function() {
