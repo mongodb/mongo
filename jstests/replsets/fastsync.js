@@ -98,6 +98,7 @@ var startSlave = function(n) {
     config.members.push({_id:n, host:hostname+":"+ports[n]});
 
     result = admin.runCommand({replSetReconfig : config});
+    printjson(result);
     assert(result.ok, "reconfig worked");
     reconnect(p);
 
