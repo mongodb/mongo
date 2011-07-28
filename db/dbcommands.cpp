@@ -1559,7 +1559,7 @@ namespace mongo {
             return true;
         }
         virtual bool slaveOk() const {
-            return false;
+            return true;
         }
         virtual LockType locktype() const { return WRITE; }
         virtual bool requiresAuth() {
