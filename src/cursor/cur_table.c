@@ -487,17 +487,19 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	const char *tablename, *columns;
 	WT_BUF fmt, plan;
-	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR *cursor;
+	WT_CURSOR_TABLE *ctable;
 	WT_TABLE *table;
 	size_t size;
 	uint32_t bufsz;
 	int ret;
+	const char *tablename, *columns;
 
 	WT_CLEAR(fmt);
 	WT_CLEAR(plan);
+	ctable = NULL;
+
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "table:"))
 		return (EINVAL);
@@ -558,7 +560,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		__wt_free(session, ctable);
+err:		if (ctable != NULL)
+			__wt_free(session, ctable);
 		__wt_buf_free(session, &fmt);
 		__wt_buf_free(session, &plan);
 	}
