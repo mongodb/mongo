@@ -554,6 +554,7 @@ extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern int __wt_ispo2(uint32_t v);
+extern uint32_t __wt_random(void);
 extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size);
 extern int __wt_buf_initsize(WT_SESSION_IMPL *session,
     WT_BUF *buf,
