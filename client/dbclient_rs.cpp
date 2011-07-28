@@ -219,32 +219,54 @@ namespace mongo {
     }
     
     HostAndPort ReplicaSetMonitor::getSlave( const HostAndPort& prev ) {
-        // make sure its valid 
+        // make sure its valid
+
+        bool wasFound = false;
+
         if ( prev.port() > 0 ) {
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
                 if ( prev != _nodes[i].addr ) 
                     continue;
 
+                wasFound = true;
+
                 if ( _nodes[i].ok ) 
                     return prev;
+
                 break;
             }
         }
         
+        if( prev.port() > 0 ){
+            if( wasFound ){ LOG(1) << "slave '" << prev << "' is no longer ok to use" << endl; }
+            else{ LOG(1) << "slave '" << prev.toString( true ) << "' was not found in the replica set" << endl; }
+        }
+        else LOG(1) << "slave '" << prev << "' has an invalid port" << endl;
+
         return getSlave();
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
 
+        LOG(2) << "selecting new slave from replica set " << getServerAddress() << endl;
+
         scoped_lock lk( _lock );
-        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+
+        unsigned i = 0;
+        for ( ; i<_nodes.size(); i++ ) {
             _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-            if ( _nextSlave == _master )
+            if ( _nextSlave == _master ){
+                LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is the current master" << endl;
                 continue;
+            }
             if ( _nodes[ _nextSlave ].ok )
                 return _nodes[ _nextSlave ].addr;
+
+            LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is not ok to use" << endl;
         }
+
+        LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ].addr << endl;
 
         return _nodes[ 0 ].addr;
     }
