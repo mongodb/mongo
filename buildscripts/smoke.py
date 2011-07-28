@@ -280,7 +280,7 @@ def runTest(test):
     t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    if argv[0].endswith( 'mongo' ) :
+    if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
         argv = argv + [ '--eval', 'TestData = new Object();' + 
                                   'TestData.testPath = "' + path + '";' + 
                                   'TestData.testFile = "' + os.path.basename( path ) + '";' +
