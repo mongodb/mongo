@@ -86,7 +86,7 @@ __curfile_prev(WT_CURSOR *cursor)
  *	WT_CURSOR->search_near method for the btree cursor type.
  */
 static int
-__curfile_search_near(WT_CURSOR *cursor, int *lastcmp)
+__curfile_search_near(WT_CURSOR *cursor, int *exact)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
@@ -94,7 +94,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *lastcmp)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
-	ret = __wt_btcur_search_near((WT_CURSOR_BTREE *)cursor, lastcmp);
+	ret = __wt_btcur_search_near(cbt, exact);
 	API_END(session);
 
 	return (ret);

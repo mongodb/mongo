@@ -167,18 +167,12 @@ __curstat_next(WT_CURSOR *cursor)
  *	WT_CURSOR->search_near method for the statistics cursor type.
  */
 static int
-__curstat_search_near(WT_CURSOR *cursor, int *lastcmp)
+__curstat_search_near(WT_CURSOR *cursor, int *exact)
 {
-	WT_SESSION_IMPL *session;
-	int ret;
+	WT_UNUSED(cursor);
+	WT_UNUSED(exact);
 
-	WT_UNUSED(lastcmp);
-
-	CURSOR_API_CALL(cursor, session, search_near, NULL);
-	ret = ENOTSUP;
-	API_END(session);
-
-	return (ret);
+	return (ENOTSUP);
 }
 
 /*

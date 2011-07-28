@@ -57,6 +57,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
+	ret = cursor->search(cursor);
+
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			break;

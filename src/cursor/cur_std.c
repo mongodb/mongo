@@ -170,10 +170,10 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 static int
 __cursor_search(WT_CURSOR *cursor)
 {
-	int lastcmp;
+	int exact;
 
-	WT_RET(cursor->search_near(cursor, &lastcmp));
-	return ((lastcmp != 0) ? WT_NOTFOUND : 0);
+	WT_RET(cursor->search_near(cursor, &exact));
+	return ((exact == 0) ? 0 : WT_NOTFOUND);
 }
 
 /*
