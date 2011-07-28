@@ -343,6 +343,8 @@ processInfoFiles = [ "util/processinfo.cpp" ]
 
 if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
     processInfoFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+elif os.sys.platform == "linux3":
+    processInfoFiles += [ "util/processinfo_linux2.cpp" ]
 else:
     processInfoFiles += [ "util/processinfo_none.cpp" ]
 
@@ -474,7 +476,7 @@ if "darwin" == os.sys.platform:
         env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
         env.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
-elif "linux2" == os.sys.platform:
+elif "linux2" == os.sys.platform or "linux3" == os.sys.platform:
     linux = True
     platform = "linux"
 
