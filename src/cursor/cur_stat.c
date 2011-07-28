@@ -266,7 +266,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * There are only two modes, printable or raw -- if it's not set, we
-	 * defalt to raw.
+	 * default to raw.
 	 */
 	if (printable)
 		F_SET(cursor, WT_CURSTD_PRINT);
