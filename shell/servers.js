@@ -1273,6 +1273,36 @@ ReplSetTest.prototype.callIsMaster = function() {
   return master || false;
 }
 
+ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
+    
+    if( host.length ){
+        for( var i = 0; i < host.length; i++ ) this.awaitOk( conn, host[i] )
+        return
+    }
+    
+    if( hostOk == undefined ) hostOk = true
+    if( host.host ) host = host.host
+    if( rs && rs.getMaster ) rs = rs.name
+    
+    print( "Awaiting " + host + " to be " + ( hostOk ? "ok" : " not ok " ) + " for " + conn + " (rs: " + rs + ")" )
+    
+    assert.soon( function() {
+        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
+        printjson( rsClientHosts )
+        
+        for ( rsName in rsClientHosts ){
+            if( rs && rs != rsName ) continue
+            for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
+                var clientHost = rsClientHosts[rsName].hosts[ i ];
+                if( clientHost.addr != host ) continue
+                if( clientHost.ok == hostOk ) return true
+            }
+        }
+        return false;
+    })
+    
+}
+
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   var master = this.getMaster();
   var slaves = this.liveNodes.slaves;
@@ -1309,6 +1339,10 @@ ReplSetTest.prototype.getSecondaries = function( timeout ){
         }
     }
     return secs
+}
+
+ReplSetTest.prototype.getSecondary = function( timeout ){
+    return this.getSecondaries( timeout )[0];
 }
 
 ReplSetTest.prototype.status = function( timeout ){

@@ -29,9 +29,15 @@ st.printShardingStatus()
 // Wait for client to update itself and replication to finish
 rst.awaitReplication()
 
+var primary = rst.getPrimary()
+var sec = rst.getSecondary()
+
 // Data now inserted... stop the master, since only two in set, other will still be secondary
 rst.stop( rst.getMaster(), undefined, true )
 printjson( rst.status() )
+
+// Wait for the mongos to recognize the slave
+ReplSetTest.awaitRSClientHosts( conn, sec, true )
 
 // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when
 // master is down
