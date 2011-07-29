@@ -142,7 +142,11 @@ methods = {
 
 'table.meta' : Method(table_meta),
 
-'cursor.close' : Method([]),
+'cursor.close' : Method([
+	Config('clear', 'false', r'''
+		for statistics cursors, reset statistics counters.''',
+		type='boolean'),
+]),
 
 'session.close' : Method([]),
 

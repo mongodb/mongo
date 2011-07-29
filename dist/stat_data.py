@@ -11,6 +11,9 @@ class Stat:
 		self.desc = desc
 		self.config = config or []
 
+	def __cmp__(self, other):
+		return cmp(self.name, other.name)
+
 ##########################################
 # CONNECTION statistics
 ##########################################

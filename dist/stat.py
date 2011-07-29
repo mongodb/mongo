@@ -6,7 +6,7 @@ from dist import compare_srcfile
 from dist import source_paths_list
 
 # Read the source files.
-from stat_class import *
+from stat_data import btree_stats, conn_stats
 
 # print_def --
 #	Print the structures for the stat.h file.
@@ -45,30 +45,37 @@ compare_srcfile(tmp_file, '../src/include/stat.h')
 # print_func --
 #	Print the functions for the stat.c file.
 def print_func(name, list):
-	f.write('\n')
-	f.write('int\n')
-	f.write('__wt_stat_alloc_' + name +
-	    '_stats(WT_SESSION_IMPL *session, WT_' +
-	    name.upper() + '_STATS **statsp)\n')
-	f.write('{\n')
-	f.write('\tWT_' + name.upper() + '_STATS *stats;\n\n')
-	f.write('\tWT_RET(__wt_calloc_def(session, 1, &stats));\n\n')
+	f.write('''
+int
+__wt_stat_alloc_''' + name + '''_stats(WT_SESSION_IMPL *session, WT_''' +
+	    name.upper() + '''_STATS **statsp)
+{
+\tWT_''' + name.upper() + '''_STATS *stats;
 
-	for l in sorted(list, key=attrgetter('name')):
+\tWT_RET(__wt_calloc_def(session, 1, &stats));
+
+''')
+
+	for l in sorted(list):
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
 		f.write(o)
-	f.write('\n')
-	f.write('\t*statsp = stats;\n')
-	f.write('\treturn (0);\n')
-	f.write('}\n\n')
+	f.write('''
+\t*statsp = stats;
+\treturn (0);
+}
+''')
 
-	f.write('void\n')
-	f.write('__wt_stat_clear_' +
-	    name + '_stats(WT_' + name.upper() + '_STATS *stats)\n')
-	f.write('{\n')
-	for l in sorted(list, key=attrgetter('name')):
+	f.write('''
+void
+__wt_stat_clear_''' + name + '''_stats(WT_STATS *stats_arg)
+{
+\tWT_''' + name.upper() + '''_STATS *stats;
+
+\tstats = (WT_''' + name.upper() + '''_STATS *)stats_arg;
+''')
+	for l in sorted(list):
 		# Items marked permanent aren't cleared by the stat clear
 		# methods.
 		if not l.config.count('perm'):

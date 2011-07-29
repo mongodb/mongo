@@ -588,10 +588,10 @@ extern void __wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
 extern void __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,
     WT_BTREE_STATS **statsp);
-extern void __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats);
+extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session,
     WT_CONN_STATS **statsp);
-extern void __wt_stat_clear_conn_stats(WT_CONN_STATS *stats);
+extern void __wt_stat_clear_conn_stats(WT_STATS *stats_arg);
 
 #ifdef __GNUC__
 #undef	WT_GCC_ATTRIBUTE

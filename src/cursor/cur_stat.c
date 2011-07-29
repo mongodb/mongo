@@ -185,14 +185,18 @@ __curstat_search_near(WT_CURSOR *cursor, int *exact)
 static int
 __curstat_close(WT_CURSOR *cursor, const char *config)
 {
+	WT_CONFIG_ITEM cval;
+	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
 	int ret;
 
 	ret = 0;
 
+	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	WT_UNUSED(cfg);
-
+	WT_TRET(__wt_config_gets(session, cfg, "clear", &cval));
+	if (ret == 0 && cval.val != 0 && cst->clear_func)
+		cst->clear_func(cst->stats_first);
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END(session);
 
@@ -236,8 +240,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_STATS *stats_first;
-	int printable, raw, ret;
+	void (*clear_func)(WT_STATS *);
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
+	int printable, raw, ret;
 
 	cst = NULL;
 	ret = 0;
@@ -248,9 +253,11 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_session_get_btree(session, uri));
 		WT_RET(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
+		clear_func = __wt_stat_clear_btree_stats;
 	} else {
 		__wt_conn_stat_init(session);
 		stats_first = (WT_STATS *)S2C(session)->stats;
+		clear_func = __wt_stat_clear_conn_stats;
 	}
 
 	WT_ERR(__wt_config_gets(session, cfg, "printable", &cval));
@@ -260,6 +267,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_calloc_def(session, 1, &cst));
 	cst->stats_first = stats_first;
+	cst->clear_func = clear_func;
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;

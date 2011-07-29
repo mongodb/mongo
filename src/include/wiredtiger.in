@@ -339,7 +339,10 @@ struct wt_cursor {
 	 * @skipline cursor->close
 	 *
 	 * @param cursor the cursor handle
-	 * @configempty{cursor.close, see dist/api_data.py}
+	 * @configstart{cursor.close, see dist/api_data.py}
+	 * @config{clear, for statistics cursors\, reset statistics counters..
+	 * The value must be a boolean flag.,\c false}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_CURSOR *cursor, const char *config);

@@ -52,8 +52,11 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 }
 
 void
-__wt_stat_clear_btree_stats(WT_BTREE_STATS *stats)
+__wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 {
+	WT_BTREE_STATS *stats;
+
+	stats = (WT_BTREE_STATS *)stats_arg;
 	stats->alloc.v = 0;
 	stats->extend.v = 0;
 	stats->file_allocsize.v = 0;
@@ -125,8 +128,11 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 }
 
 void
-__wt_stat_clear_conn_stats(WT_CONN_STATS *stats)
+__wt_stat_clear_conn_stats(WT_STATS *stats_arg)
 {
+	WT_CONN_STATS *stats;
+
+	stats = (WT_CONN_STATS *)stats_arg;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_unmodified.v = 0;

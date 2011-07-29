@@ -69,11 +69,11 @@ __wt_confchk_connection_open_session =
 
 const char *
 __wt_confdfl_cursor_close =
-    "";
+    "clear=false";
 
 const char *
 __wt_confchk_cursor_close =
-    "";
+    "clear=(type=boolean)";
 
 const char *
 __wt_confdfl_file_meta =

@@ -85,6 +85,8 @@ struct __wt_cursor_stat {
 	const char *stat_name;			/* Current stat name. */
 	uint64_t stat_value;			/* Current stat value. */
 	const char *stat_desc;			/* Current stat description. */
+
+	void (*clear_func)(WT_STATS *);		/* Function to clear stats. */
 };
 
 struct __wt_cursor_table {
