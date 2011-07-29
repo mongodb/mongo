@@ -38,8 +38,10 @@ function run( createInBackground ) {
     }
 
     
-    assert.neq( tojson(am[collName].find().map(mymap)) , 
-                tojson(as[collName].find().map(mymap)) , "order is not supposed to be same on master and slave but it is" );
+    if ( am.serverStatus().mem.bits == 64 ) {
+        assert.neq( tojson(am[collName].find().map(mymap)) , 
+                    tojson(as[collName].find().map(mymap)) , "order is not supposed to be same on master and slave but it is" );
+    }
     
     
     am[collName].ensureIndex( { x : 1 } , { unique : true , dropDups : true , background : createInBackground  } );
