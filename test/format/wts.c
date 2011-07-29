@@ -70,19 +70,10 @@ wts_startup(void)
 	char config[512], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB%s%s",
 	    g.progname, g.c_cache,
-	    ""
-	    // "evictserver,"
-	    // "fileops,"
-	    // "hazard,"
-	    // "mutex,"
-	    // "read,"
-	    // "readserver,"
-	    // "reconcile,"
-	    // "salvage,"
-	    // "write"
-	);
+	    g.config_open == NULL ? "" : ",",
+	    g.config_open == NULL ? "" : g.config_open);
 
 	ret = wiredtiger_open(NULL, &event_handler, config, &conn);
 	if (ret != 0) {
@@ -265,12 +256,9 @@ wts_salvage(void)
 	track("salvage", 0ULL);
 
 	/* Save a copy of the file before we salvage it. */
-	(void)system("cp __" WT_PREFIX " __wt.salvage");
+	(void)system("cp __" WT_PREFIX " __wt.salvage.copy");
 
-	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,verbose=[%s]",
-	    g.progname, g.c_cache,
-	    g.verbose ? "salvage" : "");
+	snprintf(config, sizeof(config), "error_prefix=\"%s\"", g.progname);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",

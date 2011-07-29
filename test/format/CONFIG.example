@@ -1,0 +1,60 @@
+#bitcnt
+#	number of bits for fixed-length column-store files
+
+#cache
+#	size of the cache in MB
+
+#delete_pct
+#	percent operations that are deletes
+
+#file_type
+#	type of file to create (fix | var | row)
+
+#huffman_key
+#	if keys are huffman encoded
+
+#huffman_value
+#	if values are huffman encoded
+
+#insert_pct
+#	percent operations that are inserts
+
+#intl_node_max
+#	maximum size of Btree internal nodes
+
+#intl_node_min
+#	minimum size of Btree internal nodes
+
+#key_max
+#	maximum size of keys
+
+#key_min
+#	minimum size of keys
+
+#leaf_node_max
+#	maximum size of Btree leaf nodes
+
+#leaf_node_min
+#	minimum size of Btree leaf nodes
+
+#ops
+#	the number of modification operations done per run
+
+#repeat_data_pct
+#	percent duplicate values in variable-length column-store files
+
+#rows
+#	the number of rows to create
+
+#runs
+#	the number of runs
+
+#value_max
+#	maximum size of values
+
+#value_min
+#	minimum size of values
+
+#write_pct
+#	percent operations that are writes
+

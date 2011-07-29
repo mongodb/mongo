@@ -84,17 +84,28 @@ config_setup(void)
 }
 
 /*
- * config_names --
- *	Display configuration names.
+ * config_error --
+ *	Display configuration information on error.
  */
 void
-config_names(void)
+config_error(void)
 {
 	CONFIG *cp;
+	FILE *fp;
 
 	/* Display configuration names. */
+	fprintf(stderr, "Configuration names:\n");
 	for (cp = c; cp->name != NULL; ++cp)
-		printf("%s\n", cp->name);
+		fprintf(stderr, "%16s : %s\n", cp->name, cp->desc);
+
+	fprintf(stderr, "\n");
+	if ((fp = fopen("CONFIG.example", "w")) != NULL) {
+		fprintf(stderr, "Re-creating CONFIG.example file... ");
+		for (cp = c; cp->name != NULL; ++cp)
+			fprintf(fp, "#%s\n#\t%s\n\n", cp->name, cp->desc);
+		(void)fclose(fp);
+		fprintf(stderr, "done\n");
+	}
 }
 
 /*

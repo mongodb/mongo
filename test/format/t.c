@@ -37,7 +37,7 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:clqrv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:lqrx:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -45,9 +45,6 @@ main(int argc, char *argv[])
 		case 'C':			/* Configuration from a file */
 			config_file(optarg);
 			break;
-		case 'c':			/* Display config strings */
-			config_names();
-			return (EXIT_SUCCESS);
 		case 'l':
 			g.logging = 1;
 			break;
@@ -58,8 +55,8 @@ main(int argc, char *argv[])
 		case 'q':			/* Quiet */
 			g.track = 0;
 			break;
-		case 'v':			/* Verbose */
-			g.verbose = 1;
+		case 'x':
+			g.config_open = optarg;
 			break;
 		default:
 			usage();
@@ -184,8 +181,20 @@ restart(void)
 static void
 usage(void)
 {
-	(void)fprintf(stderr,
-	    "usage: %s [-1clqrv] [-C config] [name=value ...]\n",
+	fprintf(stderr,
+	    "usage: %s [-1lqr] [-C wiredtiger-config] [-c config-file] "
+	    "[name=value ...]\n",
 	    g.progname);
+	fprintf(stderr, "%s",
+	    "\t-1 run once\n"
+	    "\t-C specify wiredtiger_open configuration arguments\n"
+	    "\t-c read test program configuration from a file\n"
+	    "\t-l log operations\n"
+	    "\t-q run quietly\n"
+	    "\t-r replay the last run\n");
+
+	fprintf(stderr, "\n");
+
+	config_error();
 	exit(EXIT_FAILURE);
 }

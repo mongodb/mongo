@@ -33,7 +33,6 @@
 #define	ROW		2
 #define	VAR		3
 
-#define	BDB_PREFIX	"bdb"
 #define	WT_PREFIX	"wt"
 #define	WT_TABLENAME	"file:__wt"
 
@@ -50,18 +49,18 @@ typedef struct {
 
 	uint32_t run_cnt;			/* Run counter */
 
-	int logging;				/* Are we logging everything? */
+	int   logging;				/* Are we logging everything? */
 	FILE *logfp;				/* Log file. */
+
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
-	int verbose;				/* Verbosity */
+
+	char *config_open;			/* Command-line configuration */
 
 	char *key_gen_buf;
 
-	uint32_t c_bitcnt;
-	uint32_t c_cache;			/* Config values */
-	uint32_t c_data_max;
-	uint32_t c_data_min;
+	uint32_t c_bitcnt;			/* Config values */
+	uint32_t c_cache;
 	uint32_t c_delete_pct;
 	uint32_t c_file_type;
 	uint32_t c_huffman_key;
@@ -77,6 +76,8 @@ typedef struct {
 	uint32_t c_repeat_data_pct;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_value_max;
+	uint32_t c_value_min;
 	uint32_t c_write_pct;
 
 	uint32_t key_cnt;			/* Keys loaded so far */
@@ -92,8 +93,8 @@ void	 bdb_startup(void);
 void	 bdb_teardown(void);
 const char *
 	 config_dtype(void);
+void	 config_error(void);
 void	 config_file(const char *);
-void	 config_names(void);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(char *, int);

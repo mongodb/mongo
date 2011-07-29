@@ -82,12 +82,12 @@ value_gen(void *valuep, uint32_t *sizep)
 	 * into the buffer by a few extra bytes, used to generate different
 	 * data for column-store run-length encoded files.
 	 */
-	if (blen < g.c_data_max + 10) {
+	if (blen < g.c_value_max + 10) {
 		if (buf != NULL) {
 			free(buf);
 			buf = NULL;
 		}
-		blen = g.c_data_max + 10;
+		blen = g.c_value_max + 10;
 		if ((buf = malloc(blen)) == NULL) {
 			fprintf(stderr,
 			    "%s: %s\n", g.progname, strerror(errno));
@@ -147,7 +147,7 @@ value_gen(void *valuep, uint32_t *sizep)
 	snprintf((char *)buf, blen, "%010u", r);
 	buf[10] = '/';
 	*(void **)valuep = buf;
-	*sizep = MMRAND(g.c_data_min, g.c_data_max);
+	*sizep = MMRAND(g.c_value_min, g.c_value_max);
 }
 
 void
