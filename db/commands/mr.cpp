@@ -879,8 +879,6 @@ namespace mongo {
             }
         }
 
-//        boost::thread_specific_ptr<State*> _tl;
-
         /**
          * emit that will be called by js function
          */
@@ -967,12 +965,6 @@ namespace mongo {
                 try {
                     state.init();
                     state.prepTempCollection();
-
-                    {
-                        State** s = new State*();
-                        s[0] = &state;
-//                        _tl.reset( s );
-                    }
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
                     ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
@@ -1065,8 +1057,6 @@ namespace mongo {
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
-
-//                    _tl.reset();
                 }
                 catch ( ... ) {
                     log() << "mr failed, removing collection" << endl;
