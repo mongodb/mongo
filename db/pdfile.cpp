@@ -1322,7 +1322,6 @@ namespace mongo {
                         throw;
 
                     if ( dropDups ) {
-                        log() << "eliot was here" << endl;
                         DiskLoc toDelete = cc->currLoc();
                         bool ok = cc->advance();
                         cc->updateLocation();
