@@ -63,6 +63,10 @@ namespace mongo {
                 return false;
             }
 
+            if (!checkAuth(errmsg, result)) {
+                return false;
+            }
+
             /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
             {
                 AbstractMessagingPort *mp = cc().port();

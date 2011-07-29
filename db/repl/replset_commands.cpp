@@ -47,12 +47,16 @@ namespace mongo {
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+
+            if (!checkAuth(errmsg, result)) {
+                return false;
+            }
+
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
                 return true;
             }
 
-            // may not need this, but if removed check all tests still work:
             if( !check(errmsg, result) )
                 return false;
 
@@ -76,7 +80,7 @@ namespace mongo {
             help << "internal";
         }
         CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {
-            // this is ok but micros or combo with some rand() and/or 64 bits might be better -- 
+            // this is ok but micros or combo with some rand() and/or 64 bits might be better --
             // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
             rbid = (int) curTimeMillis64();
         }
@@ -139,6 +143,10 @@ namespace mongo {
         }
     private:
         bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if ( !checkAuth(errmsg, result) ) {
+                return false;
+            }
+
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -252,19 +260,19 @@ namespace mongo {
                 long long int diff = lastOp - closest;
                 result.append("closest", closest);
                 result.append("difference", diff);
-                
+
                 if (diff < 0) {
                     // not our problem, but we'll wait until thing settle down
                     errmsg = "someone is ahead of the primary?";
                     return false;
                 }
-                                
+
                 if (diff > 10) {
                     errmsg = "no secondaries within 10 seconds of my optime";
                     return false;
                 }
             }
-            
+
             int secs = (int) cmdObj.firstElement().numberInt();
             if( secs == 0 )
                 secs = 60;

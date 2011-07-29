@@ -562,11 +562,29 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help << "internal"; }
+
+        /**
+         * Some replica set commands call this and then call check(). This is
+         * intentional, as they might do things before theReplSet is initialized
+         * that still need to be checked for auth.
+         */
+        bool checkAuth(string& errmsg, BSONObjBuilder& result) {
+            if( !noauth && adminOnly() ) {
+                AuthenticationInfo *ai = cc().getAuthenticationInfo();
+                if (!ai->isAuthorizedForLock("admin", locktype())) {
+                    errmsg = "replSet command unauthorized";
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) {
                 errmsg = "not running with --replSet";
                 return false;
             }
+
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 string s;
@@ -575,7 +593,8 @@ namespace mongo {
                     result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;
             }
-            return true;
+
+            return checkAuth(errmsg, result);
         }
     };
 
