@@ -251,11 +251,16 @@ initn
 initsize
 inmem
 intl
+intlmax
+intlmin
 intpack
 ints
 inuse
+io
 ispo
 keyname
+leafmax
+leafmin
 len
 lex
 llll
@@ -269,8 +274,10 @@ majorp
 malloc
 mb
 mem
+memalloc
 membar
 memcpy
+memfree
 metadata
 mfence
 minorp
@@ -304,6 +311,7 @@ printf
 pthread
 pv
 py
+qSS
 qdown
 qsort
 qup

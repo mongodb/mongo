@@ -342,6 +342,8 @@ wts_stats(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	FILE *fp;
+	const char *name, *pval, *desc;
+	uint64_t v;
 	int ret;
 
 	session = g.wts_session;
@@ -360,9 +362,9 @@ wts_stats(void)
 	}
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
-		    (ret = cursor->get_value(cursor, &val, &desc)) != 0)
+		    (ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
 			break;
-		if (fprintf(fp, "%s=%s\n", name, desc) < 0) {
+		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}
@@ -381,9 +383,9 @@ wts_stats(void)
 	}
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
-		    (ret = cursor->get_value(cursor, &val, &desc)) != 0)
+		    (ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
 			break;
-		if (fprintf(fp, "%s=%s\n", name, desc) < 0) {
+		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}

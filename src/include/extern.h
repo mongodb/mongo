@@ -439,16 +439,27 @@ extern int __wt_struct_check(WT_SESSION_IMPL *session,
 extern size_t __wt_struct_sizev(WT_SESSION_IMPL *session,
     const char *fmt,
     va_list ap);
+extern size_t __wt_struct_size(WT_SESSION_IMPL *session, const char *fmt, ...);
 extern int __wt_struct_packv(WT_SESSION_IMPL *session,
     void *buffer,
     size_t size,
     const char *fmt,
     va_list ap);
+extern int __wt_struct_pack(WT_SESSION_IMPL *session,
+    void *buffer,
+    size_t size,
+    const char *fmt,
+    ...);
 extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
     const void *buffer,
     size_t size,
     const char *fmt,
     va_list ap);
+extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
+    const void *buffer,
+    size_t size,
+    const char *fmt,
+    ...);
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     WT_TABLE *table,

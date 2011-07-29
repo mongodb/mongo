@@ -14,8 +14,8 @@ int
 util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	uint64_t val;
-	const char *name, *desc;
+	uint64_t v;
+	const char *name, *pval, *desc;
 	char *objname, *uri;
 	size_t urilen;
 	int ch, objname_free, ret;
@@ -65,9 +65,9 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
-		    (ret = cursor->get_value(cursor, &val, &desc)) != 0)
+		    (ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
 			break;
-		if (printf("%s=%s\n", name, desc) < 0) {
+		if (printf("%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}

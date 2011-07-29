@@ -65,8 +65,10 @@ eof
 erlang
 failchk
 fd's
+fieldname
 fileformats
 fileid
+filename
 filesystem
 fillfactor
 firstname
@@ -143,6 +145,7 @@ posix
 pre
 primary's
 printlog
+printvalue
 qnx
 rdbms
 readonly

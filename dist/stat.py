@@ -57,6 +57,7 @@ __wt_stat_alloc_''' + name + '''_stats(WT_SESSION_IMPL *session, WT_''' +
 ''')
 
 	for l in sorted(list):
+		f.write('\tstats->' + l.name + '.name = "' + l.name + '";\n')
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
