@@ -7,18 +7,17 @@
 
 #include "wt_internal.h"
 
-static int  __stat_init(WT_SESSION_IMPL *);
-static int  __stat_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
-static void __stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
+static int __stat_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
+static int __stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static int __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
 
 /*
- * __stat_init --
+ * __wt_btree_stat_init --
  *	Initialize the Btree statistics.
  */
-static int
-__stat_init(WT_SESSION_IMPL *session)
+int
+__wt_btree_stat_init(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 
@@ -36,54 +35,6 @@ __stat_init(WT_SESSION_IMPL *session)
 	WT_BSTAT_SET(session, file_minor, WT_BTREE_MINOR_VERSION);
 
 	WT_RET(__wt_tree_walk(session, NULL, __stat_page, NULL));
-
-	return (0);
-}
-
-/*
- * __wt_btree_stat_first --
- *	Initialize a walk of a Btree statistics cursor.
- */
-int
-__wt_btree_stat_first(WT_CURSOR_STAT *cst)
-{
-	cst->stats = NULL;
-	cst->notfound = 0;
-	return (__wt_btree_stat_next(cst));
-}
-
-/*
- * __wt_btree_stat_next --
- *	Return next entry in a Btree statistics cursor.
- */
-int
-__wt_btree_stat_next(WT_CURSOR_STAT *cst)
-{
-	WT_BTREE *btree;
-	WT_CURSOR *cursor;
-	WT_SESSION_IMPL *session;
-	WT_STATS *s;
-
-	session = (WT_SESSION_IMPL *)cst->iface.session;
-	btree = session->btree;
-	cursor = &cst->iface;
-
-	if (cst->notfound)
-		return (WT_NOTFOUND);
-	if (cst->stats == NULL) {
-		WT_RET(__stat_init(session));
-		cst->stats = (WT_STATS *)btree->stats;
-	}
-	s = cst->stats++;
-
-	if (s->desc == NULL) {
-		cst->notfound = 1;
-		return (WT_NOTFOUND);
-	}
-	WT_RET(__wt_buf_set(session, &cursor->key, s->desc, strlen(s->desc)));
-	F_SET(cursor, WT_CURSTD_KEY_SET);
-	WT_RET(__wt_buf_set(session, &cursor->value, &s->v, sizeof(s->v)));
-	F_SET(cursor, WT_CURSTD_VALUE_SET);
 
 	return (0);
 }
@@ -130,10 +81,11 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
  * __stat_page_col_fix --
  *	Stat a WT_PAGE_COL_FIX page.
  */
-static void
+static int
 __stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BSTAT_INCRV(session, file_item_total_value, page->entries);
+	return (0);
 }
 
 /*

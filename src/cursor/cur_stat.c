@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __curstat_next(WT_CURSOR *cursor);
+
 /*
  * __cursor_notsup --
  *	WT_CURSOR->XXX methods for unsupported statistics cursor actions.
@@ -25,23 +27,19 @@ __cursor_notsup(WT_CURSOR *cursor)
 static int
 __curstat_print_value(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
-	WT_BUF *tmp;
 	uint64_t v;
 
-	WT_RET(__wt_scr_alloc(session, 64, &tmp));
-
 	v = *(uint64_t *)buf->data;
-	if (v >= WT_BILLION)
-		tmp->size = snprintf(tmp->mem, tmp->mem_size,
-		    "%" PRIu64 "B (%" PRIu64 ")", v / WT_BILLION, v);
-	else if (v >= WT_MILLION)
-		tmp->size = snprintf(tmp->mem, tmp->mem_size,
-		    "%" PRIu64 "M (%" PRIu64 ")", v / WT_MILLION, v);
-	else
-		tmp->size = snprintf(tmp->mem, tmp->mem_size, "%" PRIu64, v);
 
-	__wt_buf_swap(buf, tmp);
-	__wt_scr_release(&tmp);
+	WT_RET(__wt_buf_init(session, buf, 64));
+	if (v >= WT_BILLION)
+		WT_RET(__wt_buf_sprintf(session, buf,
+		    "%" PRIu64 "B (%" PRIu64 ")", v / WT_BILLION, v));
+	else if (v >= WT_MILLION)
+		WT_RET(__wt_buf_sprintf(session, buf,
+		    "%" PRIu64 "M (%" PRIu64 ")", v / WT_MILLION, v));
+	else
+		WT_RET(__wt_buf_sprintf(session, buf, "%" PRIu64, v));
 
 	return (0);
 }
@@ -134,9 +132,9 @@ __curstat_first(WT_CURSOR *cursor)
 	int ret;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, first, cst->btree);
-	ret = cst->btree == NULL ?
-	    __wt_conn_stat_first(cst) : __wt_btree_stat_first(cst);
+	CURSOR_API_CALL(cursor, session, first, NULL);
+	cst->stats = NULL;
+	ret = __curstat_next(cursor);
 	API_END(session);
 
 	return (ret);
@@ -151,21 +149,27 @@ __curstat_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
+	WT_STATS *s;
 	int ret;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, next, cst->btree);
-	ret = cst->btree == NULL ?
-	    __wt_conn_stat_next(cst) : __wt_btree_stat_next(cst);
+	CURSOR_API_CALL(cursor, session, next, NULL);
+	if (cst->stats == NULL)
+		cst->stats = cst->stats_first;
+	if ((s = cst->stats) == NULL || s->desc == NULL)
+		ret = WT_NOTFOUND;
+	else {
+		ret = 0;
+		WT_TRET(__wt_buf_set(session, &cursor->key, s->desc, strlen(s->desc)));
+		F_SET(cursor, WT_CURSTD_KEY_SET);
+		WT_TRET(__wt_buf_set(session, &cursor->value, &s->v, sizeof(s->v)));
+		F_SET(cursor, WT_CURSTD_VALUE_SET);
+	}
 	API_END(session);
 
 	return (ret);
 }
 
-/*
- * __curstat_search_near --
- *	WT_CURSOR->search_near method for the statistics cursor type.
- */
 static int
 __curstat_search_near(WT_CURSOR *cursor, int *exact)
 {
@@ -232,21 +236,23 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_STAT *cst;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
+	WT_STATS *stats_first;
 	int printable, raw, ret;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
 	cst = NULL;
 	ret = 0;
 
-	/*
-	 * This code is called in two ways: (1) as a general statistics cursor,
-	 * and (2) as a statistics cursor on a file.  We can tell which we are
-	 * doing by looking at the WT_SESSION_IMPL's btree reference, it's not
-	 * set in the general case.
-	 */
-	if (session->btree == NULL)
-		if (!WT_PREFIX_SKIP(uri, "statistics:"))
-			return (EINVAL);
+	if (!WT_PREFIX_SKIP(uri, "statistics:"))
+		return (EINVAL);
+	if (WT_PREFIX_SKIP(uri, "file:")) {
+		WT_ERR(__wt_session_get_btree(session, uri));
+		WT_RET(__wt_btree_stat_init(session));
+		stats_first = (WT_STATS *)session->btree->stats;
+	} else {
+		__wt_conn_stat_init(session);
+		stats_first = (WT_STATS *)S2C(session)->stats;
+	}
 
 	WT_ERR(__wt_config_gets(session, cfg, "printable", &cval));
 	printable = (cval.val != 0);
@@ -254,6 +260,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	raw = (cval.val != 0);
 
 	WT_RET(__wt_calloc_def(session, 1, &cst));
+	cst->stats_first = stats_first;
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
@@ -266,8 +273,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_PRINT);
 	else /* if (raw) */
 		F_SET(cursor, WT_CURSTD_RAW);
-
-	cst->btree = session->btree;
 
 	cursor->get_key = __curstat_get_key;
 	cursor->get_value = __curstat_get_value;

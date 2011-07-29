@@ -259,8 +259,7 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
-extern int __wt_btree_stat_first(WT_CURSOR_STAT *cst);
-extern int __wt_btree_stat_next(WT_CURSOR_STAT *cst);
+extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *config);
@@ -336,8 +335,7 @@ extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
-extern int __wt_conn_stat_first(WT_CURSOR_STAT *cst);
-extern int __wt_conn_stat_next(WT_CURSOR_STAT *cst);
+extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern void *__wt_workq_srvr(void *arg);
 extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
