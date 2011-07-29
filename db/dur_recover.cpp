@@ -391,12 +391,16 @@ namespace mongo {
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) {
-	      /*bool abruptEnd = */processFile(files[i]);
-                /*if( abruptEnd && i+1 < files.size() ) {
+	      bool abruptEnd = processFile(files[i]);
+                if( abruptEnd && i+1 < files.size() ) {
+#if 1 // Leaving this as a warning for now. TODO: make this an error post 2.0
+                    log() << "recover warning: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
+#else
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();
                     uasserted(13535, "recover abrupt journal file end");
-                }*/
+#endif
+                }
             }
 
             close();

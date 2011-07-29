@@ -77,6 +77,14 @@ namespace mongo {
             CloseHandle(_fd);
     }
 
+    void LogFile::truncate() {
+        verify(15870, _fd != INVALID_HANDLE_VALUE);
+
+        if (!SetEndOfFile(_fd)){
+            msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
+        }
+    }
+
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
         assert(_fd);
@@ -150,8 +158,18 @@ namespace mongo {
         _fd = -1;
     }
 
+    void LogFile::truncate() {
+        verify(15872, _fd >= 0);
+
+        BOOST_STATIC_ASSERT(sizeof(off_t) == 8); // we don't want overflow here
+        const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+        if (ftruncate(_fd, pos) != 0){
+            msgasserted(15873, "Couldn't truncate file: " + errnoWithDescription());
+        }
+    }
+
     void LogFile::synchronousAppend(const void *b, size_t len) {
-        off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+        const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
 
         const char *buf = (char *) b;
         assert(_fd);

@@ -38,6 +38,8 @@ namespace mongo {
 
         const string _name;
 
+        void truncate(); // Removes extra data after current position
+
     private:
 #if defined(_WIN32)
         typedef HANDLE fd_type;

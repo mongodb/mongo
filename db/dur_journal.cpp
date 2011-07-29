@@ -621,6 +621,7 @@ namespace mongo {
                 return;
 
             if( _curLogFile ) {
+                _curLogFile->truncate();
                 closeCurrentJournalFile();
                 removeUnneededJournalFiles();
             }
