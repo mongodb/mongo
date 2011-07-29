@@ -32,9 +32,9 @@ def assignErrorCodes():
 codes = []
 
 def readErrorCodes( callback, replaceZero = False ):
-    ps = [ re.compile( "(([umsg]asser(t|ted))) *\( *(\d+)" ) ,
-           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\( *(\d+)" ) ,
-           re.compile( "(((verify))) *\( *(\d+)" )
+    ps = [ re.compile( "(([umsg]asser(t|ted))) *\(( *)(\d+)" ) ,
+           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ) ,
+           re.compile( "(((verify))) *\(( *)(\d+)" )
            ]
     
     for x in utils.getAllSourceFiles():
@@ -52,7 +52,8 @@ def readErrorCodes( callback, replaceZero = False ):
                     m = m.groups()
                     
                     start = m[0]
-                    code = m[3]
+                    spaces = m[3]
+                    code = m[4]
                     if code == '0' and replaceZero :
                         code = getNextCode( lastCodes )
                         lastCodes.append( code )
@@ -65,7 +66,7 @@ def readErrorCodes( callback, replaceZero = False ):
                         codes.append( ( x , lineNum , line , code ) )
                         callback( x , lineNum , line , code )
                     
-                    return start + "( " + code
+                    return start + "(" + spaces + code
                 
                 line = re.sub( p, repl, line )
             
