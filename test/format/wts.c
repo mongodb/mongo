@@ -5,7 +5,7 @@
  *	All rights reserved.
  */
 
-#include "wts.h"
+#include "format.h"
 
 static int  bulk(WT_ITEM **, WT_ITEM **);
 static int  wts_col_del(uint64_t);

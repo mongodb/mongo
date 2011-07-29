@@ -5,7 +5,7 @@
  *	All rights reserved.
  */
 
-#include "wts.h"
+#include "format.h"
 
 char *
 fname(const char *name)

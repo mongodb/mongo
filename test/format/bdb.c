@@ -6,7 +6,7 @@
  */
 
 #define	BDB	1			/* Berkeley DB header files */
-#include "wts.h"
+#include "format.h"
 
 void
 bdb_startup(void)

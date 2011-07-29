@@ -5,7 +5,7 @@ LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 
 CFLAGS=-g -Wall ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
 
-HDRS=	config.h wts.h
+HDRS=	config.h format.h
 SRCS=	bdb.c config.c t.c util.c wts.c
 OBJS=	bdb.o config.o t.o util.o wts.o 
 

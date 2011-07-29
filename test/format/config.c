@@ -5,7 +5,7 @@
  *	All rights reserved.
  */
 
-#include "wts.h"
+#include "format.h"
 #include "config.h"
 
 static void	   config_clear(void);
