@@ -81,6 +81,10 @@ struct __wt_cursor_stat {
 
 	WT_STATS *stats_first;			/* First stats references */
 	WT_STATS *stats;			/* Current stats reference */
+
+	const char *stat_name;			/* Current stat name. */
+	uint64_t stat_value;			/* Current stat value. */
+	const char *stat_desc;			/* Current stat description. */
 };
 
 struct __wt_cursor_table {

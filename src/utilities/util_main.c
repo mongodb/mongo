@@ -197,7 +197,7 @@ util_name(const char *s, const char *type, u_int flags)
 		copy = 1;
 	}
 
-	len = 20 + strlen(s);
+	len = strlen(type) + strlen(s) + 2;
 	if ((name = calloc(len, 1)) == NULL) {
 		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
 		return (NULL);

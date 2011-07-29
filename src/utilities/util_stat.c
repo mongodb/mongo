@@ -14,13 +14,14 @@ int
 util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
-	int ch, name_free, ret;
-	const char *cursor_config;
-	char *name;
+	uint64_t val;
+	const char *name, *desc;
+	char *objname, *uri;
+	size_t urilen;
+	int ch, objname_free, ret;
 
-	name = NULL;
-	name_free = 0;
+	objname = uri = NULL;
+	objname_free = 0;
 	while ((ch = getopt(argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
@@ -37,37 +38,36 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	 */
 	switch (argc) {
 	case 0:
-		name = (char *)"statistics:";
-		cursor_config = "printable";
+		objname = (char *)"";
 		break;
 	case 1:
-		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
+		if ((objname = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
 			return (EXIT_FAILURE);
-		name_free = 1;
-		cursor_config = "printable,statistics";
+		objname_free = 1;
 		break;
 	default:
 		return (usage());
 	}
 
-	if ((ret = session->open_cursor(
-	    session, name, NULL, cursor_config, &cursor)) != 0) {
+	urilen = strlen("statistics:") + strlen(objname) + 1;
+	if ((uri = calloc(urilen, 1)) == NULL) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+	snprintf(uri, urilen, "statistics:%s", objname);
+
+	if ((ret = session->open_cursor(session,
+	    uri, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, uri, wiredtiger_strerror(ret));
 		goto err;
 	}
 
-	ret = cursor->search(cursor);
-
 	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
+		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
+		    (ret = cursor->get_value(cursor, &val, &desc)) != 0)
 			break;
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			break;
-		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("=", 1, 1, stdout) != 1 ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1) {
+		if (printf("%s=%s\n", name, desc) < 0) {
 			ret = errno;
 			break;
 		}
@@ -84,8 +84,9 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (name_free)
-		free(name);
+	if (objname_free)
+		free(objname);
+	free(uri);
 
 	return (ret);
 }

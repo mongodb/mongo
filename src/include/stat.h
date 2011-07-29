@@ -10,8 +10,9 @@ extern "C" {
 #endif
 
 struct __wt_stats {
-	uint64_t	 v;				/* 64-bit value */
+	const char	*name;				/* field name */
 	const char	*desc;				/* text description */
+	uint64_t	 v;				/* 64-bit value */
 };
 
 #define	WT_STAT(stats, fld)						\

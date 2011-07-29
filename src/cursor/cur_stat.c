@@ -25,12 +25,8 @@ __cursor_notsup(WT_CURSOR *cursor)
  *	Convert statistics cursor value to printable format.
  */
 static int
-__curstat_print_value(WT_SESSION_IMPL *session, WT_BUF *buf)
+__curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_BUF *buf)
 {
-	uint64_t v;
-
-	v = *(uint64_t *)buf->data;
-
 	WT_RET(__wt_buf_init(session, buf, 64));
 	if (v >= WT_BILLION)
 		WT_RET(__wt_buf_sprintf(session, buf,
@@ -51,19 +47,18 @@ __curstat_print_value(WT_SESSION_IMPL *session, WT_BUF *buf)
 static int
 __curstat_get_key(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
-	WT_ITEM *key;
 	va_list ap;
 
+	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
 	va_start(ap, cursor);
-	key = va_arg(ap, WT_ITEM *);
-	key->data = cursor->key.data;
-	key->size = cursor->key.size;
+	*va_arg(ap, const char **) = cst->stat_name;
 	va_end(ap);
 
 	API_END(session);
@@ -77,21 +72,19 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 static int
 __curstat_get_value(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
-	WT_ITEM *value;
 	va_list ap;
 
+	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
-	if (F_ISSET(cursor, WT_CURSTD_PRINT))
-		WT_RET(__curstat_print_value(session, &cursor->value));
 	va_start(ap, cursor);
-	value = va_arg(ap, WT_ITEM *);
-	value->data = cursor->value.data;
-	value->size = cursor->value.size;
+	*va_arg(ap, uint64_t *) = cst->stat_value;
+	*va_arg(ap, const char **) = cst->stat_desc;
 	va_end(ap);
 
 	API_END(session);
@@ -156,14 +149,20 @@ __curstat_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	if (cst->stats == NULL)
 		cst->stats = cst->stats_first;
-	if ((s = cst->stats) == NULL || s->desc == NULL)
+	if ((s = cst->stats) == NULL || s->desc == NULL) {
 		ret = WT_NOTFOUND;
-	else {
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	} else {
 		ret = 0;
-		WT_TRET(__wt_buf_set(session, &cursor->key, s->desc, strlen(s->desc)));
+		cst->stat_name = s->desc;
 		F_SET(cursor, WT_CURSTD_KEY_SET);
-		WT_TRET(__wt_buf_set(session, &cursor->value, &s->v, sizeof(s->v)));
+		cst->stat_value = s->v;
+		WT_RET(__curstat_print_value(session, s->v, &cursor->value));
+		cst->stat_desc = cursor->value.data;
 		F_SET(cursor, WT_CURSTD_VALUE_SET);
+
+		/* Move to the next item. */
+		++cst->stats;
 	}
 	API_END(session);
 
@@ -245,7 +244,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
-	if (WT_PREFIX_SKIP(uri, "file:")) {
+	if (WT_PREFIX_MATCH(uri, "file:")) {
 		WT_ERR(__wt_session_get_btree(session, uri));
 		WT_RET(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
@@ -281,6 +280,13 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 	__wt_cursor_init(cursor, 1, config);
+
+	/*
+	 * We return the name of the statistics field as the key, and
+	 * the value plus a string representation as the value columns.
+	 */
+	cursor->key_format = "S";
+	cursor->value_format = "qS";
 
 	*cursorp = cursor;
 
