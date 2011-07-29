@@ -37,26 +37,26 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:lqrx:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:c:lqr")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
 			break;
-		case 'C':			/* Configuration from a file */
+		case 'C':			/* wiredtiger_open config */
+			g.config_open = optarg;
+			break;
+		case 'c':			/* Configuration from a file */
 			config_file(optarg);
 			break;
-		case 'l':
+		case 'l':			/* Turn on operation logging */
 			g.logging = 1;
-			break;
-		case 'r':			/* Replay a run */
-			g.replay = 1;
-			g.c_runs = 1;
 			break;
 		case 'q':			/* Quiet */
 			g.track = 0;
 			break;
-		case 'x':
-			g.config_open = optarg;
+		case 'r':			/* Replay a run */
+			g.replay = 1;
+			g.c_runs = 1;
 			break;
 		default:
 			usage();
