@@ -241,7 +241,7 @@ namespace mongo {
 
         if( myConfig().arbiterOnly )
             b.append("arbiterOnly", true);
-        if( myConfig().priority == 0 )
+        if( myConfig().priority == 0 && !myConfig().arbiterOnly)
             b.append("passive", true);
         if( myConfig().slaveDelay )
             b.append("slaveDelay", myConfig().slaveDelay);
