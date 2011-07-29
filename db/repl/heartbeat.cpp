@@ -38,7 +38,8 @@ namespace mongo {
 
     extern bool replSetBlind;
     extern ReplSettings replSettings;
-    extern unsigned int HeartbeatInfo::numPings;
+
+    unsigned int HeartbeatInfo::numPings;
 
     long long HeartbeatInfo::timeDown() const {
         if( up() ) return 0;
