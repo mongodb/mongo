@@ -497,7 +497,7 @@ struct wt_session {
 	 * stored together in a single file.  All value columns in the table
 	 * must appear in at least one column group.  Each column group must be
 	 * created with a separate call to WT_SESSION::create. The value must be
-	 * a string.,\c }
+	 * a string.,}
 	 * @config{column_internal_extend, configure the number of records a
 	 * column-store internal page is extended by when records are appended.
 	 * The value must be an integer between 500 and 10M.,\c 10000}
@@ -509,18 +509,18 @@ struct wt_session {
 	 * entries must match the total number of values in \c key_format and \c
 	 * value_format.  For colgroups and indices\, all column names must
 	 * appear in the list of columns for the table. The value must be a list
-	 * of strings.,\c }
+	 * of strings.,}
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration. The value must be a boolean flag.,\c false}
 	 * @config{filename, override the default filename derived from the
-	 * object name. The value must be a string.,\c }
+	 * object name. The value must be a string.,}
 	 * @config{huffman_key, use Huffman encoding for Btree keys.  Permitted
 	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
-	 * huffman for more details. The value must be a string.,\c }
+	 * huffman for more details. The value must be a string.,}
 	 * @config{huffman_value, use Huffman encoding for Btree values.
 	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
-	 * See @ref huffman for more details. The value must be a string.,\c }
+	 * See @ref huffman for more details. The value must be a string.,}
 	 * @config{internal_key_truncate, configure the Btree for truncation of
 	 * internal keys\, discarding unnecessary trailing bytes on internal
 	 * keys. The value must be a boolean flag.,\c true}
@@ -685,10 +685,10 @@ struct wt_session {
 	 * "serializable"\, \c "snapshot"\, \c "read-committed"\, \c
 	 * "read-uncommitted".,\c read-committed}
 	 * @config{name, name of the transaction for tracing and debugging. The
-	 * value must be a string.,\c }
+	 * value must be a string.,}
 	 * @config{priority, priority of the transaction for resolving
 	 * conflicts. Transactions with higher values are less likely to abort.
-	 * The value must be an integer between -100 and 100.,\c 0}
+	 * The value must be an integer between -100 and 100.,}
 	 * @config{sync, how to sync log records when the transaction commits.
 	 * The value must be a string\, chosen from the following options: \c
 	 * "full"\, \c "flush"\, \c "write"\, \c "none".,\c full}
@@ -813,7 +813,7 @@ struct wt_connection {
 	 * string.,\c wiredtiger_extension_init}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades. The value
-	 * must be a string.,\c }
+	 * must be a string.,}
 	 * @configend
 	 * @errors
 	 */
@@ -982,12 +982,12 @@ struct wt_connection {
  * @config{create, create the database if it does not exist. The value must be a
  * boolean flag.,\c false}
  * @config{error_prefix, Prefix string for error messages. The value must be a
- * string.,\c }
+ * string.,}
  * @config{exclusive, fail if the database already exists. The value must be a
  * boolean flag.,\c false}
  * @config{extensions, list of extensions to load.  Optional values override the
  * name of the default entry function \c wiredtiger_init. The value must be a
- * list of strings.,\c }
+ * list of strings.,}
  * @config{hazard_max, number of hazard references per session. The value must
  * be an integer greater than or equal to 3.,\c 15}
  * @config{logging, enable logging. The value must be a boolean flag.,\c false}
@@ -1000,7 +1000,7 @@ struct wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>. The value must be
  * a list\, with values chosen from the following options: \c "allocate"\, \c
  * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
- * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "write".,\c }
+ * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "write".,}
  * @configend
  * @param connectionp A pointer to the newly opened connection handle
  * @errors

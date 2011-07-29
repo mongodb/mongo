@@ -92,7 +92,7 @@ for line in open(f, 'r'):
 		desc = textwrap.dedent(c.desc)
 		desc += typedesc(c)
 		desc = desc.replace(',', '\\,')
-		default = '\\c ' + str(c.default)
+		default = '\\c ' + str(c.default) if c.default else ''
 		output = '@config{' + name + ',' + desc + ',' + default + '}'
 		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
