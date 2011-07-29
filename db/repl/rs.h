@@ -242,13 +242,19 @@ namespace mongo {
             const Member *primary;
         };
         const SP get() {
-            scoped_lock lk(m);
+            rwlock lk(m, false);
             return sp;
         }
-        MemberState getState() const { return sp.state; }
-        const Member* getPrimary() const { return sp.primary; }
+        MemberState getState() const {
+            rwlock lk(m, false);
+            return sp.state;
+        }
+        const Member* getPrimary() const {
+            rwlock lk(m, false);
+            return sp.primary;
+        }
         void change(MemberState s, const Member *self) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             if( sp.state != s ) {
                 log() << "replSet " << s.toString() << rsLog;
             }
@@ -262,24 +268,25 @@ namespace mongo {
             }
         }
         void set(MemberState s, const Member *p) {
-            scoped_lock lk(m);
-            sp.state = s; sp.primary = p;
+            rwlock lk(m, true);
+            sp.state = s;
+            sp.primary = p;
         }
         void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
         void setOtherPrimary(const Member *mem) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             assert( !sp.state.primary() );
             sp.primary = mem;
         }
         void noteRemoteIsPrimary(const Member *remote) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             if( !sp.state.secondary() && !sp.state.fatal() )
                 sp.state = MemberState::RS_RECOVERING;
             sp.primary = remote;
         }
         StateBox() : m("StateBox") { }
     private:
-        mongo::mutex m;
+        RWLock m;
         SP sp;
     };
 
