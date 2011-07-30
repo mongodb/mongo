@@ -494,6 +494,8 @@ namespace mongo {
             if( !lk1->got() )
                 return false;
 
+            journalRotate();
+
             scoped_lock lk2(groupCommitMutex);
 
             commitJob.beginCommit();
@@ -559,6 +561,8 @@ namespace mongo {
 
        /** locking: in read lock when called. */
         static void _groupCommit() {
+            journalRotate();
+
             commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
@@ -696,25 +700,14 @@ namespace mongo {
             while( !inShutdown() ) {
                 CodeBlock::Within w(durThreadMain);
                 try {
-                    int millis = groupCommitIntervalMs;
-                    {
-                        stats.rotate();
-                        {
-                            Timer t;
-                            journalRotate(); // note we do this part outside of mongomutex
-                            millis -= t.millis();
-                            wassert( millis <= groupCommitIntervalMs ); // race if groupCommitIntervalMs was changing by another thread so wassert
-                            if( millis < 2 )
-                                millis = 2;
-                        }
+                    stats.rotate();
 
-                        // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
-                        // but is likely also less spiky on our cpu usage, which is good:
-                        sleepmillis(millis/2);
-                        commitJob.wi()._deferred.invoke();
-                        sleepmillis(millis/2);
-                        commitJob.wi()._deferred.invoke();
-                    }
+                    // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
+                    // but is likely also less spiky on our cpu usage, which is good:
+                    sleepmillis(groupCommitIntervalMs/2);
+                    commitJob.wi()._deferred.invoke();
+                    sleepmillis(groupCommitIntervalMs/2);
+                    commitJob.wi()._deferred.invoke();
 
                     go();
                 }

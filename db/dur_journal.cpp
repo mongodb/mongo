@@ -607,9 +607,6 @@ namespace mongo {
             j.rotate();
         }
         void Journal::rotate() {
-            assert( !dbMutex.atLeastReadLocked() );
-            durThreadMain.assertWithin();
-
             scoped_lock lk(_curLogFileMutex);
 
             if ( inShutdown() || !_curLogFile )
