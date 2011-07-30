@@ -22,10 +22,6 @@ config_setup(void)
 	CONFIG *cp;
 	char buf[64];
 
-	/* Seed the random number generator. */
-	if (!g.replay)
-		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-
 	/* Clear any temporary values. */
 	config_clear();
 

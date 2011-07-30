@@ -9,7 +9,9 @@
 
 GLOBAL g;
 
-static void restart(void);
+static void onint(int);
+static void shutdown(void);
+static void startup(void);
 static void usage(void);
 
 int
@@ -67,9 +69,13 @@ main(int argc, char *argv[])
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
 
+	/* Clean up on signal. */
+	(void)signal(SIGINT, onint);
+
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
-		restart();			/* Clean up previous runs */
+		shutdown();			/* Clean up previous runs */
+		startup();			/* Start a run */
 
 		config_setup();
 		key_gen_setup();
@@ -153,25 +159,52 @@ err:		ret = 1;
 }
 
 /*
- * restart --
- *	Clean up from previous runs.
+ * startup --
+ *	Initialize for a run.
  */
 static void
-restart(void)
+startup(void)
 {
 	const char *p;
 
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
+	/* Seed the random number generator. */
+	if (!g.replay)
+		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
-	(void)system("rm -f __db* __bdb* __log __wt*");
-
+	/* Open/truncate the logging file. */
 	p = "__log";
-	if (g.logging &&
-	    (g.logfp = fopen(p, "w")) == NULL) {
+	if (g.logging && (g.logfp = fopen(p, "w")) == NULL) {
 		fprintf(stderr, "%s: %s\n", p, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+}
+
+/*
+ * shutdown --
+ *	Clean up from previous runs.
+ */
+static void
+shutdown(void)
+{
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+
+	(void)system("rm -f __db* __bdb* __log __rand __schema.wt __wt*");
+}
+
+/*
+ * onint --
+ *	Interrupt signal handler.
+ */
+static void
+onint(int signo)
+{
+	WT_UNUSED(signo);
+
+	shutdown();
+
+	fprintf(stderr, "\n");
+	exit (EXIT_FAILURE);
 }
 
 /*
