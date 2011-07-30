@@ -20,8 +20,8 @@ static void wts_stream_item(const char *, WT_ITEM *);
 static void
 handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(error);
+	UNUSED(handler);
+	UNUSED(error);
 
 	fprintf(stderr, "%s\n", errmsg);
 }
@@ -29,7 +29,7 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
-	WT_UNUSED(handler);
+	UNUSED(handler);
 
 	if (g.logfp != NULL)
 		fprintf(g.logfp, "%s\n", message);
@@ -46,7 +46,7 @@ static int
 handle_progress(WT_EVENT_HANDLER *handler,
      const char *operation, uint64_t progress)
 {
-	WT_UNUSED(handler);
+	UNUSED(handler);
 
 	track(operation, progress);
 	return (0);

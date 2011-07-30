@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
@@ -21,18 +22,18 @@
 #ifdef BDB
 #include "build_unix/db.h"
 #else
-#include "wt_internal.h"
+#include <wiredtiger.h>
 #endif
 
-/* General purpose. */
-#define	M(v)	((v) * 1000000)			/* Million */
-
-/* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
+#define	M(v)		((v) * 1000000)		/* Million */
+#define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
 #define	FIX		1			/* File types */
 #define	ROW		2
 #define	VAR		3
+
+/* Get a random value between a min/max pair. */
+#define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
 
 #define	WT_PREFIX	"wt"
 #define	WT_TABLENAME	"file:__wt"

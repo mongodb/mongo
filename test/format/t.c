@@ -199,7 +199,7 @@ shutdown(void)
 static void
 onint(int signo)
 {
-	WT_UNUSED(signo);
+	UNUSED(signo);
 
 	shutdown();
 
