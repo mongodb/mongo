@@ -579,6 +579,7 @@ int main(int argc, char* argv[]) {
     ("quota", "limits each database to a certain number of files (8 default)")
     ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
     ("rest","turn on simple rest api")
+    ("xorigin","allow cross-site requests via rest api, requires --rest")
     ("repair", "run repair on all dbs")
     ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
     ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
@@ -756,6 +757,9 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("rest")) {
             cmdLine.rest = true;
+        }
+        if (params.count("xorigin")) {
+            cmdLine.xorigin = true;
         }
         if (params.count("jsonp")) {
             cmdLine.jsonp = true;

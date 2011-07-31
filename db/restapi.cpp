@@ -82,6 +82,10 @@ namespace mongo {
 
             headers.push_back( (string)"x-action: " + action );
             headers.push_back( (string)"x-ns: " + fullns );
+            
+            if ( cmdLine.xorigin ) {
+                headers.push_back( "Access-Control-Allow-Origin: *" );
+            }
 
             bool html = false;
 

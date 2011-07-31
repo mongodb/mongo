@@ -50,6 +50,7 @@ namespace mongo {
 
         string bind_ip;        // --bind_ip
         bool rest;             // --rest
+        bool xorigin;          // --xorigin
         bool jsonp;            // --jsonp
 
         string _replSet;       // --replSet[/<seedlist>]
@@ -133,7 +134,7 @@ namespace mongo {
 
     // todo move to cmdline.cpp?
     inline CmdLine::CmdLine() :
-        port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
+        port(DefaultDBPort), rest(false), xorigin(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
         configsvr(false),
         quota(false), quotaFiles(8), cpu(false), durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
         syncdelay(60), noUnixSocket(false), socket("/tmp") 
