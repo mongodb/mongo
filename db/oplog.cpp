@@ -507,9 +507,9 @@ namespace mongo {
         _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns()) );
     }
 
-    bool FindingStartCursor::firstDocMatches() const {
+    bool FindingStartCursor::firstDocMatchesOrEmpty() const {
         shared_ptr<Cursor> c = _qp.newCursor();
-        return _matcher->matchesCurrent( c.get() );
+        return !c->ok() || _matcher->matchesCurrent( c.get() );
     }
     
     void FindingStartCursor::init() {
@@ -519,7 +519,7 @@ namespace mongo {
         b.append( tsElt );
         BSONObj tsQuery = b.obj();
         _matcher.reset(new CoveredIndexMatcher(tsQuery, _qp.indexKey()));
-        if ( firstDocMatches() ) {
+        if ( firstDocMatchesOrEmpty() ) {
             _c = _qp.newCursor();
             _findingStart = false;
             return;

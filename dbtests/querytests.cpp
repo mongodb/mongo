@@ -399,7 +399,6 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplayMode";
-            insert( ns, BSON( "ts" << 3 ) );
             insert( ns, BSON( "ts" << 0 ) );
             insert( ns, BSON( "ts" << 1 ) );
             insert( ns, BSON( "ts" << 2 ) );
@@ -407,6 +406,12 @@ namespace QueryTests {
             ASSERT( c->more() );
             ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
             ASSERT( !c->more() );
+
+            insert( ns, BSON( "ts" << 3 ) );
+            c = client().query( ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
+            ASSERT( c->more() );
         }
     };
 
