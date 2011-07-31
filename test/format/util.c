@@ -7,15 +7,6 @@
 
 #include "format.h"
 
-char *
-fname(const char *name)
-{
-	static char buf[128];
-
-	(void)snprintf(buf, sizeof(buf), "__%s.%s", WT_PREFIX, name);
-	return (buf);
-}
-
 void
 key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 {
@@ -58,10 +49,8 @@ key_gen_setup(void)
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] = (uint16_t)MMRAND(g.c_key_min, g.c_key_max);
 		
-	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL) {
-		fprintf(stderr, "%s: %s\n", g.progname, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL)
+		die("malloc", errno);
 	for (i = 0; i < g.c_key_max; ++i)
 		g.key_gen_buf[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
 }
@@ -88,11 +77,8 @@ value_gen(void *valuep, uint32_t *sizep)
 			buf = NULL;
 		}
 		blen = g.c_value_max + 10;
-		if ((buf = malloc(blen)) == NULL) {
-			fprintf(stderr,
-			    "%s: %s\n", g.progname, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+		if ((buf = malloc(blen)) == NULL)
+			die("malloc", errno);
 		for (i = 0; i < blen; ++i)
 			buf[i] = (u_char)"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 	}
@@ -185,7 +171,6 @@ track(const char *s, uint64_t i)
 uint32_t
 wts_rand(void)
 {
-	const char *p;
 	char buf[64];
 	uint32_t r;
 
@@ -198,11 +183,9 @@ wts_rand(void)
 	 * (and WT might call rand() in the future, who knows?)
 	 */
 	if (g.rand_log == NULL) {
-		p = "__rand";
-		if ((g.rand_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
-			fprintf(stderr, "%s: %s\n", p, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+		if ((g.rand_log =
+		    fopen("__rand", g.replay ? "r" : "w")) == NULL)
+			die("__rand", errno);
 		if (!g.replay)
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
 	}
@@ -212,10 +195,9 @@ wts_rand(void)
 				fprintf(stderr,
 				    "end of random number log reached, "
 				    "exiting\n");
-			} else
-				fprintf(stderr,
-				    "random number log: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
+				exit(EXIT_SUCCESS);
+			}
+			die("random number log", errno);
 		}
 
 		r = (uint32_t)strtoul(buf, NULL, 10);

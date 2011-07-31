@@ -35,7 +35,6 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
 
-#define	WT_PREFIX	"wt"
 #define	WT_TABLENAME	"file:__wt"
 
 typedef struct {
@@ -100,11 +99,11 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(char *, int);
-void	 value_gen(void *, uint32_t *);
-char	*fname(const char *);
+void	 die(const char *,  int);
 void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
 void	 track(const char *, uint64_t);
+void	 value_gen(void *, uint32_t *);
 int	 wts_bulk_load(void);
 int	 wts_dump(const char *, int);
 int	 wts_ops(void);

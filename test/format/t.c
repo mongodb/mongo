@@ -10,7 +10,7 @@
 GLOBAL g;
 
 static void onint(int);
-static void shutdown(void);
+static void shutdown(int);
 static void startup(void);
 static void usage(void);
 
@@ -74,7 +74,7 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
-		shutdown();			/* Clean up previous runs */
+		shutdown(0);			/* Clean up previous runs */
 		startup();			/* Start a run */
 
 		config_setup();
@@ -165,18 +165,13 @@ err:		ret = 1;
 static void
 startup(void)
 {
-	const char *p;
-
 	/* Seed the random number generator. */
 	if (!g.replay)
 		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
 	/* Open/truncate the logging file. */
-	p = "__log";
-	if (g.logging && (g.logfp = fopen(p, "w")) == NULL) {
-		fprintf(stderr, "%s: %s\n", p, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+	if (g.logging && (g.logfp = fopen("__log", "w")) == NULL)
+		die("__log", errno);
 }
 
 /*
@@ -184,12 +179,14 @@ startup(void)
  *	Clean up from previous runs.
  */
 static void
-shutdown(void)
+shutdown(int force)
 {
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 
-	(void)system("rm -f __db* __bdb* __log __rand __schema.wt __wt*");
+	(void)system("rm -f __bdb* __run __schema.wt __stats __wt*");
+	if (force)					/* __rand, too */
+		(void)system("rm -f __*");
 }
 
 /*
@@ -201,9 +198,20 @@ onint(int signo)
 {
 	UNUSED(signo);
 
-	shutdown();
+	shutdown(1);
 
 	fprintf(stderr, "\n");
+	exit (EXIT_FAILURE);
+}
+
+/*
+ * die --
+ *	Report an error and quit.
+ */
+void
+die(const char *m, int e)
+{
+	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
 	exit (EXIT_FAILURE);
 }
 

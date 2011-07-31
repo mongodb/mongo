@@ -256,7 +256,7 @@ wts_salvage(void)
 	track("salvage", 0ULL);
 
 	/* Save a copy of the file before we salvage it. */
-	(void)system("cp __" WT_PREFIX " __wt.salvage.copy");
+	(void)system("cp __wt __salvage_copy");
 
 	snprintf(config, sizeof(config), "error_prefix=\"%s\"", g.progname);
 
@@ -352,27 +352,19 @@ wts_stats(void)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	FILE *fp;
-	char *p;
 	int ret;
 
 	session = g.wts_session;
 
 	track("stat", 0ULL);
 
-	p = fname("stats");
-	if ((fp = fopen(p, "w")) == NULL) {
-		fprintf(stderr, "%s: fopen: %s\n",
-		    g.progname, wiredtiger_strerror(errno));
-		return (1);
-	}
+	if ((fp = fopen("__stats", "w")) == NULL)
+		die("__stats", errno);
 
 	/* Connection statistics. */
 	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, "printable", &cursor)) != 0) {
-		fprintf(stderr, "%s: stat cursor open failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	    "statistics:", NULL, "printable", &cursor)) != 0)
+		die("session.open_cursor", ret);
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
 		    (ret = cursor->get_value(cursor, &value)) != 0)
@@ -385,15 +377,15 @@ wts_stats(void)
 			break;
 		}
 	}
-	(void)cursor->close(cursor, NULL);
+	if (ret != WT_NOTFOUND)
+		die("cursor.next", ret);
+	if ((ret = cursor->close(cursor, NULL)) != 0)
+		die("cursor.close", ret);
 	
 	/* File statistics. */
 	if ((ret = session->open_cursor(session,
-	    WT_TABLENAME, NULL, "statistics,printable", &cursor)) != 0) {
-		fprintf(stderr, "%s: stat cursor open failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	    WT_TABLENAME, NULL, "statistics,printable", &cursor)) != 0)
+		die("session.open_cursor", ret);
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
 		    (ret = cursor->get_value(cursor, &value)) != 0)
@@ -406,13 +398,10 @@ wts_stats(void)
 			break;
 		}
 	}
-	(void)cursor->close(cursor, NULL);
-
-	if (ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: stat cursor next: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	if (ret != WT_NOTFOUND)
+		die("cursor.next", ret);
+	if ((ret = cursor->close(cursor, NULL)) != 0)
+		die("cursor.close", ret);
 
 	(void)fclose(fp);
 

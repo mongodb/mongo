@@ -113,17 +113,12 @@ config_print(int error_display)
 {
 	CONFIG *cp;
 	FILE *fp;
-	char *p;
 
 	if (error_display)
 		fp = stdout;
-	else {
-		p = fname("run");
-		if ((fp = fopen(p, "w")) == NULL) {
-			fprintf(stderr, "%s: %s\n", p, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-	}
+	else
+		if ((fp = fopen("__run", "w")) == NULL)
+			die("__run", errno);
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -159,10 +154,8 @@ config_file(const char *name)
 	FILE *fp;
 	char *p, buf[256];
 
-	if ((fp = fopen(name, "r")) == NULL) {
-		fprintf(stderr, "%s: %s\n", name, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+	if ((fp = fopen(name, "r")) == NULL)
+		die(name, errno);
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		for (p = buf; *p != '\0' && *p != '\n'; ++p)
 			;

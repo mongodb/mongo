@@ -27,23 +27,23 @@ fi
 
 if test $dump_bdb -eq 1; then
 	if test $colflag -eq 0; then
-		$bdb/db_dump -p __wt.bdb |
+		$bdb/db_dump -p __bdb |
 		    sed -e '1,/HEADER=END/d' \
 			-e '/DATA=END/d' \
-			-e 's/^ //' > __wt.bdb_dump
+			-e 's/^ //' > __bdb_dump
 	else
-		$bdb/db_dump -p __wt.bdb |
+		$bdb/db_dump -p __bdb |
 		    sed -e '1,/HEADER=END/d' \
 			-e '/DATA=END/d' \
 			-e 's/^ //' |
 		    sed -n \
 			-e '$p' \
 			-e n \
-			-e p > __wt.bdb_dump
+			-e p > __bdb_dump
 	fi
 fi
 
-$wt/wt dump -p file:__wt > __wt.wt_dump
-cmp __wt.wt_dump __wt.bdb_dump > /dev/null
+$wt/wt dump -p file:__wt > __wt_dump
+cmp __wt_dump __bdb_dump > /dev/null
 
 exit $?

@@ -13,7 +13,6 @@ bdb_startup(void)
 {
 	DB *db;
 	DB_ENV *dbenv;
-	char *p;
 
 	assert(db_env_create(&dbenv, 0) == 0);
 	dbenv->set_errpfx(dbenv, "bdb");
@@ -27,8 +26,7 @@ bdb_startup(void)
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 
-	p = fname("bdb");
-	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);
+	assert(db->open(db, NULL, "__bdb", NULL, DB_BTREE, DB_CREATE, 0) == 0);
 
 	g.bdb = db;
 }

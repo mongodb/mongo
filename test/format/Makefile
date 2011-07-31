@@ -14,11 +14,8 @@ all: t tags
 t: ${OBJS} ${LIB}
 	cc ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
-clean:
-	rm -f t ${OBJS} *.core vgcore* vgout.* xx.log
-
-distclean realclean: clean
-	rm -f __* tags
+clean distclean realclean:
+	rm -f t ${OBJS} __* *.core vgcore* vgout.* tags
 
 tags: ${HDRS} ${SRCS}
 	@type ctags > /dev/null 2>&1 && ctags -w ${HDRS} ${SRCS} || exit 0
