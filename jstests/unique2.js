@@ -1,6 +1,7 @@
 // Test unique and dropDups index options.
 
 function checkNprev( np ) {
+    // getPrevError() is not available sharded.
     if ( typeof( myShardingTest ) == 'undefined' ) {
         assert.eq( np, db.getPrevError().nPrev );
     }
