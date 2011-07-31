@@ -442,12 +442,8 @@ build(int ikey, int ivalue, int cnt)
 
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
-		/*
-		 * TODO: update this to configure a bitfield, only generate
-		 * a single byte value.
-		 */
 		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=\"20u\","
+		    "key_format=r,value_format=7t,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -474,7 +470,7 @@ build(int ikey, int ivalue, int cnt)
 	}
 	assert(session->create(session, "file:" LOAD, config) == 0);
 	assert(session->open_cursor(
-	    session, "file:" LOAD, NULL, "raw,bulk", &cursor) == 0);
+	    session, "file:" LOAD, NULL, "bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:
@@ -487,12 +483,19 @@ build(int ikey, int ivalue, int cnt)
 			cursor->set_key(cursor, &key);
 			break;
 		}
-							/* Build the value. */
-		snprintf(vbuf, sizeof(vbuf),
-		    "%010d VALUE----", value_unique ? ivalue : 37);
-		value.data = vbuf;
-		value.size = 20;
-		cursor->set_value(cursor, &value);
+
+		switch (page_type) {			/* Build the value. */
+		case WT_PAGE_COL_FIX:
+			cursor->set_value(cursor, ivalue & 0x7f);
+			break;
+		case WT_PAGE_COL_VAR:
+		case WT_PAGE_ROW_LEAF:
+			snprintf(vbuf, sizeof(vbuf),
+			    "%010d VALUE----", value_unique ? ivalue : 37);
+			value.data = vbuf;
+			value.size = 20;
+			cursor->set_value(cursor, &value);
+		}
 		assert(cursor->insert(cursor) == 0);
 	}
 
@@ -582,7 +585,8 @@ process(void)
 	config[0] = '\0';
 	if (verbose)
 		snprintf(config, sizeof(config),
-		    "error_prefix=\"%s\",verbose=[salvage]", progname);
+		    "error_prefix=\"%s\",verbose=[reconcile,salvage]",
+		    progname);
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->salvage(session, "file:" SLVG, 0) == 0);
@@ -602,14 +606,14 @@ process(void)
 	assert(session->open_cursor(
 	    session, "file:" SLVG, NULL, "dump,printable", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
-		assert (cursor->get_key(cursor, &key) == 0);
-		if (key.data != NULL) {
-			fwrite(key.data, 1, key.size, fp);
-			fwrite("\n", 1, 1, fp);
+		assert(cursor->get_key(cursor, &key) == 0);
+		if (key.size != 0) {
+			assert(fwrite(key.data, 1, key.size, fp) == key.size);
+			assert(fwrite("\n", 1, 1, fp) == 1);
 		}
 		assert(cursor->get_value(cursor, &value) == 0);
-		fwrite(value.data, 1, value.size, fp);
-		fwrite("\n", 1, 1, fp);
+		assert(fwrite(value.data, 1, value.size, fp) == value.size);
+		assert(fwrite("\n", 1, 1, fp) == 1);
 	}
 	assert(conn->close(conn, 0) == 0);
 	assert(fclose(fp) == 0);
@@ -622,9 +626,38 @@ process(void)
 void
 print_res(int key, int value, int cnt)
 {
+	static const char hex[] = "0123456789abcdef";
+	int ch;
+
 	for (; cnt > 0; ++key, ++value, --cnt) {
-		if (page_type == WT_PAGE_ROW_LEAF)
+		switch (page_type) {			/* Print key */
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			break;
+		case WT_PAGE_ROW_LEAF:
 			fprintf(res_fp, "%010d KEY------\n", key);
-		fprintf(res_fp, "%010d VALUE----\n", value_unique ? value : 37);
+			break;
+		}
+
+		switch (page_type) {			/* Print value */
+		case WT_PAGE_COL_FIX:
+			ch = value & 0x7f;
+			if (isprint(ch)) {
+				if (ch == '\\')
+					fputc('\\', res_fp);
+				fputc(ch, res_fp);
+			} else {
+				fputc('\\', res_fp);
+				fputc(hex[(ch & 0xf0) >> 4], res_fp);
+				fputc(hex[ch & 0x0f], res_fp);
+			}
+			fputc('\n', res_fp);
+			break;
+		case WT_PAGE_COL_VAR:
+		case WT_PAGE_ROW_LEAF:
+			fprintf(res_fp,
+			    "%010d VALUE----\n", value_unique ? value : 37);
+			break;
+		}
 	}
 }
