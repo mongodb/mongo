@@ -26,8 +26,6 @@
 
 namespace mongo {
 
-    extern const int DefaultIndexVersionNumber;
-    
     class IndexInterface {
     protected:
         virtual ~IndexInterface() { }

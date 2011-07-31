@@ -26,6 +26,11 @@
 
 namespace mongo {
 
+    /** old (<= v1.8) : 0
+     1 is new version
+     */
+    const int DefaultIndexVersionNumber = 1;
+    
     map<string,IndexPlugin*> * IndexPlugin::_plugins;
 
     IndexType::IndexType( const IndexPlugin * plugin , const IndexSpec * spec )
@@ -407,7 +412,7 @@ namespace mongo {
                 break;
             }
             default:
-                massert( 15854, "Invalid index version for key generation.", false );
+                massert( 15869, "Invalid index version for key generation.", false );
         }
     }
 

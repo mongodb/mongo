@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    extern const int DefaultIndexVersionNumber;
+    
     class Cursor;
     class IndexSpec;
     class IndexType; // TODO: this name sucks
