@@ -5,10 +5,13 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
-    ls ../src/include/*.[hi] ../src/include/*.in ../test/bt/*.[ch]) |
+    ls  ../src/include/*.[hi] \
+	../src/include/*.in \
+	../test/format/*.[ch] \
+	../test/thread/*.[ch] \
+	../test/salvage/*.[ch])` |
     egrep -v 'src/api/(api|pack)\.c$' |
-    egrep -v 'support/stat\.c$' |
-    egrep -v 'bt/config\.h$'`
+    egrep -v 'support/stat\.c$'
 
 for f in $l ; do
 	expand -t8 < $f | awk -- \

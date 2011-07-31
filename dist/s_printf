@@ -5,7 +5,9 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l="`sed -e '/^[a-z]/! d' -e 's,^,../,' filelist`"
 l="$l `echo ../src/include/*.[hi] ../src/include/*.in`"
-l="$l `echo ../test/bt/*.c`"
+l="$l `echo ../test/format/*.c`"
+l="$l `echo ../test/thread/*.c`"
+l="$l `echo ../test/salvage/*.c`"
 
 # Look for '%l': that suggests we're trying to print a long value, and that's
 # almost always wrong: we should use a portable PRI* macro to construct the
