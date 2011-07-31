@@ -15,7 +15,7 @@ t: ${OBJS} ${LIB}
 	cc ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
 clean:
-	rm -f t ${OBJS} *.core dbm.db dbm.dump vgcore* vgout.* xx.log
+	rm -f t ${OBJS} *.core vgcore* vgout.* xx.log
 
 distclean realclean: clean
 	rm -f __* tags
