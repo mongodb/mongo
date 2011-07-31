@@ -271,7 +271,7 @@ namespace CursorTests {
                     _c.insert( ns(), BSON( "a" << i << "b" << 5 ) );
                 }
                 FieldRangeSet frs( ns(), BSON( "b" << 3 ), true );
-                shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
+                boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
                 Client::Context ctx( ns() );
                 scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), 1, nsdetails( ns() )->idx(1), frv, 1 ) );
                 int initialNscanned = c->nscanned();
