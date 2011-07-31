@@ -570,6 +570,7 @@ int main(int argc, char* argv[]) {
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
+    ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
@@ -622,9 +623,7 @@ int main(int argc, char* argv[]) {
     ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-    // these move to unhidden later:
     ("nodur", "disable journaling (currently the default)")
-    ("nojournal", "disable journaling (currently the default)")
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")

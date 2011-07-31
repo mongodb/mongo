@@ -70,7 +70,7 @@ namespace mongo {
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
         abort();
@@ -86,7 +86,7 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after assert() failure in a debug/test build\n\n" << endl;
         abort();
@@ -103,7 +103,7 @@ namespace mongo {
         temp << msgid;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after verify() failure in a debug/test build\n\n" << endl;
         abort();

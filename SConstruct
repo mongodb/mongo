@@ -144,6 +144,7 @@ add_option( "osnew", "use newer operating system API features" , 0 , False )
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , False , "debugBuildAndLogging" )
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
+add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
@@ -233,6 +234,9 @@ if has_option( "safeshell" ):
 
 if has_option( "durableDefaultOn" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTON" ] )
+
+if has_option( "durableDefaultOff" ):
+    env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:

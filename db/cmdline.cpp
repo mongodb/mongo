@@ -110,7 +110,7 @@ namespace mongo {
             if ( s.find( "FASTSYNC" ) != string::npos )
                 cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
 
-            if ( s[0] == '#' ) { 
+            if ( s.c_str()[0] == '#' ) { 
                 // skipping commented line
             } else if ( s.find( "=FALSE" ) == string::npos ) {
                 ss << line << endl;
