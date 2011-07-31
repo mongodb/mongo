@@ -473,9 +473,9 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
-    void assertExtentNonempty( const Extent *e ) {
+    void wassertExtentNonempty( const Extent *e ) {
         // TODO ensure this requirement is clearly enforced, or fix.
-        massert( 14834, "empty extent found during finding start scan", !e->firstRecord.isNull() );
+        wassert( !e->firstRecord.isNull() );
     }
     
     DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc &rec ) {
@@ -488,14 +488,14 @@ namespace mongo {
                 e = e->xprev.ext();
             }
             if ( e->myLoc != _qp.nsd()->capExtent ) {
-                assertExtentNonempty( e );
+                wassertExtentNonempty( e );
                 return e->firstRecord;
             }
         }
         else {
             if ( !e->xprev.isNull() ) {
                 e = e->xprev.ext();
-                assertExtentNonempty( e );
+                wassertExtentNonempty( e );
                 return e->firstRecord;
             }
         }
@@ -506,20 +506,30 @@ namespace mongo {
         shared_ptr<Cursor> c = _qp.newCursor( startLoc );
         _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns()) );
     }
+
+    bool FindingStartCursor::firstDocMatches() const {
+        shared_ptr<Cursor> c = _qp.newCursor();
+        return _matcher->matchesCurrent( c.get() );
+    }
     
     void FindingStartCursor::init() {
-        // Use a ClientCursor here so we can release db mutex while scanning
-        // oplog (can take quite a while with large oplogs).
-        shared_ptr<Cursor> c = _qp.newReverseCursor();
-        _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj()) );
-        _findingStartTimer.reset();
-        _findingStartMode = Initial;
         BSONElement tsElt = _qp.originalQuery()[ "ts" ];
         massert( 13044, "no ts field in query", !tsElt.eoo() );
         BSONObjBuilder b;
         b.append( tsElt );
         BSONObj tsQuery = b.obj();
         _matcher.reset(new CoveredIndexMatcher(tsQuery, _qp.indexKey()));
+        if ( firstDocMatches() ) {
+            _c = _qp.newCursor();
+            _findingStart = false;
+            return;
+        }
+        // Use a ClientCursor here so we can release db mutex while scanning
+        // oplog (can take quite a while with large oplogs).
+        shared_ptr<Cursor> c = _qp.newReverseCursor();
+        _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj()) );
+        _findingStartTimer.reset();
+        _findingStartMode = Initial;
     }
     
     // -------------------------------------

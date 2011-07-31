@@ -1146,7 +1146,35 @@ namespace QueryTests {
     private:
         int _old;
     };
+    
+    /**
+     * Check OplogReplay mode where query timestamp is earlier than the earliest
+     * entry in the collection.
+     */
+    class FindingStartStale : public CollectionBase {
+    public:
+        FindingStartStale() : CollectionBase( "findingstart" ) {}
 
+        void run() {
+            unsigned startNumCursors = ClientCursor::numCursors();
+            
+            BSONObj info;
+            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
+            
+            // Check OplogReplay mode with empty collection.
+            auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( !c->more() );
+
+            // Check with some docs in the collection.
+            for( int i = 100; i < 150; client().insert( ns(), BSON( "ts" << i++ ) ) );
+            c = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 100, c->next()[ "ts" ].numberInt() );
+
+            // Check that no persistent cursors outlast our queries above.
+            ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
+        }
+    };
 
     class WhatsMyUri : public CollectionBase {
     public:
@@ -1362,6 +1390,7 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStartPartiallyFull >();
+            add< FindingStartStale >();
             add< WhatsMyUri >();
 
             add< parsedtests::basic1 >();

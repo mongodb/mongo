@@ -118,6 +118,7 @@ namespace mongo {
             _findingStartCursor.reset( 0 );
         }
         void init();
+        bool firstDocMatches() const;
     };
 
     void pretouchOperation(const BSONObj& op);
