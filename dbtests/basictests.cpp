@@ -411,6 +411,21 @@ namespace BasicTests {
             ASSERT_EQUALS( -1 , lexNumCmp( "a.b.c.d0" , "a.b.c.d00" ) );
             ASSERT_EQUALS( 1 , lexNumCmp( "a.b.c.0.y" , "a.b.c.00.x" ) );
             
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "a-", "a" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-", "a-" ) );
+
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-c" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "a-c", "a" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-c", "a-c" ) );
+
+            ASSERT_EQUALS( 1, lexNumCmp( "a-c.t", "a.t" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "a-c.t" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-c.t", "a-c.t" ) );
+
+            ASSERT_EQUALS( 1, lexNumCmp( "ac.t", "a.t" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "ac.t" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "ac.t", "ac.t" ) );            
         }
     };
 

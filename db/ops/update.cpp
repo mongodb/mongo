@@ -1061,7 +1061,7 @@ namespace mongo {
         debug.updateobj = updateobj;
 
         // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
-        // The pointers may be left invalid on a failed yield recovery.
+        // The pointers may be left invalid on a failed or terminal yield recovery.
         NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
         NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
 
