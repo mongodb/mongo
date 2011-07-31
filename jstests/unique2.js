@@ -1,5 +1,11 @@
 // Test unique and dropDups index options.
 
+function checkNprev( np ) {
+    if ( typeof( myShardingTest ) == 'undefined' ) {
+        assert.eq( np, db.getPrevError().nPrev );
+    }
+}
+
 t = db.jstests_unique2;
 
 t.drop();
@@ -39,13 +45,13 @@ assert( t.count() == 3 ) ;
 // Trigger an error, so we can test n of getPrevError() later.
 assert.throws( function() { t.find( {$where:'aaa'} ).itcount(); } );
 assert( db.getLastError() );
-assert.eq( 1, db.getPrevError().nPrev );
+checkNprev( 1 );
 
 t.ensureIndex({k:1}, {unique:true, dropDups:true});
 // Check error flag was not set SERVER-2054.
 assert( !db.getLastError() );
-// Check that offset of pervious error is correct.
-assert.eq( 2, db.getPrevError().nPrev );
+// Check that offset of previous error is correct.
+checkNprev( 2 );
 
 // Check the dups were dropped.
 assert( t.count() == 1 ) ;
@@ -69,13 +75,13 @@ assert( t.count() == 3 ) ;
 // Trigger an error, so we can test n of getPrevError() later.
 assert.throws( function() { t.find( {$where:'aaa'} ).itcount(); } );
 assert( db.getLastError() );
-assert.eq( 1, db.getPrevError().nPrev );
+checkNprev( 1 );
 
 t.ensureIndex({k:1}, {background:true, unique:true, dropDups:true});
 // Check error flag was not set SERVER-2054.
 assert( !db.getLastError() );
 // Check that offset of pervious error is correct.
-assert.eq( 2, db.getPrevError().nPrev );
+checkNprev( 2 );
 
 // Check the dups were dropped.
 assert( t.count() == 1 ) ;
