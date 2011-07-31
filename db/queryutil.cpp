@@ -28,6 +28,7 @@
 
 namespace mongo {
     extern BSONObj staticNull;
+    extern BSONObj staticUndefined;
 
     /** returns a string that when used as a matcher, would match a super set of regex()
         returns "" for complex regular expressions
@@ -165,13 +166,16 @@ namespace mongo {
                     regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
                 }
                 else {
-                    // A document array may be indexed by its first element, or
-                    // as a full array if it is embedded within another array.
+                    // A document array may be indexed by its first element, by undefined
+                    // if it is empty, or as a full array if it is embedded within another
+                    // array.
                     vals.insert( ie );                        
                     if ( ie.type() == Array ) {
-                        if ( !ie.embeddedObject().firstElement().eoo() ) {
-                         	vals.insert( ie.embeddedObject().firstElement() );
-                        }
+                        BSONElement temp = ie.embeddedObject().firstElement();
+                        if ( temp.eoo() ) {
+                            temp = staticUndefined.firstElement();
+                        }                        
+                        vals.insert( temp );
                     }
                 }
             }
@@ -185,17 +189,21 @@ namespace mongo {
             return;
         }
 
-        // A document array may be indexed by its first element, or
-        // as a full array if it is embedded within another array.
+        // A document array may be indexed by its first element, by undefined
+        // if it is empty, or as a full array if it is embedded within another
+        // array.
         if ( e.type() == Array && e.getGtLtOp() == BSONObj::Equality ) {
 
             _intervals.push_back( FieldInterval(e) );
-            const BSONElement& temp = e.embeddedObject().firstElement();
-            if ( ! temp.eoo() ) {
-                if ( temp < e )
-                    _intervals.insert( _intervals.begin() , temp );
-                else
-                    _intervals.push_back( FieldInterval(temp) );
+            BSONElement temp = e.embeddedObject().firstElement();
+            if ( temp.eoo() ) {
+             	temp = staticUndefined.firstElement();
+            }
+            if ( temp < e ) {
+                _intervals.insert( _intervals.begin() , temp );
+            }
+            else {
+                _intervals.push_back( FieldInterval(temp) );
             }
 
             return;
