@@ -1,5 +1,7 @@
 #! /bin/sh
 
+trap 'rm -f __*; exit 1' 1 2
+
 wt=../../build_posix
 bdb=db/build_unix
 
