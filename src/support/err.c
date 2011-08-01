@@ -129,19 +129,13 @@ __wt_failure(WT_SESSION_IMPL *session,
     WT_GCC_ATTRIBUTE ((format (printf, 5, 6)))
 {
 	va_list ap;
-	/*
-	 * !!!
-	 * SECURITY:
-	 * Buffer placed at the end of the stack in case snprintf overflows.
-	 */
-	char s[2048];
 
 	va_start(ap, fmt);
-	(void)vsnprintf(s, sizeof(s), fmt, ap);
+	__wt_errv(session, error,
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
 	va_end(ap);
-
-	__wt_err(session, error,
-	    "%s: %d: %s", file_name, line_number, s);
 
 #ifdef HAVE_DIAGNOSTIC
 	__wt_abort(session);
