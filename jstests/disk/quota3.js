@@ -16,7 +16,7 @@ assert( db.getLastError() );
 dotFourDataFile = dbpath + "/" + baseName + ".4";
 files = listFiles( dbpath );
 for( i in files ) {
-    // Since only one data file is allowed, a .0 file is expected and a .1 file may be preallocated (SERVER-3410) but no .2 file is expected.
+    // .3 file may be preallocated but not .4
 	assert.neq( dotFourDataFile, files[ i ].name );
 }
 
