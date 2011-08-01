@@ -969,6 +969,13 @@ namespace QueryOptimizerTests {
         }
     };
     
+    class BestGuessOrSortAssertion : public Base {
+    public:
+        void run() {
+            ASSERT_EXCEPTION( bestGuessCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "b" << 1 ) ) ), BSON( "a" << 1 ) ), MsgAssertionException );
+        }
+    };
+    
     namespace QueryOptimizerCursorTests {
         
         using boost::shared_ptr;
@@ -2666,6 +2673,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::EqualityThenIn>();
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<BestGuess>();
+            add<BestGuessOrSortAssertion>();
             add<QueryOptimizerCursorTests::Empty>();
             add<QueryOptimizerCursorTests::Unindexed>();
             add<QueryOptimizerCursorTests::Basic>();
