@@ -1933,7 +1933,9 @@ namespace mongo {
             // All points in array *could* be in maxDistance
 
             // Step 1 : Trim points to max size
-            if( _max >= 0 ){
+            // TODO:  This check will do little for now, but is skeleton for future work in incremental $near
+            // searches
+            if( _max > 0 ){
 
                 int numToErase = _points.size() - _max;
 
@@ -1954,12 +1956,13 @@ namespace mongo {
 
                         Holder::iterator current = maybePointIt--;
 
-                         addExactPoints( *current, tested, true );
-                         _points.erase( current );
-                         erased++;
-                         approxMin = tested.begin()->distance() - 2 * _distError;
+                        addExactPoints( *current, tested, true );
+                        _points.erase( current );
+                        erased++;
 
-                         if( _points.size() == 0 ) break;
+                        if( tested.size() )
+                            approxMin = tested.begin()->distance() - 2 * _distError;
+
                     }
 
                     GEODEBUG( "\t\tEnding search at point " << ( _points.size() == 0 ? "(beginning)" : maybePointIt->toString() ) );
@@ -2017,7 +2020,7 @@ namespace mongo {
                     addExactPoints( currPt, _points, before, after, false );
                     expandedPoints += before;
 
-                    if( _max >= 0 && expandedPoints < _max )
+                    if( _max > 0 && expandedPoints < _max )
                         expandWindowEnd = currPt.distance() + 2 * _distError;
 
                     // Iterate to the next point
