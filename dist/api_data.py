@@ -288,7 +288,7 @@ methods = {
 		min='1'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
-		list, such as <code>"verbose=[evict,read]"</code>''',
+		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=['evictserver', 'fileops', 'hazard',
 		    'mutex', 'read', 'readserver', 'reconcile', 'salvage',
 		    'write']),
