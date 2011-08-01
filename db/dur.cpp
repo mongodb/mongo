@@ -614,6 +614,7 @@ namespace mongo {
         }
 
         /** locking: in read lock when called
+                     or, for early commits (commitIfNeeded), in write lock
             @see MongoMMF::close()
         */
         static void groupCommit() {
