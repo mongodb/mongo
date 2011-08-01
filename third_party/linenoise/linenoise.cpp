@@ -549,7 +549,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         /* Only autocomplete when the callback is set. It returns < 0 when
          * there was an error reading from fd. Otherwise it will return the
          * character that should be handled next. */
-        if (c == 9 && completionCallback != NULL) {
+        if (c == 9 && completionCallback != NULL) { /* tab */
+            /* ignore tabs used for indentation */
+            if (pos == 0) continue;
+
             c = completeLine(fd,prompt,buf,buflen,&len,&pos,cols);
             /* Return on errors */
             if (c < 0) return len;
