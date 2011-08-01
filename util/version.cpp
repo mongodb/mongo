@@ -203,6 +203,19 @@ namespace mongo {
                 log() << "**          Journaling works best with it set to 0 or 1" << startupWarningsLog;
             }
         }
+
+        if (boost::filesystem::exists("/proc/sys/vm/zone_reclaim_mode")){
+            fstream f ("/proc/sys/vm/zone_reclaim_mode", ios_base::in);
+            unsigned val;
+            f >> val;
+
+            if (val != 0) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: /proc/sys/vm/zone_reclaim_mode is " << val << startupWarningsLog;
+                log() << "**          We suggest setting it to 0" << startupWarningsLog;
+                log() << "**          http://www.kernel.org/doc/Documentation/sysctl/vm.txt" << startupWarningsLog;
+            }
+        }
 #endif
 
         if (warned) {
