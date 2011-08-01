@@ -149,6 +149,8 @@ class mongod(object):
             argv += ["--master", "--oplogSize", "256"]
         if self.slave:
             argv += ['--slave', '--source', 'localhost:' + str(srcport)]
+        if self.kwargs.get('no_journal'):
+            argv += ['--nojournal']
         print "running " + " ".join(argv)
         self.proc = Popen(argv)
         if not self.did_mongod_start(self.port):
@@ -285,7 +287,8 @@ def runTest(test):
         argv = argv + [ '--eval', 'TestData = new Object();' + 
                                   'TestData.testPath = "' + path + '";' + 
                                   'TestData.testFile = "' + os.path.basename( path ) + '";' +
-                                  'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' ]
+                                  'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + 
+                                  'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" ]
     print argv
     r = call(argv, cwd=test_path)
     t2 = time.time()
@@ -308,7 +311,7 @@ def run_tests(tests):
     
     # The reason we use with is so that we get __exit__ semantics
 
-    with mongod(small_oplog=small_oplog) as master:
+    with mongod(small_oplog=small_oplog,no_journal=no_journal) as master:
         with mongod(slave=True) if small_oplog else Nothing() as slave:
             if small_oplog:
                 master.wait_for_repl()
@@ -428,7 +431,7 @@ def add_exe(e):
     return e
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -454,6 +457,9 @@ def main():
     parser.add_option('--small-oplog', dest='small_oplog', default=False,
                       action="store_true",
                       help='Run tests with master/slave replication & use a small oplog')
+    parser.add_option('--nojournal', dest='no_journal', default=False,
+                      action="store_true",
+                      help='Do not turn on journaling in tests')
     global tests
     (options, tests) = parser.parse_args()
 
@@ -474,6 +480,7 @@ def main():
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
     small_oplog = options.small_oplog
+    no_journal = options.no_journal
 
     if options.File:
         if options.File == '-':

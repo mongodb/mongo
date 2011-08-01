@@ -969,6 +969,11 @@ jsTestPath = function(){
     return "__unknown_path__"
 }
 
+jsTestOptions = function(){
+    if( TestData ) return { noJournal : TestData.noJournal }
+    return {}
+}
+
 testLog = function(x){
     print( jsTestFile() + " - " + x )
 }

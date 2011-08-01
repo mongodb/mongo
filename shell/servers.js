@@ -79,6 +79,8 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
             oplogSize: "40",
             nohttpinterface: ""
         };
+    
+    if( jsTestOptions().noJournal ) options["nojournal"] = ""
 
     if ( extraOptions )
         Object.extend( options , extraOptions );
@@ -917,6 +919,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     a.push( "--dbpath" );
     a.push( this.getPath( master ) );
     
+    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
 
     if ( !norepl ) {
         if ( master ){
@@ -1224,6 +1227,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--dbpath" );
     a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
+    
+    if( jsTestOptions.noJournal ) a.push( "--nojournal" )
     
     for ( var k in extra ){
         var v = extra[k];        
