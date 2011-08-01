@@ -47,6 +47,9 @@ namespace mongo {
         fileofs len() { return 0; }
         void fsync() { assert(false); }
 
+        // shrink file to size bytes. No-op if file already smaller.
+        void truncate(fileofs size);
+
         /** @return  -1 if error or unavailable */
         static boost::intmax_t freeSpace(const string &path) { assert(false); return -1; }
     };
@@ -123,6 +126,20 @@ namespace mongo {
             return li.QuadPart;
         }
         void fsync() { FlushFileBuffers(fd); }
+
+        void truncate(fileofs size) {
+            if (len() <= size)
+                return;
+
+            LARGE_INTEGER li;
+            li.QuadPart = size;
+            if (SetFilePointerEx(fd, li, NULL, FILE_BEGIN) == 0){
+                err(false);
+                return; //couldn't seek
+            }
+
+            err(SetEndOfFile(fd));
+        }
     };
 
 #else
@@ -193,6 +210,13 @@ namespace mongo {
             struct statvfs info;
             assert( !statvfs( path.c_str() , &info ) );
             return boost::intmax_t( info.f_bavail ) * info.f_frsize;
+        }
+
+        void truncate(fileofs size) {
+            if (len() <= size)
+                return;
+
+            err(ftruncate(fd, size) == 0);
         }
     };
 

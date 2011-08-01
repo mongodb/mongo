@@ -349,6 +349,7 @@ namespace mongo {
                                 char buf[8192];
                                 memset(buf, 0, 8192);
                                 f.write(0, buf, 8192);
+                                f.truncate(DataLimitPerJournalFile);
                                 f.fsync();
                             }
                             boost::filesystem::rename(temppath, filepath);
