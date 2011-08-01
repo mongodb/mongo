@@ -26,6 +26,7 @@
 #include "stringutils.h"
 #include "../db/jsobj.h"
 #include "file.h"
+#include "ramlog.h"
 
 namespace mongo {
 
@@ -114,35 +115,39 @@ namespace mongo {
         log() << "build info: " << sysInfo() << endl;
     }
 
+
+    static Tee * startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
+
     //
-    // 32 bit systems warning
+    // system warnings
     //
     void show_warnings() {
-        // each message adds a leading but not a trailing newline
+        // each message adds a leading and a trailing newline
 
         bool warned = false;
         {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ) {
-                cout << "\n** NOTE: This is a development version (" << versionString << ") of MongoDB.";
-                cout << "\n**       Not recommended for production." << endl;
+                log() << startupWarningsLog;
+                log() << "** NOTE: This is a development version (" << versionString << ") of MongoDB." << startupWarningsLog;
+                log() << "**       Not recommended for production." << startupWarningsLog;
                 warned = true;
             }
         }
 
         if ( sizeof(int*) == 4 ) {
-            cout << endl;
-            cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-            cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << endl;
-            cout << "**       with --journal, the limit is lower" << endl;
+            log() << startupWarningsLog;
+            log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << startupWarningsLog;
+            log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << startupWarningsLog;
+            log() << "**       with --journal, the limit is lower" << startupWarningsLog;
             warned = true;
         }
 
 #ifdef __linux__
         if (boost::filesystem::exists("/proc/vz") && !boost::filesystem::exists("/proc/bc")) {
-            cout << endl;
-            cout << "** WARNING: You are running in OpenVZ. This is known to be broken!!!" << endl;
+            log() << startupWarningsLog;
+            log() << "** WARNING: You are running in OpenVZ. This is known to be broken!!!" << startupWarningsLog;
             warned = true;
         }
 
@@ -172,22 +177,24 @@ namespace mongo {
                 const char* space = strchr(line, ' ');
                 
                 if ( ! space ) {
-                    cout << "** WARNING: cannot parse numa_maps" << endl;
+                    log() << startupWarningsLog;
+                    log() << "** WARNING: cannot parse numa_maps" << startupWarningsLog;
                     warned = true;
                 }
                 else if ( ! startsWith(space+1, "interleave") ) {
-                    cout << endl;
-                    cout << "** WARNING: You are running on a NUMA machine." << endl;
-                    cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
-                    cout << "**              numactl --interleave=all mongod [other options]" << endl;
+                    log() << startupWarningsLog;
+                    log() << "** WARNING: You are running on a NUMA machine." << startupWarningsLog;
+                    log() << "**          We suggest launching mongod like this to avoid performance problems:" << startupWarningsLog;
+                    log() << "**              numactl --interleave=all mongod [other options]" << startupWarningsLog;
                     warned = true;
                 }
             }
         }
 #endif
 
-        if (warned)
-            cout << endl;
+        if (warned) {
+            log() << startupWarningsLog;
+        }
     }
 
     int versionCmp(StringData rhs, StringData lhs) {
