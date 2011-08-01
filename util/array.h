@@ -18,6 +18,11 @@
 
 namespace mongo {
 
+    /*
+     * simple array class that does no allocations
+     * same api as vector
+     * circular buffer, so first entry in will get overridden
+     */
     template<typename T>
     class FastArray {
     public:
