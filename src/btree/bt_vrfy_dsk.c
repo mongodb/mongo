@@ -23,7 +23,7 @@ static int __wt_verify_dsk_row(
 
 #define	WT_VRFY_ERR(session, quiet, ...) do {				\
 	if (!(quiet))							\
-		__wt_errx(session, __VA_ARGS__);			\
+		WT_FAILURE(session, __VA_ARGS__);			\
 } while (0)
 
 /*
