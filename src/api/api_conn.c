@@ -279,7 +279,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/*
 	 * If the application didn't configure an event handler, use the default
-	 * one, use the default entries for any unconfigured by the application.
+	 * one, use the default entries for any not set by the application.
 	 */
 	if (event_handler == NULL)
 		event_handler = __wt_event_handler_default;
