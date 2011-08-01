@@ -56,7 +56,7 @@ s.s = s._mongos[0] = s["s0"] = conn;
 
 login(adminUser);
 
-d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 34000});
+d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100});
 d1.startSet({keyFile : "jstests/libs/key2"});
 d1.initiate();
 
@@ -118,7 +118,7 @@ assert.eq(result.err, null);
 
 logout(testUser);
 
-d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 36000});
+d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200});
 d2.startSet({keyFile : "jstests/libs/key1"});
 d2.initiate();
 
