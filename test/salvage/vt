@@ -9,6 +9,6 @@ valgrind \
     --leak-check=yes \
     --log-file=vgout.%p \
     --read-var-info=yes \
-    --suppressions=../bt/vt.suppress \
+    --suppressions=../format/vt.suppress \
     --track-fds=yes \
     ./t
