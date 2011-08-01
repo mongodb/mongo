@@ -390,6 +390,10 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	ret = 0;
 	flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
 
+	WT_VERBOSE(session, EVICTSERVER,
+	    "eviction: %s file request: %s",
+	    btree->name, er->close_method ? "close" : "sync");
+
 	/*
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
 	 * __wt_walk_begin restarts the process.
@@ -473,6 +477,10 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 		/* Reference the correct WT_BTREE handle. */
 		request_session = er->session;
 		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
+		WT_VERBOSE(session, EVICTSERVER,
+		    "eviction: %s file request retry: %s",
+		    request_session->btree->name,
+		    er->close_method ? "close" : "sync");
 
 		/*
 		 * Set the reconcile flags: should never be close, but we
@@ -629,6 +637,9 @@ walk:		WT_RET(__wt_walk_begin(
 		cache->evict[slot].btree = btree;
 		++slot;
 		++i;
+
+		WT_VERBOSE(session, EVICTSERVER,
+		    "eviction: %s walk: %" PRIu32, btree->name, WT_PADDR(page));
 	}
 
 	return (0);
