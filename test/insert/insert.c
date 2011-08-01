@@ -128,7 +128,7 @@ usage(void)
 void
 run(void)
 {
-	struct timespec start, stop;
+	clock_t start, stop;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
@@ -226,7 +226,7 @@ run(void)
 
 	/* Insert key/value pairs into the set. */
 	if (nrecs2 != 0) {
-		(void)clock_gettime(CLOCK_VIRTUAL, &start);
+		start = clock();
 
 		for (cnt = 0; cnt < nrecs2; ++cnt) {
 			key.size = snprintf(kbuf, sizeof(kbuf),
@@ -245,10 +245,9 @@ run(void)
 			}
 		}
 
-		(void)clock_gettime(CLOCK_VIRTUAL, &stop);
-		timespecsub(&stop, &start);
-		fprintf(stderr, "timer: %lu.%.2ld\n",
-		    (unsigned long)stop.tv_sec, stop.tv_nsec / 10000000);
+		stop = clock();
+		fprintf(stderr, "timer: %.2lf\n",
+		    (stop - start) / (double)CLOCKS_PER_SEC);
 	}
 
 	assert(session->sync(session, "file:" FILENAME, NULL) == 0);
