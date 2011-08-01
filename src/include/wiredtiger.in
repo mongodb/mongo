@@ -1020,18 +1020,28 @@ int wiredtiger_open(const char *home,
 const char *wiredtiger_strerror(int err);
 
 /*!
- * The interface implemented by applications in order to handle errors messages,
- * information messages and progress.
+ * The interface implemented by applications in order to handle error messages,
+ * information messages and progress.  Entries set to NULL are ignored and will
+ * continue to use the default handlers.
  */
 struct wt_event_handler {
-	/*! Callback to handle errors. */
+	/*!
+	 * Callback to handle error messages; by default, error messages are
+	 * written to the stderr stream.
+	 */
 	void (*handle_error)(WT_EVENT_HANDLER *handler,
 	    int error, const char *errmsg);
 
-	/*! Callback to handle informational messages. */
+	/*!
+	 * Callback to handle informational messages; by default, informational
+	 * messages are written to the stdout stream.
+	 */
 	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
 
-	/*! Callback to handle informational messages. */
+	/*!
+	 * Callback to handle progress messages; by default, progress messages
+	 * are ignored.
+	 */
 	int (*handle_progress)(WT_EVENT_HANDLER *handler,
 	    const char *operation, uint64_t progress);
 };
