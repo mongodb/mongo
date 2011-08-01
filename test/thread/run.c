@@ -99,7 +99,7 @@ reader(void *arg)
 
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();
-	printf("read thread %d starting: tid: %p\n", id, tid);
+	printf(" read thread %2d starting: tid: %p\n", id, tid);
 	pthread_yield();		/* Get all the threads created. */
 
 	key = &_key;
@@ -152,7 +152,7 @@ writer(void *arg)
 
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();
-	printf("write thread %d starting: tid: %p\n", id, tid);
+	printf("write thread %2d starting: tid: %p\n", id, tid);
 	pthread_yield();		/* Get all the threads created. */
 
 	key = &_key;
