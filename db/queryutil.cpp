@@ -80,6 +80,10 @@ namespace mongo {
                 r = r.substr( 0 , r.size() - 1 );
                 return r; //breaking here fails with /^a?/
             }
+            else if (c == '|') {
+                // whole match so far is optional. Nothing we can do here.
+                return string();
+            }
             else if (c == '\\') {
                 c = *(regex++);
                 if (c == 'Q'){
@@ -108,7 +112,7 @@ namespace mongo {
                     ss << c;
                 }
             }
-            else if (strchr("^$.[|()+{", c)) {
+            else if (strchr("^$.[()+{", c)) {
                 // list of "metacharacters" from man pcrepattern
                 r = ss.str();
                 break;
