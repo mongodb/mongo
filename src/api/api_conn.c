@@ -277,8 +277,23 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	opened = 0;
 	*wt_connp = NULL;
 
+	/*
+	 * If the application didn't configure an event handler, use the default
+	 * one, use the default entries for any unconfigured by the application.
+	 */
 	if (event_handler == NULL)
 		event_handler = __wt_event_handler_default;
+	else {
+		if (event_handler->handle_error == NULL)
+			event_handler->handle_error =
+			    __wt_event_handler_default->handle_error;
+		if (event_handler->handle_message == NULL)
+			event_handler->handle_message =
+			    __wt_event_handler_default->handle_message;
+		if (event_handler->handle_progress == NULL)
+			event_handler->handle_progress =
+			    __wt_event_handler_default->handle_progress;
+	}
 
 	/*
 	 * We end up here before we do any real work.   Check the build itself,
