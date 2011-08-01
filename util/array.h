@@ -21,7 +21,8 @@ namespace mongo {
     /*
      * simple array class that does no allocations
      * same api as vector
-     * circular buffer, so first entry in will get overridden
+     * fixed buffer, so once capacity is exceeded, will assert
+     * meant to be-reused with clear()
      */
     template<typename T>
     class FastArray {
@@ -49,6 +50,7 @@ namespace mongo {
         }
 
         void push_back( const T& t ) {
+            assert( _size < _capacity );
             _data[_size++] = t;
         }
 
