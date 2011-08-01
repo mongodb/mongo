@@ -33,13 +33,6 @@ namespace mongo {
             /** call during startup by journalMakeDir() */
             void init();
 
-            /** check if time to rotate files.  assure a file is open.
-                done separately from the journal() call as we can do this part
-                outside of lock.
-                thread: durThread()
-             */
-            void rotate();
-
             /** write to journal
             */
             void journal(const AlignedBuilder& b);
@@ -61,6 +54,11 @@ namespace mongo {
             void open();
 
         private:
+            /** check if time to rotate files.  assure a file is open.
+             *  internally called with every commit
+             */
+            void _rotate();
+
             void _open();
             void closeCurrentJournalFile();
             void removeUnneededJournalFiles();

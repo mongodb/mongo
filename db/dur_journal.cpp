@@ -599,17 +599,7 @@ namespace mongo {
             j._ageOut = a;
         }
 
-        /** check if time to rotate files.  assure a file is open.
-            done separately from the journal() call as we can do this part
-            outside of lock.
-            thread: durThread()
-         */
-        void journalRotate() {
-            j.rotate();
-        }
-        void Journal::rotate() {
-            scoped_lock lk(_curLogFileMutex);
-
+        void Journal::_rotate() {
             if ( inShutdown() || !_curLogFile )
                 return;
 
@@ -653,6 +643,8 @@ namespace mongo {
                 stats.curr->_journaledBytes += b.len();
                 _written += b.len();
                 _curLogFile->synchronousAppend((void *) b.buf(), b.len());
+
+                _rotate();
             }
             catch(std::exception& e) {
                 log() << "warning exception in dur::journal " << e.what() << endl;

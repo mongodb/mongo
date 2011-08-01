@@ -494,8 +494,6 @@ namespace mongo {
             if( !lk1->got() )
                 return false;
 
-            journalRotate();
-
             scoped_lock lk2(groupCommitMutex);
 
             commitJob.beginCommit();
@@ -561,8 +559,6 @@ namespace mongo {
 
        /** locking: in read lock when called. */
         static void _groupCommit() {
-            journalRotate();
-
             commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
