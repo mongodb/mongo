@@ -43,8 +43,17 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 			--btree->freelist_entries;
 			__wt_free(session, fe);
+
+			WT_VERBOSE(session, ALLOCATE,
+			    "allocate: block %" PRIu32 "/%" PRIu32,
+			    *addrp, size);
 			return (0);
 		}
+
+		WT_VERBOSE(session, ALLOCATE,
+		    "allocate: partial block %" PRIu32 "/%" PRIu32
+		    " from %" PRIu32 "/%" PRIu32,
+		    *addrp, size, fe->addr, fe->size);
 
 		/*
 		 * Otherwise, adjust the entry.   The address remains correctly
@@ -66,6 +75,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 			TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 		else
 			TAILQ_INSERT_BEFORE(fe, new, qs);
+
 		return (0);
 	}
 
@@ -115,6 +125,9 @@ __wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
 
+	WT_VERBOSE(session, ALLOCATE,
+	    "allocate: file extend %" PRIu32 "/%" PRIu32, *addrp, size);
+
 	WT_STAT_INCR(btree->stats, extend);
 	return (0);
 }
@@ -132,14 +145,17 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 	btree = session->btree;
 	new = NULL;
 
-	if (addr == WT_ADDR_INVALID) {
-		__wt_errx(session, "attempt to free an invalid file address");
-		return (WT_ERROR);
-	}
-	if (size % btree->allocsize != 0) {
-		__wt_errx(session, "attempt to free an invalid block size");
-		return (WT_ERROR);
-	}
+	if (addr == WT_ADDR_INVALID)
+		WT_FAILURE_RET(session,
+		    WT_ERROR, "attempt to free an invalid file address");
+	if (size % btree->allocsize != 0)
+		WT_FAILURE_RET(session, WT_ERROR,
+		    "attempt to free an invalid block size: %" PRIu32
+		    "not a multiple of %" PRIu32,
+		    size, btree->allocsize);
+
+	WT_VERBOSE(session, ALLOCATE,
+	    "allocate: free %" PRIu32 "/%" PRIu32, addr, size);
 
 	btree->freelist_dirty = 1;
 
@@ -221,14 +237,14 @@ combine:/*
 	    fe->addr + (fe->size / btree->allocsize) > new->addr) ||
 	    ((fe = TAILQ_NEXT(new, qa)) != NULL &&
 	    new->addr + (new->size / btree->allocsize) > fe->addr)) {
-		__wt_errx(session, "block free at addr range "
-		    "%" PRIu32 "-%" PRIu32
+		TAILQ_REMOVE(&btree->freeqa, new, qa);
+
+		WT_FAILURE_RET(session, WT_ERROR,
+		    "block free at addr range %" PRIu32 "-%" PRIu32
 		    " overlaps already free block at addr range "
 		    "%" PRIu32 "-%" PRIu32,
 		    new->addr, new->addr + (new->size / btree->allocsize),
 		    fe->addr, fe->addr + (fe->size / btree->allocsize));
-		TAILQ_REMOVE(&btree->freeqa, new, qa);
-		return (WT_ERROR);
 	}
 #endif
 
@@ -330,6 +346,10 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	if (btree->freelist_entries == 0)
 		goto done;
 
+#ifdef HAVE_DIAGNOSTIC
+	__wt_block_dump(session);
+#endif
+
 	/* Truncate the file if possible. */
 	WT_RET(__wt_block_truncate(session));
 
@@ -416,6 +436,11 @@ __wt_block_truncate(WT_SESSION_IMPL *session)
 		if (WT_ADDR_TO_OFF(btree, fe->addr) + (off_t)fe->size !=
 		    fh->file_size)
 			break;
+
+		WT_VERBOSE(session, ALLOCATE,
+		    "allocate: truncate free-list %" PRIu32 "/%" PRIu32,
+		    fe->addr, fe->size);
+
 		fh->file_size -= fe->size;
 		need_trunc = 1;
 
@@ -462,15 +487,14 @@ __wt_block_dump(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	fprintf(stderr, "Freelist by addr:");
+	WT_VERBOSE(session, ALLOCATE, "allocate: freelist by addr:");
 	TAILQ_FOREACH(fe, &btree->freeqa, qa)
-		fprintf(stderr, " {%" PRIu32 "/%" PRIu32 "}",
-		    fe->addr, fe->size);
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Freelist by size:");
+		WT_VERBOSE(session, ALLOCATE,
+		    "\t{%" PRIu32 "/%" PRIu32 "}", fe->addr, fe->size);
+
+	WT_VERBOSE(session, ALLOCATE, "allocate: freelist by size:");
 	TAILQ_FOREACH(fe, &btree->freeqs, qs)
-		fprintf(stderr, " {%" PRIu32 "/%" PRIu32 "}",
-		    fe->addr, fe->size);
-	fprintf(stderr, "\n");
+		WT_VERBOSE(session, ALLOCATE,
+		    "\t{%" PRIu32 "/%" PRIu32 "}", fe->addr, fe->size);
 }
 #endif

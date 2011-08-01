@@ -272,5 +272,6 @@ __wt_confchk_wiredtiger_open =
     "error_prefix=(),exclusive=(type=boolean),extensions=(type=list),"
     "hazard_max=(type=int,min=3),logging=(type=boolean),"
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
-    "verbose=(type=list,choices=[\"evictserver\",\"fileops\",\"hazard\","
-    "\"mutex\",\"read\",\"readserver\",\"reconcile\",\"salvage\",\"write\"])";
+    "verbose=(type=list,choices=[\"allocate\",\"evictserver\",\"fileops\","
+    "\"hazard\",\"mutex\",\"read\",\"readserver\",\"reconcile\",\"salvage\","
+    "\"write\"])";
