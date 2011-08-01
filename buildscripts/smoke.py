@@ -110,7 +110,7 @@ class mongod(object):
         sock.connect(("localhost", int(port)))
         sock.close()
 
-    def did_mongod_start(self, port=mongod_port, timeout=90):
+    def did_mongod_start(self, port=mongod_port, timeout=300):
         while timeout > 0:
             time.sleep(1)
             try:
@@ -119,6 +119,7 @@ class mongod(object):
             except Exception,e:
                 print >> sys.stderr, e
                 timeout = timeout - 1
+        print >> sys.stderr, "timeout starting mongod"
         return False
 
     def start(self):
