@@ -78,7 +78,7 @@ namespace mongo {
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
     public:
-        static const int MaxScanAndOrderBytes;
+        static const unsigned MaxScanAndOrderBytes;
 
         ScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs) :
             _best( BSONObjCmp( order ) ),

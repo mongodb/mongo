@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    const unsigned ScanAndOrder::MaxScanAndOrderBytes = 32 * 1024 * 1024;
+
     void ScanAndOrder::_add(BSONObj& k, BSONObj o, DiskLoc* loc) {
         if (!loc) {
             _best.insert(make_pair(k.getOwned(),o.getOwned()));
@@ -58,7 +60,7 @@ namespace mongo {
             _approxSize += o.objsize();
             
             /* note : adjust when bson return limit adjusts. note this limit should be a bit higher. */
-            uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", _approxSize < 32 * 1024 * 1024 );
+            uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", _approxSize < MaxScanAndOrderBytes );
             
             _add(k, o, loc);
             return;
@@ -83,7 +85,7 @@ namespace mongo {
             nFilled++;
             if ( nFilled >= _limit )
                 break;
-            uassert( 10129 ,  "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
+            uassert( 10129 ,  "too much data for sort() with no index", b.len() < (int)MaxScanAndOrderBytes ); // appserver limit
         }
         nout = nFilled;
     }
