@@ -28,6 +28,7 @@
 
 void build(int, int, int);
 void copy(u_int, u_int);
+void empty(int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
@@ -393,6 +394,7 @@ run(int r)
 		 * records.
 		 */
 		build(100, 100, 10); copy(1, 100);
+		empty(99);
 		print_res(100, 100, 10);
 		break;
 	case 23:
@@ -403,6 +405,7 @@ run(int r)
 		build(100, 100, 10); copy(1, 1);
 		build(138, 138, 10); copy(1, 48);
 		print_res(100, 100, 10);
+		empty(37);
 		print_res(138, 138, 10);
 		break;
 	default:
@@ -620,8 +623,22 @@ process(void)
 }
 
 /*
+ * empty --
+ *	Print empty print_res, for fixed-length column-store files.
+ */
+void
+empty(int cnt)
+{
+	int i;
+
+	if (page_type == WT_PAGE_COL_FIX)
+		for (i = 0; i < cnt; ++i)
+			fputs("\\00\n", res_fp);
+}
+
+/*
  * print_res --
- *	Build results file.
+ *	Write results file.
  */
 void
 print_res(int key, int value, int cnt)
