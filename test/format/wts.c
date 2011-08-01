@@ -17,15 +17,6 @@ static int  wts_row_put(uint64_t, int);
 static int  wts_sync(void);
 static void wts_stream_item(const char *, WT_ITEM *);
 
-static void
-handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
-{
-	UNUSED(handler);
-	UNUSED(error);
-
-	fprintf(stderr, "%s\n", errmsg);
-}
-
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
@@ -54,7 +45,7 @@ handle_progress(WT_EVENT_HANDLER *handler,
 
 
 static WT_EVENT_HANDLER event_handler = {
-	handle_error,
+	NULL,
 	handle_message,
 	handle_progress
 };
