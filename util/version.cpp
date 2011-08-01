@@ -27,6 +27,7 @@
 #include "../db/jsobj.h"
 #include "file.h"
 #include "ramlog.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
@@ -188,6 +189,18 @@ namespace mongo {
                     log() << "**              numactl --interleave=all mongod [other options]" << startupWarningsLog;
                     warned = true;
                 }
+            }
+        }
+
+        if (cmdLine.dur){
+            fstream f ("/proc/sys/vm/overcommit_memory", ios_base::in);
+            unsigned val;
+            f >> val;
+
+            if (val == 2) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: /proc/sys/vm/overcommit_memory is " << val << startupWarningsLog;
+                log() << "**          Journaling works best with it set to 0 or 1" << startupWarningsLog;
             }
         }
 #endif
