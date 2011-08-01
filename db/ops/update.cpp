@@ -1292,8 +1292,7 @@ namespace mongo {
                         nsdt = &NamespaceDetailsTransient::get_w(ns);
                     }
 
-                    if (atomic)
-                        getDur().commitIfNeeded();
+                    getDur().commitIfNeeded();
 
                     continue;
                 }
