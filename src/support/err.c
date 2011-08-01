@@ -11,9 +11,10 @@
  * __wt_errv --
  * 	Report an error to an event handler.
  */
-void
+static void
 __wt_errv(WT_SESSION_IMPL *session, int error,
-    const char *prefix1, const char *prefix2, const char *fmt, va_list ap)
+    const char *prefix1, const char *prefix2,
+    const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
 	char *end, *p;
@@ -35,6 +36,9 @@ __wt_errv(WT_SESSION_IMPL *session, int error,
 		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
 	else if (prefix2 != NULL && p < end)
 		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
+	if (file_name != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p),
+		    "%s, %d: ", file_name, line_number);
 	if (p < end)
 		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
 	if (error != 0 && p < end)
@@ -59,6 +63,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
 	__wt_errv(session, error,
 	    (session->btree != NULL) ? session->btree->name : NULL,
 	    session->name,
+	    NULL, 0,
 	    fmt, ap);
 	va_end(ap);
 }
@@ -77,6 +82,7 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 	__wt_errv(session, 0,
 	    (session->btree != NULL) ? session->btree->name : NULL,
 	    session->name,
+	    NULL, 0,
 	    fmt, ap);
 	va_end(ap);
 }
@@ -134,6 +140,7 @@ __wt_failure(WT_SESSION_IMPL *session,
 	__wt_errv(session, error,
 	    (session->btree != NULL) ? session->btree->name : NULL,
 	    session->name,
+	    file_name, line_number,
 	    fmt, ap);
 	va_end(ap);
 
