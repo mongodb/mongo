@@ -26,12 +26,9 @@ __wt_disk_read(
 
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
-	if (checksum != __wt_cksum(dsk, size)) {
-		__wt_errx(session,
-		    "read checksum error: addr/size %" PRIu32 "/%" PRIu32,
-		    addr, size);
-		return (WT_ERROR);
-	}
+	if (checksum != __wt_cksum(dsk, size))
+		WT_FAILURE_RET(session, WT_ERROR,
+		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
 
 	WT_STAT_INCR(btree->stats, page_read);
 	WT_STAT_INCR(S2C(session)->stats, cache_page_read);
