@@ -3621,6 +3621,9 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	    sizeof(WT_HAZARD), __hazard_bsearch_cmp) == NULL)
 		return (0);
 
+	WT_VERBOSE(session, RECONCILE,
+	    "reconcile: %" PRIu32 " hazard request failed", ref->addr);
+
 	/* Return the page to in-use. */
 	ref->state = WT_REF_MEM;
 
