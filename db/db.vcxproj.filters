@@ -175,6 +175,7 @@
     <ClCompile Include="..\third_party\snappy\snappy.cc">
       <Filter>snappy</Filter>
     </ClCompile>
+    <ClCompile Include="scanandorder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

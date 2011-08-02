@@ -893,6 +893,9 @@
     <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
       <Filter>misc and third party\snappy</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\scanandorder.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

@@ -332,6 +332,7 @@
     <ClCompile Include="..\db\repl\rs_rollback.cpp" />
     <ClCompile Include="..\db\repl\rs_sync.cpp" />
     <ClCompile Include="..\db\restapi.cpp" />
+    <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
