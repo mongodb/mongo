@@ -51,8 +51,8 @@ namespace mongo {
 
 #define RACECHECK
         // dm TODO - the right code for this file is in a different branch at the moment (merge)
-        //#define RACECHECK \
-        //static race::CodePoint __cp(__FILE__); \
+        //#define RACECHECK 
+        //static race::CodePoint __cp(__FILE__); 
         //race::Check __ck(__cp);
 
     class CodeBlock { 
