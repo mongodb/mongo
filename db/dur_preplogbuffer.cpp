@@ -60,7 +60,7 @@ namespace mongo {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
 
-            _IF( !mmf->willNeedRemap() ) {
+            if( unlikely(!mmf->willNeedRemap()) ) {
                 // tag this mmf as needed a remap of its private view later.
                 // usually it will already be dirty/already set, so we do the if above first
                 // to avoid possibility of cpu cache line contention
@@ -97,7 +97,7 @@ namespace mongo {
 #endif
             bb.appendBuf(i->start(), e.len);
 
-            _IF (e.len != (unsigned)i->length()) {
+            if (unlikely(e.len != (unsigned)i->length())) {
                 log() << "journal info splitting prepBasicWrite at boundary" << endl;
 
                 // This only happens if we write to the last byte in a file and

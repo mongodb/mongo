@@ -13,9 +13,9 @@
 
 /* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
 
-// branch prediction.  indicate we expect to enter the if statement body
-#define IF MONGOIF
+// branch prediction.  indicate we expect to be true
+#define likely MONGO_likely
 
-// branch prediction.  indicate we expect to not enter the if statement body
-#define _IF MONGO_IF
+// branch prediction.  indicate we expect to be false
+#define unlikely MONGO_unlikely
 

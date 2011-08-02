@@ -37,7 +37,7 @@ namespace mongo {
         */
         BSONObjIterator(const BSONObj& jso) {
             int sz = jso.objsize();
-            MONGO_IF ( sz == 0 ) {
+            if ( MONGO_unlikely(sz == 0) ) {
                 _pos = _theend = 0;
                 return;
             }

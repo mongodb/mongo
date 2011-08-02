@@ -101,7 +101,7 @@ namespace mongo {
         int start = 0;
         int n = 0;
 
-        _IF ( !cc ) {
+        if ( unlikely(!cc) ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;

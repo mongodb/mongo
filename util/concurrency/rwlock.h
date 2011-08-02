@@ -175,7 +175,7 @@ namespace mongo {
         pthread_rwlock_t _lock;
         const int _lowPriorityWaitMS;    
         static void check( int x ) {
-            MONGOIF( x == 0 )
+            if( likely(x == 0) )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
             assert( x == 0 );

@@ -101,7 +101,7 @@ namespace mongo {
         inline char* grow(unsigned by) {
             unsigned oldlen = _len;
             _len += by;
-            MONGO_IF ( _len > _p._size ) {
+            if (MONGO_unlikely( _len > _p._size )) {
                 growReallocate(oldlen);
             }
             return _p._data + oldlen;

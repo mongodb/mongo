@@ -345,7 +345,7 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
-#define MONGO_LOG(level) MONGO_IF ( logLevel >= (level) ) log( level )
+#define MONGO_LOG(level) if ( MONGO_unlikely(logLevel >= (level)) ) log( level )
 #define LOG MONGO_LOG
 
     inline Nullstream& log( LogLevel l ) {

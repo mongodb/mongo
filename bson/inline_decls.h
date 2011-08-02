@@ -37,11 +37,11 @@ namespace mongo {
 
 #if !defined(__GNUC__)
 
-// branch prediction.  indicate we expect to enter the if statement body
-# define MONGOIF(x) if( (x) )
+// branch prediction.  indicate we expect to be true
+# define MONGO_likely(x) ((bool)(x))
 
-// branch prediction.  indicate we expect to not enter the if statement body
-# define MONGO_IF(x) if( (x) )
+// branch prediction.  indicate we expect to be false
+# define MONGO_unlikely(x) ((bool)(x))
 
 # if defined(_WIN32)
     // prefetch data from memory
@@ -56,8 +56,8 @@ namespace mongo {
 
 #else
 
-# define MONGOIF(x) if( __builtin_expect((x), 1) )
-# define MONGO_IF(x) if( __builtin_expect((x), 0) )
+# define MONGO_likely(x) ( __builtin_expect((bool)(x), 1) )
+# define MONGO_unlikely(x) ( __builtin_expect((bool)(x), 0) )
 
     inline void prefetch(void *p) { 
         __builtin_prefetch(p);
