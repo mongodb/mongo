@@ -138,7 +138,11 @@ namespace mongo {
     void asserted(const char *msg, const char *file, unsigned line);
 }
 
-#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+
+
+// TODO: Rework the headers so we don't need this craziness
+#include "bson/inline_decls.h"
+#define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include "util/debug_util.h"
 #include "util/goodies.h"
