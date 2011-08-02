@@ -3,6 +3,7 @@
 #include "../third_party/snappy/snappy.h"
 #include "compress.h"
 #include <string>
+#include <string.h>
 #include <assert.h>
 
 namespace mongo {
@@ -32,6 +33,7 @@ namespace mongo {
             const char * c = "this is a test";
             std::string s;
             size_t len = compress(c, strlen(c)+1, &s);
+	    assert( len > 0 );
 
             std::string out;
             bool ok = uncompress(s.c_str(), s.size(), &out);

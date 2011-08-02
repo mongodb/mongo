@@ -94,7 +94,7 @@ namespace mongo {
             throws
         */
         class JournalSectionIterator : boost::noncopyable {
-            unique_ptr<BufReader> _entries;
+            auto_ptr<BufReader> _entries;
             const JSectHeader _h;
             const char *_lastDbName; // pointer into mmaped journal file
             const bool _doDurOps;
@@ -114,15 +114,16 @@ namespace mongo {
                 }
                 const char *p = _uncompressed.c_str();
                 assert( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
-                _entries = unique_ptr<BufReader>( new BufReader(p, _uncompressed.size()) );
+                _entries = auto_ptr<BufReader>( new BufReader(p, _uncompressed.size()) );
             }
 
             // we work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
             JournalSectionIterator(const JSectHeader &h, const void *p, unsigned len) :
+                _entries( new BufReader((const char *) p, len) ),
                 _h(h),
                 _lastDbName(0)
-                , _doDurOps(false),
-                _entries( new BufReader((const char *) p, len) )
+                , _doDurOps(false)
+
                 { }
 
             bool atEof() const { return _entries->atEof(); }
@@ -318,24 +319,26 @@ namespace mongo {
                 return;
             }
 
-            unique_ptr<JournalSectionIterator> i;
+            auto_ptr<JournalSectionIterator> i;
             if( _recovering ) {
-                i = unique_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, p, len, _recovering));
+                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, p, len, _recovering));
             }
             else { 
-                i = unique_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, /*after header*/p, /*w/out header*/len));
+                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, /*after header*/p, /*w/out header*/len));
             }
 
             // we use a static so that we don't have to reallocate every time through.  occasionally we 
             // go back to a small allocation so that if there were a spiky growth it won't stick forever.
             static vector<ParsedJournalEntry> entries;
             entries.clear();
+/** TEMP uncomment
             RARELY OCCASIONALLY {
                 if( entries.capacity() > 2048 ) {
                     entries.shrink_to_fit();
                     entries.reserve(2048);
                 }
             }
+*/
 
             // first read all entries to make sure this section is valid
             ParsedJournalEntry e;

@@ -92,6 +92,8 @@ namespace mongo {
     
 #else
 
+#define RACECHECK
+
     class CodeBlock{ 
     public:
         class Within { 
