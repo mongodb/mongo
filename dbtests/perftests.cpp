@@ -640,6 +640,7 @@ namespace PerfTests {
             if( once++ == 0 )
                 cout << "compress round trip " << sz/(1024.0*1024) / (t.millis()/1000.0) << "MB/sec\n";
             //cout << len / (1024.0/1024) << " compressed" << endl;
+            (void)len; //fix unused error while above line is commented out
         }
         void post() {
             ASSERT( memcmp(res.c_str(), p, sz) == 0 );
