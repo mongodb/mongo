@@ -110,7 +110,7 @@ namespace mongo {
                 if( !ok ) { 
                     // it should always be ok (i think?) as there is a previous check to see that the JSectFooter is ok
                     log() << "couldn't uncompress journal section" << endl;
-                    msgasserted(0, "couldn't uncompress journal section");
+                    msgasserted(15874, "couldn't uncompress journal section");
                 }
                 const char *p = _uncompressed.c_str();
                 assert( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
