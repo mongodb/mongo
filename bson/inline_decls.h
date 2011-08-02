@@ -60,6 +60,7 @@ namespace mongo {
 # define MONGO_IF(x) if( __builtin_expect((x), 0) )
 
     inline void prefetch(void *p) { 
+        __builtin_prefetch(p);
     }
 
 #endif
