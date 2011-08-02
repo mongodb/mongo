@@ -503,7 +503,7 @@ elif "linux2" == os.sys.platform or "linux3" == os.sys.platform:
 elif "sunos5" == os.sys.platform:
      nix = True
      solaris = True
-     env.Append( CPPDEFINES=[ "__sunos__" ] )
+     env.Append( CPPDEFINES=[ "__sunos__" , "_FILE_OFFSET_BITS=64" ] )
      env.Append( LIBS=["socket","resolv"] )
 
 elif os.sys.platform.startswith( "freebsd" ):
