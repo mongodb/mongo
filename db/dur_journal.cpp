@@ -329,13 +329,13 @@ namespace mongo {
 
         void preallocateFiles() {
             if( exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
-                exists(getJournalDir()/"prealloc.1") || 
-                preallocateIsFaster() ) {
+                exists(getJournalDir()/"prealloc.1") ||
+                ( cmdLine.preallocj && preallocateIsFaster() ) ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();
                     }
-                    catch(...) { 
+                    catch(...) {
                         log() << "warning caught exception in preallocateFiles, continuing" << endl;
                     }
             }

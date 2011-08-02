@@ -627,6 +627,7 @@ int main(int argc, char* argv[]) {
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
+    ("nopreallocj", "don't preallocate journal files")
     ("dur", "enable journaling") // deprecated version
     ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
     // deprecated pairing command line options
@@ -750,6 +751,9 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("nohints")) {
             useHints = false;
+        }
+        if (params.count("nopreallocj")) {
+            cmdLine.preallocj = false;
         }
         if (params.count("nohttpinterface")) {
             noHttpInterface = true;
