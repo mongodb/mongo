@@ -425,6 +425,7 @@ namespace mongo {
            Can be useful as index namespaces share the same start as the regular collection.
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
         static void clearForPrefix(const char *prefix);
+        static void eraseForPrefix(const char *prefix);
 
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
