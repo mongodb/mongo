@@ -1119,7 +1119,8 @@ def checkErrorCodes():
 checkErrorCodes()
 
 snappyEnv = env.Clone()
-snappyEnv.Append(CPPFLAGS="-Wno-sign-compare -Wno-unused-function") #snappy doesn't compile cleanly
+if not windows:
+    snappyEnv.Append(CPPFLAGS="-Wno-sign-compare -Wno-unused-function") #snappy doesn't compile cleanly
 serverOnlyFiles += [snappyEnv.Object(f) for f in snappyFiles]
 
 
