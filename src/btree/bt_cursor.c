@@ -362,7 +362,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		if (ret == 0) {
 			ret = __wt_return_data(session,
 			    NULL, (WT_ITEM *)&cursor->value, 0);
-			__wt_page_out(session, session->srch_page);
+			__wt_page_release(session, session->srch_page);
 		}
 		break;
 	case BTREE_ROW:
@@ -373,7 +373,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 			ret = __wt_return_data(session,
 			    (WT_ITEM *)&cursor->key,
 			    (WT_ITEM *)&cursor->value, 0);
-			__wt_page_out(session, session->srch_page);
+			__wt_page_release(session, session->srch_page);
 		}
 		break;
 	WT_ILLEGAL_FORMAT(session);

@@ -18,11 +18,11 @@ static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
 /*
- * __wt_page_free --
- *	Free all memory associated with a page.
+ * __wt_page_out --
+ *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_page_free(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);

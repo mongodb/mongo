@@ -53,7 +53,7 @@ __wt_col_modify(
 		hazard_ref = page == session->btree->root_page.page ? 0 : 1;
 		ret = __col_extend(session, page, recno);
 		if (hazard_ref)
-			__wt_page_out(session, page);
+			__wt_page_release(session, page);
 		return (ret == 0 ? WT_RESTART : 0);
 	}
 
@@ -126,7 +126,7 @@ err:		if (ins != NULL)
 	if (new_ins != NULL)
 		__wt_free(session, new_ins);
 
-	__wt_page_out(session, page);
+	__wt_page_release(session, page);
 
 	return (0);
 }

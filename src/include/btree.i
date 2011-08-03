@@ -19,7 +19,7 @@ STATIN uint8_t	__wt_fix_getv_recno(WT_BTREE *, WT_PAGE *, uint64_t);
 STATIN void	__wt_fix_setv(WT_BTREE *, uint32_t, uint8_t *, uint8_t);
 STATIN void	__wt_fix_setv_recno(WT_BTREE *, WT_PAGE *, uint64_t, uint8_t);
 STATIN int	__wt_off_page(WT_PAGE *, const void *);
-STATIN void	__wt_page_out(WT_SESSION_IMPL *, WT_PAGE *);
+STATIN void	__wt_page_release(WT_SESSION_IMPL *, WT_PAGE *);
 STATIN int	__wt_page_reconcile(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 STATIN int	__wt_page_write_gen_check(WT_PAGE *, uint32_t);
 
@@ -184,12 +184,12 @@ __wt_page_reconcile(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 }
 
 /*
- * __wt_page_out --
+ * __wt_page_release --
  *	Release a reference to a page, unless it's the root page, which remains
  * pinned for the life of the table handle.
  */
 static inline void
-__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	if (page != NULL && !WT_PAGE_IS_ROOT(page))
 		__wt_hazard_clear(session, page);

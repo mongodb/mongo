@@ -214,7 +214,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 		WT_TRET(__wt_evict_file_serial(session, 1));
 		if (btree->root_page.page != NULL)
-			__wt_page_free(session, btree->root_page.page, 0);
+			__wt_page_out(session, btree->root_page.page, 0);
 	}
 
 	/* Write out the free list. */

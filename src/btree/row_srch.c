@@ -243,7 +243,7 @@ done:	/*
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	__wt_page_out(session, page);
+err:	__wt_page_release(session, page);
 	return (ret);
 }
 

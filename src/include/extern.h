@@ -204,7 +204,7 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
 extern int __wt_desc_read(WT_SESSION_IMPL *session);
 extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
-extern void __wt_page_free(WT_SESSION_IMPL *session,
+extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
 extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);

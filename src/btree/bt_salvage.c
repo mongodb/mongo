@@ -593,7 +593,7 @@ err:		if (trk != NULL)
 			__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_free(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -1217,7 +1217,7 @@ err:	/* Reset the page. */
 
 	/* Discard our hazard reference and the page. */
 	__wt_hazard_clear(session, page);
-	__wt_page_free(session, page, 0);
+	__wt_page_out(session, page, 0);
 
 	return (ret);
 }
@@ -1616,7 +1616,7 @@ __slvg_row_trk_update_start(
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 	if (page != NULL)
-		__wt_page_free(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
 
 err:	__wt_scr_release(&dsk);
 	__wt_scr_release(&key);
@@ -1911,7 +1911,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 
 	/* Discard our hazard reference and the page. */
 err:	__wt_hazard_clear(session, page);
-	__wt_page_free(session, page, 0);
+	__wt_page_out(session, page, 0);
 
 	__wt_scr_release(&key);
 
