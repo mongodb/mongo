@@ -970,7 +970,8 @@ jsTestPath = function(){
 }
 
 jsTestOptions = function(){
-    if( TestData ) return { noJournal : TestData.noJournal }
+    if( TestData ) return { noJournal : TestData.noJournal,
+                            noJournalPrealloc : TestData.noJournalPrealloc }
     return {}
 }
 

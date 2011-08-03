@@ -81,6 +81,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
         };
     
     if( jsTestOptions().noJournal ) options["nojournal"] = ""
+    if( jsTestOptions().noJournalPrealloc ) options["nopreallocj"] = ""
 
     if ( extraOptions )
         Object.extend( options , extraOptions );
@@ -920,6 +921,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     a.push( this.getPath( master ) );
     
     if( jsTestOptions().noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
 
     if ( !norepl ) {
         if ( master ){
@@ -1228,7 +1230,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     a.push( "--dbpath" );
     a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
     
-    if( jsTestOptions.noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
     
     for ( var k in extra ){
         var v = extra[k];        
