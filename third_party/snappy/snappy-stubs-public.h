@@ -36,7 +36,7 @@
 #ifndef UTIL_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
 #define UTIL_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
 
-#if 1
+#if !defined(_WIN32)
 #include <stdint.h>
 #endif
 
@@ -54,7 +54,7 @@
 
 namespace snappy {
 
-#if 1
+#if !defined(_WIN32)
 typedef int8_t int8;
 typedef uint8_t uint8;
 typedef int16_t int16;
