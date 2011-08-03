@@ -131,18 +131,18 @@ run(void)
 	clock_t start, stop;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
 	WT_SESSION *session;
-	int cnt, ikey, ret;
+	const char *key, *value;
 	char config[256], kbuf[64], vbuf[64];
+	int cnt, ikey, ret;
+	uint8_t bitf;
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
 		(void)snprintf(config, sizeof(config),
-		    "key_format=r,"
-		    "value_format=%dt,"
+		    "key_format=r,value_format=%dt,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -150,7 +150,7 @@ run(void)
 		break;
 	case WT_PAGE_COL_VAR:
 		(void)snprintf(config, sizeof(config),
-		    "key_format=r,"
+		    "key_format=r,value_format=S,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -158,7 +158,7 @@ run(void)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		(void)snprintf(config, sizeof(config),
-		    "key_format=u,"
+		    "key_format=S,value_format=S,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -169,9 +169,7 @@ run(void)
 	}
 	assert(session->create(session, "file:" FILENAME, config) == 0);
 	assert(session->open_cursor(
-	    session, "file:" FILENAME, NULL, "raw", &cursor) == 0);
-	if (page_type != WT_PAGE_ROW_LEAF)
-		cursor->recno = 0;
+	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
 
 	/* Create the initial key/value pairs. */
 	ikey = 100;
@@ -179,44 +177,40 @@ run(void)
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			++cursor->recno;
+			cursor->set_key(cursor, (uint64_t)cnt + 1);
 			break;
 		case WT_PAGE_ROW_LEAF:
-			key.size = snprintf(
-			    kbuf, sizeof(kbuf), "%010d KEY------", ikey);
-			key.data = kbuf;
-			cursor->set_key(cursor, &key);
+			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
+			cursor->set_key(cursor, kbuf);
 			break;
 		}
 
 		switch (page_type) {			/* Build the value. */
 		case WT_PAGE_COL_FIX:
 			switch (bitcnt) {
-			case 8: vbuf[0] = cnt & 0xff; break;
-			case 7: vbuf[0] = cnt & 0x7f; break;
-			case 6: vbuf[0] = cnt & 0x3f; break;
-			case 5: vbuf[0] = cnt & 0x1f; break;
-			case 4: vbuf[0] = cnt & 0x0f; break;
-			case 3: vbuf[0] = cnt & 0x07; break;
-			case 2: vbuf[0] = cnt & 0x03; break;
+			case 8: bitf = cnt & 0xff; break;
+			case 7: bitf = cnt & 0x7f; break;
+			case 6: bitf = cnt & 0x3f; break;
+			case 5: bitf = cnt & 0x1f; break;
+			case 4: bitf = cnt & 0x0f; break;
+			case 3: bitf = cnt & 0x07; break;
+			case 2: bitf = cnt & 0x03; break;
 			case 1:
-			default:vbuf[0] = cnt & 0x01; break;
+			default: bitf = cnt & 0x01; break;
 			}
-			value.size = 1;
+			cursor->set_value(cursor, bitf);
 			break;
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
 			if (cnt != 1 &&
 			    cnt != 500 && cnt != 1000 && flags & DUPS)
-				value.size =
-				    strlen(strcpy(vbuf, "----- VALUE -----"));
+				strcpy(vbuf, "----- VALUE -----");
 			else
-				value.size = snprintf(vbuf,
-				    sizeof(vbuf), "%010d VALUE----", cnt);
+				snprintf(vbuf, sizeof(vbuf),
+				    "%010d VALUE----", cnt);
+			cursor->set_value(cursor, vbuf);
 			break;
 		}
-		value.data = vbuf;
-		cursor->set_value(cursor, &value);
 		if ((ret = cursor->update(cursor)) != 0) {
 			fprintf(stderr,
 			    "cursor->update: %s\n", wiredtiger_strerror(ret));
@@ -229,14 +223,11 @@ run(void)
 		start = clock();
 
 		for (cnt = 0; cnt < nrecs2; ++cnt) {
-			key.size = snprintf(kbuf, sizeof(kbuf),
+			snprintf(kbuf, sizeof(kbuf),
 			    "%010d KEY APPEND %010d", 105, cnt);
-			key.data = kbuf;
-			cursor->set_key(cursor, &key);
-			value.size = snprintf(vbuf,
-			    sizeof(vbuf), "%010d VALUE----", cnt);
-			value.data = vbuf;
-			cursor->set_value(cursor, &value);
+			cursor->set_key(cursor, kbuf);
+			snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", cnt);
+			cursor->set_value(cursor, vbuf);
 			if ((ret = cursor->update(cursor)) != 0) {
 				fprintf(stderr,
 				    "cursor->update: %s\n",
@@ -254,25 +245,27 @@ run(void)
 
 	if (flags & PRINT) {
 		while ((ret = cursor->next(cursor)) == 0) {
-			if ((ret = cursor->get_key(cursor, &key)) != 0)
-				break;
-			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				break;
 			switch (page_type) {
 			case WT_PAGE_COL_FIX:
-				printf("0x%02x\n", ((uint8_t *)value.data)[0]);
+				if ((ret =
+				    cursor->get_value(cursor, &bitf)) != 0)
+					break;
+				printf("0x%02x\n", bitf);
 				break;
-			case WT_PAGE_COL_VAR:
 			case WT_PAGE_ROW_LEAF:
-				if ((key.size != 0 && (fwrite(key.data,
-				    1, key.size, stdout) != key.size ||
-				    fwrite("\n", 1, 1, stdout) != 1)) ||
-				    fwrite(value.data,
-					1, value.size, stdout) != value.size ||
-				    fwrite("\n", 1, 1, stdout) != 1) {
+				if ((ret = cursor->get_key(cursor, &key)) != 0)
+					break;
+				if (printf("%s\n", key) < 0) {
 					ret = errno;
 					break;
 				}
+				/* FALLTHROUGH */
+			case WT_PAGE_COL_VAR:
+				if ((ret =
+				    cursor->get_value(cursor, &value)) != 0)
+					break;
+				if (printf("%s\n", value) < 0)
+					ret = errno;
 				break;
 			}
 		}
