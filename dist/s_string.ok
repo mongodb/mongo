@@ -15,7 +15,6 @@ BBBBBBBBBB
 BBBBBBBBBBBBB
 BBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBB
-BITSTRING
 BSR
 BTREE
 BUF
@@ -136,6 +135,7 @@ bigram
 bitfield
 bitfields
 bitpos
+bitstr
 bitstring
 bitwise
 bnd
@@ -208,6 +208,8 @@ evictserver
 exactp
 extern
 fcntl
+ffc
+ffs
 fh
 filename
 fileops
@@ -280,11 +282,13 @@ mutex
 mutexes
 namespaces
 nbits
+nclr
 negint
 newname
 nl
 nlpo
 notsup
+nset
 nul
 numSymbols
 numbare

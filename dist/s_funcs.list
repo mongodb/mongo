@@ -1,4 +1,6 @@
 # List of functions that aren't found by s_funcs, but that's OK.
+__bit_ffs
+__bit_nclr
 __wt_block_dump
 __wt_config_getone
 __wt_debug_addr

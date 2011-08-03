@@ -127,8 +127,8 @@ __bulk_col_fix(WT_CURSOR_BULK *cbulk)
 	btree = session->btree;
 	cursor = &cbulk->cbt.iface;
 
-	__wt_fix_setv(btree,
-	    cbulk->ins_cnt, cbulk->bitf, ((uint8_t *)cursor->value.data)[0]);
+	__bit_setv(cbulk->bitf,
+	    cbulk->ins_cnt, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
 	++cbulk->ins_cnt;
 
 	/* If the page is full, reconcile it and reset the insert list. */

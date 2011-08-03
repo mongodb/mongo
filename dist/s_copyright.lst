@@ -16,7 +16,7 @@ add	examples/c/ex_tpcb.c
 add	examples/c/ex_transaction.c
 skip	src/api/config_def.c
 skip	src/api/strerror.c
-skip	src/include/bitstring.h
+skip	src/include/bitstring.i
 skip	src/include/extern.h
 skip	src/include/log.i
 skip	src/include/queue.h

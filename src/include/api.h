@@ -45,7 +45,7 @@ struct __wt_btree {
 	uint32_t key_gap;		/* Btree instantiated key gap */
 	WT_BUF   key_srch;		/* Search key buffer */
 
-	u_int	 bitcnt;		/* Fixed-length field size in bits */
+	uint8_t	 bitcnt;		/* Fixed-length field size in bits */
 
 	int btree_compare_int;		/* Integer keys */
 					/* Comparison function */

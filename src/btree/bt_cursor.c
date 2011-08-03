@@ -76,7 +76,8 @@ __btcur_next_fix(
 			value->size = 1;
 			found = 1;
 		} else {
-			v = __wt_fix_getv_recno(btree, cbt->page, cbt->recno);
+			v = __bit_getv_recno(
+			    cbt->page, cbt->recno, btree->bitcnt);
 			WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
 			value->data = cbt->value.data;
 			value->size = 1;

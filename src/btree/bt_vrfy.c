@@ -12,8 +12,8 @@
  * together to make the code prettier.
  */
 typedef struct {
-	uint32_t  frags;			/* Total frags */
-	bitstr_t *fragbits;			/* Frag tracking bit list */
+	uint32_t frags;				/* Total frags */
+	uint8_t *fragbits;			/* Frag tracking bit list */
 
 	uint64_t record_total;			/* Total record count */
 
@@ -135,7 +135,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		__wt_errx(session, "file is too large to verify");
 		goto err;
 	}
-	WT_ERR(bit_alloc(session, vs->frags, &vs->fragbits));
+	WT_ERR(__bit_alloc(session, vs->frags, &vs->fragbits));
 
 	/* Verify the tree, starting at the root. */
 	WT_ERR(__verify_tree(session, &btree->root_page, (uint64_t)1, vs));
@@ -587,14 +587,14 @@ __verify_addfrag(
 
 	frags = size / btree->allocsize;
 	for (i = 0; i < frags; ++i)
-		if (bit_test(vs->fragbits, addr + i)) {
+		if (__bit_test(vs->fragbits, addr + i)) {
 			__wt_errx(session,
 			    "file fragment at addr %" PRIu32
 			    " already verified", addr);
 			return (WT_ERROR);
 		}
 	if (frags > 0)
-		bit_nset(vs->fragbits, addr, addr + (frags - 1));
+		__bit_nset(vs->fragbits, addr, addr + (frags - 1));
 	return (0);
 }
 
@@ -605,39 +605,39 @@ __verify_addfrag(
 static int
 __verify_checkfrag(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
-	int ffc, ffc_start, ffc_end, frags, ret;
+	uint32_t first, last, frags;
+	uint8_t *fragbits;
+	int ret;
 
-	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
+	fragbits = vs->fragbits;
+	frags = vs->frags;
 	ret = 0;
 
-	/* Check for file fragments we haven't verified. */
-	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(vs->fragbits, frags, &ffc);
-		if (ffc != -1) {
-			bit_set(vs->fragbits, ffc);
-			if (ffc_start == -1) {
-				ffc_start = ffc_end = ffc;
-				continue;
-			}
-			if (ffc_end == ffc - 1) {
-				ffc_end = ffc;
-				continue;
-			}
-		}
-		if (ffc_start != -1) {
-			if (ffc_start == ffc_end)
-				__wt_errx(session,
-				    "file fragment %d was never verified",
-				    ffc_start);
-			else
-				__wt_errx(session,
-				    "file fragments %d-%d were never verified",
-				    ffc_start, ffc_end);
-			ret = WT_ERROR;
-		}
-		ffc_start = ffc_end = ffc;
-		if (ffc == -1)
+	/*
+	 * Check for file fragments we haven't verified -- every time we find
+	 * a bit that's clear, complain.  We re-start the search each time
+	 * after setting the clear bit(s) we found: it's simpler and this isn't
+	 * supposed to happen a lot.
+	 */
+	for (;;) {
+		if (__bit_ffc(fragbits, frags, &first) != 0)
 			break;
+		__bit_set(fragbits, first);
+		for (last = first + 1; last < frags; ++last) {
+			if (__bit_test(fragbits, last))
+				break;
+			__bit_set(fragbits, last);
+		}
+		if (first == last)
+			__wt_errx(session,
+			    "file fragment %" PRIu32 " was never verified",
+			    first);
+		else
+			__wt_errx(session,
+			    "file fragments %" PRIu32 "-%" PRIu32 " were "
+			    "never verified",
+			    first, last);
+		ret = WT_ERROR;
 	}
 	return (ret);
 }

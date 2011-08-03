@@ -13,7 +13,7 @@ static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
-static void __inmem_row_leaf_slots( bitstr_t *, uint32_t, uint32_t, uint32_t);
+static void __inmem_row_leaf_slots(uint8_t *, uint32_t, uint32_t, uint32_t);
 
 /*
  * __wt_page_in --
@@ -425,8 +425,8 @@ __inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ROW *rip;
-	bitstr_t *list;
 	uint32_t i;
+	uint8_t *list;
 	int ret;
 
 	btree = session->btree;
@@ -450,12 +450,12 @@ __inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(bit_alloc(session, (int)page->entries, &list));
+	WT_RET(__bit_alloc(session, page->entries, &list));
 	__inmem_row_leaf_slots(list, 0, page->entries, btree->key_gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row_leaf.d, i = 0; i < page->entries; ++rip, ++i)
-		if (bit_test(list, (int)i))
+		if (__bit_test(list, i))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
 
 err:	__wt_free(session, list);
@@ -469,7 +469,7 @@ err:	__wt_free(session, list);
  */
 static void
 __inmem_row_leaf_slots(
-    bitstr_t *list, uint32_t base, uint32_t entries, uint32_t gap)
+    uint8_t *list, uint32_t base, uint32_t entries, uint32_t gap)
 {
 	uint32_t indx, limit;
 
@@ -483,11 +483,11 @@ __inmem_row_leaf_slots(
 	 *
 	 * !!!
 	 * There's got to be a function that would give me this information, I
-	 * don't see any reason we need to do this recursively.
+	 * don't see any reason we can't just do this recursively.
 	 */
 	limit = entries;
 	indx = base + (limit >> 1);
-	bit_set(list, indx);
+	__bit_set(list, indx);
 
 	__inmem_row_leaf_slots(list, base, limit >> 1, gap);
 

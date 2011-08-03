@@ -283,6 +283,7 @@ __btree_type(WT_SESSION_IMPL *session)
 	const char *config;
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	uint32_t bitcnt;
 	int fixed;
 
 	btree = session->btree;
@@ -301,10 +302,18 @@ __btree_type(WT_SESSION_IMPL *session)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
 	if (btree->type == BTREE_COL_VAR) {
-		WT_RET(__wt_struct_check(session,
-		    cval.str, cval.len, &fixed, &btree->bitcnt));
-		if (fixed)
+		WT_RET(__wt_struct_check(
+		    session, cval.str, cval.len, &fixed, &bitcnt));
+		if (fixed) {
+			if (bitcnt == 0 || bitcnt > 8) {
+				__wt_errx(session,
+				    "the fixed-width field size must be greater "
+				    "than 0 and less than or equal to 8");
+				return (WT_ERROR);
+			}
+			btree->bitcnt = (uint8_t)bitcnt;
 			btree->type = BTREE_COL_FIX;
+		}
 	}
 	return (0);
 }

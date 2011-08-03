@@ -37,7 +37,6 @@ extern "C" {
  * WiredTiger externally maintained include files.
  *******************************************/
 #include "queue.h"
-#include "bitstring.h"
 
 /*******************************************
  * Forward structure declarations for internal structures.
@@ -163,6 +162,7 @@ struct __wt_walk_entry;
 
 #include "intpack.i"
 
+#include "bitstring.i"
 #include "btree.i"
 #include "cell.i"
 #include "log.i"

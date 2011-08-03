@@ -14,10 +14,6 @@ STATIN void	__wt_cache_page_read(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 STATIN void	__wt_cache_page_workq(WT_SESSION_IMPL *);
 STATIN uint64_t __wt_cache_pages_inuse(WT_CACHE *);
 STATIN uint64_t __wt_cache_read_gen(WT_SESSION_IMPL *);
-STATIN uint8_t	__wt_fix_getv(WT_BTREE *, uint32_t, uint8_t *);
-STATIN uint8_t	__wt_fix_getv_recno(WT_BTREE *, WT_PAGE *, uint64_t);
-STATIN void	__wt_fix_setv(WT_BTREE *, uint32_t, uint8_t *, uint8_t);
-STATIN void	__wt_fix_setv_recno(WT_BTREE *, WT_PAGE *, uint64_t, uint8_t);
 STATIN int	__wt_off_page(WT_PAGE *, const void *);
 STATIN void	__wt_page_release(WT_SESSION_IMPL *, WT_PAGE *);
 STATIN int	__wt_page_reconcile(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -193,92 +189,4 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	if (page != NULL && !WT_PAGE_IS_ROOT(page))
 		__wt_hazard_clear(session, page);
-}
-
-/*
- * __wt_fix_getv --
- *	Get a bit-field and return it.
- */
-static inline uint8_t
-__wt_fix_getv(WT_BTREE *btree, uint32_t entry, uint8_t *bitf)
-{
-	uint8_t value;
-	int bit;
-
-#define	__BIT_GET(len, mask)						\
-	case len:							\
-		if (bit_test(bitf, bit))				\
-			value |= mask;					\
-		++bit							\
-		/* FALLTHROUGH */
-
-	bit = entry * btree->bitcnt;
-	value = 0;
-	switch (btree->bitcnt) {
-	__BIT_GET(8, 0x80);
-	__BIT_GET(7, 0x40);
-	__BIT_GET(6, 0x20);
-	__BIT_GET(5, 0x10);
-	__BIT_GET(4, 0x08);
-	__BIT_GET(3, 0x04);
-	__BIT_GET(2, 0x02);
-	__BIT_GET(1, 0x01);
-	}
-	return (value);
-}
-
-/*
- * __wt_fix_getv_recno --
- *	Get the record number's bit-field from a page and return it.
- */
-static inline uint8_t
-__wt_fix_getv_recno(WT_BTREE *btree, WT_PAGE *page, uint64_t recno)
-{
-	return (__wt_fix_getv(btree,
-	    (uint32_t)(recno - page->u.col_leaf.recno),
-	    page->u.col_leaf.bitf));
-}
-
-/*
- * __wt_fix_setv --
- *	Set a bit-field to a value.
- */
-static inline void
-__wt_fix_setv(WT_BTREE *btree, uint32_t entry, uint8_t *bitf, uint8_t value)
-{
-	int bit;
-
-#define	__BIT_SET(len, mask)						\
-	case len:							\
-		if (value & (mask))					\
-			bit_set(bitf, bit);				\
-		else							\
-			bit_clear(bitf, bit);				\
-		++bit							\
-		/* FALLTHROUGH */
-
-	bit = entry * btree->bitcnt;
-	switch (btree->bitcnt) {
-	__BIT_SET(8, 0x80);
-	__BIT_SET(7, 0x40);
-	__BIT_SET(6, 0x20);
-	__BIT_SET(5, 0x10);
-	__BIT_SET(4, 0x08);
-	__BIT_SET(3, 0x04);
-	__BIT_SET(2, 0x02);
-	__BIT_SET(1, 0x01);
-	}
-}
-
-/*
- * __wt_fix_setv_recno --
- *	Set the record number's bit-field to a value.
- */
-static inline void
-__wt_fix_setv_recno(
-    WT_BTREE *btree, WT_PAGE *page, uint64_t recno, uint8_t value)
-{
-	return (__wt_fix_setv(btree,
-	    (uint32_t)(recno - page->u.col_leaf.recno),
-	    page->u.col_leaf.bitf, value));
 }

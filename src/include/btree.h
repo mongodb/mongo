@@ -680,9 +680,9 @@ struct __wt_insert {
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\
 	for ((i) = 0,							\
 	    (v) = (i) < (dsk)->u.entries ?				\
-	    __wt_fix_getv(btree, 0, WT_PAGE_DISK_BYTE(dsk)) : 0;	\
+	    __bit_getv(WT_PAGE_DISK_BYTE(dsk), 0, (btree)->bitcnt) : 0;	\
 	    (i) < (dsk)->u.entries; ++(i),				\
-	    (v) = __wt_fix_getv(btree, i, WT_PAGE_DISK_BYTE(dsk)))
+	    (v) = __bit_getv(WT_PAGE_DISK_BYTE(dsk), i, (btree)->bitcnt))
 
 /*
  * WT_FIX_NRECS --

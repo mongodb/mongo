@@ -1662,8 +1662,8 @@ __rec_col_extend_truncate(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (max_update >=
 			    page->u.col_leaf.recno + (page->entries - 1))
 				break;
-			if (__wt_fix_getv(btree,
-			    page->entries - 1, page->u.col_leaf.bitf) != 0)
+			if (__bit_getv(page->u.col_leaf.bitf,
+			    page->entries - 1, btree->bitcnt) != 0)
 				break;
 		}
 		break;
@@ -1708,8 +1708,8 @@ __rec_col_fix(
 		/* Update any changes to the original on-page data items. */
 		for (ins =
 		    WT_COL_INSERT_SINGLE(page); ins != NULL; ins = ins->next)
-			__wt_fix_setv_recno(btree, page,
-			    WT_INSERT_RECNO(ins),
+			__bit_setv_recno(
+			    page, WT_INSERT_RECNO(ins), btree->bitcnt,
 			    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
 
 		return (__rec_col_fix_helper(session, page,
@@ -1741,16 +1741,16 @@ __rec_col_fix(
 
 		for (; nrecs > 0 && salvage->missing > 0;
 		    --nrecs, --salvage->missing, ++r->recno, ++entry)
-			__wt_fix_setv(btree, entry, r->first_free, 0);
+			__bit_setv(r->first_free, entry, btree->bitcnt, 0);
 
 		for (; nrecs > 0 && page_take > 0;
 		    --nrecs, --page_take, ++page_start, ++r->recno, ++entry)
-			__wt_fix_setv(btree, entry, r->first_free,
-			    __wt_fix_getv(btree,
-				(uint32_t)page_start, page->u.col_leaf.bitf));
+			__bit_setv(r->first_free, entry, btree->bitcnt,
+			    __bit_getv(page->u.col_leaf.bitf,
+			    (uint32_t)page_start, btree->bitcnt));
 
 		__rec_incrv(
-		    session, r, entry, bitstr_size(entry * btree->bitcnt));
+		    session, r, entry, __bitstr_size(entry * btree->bitcnt));
 
 		/*
 		 * If everything didn't fit, then we have to force a split and
@@ -1797,7 +1797,7 @@ __rec_col_fix_helper(
 	    session, page, recno, btree->leafmax, btree->leafmax));
 
 	/* Copy the bytes into place. */
-	len = bitstr_size(page->entries * btree->bitcnt);
+	len = __bitstr_size(page->entries * btree->bitcnt);
 	memcpy(r->first_free, bitf, len);
 	__rec_incrv(session, r, page->entries, len);
 	r->recno += page->entries;

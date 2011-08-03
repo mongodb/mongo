@@ -60,13 +60,5 @@ TRASHIT
 WT_MAX
 WT_MIN
 _DB_QUEUE_H_
-_SYS_BITSTRING_H_
 __F
 __WIREDTIGER_H_
-_bit_byte
-_bit_mask
-bit_clear
-bit_decl
-bit_ffs
-bit_nclear
-bitstr_size

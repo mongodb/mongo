@@ -427,9 +427,8 @@ __verify_dsk_col_fix(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 
-	datalen = bitstr_size(btree->bitcnt * dsk->u.entries);
-	return (
-	    __wt_verify_dsk_chunk(session, dsk, addr, datalen, size, quiet));
+	datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
+	return (__wt_verify_dsk_chunk(session, dsk, addr, datalen, size, quiet));
 }
 
 /*

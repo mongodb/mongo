@@ -133,7 +133,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		 */
 		if (!match)
 			session->srch_v =
-			    __wt_fix_getv_recno(btree, page, recno);
+			    __bit_getv_recno(page, recno, btree->bitcnt);
 		break;
 	case WT_PAGE_COL_VAR:
 		/* Walk the page, counting records. */
