@@ -108,9 +108,6 @@ reader(void *arg)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->create(session, FNAME, NULL)) != 0)
-		die("session.create", ret);
-
 	if ((ret =
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
 		die("cursor.open", ret);
@@ -161,9 +158,6 @@ writer(void *arg)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
-
-	if ((ret = session->create(session, FNAME, NULL)) != 0)
-		die("session.create", ret);
 
 	if ((ret =
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
