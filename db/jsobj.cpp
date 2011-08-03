@@ -1173,13 +1173,9 @@ namespace mongo {
 
         while (l.more() && r.more()){
             if (strcmp(l.next().fieldName(), r.next().fieldName())) {
-                PRINTFL;
                 return false;
             }
         }
-        PRINT(l.more());
-        PRINT(r.more());
-        PRINT(l.more() || r.more());
 
         return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }
