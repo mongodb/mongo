@@ -25,19 +25,17 @@ typedef struct {
 	int	 dumpfile;			/* Dump file stream */
 } WT_VSTUFF;
 
-static int __wt_verify_addfrag(
-	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
-static int __wt_verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
-static int __wt_verify_int(WT_SESSION_IMPL *, int);
-static int __wt_verify_overflow(
-	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_row_int_key_order(
+static int __verify_addfrag(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
+static int __verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
+static int __verify_int(WT_SESSION_IMPL *, int);
+static int __verify_overflow(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, uint32_t, WT_VSTUFF *);
-static int __wt_verify_row_leaf_key_order(
+static int __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
+static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_verify --
@@ -48,7 +46,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_UNUSED(config);			/* XXX: unused for now */
 
-	return (__wt_verify_int(session, 0));
+	return (__verify_int(session, 0));
 }
 
 /*
@@ -66,7 +64,7 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	return (__wt_verify_int(session, 1));
+	return (__verify_int(session, 1));
 #else
 	__wt_errx(session,
 	    "the WiredTiger library was not built in diagnostic mode");
@@ -75,12 +73,12 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_verify_int --
+ * __verify_int --
  *	Internal version of verify: verify a Btree, optionally dumping each
  * page in debugging mode.
  */
 static int
-__wt_verify_int(WT_SESSION_IMPL *session, int dumpfile)
+__verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
@@ -140,13 +138,13 @@ __wt_verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(bit_alloc(session, vs->frags, &vs->fragbits));
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(session, &btree->root_page, (uint64_t)1, vs));
+	WT_ERR(__verify_tree(session, &btree->root_page, (uint64_t)1, vs));
 
 	/* Verify the free-list. */
-	WT_ERR(__wt_verify_freelist(session, vs));
+	WT_ERR(__verify_freelist(session, vs));
 
 	/* Verify we read every file block. */
-	WT_ERR(__wt_verify_checkfrag(session, vs));
+	WT_ERR(__verify_checkfrag(session, vs));
 
 	if (0) {
 err:		if (ret == 0)
@@ -173,14 +171,14 @@ err:		if (ret == 0)
 }
 
 /*
- * __wt_verify_tree --
+ * __verify_tree --
  *	Verify a tree, recursively descending through it in depth-first fashion.
  * The page argument was physically verified (so we know it's correctly formed),
  * and the in-memory version built.  Our job is to check logical relationships
  * in the page and in the tree.
  */
 static int
-__wt_verify_tree(
+__verify_tree(
     WT_SESSION_IMPL *session, WT_REF *ref, uint64_t parent_recno, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
@@ -237,7 +235,7 @@ __wt_verify_tree(
 	 * us.)
 	 */
 	WT_ASSERT(session, ref->addr != WT_ADDR_INVALID);
-	WT_RET(__wt_verify_addfrag(session, ref->addr, ref->size, vs));
+	WT_RET(__verify_addfrag(session, ref->addr, ref->size, vs));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
@@ -289,7 +287,7 @@ recno_chk:	if (parent_recno != recno) {
 	 */
 	switch (page->type) {
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_row_leaf_key_order(session, page, vs));
+		WT_RET(__verify_row_leaf_key_order(session, page, vs));
 		break;
 	}
 
@@ -302,7 +300,7 @@ recno_chk:	if (parent_recno != recno) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow_cell(session, page, vs));
+		WT_RET(__verify_overflow_cell(session, page, vs));
 		break;
 	}
 
@@ -329,7 +327,7 @@ recno_chk:	if (parent_recno != recno) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
-			ret = __wt_verify_tree(session, ref, cref->recno, vs);
+			ret = __verify_tree(session, ref, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
 			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
@@ -349,14 +347,14 @@ recno_chk:	if (parent_recno != recno) {
 			 * can't test against it.
 			 */
 			if (entry != 0)
-				WT_RET(__wt_verify_row_int_key_order(
+				WT_RET(__verify_row_int_key_order(
 				    session, page, rref, entry, vs));
 			++entry;
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
-			ret = __wt_verify_tree(session, ref, (uint64_t)0, vs);
+			ret = __verify_tree(session, ref, (uint64_t)0, vs);
 			__wt_hazard_clear(session, ref->page);
 			WT_TRET(__wt_page_reconcile(session,
 			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
@@ -368,12 +366,12 @@ recno_chk:	if (parent_recno != recno) {
 }
 
 /*
- * __wt_verify_row_int_key_order --
+ * __verify_row_int_key_order --
  *	Compare a key on an internal page to the largest key we've seen so
  * far; update the largest key we've seen so far to that key.
  */
 static int
-__wt_verify_row_int_key_order(WT_SESSION_IMPL *session,
+__verify_row_int_key_order(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW_REF *rref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
@@ -410,12 +408,12 @@ __wt_verify_row_int_key_order(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_verify_row_leaf_key_order --
+ * __verify_row_leaf_key_order --
  *	Compare the first key on a leaf page to the largest key we've seen so
  * far; update the largest key we've seen so far to the last key on the page.
  */
 static int
-__wt_verify_row_leaf_key_order(
+__verify_row_leaf_key_order(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
@@ -467,11 +465,11 @@ __wt_verify_row_leaf_key_order(
 }
 
 /*
- * __wt_verify_overflow_cell --
+ * __verify_overflow_cell --
  *	Verify any overflow cells on the page.
  */
 static int
-__wt_verify_overflow_cell(
+__verify_overflow_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
@@ -496,7 +494,7 @@ __wt_verify_overflow_cell(
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			WT_RET(__wt_verify_overflow(
+			WT_RET(__verify_overflow(
 			    session, unpack->off.addr, unpack->off.size, vs));
 			break;
 		}
@@ -505,11 +503,11 @@ __wt_verify_overflow_cell(
 }
 
 /*
- * __wt_verify_overflow --
+ * __verify_overflow --
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(
+__verify_overflow(
     WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
 	WT_BUF *tmp;
@@ -537,7 +535,7 @@ __wt_verify_overflow(
 	    __wt_verify_dsk_chunk(session, dsk, addr, dsk->u.datalen, size, 0));
 
 	/* Add the fragments. */
-	WT_ERR(__wt_verify_addfrag(session, addr, size, vs));
+	WT_ERR(__verify_addfrag(session, addr, size, vs));
 
 err:	__wt_scr_release(&tmp);
 
@@ -545,11 +543,11 @@ err:	__wt_scr_release(&tmp);
 }
 
 /*
- * __wt_verify_freelist --
+ * __verify_freelist --
  *	Add the freelist fragments to the list of verified fragments.
  */
 static int
-__wt_verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
+__verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe;
@@ -567,19 +565,19 @@ __wt_verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 			    fe->addr);
 			return (WT_ERROR);
 		}
-		WT_TRET(__wt_verify_addfrag(session, fe->addr, fe->size, vs));
+		WT_TRET(__verify_addfrag(session, fe->addr, fe->size, vs));
 	}
 
 	return (ret);
 }
 
 /*
- * __wt_verify_addfrag --
+ * __verify_addfrag --
  *	Add the WT_PAGE's fragments to the list, and complain if we've already
  *	verified this chunk of the file.
  */
 static int
-__wt_verify_addfrag(
+__verify_addfrag(
     WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
@@ -601,11 +599,11 @@ __wt_verify_addfrag(
 }
 
 /*
- * __wt_verify_checkfrag --
+ * __verify_checkfrag --
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_verify_checkfrag(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
+__verify_checkfrag(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
 	int ffc, ffc_start, ffc_end, frags, ret;
 

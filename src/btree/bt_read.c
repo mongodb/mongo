@@ -7,17 +7,23 @@
 
 #include "wt_internal.h"
 
-static inline void __cache_read_req_set(
-	WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
-static inline void __cache_read_req_clr(WT_READ_REQ *);
+#undef	STATIN
+#define	STATIN	static inline
 
-static int __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
+static int  __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
+STATIN void __cache_read_req_clr(WT_READ_REQ *);
+STATIN void __cache_read_req_set(
+		WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
 
 #define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
 	for ((rr) = (cache)->read_request,				\
 	    (rr_end) = (rr) + WT_ELEMENTS((cache)->read_request);	\
 	    (rr) < (rr_end); ++(rr))
 
+/*
+ * __cache_read_req_set --
+ *	Initialize a request slot.
+ */
 static inline void
 __cache_read_req_set(WT_SESSION_IMPL *session,
     WT_READ_REQ *rr, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
@@ -31,6 +37,10 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 	WT_MEMORY_FLUSH;		/* Turn entry on */
 }
 
+/*
+ * __cache_read_req_set --
+ *	Clear a request slot.
+ */
 static inline void
 __cache_read_req_clr(WT_READ_REQ *rr)
 {

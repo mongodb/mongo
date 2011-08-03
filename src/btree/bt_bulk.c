@@ -7,11 +7,11 @@
 
 #include "wt_internal.h"
 
-static int __wt_bulk_col_fix(WT_CURSOR_BULK *);
-static int __wt_bulk_col_page(WT_CURSOR_BULK *);
-static int __wt_bulk_col_var(WT_CURSOR_BULK *);
-static int __wt_bulk_row(WT_CURSOR_BULK *);
-static int __wt_bulk_row_page(WT_CURSOR_BULK *);
+static int __bulk_col_fix(WT_CURSOR_BULK *);
+static int __bulk_col_page(WT_CURSOR_BULK *);
+static int __bulk_col_var(WT_CURSOR_BULK *);
+static int __bulk_row(WT_CURSOR_BULK *);
+static int __bulk_row_page(WT_CURSOR_BULK *);
 
 /*
  * __wt_bulk_init --
@@ -97,13 +97,13 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	 */
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_bulk_col_fix(cbulk));
+		WT_RET(__bulk_col_fix(cbulk));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bulk_col_var(cbulk));
+		WT_RET(__bulk_col_var(cbulk));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bulk_row(cbulk));
+		WT_RET(__bulk_row(cbulk));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -113,11 +113,11 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_bulk_col_fix --
+ * __bulk_col_fix --
  *	Fixed-length column-store bulk load.
  */
 static int
-__wt_bulk_col_fix(WT_CURSOR_BULK *cbulk)
+__bulk_col_fix(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
@@ -133,17 +133,17 @@ __wt_bulk_col_fix(WT_CURSOR_BULK *cbulk)
 
 	/* If the page is full, reconcile it and reset the insert list. */
 	if (cbulk->ins_cnt == cbulk->ipp)
-		WT_RET(__wt_bulk_col_page(cbulk));
+		WT_RET(__bulk_col_page(cbulk));
 
 	return (0);
 }
 
 /*
- * __wt_bulk_col_var --
+ * __bulk_col_var --
  *	Variable-length column-store bulk load.
  */
 static int
-__wt_bulk_col_var(WT_CURSOR_BULK *cbulk)
+__bulk_col_var(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -166,7 +166,7 @@ __wt_bulk_col_var(WT_CURSOR_BULK *cbulk)
 
 	/* If the page is full, reconcile it and reset the insert list. */
 	if (++cbulk->ins_cnt == cbulk->ipp)
-		WT_ERR(__wt_bulk_col_page(cbulk));
+		WT_ERR(__bulk_col_page(cbulk));
 
 	return (0);
 
@@ -176,11 +176,11 @@ err:	if (upd != NULL)
 }
 
 /*
- * __wt_bulk_row --
+ * __bulk_row --
  *	Variable-length row-store bulk load.
  */
 static int
-__wt_bulk_row(WT_CURSOR_BULK *cbulk)
+__bulk_row(WT_CURSOR_BULK *cbulk)
 {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
@@ -207,7 +207,7 @@ __wt_bulk_row(WT_CURSOR_BULK *cbulk)
 
 	/* If the page is full, reconcile it and reset the insert list. */
 	if (++cbulk->ins_cnt == cbulk->ipp)
-		WT_ERR(__wt_bulk_row_page(cbulk));
+		WT_ERR(__bulk_row_page(cbulk));
 
 	return (0);
 
@@ -236,10 +236,10 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 		switch (cbulk->page_type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			WT_RET(__wt_bulk_col_page(cbulk));
+			WT_RET(__bulk_col_page(cbulk));
 			break;
 		case WT_PAGE_ROW_LEAF:
-			WT_RET(__wt_bulk_row_page(cbulk));
+			WT_RET(__bulk_row_page(cbulk));
 			break;
 		}
 
@@ -283,11 +283,11 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_bulk_row_page --
+ * __bulk_row_page --
  *	Reconcile a set of row-store bulk-loaded items.
  */
 static int
-__wt_bulk_row_page(WT_CURSOR_BULK *cbulk)
+__bulk_row_page(WT_CURSOR_BULK *cbulk)
 {
 	WT_PAGE *page;
 	WT_REF *parent_ref;
@@ -343,11 +343,11 @@ __wt_bulk_row_page(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_bulk_col_page --
+ * __bulk_col_page --
  *	Reconcile a set of column-store bulk-loaded items.
  */
 static int
-__wt_bulk_col_page(WT_CURSOR_BULK *cbulk)
+__bulk_col_page(WT_CURSOR_BULK *cbulk)
 {
 	WT_PAGE *page;
 	WT_REF *parent_ref;

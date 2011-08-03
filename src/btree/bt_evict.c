@@ -7,16 +7,18 @@
 
 #include "wt_internal.h"
 
-static inline void __evict_clr(WT_EVICT_LIST *);
-static inline void __evict_req_clr(WT_SESSION_IMPL *, WT_EVICT_REQ *);
-static inline void __evict_req_set(WT_SESSION_IMPL *, WT_EVICT_REQ *, int);
+#undef	STATIN
+#define	STATIN	static inline
 
+STATIN void __evict_clr(WT_EVICT_LIST *);
 static void __evict_dup_remove(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, WT_EVICT_REQ *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
 static void __evict_page(WT_SESSION_IMPL *);
 static int  __evict_page_cmp(const void *, const void *);
+STATIN void __evict_req_clr(WT_SESSION_IMPL *, WT_EVICT_REQ *);
+STATIN void __evict_req_set(WT_SESSION_IMPL *, WT_EVICT_REQ *, int);
 static int  __evict_request_retry(WT_SESSION_IMPL *);
 static int  __evict_request_walk(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *);
@@ -24,10 +26,8 @@ static int  __evict_walk_file(WT_SESSION_IMPL *, u_int);
 static int  __evict_worker(WT_SESSION_IMPL *);
 
 /*
- * Tuning constants -- I hesitate to call this tuning, but we should review some
- * number of pages from each file's in-memory tree for each page we evict, and
- * we should amortize the comparison of the hazard references across some number
- * of eviction candidates.
+ * Tuning constants: I hesitate to call this tuning, but we want to review some
+ * number of pages from each file's in-memory tree for each page we evict.
  */
 #define	WT_EVICT_GROUP		10	/* Evict N pages at a time */
 #define	WT_EVICT_WALK_PER_TABLE	5	/* Pages to visit per file */

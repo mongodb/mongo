@@ -7,9 +7,9 @@
 
 #include "wt_internal.h"
 
-static void __wt_block_discard(WT_SESSION_IMPL *);
-static int  __wt_block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
-static int  __wt_block_truncate(WT_SESSION_IMPL *);
+static void __block_discard(WT_SESSION_IMPL *);
+static int  __block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
+static int  __block_truncate(WT_SESSION_IMPL *);
 
 /*
  * __wt_block_alloc --
@@ -80,15 +80,15 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	}
 
 	/* No segments large enough found, extend the file. */
-	return (__wt_block_extend(session, addrp, size));
+	return (__block_extend(session, addrp, size));
 }
 
 /*
- * __wt_block_extend --
+ * __block_extend --
  *	Extend the file to allocate space.
  */
 static int
-__wt_block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
+__block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
@@ -351,7 +351,7 @@ __wt_block_write(WT_SESSION_IMPL *session)
 #endif
 
 	/* Truncate the file if possible. */
-	WT_RET(__wt_block_truncate(session));
+	WT_RET(__block_truncate(session));
 
 	/*
 	 * We allocate room for all of the free-list entries, plus 2 more.  The
@@ -400,7 +400,7 @@ done:	/* Update the file's meta-data. */
 	btree->free_size = size;
 
 	/* Discard the in-memory free-list. */
-	__wt_block_discard(session);
+	__block_discard(session);
 
 	if (0) {
 err:		if (addr != WT_ADDR_INVALID)
@@ -413,11 +413,11 @@ err:		if (addr != WT_ADDR_INVALID)
 }
 
 /*
- * __wt_block_truncate --
+ * __block_truncate --
  *	Truncate the file if the last part of the file isn't in use.
  */
 static int
-__wt_block_truncate(WT_SESSION_IMPL *session)
+__block_truncate(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
@@ -458,11 +458,11 @@ __wt_block_truncate(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_block_discard --
+ * __block_discard --
  *	Discard any free-list entries.
  */
 static void
-__wt_block_discard(WT_SESSION_IMPL *session)
+__block_discard(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe;

@@ -7,6 +7,13 @@
 
 #include "wt_internal.h"
 
+#undef	STATIN
+#define	STATIN	static inline
+
+STATIN int __btcur_next_fix(WT_CURSOR_BTREE *, int, uint64_t *, WT_BUF *);
+STATIN int __btcur_next_row(WT_CURSOR_BTREE *, int, WT_BUF *, WT_BUF *);
+STATIN int __btcur_next_var(WT_CURSOR_BTREE *, int, uint64_t *, WT_BUF *);
+
 /*
  * __wt_btcur_first --
  *	Move to the first record in the tree.
@@ -24,6 +31,10 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 	return (__wt_btcur_next(cbt));
 }
 
+/*
+ * __btcur_next_fix --
+ *	Move to the next, fixed-length column-store item.
+ */
 static inline int
 __btcur_next_fix(
     WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
@@ -76,6 +87,10 @@ __btcur_next_fix(
 	return (0);
 }
 
+/*
+ * __btcur_next_var --
+ *	Move to the next, variable-length column-store item.
+ */
 static inline int
 __btcur_next_var(WT_CURSOR_BTREE *cbt,
     int newpage, uint64_t *recnop, WT_BUF *value)
@@ -162,6 +177,10 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 	return (WT_NOTFOUND);
 }
 
+/*
+ * __btcur_next_row --
+ *	Move to the next row-store item.
+ */
 static inline int
 __btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 {

@@ -7,7 +7,10 @@
 
 #include "wt_internal.h"
 
-static inline int __wt_ins_search(WT_SESSION_IMPL *, WT_INSERT *, WT_ITEM *);
+#undef	STATIN
+#define	STATIN	static inline
+
+STATIN int __insert_search(WT_SESSION_IMPL *, WT_INSERT *, WT_ITEM *);
 
 /*
  * __wt_row_search --
@@ -207,11 +210,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		 * Search the insert tree for a match -- if we don't find a
 		 * match, we fail, unless we're inserting new data.
 		 *
-		 * No matter how things turn out, __wt_ins_search resets the
+		 * No matter how things turn out, __insert_search resets the
 		 * session->srch_XXX fields appropriately, there's no more
 		 * work to be done.
 		 */
-		if ((cmp = __wt_ins_search(session, ins, key)) != 0) {
+		if ((cmp = __insert_search(session, ins, key)) != 0) {
 			/*
 			 * No match found.
 			 * If not doing an insert, we've failed.
@@ -245,11 +248,11 @@ err:	__wt_page_out(session, page);
 }
 
 /*
- * __wt_ins_search --
+ * __insert_search --
  *	Search the slot's insert list.
  */
 static inline int
-__wt_ins_search(WT_SESSION_IMPL *session, WT_INSERT *ins, WT_ITEM *key)
+__insert_search(WT_SESSION_IMPL *session, WT_INSERT *ins, WT_ITEM *key)
 {
 	WT_ITEM insert_key;
 	WT_BTREE *btree;

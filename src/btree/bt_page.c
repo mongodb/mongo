@@ -7,13 +7,13 @@
 
 #include "wt_internal.h"
 
-static int  __page_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
-static void __page_row_leaf_slots( bitstr_t *, uint32_t, uint32_t, uint32_t);
-static int  __wt_page_inmem_col_fix(WT_PAGE *);
-static int  __wt_page_inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __wt_page_inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __wt_page_inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __wt_page_inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_col_fix(WT_PAGE *);
+static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
+static void __inmem_row_leaf_slots( bitstr_t *, uint32_t, uint32_t, uint32_t);
 
 /*
  * __wt_page_in --
@@ -95,21 +95,21 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_leaf.recno = dsk->recno;
-		WT_ERR(__wt_page_inmem_col_fix(page));
+		WT_ERR(__inmem_col_fix(page));
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
-		WT_ERR(__wt_page_inmem_col_int(session, page));
+		WT_ERR(__inmem_col_int(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_leaf.recno = dsk->recno;
-		WT_ERR(__wt_page_inmem_col_var(session, page));
+		WT_ERR(__inmem_col_var(session, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_page_inmem_row_int(session, page));
+		WT_ERR(__inmem_row_int(session, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_page_inmem_row_leaf(session, page));
+		WT_ERR(__inmem_row_leaf(session, page));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -123,11 +123,11 @@ err:	if (page != NULL)
 }
 
 /*
- * __wt_page_inmem_col_fix --
+ * __inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__wt_page_inmem_col_fix(WT_PAGE *page)
+__inmem_col_fix(WT_PAGE *page)
 {
 	WT_PAGE_DISK *dsk;
 
@@ -139,11 +139,11 @@ __wt_page_inmem_col_fix(WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_col_int --
+ * __inmem_col_int --
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__wt_page_inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off_record;
@@ -180,12 +180,12 @@ __wt_page_inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_col_var --
+ * __inmem_col_var --
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
  */
 static int
-__wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_CELL *cell;
@@ -219,11 +219,11 @@ __wt_page_inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_row_int --
+ * __inmem_row_int --
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__wt_page_inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_BUF *current, *last, *tmp;
@@ -361,11 +361,11 @@ err:	if (current != NULL)
 }
 
 /*
- * __wt_page_inmem_row_leaf --
+ * __inmem_row_leaf --
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -413,15 +413,15 @@ __wt_page_inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	page->entries = nindx;
 
-	return (__page_row_leaf_keys(session, page));
+	return (__inmem_row_leaf_keys(session, page));
 }
 
 /*
- * __page_row_leaf_keys --
+ * __inmem_row_leaf_keys --
  *	Instantiate the interesting keys for random search of a page.
  */
 static int
-__page_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ROW *rip;
@@ -451,7 +451,7 @@ __page_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * marking up the array.
 	 */
 	WT_RET(bit_alloc(session, (int)page->entries, &list));
-	__page_row_leaf_slots(list, 0, page->entries, btree->key_gap);
+	__inmem_row_leaf_slots(list, 0, page->entries, btree->key_gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row_leaf.d, i = 0; i < page->entries; ++rip, ++i)
@@ -463,12 +463,12 @@ err:	__wt_free(session, list);
 }
 
 /*
- * __page_row_leaf_slots --
+ * __inmem_row_leaf_slots --
  *	Figure out the interesting slots of a page for random search, up to
  * the specified depth.
  */
 static void
-__page_row_leaf_slots(
+__inmem_row_leaf_slots(
     bitstr_t *list, uint32_t base, uint32_t entries, uint32_t gap)
 {
 	uint32_t indx, limit;
@@ -489,9 +489,9 @@ __page_row_leaf_slots(
 	indx = base + (limit >> 1);
 	bit_set(list, indx);
 
-	__page_row_leaf_slots(list, base, limit >> 1, gap);
+	__inmem_row_leaf_slots(list, base, limit >> 1, gap);
 
 	base = indx + 1;
 	--limit;
-	__page_row_leaf_slots(list, base, limit >> 1, gap);
+	__inmem_row_leaf_slots(list, base, limit >> 1, gap);
 }
