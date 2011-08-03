@@ -104,7 +104,7 @@ namespace QueryOptimizerTests {
         auto_ptr< FieldRangeSetPair > FieldRangeSetPair_GLOBAL;
 #define FRSP(x) ( FieldRangeSetPair_GLOBAL.reset( new FieldRangeSetPair( ns(), x ) ), *FieldRangeSetPair_GLOBAL )
         auto_ptr< FieldRangeSetPair > FieldRangeSetPair_GLOBAL2;
-#define FRSP2(x) ( FieldRangeSetPair_GLOBAL2.reset( new FieldRangeSetPair( ns(), x ) ), *FieldRangeSetPair_GLOBAL2 )
+#define FRSP2(x) ( FieldRangeSetPair_GLOBAL2.reset( new FieldRangeSetPair( ns(), x ) ), FieldRangeSetPair_GLOBAL2.get() )
 
         class NoIndex : public Base {
         public:
@@ -886,7 +886,7 @@ namespace QueryOptimizerTests {
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, *frsp, fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 ASSERT( c->ok() );
@@ -908,7 +908,7 @@ namespace QueryOptimizerTests {
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, *frsp, fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 int matches[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {

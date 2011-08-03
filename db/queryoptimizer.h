@@ -35,10 +35,13 @@ namespace mongo {
     class QueryPlan : boost::noncopyable {
     public:
 
+        /**
+         * @param originalFrsp - original constraints for this query clause.  If null, frsp will be used instead.
+         */
         QueryPlan(NamespaceDetails *d,
                   int idxNo, // -1 = no index
                   const FieldRangeSetPair &frsp,
-                  const FieldRangeSetPair &originalFrsp,
+                  const FieldRangeSetPair *originalFrsp,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
@@ -245,6 +248,9 @@ namespace mongo {
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
         typedef vector<QueryPlanPtr> PlanSet;
 
+        /**
+         * @param originalFrsp - original constraints for this query clause; if null, frsp will be used.
+         */
         QueryPlanSet( const char *ns,
                       auto_ptr<FieldRangeSetPair> frsp,
                       auto_ptr<FieldRangeSetPair> originalFrsp,
@@ -290,7 +296,7 @@ namespace mongo {
 
         //for testing
         const FieldRangeSetPair &frsp() const { return *_frsp; }
-        const FieldRangeSetPair &originalFrsp() const { return *_originalFrsp; }
+        const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
 
@@ -420,7 +426,7 @@ namespace mongo {
         shared_ptr<Cursor> singleCursor() const;
         
         /** @return true iff more $or clauses need to be scanned. */
-        bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
+        bool mayRunMore() const { return _or ? ( !_tableScanned && !_org->orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
@@ -445,7 +451,7 @@ namespace mongo {
         const char * _ns;
         bool _or;
         BSONObj _query;
-        OrRangeGenerator _org;
+        shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
         bool _honorRecordedPlan;
