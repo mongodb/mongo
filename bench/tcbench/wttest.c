@@ -34,12 +34,12 @@ int runvlcsread(int argc, char **argv);
 int runflcswrite(int argc, char **argv);
 int runflcsread(int argc, char **argv);
 int myrand(void);
-int dowrite(char *name, int rnum, int rnd);
+int dowrite(char *name, int rnum, int bulk, int rnd);
 int doread(char *name, int rnum, int rnd);
-int dovlcswrite(char *name, int rnum);
-int dovlcsread(char *name, int rnum);
-int doflcswrite(char *name, int rnum);
-int doflcsread(char *name, int rnum);
+int dovlcswrite(char *name, int rnum, int bulk, int rnd);
+int dovlcsread(char *name, int rnum, int rnd);
+int doflcswrite(char *name, int rnum, int bulk, int rnd);
+int doflcsread(char *name, int rnum, int rnd);
 
 
 /* main routine */
@@ -77,12 +77,12 @@ void usage(void){
   fprintf(stderr, "%s: test cases for WiredTiger\n", progname);
   fprintf(stderr, "\n");
   fprintf(stderr, "usage:\n");
-  fprintf(stderr, "  %s write name rnum\n", progname);
-  fprintf(stderr, "  %s read name rnum\n", progname);
-  fprintf(stderr, "  %s vlcswrite name rnum\n", progname);
-  fprintf(stderr, "  %s vlcsread name rnum\n", progname);
-  fprintf(stderr, "  %s flcswrite name rnum\n", progname);
-  fprintf(stderr, "  %s flcsread name rnum\n", progname);
+  fprintf(stderr, "  %s write [-bulk|-rnd] name rnum\n", progname);
+  fprintf(stderr, "  %s read [-rnd] name rnum\n", progname);
+  fprintf(stderr, "  %s vlcswrite [-bulk|-rnd] name rnum\n", progname);
+  fprintf(stderr, "  %s vlcsread [-rnd] name rnum\n", progname);
+  fprintf(stderr, "  %s flcswrite [-bulk|-rnd] name rnum\n", progname);
+  fprintf(stderr, "  %s flcsread [-rnd] name rnum\n", progname);
   fprintf(stderr, "\n");
   exit(1);
 }
@@ -91,14 +91,16 @@ void usage(void){
 /* parse arguments of write command */
 int runwrite(int argc, char **argv){
   char *name, *rstr;
-  int i, rnd, rnum, rv;
+  int bulk, i, rnd, rnum, rv;
   name = NULL;
   rstr = NULL;
-  rnd = FALSE;
+  bulk = rnd = FALSE;
   rnum = 0;
   for(i = 2; i < argc; i++){
     if(!name && argv[i][0] == '-'){
-      if(!name && !strcmp(argv[i], "-rnd"))
+      if(!name && !strcmp(argv[i], "-bulk"))
+        bulk = TRUE;
+      else if(!name && !strcmp(argv[i], "-rnd"))
         rnd = TRUE;
       else
         usage();
@@ -115,7 +117,7 @@ int runwrite(int argc, char **argv){
   rnum = atoi(rstr);
   if(rnum < 1)
     usage();
-  rv = dowrite(name, rnum, rnd);
+  rv = dowrite(name, rnum, bulk, rnd);
   return rv;
 }
 
@@ -155,13 +157,19 @@ int runread(int argc, char **argv){
 /* parse arguments of write command */
 int runvlcswrite(int argc, char **argv){
   char *name, *rstr;
-  int i, rnum, rv;
+  int bulk, i, rnd, rnum, rv;
   name = NULL;
   rstr = NULL;
   rnum = 0;
+  bulk = rnd = FALSE;
   for(i = 2; i < argc; i++){
     if(!name && argv[i][0] == '-'){
-      usage();
+      if(!name && !strcmp(argv[i], "-bulk"))
+        bulk = TRUE;
+      else if(!name && !strcmp(argv[i], "-rnd"))
+        rnd = TRUE;
+      else
+        usage();
     } else if(!name){
       name = argv[i];
     } else if(!rstr){
@@ -175,7 +183,7 @@ int runvlcswrite(int argc, char **argv){
   rnum = atoi(rstr);
   if(rnum < 1)
     usage();
-  rv = dovlcswrite(name, rnum);
+  rv = dovlcswrite(name, rnum, bulk, rnd);
   return rv;
 }
 
@@ -183,13 +191,17 @@ int runvlcswrite(int argc, char **argv){
 /* parse arguments of read command */
 int runvlcsread(int argc, char **argv){
   char *name, *rstr;
-  int i, rnum, rv;
+  int i, rnd, rnum, rv;
   name = NULL;
   rstr = NULL;
   rnum = 0;
+  rnd = FALSE;
   for(i = 2; i < argc; i++){
     if(!name && argv[i][0] == '-'){
-      usage();
+      if(!name && !strcmp(argv[i], "-rnd"))
+        rnd = TRUE;
+      else
+        usage();
     } else if(!name){
       name = argv[i];
     } else if(!rstr){
@@ -203,7 +215,7 @@ int runvlcsread(int argc, char **argv){
   rnum = atoi(rstr);
   if(rnum < 1)
     usage();
-  rv = dovlcsread(name, rnum);
+  rv = dovlcsread(name, rnum, rnd);
   return rv;
 }
 
@@ -211,13 +223,19 @@ int runvlcsread(int argc, char **argv){
 /* parse arguments of write command */
 int runflcswrite(int argc, char **argv){
   char *name, *rstr;
-  int i, rnum, rv;
+  int bulk, i, rnd, rnum, rv;
   name = NULL;
   rstr = NULL;
   rnum = 0;
+  bulk = rnd = FALSE;
   for(i = 2; i < argc; i++){
     if(!name && argv[i][0] == '-'){
-      usage();
+      if(!name && !strcmp(argv[i], "-bulk"))
+        bulk = TRUE;
+      else if(!name && !strcmp(argv[i], "-rnd"))
+        rnd = TRUE;
+      else
+        usage();
     } else if(!name){
       name = argv[i];
     } else if(!rstr){
@@ -231,7 +249,7 @@ int runflcswrite(int argc, char **argv){
   rnum = atoi(rstr);
   if(rnum < 1)
     usage();
-  rv = doflcswrite(name, rnum);
+  rv = doflcswrite(name, rnum, bulk, rnd);
   return rv;
 }
 
@@ -239,13 +257,17 @@ int runflcswrite(int argc, char **argv){
 /* parse arguments of read command */
 int runflcsread(int argc, char **argv){
   char *name, *rstr;
-  int i, rnum, rv;
+  int i, rnd, rnum, rv;
   name = NULL;
   rstr = NULL;
   rnum = 0;
+  rnd = FALSE;
   for(i = 2; i < argc; i++){
     if(!name && argv[i][0] == '-'){
-      usage();
+      if(!name && !strcmp(argv[i], "-rnd"))
+        rnd = TRUE;
+      else
+        usage();
     } else if(!name){
       name = argv[i];
     } else if(!rstr){
@@ -259,7 +281,7 @@ int runflcsread(int argc, char **argv){
   rnum = atoi(rstr);
   if(rnum < 1)
     usage();
-  rv = doflcsread(name, rnum);
+  rv = doflcsread(name, rnum, rnd);
   return rv;
 }
 
@@ -280,7 +302,7 @@ int setup(char *name, const char *tconfig, const char *cconfig, WT_CURSOR **curs
   creating = (tconfig != NULL);
 
   if (creating) {
-    snprintf(cmd, sizeof cmd, "rm -rf %s", name + strlen("table:"));
+    snprintf(cmd, sizeof cmd, "rm -rf %s", name + strlen("file:"));
     system(cmd);
   }
 
@@ -305,7 +327,7 @@ int teardown(void){
 }
 
 /* perform write command */
-int dowrite(char *name, int rnum, int rnd){
+int dowrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
   WT_ITEM key, value;
   int i, err, len;
@@ -313,7 +335,7 @@ int dowrite(char *name, int rnum, int rnd){
   if(showprgr)
     printf("<Write Test of Row Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=u,value_format=u", rnd ? NULL : "bulk", &c) != 0) {
+  if(setup(name, "key_format=u,value_format=u", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
@@ -402,7 +424,7 @@ int doread(char *name, int rnum, int rnd){
 }
 
 /* perform write command */
-int dovlcswrite(char *name, int rnum){
+int dovlcswrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
   WT_ITEM value;
   int i, err, len;
@@ -410,7 +432,7 @@ int dovlcswrite(char *name, int rnum){
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=r,value_format=u", "bulk", &c) != 0) {
+  if(setup(name, "key_format=r,value_format=u", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
@@ -422,7 +444,7 @@ int dovlcswrite(char *name, int rnum){
   for(i = 1; i <= rnum; i++){
     /* store a record */
     len = sprintf(buf, "%08d", i);
-    c->set_key(c, (wiredtiger_recno_t)i);
+    c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     c->set_value(c, &value);
     if(c->insert(c) != 0) {
       fprintf(stderr, "insert failed\n");
@@ -451,7 +473,7 @@ int dovlcswrite(char *name, int rnum){
 
 
 /* perform read command */
-int dovlcsread(char *name, int rnum){
+int dovlcsread(char *name, int rnum, int rnd){
   WT_CURSOR *c;
   int i, err;
   WT_ITEM value;
@@ -465,7 +487,7 @@ int dovlcsread(char *name, int rnum){
   err = FALSE;
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
-    c->set_key(c, (wiredtiger_recno_t)i);
+    c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     if(c->search(c) != 0){
       fprintf(stderr, "search failed\n");
       err = TRUE;
@@ -495,28 +517,27 @@ int dovlcsread(char *name, int rnum){
 
 
 /* perform write command */
-int doflcswrite(char *name, int rnum){
+int doflcswrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
-  WT_ITEM value;
+  uint8_t value;
   int i, err, len;
   char buf[RECBUFSIZ];
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=r,value_format=8u", "bulk", &c) != 0) {
+  if(setup(name, "key_format=r,value_format=8t", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
   }
   err = FALSE;
-  value.data = buf;
-  value.size = 8;
+  value = 42;
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
     /* store a record */
     len = sprintf(buf, "%08d", i);
-    c->set_key(c, (wiredtiger_recno_t)i);
-    c->set_value(c, &value);
+    c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
+    c->set_value(c, value);
     if(c->insert(c) != 0) {
       fprintf(stderr, "insert failed\n");
       err = TRUE;
@@ -544,9 +565,9 @@ int doflcswrite(char *name, int rnum){
 
 
 /* perform read command */
-int doflcsread(char *name, int rnum){
+int doflcsread(char *name, int rnum, int rnd){
   WT_CURSOR *c;
-  WT_ITEM value;
+  uint8_t value;
   int i, err;
   if(showprgr)
     printf("<Read Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
@@ -558,7 +579,7 @@ int doflcsread(char *name, int rnum){
   err = FALSE;
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
-    c->set_key(c, (wiredtiger_recno_t)i);
+    c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     if(c->search(c) != 0){
       fprintf(stderr, "search failed\n");
       err = TRUE;
