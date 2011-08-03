@@ -404,6 +404,14 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
+		if (cursor->value.size != 1) {
+			__wt_errx(session,
+			    "item size of %" PRIu32 " does not match "
+			    "fixed-length file requirement of 1 byte",
+			    cursor->value.size);
+			return (WT_ERROR);
+		}
+		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		while ((ret = __wt_col_modify(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
@@ -440,9 +448,9 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		if (cursor->value.size != 1) {
-			__wt_errx(session, "item size of %" PRIu32
-			    " does not match fixed-length file requirement "
-			    " of 1 byte",
+			__wt_errx(session,
+			    "item size of %" PRIu32 " does not match "
+			    "fixed-length file requirement of 1 byte",
 			    cursor->value.size);
 			return (WT_ERROR);
 		}
