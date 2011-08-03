@@ -20,6 +20,7 @@
 #include "../instance.h"
 #include "../queryoptimizer.h"
 #include "../../scripting/engine.h"
+#include "../clientcursor.h"
 
 namespace mongo {
 
@@ -44,7 +45,7 @@ namespace mongo {
                 uassert( 10042 ,  "return of $key has to be an object" , type == Object );
                 return s->getObject( "return" );
             }
-            return obj.extractFields( keyPattern , true );
+            return obj.extractFields( keyPattern , true ).getOwned();
         }
 
         bool group( string realdbname , const string& ns , const BSONObj& query ,
@@ -88,14 +89,27 @@ namespace mongo {
             list<BSONObj> blah;
 
             shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
+            ClientCursor::CleanupPointer ccPointer;
+            ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
 
             while ( cursor->ok() ) {
+                
+                if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) ||
+                    !cursor->ok() ) {
+                    break;
+                }
+                
                 if ( ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) ||
                     cursor->getsetdup( cursor->currLoc() ) ) {
                     cursor->advance();
                     continue;
                 }
 
+                if ( !ccPointer->yieldSometimes( ClientCursor::WillNeed ) ||
+                    !cursor->ok() ) {
+                    break;
+                }
+                
                 BSONObj obj = cursor->current();
                 cursor->advance();
 
@@ -117,6 +131,7 @@ namespace mongo {
                     throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
                 }
             }
+            ccPointer.reset();
 
             if (!finalize.empty()) {
                 s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
