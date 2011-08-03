@@ -671,6 +671,8 @@ namespace mongo {
                 nsToDatabase( target.c_str(), to );
                 if ( strcmp( from, to ) == 0 ) {
                     renameNamespace( source.c_str(), target.c_str() );
+                    // make sure we drop counters etc
+                    Top::global.collectionDropped( source );
                     return true;
                 }
             }

@@ -604,6 +604,17 @@ namespace mongo {
         }
     }
 
+    void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
+        assertInWriteLock();
+        vector< string > found;
+        for( ouriter i = _map.begin(); i != _map.end(); ++i )
+            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
+                found.push_back( i->first );
+        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
+            _map.erase(*i);
+        }
+    }
+
     void NamespaceDetailsTransient::computeIndexKeys() {
         _keysComputed = true;
         _indexKeys.clear();
@@ -657,7 +668,7 @@ namespace mongo {
         // index details across commands are in cursors and nsd
         // transient (including query cache) so clear these.
         ClientCursor::invalidate( from );
-        NamespaceDetailsTransient::clearForPrefix( from );
+        NamespaceDetailsTransient::eraseForPrefix( from );
 
         NamespaceDetails *details = ni->details( from );
         ni->add_ns( to, *details );
