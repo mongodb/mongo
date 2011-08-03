@@ -353,6 +353,7 @@ namespace mongo {
         virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL ) {
             if( retry ) *retry = false; if( targetHost ) *targetHost = "";
         }
+        virtual bool lazySupported() const = 0;
     };
 
     /**
@@ -921,13 +922,15 @@ namespace mongo {
         void setSoTimeout(double to) { _so_timeout = to; }
         double getSoTimeout() const { return _so_timeout; }
 
+        virtual bool lazySupported() const { return true; }
+
         static int getNumConnections() {
             return _numConnections;
         }
         
         static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
         static bool getLazyKillCursor() { return _lazyKillCursor; }
-
+        
     protected:
         friend class SyncClusterConnection;
         virtual void sayPiggyBack( Message &toSend );

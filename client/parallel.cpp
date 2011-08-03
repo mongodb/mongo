@@ -729,9 +729,15 @@ namespace mongo {
                 _connHolder.reset( new ScopedDbConnection( _server ) );
                 _conn = _connHolder->get();
             }
-            
-            _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1/*limit*/, 0, NULL, _options, 0));
-            _cursor->initLazy();
+
+            if ( _conn->lazySupported() ) {
+                _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1/*limit*/, 0, NULL, _options, 0));
+                _cursor->initLazy();
+            }
+            else {
+                _done = true; // we set _done first because even if there is an error we're done
+                _ok = _conn->runCommand( db , cmd , _res , options );
+            }
         }
         catch ( std::exception& e ) {
             error() << "Future::spawnComand (part 1) exception: " << e.what() << endl;

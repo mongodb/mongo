@@ -96,6 +96,7 @@ namespace mongo {
 
         virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword);
 
+        virtual bool lazySupported() const { return false; }
     private:
         SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout = 0 );
         string _toString() const;

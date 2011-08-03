@@ -246,6 +246,7 @@ namespace mongo {
         string getServerAddress() const { return _monitor->getServerAddress(); }
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
+        virtual bool lazySupported() const { return true; }
 
         // ---- low level ------
 
