@@ -268,10 +268,14 @@ __cache_read(
 	 * The page isn't in the cache, and since we're the only path for the
 	 * page to get into the cache, we don't have to worry further, and we
 	 * might as well get to it.
-	 *
-	 * Allocate memory for the in-memory page information and for the page
-	 * itself. They're two separate allocation calls so we (hopefully) get
-	 * better alignment from the underlying heap memory allocator.
+	 */
+	WT_VERBOSE(
+	    session, READSERVER, "read %" PRIu32 "/%" PRIu32, addr, size);
+
+	/*
+	 * Allocate memory for the page (memory for the in-memory version of the
+	 * page is allocated later (they're two separate allocation calls so we
+	 * hopefully get better alignment from the underlying heap allocator).
 	 */
 	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
