@@ -278,7 +278,7 @@ namespace mongo {
         }
 
         /** Initialize or iterate a runner generated from @param originalOp. */
-        shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
+        shared_ptr<QueryOp> nextOp( QueryOp &originalOp, bool retried = false );
         
         /** Yield the runner member. */
         

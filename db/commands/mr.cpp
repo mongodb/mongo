@@ -980,7 +980,9 @@ namespace mongo {
 
                         // obtain cursor on data to apply mr to, sorted
                         shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
+                        uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
+                        uassert( 15877, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
 
                         Timer mt;
                         // go through each doc
@@ -1058,8 +1060,16 @@ namespace mongo {
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
                 }
+                catch ( DBException& e ){
+                    log() << "mr failed, removing collection" << causedBy(e) << endl;
+                    throw e;
+                }
+                catch ( std::exception& e ){
+                    log() << "mr failed, removing collection" << causedBy(e) << endl;
+                    throw e;
+                }
                 catch ( ... ) {
-                    log() << "mr failed, removing collection" << endl;
+                    log() << "mr failed for unknown reason, removing collection" << endl;
                     throw;
                 }
 

@@ -555,7 +555,7 @@ doneCheckOrder:
         return r.runUntilFirstCompletes();
     }
     
-    shared_ptr<QueryOp> QueryPlanSet::nextOp( QueryOp &originalOp ) {
+    shared_ptr<QueryOp> QueryPlanSet::nextOp( QueryOp &originalOp, bool retried ) {
         if ( !_runner ) {
             _runner.reset( new Runner( *this, originalOp ) );
             shared_ptr<QueryOp> op = _runner->init();
@@ -570,10 +570,13 @@ doneCheckOrder:
         if ( !_usingPrerecordedPlan || _bestGuessOnly || _plans.size() > 1 ) {
             return op;
         }
+
+        uassert( 15878, str::stream() << "query ops not successful even after cleared indices", ! retried );
+
         // Retry with all candidate plans.
         QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
         init();
-        return nextOp( originalOp );
+        return nextOp( originalOp, true );
     }
 
     bool QueryPlanSet::prepareToYield() {
