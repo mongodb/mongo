@@ -2780,10 +2780,13 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		bnd = &r->bnd[0];
 
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: move %" PRIu32 " to %" PRIu32
-		    ", (%" PRIu32 "B to %" PRIu32 "B)",
+		    "reconcile: move addr %" PRIu32 " to %" PRIu32
+		    ", (%" PRIu32 " %s %" PRIu32 ")",
 		    WT_PADDR(page), bnd->off.addr,
-		    WT_PSIZE(page), bnd->off.size);
+		    WT_PSIZE(page),
+		    WT_PSIZE(page) == bnd->off.size ? "==" :
+		    (WT_PSIZE(page) < bnd->off.size ? ">>>" : "<<<"),
+		    bnd->off.size);
 
 		/*
 		 * Create a new in-memory version of this page if necessary.
