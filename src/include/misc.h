@@ -104,11 +104,14 @@ extern "C" {
 
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
+#define	WT_VERBOSE_ISSET(session, f)					\
+	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
 #define	WT_VERBOSE(session, f, ...) do {				\
-	if (FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))		\
+	if (WT_VERBOSE_ISSET(session, f))				\
 		__wt_msg(session, __VA_ARGS__);				\
 } while (0)
 #else
+#define	WT_VERBOSE_ISSET(session, f)	0
 #define	WT_VERBOSE(session, f, msg)
 #endif
 

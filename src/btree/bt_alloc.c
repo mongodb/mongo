@@ -23,7 +23,11 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 
 	btree = session->btree;
 
-	WT_ASSERT_RET(session, size % btree->allocsize == 0);
+	if (size % btree->allocsize != 0)
+		WT_FAILURE_RET(session, WT_ERROR,
+		    "attempt to allocate a block size: %" PRIu32 " not a "
+		    "multiple of %" PRIu32,
+		    size, btree->allocsize);
 
 	WT_STAT_INCR(btree->stats, alloc);
 
@@ -150,8 +154,8 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 		    WT_ERROR, "attempt to free an invalid file address");
 	if (size % btree->allocsize != 0)
 		WT_FAILURE_RET(session, WT_ERROR,
-		    "attempt to free an invalid block size: %" PRIu32
-		    "not a multiple of %" PRIu32,
+		    "attempt to free a block size: %" PRIu32 " not a "
+		    "multiple of %" PRIu32,
 		    size, btree->allocsize);
 
 	WT_VERBOSE(session, ALLOCATE,
@@ -346,8 +350,9 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	if (btree->freelist_entries == 0)
 		goto done;
 
-#ifdef HAVE_DIAGNOSTIC
-	__wt_block_dump(session);
+#ifdef HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, ALLOCATE))
+		__wt_block_dump(session);
 #endif
 
 	/* Truncate the file if possible. */
@@ -478,7 +483,7 @@ __block_discard(WT_SESSION_IMPL *session)
 	}
 }
 
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_VERBOSE
 void
 __wt_block_dump(WT_SESSION_IMPL *session)
 {
