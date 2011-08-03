@@ -19,6 +19,13 @@ namespace mongo {
         the same time. Also detects and disallows recursion.
     */
 
+#ifdef _WIN32
+    typedef unsigned threadId_t;
+#else
+    typedef pthread_t threadId_t;
+#endif
+
+
 #if defined(_DEBUG)
 
     namespace race {
@@ -26,14 +33,14 @@ namespace mongo {
         class CodePoint { 
         public:
             string lastName;
-            unsigned lastTid;
+            threadId_t lastTid;
             string file;
             CodePoint(string f) : lastTid(0), file(f) { }
         };
         class Check {
         public:
             Check(CodePoint& p) {
-                unsigned t = GetCurrentThreadId();
+                threadId_t t = GetCurrentThreadId();
                 if( p.lastTid == 0 ) {
                     p.lastTid = t;
                     p.lastName = getThreadName();
@@ -57,7 +64,7 @@ namespace mongo {
 
     class CodeBlock { 
         volatile int n;
-        unsigned tid;
+        threadId_t tid;
         void fail() { 
             log() << "synchronization (race condition) failure" << endl;
             printStackTrace();
