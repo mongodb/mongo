@@ -269,7 +269,7 @@ namespace mongo {
 
             getDur().commitIfNeeded();
 
-            if ( yield && ! cc->yieldSometimes() ) {
+            if ( yield && ! cc->yield() ) {
                 // cursor got finished by someone else, so we're done
                 cc.release(); // if the collection/db is dropped, cc may be deleted
                 break;
