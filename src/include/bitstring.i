@@ -252,7 +252,7 @@ static inline uint8_t
 __bit_getv(uint8_t *bitf, uint32_t entry, uint8_t width)
 {
 	uint8_t value;
-	int bit;
+	uint32_t bit;
 
 #define	__BIT_GET(len, mask)						\
 	case len:							\
@@ -261,10 +261,17 @@ __bit_getv(uint8_t *bitf, uint32_t entry, uint8_t width)
 		++bit							\
 		/* FALLTHROUGH */
 
-	bit = entry * width;
 	value = 0;
+	bit = entry * width;
+
+	/*
+	 * Fast-path single bytes, do repeated tests for the rest: we could
+	 * slice-and-dice instead, but the compiler is probably going to do
+	 * a better job than I will.
+	 */
 	switch (width) {
-	__BIT_GET(8, 0x80);
+	case 8:
+		return (bitf[__bit_byte(bit)]);
 	__BIT_GET(7, 0x40);
 	__BIT_GET(6, 0x20);
 	__BIT_GET(5, 0x10);
@@ -294,7 +301,7 @@ __bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
 static inline void
 __bit_setv(uint8_t *bitf, uint32_t entry, uint8_t width, uint8_t value)
 {
-	int bit;
+	uint32_t bit;
 
 #define	__BIT_SET(len, mask)						\
 	case len:							\
@@ -306,8 +313,16 @@ __bit_setv(uint8_t *bitf, uint32_t entry, uint8_t width, uint8_t value)
 		/* FALLTHROUGH */
 
 	bit = entry * width;
+
+	/*
+	 * Fast-path single bytes, do repeated tests for the rest: we could
+	 * slice-and-dice instead, but the compiler is probably going to do
+	 * a better job than I will.
+	 */
 	switch (width) {
-	__BIT_SET(8, 0x80);
+	case 8:
+		bitf[__bit_byte(bit)] = value;
+		return;
 	__BIT_SET(7, 0x40);
 	__BIT_SET(6, 0x20);
 	__BIT_SET(5, 0x10);
