@@ -30,13 +30,9 @@ config_setup(void)
 	if (!(cp->flags & C_PERM))
 		switch (MMRAND(0, 2)) {
 		case 0:
-#if 0
 			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
 			config_single(buf, 0);
 			break;
-#else
-			/* FALLTHROUGH */
-#endif
 		case 1:
 			(void)snprintf(buf, sizeof(buf), "file_type=vlcs");
 			config_single(buf, 0);
