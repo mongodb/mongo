@@ -244,6 +244,14 @@ __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
 	session = &conn->default_session;
 	cache = conn->cache;
 
+	/*
+	 * Wait until any current operation completes because the eviction
+	 * server only checks the WT_SERVER_RUN flag on waking from sleep.
+	 */
+	while (!cache->evict_sleeping)
+		__wt_yield();
+
+	cache->evict_sleeping = 0;
 	__wt_unlock(session, cache->mtx_evict);
 }
 
