@@ -41,6 +41,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Discard scratch buffers. */
 	__wt_scr_free(session);
 
+	/* Confirm we're not holding any hazard references. */
+	__wt_hazard_empty(session);
+
 	/* Unlock and destroy the thread's mutex. */
 	if (session->mtx != NULL) {
 		__wt_unlock(session, session->mtx);

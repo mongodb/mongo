@@ -128,7 +128,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Verify that no hazard references are set.
  */
 void
-__wt_hazard_empty(WT_SESSION_IMPL *session, const char *name)
+__wt_hazard_empty(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
@@ -150,12 +150,12 @@ __wt_hazard_empty(WT_SESSION_IMPL *session, const char *name)
 		if (hp->page != NULL) {
 #ifdef HAVE_DIAGNOSTIC
 			WT_FAILURE(session,
-			    "%s: hazard reference lost: (%p: %s, line %d)",
-			    name, hp->page, hp->file, hp->line);
+			    "hazard reference lost: (%p: %s, line %d)",
+			    hp->page, hp->file, hp->line);
 #else
 			WT_FAILURE(session,
-			    "%s: hazard reference lost: (%p)",
-			    name, hp->page);
+			    "hazard reference lost: (%p)",
+			    hp->page);
 #endif
 			hp->page = NULL;
 			WT_MEMORY_FLUSH;

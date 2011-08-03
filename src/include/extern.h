@@ -524,7 +524,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 #endif
  );
 extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_hazard_empty(WT_SESSION_IMPL *session, const char *name);
+extern void __wt_hazard_empty(WT_SESSION_IMPL *session);
 extern void __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_huffman_open(WT_SESSION_IMPL *session,
     void *symbol_frequency_array,
