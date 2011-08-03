@@ -367,10 +367,7 @@ serverOnlyFiles += Glob( "db/commands/*.cpp" )
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
-snappyEnv = env.Clone()
-snappyEnv.Append(CPPFLAGS="-Wno-sign-compare") #snappy doesn't compile cleanly
-serverOnlyFiles += snappyEnv.Object("third_party/snappy/snappy.cc")
-serverOnlyFiles += snappyEnv.Object("third_party/snappy/snappy-sinksource.cc")
+snappyFiles = ["third_party/snappy/snappy.cc", "third_party/snappy/snappy-sinksource.cc"]
 
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
@@ -714,7 +711,7 @@ if nix:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
-        env.Append( CPPFLAGS=" -O3" )
+        env.Append( CPPFLAGS=" -O3 " )
         #env.Append( CPPFLAGS=" -fprofile-generate" )
         #env.Append( LINKFLAGS=" -fprofile-generate" )
         # then:
@@ -1120,6 +1117,11 @@ def checkErrorCodes():
         Exit(-1)
 
 checkErrorCodes()
+
+snappyEnv = env.Clone()
+snappyEnv.Append(CPPFLAGS="-Wno-sign-compare -Wno-unused-function") #snappy doesn't compile cleanly
+serverOnlyFiles += [snappyEnv.Object(f) for f in snappyFiles]
+
 
 # main db target
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
