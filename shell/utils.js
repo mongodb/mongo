@@ -1517,6 +1517,41 @@ rs.remove = function (hn) {
     return "error: couldn't find "+hn+" in "+tojson(c.members);
 };
 
+rs.debug = {};
+
+rs.debug.nullLastOpWritten = function(primary, secondary) {
+    var p = connect(primary+"/local");
+    var s = connect(secondary+"/local");
+    s.getMongo().setSlaveOk();
+
+    var secondToLast = s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
+    var last = p.runCommand({findAndModify : "oplog.rs",
+                             query : {ts : {$gt : secondToLast.ts}},
+                             sort : {$natural : 1},
+                             update : {$set : {op : "n"}}});
+
+    if (!last.value.o || !last.value.o._id) {
+        print("couldn't find an _id?");
+    }
+    else {
+        last.value.o = {_id : last.value.o._id};
+    }
+
+    print("nulling out this op:");
+    printjson(last);
+};
+
+rs.debug.getLastOpWritten = function(server) {
+    var s = db.getSisterDB("local");
+    if (server) {
+        s = connect(server+"/local");
+    }
+    s.getMongo().setSlaveOk();
+
+    return s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
+};
+
+
 help = shellHelper.help = function (x) {
     if (x == "mr") {
         print("\nSee also http://www.mongodb.org/display/DOCS/MapReduce");
