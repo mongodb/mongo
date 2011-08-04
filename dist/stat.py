@@ -54,7 +54,7 @@ def print_func(name, list):
 	f.write('\tWT_' + name.upper() + '_STATS *stats;\n\n')
 	f.write('\tWT_RET(__wt_calloc_def(session, 1, &stats));\n\n')
 
-	for l in sorted(list):
+	for l in sorted(list, key=attrgetter('name')):
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
@@ -68,7 +68,7 @@ def print_func(name, list):
 	f.write('__wt_stat_clear_' +
 	    name + '_stats(WT_' + name.upper() + '_STATS *stats)\n')
 	f.write('{\n')
-	for l in sorted(list):
+	for l in sorted(list, key=attrgetter('name')):
 		# Items marked permanent aren't cleared by the stat clear
 		# methods.
 		if not l.config.count('perm'):
