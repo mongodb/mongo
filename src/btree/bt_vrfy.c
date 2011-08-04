@@ -140,11 +140,6 @@ err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
 
-	/* Discard the root page from the tree. */
-	if (btree->root_page.page != NULL)
-		WT_TRET(__wt_page_reconcile(session,
-		    btree->root_page.page, WT_REC_EVICT | WT_REC_LOCKED));
-
 	if (vs != NULL) {
 		/* Wrap up reporting. */
 		__wt_progress(session, NULL, vs->fcnt);
@@ -318,8 +313,6 @@ recno_chk:	if (parent_recno != recno) {
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __verify_tree(session, ref, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
-			WT_TRET(__wt_page_reconcile(session,
-			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
 			WT_RET_TEST(ret, ret);
 		}
 		break;
@@ -345,8 +338,6 @@ recno_chk:	if (parent_recno != recno) {
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __verify_tree(session, ref, (uint64_t)0, vs);
 			__wt_hazard_clear(session, ref->page);
-			WT_TRET(__wt_page_reconcile(session,
-			    ref->page, WT_REC_EVICT | WT_REC_LOCKED));
 			WT_RET_TEST(ret, ret);
 		}
 		break;

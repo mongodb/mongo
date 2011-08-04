@@ -296,17 +296,12 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	/*
 	 * Open a btree handle.
 	 *
-	 * Tell the eviction thread to ignore this handle, we'll manage our own
-	 * pages (it would be possible for us to let the eviction thread handle
-	 * us, but there's no reason to do so, we can be more aggressive
-	 * because we know what pages are no longer needed, regardless of LRU).
-	 *
-	 * Also tell open that we're going to verify this handle, so it skips
-	 * loading metadata such as the free list, which could be corrupted.
+	 * Tell open that we're going to verify this handle, so it skips loading
+	 * metadata such as the free list, which could be corrupted.
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(session,
-	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_ERR(__wt_btree_open(
+	    session, name, filename, treeconf, WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
