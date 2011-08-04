@@ -102,6 +102,18 @@ s.getDB(testUser.db).addUser(testUser.username, testUser.password);
 
 logout(adminUser);
 
+print("query try");
+var e = assert.throws(function() {
+    conn.getDB("foo").bar.findOne();
+});
+printjson(e);
+
+print("cmd try");
+e = assert.throws(function() {
+    conn.getDB("foo").runCommand({listdbs:1});
+});
+printjson(e);
+
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
 result = s.getDB("test").runCommand({getLastError : 1});

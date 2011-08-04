@@ -43,7 +43,12 @@ namespace mongo {
 
         _clientInfo = ClientInfo::get();
         _clientInfo->newRequest( p );
+    }
 
+    void Request::checkAuth() const {
+        char cl[256];
+        nsToDatabase(getns(), cl);
+        uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
     }
 
     void Request::init() {
@@ -138,10 +143,7 @@ namespace mongo {
             s->getMore( *this );
         }
         else {
-            char cl[256];
-            nsToDatabase(getns(), cl);
-            uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
-
+            checkAuth();
             s->writeOp( op, *this );
         }
 

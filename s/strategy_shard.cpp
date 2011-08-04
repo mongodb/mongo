@@ -35,6 +35,8 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
+            r.checkAuth();
+
             log(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
