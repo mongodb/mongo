@@ -56,7 +56,9 @@ function work() {
             d.foo.insert( { _id:i, b:big } );
         }
         
-        d.getLastError();
+        gle = d.getLastError();
+        if ( gle )
+            throw gle;
     } catch ( e ) {
         print( e );
         raise( e );
@@ -86,9 +88,8 @@ function runFirstMongodAndFillDisk() {
     conn = startMongodNoReset("--port", 30001, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8, "--noprealloc");
     
     assert.throws( work, null, "no exception thrown when exceeding disk capacity" );
-    waitMongoProgramOnPort( 30001 );
-    
-    // the above wait doesn't work on windows
+    stopMongod( 30001 );
+
     sleep(5000);    
 }
 
