@@ -24,8 +24,13 @@ r = function( key, values ) {
     return { count : total }
 };
 
-coll.mapReduce( m, r, 
+try{ coll.mapReduce( m, r, 
                { out : coll.getName() + "_mr", 
                  sort : { _id : 1 }, 
                  query : { 'location' : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } } } })
 
+}
+catch( e ){
+    // This should occur, since we can't in-mem sort for mreduce
+    printjson( e )
+}

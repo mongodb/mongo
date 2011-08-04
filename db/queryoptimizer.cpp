@@ -571,6 +571,7 @@ doneCheckOrder:
             return op;
         }
 
+        // Avoid an infinite loop here
         uassert( 15878, str::stream() << "query ops not successful even after cleared indices", ! retried );
 
         // Retry with all candidate plans.
