@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 
 /*
@@ -33,7 +29,3 @@ extern "C" {
 	(void)__wt_failure(session, 0, __FILE__, __LINE__, __VA_ARGS__)
 #define	WT_FAILURE_RET(session, error, ...)				\
 	return (__wt_failure(session, error, __FILE__, __LINE__, __VA_ARGS__))
-
-#if defined(__cplusplus)
-}
-#endif

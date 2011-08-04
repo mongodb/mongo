@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 /*
  * WT_EVICT_LIST --
  *	Encapsulation of an eviction candidate.
@@ -101,6 +97,3 @@ struct __wt_cache {
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 };
-#if defined(__cplusplus)
-}
-#endif

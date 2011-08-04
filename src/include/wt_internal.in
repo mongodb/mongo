@@ -155,7 +155,6 @@ struct __wt_walk_entry;
 #include "misc.h"
 #include "mutex.h"
 #include "stat.h"
-#include "walk.h"
 
 #include "api.h"
 #include "cursor.h"

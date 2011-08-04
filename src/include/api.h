@@ -5,89 +5,10 @@
  *	All rights reserved.
  */
 
-struct __wt_btree {
-	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
-
-	const char *name;		/* Logical name */
-	const char *filename;		/* File name */
-
-	const char *config;		/* Configuration string */
-
-	uint32_t refcnt;		/* Sessions using this tree. */
-
-	const char *key_format;
-	const char *value_format;
-
-	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
-		BTREE_COL_VAR=2,	/* Variable-length column store */
-		BTREE_ROW=3		/* Row-store */
-	} type;				/* Type */
-
-	uint64_t  lsn;			/* LSN file/offset pair */
-
-	WT_FH	 *fh;			/* Backing file handle */
-
-	WT_REF	root_page;		/* Root page reference */
-
-	uint32_t freelist_entries;	/* Free-list entry count */
-					/* Free-list queues */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size pair */
-	uint32_t free_size;
-
-	WT_WALK evict_walk;		/* Eviction thread's walk state */
-
-	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_value;		/* Value huffman encoding */
-
-	uint32_t key_gap;		/* Btree instantiated key gap */
-	WT_BUF   key_srch;		/* Search key buffer */
-
-	uint8_t	 bitcnt;		/* Fixed-length field size in bits */
-
-	int btree_compare_int;		/* Integer keys */
-					/* Comparison function */
-	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
-
-	uint32_t intlitemsize;		/* Maximum item size for overflow */
-	uint32_t leafitemsize;
-
-	uint32_t allocsize;		/* Allocation size */
-	uint32_t intlmin;		/* Min/max internal page size */
-	uint32_t intlmax;
-	uint32_t leafmin;		/* Min/max leaf page size */
-	uint32_t leafmax;
-
-	WT_BTREE_STATS *stats;		/* Btree statistics */
-
-#define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
-#define	WT_BTREE_SALVAGE	0x02	/* Handle is for salvage */
-#define	WT_BTREE_VERIFY		0x04	/* Handle is for verify */
-	uint32_t flags;
-};
-
 struct __wt_btree_session {
 	WT_BTREE *btree;
 
 	TAILQ_ENTRY(__wt_btree_session) q;
-};
-
-struct __wt_table {
-	const char *name, *config;
-	const char *key_format, *value_format;
-	const char *plan;
-
-	WT_CONFIG_ITEM cgconf, colconf;
-
-	int is_complete, is_simple;
-	int ncolgroups, nindices, nkey_columns;
-
-	WT_BTREE **colgroup;
-	WT_BTREE **index;
-
-	TAILQ_ENTRY(__wt_table) q;
 };
 
 /*******************************************
@@ -123,7 +44,10 @@ typedef	enum {
 	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
-/* Search return values. */
+/*
+ * WT_SEARCH --
+ *	Search return values.
+ */
 struct __wt_search {
 	WT_PAGE		*page;	/* page */
 	uint32_t	 write_gen;/* leaf page's write-generation */
@@ -142,6 +66,10 @@ struct __wt_search {
 
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
+/*
+ * WT_SESSION_IMPL --
+ *	Implementation of WT_SESSION.
+ */
 struct __wt_session_impl {
 	WT_SESSION iface;
 
@@ -184,9 +112,10 @@ struct __wt_session_impl {
 	uint32_t flags;
 };
 
-/*******************************************
- * Implementation of WT_CONNECTION
- *******************************************/
+/*
+ * WT_CONNECTION_IMPL --
+ *	Implementation of WT_CONNECTION
+ */
 struct __wt_connection_impl {
 	WT_CONNECTION iface;
 

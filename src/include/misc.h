@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 /* Basic constants. */
 #define	WT_BILLION	(1000000000)
 #define	WT_MEGABYTE	(1048576)
@@ -165,7 +161,3 @@ extern "C" {
 #define	WT_PREFIX_SKIP(str, pre)					\
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
-
-#if defined(__cplusplus)
-}
-#endif

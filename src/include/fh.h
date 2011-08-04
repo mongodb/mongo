@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
@@ -19,7 +15,3 @@ struct __wt_fh {
 
 	u_int	refcnt;				/* Reference count */
 };
-
-#if defined(__cplusplus)
-}
-#endif

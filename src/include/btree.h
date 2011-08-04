@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 /*
  * In WiredTiger there are "file allocation units", which is the smallest file
  * chunk that can be allocated.  The smallest file allocation unit is 512B; the
@@ -600,25 +596,29 @@ struct __wt_update {
  * Row-store leaf pages support inserts of new K/V pairs.  When the first K/V
  * pair is inserted, the WT_INSERT array is allocated, with one slot for every
  * existing element in the page, plus one additional slot.  A slot points to a
- * WT_INSERT structure which sorts after the WT_ROW element that references it
- * and before the subsequent WT_ROW element; if more than one insert is done
- * between two page entries, the WT_INSERT structures are formed into a key-
- * sorted, forward-linked list.  The additional slot is because it's possible to
- * insert items smaller than any existing key on the page -- for that reason,
- * the first slot of the insert array holds keys smaller than any other key on
- * the page.
+ * WT_INSERT_HEAD structure for the items which sort after the WT_ROW element
+ * that references it and before the subsequent WT_ROW element; if more than
+ * one insert is done between two page entries, the WT_INSERT structures are
+ * formed into a key-sorted skip list.  The skip list structure has a randomly
+ * chosen depth of next pointers in each inserted node.
  *
- * In column-store variable-length run-length encoded pages, a single indx entry
- * may reference a large number of records, because there's a single on-page
- * entry representing many identical records.   (We don't expand those entries
- * when the page comes into memory, as that would require resources as pages are
- * moved to/from the cache, including read-only files.)  Instead, a single indx
- * entry represents all of the identical records originally found on the page.
- *	Modifying (or deleting) run-length encoded column-store records is hard
+ * The additional slot is because it's possible to insert items smaller than
+ * any existing key on the page -- for that reason, the first slot of the
+ * insert array holds keys smaller than any other key on the page.
+ *
+ * In column-store variable-length run-length encoded pages, a single indx
+ * entry may reference a large number of records, because there's a single
+ * on-page entry representing many identical records.   (We don't expand those
+ * entries when the page comes into memory, as that would require resources as
+ * pages are moved to/from the cache, including read-only files.)  Instead, a
+ * single indx entry represents all of the identical records originally found
+ * on the page.
+ *
+ * Modifying (or deleting) run-length encoded column-store records is hard
  * because the page's entry no longer references a set of identical items.  We
  * handle this by "inserting" a new entry into the insert array, with its own
- * record number.  (This is the only case where it's possible to insert into
- * a column-store: only appends are allowed, as insert requires re-numbering
+ * record number.  (This is the only case where it's possible to insert into a
+ * column-store: only appends are allowed, as insert requires re-numbering
  * subsequent records.  Berkeley DB did support mutable records, but it won't
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
@@ -643,9 +643,23 @@ struct __wt_insert {
 	WT_INSERT *next[0];		/* forward-linked skip list */
 };
 
-/* 12 level skip lists, 1/4 have a link 4 elements ahead. */
-#define	WT_SKIP_MAXDEPTH        12
+/* 10 level skip lists, 1/4 have a link 4 elements ahead. */
+#define	WT_SKIP_MAXDEPTH        10
 #define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 4)
+
+/*
+ * Skiplist helper macros.
+ */
+#define	WT_SKIP_FIRST(__head)						\
+	(((__head) == NULL) ? NULL : (__head)->head[0])
+#define	WT_SKIP_NEXT(__)  ((__)->next[0])
+#define	WT_SKIP_FOREACH(__i, __head)					\
+	for (__i = WT_SKIP_FIRST(__head);				\
+	    __i != NULL;						\
+	    __i = WT_SKIP_NEXT(__i))
+#define	WT_SKIP_CHOOSE_DEPTH(__d)					\
+	for (__d = 1; __d < WT_SKIP_MAXDEPTH &&				\
+	    __wt_random() < WT_SKIP_PROBABILITY; __d++)
 
 /*
  * WT_INSERT_HEAD --
@@ -676,21 +690,6 @@ struct __wt_insert_head {
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
-
-/*
- * Skiplist helper macros.
- */
-#define	WT_SKIP_FIRST(__inshead)					\
-	(((__inshead) == NULL) ? NULL : (__inshead)->head[0])
-#define	WT_SKIP_NEXT(__ins)  ((__ins)->next[0])
-#define	WT_SKIP_FOREACH(__ins, __inshead)				\
-	for (__ins = WT_SKIP_FIRST(__inshead);				\
-	    __ins != NULL;						\
-	    __ins = WT_SKIP_NEXT(__ins))
-#define	WT_SKIP_CHOOSE_DEPTH(__d)					\
-	for (__d = 1;							\
-	    __d < WT_SKIP_MAXDEPTH && __wt_random() < WT_SKIP_PROBABILITY;\
-	    __d++)							\
 
 /*
  * WT_COL_INSERT_SINGLE references a single WT_INSERT list, which is used for
@@ -810,6 +809,94 @@ struct __wt_salvage_cookie {
 	int	 done;				/* Ignore the rest */
 };
 
-#if defined(__cplusplus)
-}
-#endif
+/*
+ * WT_WALK_ENTRY --
+ *	Node for walking one level of a tree.
+ */
+struct __wt_walk_entry {
+	WT_PAGE	*page;		/* Page being traversed */
+	uint32_t indx;		/* Not-yet-visited slot on the page */
+	int	 visited;	/* If page itself been visited */
+
+	WT_PAGE *hazard;	/* Last page returned -- has hazard reference */
+};
+
+/*
+ * WT_WALK --
+ *	Structure describing a position during a walk through a tree.
+ */
+struct __wt_walk {
+	WT_WALK_ENTRY *tree;
+
+	uint32_t tree_len;	/* Tree stack in bytes */
+	u_int	 tree_slot;	/* Current tree stack slot */
+
+	uint32_t flags;		/* Flags specified for the walk */
+};
+
+/*
+ * WT_BTREE --
+ *	A btree handle.
+ */
+struct __wt_btree {
+	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
+
+	const char *name;		/* Logical name */
+	const char *filename;		/* File name */
+
+	const char *config;		/* Configuration string */
+
+	uint32_t refcnt;		/* Sessions using this tree. */
+
+	const char *key_format;
+	const char *value_format;
+
+	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
+		BTREE_COL_VAR=2,	/* Variable-length column store */
+		BTREE_ROW=3		/* Row-store */
+	} type;				/* Type */
+
+	uint64_t  lsn;			/* LSN file/offset pair */
+
+	WT_FH	 *fh;			/* Backing file handle */
+
+	WT_REF	root_page;		/* Root page reference */
+
+	uint32_t freelist_entries;	/* Free-list entry count */
+					/* Free-list queues */
+	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
+	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	int	 freelist_dirty;	/* Free-list has been modified */
+	uint32_t free_addr;		/* Free-list addr/size pair */
+	uint32_t free_size;
+
+	WT_WALK evict_walk;		/* Eviction thread's walk state */
+
+	void *huffman_key;		/* Key huffman encoding */
+	void *huffman_value;		/* Value huffman encoding */
+
+	uint32_t key_gap;		/* Btree instantiated key gap */
+	WT_BUF   key_srch;		/* Search key buffer */
+
+	uint8_t	 bitcnt;		/* Fixed-length field size in bits */
+
+	int btree_compare_int;		/* Integer keys */
+					/* Comparison function */
+	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+
+	uint32_t intlitemsize;		/* Maximum item size for overflow */
+	uint32_t leafitemsize;
+
+	uint32_t allocsize;		/* Allocation size */
+	uint32_t intlmin;		/* Min/max internal page size */
+	uint32_t intlmax;
+	uint32_t leafmin;		/* Min/max leaf page size */
+	uint32_t leafmax;
+
+	WT_BTREE_STATS *stats;		/* Btree statistics */
+
+#define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
+#define	WT_BTREE_SALVAGE	0x02	/* Handle is for salvage */
+#define	WT_BTREE_VERIFY		0x04	/* Handle is for verify */
+	uint32_t flags;
+};

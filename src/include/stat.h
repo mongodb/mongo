@@ -5,10 +5,6 @@
  *	All rights reserved.
  */
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 struct __wt_stats {
 	const char	*name;				/* field name */
 	const char	*desc;				/* text description */
@@ -115,7 +111,3 @@ struct __wt_conn_stats {
 };
 
 /* Statistics section: END */
-
-#if defined(__cplusplus)
-}
-#endif
