@@ -16,7 +16,7 @@ __create_file(WT_SESSION_IMPL *session,
 	const char *treeconf;
 	int exists, ret;
 
-	if (__wt_session_get_btree(session,
+	if (__wt_session_find_btree(session,
 	    filename, strlen(filename), NULL) == 0)
 		return (0);
 

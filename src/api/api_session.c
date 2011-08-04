@@ -237,7 +237,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 		return (EINVAL);
 	}
 
-	ret = __wt_session_get_btree(session,
+	ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), &btree_session);
 
 	/* If the tree isn't open, there's nothing to do. */

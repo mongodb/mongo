@@ -24,10 +24,6 @@ __wt_session_add_btree(
 
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
 
-	__wt_lock(session, conn->mtx);
-	++session->btree->refcnt;
-	__wt_unlock(session, conn->mtx);
-
 	if (btree_sessionp != NULL)
 		*btree_sessionp = btree_session;
 
@@ -35,11 +31,11 @@ __wt_session_add_btree(
 }
 
 /*
- * __wt_session_get_btree --
- *	Get the btree handle for the named table.
+ * __wt_session_find_btree --
+ *	Find an open btree handle for the named table.
  */
 int
-__wt_session_get_btree(WT_SESSION_IMPL *session,
+__wt_session_find_btree(WT_SESSION_IMPL *session,
     const char *filename, size_t namelen, WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE *btree;
@@ -59,6 +55,34 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_session_get_btree --
+ *	Get a btree handle for the given name, set session->btree.
+ */
+int
+__wt_session_get_btree(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_BTREE_SESSION *btree_session;
+	const char *filename, *treeconf;
+	int ret;
+
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		return (EINVAL);
+
+	if ((ret = __wt_session_find_btree(session,
+	    filename, strlen(filename), &btree_session)) == 0)
+		session->btree = btree_session->btree;
+	else if (ret == WT_NOTFOUND) {
+		WT_RET(__wt_schema_table_read(session, name, &treeconf));
+		WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
+		WT_RET(__wt_session_add_btree(session, &btree_session));
+		ret = 0;
+	}
+
+	return (ret);
+}
+
+/*
  * __wt_session_remove_btree --
  *	Remove the btree handle from the session, closing if necessary.
  */
@@ -67,7 +91,6 @@ __wt_session_remove_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
 	WT_CONNECTION_IMPL *conn;
-	int need_close;
 
 	conn = S2C(session);
 
@@ -75,10 +98,5 @@ __wt_session_remove_btree(
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
 
-	__wt_lock(session, conn->mtx);
-	WT_ASSERT(session, session->btree->refcnt > 0);
-	need_close = (--session->btree->refcnt == 0);
-	__wt_unlock(session, conn->mtx);
-
-	return (need_close ? __wt_btree_close(session) : 0);
+	return (__wt_btree_close(session));
 }

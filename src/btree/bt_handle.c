@@ -95,9 +95,27 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int ret;
+	int matched, ret;
 
 	conn = S2C(session);
+
+	/* Increment the reference count if we already have the btree open. */
+	matched = 0;
+	__wt_lock(session, conn->mtx);
+	TAILQ_FOREACH(btree, &conn->dbqh, q) {
+		if (strcmp(filename, btree->filename) == 0) {
+			++btree->refcnt;
+			session->btree = btree;
+			matched = 1;
+			break;
+		}
+	}
+	__wt_unlock(session, conn->mtx);
+	if (matched) {
+		/* The config string will not be needed: free it now. */
+		__wt_free(session, config);
+		return (0);
+	}
 
 	/* Create the WT_BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
@@ -143,6 +161,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 
 done:	/* Add to the connection list. */
 	__wt_lock(session, conn->mtx);
+	btree->refcnt = 1;
 	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
 	++conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);
@@ -194,7 +213,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int ret;
+	int inuse, ret;
 
 	btree = session->btree;
 	conn = S2C(session);
@@ -202,9 +221,14 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	/* Remove from the connection's list. */
 	__wt_lock(session, conn->mtx);
-	TAILQ_REMOVE(&conn->dbqh, btree, q);
-	--conn->dbqcnt;
+	inuse = (--btree->refcnt > 0);
+	if (!inuse) {
+		TAILQ_REMOVE(&conn->dbqh, btree, q);
+		--conn->dbqcnt;
+	}
 	__wt_unlock(session, conn->mtx);
+	if (inuse)
+		return (0);
 
 	/*
 	 * If it's a normal tree, ask the eviction thread to flush any pages

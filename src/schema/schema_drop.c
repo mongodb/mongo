@@ -17,7 +17,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 	WT_CLEAR(keybuf);
 
 	/* If open, close the btree handle. */
-	if ((ret = __wt_session_get_btree(session,
+	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), &btree_session)) == 0) {
 		/*
 		 * XXX fail gracefully if other threads have the tree open.

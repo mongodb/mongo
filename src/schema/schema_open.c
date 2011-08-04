@@ -37,13 +37,12 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
-	WT_BTREE_SESSION *btree_session;
-	WT_BUF keybuf, plan;
+	WT_BUF keybuf, plan, uribuf;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
-	char *cgname, *filename;
-	const char *cgconf, *fileconf;
+	char *cgname;
+	const char *cgconf, *fileconf, *uri;
 	uint32_t plansize;
 	int i, ret;
 
@@ -52,8 +51,9 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 	cursor = NULL;
 	cgconf = fileconf = NULL;
-	cgname = filename = NULL;
+	cgname = NULL;
 	WT_CLEAR(keybuf);
+	WT_CLEAR(uribuf);
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
@@ -84,41 +84,24 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		cursor->get_value(cursor, &cgconf);
 
 		WT_ERR(__wt_config_getones(session, cgconf, "filename", &cval));
-		if ((ret = __wt_session_get_btree(session,
-		    cval.str, cval.len, &btree_session)) == 0) {
-			table->colgroup[i] = btree_session->btree;
-			goto end;
-		}
+		WT_ERR(__wt_buf_init(session, &uribuf, 0));
+		WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
+		    (int)cval.len, cval.str));
+		uri = uribuf.data;
 
-		WT_ERR(__wt_realloc(session, NULL, cval.len + 1, &filename));
-		memcpy(filename, cval.str, cval.len);
-
-		if (!__wt_exist(filename)) {
-			if (i == 0)
-				__wt_errx(session, "Primary column group "
-				    "for table '%s': file '%s' is missing",
-				    table->name, filename);
-			else
-				__wt_errx(session, "Column group '%s' "
-				    "created but the file '%s' is missing",
-				    cgname, filename);
-			ret = ENOENT;
+		ret = __wt_session_get_btree(session, uri);
+		if (ret == ENOENT)
+			__wt_errx(session, "Column group '%s' "
+			    "created but '%s' is missing",
+			    cgname, uri);
+		/* Other errors have already generated a message. */
+		if (ret != 0)
 			goto err;
-		}
 
-		(void)__wt_buf_init(session, &keybuf, 0);
-		WT_ERR(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
-		WT_ERR(__wt_schema_table_read(session, keybuf.data, &fileconf));
-		WT_ERR(__wt_btree_open(session, cgname, filename, fileconf, 0));
-		fileconf = NULL;
-		WT_ERR(__wt_session_add_btree(session, NULL));
 		table->colgroup[i] = session->btree;
-
-end:		if (cursor != NULL) {
-			ret = cursor->close(cursor, NULL);
-			cursor = NULL;
-			WT_ERR(ret);
-		}
+		ret = cursor->close(cursor, NULL);
+		cursor = NULL;
+		WT_ERR(ret);
 	}
 
 	if (!table->is_simple) {
@@ -134,8 +117,8 @@ end:		if (cursor != NULL) {
 
 err:	__wt_free(session, cgname);
 	__wt_free(session, fileconf);
-	__wt_free(session, filename);
 	__wt_buf_free(session, &keybuf);
+	__wt_buf_free(session, &uribuf);
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor, NULL));
 	return (ret);

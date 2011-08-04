@@ -281,25 +281,9 @@ int
 __wt_curfile_open(WT_SESSION_IMPL *session,
     const char *name, const char *config, WT_CURSOR **cursorp)
 {
-	WT_BTREE_SESSION *btree_session;
-	const char *filename, *treeconf;
-	int ret;
-
-	filename = name;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
-
 	/* TODO: handle projections. */
 
-	if ((ret = __wt_session_get_btree(session,
-	    filename, strlen(filename), &btree_session)) == 0)
-		session->btree = btree_session->btree;
-	else if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_schema_table_read(session, name, &treeconf));
-		WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
-		WT_RET(__wt_session_add_btree(session, &btree_session));
-	} else
-		return (ret);
+	WT_RET(__wt_session_get_btree(session, name));
 
 	return (__wt_curfile_create(session, 1, config, cursorp));
 }

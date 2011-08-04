@@ -28,7 +28,7 @@ __open_schema_table(WT_SESSION_IMPL *session)
 	WT_RET(__wt_config_collapse(session, cfg, &schemaconf));
 	WT_ERR(__wt_schema_create(session,
 	    "schema:" SCHEMATAB_NAME, schemaconf));
-	WT_ERR(__wt_session_get_btree(session,
+	WT_ERR(__wt_session_find_btree(session,
 	    SCHEMATAB_NAME, strlen(SCHEMATAB_NAME), &btree_session));
 	session->schematab = btree_session->btree;
 err:	__wt_free(session, schemaconf);
