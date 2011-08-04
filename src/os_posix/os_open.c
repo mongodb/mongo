@@ -84,8 +84,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	return (0);
 
 err:	if (fh != NULL) {
-		if (fh->name != NULL)
-			__wt_free(session, fh->name);
+		__wt_free(session, fh->name);
 		__wt_free(session, fh);
 	}
 	(void)close(fd);

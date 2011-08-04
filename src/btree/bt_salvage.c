@@ -589,8 +589,7 @@ __slvg_trk_leaf(
 	ss->pages[ss->pages_next++] = trk;
 
 	if (0) {
-err:		if (trk != NULL)
-			__wt_free(session, trk);
+err:		__wt_free(session, trk);
 	}
 	if (page != NULL)
 		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
@@ -1125,10 +1124,8 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	return (__wt_page_reconcile(
 	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 
-err:	if (page->u.col_int.t != NULL)
-		__wt_free(session, page->u.col_int.t);
-	if (page != NULL)
-		__wt_free(session, page);
+err:	__wt_free(session, page->u.col_int.t);
+	__wt_free(session, page);
 	return (ret);
 }
 
@@ -1710,10 +1707,8 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	return (__wt_page_reconcile(
 	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
 
-err:	if (page->u.row_int.t != NULL)
-		__wt_free(session, page->u.row_int.t);
-	if (page != NULL)
-		__wt_free(session, page);
+err:	__wt_free(session, page->u.row_int.t);
+	__wt_free(session, page);
 	return (ret);
 }
 

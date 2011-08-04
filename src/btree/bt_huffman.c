@@ -323,8 +323,7 @@ nofile:		ret = (errno == 0) ? WT_ERROR : errno;
 
 err:	if (ret == 0)
 		ret = WT_ERROR;
-	if (table != NULL)
-		__wt_free(session, table);
+	__wt_free(session, table);
 	return (ret);
 }
 

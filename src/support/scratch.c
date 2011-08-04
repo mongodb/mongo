@@ -158,8 +158,7 @@ __wt_buf_swap(WT_BUF *a, WT_BUF *b)
 void
 __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
-	if (buf->mem != NULL)
-		__wt_free(session, buf->mem);
+	__wt_free(session, buf->mem);
 	__wt_buf_clear(buf);
 }
 

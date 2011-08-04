@@ -512,8 +512,7 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
-	if (indexed_freqs != NULL)
-		__wt_free(session, indexed_freqs);
+	__wt_free(session, indexed_freqs);
 	if (leaves != NULL)
 		node_queue_close(session, leaves);
 	if (combined_nodes != NULL)
@@ -522,8 +521,7 @@ err:		if (ret == 0)
 		recursive_free_node(session, node);
 	if (node2 != NULL)
 		recursive_free_node(session, node2);
-	if (tempnode != NULL)
-		__wt_free(session, tempnode);
+	__wt_free(session, tempnode);
 	if (ret != 0)
 		__wt_huffman_close(session, huffman);
 	return (ret);

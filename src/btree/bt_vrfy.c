@@ -145,8 +145,7 @@ err:		if (ret == 0)
 		__wt_progress(session, NULL, vs->fcnt);
 
 		/* Free allocated memory. */
-		if (vs->fragbits != NULL)
-			__wt_free(session, vs->fragbits);
+		__wt_free(session, vs->fragbits);
 		if (vs->max_key != NULL)
 			__wt_scr_release(&vs->max_key);
 	}

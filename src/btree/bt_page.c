@@ -117,8 +117,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	*pagep = page;
 	return (0);
 
-err:	if (page != NULL)
-		__wt_free(session, page);
+err:	__wt_free(session, page);
 	return (ret);
 }
 

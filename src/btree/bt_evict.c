@@ -85,8 +85,7 @@ __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
-	if (r->retry != NULL)
-		__wt_free(session, r->retry);
+	__wt_free(session, r->retry);
 	r->retry_next = r->retry_entries = r->retry_allocated = 0;
 
 	r->session = NULL;
@@ -222,11 +221,9 @@ err:		__wt_err(session, ret, "cache eviction server error");
 
 	WT_VERBOSE(session, EVICTSERVER, "cache eviction server exiting");
 
-	if (cache->evict != NULL)
-		__wt_free(session, cache->evict);
+	__wt_free(session, cache->evict);
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
-		if (er->retry != NULL)
-			__wt_free(session, er->retry);
+		__wt_free(session, er->retry);
 
 	if (session != &conn->default_session)
 		(void)wt_session->close(wt_session, NULL);

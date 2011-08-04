@@ -495,23 +495,18 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 
 	__wt_buf_free(session, &r->dsk);
 
-	if (r->discard != NULL)
-		__wt_free(session, r->discard);
+	__wt_free(session, r->discard);
 
 	if (r->bnd != NULL) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
 			__wt_buf_free(session, &bnd->key);
-			if (bnd->imp_dsk != NULL)
-				__wt_free(session, bnd->imp_dsk);
+			__wt_free(session, bnd->imp_dsk);
 		}
 		__wt_free(session, r->bnd);
 	}
 
-	if (r->imref != NULL)
-		__wt_free(session, r->imref);
-
-	if (r->hazard != NULL)
-		__wt_free(session, r->hazard);
+	__wt_free(session, r->imref);
+	__wt_free(session, r->hazard);
 
 	__wt_buf_free(session, &r->k.buf);
 	__wt_buf_free(session, &r->v.buf);

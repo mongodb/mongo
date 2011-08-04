@@ -99,13 +99,9 @@ err:		if (ins != NULL)
 			__wt_sb_decrement(session, upd->sb);
 	}
 
-	/* Free any insert array. */
-	if (new_ins != NULL)
-		__wt_free(session, new_ins);
-
-	/* Free any update array. */
-	if (new_upd != NULL)
-		__wt_free(session, new_upd);
+	/* Free any insert, update arrays. */
+	__wt_free(session, new_ins);
+	__wt_free(session, new_upd);
 
 	__wt_page_release(session, page);
 

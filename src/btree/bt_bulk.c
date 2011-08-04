@@ -242,8 +242,7 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 		}
 
 	/* Discard any fixed-length column-store bulk buffer. */
-	if (cbulk->page_type == WT_PAGE_COL_FIX && cbulk->bitf != NULL)
-		__wt_free(session, cbulk->bitf);
+	__wt_free(session, cbulk->bitf);
 
 	root_page = &session->btree->root_page;
 

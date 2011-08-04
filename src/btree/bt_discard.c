@@ -80,7 +80,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			break;
 		}
 
-	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK) && page->dsk != NULL)
+	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))
 		__wt_free(session, page->dsk);
 	__wt_free(session, page);
 }
@@ -95,8 +95,7 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_INSERT *ins;
 
 	/* Free the in-memory index array. */
-	if (page->u.col_leaf.d != NULL)
-		__wt_free(session, page->u.col_leaf.d);
+	__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the insert array. */
 	if ((ins = WT_COL_INSERT_SINGLE(page)) != NULL)
@@ -111,8 +110,7 @@ static void
 __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the subtree-reference array. */
-	if (page->u.col_int.t != NULL)
-		__wt_free(session, page->u.col_int.t);
+	__wt_free(session, page->u.col_int.t);
 }
 
 /*
@@ -123,8 +121,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
-	if (page->u.col_leaf.d != NULL)
-		__wt_free(session, page->u.col_leaf.d);
+	__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the insert array. */
 	if (page->u.col_leaf.ins != NULL)
@@ -151,8 +148,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_sb_free(session, ikey->sb);
 
 	/* Free the subtree-reference array. */
-	if (page->u.row_int.t != NULL)
-		__wt_free(session, page->u.row_int.t);
+	__wt_free(session, page->u.row_int.t);
 }
 
 /*

@@ -280,8 +280,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		if (cst != NULL)
-			__wt_free(session, cst);
+err:		__wt_free(session, cst);
 	}
 
 	return (ret);

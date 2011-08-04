@@ -560,8 +560,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		if (ctable != NULL)
-			__wt_free(session, ctable);
+err:		__wt_free(session, ctable);
 		__wt_buf_free(session, &fmt);
 		__wt_buf_free(session, &plan);
 	}

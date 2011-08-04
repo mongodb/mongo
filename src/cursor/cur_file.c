@@ -266,8 +266,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		if (cbt != NULL)
-			__wt_free(session, cbt);
+err:		__wt_free(session, cbt);
 	}
 
 	return (ret);
