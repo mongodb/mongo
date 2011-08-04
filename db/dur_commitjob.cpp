@@ -146,83 +146,82 @@ namespace mongo {
             _commitNumber = 0;
         }
 
-        void CommitJob::_note(void* p, int len) {
+        void CommitJob::note(void* p, int len) {
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
-            MemoryMappedFile::makeWritable(p, len);
+            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
+                MemoryMappedFile::makeWritable(p, len);
 
-            if( !_hasWritten ) {
-                // you can't be writing if one of these is pending, so this is a verification.
-                assert( !dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
+                if( !_hasWritten ) {
+                    // you can't be writing if one of these is pending, so this is a verification.
+                    assert( !dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
 
-                // we don't bother doing a group commit when nothing is written, so we have a var to track that
-                _hasWritten = true;
-            }
+                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
+                    _hasWritten = true;
+                }
 
-            /** tips for debugging:
-                    if you have an incorrect diff between data files in different folders
-                    (see jstests/dur/quick.js for example),
-                    turn this on and see what is logged.  if you have a copy of its output from before the
-                    regression, a simple diff of these lines would tell you a lot likely.
-            */
+                /** tips for debugging:
+                        if you have an incorrect diff between data files in different folders
+                        (see jstests/dur/quick.js for example),
+                        turn this on and see what is logged.  if you have a copy of its output from before the
+                        regression, a simple diff of these lines would tell you a lot likely.
+                */
 #if 0 && defined(_DEBUG)
-            {
-                static int n;
-                if( ++n < 10000 ) {
-                    size_t ofs;
-                    MongoMMF *mmf = privateViews._find(w.p, ofs);
-                    if( mmf ) {
-                        log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
-                    }
-                    else {
-                        log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
-                    }
-                }
-                else if( n == 10000 ) {
-                    log() << "DEBUG stopping write intent logging, too much to log" << endl;
-                }
-            }
-#endif
-
-            // remember intent. we will journal it in a bit
-            _wi.insertWriteIntent(p, len);
-            wassert( _wi._writes.size() <  2000000 );
-            //assert(  _wi._writes.size() < 20000000 );
-
-            {
-                // a bit over conservative in counting pagebytes used
-                size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
-
-                // array 'seen' gives us a little memory of pages seen, we don't need much
-                // as this is all approximate. pathological case is multi update of a collection 
-                // with 40 indexes or something.
-                if( seen[x % P] != x ) { 
-                    seen[x % P] = x;
-                    unsigned b = (len+4095) & ~0xfff;
-                    _bytes += b;
-#if defined(_DEBUG)
-                    _nSinceCommitIfNeededCall++;
-                    if( _nSinceCommitIfNeededCall >= 80 ) {
-                        if( _nSinceCommitIfNeededCall % 40 == 0 ) {
-                            log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-                            if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
-                                printStackTrace();
+                {
+                    static int n;
+                    if( ++n < 10000 ) {
+                        size_t ofs;
+                        MongoMMF *mmf = privateViews._find(w.p, ofs);
+                        if( mmf ) {
+                            log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
+                        }
+                        else {
+                            log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
                         }
                     }
+                    else if( n == 10000 ) {
+                        log() << "DEBUG stopping write intent logging, too much to log" << endl;
+                    }
+                }
 #endif
-                    if (_bytes > UncommittedBytesLimit * 3) {
-                        static time_t lastComplain;
-                        static unsigned nComplains;
-                        // throttle logging
-                        if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
-                            lastComplain = time(0);
-                            warning() << "DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
-                            if( nComplains < 10 || nComplains % 10 == 0 ) {
-                                // wassert makes getLastError show an error, so we just print stack trace
-                                printStackTrace();
+
+                // remember intent. we will journal it in a bit
+                _wi.insertWriteIntent(p, len);
+                wassert( _wi._writes.size() <  2000000 );
+                //assert(  _wi._writes.size() < 20000000 );
+
+                {
+                    // a bit over conservative in counting pagebytes used
+                    static size_t lastPos; // note this doesn't reset with each commit, but that is ok we aren't being that precise
+                    size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
+                    if( x != lastPos ) { 
+                        lastPos = x;
+                        unsigned b = (len+4095) & ~0xfff;
+                        _bytes += b;
+#if defined(_DEBUG)
+                        _nSinceCommitIfNeededCall++;
+                        if( _nSinceCommitIfNeededCall >= 80 ) {
+                            if( _nSinceCommitIfNeededCall % 40 == 0 ) {
+                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
+                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
+                                    printStackTrace();
+                            }
+                        }
+#endif
+                        if (_bytes > UncommittedBytesLimit * 3) {
+                            static time_t lastComplain;
+                            static unsigned nComplains;
+                            // throttle logging
+                            if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
+                                lastComplain = time(0);
+                                warning() << "DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
+                                if( nComplains < 10 || nComplains % 10 == 0 ) {
+                                    // wassert makes getLastError show an error, so we just print stack trace
+                                    printStackTrace();
+                                }
                             }
                         }
                     }

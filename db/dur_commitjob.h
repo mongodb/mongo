@@ -159,20 +159,13 @@ namespace mongo {
                          other uses are in a read lock from a single thread (durThread)
         */
         class CommitJob : boost::noncopyable {
-            enum { P = 43 };
-            size_t seen[P];
-            void _note(void* p, int len);
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
             CommitJob();
 
             /** record/note an intent to write */
-            void note(void* p, int len) { 
-                if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
-                    _note(p, len);
-                }
-            }
+            void note(void* p, int len);
 
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
