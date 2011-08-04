@@ -19,9 +19,8 @@
 #include "processinfo.h"
 #include "log.h"
 
-
-#include <mach/task_info.h>
 #include <mach/vm_statistics.h>
+#include <mach/task_info.h>
 #include <mach/mach_init.h>
 #include <mach/mach_host.h>
 #include <mach/mach_traps.h>
