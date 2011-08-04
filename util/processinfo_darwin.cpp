@@ -21,13 +21,13 @@
 
 
 #include <mach/task_info.h>
-
+#include <mach/vm_statistics.h>
 #include <mach/mach_init.h>
 #include <mach/mach_host.h>
 #include <mach/mach_traps.h>
 #include <mach/task.h>
 #include <mach/vm_map.h>
-#include <mach/shared_memory_server.h>
+#include <mach/shared_region.h>
 #include <iostream>
 
 #include <sys/types.h>
