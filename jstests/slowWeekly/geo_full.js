@@ -279,6 +279,7 @@ var randYesQuery = function(){
 
 var locArray = function( loc ){
 	if( loc.x ) return [ loc.x, loc.y ]
+	if( ! loc.length ) return [ loc[0], loc[1] ]
 	return loc
 }
 
@@ -326,6 +327,7 @@ for ( var test = 0; test < numTests; test++ ) {
 	
 	Random.srand( seed + test );
 	//Random.srand( 42240 )
+	//Random.srand( 7344 )
 	var t = db.testAllGeo
 	t.drop()
 	
@@ -442,7 +444,8 @@ for ( var test = 0; test < numTests; test++ ) {
 		var output = db.runCommand( {
 			geoNear : "testAllGeo", 
 			near : query.center, 
-			maxDistance : query.radius , 
+			maxDistance : query.radius ,
+			includeLocs : true,
 			num : num } ).results
 				
 		assert.eq( Math.min( 200, results.center.locsIn ), output.length )
@@ -450,11 +453,14 @@ for ( var test = 0; test < numTests; test++ ) {
 		var distance = 0;
 		for ( var i = 0; i < output.length; i++ ) {
 			var retDistance = output[i].dis
-	
+			var retLoc = locArray( output[i].loc )
+			
 			// print( "Dist from : " + results[i].loc + " to " + startPoint + " is "
 			// + retDistance + " vs " + radius )
 			
 			var arrLocs = locsArray( output[i].obj.locs )
+						
+			assert.contains( retLoc, arrLocs )
 			
 			// printjson( arrLocs )
 			
@@ -465,6 +471,7 @@ for ( var test = 0; test < numTests; test++ ) {
 			}
 			
 			assert( distInObj )
+			assert.between( retDistance - 0.0001 , Geo.distance( locArray( query.center ), retLoc ), retDistance + 0.0001 )
 			assert.lte( retDistance, query.radius )
 			assert.gte( retDistance, distance )
 			distance = retDistance
