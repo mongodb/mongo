@@ -2363,7 +2363,7 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
-            _maxDim = _bounds.maxDim() / 2;
+            _maxDim = _g->_error + _bounds.maxDim() / 2;
 
             ok();
         }

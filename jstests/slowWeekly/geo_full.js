@@ -321,7 +321,7 @@ var numTests = 100
 // Our seed will change every time this is run, but 
 // each individual test will be reproducible given
 // that seed and test number
-var seed = Math.floor( Random.rand() * ( 10 ^ 30) ) 
+var seed = new Date().getTime()
 
 for ( var test = 0; test < numTests; test++ ) {
 	
