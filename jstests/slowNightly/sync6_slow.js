@@ -1,3 +1,4 @@
+// More complete version of sharding/sync6.js
 // Test that distributed lock forcing does not result in inconsistencies, using a 
 // fast timeout.
 
@@ -12,18 +13,15 @@ var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {})//{ log
 // { logpath : "/data/db/syncCommander/mongod.log" } );
 
 // Up the log level for this test
-commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 1 } )
+commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 0 } )
 
 // Have lots of threads, so use larger i
 // Can't test too many, we get socket exceptions... possibly due to the 
 // javascript console.
-for ( var i = 8; i < 9; i++ ) {
+for ( var i = 8; i < 12; i++ ) {
 
-	// Our force time is 4 seconds
-    // Slower machines can't keep up the LockPinger rate, which can lead to lock failures
-    // since our locks are only valid if the LockPinger pings faster than the force time.
-    // Actual lock timeout is 15 minutes, so a few seconds is extremely aggressive
-	var takeoverMS = 4000;
+	// Our force time is 6 seconds - slightly diff from sync6 to ensure exact time not important
+	var takeoverMS = 6000;
 
 	// Generate valid sleep and skew for this timeout
 	var threadSleepWithLock = takeoverMS / 2;
