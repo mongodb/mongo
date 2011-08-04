@@ -264,15 +264,17 @@ namespace mongo {
                     if( (t & 0x78) == 0 && t != ByteArrayDeprecated ) {
                         int len;
                         const char * d = e.binData(len);
-                        int code = BinDataLengthToCode[len];
-                        if( code >= 0 ) {
-                            if( t >= 128 )
-                                t = (t-128) | 0x08;
-                            dassert( (code&t) == 0 );
-                            b.appendUChar( cbindata|bits );
-                            b.appendUChar( code | t );
-                            b.appendBuf(d, len);
-                            break;
+                        if( len <= BinDataLenMax ) {
+                            int code = BinDataLengthToCode[len];
+                            if( code >= 0 ) {
+                                if( t >= 128 )
+                                    t = (t-128) | 0x08;
+                                dassert( (code&t) == 0 );
+                                b.appendUChar( cbindata|bits );
+                                b.appendUChar( code | t );
+                                b.appendBuf(d, len);
+                                break;
+                            }
                         }
                     }
                     traditional(obj);
