@@ -138,7 +138,7 @@ add_option( "usev8" , "use v8 for javascript" , 0 , True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
-add_option( "osnew", "use newer operating system API features" , 0 , False )
+add_option( "win2008plus", "use newer operating system API features" , 0 , False )
 
 # dev tools
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
@@ -525,7 +525,7 @@ elif "win32" == os.sys.platform:
     #if force64:
     #    release = True
 
-    if has_option( "osnew" ):
+    if has_option( "win2008plus" ):
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
