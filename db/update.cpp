@@ -1225,8 +1225,7 @@ namespace mongo {
                     }
                 }
 
-                if (atomic)
-                    getDur().commitIfNeeded();
+                getDur().commitIfNeeded();
 
                 continue;
             }
