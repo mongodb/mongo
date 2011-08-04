@@ -9,9 +9,8 @@ l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
 	../src/include/*.in \
 	../test/format/*.[ch] \
 	../test/thread/*.[ch] \
-	../test/salvage/*.[ch])` |
-    egrep -v 'src/api/(api|pack)\.c$' |
-    egrep -v 'support/stat\.c$'
+	../test/salvage/*.[ch]) |
+    egrep -v 'support/stat\.c$'`
 
 for f in $l ; do
 	expand -t8 < $f | awk -- \

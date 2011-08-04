@@ -29,7 +29,8 @@ static int __verify_addfrag(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __verify_int(WT_SESSION_IMPL *, int);
-static int __verify_overflow(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __verify_overflow(
+	WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, uint32_t, WT_VSTUFF *);

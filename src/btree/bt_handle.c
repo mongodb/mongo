@@ -331,8 +331,9 @@ __btree_type(WT_SESSION_IMPL *session)
 		if (fixed) {
 			if (bitcnt == 0 || bitcnt > 8) {
 				__wt_errx(session,
-				    "the fixed-width field size must be greater "
-				    "than 0 and less than or equal to 8");
+				    "the fixed-width field size must be "
+				    "greater than 0 and "
+				    "less than or equal to 8");
 				return (WT_ERROR);
 			}
 			btree->bitcnt = (uint8_t)bitcnt;

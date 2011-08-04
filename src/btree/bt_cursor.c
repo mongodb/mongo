@@ -260,7 +260,6 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 	return (__wt_btcur_next(cbt));
 }
 
-
 /*
  * __wt_btcur_next --
  *	Move to the next record in the tree.
