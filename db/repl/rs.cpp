@@ -24,6 +24,7 @@
 #include "rs.h"
 #include "connections.h"
 #include "../repl.h"
+#include "../instance.h"
 
 using namespace std;
 
@@ -65,6 +66,14 @@ namespace mongo {
         LOG(2) << "replSet assuming primary" << endl;
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
+
+        // Make sure that new OpTimes are higher than existing ones even with clock skew
+        DBDirectClient c;
+        BSONObj lastOp = c.findOne( "local.oplog.rs", Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk );
+        if ( !lastOp.isEmpty() ) {
+            OpTime::setLast( lastOp[ "ts" ].date() );
+        }
+
         changeState(MemberState::RS_PRIMARY);
     }
 
