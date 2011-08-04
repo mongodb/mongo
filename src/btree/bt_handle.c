@@ -72,7 +72,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	}
 	page->parent = NULL;
 	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_INITIAL_EMPTY);
+	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
 
 	btree->root_page.state = WT_REF_MEM;
 	btree->root_page.addr = WT_ADDR_INVALID;
