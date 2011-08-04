@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_lex_compare --
+ * __wt_btree_lex_compare --
  *	Lexicographic comparison routine.
  */
 int
-__wt_bt_lex_compare(
+__wt_btree_lex_compare(
     WT_BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	uint32_t len;

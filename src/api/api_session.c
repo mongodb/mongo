@@ -247,7 +247,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 		return (ret);
 
 	session->btree = btree_session->btree;
-	ret = __wt_bt_sync(session);
+	ret = __wt_btree_sync(session);
 	API_END(session);
 
 	return (0);

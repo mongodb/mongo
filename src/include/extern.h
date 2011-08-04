@@ -175,7 +175,7 @@ extern int __wt_cell_copy(WT_SESSION_IMPL *session,
 extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack,
     WT_BUF *retb);
-extern int __wt_bt_lex_compare( WT_BTREE *btree,
+extern int __wt_btree_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
@@ -261,7 +261,7 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_btree_stat_first(WT_CURSOR_STAT *cst);
 extern int __wt_btree_stat_next(WT_CURSOR_STAT *cst);
-extern int __wt_bt_sync(WT_SESSION_IMPL *session);
+extern int __wt_btree_sync(WT_SESSION_IMPL *session);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,

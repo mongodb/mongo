@@ -197,7 +197,7 @@ __btree_init(WT_SESSION_IMPL *session, const char *name, const char *filename)
 
 	btree->free_addr = WT_ADDR_INVALID;
 
-	btree->btree_compare = __wt_bt_lex_compare;
+	btree->btree_compare = __wt_btree_lex_compare;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
