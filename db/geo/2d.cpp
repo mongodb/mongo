@@ -814,6 +814,10 @@ namespace mongo {
             return _o;
         }
 
+        BSONObj pt() const {
+            return _pt;
+        }
+
         bool isEmpty() {
             return _o.isEmpty();
         }
@@ -825,6 +829,7 @@ namespace mongo {
         BSONObj _key;
         DiskLoc _loc;
         BSONObj _o;
+        BSONObj _pt;
 
         double _distance;
         bool _exact;
@@ -1905,10 +1910,12 @@ namespace mongo {
 
                 if( _uniqueDocs && ( nearestPt.distance() < 0 || d < nearestPt.distance() ) ){
                     nearestPt._distance = d;
+                    nearestPt._pt = *i;
                     continue;
                 }
                 else if( ! _uniqueDocs ){
                     GeoPoint exactPt( pt, d, true );
+                    exactPt._pt = *i;
                     GEODEBUG( "Inserting exact pt " << exactPt.toString() << " for " << pt.toString() << " exact : " << d << " is less? " << ( exactPt < pt ) << " bits : " << _g->_bits );
                     points.insert( exactPt );
                     exactPt < pt ? before++ : after++;
@@ -2553,6 +2560,9 @@ namespace mongo {
             bool uniqueDocs = false;
             if( ! cmdObj["uniqueDocs"].eoo() ) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
 
+            bool includeLocs = false;
+            if( ! cmdObj["includeLocs"].eoo() ) includeLocs = cmdObj["includeLocs"].trueValue();
+
             uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
             const Point n( cmdObj["near"] );
             result.append( "near" , g->_tohash( cmdObj["near"] ).toString() );
@@ -2594,6 +2604,7 @@ namespace mongo {
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
                 bb.append( "dis" , dis );
+                if( includeLocs ) bb.append( "loc" , p._pt );
                 bb.append( "obj" , p._o );
                 bb.done();
             }
