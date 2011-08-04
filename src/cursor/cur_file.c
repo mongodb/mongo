@@ -273,7 +273,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 {
 	/* TODO: handle projections. */
 
-	WT_RET(__wt_session_get_btree(session, name));
+	WT_RET(__wt_session_get_btree(session, name, NULL));
 
 	return (__wt_curfile_create(session, 1, config, cursorp));
 }

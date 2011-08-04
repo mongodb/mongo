@@ -59,7 +59,8 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
  *	Get a btree handle for the given name, set session->btree.
  */
 int
-__wt_session_get_btree(WT_SESSION_IMPL *session, const char *name)
+__wt_session_get_btree(
+    WT_SESSION_IMPL *session, const char *name, const char *tconfig)
 {
 	WT_BTREE_SESSION *btree_session;
 	const char *filename, *treeconf;
@@ -72,8 +73,16 @@ __wt_session_get_btree(WT_SESSION_IMPL *session, const char *name)
 	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), &btree_session)) == 0)
 		session->btree = btree_session->btree;
-	else if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_schema_table_read(session, name, &treeconf));
+	else if (ret == WT_NOTFOUND && __wt_exist(filename)) {
+		/*
+		 * A fixed configuration is passed in for special files, such
+		 * as the schema table itself.
+		 */
+		if (tconfig != NULL)
+			WT_RET(__wt_strdup(session, tconfig, &treeconf));
+		else
+			WT_RET(__wt_schema_table_read(session,
+			    name, &treeconf));
 		WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
 		WT_RET(__wt_session_add_btree(session, &btree_session));
 		ret = 0;

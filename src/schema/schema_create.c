@@ -9,37 +9,37 @@
 
 static int
 __create_file(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, int intable, const char *config)
+    const char *name, const char *filename, const char *config)
 {
 	WT_BUF keybuf;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *treeconf;
-	int exists, ret;
-
-	if (__wt_session_find_btree(session,
-	    filename, strlen(filename), NULL) == 0)
-		return (0);
+	int ret;
 
 	WT_CLEAR(keybuf);
-	treeconf = NULL;
 
-	exists = __wt_exist(filename);
-	if (!exists)
-		WT_RET(__wt_btree_create(session, filename));
-
-	if (intable)
+	/*
+	 * Opening the schema table is a special case, use the config
+	 * string we were passed to open the file.
+	 */
+	if (strcmp(filename, WT_SCHEMA_FILENAME) == 0)
 		WT_RET(__wt_strdup(session, config, &treeconf));
-	else {
+	else
+		treeconf = NULL;
+
+	/* If the file exists, don't try to recreate it. */
+	ret = __wt_session_get_btree(session, name, treeconf);
+	if (ret != WT_NOTFOUND)
+		return (ret);
+
+	WT_RET(__wt_btree_create(session, filename));
+
+	if (treeconf == NULL) {
 		WT_RET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
 
-		if (exists)
-			WT_ERR(__wt_schema_table_read(session,
-			    keybuf.data, &treeconf));
-		else {
-			WT_ERR(__wt_config_collapse(session, cfg, &treeconf));
-			WT_ERR(__wt_schema_table_insert(session,
-			    keybuf.data, treeconf));
-		}
+		WT_ERR(__wt_config_collapse(session, cfg, &treeconf));
+		WT_ERR(__wt_schema_table_insert(session,
+		    keybuf.data, treeconf));
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
@@ -135,7 +135,7 @@ __create_colgroup(
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
-	WT_ERR(__create_file(session, name, filename, 0, fileconf));
+	WT_ERR(__create_file(session, name, filename, fileconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -211,7 +211,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
 	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
-	WT_ERR(__create_file(session, name, filename, 0, fileconf));
+	WT_ERR(__create_file(session, name, filename, fileconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
@@ -282,11 +282,9 @@ __wt_schema_create(
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
 	else if (WT_PREFIX_SKIP(name, "file:"))
-		return (__create_file(session, fullname, name, 0, config));
+		return (__create_file(session, fullname, name, config));
 	else if (WT_PREFIX_MATCH(name, "index:"))
 		return (__create_index(session, name, config));
-	else if (WT_PREFIX_SKIP(name, "schema:"))
-		return (__create_file(session, fullname, name, 1, config));
 	else if (WT_PREFIX_MATCH(name, "table:"))
 		return (__create_table(session, name, config));
 	else {

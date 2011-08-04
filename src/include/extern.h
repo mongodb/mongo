@@ -121,7 +121,9 @@ extern int __wt_session_find_btree(WT_SESSION_IMPL *session,
     const char *filename,
     size_t namelen,
     WT_BTREE_SESSION **btree_sessionp);
-extern int __wt_session_get_btree(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_session_get_btree( WT_SESSION_IMPL *session,
+    const char *name,
+    const char *tconfig);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);

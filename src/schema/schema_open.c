@@ -89,7 +89,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		    (int)cval.len, cval.str));
 		uri = uribuf.data;
 
-		ret = __wt_session_get_btree(session, uri);
+		ret = __wt_session_get_btree(session, uri, NULL);
 		if (ret == ENOENT)
 			__wt_errx(session, "Column group '%s' "
 			    "created but '%s' is missing",

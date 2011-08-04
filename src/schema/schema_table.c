@@ -7,7 +7,6 @@
 
 #include "wt_internal.h"
 
-#define	SCHEMATAB_NAME	"__schema.wt"
 static const char *schematab_config = "key_format=S,value_format=S";
 
 /*
@@ -17,7 +16,6 @@ static const char *schematab_config = "key_format=S,value_format=S";
 static inline int
 __open_schema_table(WT_SESSION_IMPL *session)
 {
-	WT_BTREE_SESSION *btree_session;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, schematab_config);
 	const char *schemaconf;
 	int ret;
@@ -27,10 +25,8 @@ __open_schema_table(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_config_collapse(session, cfg, &schemaconf));
 	WT_ERR(__wt_schema_create(session,
-	    "schema:" SCHEMATAB_NAME, schemaconf));
-	WT_ERR(__wt_session_find_btree(session,
-	    SCHEMATAB_NAME, strlen(SCHEMATAB_NAME), &btree_session));
-	session->schematab = btree_session->btree;
+	    "file:" WT_SCHEMA_FILENAME, schemaconf));
+	session->schematab = session->btree;
 err:	__wt_free(session, schemaconf);
 	return (ret);
 }
