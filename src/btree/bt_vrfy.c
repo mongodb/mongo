@@ -122,19 +122,8 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	 *
 	 * To verify larger files than we can handle in this way, we'd have to
 	 * write parts of the bit array into a disk file.
-	 *
-	 * !!!
-	 * There's one portability issue -- the bitstring package uses "ints",
-	 * not unsigned ints, or any fixed size.   If an "int" can't hold a
-	 * big enough value, we could lose.   There's a check here to make we
-	 * don't overflow.   I don't ever expect to see this error message, but
-	 * better safe than sorry.
 	 */
 	vs->frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
-	if (vs->frags > INT_MAX) {
-		__wt_errx(session, "file is too large to verify");
-		goto err;
-	}
 	WT_ERR(__bit_alloc(session, vs->frags, &vs->fragbits));
 
 	/* Verify the tree, starting at the root. */
