@@ -7,13 +7,7 @@
 
 #include "wt_internal.h"
 
-#undef	STATIN
-#define	STATIN	static inline
-
 static int  __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
-STATIN void __cache_read_req_clr(WT_READ_REQ *);
-STATIN void __cache_read_req_set(
-		WT_SESSION_IMPL *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
 
 #define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
 	for ((rr) = (cache)->read_request,				\

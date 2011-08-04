@@ -7,18 +7,12 @@
 
 #include "wt_internal.h"
 
-#undef	STATIN
-#define	STATIN	static inline
-
-STATIN void __evict_clr(WT_EVICT_LIST *);
 static void __evict_dup_remove(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, WT_EVICT_REQ *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
 static void __evict_page(WT_SESSION_IMPL *);
 static int  __evict_page_cmp(const void *, const void *);
-STATIN void __evict_req_clr(WT_SESSION_IMPL *, WT_EVICT_REQ *);
-STATIN void __evict_req_set(WT_SESSION_IMPL *, WT_EVICT_REQ *, int);
 static int  __evict_request_retry(WT_SESSION_IMPL *);
 static int  __evict_request_walk(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *);

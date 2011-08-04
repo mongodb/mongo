@@ -5,20 +5,6 @@
  *	All rights reserved.
  */
 
-#undef	STATIN
-#define	STATIN	static inline
-
-STATIN uint64_t __wt_cache_bytes_inuse(WT_CACHE *);
-STATIN void	__wt_cache_page_evict(WT_SESSION_IMPL *, WT_PAGE *);
-STATIN void	__wt_cache_page_read(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-STATIN void	__wt_cache_page_workq(WT_SESSION_IMPL *);
-STATIN uint64_t __wt_cache_pages_inuse(WT_CACHE *);
-STATIN uint64_t __wt_cache_read_gen(WT_SESSION_IMPL *);
-STATIN int	__wt_off_page(WT_PAGE *, const void *);
-STATIN void	__wt_page_release(WT_SESSION_IMPL *, WT_PAGE *);
-STATIN int	__wt_page_reconcile(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-STATIN int	__wt_page_write_gen_check(WT_PAGE *, uint32_t);
-
 /*
  * __wt_cache_page_workq --
  *	Create pages into the cache.

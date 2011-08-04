@@ -22,9 +22,6 @@ typedef struct {
 } WT_DBG;
 
 #ifdef HAVE_DIAGNOSTIC
-#undef	STATIN
-#define	STATIN	static inline
-
 static void __debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
@@ -33,7 +30,6 @@ static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_int(WT_DBG *, WT_PAGE_DISK *);
-STATIN void __debug_hex_byte(WT_DBG *, uint8_t);
 static void __debug_ikey(WT_DBG *, WT_IKEY *);
 static void __debug_item(WT_DBG *, const char *, const void *, uint32_t);
 static void __debug_page_col_fix(WT_DBG *, WT_PAGE *);
@@ -47,6 +43,18 @@ static void __debug_row_insert(WT_DBG *, WT_INSERT_HEAD *);
 static void __debug_update(WT_DBG *, WT_UPDATE *);
 static void __dmsg(WT_DBG *, const char *, ...);
 static void __dmsg_wrapup(WT_DBG *);
+
+/*
+ * __debug_hex_byte --
+ *	Output a single byte in hex.
+ */
+static inline void
+__debug_hex_byte(WT_DBG *ds, uint8_t v)
+{
+	static const char hex[] = "0123456789abcdef";
+
+	__dmsg(ds, "#%c%c", hex[(v & 0xf0) >> 4], hex[v & 0x0f]);
+}
 
 /*
  * __debug_config --
@@ -856,17 +864,5 @@ __debug_byte_string(WT_DBG *ds, const uint8_t *data, uint32_t size)
 		else
 			__debug_hex_byte(ds, data[0]);
 	}
-}
-
-/*
- * __debug_hex_byte --
- *	Output a single byte in hex.
- */
-static inline void
-__debug_hex_byte(WT_DBG *ds, uint8_t v)
-{
-	static const char hex[] = "0123456789abcdef";
-
-	__dmsg(ds, "#%c%c", hex[(v & 0xf0) >> 4], hex[v & 0x0f]);
 }
 #endif

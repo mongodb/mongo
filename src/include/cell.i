@@ -5,15 +5,6 @@
  *	All rights reserved.
  */
 
-#undef	STATIN
-#define	STATIN static inline
-
-STATIN uint32_t	__wt_cell_pack_data(WT_CELL *, uint64_t, uint32_t);
-STATIN uint32_t	__wt_cell_pack_key(WT_CELL *, uint8_t, uint32_t);
-STATIN uint32_t	__wt_cell_pack_type(WT_CELL *, uint8_t, uint64_t);
-STATIN void	__wt_cell_unpack(WT_CELL *, WT_CELL_UNPACK *);
-STATIN int	__wt_cell_unpack_safe(WT_CELL *, WT_CELL_UNPACK *, uint8_t *);
-
 /*
  * WT_CELL --
  *	Variable-length cell type.
@@ -229,16 +220,6 @@ __wt_cell_type(WT_CELL *cell)
 }
 
 /*
- * __wt_cell_unpack --
- *	Unpack a WT_CELL into a structure.
- */
-static inline void
-__wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
-{
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
-}
-
-/*
  * __wt_cell_unpack_safe --
  *	Unpack a WT_CELL into a structure during verification.
  */
@@ -371,3 +352,14 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 done:	CHK(cell, unpack->len);
 	return (0);
 }
+
+/*
+ * __wt_cell_unpack --
+ *	Unpack a WT_CELL into a structure.
+ */
+static inline void
+__wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
+{
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+}
+

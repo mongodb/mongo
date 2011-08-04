@@ -7,30 +7,6 @@
 
 #include "wt_internal.h"
 
-#undef	STATIN
-#define	STATIN	static inline
-
-STATIN int __btcur_next_fix(WT_CURSOR_BTREE *, int, uint64_t *, WT_BUF *);
-STATIN int __btcur_next_row(WT_CURSOR_BTREE *, int, WT_BUF *, WT_BUF *);
-STATIN int __btcur_next_var(WT_CURSOR_BTREE *, int, uint64_t *, WT_BUF *);
-
-/*
- * __wt_btcur_first --
- *	Move to the first record in the tree.
- */
-int
-__wt_btcur_first(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk, 0));
-	F_SET(&cbt->iface, WT_CURSTD_POSITIONED);
-
-	return (__wt_btcur_next(cbt));
-}
-
 /*
  * __btcur_next_fix --
  *	Move to the next, fixed-length column-store item.
@@ -266,6 +242,24 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 
 	return (0);
 }
+
+/*
+ * __wt_btcur_first --
+ *	Move to the first record in the tree.
+ */
+int
+__wt_btcur_first(WT_CURSOR_BTREE *cbt)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk, 0));
+	F_SET(&cbt->iface, WT_CURSTD_POSITIONED);
+
+	return (__wt_btcur_next(cbt));
+}
+
 
 /*
  * __wt_btcur_next --

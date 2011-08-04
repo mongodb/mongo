@@ -59,26 +59,6 @@
  * $FreeBSD: src/sys/sys/bitstring.h,v 1.5 2005/01/07 02:29:23 imp Exp $
  */
 
-#undef	STATIN
-#define	STATIN	static inline
-
-STATIN int	__bit_alloc(WT_SESSION_IMPL *, uint32_t, void *);
-STATIN void	__bit_clear(uint8_t *, uint32_t);
-STATIN int	__bit_ffc(uint8_t *, uint32_t, uint32_t *);
-STATIN uint8_t	__bit_getv(uint8_t *, uint32_t, uint8_t);
-STATIN uint8_t	__bit_getv_recno(WT_PAGE *, uint64_t, uint8_t);
-STATIN void	__bit_nset(uint8_t *, uint32_t, uint32_t);
-STATIN void	__bit_set(uint8_t *, uint32_t);
-STATIN void	__bit_setv(uint8_t *, uint32_t, uint8_t, uint8_t);
-STATIN void	__bit_setv_recno(WT_PAGE *, uint64_t, uint8_t, uint8_t);
-STATIN int	__bit_test(uint8_t *, uint32_t);
-STATIN uint32_t	__bitstr_size(uint32_t);
-
-#ifdef __NOT_CURRENTLY_USED
-STATIN int	__bit_ffs(uint8_t *, uint32_t, uint32_t *);
-STATIN void	__bit_nclr(uint8_t *, uint32_t, uint32_t);
-#endif
-
 				/* byte of the bitstring bit is in */
 #define	__bit_byte(bit)	((bit) >> 3)
 
