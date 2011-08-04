@@ -68,40 +68,55 @@ __convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 	 * Overwrite in place: the converted string will always be smaller
 	 * than the printable representation, so dest <= src in this loop.
 	 */
-	dest = src = (uint8_t *)buf->data;
+	src = dest = (uint8_t *)buf->data;
 	end = src + buf->size;
-	while (src < end) {
+	for (; src < end; ++src, ++dest) {
 		if (*src == '\\') {
-			if (src + 1 < end && *++src == '\\') {
-				*dest++ = '\\';
+			if (src < end && src[1] == '\\') {
+				++src;
+				*dest = '\\';
 				continue;
 			}
 
-			if (src + 2 > end) {
-				__wt_errx(session, "Unexpected end of input "
-				    "in an escaped value");
+			if (src + 2 >= end) {
+				__wt_errx(session,
+				    "Unexpected end of input in an escaped "
+				    "value");
 				return (EINVAL);
 			}
 
 			*dest = 0;
 			for (i = 0; i < 2; i++) {
 				*dest <<= 4;
-				if ('0' <= *src && *src <= '9')
-					*dest = (*src++ - '0');
-				else if ('a' <= *src && *src <= 'f')
-					*dest = (*src++ - 'a');
-				else {
+				switch (*++src) {
+				case '0': *dest |= 0; break;
+				case '1': *dest |= 1; break;
+				case '2': *dest |= 2; break;
+				case '3': *dest |= 3; break;
+				case '4': *dest |= 4; break;
+				case '5': *dest |= 5; break;
+				case '6': *dest |= 6; break;
+				case '7': *dest |= 7; break;
+				case '8': *dest |= 8; break;
+				case '9': *dest |= 9; break;
+				case 'a': *dest |= 10; break;
+				case 'b': *dest |= 11; break;
+				case 'c': *dest |= 12; break;
+				case 'd': *dest |= 13; break;
+				case 'e': *dest |= 14; break;
+				case 'f': *dest |= 15; break;
+				default:
 					__wt_errx(session,
-					    "Invalid escaped value: "
-					    "expecting a hexadecimal value");
+					    "Invalid escaped value: expecting "
+					    "a hexadecimal value");
 					return (EINVAL);
 				}
 			}
 		} else
-			*dest++ = *src++;
+			*dest = *src;
 	}
 
-	buf->size = (uint32_t)(dest - (uint8_t *)buf->data);
+	buf->size = WT_PTRDIFF32(dest, buf->data);
 	return (0);
 }
 
