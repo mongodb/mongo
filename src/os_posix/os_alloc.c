@@ -32,7 +32,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	WT_ASSERT(session, number != 0 && size != 0);
 
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_STAT_INCR(S2C(session)->stats, memalloc);
+		WT_CSTAT_INCR(session, memalloc);
 
 	if ((p = calloc(number, (size_t)size)) == NULL) {
 		__wt_err(session, errno, "memory allocation");
@@ -61,7 +61,7 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, bytes_to_allocate != 0);
 
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_STAT_INCR(S2C(session)->stats, memalloc);
+		WT_CSTAT_INCR(session, memalloc);
 
 	p = *(void **)retp;
 
@@ -119,7 +119,7 @@ __wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_STAT_INCR(S2C(session)->stats, memalloc);
+		WT_CSTAT_INCR(session, memalloc);
 
 	WT_RET(__wt_calloc(session, len + 1, 1, &p));
 	memcpy(p, str, len);
@@ -153,7 +153,7 @@ __wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_STAT_INCR(S2C(session)->stats, memfree);
+		WT_CSTAT_INCR(session, memfree);
 
 	/*
 	 * If there's a serialization bug we might race with another thread.

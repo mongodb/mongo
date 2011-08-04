@@ -1568,6 +1568,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
 				WT_ASSERT_RET(
 				    session, !F_ISSET(rp, WT_PAGE_DELETED));
+
+				WT_BSTAT_INCR(session, rec_page_merge);
 				if (F_ISSET(rp, WT_PAGE_MERGE))
 					WT_RET(__rec_col_merge(session, rp));
 				continue;
@@ -2261,6 +2263,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 					WT_RET(__rec_discard_add_ovfl(
 					    session, unpack));
 
+				WT_BSTAT_INCR(session, rec_page_merge);
+
 				/* Merge split subtrees */
 				if (F_ISSET(rp, WT_PAGE_MERGE)) {
 					r->merge_ref = rref;
@@ -2363,6 +2367,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_MERGE)) {
+				WT_BSTAT_INCR(session, rec_page_merge);
+
 				/* Merge split subtrees */
 				if (F_ISSET(rp, WT_PAGE_MERGE))
 					WT_RET(__rec_row_merge(session, rp));
@@ -2692,12 +2698,10 @@ static int
 __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BOUNDARY *bnd;
-	WT_BTREE *btree;
 	WT_PAGE *replace;
 	WT_RECONCILE *r;
 
 	r = S2C(session)->cache->rec;
-	btree = session->btree;
 
 	/*
 	 * If the page was empty, we want to eventually discard it from the
@@ -2707,7 +2711,7 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_VERBOSE(session, RECONCILE,
 		    "reconcile: delete page %" PRIu32 " (%" PRIu32 "B)",
 		    WT_PADDR(page), WT_PSIZE(page));
-		WT_STAT_INCR(btree->stats, page_delete);
+		WT_BSTAT_INCR(session, rec_page_delete);
 
 		/*
 		 * If the tree is empty, we will arrive here with an empty root
@@ -2815,12 +2819,12 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_STAT_INCR(btree->stats, split_intl);
+			WT_BSTAT_INCR(session, rec_split_intl);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
-			WT_STAT_INCR(btree->stats, split_leaf);
+			WT_BSTAT_INCR(session, rec_split_leaf);
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
@@ -3010,7 +3014,7 @@ __rec_cell_build_key(
 
 	/* Create an overflow object if the data won't fit. */
 	if (key->buf.size > btree->leafitemsize) {
-		WT_STAT_INCR(btree->stats, overflow_key);
+		WT_BSTAT_INCR(session, rec_ovfl_key);
 
 		/*
 		 * Overflow objects aren't prefix compressed -- rebuild any
@@ -3064,7 +3068,7 @@ __rec_cell_build_val(
 
 		/* Create an overflow object if the data won't fit. */
 		if (val->buf.size > btree->leafitemsize) {
-			WT_STAT_INCR(btree->stats, overflow_data);
+			WT_BSTAT_INCR(session, rec_ovfl_value);
 
 			return (__rec_cell_build_ovfl(
 			    session, val, WT_CELL_VALUE_OVFL, rle));
@@ -3624,6 +3628,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	    sizeof(WT_HAZARD), __hazard_bsearch_cmp) == NULL)
 		return (0);
 
+	WT_BSTAT_INCR(session, rec_hazard);
 	WT_VERBOSE(session, RECONCILE,
 	    "reconcile: %" PRIu32 " hazard request failed", ref->addr);
 

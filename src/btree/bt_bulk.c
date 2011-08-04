@@ -75,11 +75,9 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 int
 __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
-	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	btree = session->btree;
 
 	/*
 	 * The WiredTiger reconciliation code is where on-disk page formats are
@@ -108,7 +106,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	WT_STAT_INCR(btree->stats, items_inserted);
+	WT_BSTAT_INCR(session, items_inserted);
 	return (0);
 }
 

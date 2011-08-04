@@ -32,6 +32,18 @@ struct __wt_stats {
 	(stats)->fld.v = (value);					\
 } while (0)
 
+#define	WT_BSTAT_INCR(session, fld)					\
+	WT_STAT_INCR((session)->btree->stats, fld)
+#define	WT_BSTAT_INCRV(session, fld, v)					\
+	WT_STAT_INCRV((session)->btree->stats, fld, v)
+#define	WT_BSTAT_DECR(session, fld)					\
+	WT_STAT_DECR((session)->btree->stats, fld)
+#define	WT_BSTAT_SET(session, fld, v)					\
+	WT_STAT_SET((session)->btree->stats, fld, v)
+
+#define	WT_CSTAT_INCR(session, fld)					\
+	WT_STAT_INCR(S2C(session)->stats, fld)
+
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
@@ -49,10 +61,7 @@ struct __wt_btree_stats {
 	WT_STATS extend;
 	WT_STATS free;
 	WT_STATS items_inserted;
-	WT_STATS overflow_key;
 	WT_STATS overflow_read;
-	WT_STATS overflow_data;
-	WT_STATS page_delete;
 	WT_STATS page_read;
 	WT_STATS page_write;
 	WT_STATS file_fixed_len;
@@ -66,12 +75,17 @@ struct __wt_btree_stats {
 	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
+	WT_STATS rec_page_merge;
+	WT_STATS rec_split_intl;
+	WT_STATS rec_split_leaf;
+	WT_STATS rec_ovfl_key;
+	WT_STATS rec_ovfl_value;
+	WT_STATS rec_page_delete;
+	WT_STATS rec_hazard;
 	WT_STATS file_row_internal;
 	WT_STATS file_row_leaf;
-	WT_STATS split_intl;
-	WT_STATS split_leaf;
-	WT_STATS file_item_total_data;
 	WT_STATS file_item_total_key;
+	WT_STATS file_item_total_value;
 	WT_STATS __end;
 };
 

@@ -14,11 +14,9 @@
 int
 __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	btree = session->btree;
 
 	/*
 	 * Read an overflow page, using an overflow structure from a page for
@@ -28,7 +26,7 @@ __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 	 * WiredTiger supports large page sizes, and overflow items should be
 	 * rare.
 	 */
-	WT_STAT_INCR(btree->stats, overflow_read);
+	WT_BSTAT_INCR(session, overflow_read);
 	WT_STAT_INCR(conn->stats, cache_overflow_read);
 
 	/*

@@ -29,7 +29,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 		    "multiple of %" PRIu32,
 		    size, btree->allocsize);
 
-	WT_STAT_INCR(btree->stats, alloc);
+	WT_BSTAT_INCR(session, alloc);
 
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		if (fe->size < size)
@@ -132,7 +132,7 @@ __block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	WT_VERBOSE(session, ALLOCATE,
 	    "allocate: file extend %" PRIu32 "/%" PRIu32, *addrp, size);
 
-	WT_STAT_INCR(btree->stats, extend);
+	WT_BSTAT_INCR(session, extend);
 	return (0);
 }
 
@@ -163,7 +163,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 
 	btree->freelist_dirty = 1;
 
-	WT_STAT_INCR(btree->stats, free);
+	WT_BSTAT_INCR(session, free);
 	++btree->freelist_entries;
 
 	/* Allocate memory for the new entry. */

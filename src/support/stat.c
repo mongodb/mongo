@@ -21,9 +21,9 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	    "number of entries in the freelist";
 	stats->file_intlmax.desc = "maximum internal page size";
 	stats->file_intlmin.desc = "minimum internal page size";
-	stats->file_item_col_deleted.desc = "column-store deleted data items";
-	stats->file_item_total_data.desc = "total data items";
+	stats->file_item_col_deleted.desc = "column-store deleted value";
 	stats->file_item_total_key.desc = "total keys";
+	stats->file_item_total_value.desc = "total value items";
 	stats->file_leafmax.desc = "maximum leaf page size";
 	stats->file_leafmin.desc = "minimum leaf page size";
 	stats->file_magic.desc = "magic number";
@@ -34,14 +34,18 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_row_leaf.desc = "row-store leaf pages";
 	stats->free.desc = "file: block frees";
 	stats->items_inserted.desc = "file: key/value pairs inserted";
-	stats->overflow_data.desc = "file: overflow values inserted";
-	stats->overflow_key.desc = "file: overflow key items inserted";
 	stats->overflow_read.desc = "file: overflow pages read from the file";
-	stats->page_delete.desc = "file: pages deleted";
 	stats->page_read.desc = "file: pages read from a file";
 	stats->page_write.desc = "file: pages written to a file";
-	stats->split_intl.desc = "split internal pages";
-	stats->split_leaf.desc = "split leaf pages";
+	stats->rec_hazard.desc =
+	    "reconcile: unable to acquire hazard reference";
+	stats->rec_ovfl_key.desc = "reconcile: overflow key";
+	stats->rec_ovfl_value.desc = "reconcile: overflow value";
+	stats->rec_page_delete.desc = "reconcile: pages deleted";
+	stats->rec_page_merge.desc =
+	    "reconcile: deleted or temporary pages merged";
+	stats->rec_split_intl.desc = "reconcile: internal pages split";
+	stats->rec_split_leaf.desc = "reconcile: leaf pages split";
 
 	*statsp = stats;
 	return (0);
@@ -61,8 +65,8 @@ __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats)
 	stats->file_intlmax.v = 0;
 	stats->file_intlmin.v = 0;
 	stats->file_item_col_deleted.v = 0;
-	stats->file_item_total_data.v = 0;
 	stats->file_item_total_key.v = 0;
+	stats->file_item_total_value.v = 0;
 	stats->file_leafmax.v = 0;
 	stats->file_leafmin.v = 0;
 	stats->file_magic.v = 0;
@@ -73,14 +77,16 @@ __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats)
 	stats->file_row_leaf.v = 0;
 	stats->free.v = 0;
 	stats->items_inserted.v = 0;
-	stats->overflow_data.v = 0;
-	stats->overflow_key.v = 0;
 	stats->overflow_read.v = 0;
-	stats->page_delete.v = 0;
 	stats->page_read.v = 0;
 	stats->page_write.v = 0;
-	stats->split_intl.v = 0;
-	stats->split_leaf.v = 0;
+	stats->rec_hazard.v = 0;
+	stats->rec_ovfl_key.v = 0;
+	stats->rec_ovfl_value.v = 0;
+	stats->rec_page_delete.v = 0;
+	stats->rec_page_merge.v = 0;
+	stats->rec_split_intl.v = 0;
+	stats->rec_split_leaf.v = 0;
 }
 
 int
