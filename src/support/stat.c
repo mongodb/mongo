@@ -90,6 +90,8 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
+	stats->cache_evict_unmodified.desc =
+	    "cache: unmodified pages selected for eviction";
 	stats->cache_bytes_inuse.desc =
 	    "cache: bytes currently held in the cache";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
@@ -97,8 +99,6 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 	    "cache: pages selected for eviction not evicted because of a hazard reference";
 	stats->cache_evict_modified.desc =
 	    "cache: modified pages selected for eviction";
-	stats->cache_evict_unmodified.desc =
-	    "cache: unmodified pages selected for eviction";
 	stats->cache_overflow_read.desc =
 	    "cache: overflow pages read from the file";
 	stats->cache_page_read.desc = "cache: pages read from a file";
@@ -121,9 +121,9 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 void
 __wt_stat_clear_conn_stats(WT_CONN_STATS *stats)
 {
+	stats->cache_evict_unmodified.v = 0;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_modified.v = 0;
-	stats->cache_evict_unmodified.v = 0;
 	stats->cache_overflow_read.v = 0;
 	stats->cache_page_read.v = 0;
 	stats->cache_page_write.v = 0;
