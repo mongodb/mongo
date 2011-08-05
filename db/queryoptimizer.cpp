@@ -836,7 +836,7 @@ doneCheckOrder:
             if ( !_org->getSpecial().empty() ) {
                 _or = false;
             }
-            if ( uselessOr( _hint.firstElement() ) ) {
+            else if ( uselessOr( _hint.firstElement() ) ) {
                 _or = false;   
             }
         }
