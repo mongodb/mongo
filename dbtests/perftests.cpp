@@ -179,7 +179,7 @@ namespace PerfTests {
 
                     DBClientConnection *c = new DBClientConnection(false, 0, 10);
                     string err;
-                    if( c->connect("mongo05.10gen.cust.cbici.net", err) ) { 
+                    if( c->connect("perfdb.10gen.cc", err) ) { 
                         if( !c->auth("perf", "perf", pwd, err) ) { 
                             cout << "info: authentication with stats db failed: " << err << endl;
                             assert(false);
