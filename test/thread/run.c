@@ -33,11 +33,10 @@ r(void)
 	static uint32_t m_w = 0, m_z = 0;
 
 	if (m_w == 0) {
-		struct timespec t;
-		(void)clock_gettime(CLOCK_REALTIME, &t);
-		m_w = (uint32_t)t.tv_nsec;
-		(void)clock_gettime(CLOCK_MONOTONIC, &t);
-		m_z = (uint32_t)t.tv_nsec;
+		struct timeval t;
+		(void)gettimeofday(&t, NULL);
+		m_w = (uint32_t)t.tv_sec;
+		m_z = (uint32_t)t.tv_usec;
 	}
 
 	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
@@ -100,7 +99,7 @@ reader(void *arg)
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();
 	printf(" read thread %2d starting: tid: %p\n", id, tid);
-	pthread_yield();		/* Get all the threads created. */
+	sched_yield();		/* Get all the threads created. */
 
 	key = &_key;
 	s = &run_stats[id];
@@ -112,7 +111,7 @@ reader(void *arg)
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
 		die("cursor.open", ret);
 
-	for (i = 0; i < nops; ++i, ++s->reads, pthread_yield()) {
+	for (i = 0; i < nops; ++i, ++s->reads, sched_yield()) {
 		keyno = r() % nkeys;
 		if (ftype == ROW) {
 			key->data = keybuf;
@@ -150,7 +149,7 @@ writer(void *arg)
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();
 	printf("write thread %2d starting: tid: %p\n", id, tid);
-	pthread_yield();		/* Get all the threads created. */
+	sched_yield();		/* Get all the threads created. */
 
 	key = &_key;
 	value = &_value;
@@ -163,7 +162,7 @@ writer(void *arg)
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
 		die("cursor.open", ret);
 
-	for (i = 0; i < nops; ++i, pthread_yield()) {
+	for (i = 0; i < nops; ++i, sched_yield()) {
 		keyno = r() % nkeys;
 		if (ftype == ROW) {
 			key->data = keybuf;
