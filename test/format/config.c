@@ -20,28 +20,25 @@ void
 config_setup(void)
 {
 	CONFIG *cp;
-	char buf[64];
 
 	/* Clear any temporary values. */
 	config_clear();
 
 	/* Pick a file type next, other items depend on it. */
 	cp = config_find("file_type");
-	if (!(cp->flags & C_PERM))
+	if (!(cp->flags & C_PERM)) {
 		switch (MMRAND(0, 2)) {
 		case 0:
-			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
-			config_single(buf, 0);
+			config_single("file_type=fix", 0);
 			break;
 		case 1:
-			(void)snprintf(buf, sizeof(buf), "file_type=vlcs");
-			config_single(buf, 0);
+			config_single("file_type=var", 0);
 			break;
 		case 2:
-			(void)snprintf(buf, sizeof(buf), "file_type=row");
-			config_single(buf, 0);
+			config_single("file_type=row", 0);
 			break;
 		}
+	}
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
