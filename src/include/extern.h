@@ -126,36 +126,6 @@ extern int __wt_session_get_btree( WT_SESSION_IMPL *session,
     const char *tconfig);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
-extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
-extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
-    const char *uri,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern void __wt_curdump_init(WT_CURSOR *cursor, int printable);
-extern int __wt_curfile_create(WT_SESSION_IMPL *session,
-    int is_public,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *name,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_curindex_open(WT_SESSION_IMPL *session,
-    const char *uri,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_curstat_open(WT_SESSION_IMPL *session,
-    const char *uri,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
-extern void __wt_cursor_init(WT_CURSOR *cursor,
-    int is_public,
-    const char *config);
-extern int __wt_curtable_open(WT_SESSION_IMPL *session,
-    const char *uri,
-    const char *config,
-    WT_CURSOR **cursorp);
 extern int __wt_block_alloc(WT_SESSION_IMPL *session,
     uint32_t *addrp,
     uint32_t size);
@@ -327,19 +297,44 @@ extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *key,
     uint32_t flags);
-extern int __wt_library_init(void);
-extern int __wt_breakpoint(void);
-extern void __wt_attach(WT_SESSION_IMPL *session);
 extern int __wt_connection_config(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
     const char *home,
     mode_t mode);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
-extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
-extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern void *__wt_workq_srvr(void *arg);
+extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
+extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern void __wt_curdump_init(WT_CURSOR *cursor, int printable);
+extern int __wt_curfile_create(WT_SESSION_IMPL *session,
+    int is_public,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_curfile_open(WT_SESSION_IMPL *session,
+    const char *name,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_curindex_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_curstat_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
+extern void __wt_cursor_init(WT_CURSOR *cursor,
+    int is_public,
+    const char *config);
+extern int __wt_curtable_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
 extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     const char *fmt,
@@ -530,6 +525,9 @@ extern int __wt_failure(WT_SESSION_IMPL *session,
     6)));
 extern int __wt_file_format(WT_SESSION_IMPL *session);
 extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
+extern int __wt_library_init(void);
+extern int __wt_breakpoint(void);
+extern void __wt_attach(WT_SESSION_IMPL *session);
 extern int
 __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC
@@ -600,6 +598,8 @@ extern int __wt_sb_alloc( WT_SESSION_IMPL *session,
     WT_SESSION_BUFFER **sbp);
 extern void __wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
 extern void __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
+extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
+extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,
     WT_BTREE_STATS **statsp);
 extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
