@@ -2089,26 +2089,26 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 _cli.createCollection( ns(), 1000, true );
-                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
-                _cli.ensureIndex( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
                 
                 shared_ptr<Cursor> c;
                 {
                     dblock lk;
                     Client::Context ctx( ns() );
-                    c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
-                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    c = newQueryOptimizerCursor( ns(), BSON( "a" << GT << 0 << "b" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "a" ) );
                     ASSERT( !c->getsetdup( c->currLoc() ) );
                     c->advance();
-                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "a" ) );
                     ASSERT( c->getsetdup( c->currLoc() ) );
                     ASSERT( c->prepareToYield() );
                 }
                 
                 int i = 1;
-                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                while( _cli.count( ns(), BSON( "a" << 1 ) ) > 0 ) {
                     ++i;
-                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );
+                 	_cli.insert( ns(), BSON( "a" << i << "b" << i ) );
                 }
                 
                 {
@@ -2117,7 +2117,7 @@ namespace QueryOptimizerTests {
                     c->recoverFromYield();
                     ASSERT( c->ok() );
                     // {$natural:1} plan does not recover, {_id:1} plan does.
-                    ASSERT( 1 < c->current().getIntField( "_id" ) );
+                    ASSERT( 1 < c->current().getIntField( "a" ) );
                 }                
             }
         };
