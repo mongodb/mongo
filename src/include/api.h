@@ -19,12 +19,12 @@ struct __wt_btree_session {
  *	A structure to accumulate file changes on a per-thread basis.
  */
 struct __wt_session_buffer {
-	uint32_t len;				/* Buffer original size */
-	uint32_t space_avail;			/* Buffer's available memory */
-	uint8_t *first_free;			/* Buffer's first free byte */
+	uint32_t len;			/* Buffer original size */
+	uint32_t space_avail;		/* Buffer's available memory */
+	uint8_t *first_free;		/* Buffer's first free byte */
 
-	uint32_t in;				/* Buffer chunks in use */
-	uint32_t out;				/* Buffer chunks not in use */
+	uint32_t in;			/* Buffer chunks in use */
+	uint32_t out;			/* Buffer chunks not in use */
 };
 
 struct __wt_hazard {
@@ -49,19 +49,20 @@ typedef	enum {
  *	Search return values.
  */
 struct __wt_search {
-	WT_PAGE		*page;	/* page */
-	uint32_t	 write_gen;/* leaf page's write-generation */
-	int		 match;	/* an exact match */
-	void		*ip;	/* WT_{COL,ROW} reference */
-	uint32_t	 slot;	/* WT_{COL,ROW} slot */
+	WT_PAGE		*page;		/* page */
+	uint32_t	 write_gen;	/* leaf page's write-generation */
+	int		 match;		/* an exact match */
+	void		*ip;		/* WT_{COL,ROW} reference */
+	uint32_t	 slot;		/* WT_{COL,ROW} slot */
 
-	WT_UPDATE      **upd;	/* WT_UPDATE base insert node */
+	WT_UPDATE      **upd;		/* WT_UPDATE base insert node */
 	WT_UPDATE	*vupdate;	/* WT_UPDATE value node */
 
 	WT_INSERT_HEAD **inshead;	/* WT_INSERT_HEAD node */
-	WT_INSERT      **ins[WT_SKIP_MAXDEPTH];	/* Previous inserts */
+					/* Previous inserts */
+	WT_INSERT      **ins[WT_SKIP_MAXDEPTH];
 
-	uint8_t		 v;	/* Bitfield search value */
+	uint8_t		 v;		/* Bitfield search value */
 };
 
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
