@@ -7,10 +7,10 @@
 
 #include "wt_internal.h"
 
-static int __stat_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
-static int __stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static int __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
+static int  __stat_page(WT_SESSION_IMPL *, WT_PAGE *, void *);
+static void __stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, void *);
 
 /*
  * __wt_btree_stat_init --
@@ -81,11 +81,10 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, void *arg)
  * __stat_page_col_fix --
  *	Stat a WT_PAGE_COL_FIX page.
  */
-static int
+static void
 __stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BSTAT_INCRV(session, file_item_total_value, page->entries);
-	return (0);
 }
 
 /*
