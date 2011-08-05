@@ -495,8 +495,6 @@ namespace mongo {
 
         extern mutex groupCommitMutex;
 
-        boost::mutex foo;
-
         /** recover from a crash
             called during startup
             throws on error
