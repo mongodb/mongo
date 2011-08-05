@@ -361,6 +361,7 @@ namespace QueryTests {
 		void insertA(const char* ns, int a) {
 			BSONObjBuilder b;
 			b.appendOID("_id", 0, true);
+			b.appendOID("value", 0, true);
 			b.append("a", a);
 			insert(ns, b.obj());
 		}
@@ -374,7 +375,7 @@ namespace QueryTests {
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
             OID id;
             id.init("000000000000000000000000");
-            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "_id" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
+            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "value" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
             c1->next();
             c1->next();
             ASSERT( !c1->more() );
