@@ -180,7 +180,7 @@ config_clear(void)
  *	Set a single configuration structure value.
  */
 void
-config_single(char *s, int perm)
+config_single(const char *s, int perm)
 {
 	CONFIG *cp;
 	char *vp;

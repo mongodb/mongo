@@ -98,7 +98,7 @@ void	 config_error(void);
 void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
-void	 config_single(char *, int);
+void	 config_single(const char *, int);
 void	 die(const char *,  int);
 void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
