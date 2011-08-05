@@ -1798,21 +1798,12 @@ namespace mongo {
         }
 
         if ( c->locktype() == Command::NONE ) {
-
-            bool ok = false;
-            try {
-                client.curop()->ensureStarted();
-                string errmsg;
-                ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
-
-                if ( ! ok )
-                    result.append( "errmsg" , errmsg );
-            }
-            catch( DBException& e ){
-                result.append( "errmsg" , str::stream() << "exception: " << e.what() );
-                result.append( "code" , e.getCode() );
-                ok = false;
-            }
+            // we also trust that this won't crash
+            client.curop()->ensureStarted();
+            string errmsg;
+            int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
+            if ( ! ok )
+                result.append( "errmsg" , errmsg );
 
             if (c->maintenanceMode() && theReplSet) {
                 theReplSet->setMaintenanceMode(false);

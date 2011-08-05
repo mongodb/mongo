@@ -1060,7 +1060,9 @@ namespace mongo {
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
                 }
-                catch ( DBException& e ){
+                // TODO:  The error handling code for queries is v. fragile,
+                // *requires* rethrow AssertionExceptions - should probably fix.
+                catch ( AssertionException& e ){
                     log() << "mr failed, removing collection" << causedBy(e) << endl;
                     throw e;
                 }

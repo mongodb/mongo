@@ -572,7 +572,7 @@ doneCheckOrder:
         }
 
         // Avoid an infinite loop here
-        uassert( 15878, str::stream() << "query ops not successful even after cleared indices", ! retried );
+        uassert( 15878, str::stream() << "query plans not successful even with no constraints, potentially due to additional sort", ! retried );
 
         // Retry with all candidate plans.
         QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
