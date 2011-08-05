@@ -296,6 +296,8 @@ struct __wt_page {
 			uint64_t    recno;	/* Starting recno */
 			uint8_t	   *bitf;	/* COL_FIX bits */
 			WT_COL	   *d;		/* COL_VAR objects */
+			WT_COL_RLE *repeats;	/* RLE array for lookups */
+			uint32_t    nrepeats;	/* Number of repeats. */
 			WT_INSERT_HEAD **ins;	/* Inserts (RLE) */
 		} col_leaf;
 
@@ -535,6 +537,18 @@ struct __wt_col {
 	 * interface is WT_COL_PTR.
 	 */
 	uint32_t __value;
+};
+
+/*
+ * WT_COL_RLE --
+ * In variable-length column store leaf pages, we build an array of entries
+ * with RLE counts greater than 1 when reading the page.  We can do a binary
+ * search in this array, then an offset calculation to find the cell.
+ */
+struct __wt_col_rle {
+	uint64_t recno;			/* Record number of first repeat. */
+	uint64_t rle;			/* Repeat count. */
+	uint32_t indx;			/* Slot of entry in col_leaf.d */
 };
 
 /*

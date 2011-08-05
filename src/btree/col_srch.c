@@ -63,9 +63,10 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_COL_REF *cref;
+	WT_COL_RLE *repeat;
 	WT_PAGE *page;
-	uint64_t record_cnt, start_recno;
-	uint32_t base, i, indx, limit, match, write_gen;
+	uint64_t start_recno;
+	uint32_t base, indx, limit, match, start_indx, write_gen;
 	int ret;
 
 	unpack = &_unpack;
@@ -167,23 +168,62 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 			    __bit_getv_recno(page, recno, btree->bitcnt);
 		break;
 	case WT_PAGE_COL_VAR:
-		/* Walk the page, counting records. */
-		record_cnt = page->u.col_leaf.recno - 1;
-		WT_COL_FOREACH(page, cip, i) {
-			if ((cell = WT_COL_PTR(page, cip)) == NULL)
-				++record_cnt;
-			else {
-				__wt_cell_unpack(cell, unpack);
-				record_cnt += unpack->rle;
-			}
-			if (record_cnt >= recno)
+		/*
+		 * Find the matching slot.
+		 *
+		 * This is done in two stages: first, we do a binary search
+		 * among any repeating records to find largest repeating
+		 * less than the search key.  Once there, we can do a simple
+		 * offset calculation to find the correct slot for this record
+		 * number, because we know any intervening records will have
+		 * repeat counts of 1.
+		 */
+		cip = NULL;
+		for (base = 0, limit = page->u.col_leaf.nrepeats;
+		    limit != 0;
+		    limit >>= 1) {
+			indx = base + (limit >> 1);
+
+			repeat = page->u.col_leaf.repeats + indx;
+			if (recno >= repeat->recno &&
+			    recno < repeat->recno + repeat->rle) {
+				cip = page->u.col_leaf.d + repeat->indx;
 				break;
+			}
+			if (recno < repeat->recno)
+				continue;
+			base = indx + 1;
+			--limit;
 		}
-		if (record_cnt < recno) {
-			if (LF_ISSET(WT_WRITE))
-				goto append;
-			goto notfound;
+
+		/*
+		 * If we didn't find an exact match, take the largest repeat
+		 * less than the search key.
+		 */
+		if (cip == NULL) {
+			if (base == 0) {
+				start_indx = 0;
+				start_recno = page->u.col_leaf.recno;
+			} else {
+				repeat = page->u.col_leaf.repeats + (base - 1);
+				start_indx = repeat->indx + 1;
+				start_recno = repeat->recno + repeat->rle;
+			}
+
+			if (recno >= start_recno +
+			    (page->entries - start_indx)) {
+				if (LF_ISSET(WT_WRITE))
+					goto append;
+				goto notfound;
+			}
+
+			cip = page->u.col_leaf.d + start_indx +
+			    (uint32_t)(recno - start_recno);
 		}
+
+		/* Now we have a slot, look up the cell and unpack. */
+		if ((cell = WT_COL_PTR(page, cip)) != NULL)
+			__wt_cell_unpack(cell, unpack);
 
 		/*
 		 * We have the right WT_COL slot: if it's a write, set up the
@@ -209,8 +249,8 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 
 		/*
 		 * If we're not updating an existing data item, check to see if
-		 * the item has been deleted.	If we found a match, use the
-		 * WT_INSERT's WT_UPDATE value.   If we didn't find a match, use
+		 * the item has been deleted.  If we found a match, use the
+		 * WT_INSERT's WT_UPDATE value.  If we didn't find a match, use
 		 * use the original data.
 		 */
 		if (LF_ISSET(WT_WRITE))

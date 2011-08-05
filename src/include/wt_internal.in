@@ -63,6 +63,8 @@ struct __wt_col;
     typedef struct __wt_col WT_COL;
 struct __wt_col_ref;
     typedef struct __wt_col_ref WT_COL_REF;
+struct __wt_col_rle;
+    typedef struct __wt_col_rle WT_COL_RLE;
 struct __wt_config;
     typedef struct __wt_config WT_CONFIG;
 struct __wt_config_item;

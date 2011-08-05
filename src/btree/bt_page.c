@@ -187,13 +187,18 @@ static int
 __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_COL *cip;
+	WT_COL_RLE *repeats;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
-	uint32_t i;
+	uint64_t recno;
+	uint32_t bytes_allocated, i, indx, max_repeats, nrepeats;
 
 	dsk = page->dsk;
 	unpack = &_unpack;
+	repeats = NULL;
+	bytes_allocated = max_repeats = nrepeats = 0;
+	recno = page->u.col_leaf.recno;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -208,11 +213,33 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
 	cip = page->u.col_leaf.d;
+	indx = 0;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_DISK_OFFSET(dsk, cell);
+
+		/*
+		 * Add records with repeat counts greater than 1 to an array we
+		 * use for fast lookups.
+		 */
+		if (unpack->rle > 1) {
+			if (nrepeats == max_repeats) {
+				max_repeats = (max_repeats == 0) ?
+				    10 : 2 * max_repeats;
+				WT_RET(__wt_realloc(session, &bytes_allocated,
+				    max_repeats * sizeof(WT_COL_RLE),
+				    &repeats));
+			}
+			repeats[nrepeats].indx = indx;
+			repeats[nrepeats].recno = recno;
+			repeats[nrepeats++].rle = unpack->rle;
+		}
+		indx++;
+		recno += unpack->rle;
 	}
 
+	page->u.col_leaf.repeats = repeats;
+	page->u.col_leaf.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
 	return (0);
 }

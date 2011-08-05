@@ -123,6 +123,9 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_leaf.d);
 
+	/* Free the RLE lookup array. */
+	__wt_free(session, page->u.col_leaf.repeats);
+
 	/* Free the insert array. */
 	if (page->u.col_leaf.ins != NULL)
 		__free_insert(session, page->u.col_leaf.ins, page->entries);
