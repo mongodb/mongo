@@ -10,8 +10,7 @@ Darwin)
 	NM='nm -gUo $f | egrep " T | D " | sed "s/ _/ /"'
 	;;
 *)
-	# We require GNU nm which may not be installed.  Be silent on this error
-	# there's no need to annoy people.
+	# We require GNU nm, which may not be installed.
 	type nm > /dev/null 2>&1 &&
 	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || {
 		echo 'skipped: GNU nm not found'
