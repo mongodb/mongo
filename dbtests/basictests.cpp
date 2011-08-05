@@ -26,6 +26,7 @@
 #include "../util/queue.h"
 #include "../util/paths.h"
 #include "../util/stringutils.h"
+#include "../util/compress.h"
 #include "../db/db.h"
 
 namespace BasicTests {
@@ -630,6 +631,21 @@ namespace BasicTests {
         }
     };
 
+    struct CompressionTest1 { 
+        void run() { 
+            const char * c = "this is a test";
+            std::string s;
+            size_t len = compress(c, strlen(c)+1, &s);
+            assert( len > 0 );
+            
+            std::string out;
+            bool ok = uncompress(s.c_str(), s.size(), &out);
+            assert(ok);
+            assert( strcmp(out.c_str(), c) == 0 );
+        }
+    } ctest1;
+
+
     class All : public Suite {
     public:
         All() : Suite( "basic" ) {
@@ -667,6 +683,8 @@ namespace BasicTests {
             add< HostAndPortTests >();
             add< RelativePathTest >();
             add< CmdLineParseConfigTest >();
+
+            add< CompressionTest1 >();
         }
     } myall;
 

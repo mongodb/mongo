@@ -28,18 +28,4 @@ namespace mongo {
         return snappy::Uncompress(compressed, compressed_length, uncompressed);
     }
 
-    struct CTest { 
-        CTest() { 
-            const char * c = "this is a test";
-            std::string s;
-            size_t len = compress(c, strlen(c)+1, &s);
-	    assert( len > 0 );
-
-            std::string out;
-            bool ok = uncompress(s.c_str(), s.size(), &out);
-            assert(ok);
-            assert( strcmp(out.c_str(), c) == 0 );
-        }
-    } ctest;
-
 }
