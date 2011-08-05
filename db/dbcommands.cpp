@@ -1631,8 +1631,8 @@ namespace mongo {
                 }
                 else {
                     bb.done();
-                    errmsg = (string)"can't find _id index for: " + c;
-                    return 0;
+                    log() << "can't find _id index for: " << c << endl;
+                    continue;
                 }
 
                 md5_state_t st;
