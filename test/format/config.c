@@ -9,8 +9,8 @@
 #include "config.h"
 
 static void	   config_clear(void);
-static CONFIG	  *config_find(const char *);
-static uint32_t	   config_translate(char *);
+static CONFIG	  *config_find(const char *, size_t);
+static uint32_t	   config_translate(const char *);
 
 /*
  * config_setup --
@@ -25,7 +25,7 @@ config_setup(void)
 	config_clear();
 
 	/* Pick a file type next, other items depend on it. */
-	cp = config_find("file_type");
+	cp = config_find("file_type", strlen("file_type"));
 	if (!(cp->flags & C_PERM)) {
 		switch (MMRAND(0, 2)) {
 		case 0:
@@ -183,19 +183,18 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	char *vp;
+	const char *ep;
 
-	if ((vp = strchr(s, '=')) == NULL) {
+	if ((ep = strchr(s, '=')) == NULL) {
 		fprintf(stderr,
 		    "%s: %s: illegal command-line value\n", g.progname, s);
 		exit(EXIT_FAILURE);
 	}
-	*vp++ = '\0';
 
-	cp = config_find(s);
+	cp = config_find(s, (size_t)(ep - s));
 	cp->flags |= perm ? C_PERM : C_TEMP;
 
-	*cp->v = config_translate(vp);
+	*cp->v = config_translate(ep + 1);
 	if (*cp->v < cp->min || *cp->v > cp->max) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
                     " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
@@ -209,7 +208,7 @@ config_single(const char *s, int perm)
  *	Return an integer value representing the argument.
  */
 static uint32_t
-config_translate(char *s)
+config_translate(const char *s)
 {
 	/* If it's already a integer value, we're done. */
 	if (isdigit(s[0]))
@@ -237,12 +236,12 @@ config_translate(char *s)
  *	Find a specific configuration entry.
  */
 static CONFIG *
-config_find(const char *s)
+config_find(const char *s, size_t len)
 {
 	CONFIG *cp;
 
 	for (cp = c; cp->name != NULL; ++cp) 
-		if (strcmp(s, cp->name) == 0)
+		if (strncmp(s, cp->name, len) == 0)
 			return (cp);
 
 	fprintf(stderr,
