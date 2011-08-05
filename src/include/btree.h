@@ -666,14 +666,14 @@ struct __wt_insert {
  */
 #define	WT_SKIP_FIRST(__head)						\
 	(((__head) == NULL) ? NULL : (__head)->head[0])
-#define	WT_SKIP_NEXT(__)  ((__)->next[0])
+#define	WT_SKIP_NEXT(ins)  ((ins)->next[0])
 #define	WT_SKIP_FOREACH(__i, __head)					\
-	for (__i = WT_SKIP_FIRST(__head);				\
-	    __i != NULL;						\
-	    __i = WT_SKIP_NEXT(__i))
+	for ((__i) = WT_SKIP_FIRST(__head);				\
+	    (__i) != NULL;						\
+	    (__i) = WT_SKIP_NEXT(__i))
 #define	WT_SKIP_CHOOSE_DEPTH(__d)					\
-	for (__d = 1; __d < WT_SKIP_MAXDEPTH &&				\
-	    __wt_random() < WT_SKIP_PROBABILITY; __d++)
+	for ((__d) = 1; (__d) < WT_SKIP_MAXDEPTH &&			\
+	    __wt_random() < WT_SKIP_PROBABILITY; (__d)++)
 
 /*
  * WT_INSERT_HEAD --
