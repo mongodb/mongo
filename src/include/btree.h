@@ -637,15 +637,15 @@ struct __wt_update {
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
-	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
+	WT_SESSION_BUFFER *sb;			/* insert's session buffer */
 
-	WT_UPDATE *upd;			/* value */
+	WT_UPDATE *upd;				/* value */
 
 	union {
-		uint64_t recno;
+		uint64_t recno;			/* column-store record number */
 		struct {
-			uint32_t offset;	/* start of key data */
-			uint32_t size;          /* size of key data */
+			uint32_t offset;	/* row-store key data start */
+			uint32_t size;          /* row-store key data size */
 		} key;
 	} u;
 
@@ -654,7 +654,7 @@ struct __wt_insert {
 	((void *)((uint8_t *)(ins) + (ins)->u.key.offset))
 #define	WT_INSERT_RECNO(ins)	((ins)->u.recno)
 
-	WT_INSERT *next[0];		/* forward-linked skip list */
+	WT_INSERT *next[0];			/* forward-linked skip list */
 };
 
 /* 10 level skip lists, 1/4 have a link 4 elements ahead. */
