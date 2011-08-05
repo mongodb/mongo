@@ -45,6 +45,7 @@
 #include "stats.h"
 #include "writeback_listener.h"
 #include "client.h"
+#include "../util/ramlog.h"
 
 namespace mongo {
 
@@ -177,6 +178,20 @@ namespace mongo {
                     bb.done();
                 }
 
+                {
+                    RamLog* rl = RamLog::get( "warnings" );
+                    verify(15879, rl);
+                    
+                    if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
+                        vector<const char*> lines;
+                        rl->get( lines );
+                        
+                        BSONArrayBuilder arr( result.subarrayStart( "warnings" ) );
+                        for ( unsigned i=std::max(0,(int)lines.size()-10); i<lines.size(); i++ )
+                            arr.append( lines[i] );
+                        arr.done();
+                    }
+                }
 
                 return 1;
             }

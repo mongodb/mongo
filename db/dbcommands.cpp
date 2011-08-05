@@ -31,6 +31,7 @@
 #include "../util/lruishmap.h"
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
+#include "../util/ramlog.h"
 #include "json.h"
 #include "repl.h"
 #include "repl_block.h"
@@ -596,6 +597,21 @@ namespace mongo {
             }
 
             timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
+
+            {
+                RamLog* rl = RamLog::get( "warnings" );
+                verify(15880, rl);
+                
+                if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
+                    vector<const char*> lines;
+                    rl->get( lines );
+                    
+                    BSONArrayBuilder arr( result.subarrayStart( "warnings" ) );
+                    for ( unsigned i=std::max(0,(int)lines.size()-10); i<lines.size(); i++ )
+                        arr.append( lines[i] );
+                    arr.done();
+                }
+            }
 
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );

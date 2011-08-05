@@ -520,4 +520,6 @@ namespace mongo {
         }
     };
 
+    extern Tee* const warnings; // Things put here go in serverStatus
+
 } // namespace mongo

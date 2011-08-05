@@ -34,6 +34,8 @@ namespace mongo {
         static RamLog* get( string name );
         static void getNames( vector<string>& names );
 
+        time_t lastWrite() { return _lastWrite; } // 0 if no writes
+
     protected:
         static int repeats(const vector<const char *>& v, int i);
         static string clean(const vector<const char *>& v, int i, string line="");
@@ -57,6 +59,7 @@ namespace mongo {
         typedef map<string,RamLog*> RM;
         static mongo::mutex* _namedLock;
         static RM*  _named;
+        time_t _lastWrite;
     };
 
 }
