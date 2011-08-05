@@ -209,6 +209,7 @@ namespace mongo {
 
             hidden_options.add_options()
             ("suites", po::value< vector<string> >(), "test suites to run")
+            ("nopreallocj", "disable journal prealloc")
             ;
 
             positional_options.add("suites", -1);
@@ -245,6 +246,10 @@ namespace mongo {
             }
             if( params.count("dur") || cmdLine.dur ) {
                 cmdLine.dur = true;
+            }
+
+            if( params.count("nopreallocj") ) {
+                cmdLine.preallocj = false;
             }
 
             if (params.count("debug") || params.count("verbose") ) {

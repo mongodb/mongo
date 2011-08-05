@@ -292,6 +292,11 @@ def runTest(test):
                                   'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + 
                                   'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" +
                                   'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" ]
+    
+    if argv[0].endswith( 'test' ) and no_preallocj :
+        argv = argv + [ '--nopreallocj' ]
+    
+    
     print argv
     r = call(argv, cwd=test_path)
     t2 = time.time()
