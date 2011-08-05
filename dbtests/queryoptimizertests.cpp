@@ -1900,18 +1900,19 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 _cli.createCollection( ns(), 1000, true );
-                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "x" << 1 ) );
                 
                 {
                     dblock lk;
                     Client::Context ctx( ns() );
-                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
-                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "x" ) );
                     ASSERT( prepareToYield() );
                 }
-                
-                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
-                 	_cli.insert( ns(), BSONObj() );   
+
+                int x = 2;
+                while( _cli.count( ns(), BSON( "x" << 1 ) ) > 0 ) {
+                 	_cli.insert( ns(), BSON( "x" << x++ ) );   
                 }
 
                 {
