@@ -21,6 +21,22 @@ _parsePort = function() {
     return port;
 }
 
+connectionURLTheSame = function( a , b ){
+    if ( a == b )
+        return true;
+
+    a = a.split( "/" )[0]
+    b = b.split( "/" )[0]
+
+    return a == b;
+}
+
+assert( connectionURLTheSame( "foo" , "foo" ) )
+assert( ! connectionURLTheSame( "foo" , "bar" ) )
+
+assert( connectionURLTheSame( "foo/a,b" , "foo/b,a" ) )
+assert( ! connectionURLTheSame( "foo/a,b" , "bar/a,b" ) )
+
 createMongoArgs = function( binaryName , args ){
     var fullArgs = [ binaryName ];
 
@@ -338,10 +354,9 @@ ShardingTest.prototype.getServer = function( dbname ){
     
     for ( var i=0; i<this._connections.length; i++ ){
         var c = this._connections[i];
-        if ( name == c.name )
+        if ( connectionURLTheSame( name , c.name ) || 
+             connectionURLTheSame( rsName , c.name ) )
             return c;
-	if ( rsName && c.name.startsWith( rsName ) )
-	    return c;
     }
     
     throw "can't find server for: " + dbname + " name:" + name;
@@ -699,7 +714,7 @@ ShardingTest.prototype.getShards = function( coll, query ){
     
     for( var i = 0; i < shards.length; i++ ){
         for( var j = 0; j < this._connections.length; j++ ){
-            if( this._connections[j].name == shards[i] ){
+            if ( connectionURLTheSame(  this._connections[j].name , shards[i] ) ){
                 shards[i] = this._connections[j]
                 break;
             }
