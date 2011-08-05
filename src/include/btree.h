@@ -862,19 +862,29 @@ struct __wt_btree {
 
 	uint32_t refcnt;		/* Sessions using this tree. */
 
-	const char *key_format;
-	const char *value_format;
-
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
 		BTREE_ROW=3		/* Row-store */
 	} type;				/* Type */
 
-	uint64_t  lsn;			/* LSN file/offset pair */
+	WT_REF	 root_page;		/* Root page reference */
+	WT_FH	*fh;			/* Backing file handle */
+	uint64_t lsn;			/* LSN file/offset pair */
 
-	WT_FH	 *fh;			/* Backing file handle */
+	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
-	WT_REF	root_page;		/* Root page reference */
+	const char *key_format;		/* Key format */
+	const char *value_format;	/* Value format */
+
+	void *huffman_key;		/* Key huffman encoding */
+	void *huffman_value;		/* Value huffman encoding */
+
+	int btree_compare_int;		/* Integer keys */
+					/* Comparison function */
+	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+
+	uint32_t key_gap;		/* Btree instantiated key gap */
+	WT_BUF   key_srch;		/* Search key buffer */
 
 	uint32_t freelist_entries;	/* Free-list entry count */
 					/* Free-list queues */
@@ -884,20 +894,6 @@ struct __wt_btree {
 	uint32_t free_addr;		/* Free-list addr/size pair */
 	uint32_t free_size;
 
-	WT_WALK evict_walk;		/* Eviction thread's walk state */
-
-	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_value;		/* Value huffman encoding */
-
-	uint32_t key_gap;		/* Btree instantiated key gap */
-	WT_BUF   key_srch;		/* Search key buffer */
-
-	uint8_t	 bitcnt;		/* Fixed-length field size in bits */
-
-	int btree_compare_int;		/* Integer keys */
-					/* Comparison function */
-	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
-
 	uint32_t intlitemsize;		/* Maximum item size for overflow */
 	uint32_t leafitemsize;
 
@@ -906,6 +902,10 @@ struct __wt_btree {
 	uint32_t intlmax;
 	uint32_t leafmin;		/* Min/max leaf page size */
 	uint32_t leafmax;
+
+	WT_WALK evict_walk;		/* Eviction thread's walk state */
+
+	void	*reconcile;		/* Reconciliation structure */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 

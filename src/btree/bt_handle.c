@@ -241,27 +241,25 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 			__wt_page_out(session, btree->root_page.page, 0);
 	}
 
-	/* Write out the free list. */
+	/*
+	 * Write out the free list.
+	 * Update the file's description.
+	 * Close the underlying file handle.
+	 */
 	WT_TRET(__wt_block_write(session));
-
-	/* Update the file's description. */
 	WT_TRET(__wt_desc_update(session));
-
-	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(session, btree->fh));
 
-	__wt_free(session, btree->config);
+	/* Free allocated memory. */
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->filename);
+	__wt_free(session, btree->config);
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
-
 	__wt_btree_huffman_close(session);
-
 	__wt_buf_free(session, &btree->key_srch);
-
 	__wt_walk_end(session, &btree->evict_walk);
-
+	__wt_rec_destroy(session);
 	__wt_free(session, btree->stats);
 
 	__wt_free(session, session->btree);

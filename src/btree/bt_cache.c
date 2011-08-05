@@ -80,7 +80,5 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache->mtx_read != NULL)
 		(void)__wt_mtx_destroy(session, cache->mtx_read);
 
-	__wt_rec_destroy(session);
-
 	__wt_free(session, conn->cache);
 }

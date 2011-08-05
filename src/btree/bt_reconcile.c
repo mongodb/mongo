@@ -384,7 +384,7 @@ __rec_split_bnd_grow(WT_SESSION_IMPL *session)
 {
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/*
 	 * Make sure there's enough room in which to save another boundary.
@@ -577,18 +577,16 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 static int
 __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
-	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_RECONCILE *r;
 
 	conn = S2C(session);
-	cache = conn->cache;
 
 	/* Allocate a reconciliation structure if we don't already have one. */
-	if ((r = cache->rec) == NULL) {
+	if ((r = session->btree->reconcile) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
-		cache->rec = r;
+		session->btree->reconcile = r;
 
 		/*
 		 * Allocate memory for a copy of the hazard references -- it's
@@ -654,7 +652,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	WT_RECONCILE *r;
 	uint32_t i;
 
-	if ((r = S2C(session)->cache->rec) == NULL)
+	if ((r = session->btree->reconcile) == NULL)
 		return;
 
 	__wt_buf_free(session, &r->dsk);
@@ -677,7 +675,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->_cur);
 	__wt_buf_free(session, &r->_last);
 
-	__wt_free(session, S2C(session)->cache->rec);
+	__wt_free(session, session->btree->reconcile);
 }
 
 /*
@@ -690,7 +688,7 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	int ret;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	ret = 0;
 
 	/*
@@ -774,7 +772,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_REF *parent_ref;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/* For each entry in the page... */
 	WT_COL_REF_FOREACH(parent, cref, i) {
@@ -898,7 +896,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_ROW_REF *rref;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/* For each entry in the page... */
 	WT_ROW_REF_FOREACH(parent, rref, i) {
@@ -1053,7 +1051,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	btree = session->btree;
 
 						/* New page, compression off. */
@@ -1152,7 +1150,7 @@ __rec_split(WT_SESSION_IMPL *session)
 	 * reconciliation loop, and I don't want to repeat the code that many
 	 * times.
 	 */
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	dsk = r->dsk.mem;
 
 	/*
@@ -1283,7 +1281,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	WT_PAGE_DISK *dsk;
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/*
 	 * We're done reconciling a page.
@@ -1347,7 +1345,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * split chunks we've created and write those pages out, then update
 	 * the caller's information.
 	 */
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	tmp = NULL;
 	ret = 0;
 
@@ -1417,7 +1415,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	WT_RECONCILE *r;
 	uint32_t addr, size;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	dsk = buf->mem;
 
 	/*
@@ -1485,7 +1483,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	uint32_t cnt, len, size;
 	const uint8_t *pa, *pb;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	unpack = &_unpack;
 
 	/*
@@ -1590,7 +1588,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/* For each entry in the page... */
 	WT_COL_REF_FOREACH(page, cref, i) {
@@ -1739,7 +1737,7 @@ __rec_col_fix(
 	uint64_t page_start, page_take;
 	uint32_t entry, nrecs;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	btree = session->btree;
 
 	/*
@@ -1832,7 +1830,7 @@ __rec_col_fix_helper(
 	WT_RECONCILE *r;
 	uint32_t len;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	btree = session->btree;
 
 	/*
@@ -1865,7 +1863,7 @@ __rec_col_var_helper(
 	WT_RECONCILE *r;
 	WT_KV *val;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	val = &r->v;
 
 	/*
@@ -1946,7 +1944,7 @@ __rec_col_var(
 	int can_compare, deleted, last_deleted, orig_deleted;
 	const void *data;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	last = r->last;
 	unpack = &_unpack;
 
@@ -2157,7 +2155,7 @@ __rec_col_var_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_UPDATE *upd, *next;
 	uint64_t rle;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	val = &r->v;
 
 	WT_RET(__rec_split_init(session, page,
@@ -2214,7 +2212,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 	int ovfl_key;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	unpack = &_unpack;
 	key = &r->k;
 	val = &r->v;
@@ -2398,7 +2396,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 	int ovfl_key;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	key = &r->k;
 	val = &r->v;
 
@@ -2492,7 +2490,7 @@ __rec_row_leaf(
 	uint32_t i;
 	int ovfl_key, ret;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	tmp = NULL;
 	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
@@ -2686,7 +2684,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	WT_UPDATE *upd;
 	int ovfl_key;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	key = &r->k;
 	val = &r->v;
 
@@ -2745,7 +2743,7 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE *replace;
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/*
 	 * If the page was empty, we want to eventually discard it from the
@@ -3006,7 +3004,7 @@ __rec_cell_build_key(
 	uint8_t pfx;
 	const uint8_t *a, *b;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	btree = session->btree;
 	key = &r->k;
 	*is_ovflp = 0;
@@ -3091,7 +3089,7 @@ __rec_cell_build_val(
 	WT_KV *val;
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	btree = session->btree;
 	val = &r->v;
 
@@ -3191,7 +3189,7 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	uint32_t i;
 	int ret;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	ret = 0;
 
 	/* Allocate a row-store internal page. */
@@ -3267,7 +3265,7 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	uint32_t i;
 	int ret;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	ret = 0;
 
 	/* Allocate a column-store internal page. */
@@ -3376,7 +3374,7 @@ __rec_imref_fixup(WT_SESSION_IMPL *session,
 	WT_ROW_REF *rref;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/*
 	 * Create the in-memory version of the page from the disk image.  We'll
@@ -3453,7 +3451,7 @@ __rec_imref_add(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	if (r->imref_next == r->imref_entries) {
 		WT_RET(__wt_realloc(session, &r->imref_allocated,
@@ -3485,7 +3483,7 @@ __rec_discard_add(
 {
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	if (r->discard_next == r->discard_entries) {
 		WT_RET(__wt_realloc(session, &r->discard_allocated,
@@ -3511,7 +3509,7 @@ __rec_discard_evict(WT_SESSION_IMPL *session)
 	WT_RECONCILE *r;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	for (discard = r->discard, i = 0; i < r->discard_next; ++discard, ++i)
 		if (discard->page == NULL)
@@ -3553,7 +3551,7 @@ __hazard_copy(WT_SESSION_IMPL *session)
 	WT_RECONCILE *r;
 	uint32_t elem, i, j;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 	conn = S2C(session);
 
 	/* Copy the list of hazard references, compacting it as we go. */
@@ -3595,7 +3593,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_RECONCILE *r;
 
-	r = S2C(session)->cache->rec;
+	r = session->btree->reconcile;
 
 	/*
 	 * Hazard references are acquired down the tree, which means we can't

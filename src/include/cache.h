@@ -81,8 +81,6 @@ struct __wt_cache {
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 
-	void	  *rec;			/* Page reconciliation structure */
-
 	/*
 	 * Different threads read/write pages to/from the cache and create pages
 	 * in the cache, so we cannot know precisely how much memory is in use
