@@ -9,11 +9,17 @@ for( i = 0; i < 3000; ++i ) {
 }
 db.getLastError();
 
+// Iteratively update all a values to a atomically.
+p = startParallelShell( 'for( a = 0; a < 100; ++a ) { db.jstests_group7.update( {$atomic:true}, {$set:{a:a}}, false, true ); db.getLastError(); }' );
+
 assert.soon( function() {
-            // Update all a values to a+1 atomically.
-            p = startParallelShell( 'db.jstests_group7.update( {$atomic:true}, {$set:{a:' + ++a + '}}, false, true ); db.getLastError();' );
+            ret = t.group({key:{a:1},reduce:function(){},initial:{}});
             // Check if group sees more than one a value, indicating that group yielded.
-            ret = t.group({key:{a:1},reduce:function(){},initial:{}}).length > 1;
-            p();
-            return ret;
+            if ( ret.length > 1 ) {
+                return true;
+            }
+            printjson( ret );
+            return false;
             } );
+
+p();
