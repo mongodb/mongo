@@ -47,7 +47,7 @@ function checkDecreasing( i ) {
 
 for( i = 0 ;; ++i ) {
     debug( "capped 2: " + i );
-    tzz.save( val[ i ] );
+    tzz.insert( val[ i ] );
     if ( tzz.count() == 0 ) {
     	assert( i > 100, "K" );
         break;
@@ -57,6 +57,6 @@ for( i = 0 ;; ++i ) {
 
 for( i = 600 ; i >= 0 ; --i ) {
     debug( "capped 2: " + i );
-    tzz.save( val[ i ] );
+    tzz.insert( val[ i ] );
     checkDecreasing( i );
 }
