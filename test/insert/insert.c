@@ -17,7 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "wt_internal.h"
+#include <wiredtiger.h>
 
 #define	FILENAME	"xx"
 #define	PSIZE		2048
@@ -40,7 +40,11 @@ u_int	flags = PRINT;
 int	bitcnt = 3;
 int	nrecs = 10;
 int	nrecs2 = 0;
-int	page_type = WT_PAGE_ROW_LEAF;
+
+#define	FIX	1
+#define	ROW	2
+#define	VAR	3
+int	file_type = ROW;
 
 void run(void);
 int  usage(void);
@@ -74,11 +78,11 @@ main(int argc, char *argv[])
 			break;
 		case 't':
 			if (strcmp(optarg, "fix") == 0)
-				page_type = WT_PAGE_COL_FIX;
-			else if (strcmp(optarg, "var") == 0)
-				page_type = WT_PAGE_COL_VAR;
+				file_type = FIX;
 			else if (strcmp(optarg, "row") == 0)
-				page_type = WT_PAGE_ROW_LEAF;
+				file_type = ROW;
+			else if (strcmp(optarg, "var") == 0)
+				file_type = VAR;
 			else
 				return (usage());
 			break;
@@ -95,13 +99,13 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((flags & DUPS) && page_type == WT_PAGE_COL_FIX) {
+	if ((flags & DUPS) && file_type == FIX) {
 		fprintf(stderr,
 		    "%s: -d requires row-store or variable-length "
 		    "column-store file type\n", progname);
 		return (EXIT_FAILURE);
 	}
-	if (nrecs2 != 0 && page_type != WT_PAGE_ROW_LEAF) {
+	if (nrecs2 != 0 && file_type != ROW) {
 		fprintf(stderr,
 		    "%s: -N requires row-store file type\n",
 		    progname);
@@ -139,8 +143,8 @@ run(void)
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	switch (page_type) {
-	case WT_PAGE_COL_FIX:
+	switch (file_type) {
+	case FIX:
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=%dt,"
 		    "allocation_size=%d,"
@@ -148,17 +152,17 @@ run(void)
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    bitcnt, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
-	case WT_PAGE_COL_VAR:
+	case ROW:
 		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=S,"
+		    "key_format=S,value_format=S,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
 		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
 		break;
-	case WT_PAGE_ROW_LEAF:
+	case VAR:
 		(void)snprintf(config, sizeof(config),
-		    "key_format=S,value_format=S,"
+		    "key_format=r,value_format=S,"
 		    "allocation_size=%d,"
 		    "internal_node_min=%d,internal_node_max=%d,"
 		    "leaf_node_min=%d,leaf_node_max=%d",
@@ -174,19 +178,19 @@ run(void)
 	/* Create the initial key/value pairs. */
 	ikey = 100;
 	for (cnt = 0; cnt < nrecs; ++cnt, ++ikey) {
-		switch (page_type) {			/* Build the key. */
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_VAR:
+		switch (file_type) {			/* Build the key. */
+		case FIX:
+		case VAR:
 			cursor->set_key(cursor, (uint64_t)cnt + 1);
 			break;
-		case WT_PAGE_ROW_LEAF:
+		case ROW:
 			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
 			cursor->set_key(cursor, kbuf);
 			break;
 		}
 
-		switch (page_type) {			/* Build the value. */
-		case WT_PAGE_COL_FIX:
+		switch (file_type) {			/* Build the value. */
+		case FIX:
 			switch (bitcnt) {
 			case 8: bitf = cnt & 0xff; break;
 			case 7: bitf = cnt & 0x7f; break;
@@ -200,8 +204,8 @@ run(void)
 			}
 			cursor->set_value(cursor, bitf);
 			break;
-		case WT_PAGE_COL_VAR:
-		case WT_PAGE_ROW_LEAF:
+		case ROW:
+		case VAR:
 			if (cnt != 1 &&
 			    cnt != 500 && cnt != 1000 && flags & DUPS)
 				strcpy(vbuf, "----- VALUE -----");
@@ -245,14 +249,14 @@ run(void)
 
 	if (flags & PRINT) {
 		while ((ret = cursor->next(cursor)) == 0) {
-			switch (page_type) {
-			case WT_PAGE_COL_FIX:
+			switch (file_type) {
+			case FIX:
 				if ((ret =
 				    cursor->get_value(cursor, &bitf)) != 0)
 					break;
 				printf("0x%02x\n", bitf);
 				break;
-			case WT_PAGE_ROW_LEAF:
+			case ROW:
 				if ((ret = cursor->get_key(cursor, &key)) != 0)
 					break;
 				if (printf("%s\n", key) < 0) {
@@ -260,7 +264,7 @@ run(void)
 					break;
 				}
 				/* FALLTHROUGH */
-			case WT_PAGE_COL_VAR:
+			case VAR:
 				if ((ret =
 				    cursor->get_value(cursor, &value)) != 0)
 					break;
