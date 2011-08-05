@@ -211,8 +211,19 @@ doneCheckOrder:
         }
 
         if ( willScanTable() ) {
-            if ( _frs.nNontrivialRanges() )
+            if ( _frs.nNontrivialRanges() ) {
                 checkTableScanAllowed( _frs.ns() );
+                
+                // if we are doing a table scan on _id
+                // and its a capped collection
+                // we disallow as its a common user error
+                // .system. and local collections are exempt
+                if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
+                    uassert( 14820, "doing _id query on a capped collection without an index is not allowed" ,
+                             str::contains( _frs.ns() , ".system." ) || 
+                             str::startsWith( _frs.ns() , "local." ) );
+                }
+            }
             return findTableScan( _frs.ns(), _order, startLoc );
         }
                 
