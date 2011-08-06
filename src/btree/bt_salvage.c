@@ -557,8 +557,11 @@ __slvg_trk_leaf(
 		/*
 		 * Row-store format: copy the first and last keys on the page.
 		 * Keys are prefix-compressed, the simplest and slowest thing
-		 * to do is instantiate the in-memory page, then instantiate
-		 * and copy the keys, then free the page.
+		 * to do is instantiate the in-memory page (which instantiates
+		 * the prefix keys at specific split points), then instantiate
+		 * and copy the full keys, then free the page.   We do this
+		 * on every leaf page, and if you need to speed up the salvage,
+		 * it's probably a great place to start.
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
 		WT_ERR(__wt_row_key(session,
