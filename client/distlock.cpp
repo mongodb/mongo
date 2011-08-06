@@ -634,7 +634,9 @@ namespace mongo {
                         // TODO: Clean up all the extra code to exit this method, probably with a refactor
                         if ( ! errMsg.empty() || ! err["n"].type() || err["n"].numberInt() < 1 ) {
                             ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "Could not re-enter lock '" << lockName << "' "
-                                    << ( !errMsg.empty() ? causedBy(errMsg) : string("(not sure lock is held)") ) << endl;
+                                                                               << ( !errMsg.empty() ? causedBy(errMsg) : string("(not sure lock is held)") ) 
+                                                                               << " gle: " << err
+                                                                               << endl;
                             *other = o; other->getOwned(); conn.done();
                             return false;
                         }
