@@ -20,8 +20,9 @@ function u() {
 }
     
 
-assert.throws( q , [] , "A1" );
-assert.throws( u , [] , "B1" );
+// SERVER-3064
+//assert.throws( q , [] , "A1" );
+//assert.throws( u , [] , "B1" );
 
 t.ensureIndex( { _id : 1 } )
 

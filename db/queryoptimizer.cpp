@@ -219,9 +219,15 @@ doneCheckOrder:
                 // we disallow as its a common user error
                 // .system. and local collections are exempt
                 if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
-                    uassert( 14820, "doing _id query on a capped collection without an index is not allowed" ,
-                             str::contains( _frs.ns() , ".system." ) || 
-                             str::startsWith( _frs.ns() , "local." ) );
+                    if ( cc().isSyncThread() ||
+                         str::contains( _frs.ns() , ".system." ) || 
+                         str::startsWith( _frs.ns() , "local." ) ) {
+                        // ok
+                    }
+                    else {
+                        warning() << "_id query on capped collection without an _id index, performance will be poor collection: " << _frs.ns() << endl;
+                        //uassert( 14820, str::stream() << "doing _id query on a capped collection without an index is not allowed: " << _frs.ns() ,
+                    }
                 }
             }
             return findTableScan( _frs.ns(), _order, startLoc );
