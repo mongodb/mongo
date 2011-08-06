@@ -511,13 +511,18 @@ namespace mongo {
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
             _slaveHost = _monitor->getSlave();
-        } else {
+            _slave.reset();
+        } 
+        else {
             _slaveHost = h;
         }
+        
+        if ( ! _slave ) {
+            _slave.reset( new DBClientConnection( true , this ) );
+            _slave->connect( _slaveHost );
+            _auth( _slave.get() );
+        }
 
-        _slave.reset( new DBClientConnection( true , this ) );
-        _slave->connect( _slaveHost );
-        _auth( _slave.get() );
         return _slave.get();
     }
 
