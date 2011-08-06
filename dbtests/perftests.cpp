@@ -119,7 +119,7 @@ namespace PerfTests {
 
         // optional 2nd test phase to be timed separately
         // return name of it
-        virtual const char * timed2() { return 0; }
+        virtual string timed2() { return ""; }
 
         virtual void post() { }
 
@@ -321,8 +321,8 @@ namespace PerfTests {
             post();
 
             {
-                const char *test2name = timed2();
-                if( test2name ) {
+                string test2name = timed2();
+                if( test2name.size() != 0 ) {
                     dur::stats.curr->reset();
                     mongo::Timer t;
                     unsigned long long n = 0;
@@ -735,7 +735,7 @@ namespace PerfTests {
         void timed() {
             client().insert( ns(), x );
         }
-        const char * timed2() {
+        string timed2() {
             client().findOne(ns(), query);
             return "findOne_by_id";
         }
@@ -804,7 +804,7 @@ namespace PerfTests {
             client().update(ns(), q, y, /*upsert*/true);
         }
 
-        const char * timed2() {
+        virtual string timed2() {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
 
             // test some $inc's
@@ -813,8 +813,7 @@ namespace PerfTests {
             BSONObj q = BSON("x" << x);
             client().update(ns(), q, I);
 
-            static string s = name()+"-inc";
-            return s.c_str();
+            return name()+"-inc";
         }
 
         unsigned long long expectation() { return 1000; }
@@ -829,6 +828,16 @@ namespace PerfTests {
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
+        
+        /*
+        virtual string timed2() {
+            string x = T::timed2();
+            if ( x.size() == 0 )
+                return x;
+            
+            return x + "-with-more-indexes";
+        }
+        */        
     };
 
     void t() {
