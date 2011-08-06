@@ -637,7 +637,7 @@ struct __wt_update {
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
-	WT_SESSION_BUFFER *sb;			/* insert's session buffer */
+	WT_SESSION_BUFFER *sb;			/* insert session buffer */
 
 	WT_UPDATE *upd;				/* value */
 
