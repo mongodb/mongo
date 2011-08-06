@@ -312,8 +312,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_start = bytes_inuse;
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		if (bytes_start == bytes_inuse && ++loop == 10) {
-			__wt_errx(session,
-			    "eviction server: unable to evict cache pages");
+			WT_STAT_INCR(conn->stats, cache_evict_slow);
+			WT_VERBOSE(session, EVICTSERVER,
+			    "eviction server: unable to reach eviction goal");
 			break;
 		}
 	}

@@ -91,6 +91,7 @@ struct __wt_btree_stats {
  */
 struct __wt_conn_stats {
 	WT_STATS cache_bytes_inuse;
+	WT_STATS cache_evict_slow;
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_evict_modified;
 	WT_STATS cache_overflow_read;
@@ -100,9 +101,9 @@ struct __wt_conn_stats {
 	WT_STATS cache_page_write;
 	WT_STATS cache_evict_unmodified;
 	WT_STATS file_open;
+	WT_STATS mtx_lock;
 	WT_STATS memalloc;
 	WT_STATS memfree;
-	WT_STATS mtx_lock;
 	WT_STATS total_read_io;
 	WT_STATS total_write_io;
 	WT_STATS workq_passes;

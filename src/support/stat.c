@@ -143,6 +143,9 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 	stats->cache_evict_modified.name = "cache_evict_modified";
 	stats->cache_evict_modified.desc =
 	    "cache: modified pages selected for eviction";
+	stats->cache_evict_slow.name = "cache_evict_slow";
+	stats->cache_evict_slow.desc =
+	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_evict_unmodified.name = "cache_evict_unmodified";
 	stats->cache_evict_unmodified.desc =
 	    "cache: unmodified pages selected for eviction";
@@ -157,11 +160,11 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
 	stats->file_open.name = "file_open";
-	stats->file_open.desc = "file open";
+	stats->file_open.desc = "files currently open";
 	stats->memalloc.name = "memalloc";
-	stats->memalloc.desc = "memory allocations";
+	stats->memalloc.desc = "total memory allocations";
 	stats->memfree.name = "memfree";
-	stats->memfree.desc = "memory frees";
+	stats->memfree.desc = "total memory frees";
 	stats->mtx_lock.name = "mtx_lock";
 	stats->mtx_lock.desc = "mutex lock calls";
 	stats->total_read_io.name = "total_read_io";
@@ -185,6 +188,7 @@ __wt_stat_clear_conn_stats(WT_STATS *stats_arg)
 	stats = (WT_CONN_STATS *)stats_arg;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_modified.v = 0;
+	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;
 	stats->cache_overflow_read.v = 0;
 	stats->cache_page_read.v = 0;

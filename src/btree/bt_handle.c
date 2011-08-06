@@ -264,6 +264,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	__wt_free(session, session->btree);
 
+	WT_STAT_DECR(conn->stats, file_open);
+
 	return (ret);
 }
 
