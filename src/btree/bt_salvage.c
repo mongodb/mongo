@@ -110,7 +110,7 @@ static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_build_leaf(WT_SESSION_IMPL *,
-		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
+		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *);
 static int  __slvg_row_merge_ovfl(
 		WT_SESSION_IMPL *, uint32_t, WT_PAGE *, uint32_t, uint32_t);
 static int  __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
@@ -1637,7 +1637,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_ROW_REF *rref;
 	WT_TRACK *trk;
 	uint32_t i, leaf_cnt;
-	int deleted, ret;
+	int ret;
 
 	root_page = &session->btree->root_page;
 
@@ -1687,17 +1687,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			ss->merge_free = 1;
 
 			WT_ERR(__slvg_row_build_leaf(
-			    session, trk, page, rref, ss, &deleted));
-
-			/*
-			 * If we took none of the keys from the merged page,
-			 * we don't need the page; fix the count of entries
-			 * we're creating.
-			 */
-			if (deleted) {
-				--page->entries;
-				continue;
-			}
+			    session, trk, page, rref, ss));
 		} else
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->row_start.data,
@@ -1720,8 +1710,8 @@ err:	__wt_free(session, page->u.row_int.t);
  *	Build a row-store leaf page for a merged page.
  */
 static int
-__slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
-    WT_PAGE *parent, WT_ROW_REF *rref, WT_STUFF *ss, int *deletedp)
+__slvg_row_build_leaf(WT_SESSION_IMPL *session,
+    WT_TRACK *trk, WT_PAGE *parent, WT_ROW_REF *rref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
@@ -1732,8 +1722,6 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 	uint32_t i, skip_start, skip_stop;
-
-	*deletedp = 0;
 
 	btree = session->btree;
 	page = NULL;
@@ -1825,86 +1813,77 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk,
 		}
 
 	/*
-	 * Because the stopping key range is a boundary, not an exact match,
-	 * we may have just decided not to take all of the keys on the page, or
-	 * none of them.
-	 *
-	 * If we take none of the keys, all we have to do is tell our caller to
-	 * not include this leaf page in the internal page it's building.
+	 * I believe it's no longer possible for a salvaged page to be entirely
+	 * empty, that is, if we selected the page for salvage, there is at
+	 * least one cell on the page we want.  This is a change from previous
+	 * behavior, so I'm asserting it.
 	 */
-	if (skip_start + skip_stop >= page->entries) {
-		*deletedp = 1;
-		WT_VERBOSE(session, SALVAGE,
-		    "[%" PRIu32 "] merge required no records, deleting instead",
-		    trk->addr);
+	WT_ASSERT_RET(session, skip_start + skip_stop < page->entries);
+
+	/*
+	 * Discard backing overflow pages for any items being discarded that
+	 * reference overflow pages.
+	 */
+	WT_ERR(__slvg_row_merge_ovfl(session, trk->addr, page, 0, skip_start));
+	WT_ERR(__slvg_row_merge_ovfl(session,
+	    trk->addr, page, page->entries - skip_stop, page->entries));
+
+	/*
+	 * If we take all of the keys, we don't write the page and we clear the
+	 * merge flags so that the underlying blocks are not later freed (for
+	 * merge pages re-written into the file, the underlying blocks have to
+	 * be freed, but if this page never gets written, we shouldn't free the
+	 * blocks).
+	 */
+	if (skip_start == 0 && skip_stop == 0)
+		F_CLR(trk, WT_TRACK_MERGE);
+	else {
+		/*
+		 * Change the page to reflect the correct record count: there
+		 * is no need to copy anything on the page itself, the entries
+		 * value limits the number of page items.
+		 */
+		page->entries -= skip_stop;
+
+		/*
+		 * We can't discard the original blocks associated with the page
+		 * now.  (The problem is we don't want to overwrite any original
+		 * information until the salvage run succeeds -- if we free the
+		 * blocks now, the next merge page we write might allocate those
+		 * blocks and overwrite them, and should the salvage run fail,
+		 * the original information would have been lost to subsequent
+		 * salvage runs.)  Clear the reference addr so reconciliation
+		 * does not free the underlying blocks.
+		 */
+		WT_ROW_REF_ADDR(rref) = WT_ADDR_INVALID;
+		WT_ROW_REF_SIZE(rref) = 0;
+
+		/* Write the new version of the leaf page to disk. */
+		WT_PAGE_SET_MODIFIED(page);
+		cookie->skip = skip_start;
+		ret = __wt_page_reconcile_int(session, page, cookie,
+		    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+
+		page->entries += skip_stop;
+		if (ret != 0)
+			goto err;
+	}
+
+	/*
+	 * Take a copy of this page's first key to define the start of
+	 * its range.  The key may require processing, otherwise, it's
+	 * a copy from the page.
+	 */
+	rip = page->u.row_leaf.d + skip_start;
+	if (__wt_off_page(page, rip->key)) {
+		ikey = rip->key;
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    WT_IKEY_DATA(ikey), ikey->size,
+		    (WT_IKEY **)&rref->key));
 	} else {
-		/*
-		 * Discard backing overflow pages for any items being discarded
-		 * that reference overflow pages.
-		 */
-		WT_ERR(__slvg_row_merge_ovfl(
-		    session, trk->addr, page, 0, skip_start));
-		WT_ERR(__slvg_row_merge_ovfl(session,
-		    trk->addr, page, page->entries - skip_stop, page->entries));
-
-		/*
-		 * If we take all of the keys, we don't write the page and we
-		 * clear the merge flags so that the underlying blocks are not
-		 * later freed (for merge pages re-written into the file, the
-		 * underlying blocks have to be freed, but if this page never
-		 * gets written, we shouldn't free the blocks).
-		 */
-		if (skip_start == 0 && skip_stop == 0)
-			F_CLR(trk, WT_TRACK_MERGE);
-		else {
-			/*
-			 * Change the page to reflect the correct record count:
-			 * there is no need to copy anything on the page itself,
-			 * the entries value limits the number of page items.
-			 */
-			page->entries -= skip_stop;
-
-			/*
-			 * We can't discard the original blocks associated with
-			 * this page now.  (The problem is we don't want to
-			 * overwrite any original information until the salvage
-			 * run succeeds -- if we free the blocks now, the next
-			 * merge page we write might allocate those blocks and
-			 * overwrite them, and should the salvage run eventually
-			 * fail, the original information would have been lost.)
-			 * Clear the reference addr so reconciliation does not
-			 * free the underlying blocks.
-			 */
-			WT_ROW_REF_ADDR(rref) = WT_ADDR_INVALID;
-			WT_ROW_REF_SIZE(rref) = 0;
-
-			/* Write the new version of the leaf page to disk. */
-			WT_PAGE_SET_MODIFIED(page);
-			cookie->skip = skip_start;
-			ret = __wt_page_reconcile_int(session, page, cookie,
-			    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
-
-			page->entries += skip_stop;
-			if (ret != 0)
-				goto err;
-		}
-
-		/*
-		 * Take a copy of this page's first key to define the start of
-		 * its range.  The key may require processing, otherwise, it's
-		 * a copy from the page.
-		 */
-		rip = page->u.row_leaf.d + skip_start;
-		if (__wt_off_page(page, rip->key)) {
-			ikey = rip->key;
-			WT_ERR(__wt_row_ikey_alloc(session, 0,
-			    WT_IKEY_DATA(ikey), ikey->size,
-			    (WT_IKEY **)&rref->key));
-		} else {
-			WT_ERR(__wt_row_key(session, page, rip, key));
-			WT_ERR(__wt_row_ikey_alloc(session, 0,
-			    key->data, key->size, (WT_IKEY **)&rref->key));
-		}
+		WT_ERR(__wt_row_key(session, page, rip, key));
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    key->data, key->size, (WT_IKEY **)&rref->key));
 	}
 
 	/* Discard our hazard reference and the page. */
