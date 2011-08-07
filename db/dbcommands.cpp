@@ -1630,7 +1630,6 @@ namespace mongo {
                     cursor = findTableScan( c.c_str() , BSONObj() );
                 }
                 else {
-                    bb.done();
                     log() << "can't find _id index for: " << c << endl;
                     continue;
                 }
