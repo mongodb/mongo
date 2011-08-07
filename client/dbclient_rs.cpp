@@ -475,8 +475,9 @@ namespace mongo {
     // ----- DBClientReplicaSet ---------
     // --------------------------------
 
-    DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers )
-        : _monitor( ReplicaSetMonitor::get( name , servers ) ) {
+    DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
+        : _monitor( ReplicaSetMonitor::get( name , servers ) ),
+          _so_timeout( so_timeout ) {
     }
 
     DBClientReplicaSet::~DBClientReplicaSet() {
@@ -493,7 +494,7 @@ namespace mongo {
         }
 
         _masterHost = _monitor->getMaster();
-        _master.reset( new DBClientConnection( true , this ) );
+        _master.reset( new DBClientConnection( true , this , _so_timeout ) );
         string errmsg;
         if ( ! _master->connect( _masterHost , errmsg ) ) {
             _monitor->notifyFailure( _masterHost );
@@ -516,7 +517,7 @@ namespace mongo {
             _slaveHost = h;
         }
 
-        _slave.reset( new DBClientConnection( true , this ) );
+        _slave.reset( new DBClientConnection( true , this , _so_timeout ) );
         _slave->connect( _slaveHost );
         _auth( _slave.get() );
         return _slave.get();

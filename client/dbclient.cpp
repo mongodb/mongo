@@ -80,7 +80,7 @@ namespace mongo {
 
         case PAIR:
         case SET: {
-            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers );
+            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
             if( ! set->connect() ) {
                 delete set;
                 errmsg = "connect failed to set ";

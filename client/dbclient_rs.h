@@ -176,7 +176,7 @@ namespace mongo {
 
     public:
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
-        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers );
+        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
         /** Returns false if nomember of the set were reachable, or neither is
@@ -236,10 +236,7 @@ namespace mongo {
 
         // ----- informational ----
 
-        /**
-         * timeout not supported in DBClientReplicaSet yet
-         */
-        double getSoTimeout() const { return 0; }
+        double getSoTimeout() const { return _so_timeout; }
 
         string toString() { return getServerAddress(); }
 
@@ -274,6 +271,8 @@ namespace mongo {
 
         HostAndPort _slaveHost;
         scoped_ptr<DBClientConnection> _slave;
+        
+        double _so_timeout;
 
         /**
          * for storing authentication info
