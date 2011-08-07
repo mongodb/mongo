@@ -18,7 +18,9 @@ commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 0 } )
 // Have lots of threads, so use larger i
 // Can't test too many, we get socket exceptions... possibly due to the 
 // javascript console.
-for ( var i = 8; i < 12; i++ ) {
+// TODO:  Figure out our max bounds here - use less threads now to avoid pinger starvation issues.
+for ( var t = 0; t < 4; t++ ) {
+for ( var i = 4; i < 5; i++ ) {
 
 	// Our force time is 6 seconds - slightly diff from sync6 to ensure exact time not important
 	var takeoverMS = 6000;
@@ -73,6 +75,7 @@ for ( var i = 8; i < 12; i++ ) {
 	printjson( command )
 	assert( result.ok, "Skewed threads did not increment correctly." );
 
+}
 }
 
 stopMongoProgram( 30004 )
