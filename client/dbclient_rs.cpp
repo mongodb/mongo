@@ -463,9 +463,12 @@ namespace mongo {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
+            _slaveHost = _monitor->getSlave();
         }
-        
-        _slaveHost = _monitor->getSlave();
+        else {
+            _slaveHost = h;
+        }
+
         _slave.reset( new DBClientConnection( true , this ) );
         _slave->connect( _slaveHost );
         _auth( _slave.get() );
