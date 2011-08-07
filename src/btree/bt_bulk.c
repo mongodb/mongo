@@ -29,7 +29,9 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 
 	/*
 	 * You can't bulk-load into existing trees; while checking, free the
-	 * empty page created when the btree was opened.
+	 * empty page created when the btree was opened, and reset the state
+	 * of the root page (we're doing a bulk load, on-disk is the eventual
+	 * state of this tree, after we write the internal page).
 	 */
 	if (F_ISSET(btree->root_page.page, WT_PAGE_INITIAL_EMPTY)) {
 		btree->root_page.state = WT_REF_DISK;
