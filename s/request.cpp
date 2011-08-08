@@ -65,16 +65,18 @@ namespace mongo {
 
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
-        _config = grid.getDBConfig( getns() );
+        const string nsStr (getns()); // use in functions taking string rather than char*
+
+        _config = grid.getDBConfig( nsStr );
         if ( reload ) {
-            if ( _config->isSharded( getns() ) )
-                _config->getChunkManager( getns() , true );
+            if ( _config->isSharded( nsStr ) )
+                _config->getChunkManager( nsStr , true );
             else
                 _config->reload();
         }
 
-        if ( _config->isSharded( getns() ) ) {
-            _chunkManager = _config->getChunkManager( getns() , reload );
+        if ( _config->isSharded( nsStr ) ) {
+            _chunkManager = _config->getChunkManager( nsStr , reload );
             uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
