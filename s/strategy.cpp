@@ -38,7 +38,7 @@ namespace mongo {
             conn.donotCheckVersion();
         else if ( conn.setVersion() ) {
             conn.done();
-            throw StaleConfigException( r.getns() , "doWRite" , true );
+            throw StaleConfigException( r.getns() , "doWrite" , true );
         }
         conn->say( r.m() );
         conn.done();

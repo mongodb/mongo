@@ -169,20 +169,20 @@ namespace mongo {
                             int logLevel = i < ( maxTries / 2 );
                             LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
                             r.reset();
-                            
-                            unsigned long long old = manager->getSequenceNumber();
-                            manager = r.getChunkManager();
-                            
-                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
-                            if (!manager) {
+                            manager = r.getChunkManager();
+                            if( ! manager ) {
                                 keepGoing = false;
                                 uasserted(14804, "collection no longer sharded");
                             }
+
+                            unsigned long long old = manager->getSequenceNumber();
+                            
+                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
                         }
                         sleepmillis( i * 20 );
                     }
-                    
+
                     assert( inShutdown() || gotThrough ); // not caught below
                 } catch (const UserException&){
                     if (!keepGoing || !d.moreJSObjs()){

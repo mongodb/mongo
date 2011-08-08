@@ -201,8 +201,8 @@ namespace mongo {
                 _reload();
                 ci = _collections[ns];
             }
-            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
-            assert( ci.wasDropped() || ! ci.key().isEmpty() );
+            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
+            assert( ! ci.key().isEmpty() );
             
             if ( ! shouldReload || earlyReload )
                 return ci.getCM();
@@ -244,7 +244,7 @@ namespace mongo {
         scoped_lock lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
-        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
+        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
         
         if ( temp->getVersion() > ci.getCM()->getVersion() ) {
             // we only want to reset if we're newer
@@ -252,6 +252,7 @@ namespace mongo {
             ci.resetCM( temp.release() );
         }
         
+        assert( ci.getCM().get() );
         return ci.getCM();
     }
 
@@ -306,7 +307,8 @@ namespace mongo {
         assert( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
-            _collections[o["_id"].String()] = CollectionInfo( o );
+            if( o["dropped"].trueValue() ) _collections.erase( o["_id"].String() );
+            else _collections[o["_id"].String()] = CollectionInfo( o );
         }
 
         conn.done();
@@ -440,6 +442,7 @@ namespace mongo {
         while ( true ) {
             Collections::iterator i = _collections.begin();
             for ( ; i != _collections.end(); ++i ) {
+                // log() << "coll : " << i->first << " and " << i->second.isSharded() << endl;
                 if ( i->second.isSharded() )
                     break;
             }

@@ -139,8 +139,14 @@ namespace mongo {
         }
         
         if ( result["reloadConfig"].trueValue() ) {
-            // reload config
-            conf->getChunkManager( ns , true );
+            if( result["version"].timestampTime() == 0 ){
+                // reload db
+                conf->reload();
+            }
+            else {
+                // reload config
+                conf->getChunkManager( ns , true );
+            }
         }
 
         const int maxNumTries = 7;
