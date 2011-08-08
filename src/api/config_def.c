@@ -270,7 +270,7 @@ const char *
 __wt_confchk_wiredtiger_open =
     "cache_size=(type=int,min=1MB,max=10TB),create=(type=boolean),"
     "error_prefix=(),exclusive=(type=boolean),extensions=(type=list),"
-    "hazard_max=(type=int,min=3),logging=(type=boolean),"
+    "hazard_max=(type=int,min=15),logging=(type=boolean),"
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
     "verbose=(type=list,choices=[\"allocate\",\"evictserver\",\"fileops\","
     "\"hazard\",\"mutex\",\"read\",\"readserver\",\"reconcile\",\"salvage\","
