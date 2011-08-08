@@ -154,6 +154,9 @@ namespace mongo {
                     rm._prefix = prefix;
             }
             else {
+                uassert( 15882, "$elemMatch not allowed within $in",
+                         ie.type() != Object ||
+                         ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 _myset->insert(ie);
             }
         }

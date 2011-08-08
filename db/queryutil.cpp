@@ -168,6 +168,9 @@ namespace mongo {
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() ) {
                 BSONElement ie = i.next();
+                uassert( 15881, "$elemMatch not allowed within $in",
+                         ie.type() != Object ||
+                         ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 if ( ie.type() == RegEx ) {
                     regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
                 }
