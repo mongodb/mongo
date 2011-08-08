@@ -15,6 +15,12 @@ int
 __wt_exist(const char *path)
 {
 	struct stat sb;
+	int ret;
 
-	return (stat(path, &sb) == 0);
+	/*
+	 * XXX
+	 * This isn't correct: EINTR doesn't mean the file doesn't exist.
+	 */
+	SYSCALL_RETRY(stat(path, &sb), ret);
+	return (ret == 0 ? 1 : 0);
 }

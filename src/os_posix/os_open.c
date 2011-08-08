@@ -47,9 +47,23 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (ok_create)
 		f |= O_CREAT;
 
-	if ((fd = open(name, f, mode)) == -1) {
-		__wt_err(session, errno, "%s", name);
-		return (WT_ERROR);
+	for (;;) {
+		if ((fd = open(name, f, mode)) != -1)
+			break;
+
+		switch (errno) {
+		case EAGAIN:
+		case EBUSY:
+		case EINTR:
+		case EMFILE:
+		case ENFILE:
+		case ENOSPC:
+			__wt_sleep(1L, 0L);
+			break;
+		default:
+			__wt_err(session, errno, "%s", name);
+			return (WT_ERROR);
+		}
 	}
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_FH), &fh));

@@ -14,12 +14,13 @@
 int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 {
+	int ret;
 
 	WT_VERBOSE(session, FILEOPS, "fileops: %s: fsync", fh->name);
 
-	if (fsync(fh->fd) == 0)
+	SYSCALL_RETRY(fsync(fh->fd), ret);
+	if (ret == 0)
 		return (0);
-
 	__wt_err(session, errno, "%s fsync error", fh->name);
 	return (WT_ERROR);
 }

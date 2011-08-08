@@ -152,10 +152,10 @@ struct __wt_walk_entry;
 #include "config.h"
 #include "debug.h"
 #include "dlh.h"
-#include "fh.h"
 #include "log.h"
 #include "misc.h"
 #include "mutex.h"
+#include "os.h"
 #include "stat.h"
 
 #include "api.h"

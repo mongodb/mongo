@@ -15,14 +15,15 @@ int
 __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 {
 	struct stat sb;
+	int ret;
 
 	WT_VERBOSE(session, FILEOPS, "fileops: %s: fstat", fh->name);
 
-	if (fstat(fh->fd, &sb) == -1) {
-		__wt_err(session, errno, "%s: fstat", fh->name);
-		return (WT_ERROR);
+	SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
+	if (ret == 0) {
+		*sizep = sb.st_size;
+		return (0);
 	}
-
-	*sizep = sb.st_size;
-	return (0);
+	__wt_err(session, errno, "%s: fstat", fh->name);
+	return (WT_ERROR);
 }
