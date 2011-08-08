@@ -355,8 +355,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		    session, cursor->recno, 0)) == WT_RESTART)
 			;
 		if (ret == 0) {
-			ret = __wt_return_data(session,
-			    NULL, (WT_ITEM *)&cursor->value, 0);
+			ret = __wt_return_value(session, cursor);
 			__wt_page_release(session, session->srch.page);
 		}
 		break;
@@ -365,9 +364,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		    session, (WT_ITEM *)&cursor->key, 0)) == WT_RESTART)
 			;
 		if (ret == 0) {
-			ret = __wt_return_data(session,
-			    (WT_ITEM *)&cursor->key,
-			    (WT_ITEM *)&cursor->value, 0);
+			ret = __wt_return_value(session, cursor);
 			__wt_page_release(session, session->srch.page);
 		}
 		break;

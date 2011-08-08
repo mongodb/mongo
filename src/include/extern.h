@@ -219,10 +219,7 @@ extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
-extern int __wt_return_data( WT_SESSION_IMPL *session,
-    WT_ITEM *key,
-    WT_ITEM *value,
-    int key_return);
+extern int __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR *cursor);
 extern int __wt_disk_read( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
