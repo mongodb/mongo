@@ -28,7 +28,8 @@ namespace mongo {
 
     /* --------------------------- Expression ------------------------------ */
 
-    void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
+    void Expression::toMatcherBson(
+	BSONObjBuilder *pBuilder, unsigned depth) const {
 	assert(false && "Expression::toMatcherBson()");
     }
 
@@ -49,6 +50,13 @@ namespace mongo {
     }
 
     const char Expression::unwindName[] = "$unwind";
+
+    string Expression::removeFieldPrefix(const string &prefixedField) {
+	const char *pPrefixedField = prefixedField.c_str();
+	assert(pPrefixedField[0] == '$');
+	// CW TODO field name must begin with a $
+	return string(pPrefixedField + 1);
+    }
 
     shared_ptr<Expression> Expression::parseObject(
         BSONElement *pBsonElement, ObjectCtx *pCtx) {
@@ -96,8 +104,7 @@ namespace mongo {
                     assert(fieldElement.type() == String);
                     // CW TODO $unwind operand must be single field name
 
-                    // TODO should we require the leading field prefix here?
-                    string fieldPath(fieldElement.String());
+		    string fieldPath(removeFieldPrefix(fieldElement.String()));
                     pExpression = ExpressionFieldPath::create(fieldPath);
                     pCtx->unwind(fieldPath);
                 }
@@ -132,8 +139,10 @@ namespace mongo {
                 }
                 else if (fieldType == String) {
                     /* it's a renamed field */
+		    // CW TODO could also be a constant
                     shared_ptr<Expression> pPath(
-                        ExpressionFieldPath::create(fieldElement.String()));
+                        ExpressionFieldPath::create(
+			    removeFieldPrefix(fieldElement.String())));
                     pExpressionObject->addField(fieldName, pPath);
                 }
                 else if (fieldType == NumberDouble) {
@@ -181,6 +190,7 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
+	{"$const", ExpressionNoOp::create},
         {"$dayOfMonth", ExpressionDayOfMonth::create},
         {"$dayOfWeek", ExpressionDayOfWeek::create},
         {"$dayOfYear", ExpressionDayOfYear::create},
@@ -275,7 +285,7 @@ namespace mongo {
                 goto ExpectConstant;  // assume plain string constant
 
             /* if we got here, this is a field path expression */
-	    string fieldPath(value.substr(1));
+	    string fieldPath(removeFieldPrefix(value));
             shared_ptr<Expression> pFieldExpr(
                 ExpressionFieldPath::create(fieldPath));
             return pFieldExpr;
@@ -480,7 +490,8 @@ namespace mongo {
 	return "$and";
     }
 
-    void ExpressionAnd::toMatcherBson(BSONObjBuilder *pBuilder) const {
+    void ExpressionAnd::toMatcherBson(
+	BSONObjBuilder *pBuilder, unsigned depth) const {
 	/*
 	  There are two patterns we can handle:
 	  (1) one or two comparisons on the same field: { a:{$gte:3, $lt:7} }
@@ -541,12 +552,12 @@ namespace mongo {
     }
 
     void ExpressionCoerceToBool::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
 	assert(false && "not possible"); // no equivalent of this
     }
 
     void ExpressionCoerceToBool::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	assert(false && "not possible"); // no equivalent of this
     }
 
@@ -793,12 +804,37 @@ namespace mongo {
     }
 
     void ExpressionConstant::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
-	pValue->addToBsonObj(pBuilder, fieldName);
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+
+	/*
+	  For depth greater than one, do the regular thing
+
+	  This will be one because any top level expression will actually
+	  be an operator node, so by the time we get to an expression
+	  constant, we're at level 1 (counting up as we go down the
+	  expression tree).
+
+	  See the comment below for more on why this happens.
+	*/
+	if (depth > 1) {
+	    pValue->addToBsonObj(pBuilder, fieldName);
+	    return;
+	}
+
+	/*
+	  If this happens at the top level, we don't have any direct way
+	  to express it.  However, we may need to if constant folding
+	  reduced expressions to constants, and we need to re-materialize
+	  the pipeline in order to ship it to a shard server.  This has
+	  forced the introduction of {$const: ...}.
+	 */
+	BSONObjBuilder constBuilder;
+	pValue->addToBsonObj(&constBuilder, "$const");
+	pBuilder->append(fieldName, constBuilder.done());
     }
 
     void ExpressionConstant::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	pValue->addToBsonArray(pBuilder);
     }
 
@@ -807,7 +843,7 @@ namespace mongo {
 	return NULL;
     }
 
-    /* ------------------------- ExpressionDayOfMonth ----------------------------- */
+    /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
     ExpressionDayOfMonth::~ExpressionDayOfMonth() {
     }
@@ -868,7 +904,7 @@ namespace mongo {
     }
 
     const char *ExpressionDayOfWeek::getOpName() const {
-	return "$dayofweek";
+	return "$dayOfWeek";
     }
 
     /* ------------------------- ExpressionDayOfYear ----------------------------- */
@@ -1300,8 +1336,8 @@ namespace mongo {
     }
 
     void ExpressionObject::documentToBson(
-	BSONObjBuilder *pBuilder, bool fieldPrefix,
-	const string &unwindField) const {
+	BSONObjBuilder *pBuilder, const string &unwindField,
+	unsigned depth) const {
 
 	/* emit any inclusion/exclusion paths */
 	vector<string> vPath;
@@ -1320,29 +1356,28 @@ namespace mongo {
 	    if (unwindField.compare(fieldName) == 0) {
 		BSONObjBuilder unwind;
 		vpExpression[iField]->addToBsonObj(
-		    &unwind, Expression::unwindName, false);
+		    &unwind, Expression::unwindName, depth + 1);
 		pBuilder->append(vFieldName[iField], unwind.done());
 		continue;
 	    }
 
-	    vpExpression[iField]->addToBsonObj(
-		pBuilder, fieldName, fieldPrefix);
+	    vpExpression[iField]->addToBsonObj(pBuilder, fieldName, depth + 1);
 	}
     }
 
     void ExpressionObject::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, fieldPrefix, string());
+	documentToBson(&objBuilder, string(), depth);
 	pBuilder->append(fieldName, objBuilder.done());
     }
 
     void ExpressionObject::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, fieldPrefix, string());
+	documentToBson(&objBuilder, string(), depth);
 	pBuilder->append(objBuilder.done());
     }
 
@@ -1430,13 +1465,13 @@ namespace mongo {
     }
 
     void ExpressionFieldPath::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
-	pBuilder->append(fieldName, fieldPath.getPath(fieldPrefix));
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+	pBuilder->append(fieldName, fieldPath.getPath(true));
     }
 
     void ExpressionFieldPath::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
-	pBuilder->append(getFieldPath(fieldPrefix));
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
+	pBuilder->append(getFieldPath(true));
     }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1482,7 +1517,7 @@ namespace mongo {
     }
 
     void ExpressionFieldRange::addToBson(
-	Builder *pBuilder, bool fieldPrefix) const {
+	Builder *pBuilder, unsigned depth) const {
 	if (!pRange.get()) {
 	    /* nothing will satisfy this predicate */
 	    pBuilder->append(false);
@@ -1497,7 +1532,7 @@ namespace mongo {
 
 	if (pRange->pTop.get() == pRange->pBottom.get()) {
 	    BSONArrayBuilder operands;
-	    pFieldPath->addToBsonArray(&operands, true);
+	    pFieldPath->addToBsonArray(&operands, depth);
 	    pRange->pTop->addToBsonArray(&operands);
 	    
 	    BSONObjBuilder equals;
@@ -1509,7 +1544,7 @@ namespace mongo {
 	BSONObjBuilder leftOperator;
 	if (pRange->pBottom.get()) {
 	    BSONArrayBuilder leftOperands;
-	    pFieldPath->addToBsonArray(&leftOperands, true);
+	    pFieldPath->addToBsonArray(&leftOperands, depth);
 	    pRange->pBottom->addToBsonArray(&leftOperands);
 	    leftOperator.append(
 		(pRange->bottomOpen ? "$gt" : "$gte"),
@@ -1524,7 +1559,7 @@ namespace mongo {
 	BSONObjBuilder rightOperator;
 	if (pRange->pTop.get()) {
 	    BSONArrayBuilder rightOperands;
-	    pFieldPath->addToBsonArray(&rightOperands, true);
+	    pFieldPath->addToBsonArray(&rightOperands, depth);
 	    pRange->pTop->addToBsonArray(&rightOperands);
 	    rightOperator.append(
 		(pRange->topOpen ? "$lt" : "$lte"),
@@ -1545,19 +1580,19 @@ namespace mongo {
     }
 
     void ExpressionFieldRange::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
 	BuilderObj builder(pBuilder, fieldName);
-	addToBson(&builder, fieldPrefix);
+	addToBson(&builder, depth);
     }
 
     void ExpressionFieldRange::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	BuilderArray builder(pBuilder);
-	addToBson(&builder, fieldPrefix);
+	addToBson(&builder, depth);
     }
 
     void ExpressionFieldRange::toMatcherBson(
-	BSONObjBuilder *pBuilder) const {
+	BSONObjBuilder *pBuilder, unsigned depth) const {
 	assert(pRange.get()); // otherwise, we can't do anything
 
 	/* if there are no endpoints, then every value is accepted */
@@ -2103,34 +2138,70 @@ namespace mongo {
     }
 
     void ExpressionNary::toBson(
-	BSONObjBuilder *pBuilder, const char *pOpName, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, const char *pOpName, unsigned depth) const {
 	const size_t nOperand = vpOperand.size();
 	assert(nOperand > 0);
 	if (nOperand == 1) {
-	    vpOperand[0]->addToBsonObj(pBuilder, pOpName, fieldPrefix);
+	    vpOperand[0]->addToBsonObj(pBuilder, pOpName, depth + 1);
 	    return;
 	}
 
 	/* build up the array */
 	BSONArrayBuilder arrBuilder;
 	for(size_t i = 0; i < nOperand; ++i)
-	    vpOperand[i]->addToBsonArray(&arrBuilder, true);
+	    vpOperand[i]->addToBsonArray(&arrBuilder, depth + 1);
 
 	pBuilder->append(pOpName, arrBuilder.arr());
     }
 
     void ExpressionNary::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
 	BSONObjBuilder exprBuilder;
-	toBson(&exprBuilder, getOpName(), fieldPrefix);
+	toBson(&exprBuilder, getOpName(), depth);
 	pBuilder->append(fieldName, exprBuilder.done());
     }
 
     void ExpressionNary::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	BSONObjBuilder exprBuilder;
-	toBson(&exprBuilder, getOpName(), fieldPrefix);
+	toBson(&exprBuilder, getOpName(), depth);
 	pBuilder->append(exprBuilder.done());
+    }
+
+    /* ----------------------- ExpressionNoOp ------------------------------ */
+
+    ExpressionNoOp::~ExpressionNoOp() {
+    }
+
+    shared_ptr<ExpressionNary> ExpressionNoOp::create() {
+        shared_ptr<ExpressionNoOp> pExpression(new ExpressionNoOp());
+        return pExpression;
+    }
+
+    shared_ptr<Expression> ExpressionNoOp::optimize() {
+        assert(vpOperand.size() == 1); // CW TODO user error
+	shared_ptr<Expression> pR(vpOperand[0]->optimize());
+	return pR;
+    }
+
+    ExpressionNoOp::ExpressionNoOp():
+        ExpressionNary() {
+    }
+
+    void ExpressionNoOp::addOperand(const shared_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    shared_ptr<const Value> ExpressionNoOp::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 1); // CW TODO user error
+        shared_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
+	return pValue;
+    }
+
+    const char *ExpressionNoOp::getOpName() const {
+	return "$noOp";
     }
 
     /* ------------------------- ExpressionNot ----------------------------- */
@@ -2193,11 +2264,12 @@ namespace mongo {
         return Value::getFalse();
     }
 
-    void ExpressionOr::toMatcherBson(BSONObjBuilder *pBuilder) const {
+    void ExpressionOr::toMatcherBson(
+	BSONObjBuilder *pBuilder, unsigned depth) const {
 	BSONObjBuilder opArray;
 	const size_t n = vpOperand.size();
 	for(size_t i = 0; i < n; ++i)
-	    vpOperand[i]->toMatcherBson(&opArray);
+	    vpOperand[i]->toMatcherBson(&opArray, depth + 1);
 
 	pBuilder->append("$or", opArray.done());
     }
@@ -2471,7 +2543,7 @@ namespace mongo {
 	return "$toLower";
     }
 
-    /* ------------------------- ExpressionToUpper ----------------------------- */
+    /* ------------------------- ExpressionToUpper -------------------------- */
 
     ExpressionToUpper::~ExpressionToUpper() {
     }
@@ -2485,7 +2557,8 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionToUpper::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionToUpper::addOperand(
+	const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2494,7 +2567,7 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
-        string str = pString->coerceToString();
+        string str(pString->coerceToString());
         boost::to_upper(str);
         return Value::createString(str);
     }

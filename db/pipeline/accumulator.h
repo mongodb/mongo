@@ -32,9 +32,9 @@ namespace mongo {
         // virtuals from ExpressionNary
 	virtual void addOperand(const shared_ptr<Expression> &pExpression);
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
         /*
           Get the accumulated value.
@@ -56,7 +56,8 @@ namespace mongo {
 	  @params opName the operator name
 	 */
 	void opToBson(
-	    BSONObjBuilder *pBuilder, string fieldName, string opName) const;
+	    BSONObjBuilder *pBuilder, string fieldName, string opName,
+	    unsigned depth) const;
     };
 
 

@@ -68,12 +68,10 @@ namespace mongo {
 
 	  @params pBuilder the builder to add the expression to
 	  @params fieldName the name the object should be given
-	  @params fieldPrefix whether or not any descendant field references
-	    should have the field indicator prepended or not
 	 */
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName,
-	    bool fieldPrefix) const = 0;
+	    unsigned depth) const = 0;
 
 	/*
 	  Add the Expression (and any descendant Expressions) into a BSON
@@ -84,11 +82,9 @@ namespace mongo {
 	  substituted inline.
 
 	  @params pBuilder the builder to add the expression to
-	  @params fieldPrefix whether or not any descendant field references
-	    should have the field indicator prepended or not
 	 */
-	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const = 0;
+	virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
+	    unsigned depth) const = 0;
 
 	/*
 	  Convert the expression into a BSONObj that corresponds to the
@@ -108,7 +104,8 @@ namespace mongo {
 
 	  @params pBuilder the builder to add the expression to.
 	 */
-	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+	virtual void toMatcherBson(
+	    BSONObjBuilder *pBuilder, unsigned depth) const;
 
 	/*
 	  Utility class for parseObject() below.
@@ -174,6 +171,16 @@ namespace mongo {
 	    BSONElement *pBsonElement);
 
 	/*
+	  Produce a field path string with the field prefix removed.
+
+	  Throws an error if the field prefix is not present.
+
+	  @param prefixedField the prefixed field
+	  @returns the field path with the prefix removed
+	 */
+	static string removeFieldPrefix(const string &prefixedField);
+
+	/*
 	  Enumeration of comparison operators.  These are shared between a
 	  few expression implementations, so they are factored out here.
 
@@ -201,9 +208,9 @@ namespace mongo {
         // virtuals from Expression
 	virtual shared_ptr<Expression> optimize();
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
         /*
           Add an operand to the n-ary expression.
@@ -254,12 +261,9 @@ namespace mongo {
 
 	  @params pBuilder the (blank) builder to add the expression to
 	  @params pOpName the name of the operator
-	  @params fieldPrefix whether or not to add the field indicator prefix
-	    to field paths
 	 */
-	void toBson(
-	    BSONObjBuilder *pBuilder, const char *pOpName,
-	    bool fieldPrefix) const;
+	void toBson(BSONObjBuilder *pBuilder, const char *pOpName,
+		    unsigned depth) const;
     };
 
 
@@ -296,7 +300,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+	virtual void toMatcherBson(
+	    BSONObjBuilder *pBuilder, unsigned depth) const;
 
 	// virtuals from ExpressionNary
 	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
@@ -327,9 +332,9 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
         static shared_ptr<ExpressionCoerceToBool> create(
 	    const shared_ptr<Expression> &pExpression);
@@ -386,9 +391,9 @@ namespace mongo {
             const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
         static shared_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
@@ -488,9 +493,9 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
 	/*
 	  Create a field path expression.
@@ -558,10 +563,11 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
-	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
+	virtual void toMatcherBson(
+	    BSONObjBuilder *pBuilder, unsigned depth) const;
 
 	/*
 	  Create a field range expression.
@@ -637,7 +643,7 @@ namespace mongo {
 	  always looks the same, and then implement addToBsonObj() and
 	  addToBsonArray() by using the common method.
 	 */
-	void addToBson(Builder *pBuilder, bool fieldPrefix) const;
+	void addToBson(Builder *pBuilder, unsigned depth) const;
     };
 
 
@@ -750,6 +756,24 @@ namespace mongo {
     };
 
 
+    class ExpressionNoOp :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionNoOp();
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
+
+        static shared_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionNoOp();
+    };
+
+
     class ExpressionNot :
         public ExpressionNary {
     public:
@@ -777,9 +801,9 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
+	    BSONArrayBuilder *pBuilder, unsigned depth) const;
 
 	/*
 	  evaluate(), but return a Document instead of a Value-wrapped
@@ -881,12 +905,11 @@ namespace mongo {
 	  be added to a containing object with a name
 
 	  @params pBuilder where to write the object to
-	  @params fieldPrefix whether or not fields require the field prefix
 	  @params unwindField which field to unwind, or empty
 	 */
 	void documentToBson(
-	    BSONObjBuilder *pBuilder, bool fieldPrefix,
-	    const string &unwindField) const;
+	    BSONObjBuilder *pBuilder, const string &unwindField,
+	    unsigned depth) const;
 
     private:
         ExpressionObject();
@@ -935,7 +958,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+	virtual void toMatcherBson(
+	    BSONObjBuilder *pBuilder, unsigned depth) const;
 
 	// virtuals from ExpressionNary
 	virtual shared_ptr<ExpressionNary> (*getFactory() const)();

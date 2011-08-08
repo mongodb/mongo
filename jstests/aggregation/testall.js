@@ -57,7 +57,7 @@ var p2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	pageViews : 1
     }}
 ]});
@@ -114,8 +114,8 @@ assert(arrayEq(p2.result, p2result), 'p2 failed');
 var p3 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	otherfoo : "other.foo",
-	otherbar : "other.bar"
+	otherfoo : "$other.foo",
+	otherbar : "$other.bar"
     }}
 ]});
 
@@ -173,11 +173,11 @@ var p5 = db.runCommand(
     { $project : {
 	author : 1,
 	pageViews : 1,
-	tag : { $unwind : "tags" }
+	tag : { $unwind : "$tags" }
     }},
     { $project : {
 	author : 1,
-	subDocument : { foo : "pageViews", bar : "tag"  }
+	subDocument : { foo : "$pageViews", bar : "$tag"  }
     }}
 ]});
 
@@ -249,7 +249,7 @@ var p6 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	pageViews : 1
     }},
     { $project : {
@@ -358,7 +358,7 @@ var p8 = db.runCommand(
     { $project : {
 	_id : 0,
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	"comments.author" : 1
     }}
 ]});
@@ -459,7 +459,7 @@ var p9 = db.runCommand(
     { $project : {
 	_id : 0,
 	author : 1,
-	commentsAuthor : "comments.author"
+	commentsAuthor : "$comments.author"
     }}
 ]});
 
@@ -594,7 +594,7 @@ var p11 = db.runCommand(
 { aggregate : "p11", pipeline : [
     { $project : {
 	name : 1,
-	author : { $unwind : "items.authors" },
+	author : { $unwind : "$items.authors" },
     }}
 ]});
 
@@ -945,7 +945,7 @@ var m2 = db.runCommand(
 	title : 1,
 	author : 1,
 	pageViews : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	comments : 1
     }},
     { $match : { tag : "nasty" } }
@@ -997,7 +997,7 @@ var g1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	pageViews : 1
     }},
     { $group : {
@@ -1046,7 +1046,7 @@ var g2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	pageViews : 1
     }},
     { $group : {
@@ -1057,7 +1057,7 @@ var g2 = db.runCommand(
     }},
     { $project : {
 	_id: false,
-	tag : "_id.tag",
+	tag : "$_id.tag",
 	mostViewsByTag : 1,
 	docsByTag : 1,
 	viewsByTag : 1,
@@ -1104,7 +1104,7 @@ var g3 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" }
+	tag : { $unwind : "$tags" }
     }},
     { $group : {
 	_id : { tag : 1 },
@@ -1158,7 +1158,7 @@ var g4 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" },
+	tag : { $unwind : "$tags" },
 	pageViews : 1
     }},
     { $group : {
@@ -1212,7 +1212,7 @@ var g5 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "tags" }
+	tag : { $unwind : "$tags" }
     }},
     { $group : {
 	_id : { tag : 1 },

@@ -140,7 +140,7 @@ namespace mongo {
 	BSONObjBuilder insides;
 	if (excludeId)
 	    insides.append(Document::idName, false);
-	pEO->documentToBson(&insides, false, unwindName);
+	pEO->documentToBson(&insides, unwindName, 0);
 	pBuilder->append("$project", insides.done());
     }
 
@@ -252,7 +252,8 @@ IncludeExclude:
                 inFieldName = outFieldElement.String();
 		pProject->addField(
 		    outFieldPath,
-		    ExpressionFieldPath::create(inFieldName), false);
+		    ExpressionFieldPath::create(
+			Expression::removeFieldPrefix(inFieldName)), false);
 		break;
 
             case Object: {

@@ -31,21 +31,21 @@ namespace mongo {
     }
 
     void Accumulator::opToBson(
-	BSONObjBuilder *pBuilder, string opName, string fieldName) const {
+	BSONObjBuilder *pBuilder, string opName,
+	string fieldName, unsigned depth) const {
 	assert(vpOperand.size() == 1);
 	BSONObjBuilder builder;
-	vpOperand[0]->addToBsonObj(&builder, opName, true);
+	vpOperand[0]->addToBsonObj(&builder, opName, depth);
 	pBuilder->append(fieldName, builder.done());
     }
 
     void Accumulator::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool docPrefix) const {
-	opToBson(pBuilder, getOpName(), fieldName);
+	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+	opToBson(pBuilder, getOpName(), fieldName, depth);
     }
 
     void Accumulator::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	assert(false); // these can't appear in arrays
     }
-
 }

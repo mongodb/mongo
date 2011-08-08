@@ -65,15 +65,14 @@ namespace mongo {
 	BSONObjBuilder insides;
 
 	/* add the _id */
-	pIdExpression->addToBsonObj(
-	    &insides, Document::idName.c_str(), false);
+	pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), 0);
 
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
 	    shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pCtx));
 	    pA->addOperand(vpExpression[i]);
-	    pA->addToBsonObj(&insides, vFieldName[i], true);
+	    pA->addToBsonObj(&insides, vFieldName[i], 0);
 	}
 
 	pBuilder->append(groupName, insides.done());
