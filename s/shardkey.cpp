@@ -84,7 +84,7 @@ namespace mongo {
         vector<const char*> keysToMove;
         keysToMove.push_back("_id");
         BSONForEach(e, pattern) {
-            if (strchr(e.fieldName(), '.') == NULL)
+            if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
                 keysToMove.push_back(e.fieldName());
         }
 
