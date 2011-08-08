@@ -271,9 +271,14 @@ int
 __wt_curfile_open(WT_SESSION_IMPL *session,
     const char *name, const char *config, WT_CURSOR **cursorp)
 {
+	const char *filename;
+
 	/* TODO: handle projections. */
 
-	WT_RET(__wt_session_get_btree(session, name, NULL));
+	filename = name;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		return (EINVAL);
+	WT_RET(__wt_session_get_btree(session, name, filename, NULL));
 
 	return (__wt_curfile_create(session, 1, config, cursorp));
 }

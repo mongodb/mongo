@@ -28,7 +28,7 @@ __create_file(WT_SESSION_IMPL *session,
 		treeconf = NULL;
 
 	/* If the file exists, don't try to recreate it. */
-	ret = __wt_session_get_btree(session, name, treeconf);
+	ret = __wt_session_get_btree(session, name, filename, treeconf);
 	if (ret != WT_NOTFOUND)
 		return (ret);
 
@@ -188,8 +188,8 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 		WT_RET(__wt_calloc_def(session, namelen, &namebuf));
 		snprintf(namebuf, namelen, "filename=%.*s_%s.wti",
 		    (int)tlen, tablename, idxname);
-		filename = namebuf + strlen("filename=");
-		cfg[2] = namebuf;
+		cfg[2] = filename = namebuf;
+		WT_PREFIX_SKIP(filename, "filename=");
 	}
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 

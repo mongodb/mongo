@@ -267,6 +267,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
+	const char *filename;
 	int raw, ret;
 
 	cst = NULL;
@@ -274,8 +275,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
-	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(__wt_session_get_btree(session, uri, NULL));
+	filename = uri;
+	if (WT_PREFIX_SKIP(filename, "file:")) {
+		WT_ERR(__wt_session_get_btree(session, uri, filename, NULL));
 		WT_RET(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
 		clear_func = __wt_stat_clear_btree_stats;

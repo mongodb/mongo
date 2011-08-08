@@ -59,16 +59,12 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
  *	Get a btree handle for the given name, set session->btree.
  */
 int
-__wt_session_get_btree(
-    WT_SESSION_IMPL *session, const char *name, const char *tconfig)
+__wt_session_get_btree(WT_SESSION_IMPL *session,
+    const char *name, const char *filename, const char *tconfig)
 {
 	WT_BTREE_SESSION *btree_session;
-	const char *filename, *treeconf;
+	const char *treeconf;
 	int ret;
-
-	filename = name;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
 
 	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), &btree_session)) == 0)
