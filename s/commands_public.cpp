@@ -497,7 +497,6 @@ namespace mongo {
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    result.append( "ns" , fullns );
                     result.appendBool("sharded", false);
                     result.append( "primary" , conf->getPrimary().getName() );
                     return passthrough( conf , cmdObj , result);

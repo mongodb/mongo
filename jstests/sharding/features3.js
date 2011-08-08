@@ -17,11 +17,19 @@ for ( i=0; i<N; i++ )
     db.foo.insert( { _id : i } )
 db.getLastError();
 x = db.foo.stats();
+assert.eq( "test.foo" , x.ns , "basic1" )
+assert( x.sharded , "basic2" )
 assert.eq( N , x.count , "total count" )
 assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
 assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
 assert( x.totalIndexSize > 0 )
 assert( x.numExtents > 0 )
+
+db.bar.insert( { x : 1 } )
+x = db.bar.stats();
+assert.eq( 1 , x.count , "XXX1" )
+assert.eq( "test.bar" , x.ns , "XXX2" )
+assert( ! x.sharded , "XXX3: " + tojson(x) )
 
 // Fork shell and start pulling back data
 start = new Date()
