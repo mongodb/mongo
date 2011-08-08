@@ -54,7 +54,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
     }
 
-    assert.gt( 2000 , me );
+    assert.gt( time / 3 , me );
 }
 
 join();
