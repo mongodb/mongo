@@ -666,8 +666,10 @@ namespace mongo {
             }
 
             if ( c ) {
-                if ( c->contains( obj ) )
+                if ( c->contains( key ) ){
+                    dassert(c->contains(key)); // doesn't use fast-path in extractKey
                     return c;
+                }
 
                 PRINT(foo);
                 PRINT(*c);
