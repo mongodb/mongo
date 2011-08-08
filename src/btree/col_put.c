@@ -9,7 +9,7 @@
 
 static int __col_extend(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int __col_insert_alloc(
-		WT_SESSION_IMPL *, uint64_t, int, WT_INSERT **, uint32_t *);
+		WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, uint32_t *);
 static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
 
 /*
@@ -26,7 +26,8 @@ __wt_col_modify(
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
 	uint32_t ins_size, new_inslist_size, new_inshead_size, upd_size;
-	int hazard_ref, i, ret, skipdepth;
+	u_int skipdepth;
+	int hazard_ref, i, ret;
 
 	new_inshead = NULL;
 	new_inslist = NULL;
@@ -128,8 +129,8 @@ __wt_col_modify(
 		 * WT_INSERT/WT_UPDATE pair, link it into the WT_INSERT array.
 		 */
 		skipdepth = __wt_skip_choose_depth();
-		WT_ERR(__col_insert_alloc(session, recno, skipdepth,
-		    &ins, &ins_size));
+		WT_ERR(__col_insert_alloc(
+		    session, recno, skipdepth, &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
 		ins_size += upd_size;
@@ -175,7 +176,7 @@ err:		if (ins != NULL)
  */
 static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
-    uint64_t recno, int skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
+    uint64_t recno, u_int skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
