@@ -307,20 +307,36 @@ namespace mongo {
     }
 
     bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ) const{
-        string ap = str::before( a , "/" );
-        string bp = str::before( b , "/" );
-        
-        return ap < bp;
+        const char* ap = a.c_str();
+        const char* bp = b.c_str();
+       
+        while (true){
+            if (*ap == '\0' || *ap == '/'){
+                if (*bp == '\0' || *bp == '/')
+                    return false; // equal strings
+                else
+                    return true; // a is shorter
+            }
+
+            if (*bp == '\0' || *bp == '/')
+                return false; // b is shorter
+            
+            if ( *ap < *bp)
+                return true;
+            else if (*ap > *bp)
+                return false;
+
+            ++ap;
+            ++bp;
+        }
+        assert(false);
     }
     
     bool DBConnectionPool::poolKeyCompare::operator()( const PoolKey& a , const PoolKey& b ) const {
-        string ap = str::before( a.ident , "/" );
-        string bp = str::before( b.ident , "/" );
-        
-        if ( ap < bp )
+        if (DBConnectionPool::serverNameCompare()( a.ident , b.ident ))
             return true;
         
-        if ( ap > bp )
+        if (DBConnectionPool::serverNameCompare()( b.ident , a.ident ))
             return false;
 
         return a.timeout < b.timeout;
