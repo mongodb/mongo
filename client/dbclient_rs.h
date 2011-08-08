@@ -52,7 +52,7 @@ namespace mongo {
          * checks all sets for current master and new secondaries
          * usually only called from a BackgroundJob
          */
-        static void checkAll();
+        static void checkAll( bool checkAllSecondaries );
 
         /**
          * this is called whenever the config of any repclia set changes
@@ -87,7 +87,7 @@ namespace mongo {
         /**
          * checks for current master and new secondaries
          */
-        void check();
+        void check( bool checkAllSecondaries );
 
         string getName() const { return _name; }
 
@@ -106,7 +106,7 @@ namespace mongo {
          */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
-        void _check();
+        void _check( bool checkAllSecondaries );
 
         /**
          * Use replSetGetStatus command to make sure hosts in host list are up
@@ -127,9 +127,10 @@ namespace mongo {
          * @param c the connection to check
          * @param maybePrimary OUT
          * @param verbose
+         * @param nodesOffset - offset into _nodes array, -1 for not in it
          * @return if the connection is good
          */
-        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
+        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset );
 
         int _find( const string& server ) const ;
         int _find_inlock( const string& server ) const ;
@@ -140,14 +141,32 @@ namespace mongo {
 
         string _name;
         struct Node {
-            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c) , ok(true) {}
+            Node( const HostAndPort& a , DBClientConnection* c ) 
+                : addr( a ) , conn(c) , ok(true) , 
+                  ismaster(false), secondary( false ) , hidden( false ) , pingTimeMillis(0) {
+            }
+
+            bool okForSecondaryQueries() const {
+                return ok && ( ismaster || ( secondary && ! hidden ) );
+            }
+
             HostAndPort addr;
-            DBClientConnection* conn;
+            shared_ptr<DBClientConnection> conn;
 
             // if this node is in a failure state
             // used for slave routing
             // this is too simple, should make it better
             bool ok;
+
+            // as reported by ismaster
+            BSONObj lastIsMaster;
+
+            bool ismaster;
+            bool secondary; 
+            bool hidden;
+            
+            int pingTimeMillis;
+
         };
 
         /**
