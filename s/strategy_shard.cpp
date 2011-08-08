@@ -123,7 +123,7 @@ namespace mongo {
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
             const int flags = d.reservedField();
-            bool keepGoing = flags & InsertOption_KeepGoing; // modified before assertion if should abort
+            bool keepGoing = flags & InsertOption_ContinueOnError; // modified before assertion if should abort
 
             while ( d.moreJSObjs() ) {
                 try {

@@ -84,7 +84,7 @@ namespace DirectClientTests {
             ASSERT_EQUALS((int)client().count(ns), 1);
 
             client().dropCollection(ns);
-            client().insert(ns, objs, InsertOption_KeepGoing);
+            client().insert(ns, objs, InsertOption_ContinueOnError);
             ASSERT_EQUALS(client().getLastErrorDetailed()["code"].numberInt(), 11000);
             ASSERT_EQUALS((int)client().count(ns), 2);
         }

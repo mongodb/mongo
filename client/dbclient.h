@@ -110,7 +110,7 @@ namespace mongo {
      */
     enum InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
-        InsertOption_KeepGoing = 1 << 0
+        InsertOption_ContinueOnError = 1 << 0
     };
 
     class DBClientBase;
