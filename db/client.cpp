@@ -691,11 +691,14 @@ namespace mongo {
 
 #define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
-    void OpDebug::append( BSONObjBuilder& b ) const {
+    void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );
         b.append( "ns" , ns.toString() );
         if ( ! query.isEmpty() )
             b.append( iscommand ? "command" : "query" , query );
+        else if ( ! iscommand && curop.haveQuery() )
+            curop.appendQuery( b , "query" );
+
         if ( ! updateobj.isEmpty() )
             b.append( "updateobj" , updateobj );
         
