@@ -10,10 +10,8 @@ var admin = mongos.getDB("admin")
 admin.runCommand({ addshard : "localhost:30001" })
 admin.runCommand({ addshard : "localhost:30002" })
 
-
-
-var coll = mongos.getDB("test").getCollection("stuff")
-coll.drop()
+db = mongos.getDB("test");
+var coll = db.getCollection("stuff")
 
 var data = "x"
 var nsq = 16
@@ -28,6 +26,9 @@ for( var i = 0; i < 40; i++ ) {
         if(i != 0 && i % 10 == 0) printjson( coll.stats() )
         coll.save({ data : dataObj })
 }
+db.getLastError();
+
+assert.eq( 40 , coll.count() , "prep1" );
 
 printjson( coll.stats() )
 
@@ -36,6 +37,8 @@ admin.runCommand({ enablesharding : "" + coll.getDB() })
 admin.printShardingStatus()
 
 admin.runCommand({ shardcollection : "" + coll, key : { _id : 1 } })
+
+assert.lt( 5 , mongos.getDB( "config" ).chunks.find( { ns : "test.stuff" } ).count() , "not enough chunks" );
 
 assert.soon( 
     function(){ 
