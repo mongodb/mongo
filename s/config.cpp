@@ -609,7 +609,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
+                log( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
                 return false;
             }
         }

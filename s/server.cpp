@@ -26,6 +26,7 @@
 #include "../util/ramlog.h"
 #include "../util/signal_handlers.h"
 #include "../util/admin_access.h"
+#include "../util/concurrency/task.h"
 #include "../db/dbwebserver.h"
 #include "../scripting/engine.h"
 
@@ -316,6 +317,16 @@ int _main(int argc, char* argv[]) {
     if ( ! configServer.ok( true ) ) {
         cout << "configServer startup check failed" << endl;
         return 8;
+    }
+
+    {
+        class CheckConfigServers : public task::Task {
+            virtual string name() const { return "CheckConfigServers"; }
+            virtual void doWork() { configServer.ok(true); }
+        };
+        static CheckConfigServers checkConfigServers;
+
+        task::repeat(&checkConfigServers, 60*1000);
     }
 
     int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
