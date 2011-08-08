@@ -566,6 +566,7 @@ int main(int argc, char* argv[]) {
     ("directoryperdb", "each database will be stored in a separate directory")
     ("journal", "enable journaling")
     ("journalOptions", po::value<int>(), "journal diagnostic options")
+    ("journalCommitInterval", po::value<unsigned>(), "how often to group/batch commit (ms)")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
@@ -735,6 +736,15 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("durOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();
+        }
+        if( params.count("journalCommitInterval") ) { 
+            // don't check if dur is false here as many will just use the default, and will default to off on win32. 
+            // ie no point making life a little more complex by giving an error on a dev environment.
+            cmdLine.journalCommitInterval = params["journalCommitInterval"].as<unsigned>();
+            if( cmdLine.journalCommitInterval <= 1 || cmdLine.journalCommitInterval > 300 ) {
+                out() << "--journalCommitInterval out of allowed range (0-300ms)" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
         }
         if (params.count("journalOptions")) {
             cmdLine.durOptions = params["journalOptions"].as<int>();

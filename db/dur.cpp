@@ -145,6 +145,8 @@ namespace mongo {
                 b << "ageOutJournalFiles" << "mutex timeout";
             if( r == 0 )
                 b << "ageOutJournalFiles" << false;
+            if( cmdLine.journalCommitInterval != 0 )
+                b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
         }
 
@@ -682,20 +684,33 @@ namespace mongo {
 
         CodeBlock durThreadMain;
 
-        extern int groupCommitIntervalMs;
+        filesystem::path getJournalDir();
 
         void durThread() {
             Client::initThread("journal");
+
+            bool same = false;
+            try { same = onSamePartition(getJournalDir().string(), dbpath); }
+            catch(...) { }
+
             while( !inShutdown() ) {
                 CodeBlock::Within w(durThreadMain);
+
+                unsigned ms = cmdLine.journalCommitInterval;
+                if( ms == 0 ) { 
+                    // use default
+                    ms = same ? 100 : 30;
+                }
+                assert( ms >= 2 );
+
                 try {
                     stats.rotate();
 
                     // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
                     // but is likely also less spiky on our cpu usage, which is good:
-                    sleepmillis(groupCommitIntervalMs/2);
+                    sleepmillis(ms/2);
                     commitJob.wi()._deferred.invoke();
-                    sleepmillis(groupCommitIntervalMs/2);
+                    sleepmillis(ms/2);
                     commitJob.wi()._deferred.invoke();
 
                     go();

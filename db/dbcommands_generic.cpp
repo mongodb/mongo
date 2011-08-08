@@ -117,11 +117,6 @@ namespace mongo {
         }
     } cmdGet;
 
-    // dev - experimental. so only in set command for now.  may go away or change
-    namespace dur { 
-        int groupCommitIntervalMs = 100;
-    }
-
     // tempish
     bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl );
 
@@ -135,23 +130,24 @@ namespace mongo {
             help << "set administrative option(s)\n";
             help << "{ setParameter:1, <param>:<value> }\n";
             help << "supported so far:\n";
-            help << "  notablescan\n";
+            help << "  journalCommitInterval\n";
             help << "  logLevel\n";
+            help << "  notablescan\n";
             help << "  quiet\n";
             help << "  syncdelay\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
-            if( cmdObj.hasElement("groupCommitIntervalMs") ) { 
+            if( cmdObj.hasElement("journalCommitInterval") ) { 
                 if( !cmdLine.dur ) { 
                     errmsg = "journaling is off";
                     return false;
                 }
-                int x = (int) cmdObj["groupCommitIntervalMs"].Number();
-                assert( x > 0 && x < 500 );
-                dur::groupCommitIntervalMs = x;
-                log() << "groupCommitIntervalMs " << x << endl;
+                int x = (int) cmdObj["journalCommitInterval"].Number();
+                assert( x > 1 && x < 500 );
+                cmdLine.journalCommitInterval = x;
+                log() << "setParameter journalCommitInterval=" << x << endl;
                 s++;
             }
             if( cmdObj.hasElement("notablescan") ) {
