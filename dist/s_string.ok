@@ -32,6 +32,7 @@ Checksum
 Config
 DATAITEMs
 DESC
+Decrement
 EINTR
 ENOMEM
 ETIME
@@ -48,6 +49,7 @@ Fasttrack
 FreeBSD
 FreeBSD's
 Freelist
+IKEY
 IMPL
 IMPL's
 INDX
@@ -67,6 +69,7 @@ LSNs
 Lookup
 MBUF
 MEM
+MERCHANTABILITY
 MVCC
 Marsaglia's
 Mewhort
@@ -128,6 +131,7 @@ addr
 addrs
 alfred
 alloc
+allocator
 allocsize
 ap
 api
@@ -157,6 +161,7 @@ clr
 cmp
 colgroup
 colgroups
+comparator
 concat
 cond
 conf
@@ -175,8 +180,10 @@ curindex
 cursorp
 curstat
 curtable
+data's
 datalen
 datasets
+decrement
 del
 delfmt
 dequeue
@@ -244,6 +251,7 @@ iSh
 ikey
 imref
 incr
+incrementing
 incrv
 indices
 indx
@@ -264,6 +272,7 @@ leafmax
 leafmin
 len
 lex
+lexicographically
 llll
 logput
 lookup
@@ -320,6 +329,7 @@ readserver
 realloc
 recno
 req
+resizing
 ret
 retp
 rle
@@ -371,6 +381,7 @@ th
 thazard
 tinsert
 toffpage
+transactional
 trecno
 trepeat
 trk
@@ -389,12 +400,16 @@ undef
 unesc
 uninstantiated
 unjams
+unlinked
 unpackv
+unreferenced
 unsized
+untyped
 upd
 uri
 utf
 va
+vanishingly
 versa
 vpack
 vsize
