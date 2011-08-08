@@ -91,7 +91,7 @@ namespace mongo {
     DocumentSourceSort::DocumentSourceSort(
 	const intrusive_ptr<ExpressionContext> &pTheCtx):
         populated(false),
-        limit(LONG_MAX),
+        limit(LLONG_MAX),
         skip(0),
         count(0),
         pCtx(pTheCtx) {
@@ -120,7 +120,7 @@ namespace mongo {
             if (!strcmp(pFieldName,"limit")) {
                 pSort->limit = sortVarField.numberLong();
                 if (pSort->limit <= 0)
-                    pSort->limit = LONG_MAX;
+                    pSort->limit = LLONG_MAX;
                 continue;
             }
 

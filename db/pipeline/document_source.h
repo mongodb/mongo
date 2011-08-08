@@ -712,9 +712,9 @@ namespace mongo {
 	 */
         void populate();
         bool populated;
-        long limit;
-        long skip;
-        long count;
+        long long limit;
+        long long skip;
+        long long count;
 
 	/* these two parallel each other */
 	vector<shared_ptr<ExpressionFieldPath> > vSortKey;
