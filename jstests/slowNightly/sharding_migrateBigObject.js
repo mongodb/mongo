@@ -48,7 +48,7 @@ assert.soon(
                                                        initial : { nChunks : 0 } } );
         
         printjson( res );
-        return res.length > 1 && Math.abs( res[0].nChunks - res[1].nChunks ) <= 1;
+        return res.length > 1 && Math.abs( res[0].nChunks - res[1].nChunks ) <= 3;
 
     } , 
     "never migrated" , 180000 , 1000 );
