@@ -60,7 +60,7 @@ namespace mongo {
             return false;
         }
 
-        log(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
+        LOG(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
 
         if ( doesOpGetAResponse( op ) ) {
             assert( dbresponse );
@@ -97,8 +97,8 @@ namespace mongo {
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
 
-        log(1) << "got write with an old config - writing back ns: " << ns << endl;
-        if ( logLevel ) log(1) << m.toString() << endl;
+        LOG(1) << "got write with an old config - writing back ns: " << ns << endl;
+        if ( logLevel ) LOG(1) << m.toString() << endl;
 
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
@@ -109,7 +109,7 @@ namespace mongo {
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
-        log(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
+        LOG(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
         writeBackManager.queueWriteBack( clientID.str() , b.obj() );
 
         return true;

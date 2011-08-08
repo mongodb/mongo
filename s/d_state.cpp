@@ -288,7 +288,7 @@ namespace mongo {
     ShardedConnectionInfo* ShardedConnectionInfo::get( bool create ) {
         ShardedConnectionInfo* info = _tl.get();
         if ( ! info && create ) {
-            log(1) << "entering shard mode for connection" << endl;
+            LOG(1) << "entering shard mode for connection" << endl;
             info = new ShardedConnectionInfo();
             _tl.reset( info );
         }
@@ -316,7 +316,7 @@ namespace mongo {
     void ShardedConnectionInfo::addHook() {
         static bool done = false;
         if (!done) {
-            log(1) << "adding sharding hook" << endl;
+            LOG(1) << "adding sharding hook" << endl;
             pool.addHook(new ShardingConnectionHook(false));
             done = true;
         }

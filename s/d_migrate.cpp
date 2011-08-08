@@ -1079,7 +1079,7 @@ namespace mongo {
                 preCond.done();
 
                 BSONObj cmd = cmdBuilder.obj();
-                log(7) << "moveChunk update: " << cmd << migrateLog;
+                LOG(7) << "moveChunk update: " << cmd << migrateLog;
 
                 bool ok = false;
                 BSONObj cmdResult;
@@ -1679,7 +1679,7 @@ namespace mongo {
             assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
 
-            log(1) << "isInRangeTest passed" << migrateLog;
+            LOG(1) << "isInRangeTest passed" << migrateLog;
         }
     } isInRangeTest;
 }

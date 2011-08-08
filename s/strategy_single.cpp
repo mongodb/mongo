@@ -36,7 +36,7 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
-            log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
+            LOG(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
 
             if ( r.isCommand() ) {
 
@@ -161,12 +161,12 @@ namespace mongo {
             if ( r.isShardingEnabled() &&
                     strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) &&
                     strchr( ns , '.' ) ) {
-                log(1) << " .system.indexes write for: " << ns << endl;
+                LOG(1) << " .system.indexes write for: " << ns << endl;
                 handleIndexWrite( op , r );
                 return;
             }
 
-            log(3) << "single write: " << ns << endl;
+            LOG(3) << "single write: " << ns << endl;
             doWrite( op , r , r.primaryShard() );
             r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
         }

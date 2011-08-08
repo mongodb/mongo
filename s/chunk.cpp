@@ -208,7 +208,7 @@ namespace mongo {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
-                log(1) << "chunk not full enough to trigger auto-split" << endl;
+                LOG(1) << "chunk not full enough to trigger auto-split" << endl;
                 return BSONObj();
             }
 
@@ -350,7 +350,7 @@ namespace mongo {
             // this was implicit before since we did a splitVector on the same socket
             ShardConnection::sync();
 
-            log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
+            LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 
             _dataWritten = 0; // reset so we check often enough
 
@@ -378,7 +378,7 @@ namespace mongo {
                 Shard newLocation = Shard::pick( getShard() );
                 if ( getShard() == newLocation ) {
                     // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
-                    log(1) << "recently split chunk: " << range << " already in the best shard: " << getShard() << endl;
+                    LOG(1) << "recently split chunk: " << range << " already in the best shard: " << getShard() << endl;
                     return true; // we did split even if we didn't migrate
                 }
 
@@ -386,7 +386,7 @@ namespace mongo {
                 ChunkPtr toMove = cm->findChunk(min);
 
                 if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
-                    log(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
+                    LOG(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
                     return true;
                 }
 
@@ -793,7 +793,7 @@ namespace mongo {
 
         set<Shard> seen;
 
-        log(1) << "ChunkManager::drop : " << _ns << endl;
+        LOG(1) << "ChunkManager::drop : " << _ns << endl;
 
         // lock all shards so no one can do a split/migrate
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
@@ -801,7 +801,7 @@ namespace mongo {
             seen.insert( c->getShard() );
         }
 
-        log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;
+        LOG(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;
 
         // delete data from mongod
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
@@ -810,13 +810,13 @@ namespace mongo {
             conn.done();
         }
 
-        log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
+        LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
 
         // remove chunk data
         ScopedDbConnection conn( configServer.modelServer() );
         conn->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
         conn.done();
-        log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
+        LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
             ScopedDbConnection conn( *i );
@@ -832,7 +832,7 @@ namespace mongo {
             conn.done();
         }
 
-        log(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;
+        LOG(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
@@ -843,7 +843,7 @@ namespace mongo {
         vector<BSONObj> splitPoints;
         soleChunk->pickSplitVector( splitPoints , Chunk::MaxChunkSize );
         if ( splitPoints.empty() ) {
-            log(1) << "not enough data to warrant chunking " << getns() << endl;
+            LOG(1) << "not enough data to warrant chunking " << getns() << endl;
             return;
         }
 
@@ -985,7 +985,7 @@ namespace mongo {
 
         void run() {
             runShardChunkVersion();
-            log(1) << "shardObjTest passed" << endl;
+            LOG(1) << "shardObjTest passed" << endl;
         }
     } shardObjTest;
 
@@ -1010,7 +1010,7 @@ namespace mongo {
         cmdBuilder.append( "shardHost" , s.getConnString() );
         BSONObj cmd = cmdBuilder.obj();
 
-        log(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
+        LOG(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
 
         return conn.runCommand( "admin" , cmd , result );
     }

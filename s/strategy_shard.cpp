@@ -37,7 +37,7 @@ namespace mongo {
 
             r.checkAuth();
 
-            log(3) << "shard query: " << q.ns << "  " << q.query << endl;
+            LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
@@ -75,7 +75,7 @@ namespace mongo {
             try {
                 cursor->init();
 
-                log(5) << "   cursor type: " << cursor->type() << endl;
+                LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
                 if ( query.isExplain() ) {
@@ -94,7 +94,7 @@ namespace mongo {
             if ( ! cc->sendNextBatch( r ) ) {
                 return;
             }
-            log(6) << "storing cursor : " << cc->getId() << endl;
+            LOG(6) << "storing cursor : " << cc->getId() << endl;
             cursorCache.store( cc );
         }
 
@@ -102,11 +102,11 @@ namespace mongo {
             int ntoreturn = r.d().pullInt();
             long long id = r.d().pullInt64();
 
-            log(6) << "want cursor : " << id << endl;
+            LOG(6) << "want cursor : " << id << endl;
 
             ShardedClientCursorPtr cursor = cursorCache.get( id );
             if ( ! cursor ) {
-                log(6) << "\t invalid cursor :(" << endl;
+                LOG(6) << "\t invalid cursor :(" << endl;
                 replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                 return;
             }
@@ -156,7 +156,7 @@ namespace mongo {
                     for ( int i=0; i<maxTries; i++ ) {
                         try {
                             ChunkPtr c = manager->findChunk( o );
-                            log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                            LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                             insert( c->getShard() , r.getns() , o , flags);
 
                             r.gotInsert();
@@ -224,7 +224,7 @@ namespace mongo {
             for ( int i=0; i<maxTries; i++ ) {
                 try {
                     ChunkPtr c = manager->findChunk( o );
-                    log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                    LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                     insert( c->getShard() , ns , o , flags, safe);
                     break;
                 }
@@ -450,7 +450,7 @@ namespace mongo {
             while ( true ) {
                 try {
                     manager->getShardsForQuery( shards , pattern );
-                    log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+                    LOG(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
                     if ( shards.size() == 1 ) {
                         doWrite( dbDelete , r , *shards.begin() );
                         return;
@@ -482,7 +482,7 @@ namespace mongo {
 
         virtual void writeOp( int op , Request& r ) {
             const char *ns = r.getns();
-            log(3) << "write: " << ns << endl;
+            LOG(3) << "write: " << ns << endl;
 
             DbMessage& d = r.d();
             ChunkManagerPtr info = r.getChunkManager();

@@ -264,7 +264,7 @@ namespace mongo {
                 moveToFrontBenchmark(100);
             }
 
-            log(1) << "shardKeyTest passed" << endl;
+            LOG(1) << "shardKeyTest passed" << endl;
         }
     } shardKeyTest;
 

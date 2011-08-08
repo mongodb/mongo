@@ -691,7 +691,7 @@ namespace mongo {
 
             BSONObjBuilder logDetail;
             origChunk.appendShortVersion( "before" , logDetail );
-            log(1) << "before split on " << origChunk << endl;
+            LOG(1) << "before split on " << origChunk << endl;
             vector<ChunkInfo> newChunks;
 
             ShardChunkVersion myVersion = maxVersion;

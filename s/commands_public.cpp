@@ -1110,7 +1110,7 @@ namespace mongo {
 
                     mr_shard::Config config( dbName , cmdObj );
                     mr_shard::State state(config);
-                    log(1) << "mr sharded output ns: " << config.ns << endl;
+                    LOG(1) << "mr sharded output ns: " << config.ns << endl;
 
                     if (config.outType == mr_shard::Config::INMEMORY) {
                         errmsg = "This Map Reduce mode is not supported with sharded output";

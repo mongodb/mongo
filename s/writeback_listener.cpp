@@ -117,7 +117,7 @@ namespace mongo {
         while ( ! inShutdown() ) {
             
             if ( ! Shard::isAShardNode( _addr ) ) {
-                log(1) << _addr << " is not a shard node" << endl;
+                LOG(1) << _addr << " is not a shard node" << endl;
                 sleepsecs( 60 );
                 continue;
             }

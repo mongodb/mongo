@@ -513,7 +513,7 @@ namespace mongo {
             assert( Grid::_inBalancingWindow( w8 , now ) );
             assert( Grid::_inBalancingWindow( w9 , now ) );
 
-            log(1) << "BalancingWidowObjTest passed" << endl;
+            LOG(1) << "BalancingWidowObjTest passed" << endl;
         }
     } BalancingWindowObjTest;
 
