@@ -20,18 +20,18 @@ __wt_row_modify(
 	WT_PAGE *page;
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE **new_upd, *upd;
-	uint32_t ins_size, new_inshead_size, new_inslist_size;
+	uint32_t ins_size, new_inshead_size, new_inslist_size, skipdepth;
 	uint32_t new_upd_size, upd_size;
-	int i, ret, skipdepth;
+	int i, ret;
 
 	new_inshead = NULL;
 	new_inslist = NULL;
 	ins = NULL;
 	new_upd = NULL;
 	upd = NULL;
-	ins_size = new_inshead_size = new_inslist_size = 0;
+	ins_size = new_inshead_size = new_inslist_size = skipdepth = 0;
 	new_upd_size = upd_size = 0;
-	ret = skipdepth = 0;
+	ret = 0;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_row_search(session, key, is_write ? WT_WRITE : 0));
@@ -96,7 +96,7 @@ __wt_row_modify(
 		}
 
 		/* Choose a skiplist depth for this insert. */
-		WT_SKIP_CHOOSE_DEPTH(skipdepth);
+		skipdepth = __wt_skip_choose_depth();
 
 		/* Allocate a WT_INSERT/WT_UPDATE pair. */
 		WT_ERR(__wt_row_insert_alloc(session,
@@ -136,7 +136,7 @@ err:		if (ins != NULL)
  */
 int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *key, int skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
+    WT_ITEM *key, uint32_t skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -173,7 +173,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	WT_INSERT_HEAD **new_inslist, *new_inshead;
 	WT_INSERT *ins;
 	WT_SEARCH *srch;
-	int i, ret, skipdepth;
+	uint32_t i, skipdepth;
+	int ret;
 
 	ret = 0;
 

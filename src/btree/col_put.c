@@ -127,7 +127,7 @@ __wt_col_modify(
 		 * If changing a not-yet-changed record, then allocate a new
 		 * WT_INSERT/WT_UPDATE pair, link it into the WT_INSERT array.
 		 */
-		WT_SKIP_CHOOSE_DEPTH(skipdepth);
+		skipdepth = __wt_skip_choose_depth();
 		WT_ERR(__col_insert_alloc(session, recno, skipdepth,
 		    &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));

@@ -43,7 +43,7 @@ Serial('insert', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
 		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'ins', 1),
-		SerialArg('int', 'depth'),
+		SerialArg('uint32_t', 'depth'),
 	]),
 
 Serial('row_key', 'WT_WORKQ_FUNC', 1, [

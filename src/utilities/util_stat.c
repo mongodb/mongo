@@ -76,7 +76,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		ret = 0;
 	else {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, objname, wiredtiger_strerror(ret));
 		goto err;
 	}
 

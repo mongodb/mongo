@@ -41,7 +41,8 @@ __insert_search(
 			cmp = compare(btree, key, &insert_key);
 		}
 		if (cmp == 0) {
-			WT_CLEAR(session->srch.ins);
+			/* Clear the ins array, we're not going to insert. */
+			memset(session->srch.ins, 0, sizeof(session->srch.ins));
 			session->srch.vupdate = (*ins)->upd;
 			session->srch.upd = &(*ins)->upd;
 			return (0);
@@ -74,14 +75,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 	int cmp, ret;
 	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	session->srch.page = NULL;			/* Return values. */
-	session->srch.write_gen = 0;
-	session->srch.match = 0;
-	session->srch.ip = NULL;
-	session->srch.vupdate = NULL;
-	session->srch.inshead = NULL;
-	WT_CLEAR(session->srch.ins);
-	session->srch.upd = NULL;
+	/* Return values. */
+	WT_CLEAR(session->srch);
 	session->srch.slot = UINT32_MAX;
 
 	btree = session->btree;

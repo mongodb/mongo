@@ -285,7 +285,7 @@ extern int __wt_row_modify( WT_SESSION_IMPL *session,
     int is_write);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *key,
-    int skipdepth,
+    uint32_t skipdepth,
     WT_INSERT **insp,
     uint32_t *ins_sizep);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session);

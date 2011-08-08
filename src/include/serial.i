@@ -234,7 +234,7 @@ typedef struct {
 	WT_INSERT *ins;
 	uint32_t ins_size;
 	int ins_taken;
-	int depth;
+	uint32_t depth;
 } __wt_insert_args;
 
 static inline int
@@ -242,7 +242,7 @@ __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_SEARCH *srch, WT_INSERT_HEAD
 	***new_inslistp, uint32_t new_inslist_size, WT_INSERT_HEAD
 	**new_insheadp, uint32_t new_inshead_size, WT_INSERT **insp, uint32_t
-	ins_size, int depth)
+	ins_size, uint32_t depth)
 {
 	__wt_insert_args _args, *args = &_args;
 	int ret;
@@ -293,8 +293,8 @@ __wt_insert_serial(
 static inline void
 __wt_insert_unpack(
 	WT_SESSION_IMPL *session, WT_SEARCH **srchp, WT_INSERT_HEAD
-	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **insp, int
-	*depthp)
+	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **insp,
+	uint32_t *depthp)
 {
 	__wt_insert_args *args =
 	    (__wt_insert_args *)session->wq_args;

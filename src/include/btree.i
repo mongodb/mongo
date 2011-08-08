@@ -176,3 +176,17 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page != NULL && !WT_PAGE_IS_ROOT(page))
 		__wt_hazard_clear(session, page);
 }
+
+/*
+ * __wt_skip_choose_depth --
+ *      Randomly choose a depth for a skiplist insert.
+ */
+static inline uint32_t
+__wt_skip_choose_depth(void)
+{
+	uint32_t d;
+	for (d = 1; d < WT_SKIP_MAXDEPTH &&
+	    __wt_random() < WT_SKIP_PROBABILITY; d++)
+		;
+	return (d);
+}

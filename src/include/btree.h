@@ -671,9 +671,6 @@ struct __wt_insert {
 	for ((__i) = WT_SKIP_FIRST(__head);				\
 	    (__i) != NULL;						\
 	    (__i) = WT_SKIP_NEXT(__i))
-#define	WT_SKIP_CHOOSE_DEPTH(__d)					\
-	for ((__d) = 1; (__d) < WT_SKIP_MAXDEPTH &&			\
-	    __wt_random() < WT_SKIP_PROBABILITY; (__d)++)
 
 /*
  * WT_INSERT_HEAD --

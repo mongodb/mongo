@@ -36,7 +36,8 @@ __wt_col_ins_search(
 			    (recno < ins_recno) ? -1 : 1;
 		}
 		if (cmp == 0) {
-			WT_CLEAR(session->srch.ins);
+			/* Clear the ins array, we're not going to insert. */
+			memset(session->srch.ins, 0, sizeof(session->srch.ins));
 			session->srch.vupdate = (*ins)->upd;
 			session->srch.upd = &(*ins)->upd;
 			return (0);
@@ -74,13 +75,8 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	cref = NULL;
 	start_recno = 0;
 
-	session->srch.page = NULL;			/* Return values. */
-	session->srch.write_gen = 0;
-	session->srch.ip = NULL;
-	session->srch.vupdate = NULL;
-	session->srch.inshead = NULL;
-	WT_CLEAR(session->srch.ins);
-	session->srch.upd = NULL;
+	/* Return values. */
+	WT_CLEAR(session->srch);
 	session->srch.slot = UINT32_MAX;
 
 	btree = session->btree;
