@@ -81,8 +81,6 @@ namespace mongo {
             return getJournalDir()/"lsn";
         }
 
-        extern CodeBlock durThreadMain;
-
         /** this should be called when something really bad happens so that we can flag appropriately
         */
         void journalingFailure(const char *msg) {
@@ -528,7 +526,6 @@ namespace mongo {
         void Journal::updateLSNFile() {
             if( !_writeToLSNNeeded )
                 return;
-            durThreadMain.assertWithin();
             _writeToLSNNeeded = false;
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
@@ -639,7 +636,7 @@ namespace mongo {
         }
 
         /** write (append) the buffer we have built to the journal and fsync it.
-            outside of lock as that could be slow.
+            outside of dbMutex lock as this could be slow.
             @param uncompressed - a buffer that will be written to the journal after compression
             will not return until on disk
         */

@@ -685,8 +685,6 @@ namespace mongo {
             }
         }
 
-        CodeBlock durThreadMain;
-
         filesystem::path getJournalDir();
 
         void durThread() {
@@ -697,8 +695,6 @@ namespace mongo {
             catch(...) { }
 
             while( !inShutdown() ) {
-                CodeBlock::Within w(durThreadMain);
-
                 unsigned ms = cmdLine.journalCommitInterval;
                 if( ms == 0 ) { 
                     // use default
