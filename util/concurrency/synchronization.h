@@ -65,16 +65,21 @@ namespace mongo {
         */
         void waitFor(When);
 
+        /** a bit faster than waitFor( now() ) */
         void awaitBeyondNow();
 
         /** may be called multiple times. notifies all waiters */
         void notifyAll(When);
+
+        /** indicates how many threads are waiting for a notify. */
+        unsigned nWaiting() const { return _nWaiting; }
 
     private:
         mongo::mutex _mutex;
         boost::condition _condition;
         When _lastDone;
         When _lastReturned;
+        unsigned _nWaiting;
     };
 
 } // namespace mongo

@@ -43,6 +43,7 @@ namespace mongo {
     NotifyAll::NotifyAll() : _mutex("NotifyAll") { 
         _lastDone = 0;
         _lastReturned = 0;
+        _nWaiting = 0;
     }
 
     NotifyAll::When NotifyAll::now() { 
@@ -52,6 +53,7 @@ namespace mongo {
 
     void NotifyAll::waitFor(When e) {
         scoped_lock lock( _mutex );
+        ++_nWaiting;
         while( _lastDone < e ) {
             _condition.wait( lock.boost() );
         }
@@ -59,6 +61,7 @@ namespace mongo {
 
     void NotifyAll::awaitBeyondNow() { 
         scoped_lock lock( _mutex );
+        ++_nWaiting;
         When e = ++_lastReturned;
         while( _lastDone <= e ) {
             _condition.wait( lock.boost() );
@@ -68,6 +71,7 @@ namespace mongo {
     void NotifyAll::notifyAll(When e) {
         scoped_lock lock( _mutex );
         _lastDone = e;
+        _nWaiting = 0;
         _condition.notify_all();
     }
 
