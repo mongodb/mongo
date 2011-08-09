@@ -63,21 +63,21 @@ struct __wt_cursor_btree {
 struct __wt_cursor_bulk {
 	WT_CURSOR_BTREE cbt;
 
-	uint8_t	 page_type;		/* Page type */
-	uint64_t recno;			/* Total record number */
-	uint32_t ipp;			/* Items per page */
+	uint64_t recno;				/* Total record number */
+	uint32_t ipp;				/* Items per page */
+	uint32_t ins_cnt;			/* Inserts on the list */
+	uint8_t	 page_type;			/* Page type */
 
 	/*
 	 * K/V pairs for row-store leaf pages, and V objects for column-store
 	 * leaf pages, are stored in singly-linked lists (the lists are never
 	 * searched, only walked at reconciliation, so it's not so bad).
 	 */
-	WT_INSERT  *ins_base;		/* Base insert link */
-	WT_INSERT **insp;		/* Next insert link */
-	WT_UPDATE  *upd_base;		/* Base update link */
-	WT_UPDATE **updp;		/* Next update link */
-	uint8_t	   *bitf;		/* Bit field */
-	uint32_t   ins_cnt;		/* Inserts on the list */
+	WT_INSERT  *ins_base;			/* Base insert link */
+	WT_INSERT **insp;			/* Next insert link */
+	WT_UPDATE  *upd_base;			/* Base update link */
+	WT_UPDATE **updp;			/* Next update link */
+	uint8_t	   *bitf;			/* Bit field */
 
 	/*
 	 * Bulk load dynamically allocates an array of leaf-page references;

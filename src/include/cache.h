@@ -19,14 +19,15 @@ struct __wt_evict_list {
  *	Encapsulation of a eviction request.
  */
 struct __wt_evict_req {
-	WT_SESSION_IMPL *session;			/* Requesting thread */
-	WT_BTREE *btree;				/* Btree */
-	int	  close_method;			/* Discard pages */
+	WT_SESSION_IMPL *session;		/* Requesting thread */
+	WT_BTREE *btree;			/* Btree */
 
 	WT_PAGE **retry;			/* Pages to retry */
 	uint32_t  retry_next;			/* Next retry slot */
 	uint32_t  retry_entries;		/* Total retry slots */
 	size_t    retry_allocated;		/* Bytes allocated */
+
+	int	  close_method;			/* Discard pages */
 };
 
 /*
@@ -52,10 +53,6 @@ struct __wt_cache {
 	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
 	u_int volatile evict_sleeping;	/* Sleeping */
 
-	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	uint32_t evict_entries;		/* Total evict slots */
-	size_t   evict_allocated;	/* Bytes allocated */
-
 	/*
 	 * File sync can temporarily fail when a tree is active, that is, we may
 	 * not be able to immediately reconcile all of the file's pages.  If the
@@ -63,6 +60,10 @@ struct __wt_cache {
 	 * we need to handle.
 	 */
 	int pending_retry;		/* Eviction request needs completion */
+
+	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
+	size_t   evict_allocated;	/* Bytes allocated */
+	uint32_t evict_entries;		/* Total evict slots */
 
 	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
 					   slot available if session is NULL */

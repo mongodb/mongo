@@ -56,36 +56,34 @@ struct __wt_session_impl {
 	WT_MTX	 *mtx;			/* Blocking mutex */
 
 	const char *name;		/* Name */
+	WT_EVENT_HANDLER *event_handler;
 
 	WT_BTREE *btree;		/* Current file */
-	WT_CURSOR *cursor;		/* Current cursor */
+	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
-	WT_BUF	**scratch;		/* Temporary memory for any function */
-	u_int	 scratch_alloc;		/* Currently allocated */
+	WT_CURSOR *cursor;		/* Current cursor */
+	TAILQ_HEAD(__cursors, wt_cursor) cursors;
+
+	WT_BTREE *schematab;		/* Schema tables */
+	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	WT_BUF	logrec_buf;		/* Buffer for log records */
 	WT_BUF	logprint_buf;		/* Buffer for debug log records */
 
+	WT_BUF	**scratch;		/* Temporary memory for any function */
+	u_int	 scratch_alloc;		/* Currently allocated */
+
 					/* WT_SESSION_IMPL workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
-	int	  wq_ret;		/* Return value */
 	int     (*wq_func)(WT_SESSION_IMPL *);	/* Function */
 	void	 *wq_args;		/* Function argument */
 	int	  wq_sleeping;		/* Thread is blocked */
+	int	  wq_ret;		/* Return value */
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
 	WT_SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
-
-	WT_EVENT_HANDLER *event_handler;
-
-	TAILQ_HEAD(__cursors, wt_cursor) cursors;
-
-	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
-	WT_BTREE *schematab;		/* Schema tables */
-
-	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	uint32_t flags;
 };
@@ -109,16 +107,15 @@ struct __wt_connection_impl {
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 	TAILQ_HEAD(wt_btree_qh, __wt_btree) dbqh; /* Locked: database list */
-	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
-	u_int next_file_id;		/* Locked: file ID counter */
 
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh)
 	    dlhqh;			/* Locked: library list */
 
-	uint32_t volatile api_gen;	/* API generation number */
+	u_int dbqcnt;			/* Locked: database list count */
+	u_int next_file_id;		/* Locked: file ID counter */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
@@ -132,8 +129,10 @@ struct __wt_connection_impl {
 	 * threads are running.
 	 */
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
-	uint32_t	  session_cnt;		/* Session count */
 	void		 *session_array;	/* Session array */
+	uint32_t	  session_cnt;		/* Session count */
+
+	uint32_t volatile api_gen;	/* API generation number */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of

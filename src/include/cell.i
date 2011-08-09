@@ -89,19 +89,19 @@ struct __wt_cell {
  *	Unpacked cell.
  */
 struct __wt_cell_unpack {
+	WT_OFF	 off;			/* WT_OFF structure */
+
+	uint64_t rle;			/* RLE count */
+
+	const void *data;		/* Data */
+	uint32_t size;			/* Data size */
+
+	uint32_t len;			/* Cell + data total length */
+
 	uint8_t  raw;			/* Raw cell type (include "shorts") */
 	uint8_t  type;			/* Cell type */
 	uint8_t  prefix;		/* Cell prefix */
 	uint8_t	 ovfl;			/* Cell is an overflow */
-
-	uint64_t rle;			/* RLE count */
-
-	WT_OFF	 off;			/* WT_OFF structure */
-
-	const void *data;		/* Data */
-	uint32_t    size;		/* Data size */
-
-	uint32_t    len;		/* Cell + data total length */
 };
 
 /*

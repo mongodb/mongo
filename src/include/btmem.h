@@ -19,6 +19,50 @@ struct __wt_page {
 	WT_PAGE	*parent;		/* Page's parent */
 	WT_REF	*parent_ref;		/* Page's parent reference */
 
+	/* But the entries are wildly different, based on the page type. */
+	union {
+		/* Row-store internal page. */
+		struct {
+			WT_ROW_REF *t;		/* Subtrees */
+		} row_int;
+
+		/* Row-store leaf page. */
+		struct {
+			WT_ROW	   *d;		/* K/V object pairs */
+			WT_INSERT_HEAD **ins;	/* Inserts */
+			WT_UPDATE **upd;	/* Updates */
+		} row_leaf;
+
+		/* Column-store internal page. */
+		struct {
+			uint64_t    recno;	/* Starting recno */
+			WT_COL_REF *t;		/* Subtrees */
+			uint32_t    ext_entries;/* Extension entries */
+		} col_int;
+
+		/* Column-store leaf page. */
+		struct {
+			uint64_t    recno;	/* Starting recno */
+			uint8_t	   *bitf;	/* COL_FIX bits */
+			WT_COL	   *d;		/* COL_VAR objects */
+			WT_INSERT_HEAD **ins;	/* Inserts (RLE) */
+			WT_COL_RLE *repeats;	/* RLE array for lookups */
+			uint32_t    nrepeats;	/* Number of repeats. */
+		} col_leaf;
+
+		/* Bulk-loaded linked list. */
+		struct {
+			uint64_t   recno;	/* Starting recno */
+			WT_INSERT *ins;		/* Bulk-loaded K/V pairs */
+			WT_UPDATE *upd;		/* Bulk-loaded V items */
+			uint8_t	  *bitf;	/* Bulk-loaded bit fields */
+
+		} bulk;
+	} u;
+
+	/* Page's on-disk representation: NULL for pages created in memory. */
+	WT_PAGE_DISK *dsk;
+
 	/*
 	 * The read generation is incremented each time the page is searched,
 	 * and acts as an LRU value for each page in the tree; it is read by
@@ -74,50 +118,6 @@ struct __wt_page {
 } while (0)
 #define	WT_PAGE_IS_MODIFIED(p)	(F_ISSET(p, WT_PAGE_MODIFIED))
 	uint32_t write_gen;
-
-	/* But the entries are wildly different, based on the page type. */
-	union {
-		/* Row-store internal page. */
-		struct {
-			WT_ROW_REF *t;		/* Subtrees */
-		} row_int;
-
-		/* Row-store leaf page. */
-		struct {
-			WT_ROW	   *d;		/* K/V object pairs */
-			WT_INSERT_HEAD **ins;	/* Inserts */
-			WT_UPDATE **upd;	/* Updates */
-		} row_leaf;
-
-		/* Column-store internal page. */
-		struct {
-			uint64_t    recno;	/* Starting recno */
-			uint32_t    ext_entries;/* Extension entries */
-			WT_COL_REF *t;		/* Subtrees */
-		} col_int;
-
-		/* Column-store leaf page. */
-		struct {
-			uint64_t    recno;	/* Starting recno */
-			uint8_t	   *bitf;	/* COL_FIX bits */
-			WT_COL	   *d;		/* COL_VAR objects */
-			WT_COL_RLE *repeats;	/* RLE array for lookups */
-			uint32_t    nrepeats;	/* Number of repeats. */
-			WT_INSERT_HEAD **ins;	/* Inserts (RLE) */
-		} col_leaf;
-
-		/* Bulk-loaded linked list. */
-		struct {
-			uint64_t   recno;	/* Starting recno */
-			WT_INSERT *ins;		/* Bulk-loaded K/V pairs */
-			WT_UPDATE *upd;		/* Bulk-loaded V items */
-			uint8_t	  *bitf;	/* Bulk-loaded bit fields */
-
-		} bulk;
-	} u;
-
-	/* Page's on-disk representation: NULL for pages created in memory. */
-	WT_PAGE_DISK *dsk;
 
 	/*
 	 * In-memory pages optionally reference a number of entries, originally

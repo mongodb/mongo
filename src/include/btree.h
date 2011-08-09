@@ -89,8 +89,6 @@ struct __wt_btree {
 	WT_FH	*fh;			/* Backing file handle */
 	uint64_t lsn;			/* LSN file/offset pair */
 
-	uint8_t bitcnt;			/* Fixed-length field size in bits */
-
 	const char *key_format;		/* Key format */
 	const char *value_format;	/* Value format */
 
@@ -99,12 +97,12 @@ struct __wt_btree {
 
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
-	int btree_compare_int;		/* Integer keys */
+	uint8_t bitcnt;			/* Fixed-length field size in bits */
 					/* Comparison function */
 	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	uint32_t key_gap;		/* Btree instantiated key gap */
 	WT_BUF   key_srch;		/* Search key buffer */
+	uint32_t key_gap;		/* Btree instantiated key gap */
 
 	uint64_t freelist_bytes;	/* Free-list byte count */
 	uint32_t freelist_entries;	/* Free-list entry count */

@@ -20,15 +20,15 @@ typedef struct {
 } WT_PACK;
 
 typedef struct {
-	char type;
-	int8_t havesize;
-	uint32_t size;
 	union {
 		int64_t i;
 		uint64_t u;
 		const char *s;
 		WT_ITEM item;
 	} u;
+	uint32_t size;
+	int8_t havesize;
+	char type;
 } WT_PACK_VALUE;
 
 static inline int
