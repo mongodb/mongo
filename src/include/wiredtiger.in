@@ -992,7 +992,7 @@ struct wt_connection {
  * name of the default entry function \c wiredtiger_init. The value must be a
  * list of strings.,}
  * @config{hazard_max, number of simultaneous hazard references per session
- * handle. The value must be an integer greater than or equal to 15.,\c 15}
+ * handle. The value must be an integer greater than or equal to 15.,\c 30}
  * @config{logging, enable logging. The value must be a boolean flag.,\c false}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary

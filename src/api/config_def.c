@@ -264,7 +264,7 @@ __wt_confchk_table_meta =
 const char *
 __wt_confdfl_wiredtiger_open =
     "cache_size=20MB,create=false,error_prefix=,exclusive=false,extensions=,"
-    "hazard_max=15,logging=false,multiprocess=false,session_max=50,verbose=";
+    "hazard_max=30,logging=false,multiprocess=false,session_max=50,verbose=";
 
 const char *
 __wt_confchk_wiredtiger_open =
