@@ -31,7 +31,7 @@ __wt_disk_read(
 		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
 
 	WT_BSTAT_INCR(session, page_read);
-	WT_CSTAT_INCR(session, cache_page_read);
+	WT_CSTAT_INCR(session, block_read);
 
 	WT_VERBOSE(session, READ,
 	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
@@ -81,7 +81,7 @@ __wt_disk_write(
 	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);
-	WT_CSTAT_INCR(session, cache_page_write);
+	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE(session, WRITE,
 	    "write addr/size %" PRIu32 "/%" PRIu32 ": %s",

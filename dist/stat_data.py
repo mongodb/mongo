@@ -18,15 +18,14 @@ class Stat:
 # CONNECTION statistics
 ##########################################
 conn_stats = [
+	Stat('block_read', 'blocks read from a file'),
+	Stat('block_write', 'blocks written to a file'),
 	Stat('cache_bytes_inuse', 'cache: bytes currently held in the cache', 'perm'),
 	Stat('cache_bytes_max', 'cache: maximum bytes configured', 'perm'),
 	Stat('cache_evict_hazard', 'cache: pages selected for eviction not evicted because of a hazard reference'),
 	Stat('cache_evict_modified', 'cache: modified pages selected for eviction'),
 	Stat('cache_evict_slow', 'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_evict_unmodified', 'cache: unmodified pages selected for eviction'),
-	Stat('cache_overflow_read', 'cache: overflow pages read from the file'),
-	Stat('cache_page_read', 'cache: pages read from a file'),
-	Stat('cache_page_write', 'cache: pages written to a file'),
 	Stat('cache_pages_inuse', 'cache: pages currently held in the cache', 'perm'),
 	Stat('file_open', 'files currently open'),
 	Stat('memalloc', 'total memory allocations'),

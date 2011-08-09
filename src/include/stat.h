@@ -96,15 +96,14 @@ struct __wt_btree_stats {
  * Statistics entries for CONNECTION handle.
  */
 struct __wt_conn_stats {
+	WT_STATS block_read;
+	WT_STATS block_write;
 	WT_STATS cache_bytes_inuse;
 	WT_STATS cache_evict_slow;
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_evict_modified;
-	WT_STATS cache_overflow_read;
 	WT_STATS cache_pages_inuse;
-	WT_STATS cache_page_read;
 	WT_STATS cache_evict_hazard;
-	WT_STATS cache_page_write;
 	WT_STATS cache_evict_unmodified;
 	WT_STATS file_open;
 	WT_STATS mtx_lock;

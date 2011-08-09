@@ -150,6 +150,10 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
+	stats->block_read.name = "block_read";
+	stats->block_read.desc = "blocks read from a file";
+	stats->block_write.name = "block_write";
+	stats->block_write.desc = "blocks written to a file";
 	stats->cache_bytes_inuse.name = "cache_bytes_inuse";
 	stats->cache_bytes_inuse.desc =
 	    "cache: bytes currently held in the cache";
@@ -167,13 +171,6 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 	stats->cache_evict_unmodified.name = "cache_evict_unmodified";
 	stats->cache_evict_unmodified.desc =
 	    "cache: unmodified pages selected for eviction";
-	stats->cache_overflow_read.name = "cache_overflow_read";
-	stats->cache_overflow_read.desc =
-	    "cache: overflow pages read from the file";
-	stats->cache_page_read.name = "cache_page_read";
-	stats->cache_page_read.desc = "cache: pages read from a file";
-	stats->cache_page_write.name = "cache_page_write";
-	stats->cache_page_write.desc = "cache: pages written to a file";
 	stats->cache_pages_inuse.name = "cache_pages_inuse";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
@@ -204,13 +201,12 @@ __wt_stat_clear_conn_stats(WT_STATS *stats_arg)
 	WT_CONN_STATS *stats;
 
 	stats = (WT_CONN_STATS *)stats_arg;
+	stats->block_read.v = 0;
+	stats->block_write.v = 0;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;
-	stats->cache_overflow_read.v = 0;
-	stats->cache_page_read.v = 0;
-	stats->cache_page_write.v = 0;
 	stats->file_open.v = 0;
 	stats->memalloc.v = 0;
 	stats->memfree.v = 0;
