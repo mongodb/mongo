@@ -12,21 +12,13 @@
  * tree walk in __wt_tree_walk(), and a non-recursive, depth-first tree walk
  * in __wt_walk_{begin,end,next}().
  *
- * The simple recursive walk is sufficient in most cases -- a hazard reference
+ * The simple recursive walk is sufficient in most cases: a hazard reference
  * is obtained on each page in turn, a worker function is called on the page,
  * then the hazard reference is released.
  *
- * The complicated tree walk routine was added because the cache eviction code
- * needs:
- *    + to walk the tree a few pages at a time, that is, periodically wake,
- *	visit some pages, then go back to sleep, which requires enough state
- *	to restart the traversal at any point,
- *    + to walk files not associated with the current session's WT_BTREE handle,
- *    + and finally, it doesn't require a hazard reference.
- *
- * My guess is we'll generalize a more complicated walk at some point, which
- * means some or all of those behaviors will become configurable, and that's
- * why the code lives here instead of in the eviction code.
+ * The complicated tree walk routine was added to support intermittent walks
+ * of the tree (for example, a cursor walk, or the eviction thread, both of
+ * which require enough state to suspend then restart the traversal).
  */
 
 /*
