@@ -172,7 +172,7 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
  */
 int
 __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
 	size_t len, space;

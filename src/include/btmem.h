@@ -368,7 +368,7 @@ struct __wt_col_rle {
 	uint64_t recno;			/* Record number of first repeat. */
 	uint64_t rle;			/* Repeat count. */
 	uint32_t indx;			/* Slot of entry in col_leaf.d */
-};
+} WT_GCC_ATTRIBUTE((packed));
 
 /*
  * WT_COL_PTR --

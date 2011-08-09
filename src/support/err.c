@@ -58,7 +58,7 @@ __wt_errv(WT_SESSION_IMPL *session, int error,
  */
 void
 __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
 
@@ -73,7 +73,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
  */
 void
 __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	va_list ap;
 
@@ -110,7 +110,7 @@ __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
  */
 void
 __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	va_list ap;
 
@@ -127,7 +127,7 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 int
 __wt_failure(WT_SESSION_IMPL *session,
     int error, const char *file_name, int line_number, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 5, 6)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 5, 6)))
 {
 	va_list ap;
 

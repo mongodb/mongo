@@ -8,12 +8,6 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 cat <<EOF
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
-#ifdef __GNUC__
-#define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)
-#else
-#define	WT_GCC_ATTRIBUTE(x)
-#endif
-
 EOF
 
 for i in `sed -e '/^[a-z]/! d' filelist`; do
@@ -37,18 +31,10 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e 's/\* /\*/g' \
 	    -e 's/  */ /g' \
 	    -e 's/^/extern /' \
+	    -e 's/WT_GCC_FUNC_/WT_GCC_/' \
 	    -e 's/$/;/p' \
 	    < ../$i
-done
-
-cat <<EOF
-
-#ifdef __GNUC__
-#undef	WT_GCC_ATTRIBUTE
-#define	WT_GCC_ATTRIBUTE(x)
-#endif
-EOF
-) | awk '{
+done) | awk '{
 
 	if (length() > 80)
 		gsub(", ", ",\n    ");

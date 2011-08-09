@@ -217,21 +217,13 @@ struct __wt_off {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OFF_SIZE	8
-/*
- *
- * Compilers pad the WT_OFF_RECORD structure because of the 64-bit record count
- * field.  This is an on-disk structure, which means we require a fixed size,
- * so we declare it as two 32-bit fields and cast it.  We haven't yet found a
- * compiler that aligns the 32-bit fields such that a cast won't work; if we
- * find one, we'll have to go to bit masks, or to copying bytes to/from a local
- * variable.
- */
+
 struct __wt_off_record {
 	uint32_t addr;			/* Subtree root page address */
 	uint32_t size;			/* Subtree root page length */
 
-#define	WT_RECNO(offp)		(*(uint64_t *)(&(offp)->__record_chunk[0]))
-	uint32_t __record_chunk[2];	/* Subtree record count */
+#define	WT_RECNO(offp)		((offp)->recno)
+	uint64_t recno;
 };
 /*
  * WT_OFF_RECORD_SIZE is the expected structure size -- we verify the build to

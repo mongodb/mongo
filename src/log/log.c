@@ -78,7 +78,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 int
 __wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	va_list ap;
 	int ret;

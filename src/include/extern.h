@@ -1,11 +1,5 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
-#ifdef __GNUC__
-#define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)
-#else
-#define	WT_GCC_ATTRIBUTE(x)
-#endif
-
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
@@ -342,7 +336,7 @@ extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     va_list ap);
 extern int __wt_log_printf(WT_SESSION_IMPL *session,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
@@ -508,18 +502,18 @@ extern void __wt_errv(WT_SESSION_IMPL *session,
 extern void __wt_err(WT_SESSION_IMPL *session,
     int error,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     3,
     4)));
 extern void __wt_errx(WT_SESSION_IMPL *session,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
 extern void __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
 extern void __wt_msg(WT_SESSION_IMPL *session,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
 extern int __wt_failure(WT_SESSION_IMPL *session,
@@ -527,7 +521,7 @@ extern int __wt_failure(WT_SESSION_IMPL *session,
     const char *file_name,
     int line_number,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     5,
     6)));
 extern int __wt_file_format(WT_SESSION_IMPL *session);
@@ -582,7 +576,7 @@ extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
 extern int __wt_buf_sprintf(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
     3,
     4)));
 extern int __wt_scr_alloc(WT_SESSION_IMPL *session,
@@ -614,8 +608,3 @@ extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session,
     WT_CONN_STATS **statsp);
 extern void __wt_stat_clear_conn_stats(WT_STATS *stats_arg);
-
-#ifdef __GNUC__
-#undef	WT_GCC_ATTRIBUTE
-#define	WT_GCC_ATTRIBUTE(x)
-#endif

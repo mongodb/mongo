@@ -41,7 +41,8 @@ static int  __debug_page_work(WT_DBG *, WT_PAGE *, uint32_t);
 static void __debug_ref(WT_DBG *, WT_REF *);
 static void __debug_row_insert(WT_DBG *, WT_INSERT_HEAD *);
 static void __debug_update(WT_DBG *, WT_UPDATE *, int);
-static void __dmsg(WT_DBG *, const char *, ...);
+static void __dmsg(WT_DBG *, const char *, ...)
+	WT_GCC_ATTRIBUTE((format (printf, 2, 3)));
 static void __dmsg_wrapup(WT_DBG *);
 
 /*
@@ -111,7 +112,6 @@ __dmsg_wrapup(WT_DBG *ds)
  */
 static void
 __dmsg(WT_DBG *ds, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;
 	WT_BUF *msg;
