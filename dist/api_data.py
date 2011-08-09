@@ -275,7 +275,7 @@ methods = {
 		type='list'),
 	Config('error_prefix', '', r'''
 		Prefix string for error messages'''),
-	Config('hazard_max', '15', r'''
+	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
 		min='15'),
 	Config('logging', 'false', r'''
