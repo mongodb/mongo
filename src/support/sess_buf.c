@@ -33,9 +33,8 @@ __wt_sb_alloc(
 	 * this buffer needs to align its allocations as well.
 	 *
 	 * The first thing in each chunk of memory is a WT_SESSION_BUFFER
-	 * structure (which we check is a multiple of 4B during
-	 * initialization); then one or more WT_UPDATE structure plus value
-	 * chunk pairs.
+	 * structure (check to be a multiple of 4B during initialization);
+	 * then one or more WT_UPDATE structure plus value chunk pairs.
 	 *
 	 * Figure out how much space we need: this code limits the maximum size
 	 * of a data item stored in the file.  In summary, for a big item we
@@ -60,8 +59,8 @@ __wt_sb_alloc(
 	/*
 	 * We start by allocating 4KB for the thread, then every time we have
 	 * to re-allocate the buffer, we double the allocation size, up to a
-	 * total of 256KB, that way any thread that is doing a lot of updates
-	 * doesn't re-allocate new chunks of memory so often.
+	 * total of 8MB, so any thread doing a lot of updates won't re-allocate
+	 * new chunks of memory that often.
 	 */
 	if (session->update_alloc_size == 0)
 		session->update_alloc_size = 4 * 1024;
