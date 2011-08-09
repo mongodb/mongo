@@ -147,7 +147,7 @@ namespace mongo {
             }
 
             bool okForSecondaryQueries() const {
-                return ok && ( ismaster || ( secondary && ! hidden ) );
+                return ok && secondary && ! hidden;
             }
 
             HostAndPort addr;

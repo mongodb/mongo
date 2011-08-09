@@ -249,25 +249,31 @@ namespace mongo {
     HostAndPort ReplicaSetMonitor::getSlave() {
 
         LOG(2) << "selecting new slave from replica set " << getServerAddress() << endl;
-
-        scoped_lock lk( _lock );
-
-        unsigned i = 0;
-        for ( ; i<_nodes.size(); i++ ) {
-            _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-            if ( _nextSlave == _master ){
-                LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is the current master" << endl;
-                continue;
+        
+        const int MAX = 3;
+        for ( int xxx=0; xxx<MAX; xxx++ ) {
+            {
+                scoped_lock lk( _lock );
+                
+                unsigned i = 0;
+                for ( ; i<_nodes.size(); i++ ) {
+                    _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+                    if ( _nextSlave == _master ){
+                        LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is the current master" << endl;
+                        continue;
+                    }
+                    if ( _nodes[ _nextSlave ].okForSecondaryQueries() || ( _nodes[ _nextSlave ].ok && ( xxx + 1 ) >= MAX ) )
+                        return _nodes[ _nextSlave ].addr;
+                    
+                    LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is not ok to use" << endl;
+                }
+                
+                LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ].addr << endl;
             }
-            if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
-                return _nodes[ _nextSlave ].addr;
-
-            LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is not ok to use" << endl;
+            check(false);
         }
-
-        LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ].addr << endl;
-
-        return _nodes[ 0 ].addr;
+        
+        return _nodes[0].addr;
     }
 
     /**
@@ -384,6 +390,7 @@ namespace mongo {
         }
         catch ( std::exception& e ) {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception " << c->toString() << ' ' << e.what() << endl;
+            _nodes[nodesOffset].ok = false;
         }
 
         if ( changed && _hook )
