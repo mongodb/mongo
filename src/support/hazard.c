@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_DIAGNOSTIC
+static void __hazard_dump(WT_SESSION_IMPL *);
+#endif
+
 /*
  * __wt_hazard_set --
  *	Set a hazard reference.
@@ -80,8 +84,12 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 	}
 
 	__wt_errx(session,
-	    "There are no more hazard reference slots in the session");
-	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
+	    "there are no more hazard reference slots in the session");
+
+#ifdef HAVE_DIAGNOSTIC
+	__hazard_dump(session);
+#endif
+
 	return (0);
 }
 
@@ -145,24 +153,49 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 	 * cache eviction thread immediate access to any page our reference
 	 * blocks.
 	 */
+#ifdef HAVE_DIAGNOSTIC
+	__hazard_dump(session);
+#endif
+
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-#ifdef HAVE_DIAGNOSTIC
-			WT_FAILURE(session,
-			    "hazard reference lost: (%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
-#else
-			WT_FAILURE(session,
-			    "hazard reference lost: (%p)",
-			    hp->page);
-#endif
 			hp->page = NULL;
 			WT_MEMORY_FLUSH;
+
+			__wt_errx(session,
+			    "unexpected hazard reference at session.close");
 		}
 }
 
 #ifdef HAVE_DIAGNOSTIC
+/*
+ * __hazard_dump --
+ *	Display the list of hazard references.
+ */
+static void
+__hazard_dump(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_HAZARD *hp;
+	int fail;
+
+	conn = S2C(session);
+
+	fail = 0;
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size; ++hp)
+		if (hp->page != NULL) {
+			__wt_errx(session,
+			    "hazard reference: (%p: %s, line %d)",
+			    hp->page, hp->file, hp->line);
+			fail = 1;
+		}
+
+	if (fail)
+		WT_FAILURE(session, "unexpected hazard reference");
+}
+
 /*
  * __wt_hazard_validate --
  *	Confirm that a page isn't on the hazard list.
