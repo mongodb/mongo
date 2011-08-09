@@ -135,6 +135,7 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     uint32_t size);
 extern int __wt_block_read(WT_SESSION_IMPL *session);
 extern int __wt_block_write(WT_SESSION_IMPL *session);
+extern void __wt_block_stat(WT_SESSION_IMPL *session);
 extern void __wt_block_dump(WT_SESSION_IMPL *session);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);

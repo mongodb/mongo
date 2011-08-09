@@ -25,7 +25,6 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 
 	WT_BSTAT_SET(session, file_allocsize, btree->allocsize);
 	WT_BSTAT_SET(session, file_fixed_len, btree->bitcnt);
-	WT_BSTAT_SET(session, file_freelist_entries, btree->freelist_entries);
 	WT_BSTAT_SET(session, file_intlmax, btree->intlmax);
 	WT_BSTAT_SET(session, file_intlmin, btree->intlmin);
 	WT_BSTAT_SET(session, file_leafmax, btree->leafmax);

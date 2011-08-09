@@ -66,6 +66,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 		 */
 		fe->addr += size / btree->allocsize;
 		fe->size -= size;
+		btree->freelist_bytes -= size;
 		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 		new = fe;
@@ -165,6 +166,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 
 	WT_BSTAT_INCR(session, free);
 	++btree->freelist_entries;
+	btree->freelist_bytes += size;
 
 	/* Allocate memory for the new entry. */
 	WT_RET(__wt_calloc_def(session, 1, &new));
@@ -481,6 +483,21 @@ __block_discard(WT_SESSION_IMPL *session)
 		--btree->freelist_entries;
 		__wt_free(session, fe);
 	}
+}
+
+/*
+ * __wt_block_stat --
+ *	Free-list statistics.
+ */
+void
+__wt_block_stat(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_BSTAT_SET(session, file_freelist_bytes, btree->freelist_bytes);
+	WT_BSTAT_SET(session, file_freelist_entries, btree->freelist_entries);
 }
 
 #ifdef HAVE_VERBOSE

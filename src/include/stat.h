@@ -70,6 +70,7 @@ struct __wt_btree_stats {
 	WT_STATS file_intlmin;
 	WT_STATS file_leafmin;
 	WT_STATS file_minor;
+	WT_STATS file_freelist_bytes;
 	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;

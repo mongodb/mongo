@@ -92,7 +92,9 @@ struct __wt_btree {
 	uint32_t key_gap;		/* Btree instantiated key gap */
 	WT_BUF   key_srch;		/* Search key buffer */
 
+	uint64_t freelist_bytes;	/* Free-list byte count */
 	uint32_t freelist_entries;	/* Free-list entry count */
+
 					/* Free-list queues */
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
