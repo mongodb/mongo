@@ -149,6 +149,8 @@ breakpoint
 bsearch
 bt
 btcur
+btdsk
+btmem
 btree
 buf
 builtin

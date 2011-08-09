@@ -147,6 +147,8 @@ struct __wt_walk_entry;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "btdsk.h"
+#include "btmem.h"
 #include "btree.h"
 #include "cache.h"
 #include "config.h"
