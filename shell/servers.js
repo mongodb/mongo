@@ -1340,15 +1340,17 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
     var tests = 0
     assert.soon( function() {
         var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
-        if( tests % 10 == 0 ) printjson( rsClientHosts )
-        tests++
+        if( tests++ % 10 == 0 ) 
+            printjson( rsClientHosts )
         
         for ( rsName in rsClientHosts ){
             if( rs && rs != rsName ) continue
             for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
                 var clientHost = rsClientHosts[rsName].hosts[ i ];
-                if( clientHost.addr != host ) continue
-                if( clientHost.ok == hostOk ) return true
+                if( clientHost.addr != host ) 
+                    continue;
+                if( clientHost.ok == hostOk ) 
+                    return true;
             }
         }
         return false;
