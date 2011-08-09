@@ -23,6 +23,8 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
+	__wt_block_stat(session);
+
 	WT_BSTAT_SET(session, file_allocsize, btree->allocsize);
 	WT_BSTAT_SET(session, file_fixed_len, btree->bitcnt);
 	WT_BSTAT_SET(session, file_intlmax, btree->intlmax);
