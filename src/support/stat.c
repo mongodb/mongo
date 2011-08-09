@@ -29,6 +29,8 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_freelist_entries.name = "file_freelist_entries";
 	stats->file_freelist_entries.desc =
 	    "number of entries in the freelist";
+	stats->file_inserts.name = "file_inserts";
+	stats->file_inserts.desc = "inserts";
 	stats->file_intlmax.name = "file_intlmax";
 	stats->file_intlmax.desc = "maximum internal page size";
 	stats->file_intlmin.name = "file_intlmin";
@@ -51,12 +53,18 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_minor.desc = "minor version number";
 	stats->file_overflow.name = "file_overflow";
 	stats->file_overflow.desc = "overflow pages";
+	stats->file_reads.name = "file_reads";
+	stats->file_reads.desc = "reads";
+	stats->file_removes.name = "file_removes";
+	stats->file_removes.desc = "removes";
 	stats->file_row_internal.name = "file_row_internal";
 	stats->file_row_internal.desc = "row-store internal pages";
 	stats->file_row_leaf.name = "file_row_leaf";
 	stats->file_row_leaf.desc = "row-store leaf pages";
 	stats->file_size.name = "file_size";
 	stats->file_size.desc = "file: size";
+	stats->file_updates.name = "file_updates";
+	stats->file_updates.desc = "updates";
 	stats->free.name = "free";
 	stats->free.desc = "file: block frees";
 	stats->items_inserted.name = "items_inserted";
@@ -103,6 +111,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_fixed_len.v = 0;
 	stats->file_freelist_bytes.v = 0;
 	stats->file_freelist_entries.v = 0;
+	stats->file_inserts.v = 0;
 	stats->file_intlmax.v = 0;
 	stats->file_intlmin.v = 0;
 	stats->file_item_col_deleted.v = 0;
@@ -114,9 +123,12 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_major.v = 0;
 	stats->file_minor.v = 0;
 	stats->file_overflow.v = 0;
+	stats->file_reads.v = 0;
+	stats->file_removes.v = 0;
 	stats->file_row_internal.v = 0;
 	stats->file_row_leaf.v = 0;
 	stats->file_size.v = 0;
+	stats->file_updates.v = 0;
 	stats->free.v = 0;
 	stats->items_inserted.v = 0;
 	stats->overflow_read.v = 0;

@@ -274,6 +274,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
+	WT_BSTAT_INCR(session, file_reads);
+
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));
 
@@ -326,7 +328,13 @@ err:	if (ret == 0)
 int
 __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 {
-	WT_UNUSED(cbt);
+	WT_SESSION_IMPL *session;
+	WT_CURSOR *cursor;
+
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_BSTAT_INCR(session, file_reads);
 
 	return (ENOTSUP);
 }
@@ -346,6 +354,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_BSTAT_INCR(session, file_reads);
 
 	*exact = 0;
 	switch (btree->type) {
@@ -393,6 +403,8 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
+	WT_BSTAT_INCR(session, file_inserts);
+
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		if (cursor->value.size != 1) {
@@ -435,6 +447,8 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_BSTAT_INCR(session, file_updates);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -479,6 +493,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_BSTAT_INCR(session, file_removes);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:

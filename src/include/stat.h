@@ -63,6 +63,7 @@ struct __wt_btree_stats {
 	WT_STATS page_write;
 	WT_STATS file_size;
 	WT_STATS file_fixed_len;
+	WT_STATS file_inserts;
 	WT_STATS file_magic;
 	WT_STATS file_major;
 	WT_STATS file_intlmax;
@@ -74,6 +75,7 @@ struct __wt_btree_stats {
 	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
+	WT_STATS file_reads;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
@@ -81,10 +83,12 @@ struct __wt_btree_stats {
 	WT_STATS rec_ovfl_value;
 	WT_STATS rec_page_delete;
 	WT_STATS rec_hazard;
+	WT_STATS file_removes;
 	WT_STATS file_row_internal;
 	WT_STATS file_row_leaf;
 	WT_STATS file_item_total_key;
 	WT_STATS file_item_total_value;
+	WT_STATS file_updates;
 	WT_STATS __end;
 };
 
