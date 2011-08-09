@@ -37,7 +37,7 @@ rst.stop( rst.getMaster(), undefined, true )
 printjson( rst.status() )
 
 // Wait for the mongos to recognize the slave
-ReplSetTest.awaitRSClientHosts( conn, sec, true )
+ReplSetTest.awaitRSClientHosts( conn, sec, { ok : true, secondary : true } )
 
 // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when
 // master is down

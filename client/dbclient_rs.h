@@ -150,6 +150,18 @@ namespace mongo {
                 return ok && secondary && ! hidden;
             }
 
+            BSONObj toBSON() const {
+                return BSON( "addr" << addr.toString() <<
+                             "isMaster" << ismaster <<
+                             "secondary" << secondary <<
+                             "hidden" << hidden <<
+                             "ok" << ok );
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
             HostAndPort addr;
             shared_ptr<DBClientConnection> conn;
 

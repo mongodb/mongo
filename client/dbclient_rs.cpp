@@ -249,9 +249,13 @@ namespace mongo {
     HostAndPort ReplicaSetMonitor::getSlave() {
 
         LOG(2) << "selecting new slave from replica set " << getServerAddress() << endl;
-        
+
+        // Logic is to retry three times for any secondary node, if we can't find any secondary, we'll take
+        // any "ok" node
+        // TODO: Could this query hidden nodes?
         const int MAX = 3;
         for ( int xxx=0; xxx<MAX; xxx++ ) {
+
             {
                 scoped_lock lk( _lock );
                 
@@ -259,20 +263,22 @@ namespace mongo {
                 for ( ; i<_nodes.size(); i++ ) {
                     _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
                     if ( _nextSlave == _master ){
-                        LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is the current master" << endl;
+                        LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is the current master" << endl;
                         continue;
                     }
                     if ( _nodes[ _nextSlave ].okForSecondaryQueries() || ( _nodes[ _nextSlave ].ok && ( xxx + 1 ) >= MAX ) )
                         return _nodes[ _nextSlave ].addr;
                     
-                    LOG(2) << "not selecting " << _nodes[_nextSlave].addr << " as it is not ok to use" << endl;
+                    LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is not ok to use" << endl;
                 }
                 
-                LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ].addr << endl;
             }
+
             check(false);
         }
         
+        LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ] << endl;
+
         return _nodes[0].addr;
     }
 
@@ -367,7 +373,7 @@ namespace mongo {
                 _nodes[nodesOffset].hidden = o["hidden"].trueValue();
                 _nodes[nodesOffset].secondary = o["secondary"].trueValue();
                 _nodes[nodesOffset].ismaster = o["ismaster"].trueValue();
-                
+
                 _nodes[nodesOffset].lastIsMaster = o.copy();
             }
 

@@ -1331,11 +1331,11 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
         return
     }
     
-    if( hostOk == undefined ) hostOk = true
+    if( hostOk == undefined ) hostOk = { ok : true }
     if( host.host ) host = host.host
     if( rs && rs.getMaster ) rs = rs.name
     
-    print( "Awaiting " + host + " to be " + ( hostOk ? "ok" : " not ok " ) + " for " + conn + " (rs: " + rs + ")" )
+    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" )
     
     var tests = 0
     assert.soon( function() {
@@ -1347,10 +1347,19 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
             if( rs && rs != rsName ) continue
             for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
                 var clientHost = rsClientHosts[rsName].hosts[ i ];
-                if( clientHost.addr != host ) 
-                    continue;
-                if( clientHost.ok == hostOk ) 
-                    return true;
+                if( clientHost.addr != host ) continue
+                
+                // Check that *all* host properties are set correctly
+                var propOk = true
+                for( var prop in hostOk ){
+                    if( clientHost[prop] != hostOk[prop] ){ 
+                        propOk = false
+                        break
+                    }
+                }
+                
+                if( propOk ) return true;
+
             }
         }
         return false;
