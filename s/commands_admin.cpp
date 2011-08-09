@@ -545,7 +545,7 @@ namespace mongo {
                     return false;
                 }
 
-                ChunkManagerPtr cm = config->getChunkManager( ns );
+                ChunkManagerPtr cm = config->getChunkManagerIfExists( ns );
                 if ( ! cm ) {
                     errmsg = "no chunk manager?";
                     return false;

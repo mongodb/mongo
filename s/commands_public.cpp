@@ -393,7 +393,6 @@ namespace mongo {
                     filter = cmdObj["query"].Obj();
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
-
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
                     ShardConnection conn( conf->getPrimary() , fullns );
 
@@ -413,7 +412,7 @@ namespace mongo {
                     }
 
                     // this collection got sharded
-                    ChunkManagerPtr cm = conf->getChunkManager( fullns , true );
+                    ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns , true );
                     if ( ! cm ) {
                         errmsg = "should be sharded now";
                         result.append( "root" , temp );
@@ -424,7 +423,7 @@ namespace mongo {
                 long long total = 0;
                 map<string,long long> shardCounts;
 
-                ChunkManagerPtr cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns );
                 while ( true ) {
                     if ( ! cm ) {
                         // probably unsharded now
@@ -442,7 +441,7 @@ namespace mongo {
                         if ( conn.setVersion() ) {
                             total = 0;
                             shardCounts.clear();
-                            cm = conf->getChunkManager( fullns );
+                            cm = conf->getChunkManagerIfExists( fullns );
                             conn.done();
                             hadToBreak = true;
                             break;
@@ -463,7 +462,7 @@ namespace mongo {
                             // my version is old
                             total = 0;
                             shardCounts.clear();
-                            cm = conf->getChunkManager( fullns , true );
+                            cm = conf->getChunkManagerIfExists( fullns , true );
                             hadToBreak = true;
                             break;
                         }

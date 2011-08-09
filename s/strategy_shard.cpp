@@ -233,7 +233,7 @@ namespace mongo {
                     LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
 
                     unsigned long long old = manager->getSequenceNumber();
-                    manager = conf->getChunkManager(ns);
+                    manager = conf->getChunkManagerIfExists(ns);
 
                     LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 

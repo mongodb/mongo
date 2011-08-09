@@ -96,7 +96,7 @@ namespace mongo {
         ChunkManagerPtr manager;
         const bool isSharded = conf->isSharded( ns );
         if ( isSharded ) {
-            manager = conf->getChunkManager( ns , authoritative );
+            manager = conf->getChunkManagerIfExists( ns , authoritative );
             // It's possible the chunk manager was reset since we checked whether sharded was true,
             // so must check this here.
             if( manager ) officialSequenceNumber = manager->getSequenceNumber();

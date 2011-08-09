@@ -185,6 +185,16 @@ namespace mongo {
         return true;
     }
 
+    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload ){
+        try{
+            return getChunkManager( ns, shouldReload );
+        }
+        catch( AssertionException& e ){
+            warning() << "chunk manager not found for " << ns << causedBy( e ) << endl;
+            return ChunkManagerPtr();
+        }
+    }
+
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
         BSONObj key;
         bool unique;
@@ -226,6 +236,7 @@ namespace mongo {
                 if ( v == oldVersion ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
+                    massert( 15882 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
                 }
             }
@@ -252,7 +263,7 @@ namespace mongo {
             ci.resetCM( temp.release() );
         }
         
-        assert( ci.getCM().get() );
+        massert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
         return ci.getCM();
     }
 

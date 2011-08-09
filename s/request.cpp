@@ -77,7 +77,9 @@ namespace mongo {
 
         if ( _config->isSharded( nsStr ) ) {
             _chunkManager = _config->getChunkManager( nsStr , reload );
-            uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
+            // TODO:  All of these uasserts are no longer necessary, getChunkManager() throws when
+            // not returning the right value.
+            uassert( 10193 ,  (string)"no shard info for: " + nsStr , _chunkManager );
         }
         else {
             _chunkManager.reset();
