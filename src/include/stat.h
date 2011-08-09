@@ -26,7 +26,7 @@ struct __wt_stats {
 	(stats)->fld.v += (value);					\
 } while (0)
 #define	WT_STAT_SET(stats, fld, value) do {				\
-	(stats)->fld.v = (value);					\
+	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
 #define	WT_BSTAT_INCR(session, fld)					\
