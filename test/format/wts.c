@@ -617,7 +617,18 @@ wts_read(uint64_t keyno)
 		return (1);
 	}
 
-	/* Check for not-found status. */
+	/*
+	 * Check for not-found status.
+	 *
+	 * In fixed length stores, zero values at the end of the key space
+	 * are treated as not found.  Treat this the same as a zero value
+	 * in the key space, to match BDB's behavior.
+	 */
+	if (g.c_file_type == FIX && ret == WT_NOTFOUND) {
+		bitfield = 0;
+		ret = 0;
+	}
+
 	NTF_CHK(wts_notfound_chk("wts_read", ret, notfound, keyno));
 
 	/* Compare the two. */

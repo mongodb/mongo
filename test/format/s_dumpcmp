@@ -27,6 +27,18 @@ if test $# -ne 0; then
 	exit 1
 fi
 
+# Strip trailing zeros from a dump to deal with differences in fixed-length
+# column store behavior between WT and BDB.
+strip_zeros() {
+	cat > __t
+
+	lines=`wc -l __t | sed 's/[^0-9]//g'`
+	while test `sed -n -e ${lines}p < __t` = '\00' ; do
+		lines=`expr $lines - 1`
+	done
+	sed -e `expr $lines + 1`,'$d' < __t
+}
+
 if test $dump_bdb -eq 1; then
 	if test $colflag -eq 0; then
 		$bdb/db_dump -p __bdb |
@@ -41,11 +53,17 @@ if test $dump_bdb -eq 1; then
 		    sed -n \
 			-e '$p' \
 			-e n \
-			-e p > __bdb_dump
+			-e p |
+		    strip_zeros > __bdb_dump
 	fi
 fi
 
-$wt/wt dump -p file:__wt > __wt_dump
+if test $colflag -eq 0; then
+	$wt/wt dump -p file:__wt > __wt_dump
+else
+	$wt/wt dump -p file:__wt | strip_zeros > __wt_dump
+fi
+
 cmp __wt_dump __bdb_dump > /dev/null
 
 exit $?
