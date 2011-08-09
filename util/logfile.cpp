@@ -170,7 +170,9 @@ namespace mongo {
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
+#ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+#endif
 
         const char *buf = (char *) b;
         assert(_fd);
