@@ -70,7 +70,7 @@ namespace mongo {
         _dropped = false;
     }
 
-    void DBConfig::CollectionInfocon::unshard() {
+    void DBConfig::CollectionInfo::unshard() {
         _cm.reset();
         _dropped = true;
         _dirty = true;
