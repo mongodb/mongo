@@ -70,7 +70,7 @@ namespace mongo {
         _dropped = false;
     }
 
-    void DBConfig::CollectionInfo::unshard() {
+    void DBConfig::CollectionInfocon::unshard() {
         _cm.reset();
         _dropped = true;
         _dirty = true;
@@ -236,7 +236,7 @@ namespace mongo {
                 if ( v == oldVersion ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
-                    massert( 15882 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
+                    massert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
                 }
             }

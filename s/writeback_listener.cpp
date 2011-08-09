@@ -217,7 +217,7 @@ namespace mongo {
                             if ( gle["code"].numberInt() == 9517 ) {
                                 log() << "writeback failed because of stale config, retrying attempts: " << attempts << endl;
                                 if( ! db->getChunkManagerIfExists( ns , true ) ){
-                                    uassert( 15881, str::stream() << "Could not reload chunk manager after " << attempts << " attempts.", attempts <= 4 );
+                                    uassert( 15884, str::stream() << "Could not reload chunk manager after " << attempts << " attempts.", attempts <= 4 );
                                     sleepsecs( attempts - 1 );
                                 }
                                 continue;
