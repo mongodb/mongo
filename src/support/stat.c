@@ -12,7 +12,7 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->alloc.name = "alloc";
 	stats->alloc.desc = "file: block allocations";
 	stats->extend.name = "extend";
-	stats->extend.desc = "file: block allocations require file extension";
+	stats->extend.desc = "file: block allocations required file extension";
 	stats->file_allocsize.name = "file_allocsize";
 	stats->file_allocsize.desc = "page size allocation unit";
 	stats->file_col_fix.name = "file_col_fix";
@@ -53,6 +53,8 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_row_internal.desc = "row-store internal pages";
 	stats->file_row_leaf.name = "file_row_leaf";
 	stats->file_row_leaf.desc = "row-store leaf pages";
+	stats->file_size.name = "file_size";
+	stats->file_size.desc = "file: size";
 	stats->free.name = "free";
 	stats->free.desc = "file: block frees";
 	stats->items_inserted.name = "items_inserted";
@@ -111,6 +113,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_overflow.v = 0;
 	stats->file_row_internal.v = 0;
 	stats->file_row_leaf.v = 0;
+	stats->file_size.v = 0;
 	stats->free.v = 0;
 	stats->items_inserted.v = 0;
 	stats->overflow_read.v = 0;

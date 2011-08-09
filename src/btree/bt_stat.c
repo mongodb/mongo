@@ -33,6 +33,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 	WT_BSTAT_SET(session, file_magic, WT_BTREE_MAGIC);
 	WT_BSTAT_SET(session, file_major, WT_BTREE_MAJOR_VERSION);
 	WT_BSTAT_SET(session, file_minor, WT_BTREE_MINOR_VERSION);
+	WT_BSTAT_SET(session, file_size, btree->fh->file_size);
 
 	WT_RET(__wt_tree_walk(session, NULL, __stat_page, NULL));
 

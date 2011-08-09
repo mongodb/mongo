@@ -61,6 +61,7 @@ struct __wt_btree_stats {
 	WT_STATS overflow_read;
 	WT_STATS page_read;
 	WT_STATS page_write;
+	WT_STATS file_size;
 	WT_STATS file_fixed_len;
 	WT_STATS file_magic;
 	WT_STATS file_major;

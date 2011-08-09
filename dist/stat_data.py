@@ -43,7 +43,7 @@ conn_stats = [
 ##########################################
 btree_stats = [
 	Stat('alloc', 'file: block allocations'),
-	Stat('extend', 'file: block allocations require file extension'),
+	Stat('extend', 'file: block allocations required file extension'),
 	Stat('file_allocsize', 'page size allocation unit'),
 	Stat('file_col_fix', 'column-store fixed-size leaf pages'),
 	Stat('file_col_internal', 'column-store internal pages'),
@@ -63,6 +63,7 @@ btree_stats = [
 	Stat('file_overflow', 'overflow pages'),
 	Stat('file_row_internal', 'row-store internal pages'),
 	Stat('file_row_leaf', 'row-store leaf pages'),
+	Stat('file_size', 'file: size'),
 	Stat('free', 'file: block frees'),
 	Stat('items_inserted', 'file: key/value pairs inserted'),
 	Stat('overflow_read', 'file: overflow pages read from the file'),
