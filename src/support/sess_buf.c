@@ -62,14 +62,36 @@ __wt_sb_alloc(
 	 * total of 8MB, so any thread doing a lot of updates won't re-allocate
 	 * new chunks of memory that often.
 	 */
-	if (session->update_alloc_size == 0)
-		session->update_alloc_size = 4 * 1024;
+	if (session->update_alloc_size == 0) {
+		/*
+		 * 2KB is correct, we're going to double it to 4KB when we
+		 * calculate a new allocation size.
+		 */
+		session->update_alloc_size = 2 * 1024;
+
+		/*
+		 * We don't want to never aggregate changes because records are
+		 * initially relatively large, compared to the allocation size,
+		 * that is, if the application is loading many 4KB records, we'd
+		 * like to handle that reasonably.  This code adjusts for that
+		 * case.
+		 *
+		 * If we get nothing but 256KB inserts, this code will allocate
+		 * each of them individually, without aggregation, never growing
+		 * the aggregation buffer size.  That doesn't seem all that bad,
+		 * aggregation isn't intended for lots of large records, rather
+		 * it's intended for lots of small records.
+		 */
+		if (align_size > session->update_alloc_size &&
+		    align_size < 128 * 1024)
+			session->update_alloc_size = 128 * 1024;
+	}
 
 	/*
 	 * Decide how much memory to allocate: if it's a one-off (that is, the
-	 * value is bigger than anything we'll aggregate into these buffers,
-	 * it's a one-off.  Otherwise, allocate the next power-of-two larger
-	 * than 4 times the requested size and at least the default buffer size.
+	 * value is bigger than anything we'll aggregate into these buffers),
+	 * allocate just enough memory.  Else, allocate the next power-of-two
+	 * larger, up to 8MB.
 	 */
 	if (align_size > session->update_alloc_size) {
 		alloc_size = WT_SIZEOF32(WT_SESSION_BUFFER) + align_size;
