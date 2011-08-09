@@ -105,15 +105,18 @@ main(int argc, char *argv[])
 
 			if (wts_ops())		/* Random operations */
 				goto err;
+
+						/* Statistics */
+			if (reps == 2 && wts_stats())
+				goto err;
+
+						/* Close the file */
 						/* Close, verify, re-open */
 			if (wts_teardown() ||
 			    wts_verify("ops") || wts_startup())
 				goto err;
 		}
 
-		if (wts_stats())		/* Statistics */
-			goto err;
-						/* Close the file */
 		track("shutting down BDB", 0ULL);
 		bdb_teardown();	
 
