@@ -57,6 +57,16 @@ struct __wt_walk {
 };
 
 /*
+ * WT_NAMED_COMPRESSOR --
+ *	A compressor list entry
+ */
+typedef struct __wt_named_compressor {
+	TAILQ_ENTRY(__wt_named_compressor) q;	/* Linked list of compressors */
+	const char *name;		/* Name of compressor */
+	WT_COMPRESSOR *compressor;	/* User supplied callbacks */
+} WT_NAMED_COMPRESSOR;
+
+/*
  * WT_BTREE --
  *	A btree handle.
  */
@@ -86,6 +96,8 @@ struct __wt_btree {
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
+
+	WT_COMPRESSOR *compressor;	/* Page compressor */
 
 	int btree_compare_int;		/* Integer keys */
 					/* Comparison function */

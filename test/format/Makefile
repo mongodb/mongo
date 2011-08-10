@@ -2,8 +2,9 @@ BDB=	db
 SRC=	../../src
 WT=	../../build_posix
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
+CPPFLAGS=
 
-CFLAGS=-g -Wall ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
+CFLAGS=-g -Wall ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include ${CPPFLAGS}
 
 HDRS=	config.h format.h
 SRCS=	bdb.c config.c t.c util.c wts.c

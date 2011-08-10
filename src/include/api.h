@@ -179,6 +179,9 @@ struct __wt_connection_impl {
 	WT_FH	   *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
+	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor)
+	    compqh;			/* Locked: compressor list */
+
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 

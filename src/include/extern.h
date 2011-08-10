@@ -226,10 +226,25 @@ extern int __wt_disk_read( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
     uint32_t size);
+extern int __wt_disk_decompress( WT_SESSION_IMPL *session,
+    WT_PAGE_DISK *comp_dsk,
+    WT_PAGE_DISK *mem_dsk);
+extern int __wt_disk_read_scr( WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    uint32_t addr,
+    uint32_t *psize);
+extern int __wt_disk_read_realloc( WT_SESSION_IMPL *session,
+    WT_PAGE_DISK **pdsk,
+    uint32_t addr,
+    uint32_t *psize);
 extern int __wt_disk_write( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
     uint32_t size);
+extern int __wt_disk_compress( WT_SESSION_IMPL *session,
+    WT_PAGE_DISK *mem_dsk,
+    WT_PAGE_DISK *comp_dsk,
+    uint32_t *psize);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session);

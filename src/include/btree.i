@@ -148,7 +148,7 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	 */
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
-	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size));
+	    p >= (void *)((uint8_t *)page->dsk + page->dsk->memsize));
 }
 
 /*

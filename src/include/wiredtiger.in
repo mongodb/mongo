@@ -544,6 +544,9 @@ struct wt_session {
 	 * The value must be an integer between 512B and 512MB.,\c 1MB}
 	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes.
 	 * The value must be an integer between 512B and 512MB.,\c 32KB}
+	 * @config{page_compressor, use indicated compressor for database pages.
+	 * Permitted values are empty (off) or \c "<name>".  See @ref compressor
+	 * for more details.. The value must be a string.,}
 	 * @config{prefix_compression, configure the Btree for prefix
 	 * compression\, storing keys as a count of bytes matching the previous
 	 * key plus a unique suffix. The value must be a boolean flag.,\c true}

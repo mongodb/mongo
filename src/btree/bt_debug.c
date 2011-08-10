@@ -183,7 +183,8 @@ __wt_debug_addr(
 	WT_RET(__debug_config(session, ds, ofile));
 
 	WT_RET(__wt_calloc_def(session, (size_t)size, &bp));
-	WT_ERR(__wt_disk_read(session, (WT_PAGE_DISK *)bp, addr, size));
+	WT_ERR(__wt_disk_read_realloc(session, (WT_PAGE_DISK **)&bp,
+		addr, &size));
 	ret = __wt_debug_disk(session, (WT_PAGE_DISK *)bp, NULL);
 err:	__wt_free(session, bp);
 

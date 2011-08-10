@@ -501,8 +501,8 @@ __verify_overflow(
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the page. */
+	WT_ERR(__wt_disk_read_scr(session, tmp, addr, &size));
 	dsk = tmp->mem;
-	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/*
 	 * Verify the disk image -- this function would normally be called
@@ -515,7 +515,8 @@ __verify_overflow(
 	    __wt_verify_dsk_chunk(session, dsk, addr, dsk->u.datalen, size, 0));
 
 	/* Add the fragments. */
-	WT_ERR(__verify_addfrag(session, addr, size, vs));
+	WT_ERR(__verify_addfrag(session, addr,
+		WT_ALIGN(dsk->size, session->btree->allocsize), vs));
 
 err:	__wt_scr_release(&tmp);
 

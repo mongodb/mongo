@@ -312,6 +312,10 @@ __wt_block_read(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_disk_read(session,
 	    tmp->mem, btree->free_addr, btree->free_size));
 
+	/* The page is not compressed. */
+	WT_ASSERT(session, ((WT_PAGE_DISK *)tmp->mem)->size ==
+	    ((WT_PAGE_DISK *)tmp->mem)->memsize);
+
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)WT_PAGE_DISK_BYTE(tmp->mem);
 	    *p != WT_ADDR_INVALID; p += 2)
@@ -399,7 +403,14 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	*p++ = WT_ADDR_INVALID;		/* The list terminating values. */
 	*p = 0;
 
-	/* Write the free list to disk. */
+	/* Write the free list to disk.  We don't compress this page
+	 * because it would introduce a circular dependency: the disk
+	 * address is needed to create the freelist itself, we need to
+	 * create the freelist before compressing, and we don't know
+	 * the final size (and hence the disk address) until we
+	 * compress.  Making the free list addresses to be relative on
+	 * disk would solve this.
+	 */
 	WT_ERR(__wt_disk_write(session, dsk, addr, size));
 
 done:	/* Update the file's meta-data. */

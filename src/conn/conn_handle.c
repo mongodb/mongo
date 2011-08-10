@@ -24,6 +24,7 @@ __wt_connection_config(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->dbqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
+	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_conn_stats(session, &conn->stats));

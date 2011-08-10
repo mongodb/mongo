@@ -278,8 +278,11 @@ __btree_conf(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	WT_NAMED_COMPRESSOR *ncomp;
+	WT_CONNECTION_IMPL *conn;
 
 	btree = session->btree;
+	conn = S2C(session);
 
 	/* File type. */
 	WT_RET(__btree_type(session));
@@ -293,6 +296,23 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Set the key gap for prefix compression. */
 	WT_RET(__wt_config_getones(session, btree->config, "key_gap", &cval));
 	btree->key_gap = (uint32_t)cval.val;
+
+	/* Page compressor configuration. */
+	WT_RET(__wt_config_getones(session,
+	    btree->config, "page_compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
+			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
+				btree->compressor = ncomp->compressor;
+				break;
+			}
+		}
+		if (btree->compressor == NULL) {
+			__wt_errx(session, "Unknown page_compressor '%.*s'",
+			    (int)cval.len, cval.str);
+			return (EINVAL);
+		}
+	}
 
 	return (0);
 }

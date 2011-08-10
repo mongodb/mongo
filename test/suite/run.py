@@ -38,8 +38,16 @@ if len(sys.argv) < 2:
 	tests.addTests(loader.discover(suitedir))
 
 # Otherwise, turn numbers and ranges into test module names
+preserve = False
 for arg in sys.argv[1:]:
 	from unittest import defaultTestLoader as loader
+
+        # Command line options
+        if arg[0] == '-':
+                option = arg[1:]
+                if option == 'preserve' or option == 'p':
+                        preserve = True
+                        continue
 
 	# Explicit test class names
 	if not arg[0].isdigit():
@@ -57,5 +65,6 @@ for arg in sys.argv[1:]:
 		tests.addTests(loader.loadTestsFromName('test%03d' % t))
 
 import wttest
+wttest.WiredTigerTestCase.globallyPreserveFiles(preserve)
 result = wttest.runsuite(tests)
 sys.exit(not result.wasSuccessful())

@@ -245,7 +245,7 @@ __cache_read(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, size;
+	uint32_t addr, size, disk_size;
 	int ret;
 
 	dsk = NULL;
@@ -281,12 +281,13 @@ __cache_read(
 	 */
 	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
-	/* Read the page. */
-	WT_ERR(__wt_disk_read(session, dsk, addr, size));
+	/* Read the page, decompressing if needed. */
+	disk_size = size;
+	WT_ERR(__wt_disk_read_realloc(session, &dsk, addr, &size));
 
 	/* Verify the disk image on demand. */
 	if (dsk_verify)
-		WT_ERR(__wt_verify_dsk(session, dsk, addr, size, 0));
+		WT_ERR(__wt_verify_dsk(session, dsk, addr, disk_size, 0));
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));

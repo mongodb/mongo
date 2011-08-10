@@ -23,7 +23,22 @@ class WiredTigerTestCase(unittest.TestCase):
     subprocess.call(["rm", "-rf", _parentTestdir])
     subprocess.call(["mkdir", "-p", _parentTestdir])
     _resultfile = open(_parentTestdir + os.sep + 'results.txt', "w", 0)  # unbuffered
+    _preserveFiles = False
 
+    @staticmethod
+    def globallyPreserveFiles(val):
+        WiredTigerTestCase._preserveFiles = val
+
+    # Can be overridden
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir, 'create')
+        self.pr(`conn`)
+        return conn
+        
+    # Can be overridden
+    def setUpSessionOpen(self, conn):
+        return conn.open_session(None)
+        
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
@@ -37,19 +52,22 @@ class WiredTigerTestCase(unittest.TestCase):
         subprocess.call(["mkdir", "-p", self.testdir])
         os.chdir(self.testdir)
 
-        self.conn = wiredtiger.wiredtiger_open(".", 'create')
-        self.pr(`self.conn`)
-        self.session = self.conn.open_session()
+        self.conn = self.setUpConnectionOpen(".")
+        self.session = self.setUpSessionOpen(self.conn)
 
     def tearDown(self):
         self.pr('finishing')
-        self.conn.close(None)
-        self.conn = None
+        if self.conn != None:
+            self.conn.close(None)
+            self.conn = None
         os.chdir(self.origcwd)
         # Clean up unless there's a failure
         excinfo = sys.exc_info()
         if excinfo == (None, None, None):
-            subprocess.call(["rm", "-rf", self.testdir])
+            if not WiredTigerTestCase._preserveFiles:
+                subprocess.call(["rm", "-rf", self.testdir])
+            else:
+                self.pr('preserving directory ' + self.testdir)
         else:
             self.pr('FAIL')
             self.prexception(excinfo)

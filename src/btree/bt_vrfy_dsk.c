@@ -82,8 +82,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
-	/* The in-memory and on-disk page sizes are currently the same. */
-	if (dsk->size != size || dsk->memsize != size) {
+	if (dsk->size != size) {
 		WT_VRFY_ERR(session, quiet,
 		    "page at addr %" PRIu32 " has an incorrect size",
 		    addr);
@@ -103,20 +102,24 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		return (
-		    __verify_dsk_col_int(session, dsk, addr, size, quiet));
+		    __verify_dsk_col_int(session, dsk, addr, dsk->memsize,
+			quiet));
 	case WT_PAGE_COL_FIX:
 		return (
-		    __verify_dsk_col_fix(session, dsk, addr, size, quiet));
+		    __verify_dsk_col_fix(session, dsk, addr, dsk->memsize,
+			quiet));
 	case WT_PAGE_COL_VAR:
 		return (
-		    __verify_dsk_col_var(session, dsk, addr, size, quiet));
+		    __verify_dsk_col_var(session, dsk, addr, dsk->memsize,
+			quiet));
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		return (__verify_dsk_row(session, dsk, addr, size, quiet));
+		return (__verify_dsk_row(session, dsk, addr, dsk->memsize,
+			quiet));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 		return (__wt_verify_dsk_chunk(
-		    session, dsk, addr, dsk->u.datalen, size, quiet));
+		    session, dsk, addr, dsk->u.datalen, dsk->memsize, quiet));
 	WT_ILLEGAL_FORMAT(session);
 	}
 	/* NOTREACHED */
@@ -241,12 +244,14 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 			break;
 		}
 
-		/* Check if any referenced item is entirely in the file. */
+		/* Check if any referenced item is entirely in the file.
+		 * The check is only sensible if there is no compression.
+		 */
 		switch (cell_type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
 		case WT_CELL_VALUE_OVFL:
-			if (WT_ADDR_TO_OFF(btree,
+			if (btree->compressor == NULL && WT_ADDR_TO_OFF(btree,
 			    unpack->off.addr) + unpack->off.size > file_size)
 				goto eof;
 			break;
@@ -405,8 +410,11 @@ __verify_dsk_col_int(WT_SESSION_IMPL *session,
 		if ((uint8_t *)off_record + sizeof(WT_OFF_RECORD) > end)
 			return (__err_eop(session, entry_num, addr, quiet));
 
-		/* Check if the reference is past the end-of-file. */
-		if (WT_ADDR_TO_OFF(btree, off_record->addr) +
+		/* Check if the reference is past the end-of-file.
+		 * The check is only sensible if there is no compression.
+		 */
+		if (btree->compressor == NULL &&
+		    WT_ADDR_TO_OFF(btree, off_record->addr) +
 		    (off_t)off_record->size > btree->fh->file_size)
 			return (__err_eof(session, entry_num, addr, quiet));
 	}
@@ -481,9 +489,11 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 			    session, cell_num, addr, unpack->raw, dsk, quiet));
 		}
 
-		/* Check if any referenced item is entirely in the file. */
+		/* Check if any referenced item is entirely in the file.
+		 * The check is only sensible if there is no compression.
+		 */
 		if (cell_type == WT_CELL_VALUE_OVFL) {
-			if (WT_ADDR_TO_OFF(btree,
+			if (btree->compressor == NULL && WT_ADDR_TO_OFF(btree,
 			    unpack->off.addr) + unpack->off.size > file_size)
 				return (__err_eof(
 				    session, cell_num, addr, quiet));

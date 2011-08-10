@@ -60,6 +60,12 @@ wts_startup(void)
 	int ret;
 	char config[512], *end, *p;
 
+#ifdef COMPRESSOR
+	char *compressor = COMPRESSOR;
+#else
+	char *compressor = NULL;
+#endif
+
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB%s%s",
 	    g.progname, g.c_cache,
@@ -92,6 +98,9 @@ wts_startup(void)
 	    1U << g.c_intl_node_max,
 	    1U << g.c_leaf_node_min,
 	    1U << g.c_leaf_node_max);
+	if (compressor)
+		p += snprintf(p, (size_t)(end - p),
+		    ",page_compressor=%s", compressor);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -249,7 +258,9 @@ wts_salvage(void)
 	/* Save a copy of the file before we salvage it. */
 	(void)system("cp __wt __salvage_copy");
 
-	snprintf(config, sizeof(config), "error_prefix=\"%s\"", g.progname);
+	snprintf(config, sizeof(config), "error_prefix=\"%s\"%s%s", g.progname,
+	    g.config_open == NULL ? "" : ",",
+	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",
@@ -305,8 +316,10 @@ wts_verify(const char *tag)
 	track("verify", 0ULL);
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB",
-	    g.progname, g.c_cache);
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB%s%s",
+	    g.progname, g.c_cache,
+	    g.config_open == NULL ? "" : ",",
+	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",

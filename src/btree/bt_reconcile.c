@@ -1412,11 +1412,18 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 {
 	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
+	WT_PAGE_DISK *ondsk;
 	WT_RECONCILE *r;
+	WT_BUF *comp_buf;
 	uint32_t addr, size;
+	int ret;
+	uint32_t comp_size;
+	uint32_t ondsk_size;
 
+	ret = 0;
+	comp_buf = NULL;
+	dsk = ondsk = buf->mem;
 	r = session->btree->reconcile;
-	dsk = buf->mem;
 
 	/*
 	 * We always write an additional byte on row-store leaf pages after the
@@ -1446,11 +1453,24 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 * Return the addr/size pair.
 	 */
 	__rec_split_buf_prep(session, buf, &size);
-	WT_RET(__wt_block_alloc(session, &addr, size));
-	WT_RET(__wt_disk_write(session, dsk, addr, size));
+
+	ondsk_size = size;
+	dsk->memsize = 0;
+	if (session->btree->compressor != NULL) {
+		WT_RET(__wt_scr_alloc(session, size, &comp_buf));
+		comp_size = size;
+		WT_ERR(__wt_disk_compress(session, dsk, comp_buf->mem,
+			&comp_size));
+		if (comp_size != 0 && comp_size < size) {
+			ondsk = comp_buf->mem;
+			ondsk_size = comp_size;
+		}
+	}
+	WT_ERR(__wt_block_alloc(session, &addr, ondsk_size));
+	WT_ERR(__wt_disk_write(session, ondsk, addr, ondsk_size));
 
 	bnd->off.addr = addr;
-	bnd->off.size = size;
+	bnd->off.size = ondsk_size;
 
 	/*
 	 * If we're evicting the page, there's no more work to do.
@@ -1463,11 +1483,14 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	if (r->evict)
 		bnd->imp_dsk = NULL;
 	else {
-		WT_RET(__wt_calloc(
+		WT_ERR(__wt_calloc(
 		    session, (size_t)size, sizeof(uint8_t), &bnd->imp_dsk));
 		memcpy(bnd->imp_dsk, dsk, size);
 	}
-	return (0);
+err:
+	if (comp_buf != NULL)
+		__wt_scr_release(&comp_buf);
+	return (ret);
 }
 
 /*
@@ -3131,12 +3154,17 @@ __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BUF *tmp;
+	WT_BUF *comp_buf;
 	WT_PAGE_DISK *dsk;
+	WT_PAGE_DISK *ondsk;
 	uint32_t addr, size;
+	uint32_t comp_size;
+	uint32_t ondsk_size;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
+	comp_buf = NULL;
 
 	/* Allocate a scratch buffer big enough to hold the overflow chunk. */
 	size = WT_DISK_REQUIRED(session, kv->buf.size);
@@ -3146,7 +3174,7 @@ __rec_cell_build_ovfl(
 	 * Set up the chunk; clear any unused bytes so the contents are never
 	 * random.
 	 */
-	dsk = tmp->mem;
+	dsk = ondsk = tmp->mem;
 	memset(dsk, 0, WT_PAGE_DISK_SIZE);
 	dsk->type = WT_PAGE_OVFL;
 	dsk->u.datalen = kv->buf.size;
@@ -3154,13 +3182,26 @@ __rec_cell_build_ovfl(
 	memset((uint8_t *)WT_PAGE_DISK_BYTE(dsk) +
 	    kv->buf.size, 0, size - (WT_PAGE_DISK_SIZE + kv->buf.size));
 
+	ondsk_size = size;
+	dsk->memsize = 0;
+	if (session->btree->compressor != NULL) {
+		WT_RET(__wt_scr_alloc(session, size, &comp_buf));
+		comp_size = size;
+		WT_ERR(__wt_disk_compress(session, dsk, comp_buf->mem,
+			&comp_size));
+		if (comp_size != 0 && comp_size < size) {
+			ondsk = comp_buf->mem;
+			ondsk_size = comp_size;
+		}
+	}
+
 	/*
 	 * Allocate a file address (we're the only writer of the file, so we
 	 * can allocate file space on demand).  Fill in the WT_OFF structure.
 	 */
-	WT_ERR(__wt_block_alloc(session, &addr, size));
+	WT_ERR(__wt_block_alloc(session, &addr, ondsk_size));
 	kv->off.addr = addr;
-	kv->off.size = size;
+	kv->off.size = ondsk_size;
 
 	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;
@@ -3168,10 +3209,12 @@ __rec_cell_build_ovfl(
 	kv->cell_len = __wt_cell_pack_type(&kv->cell, type, rle);
 	kv->len = kv->cell_len + kv->buf.size;
 
-	ret = __wt_disk_write(session, dsk, addr, size);
+	ret = __wt_disk_write(session, ondsk, addr, ondsk_size);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
+	if (comp_buf != NULL)
+		__wt_scr_release(&comp_buf);
 	return (ret);
 }
 

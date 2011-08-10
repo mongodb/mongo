@@ -81,8 +81,8 @@ __wt_confdfl_file_meta =
     "column_leaf_extend=10000,columns=,huffman_key=,huffman_value=,"
     "internal_key_truncate=true,internal_node_max=2KB,internal_node_min=2KB,"
     "key_format=u,key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,"
-    "prefix_compression=true,split_min=false,split_pct=75,type=btree,"
-    "value_format=u";
+    "page_compressor=,prefix_compression=true,split_min=false,split_pct=75,"
+    "type=btree,value_format=u";
 
 const char *
 __wt_confchk_file_meta =
@@ -93,7 +93,7 @@ __wt_confchk_file_meta =
     "internal_node_max=(type=int,min=512B,max=512MB),"
     "internal_node_min=(type=int,min=512B,max=512MB),key_format=(type=format)"
     ",key_gap=(type=int,min=0),leaf_node_max=(type=int,min=512B,max=512MB),"
-    "leaf_node_min=(type=int,min=512B,max=512MB),"
+    "leaf_node_min=(type=int,min=512B,max=512MB),page_compressor=(),"
     "prefix_compression=(type=boolean),split_min=(type=boolean),"
     "split_pct=(type=int,min=0,max=100),type=(choices=[\"btree\"]),"
     "value_format=(type=format)";
@@ -150,8 +150,9 @@ __wt_confdfl_session_create =
     "column_leaf_extend=10000,columns=,columns=,exclusive=false,filename=,"
     "huffman_key=,huffman_value=,internal_key_truncate=true,"
     "internal_node_max=2KB,internal_node_min=2KB,key_format=u,key_format=u,"
-    "key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,prefix_compression=true,"
-    "split_min=false,split_pct=75,type=btree,value_format=u,value_format=u";
+    "key_gap=10,leaf_node_max=1MB,leaf_node_min=32KB,page_compressor=,"
+    "prefix_compression=true,split_min=false,split_pct=75,type=btree,"
+    "value_format=u,value_format=u";
 
 const char *
 __wt_confchk_session_create =
@@ -164,8 +165,8 @@ __wt_confchk_session_create =
     "internal_node_min=(type=int,min=512B,max=512MB),key_format=(type=format)"
     ",key_format=(type=format),key_gap=(type=int,min=0),"
     "leaf_node_max=(type=int,min=512B,max=512MB),leaf_node_min=(type=int,"
-    "min=512B,max=512MB),prefix_compression=(type=boolean),"
-    "split_min=(type=boolean),split_pct=(type=int,min=0,max=100),"
+    "min=512B,max=512MB),page_compressor=(),prefix_compression=(type=boolean)"
+    ",split_min=(type=boolean),split_pct=(type=int,min=0,max=100),"
     "type=(choices=[\"btree\"]),value_format=(type=format),"
     "value_format=(type=format)";
 

@@ -107,16 +107,67 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	WT_NAMED_COMPRESSOR *ncomp;
+	int ret;
 
 	WT_UNUSED(name);
 	WT_UNUSED(compressor);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
+	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
 	WT_UNUSED(cfg);
+
+	WT_RET(__wt_calloc_def(session, 1, &ncomp));
+	WT_ERR(__wt_strdup(session, name, &ncomp->name));
+	ncomp->compressor = compressor;
+
+	__wt_lock(session, conn->mtx);
+	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
+	__wt_unlock(session, conn->mtx);
 	API_END(session);
 
-	return (ENOTSUP);
+	return (0);
+
+err:	__wt_free(session, ncomp);
+	return (ret);
+}
+
+/*
+ * __conn_remove_compressor --
+ *	remove compressor added by WT_CONNECTION->add_compressor,
+ *	only used internally.
+ */
+static int
+__conn_remove_compressor(WT_CONNECTION *wt_conn, WT_COMPRESSOR *compressor)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+	WT_NAMED_COMPRESSOR *ncomp;
+	int ret;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	session = &conn->default_session;
+
+	/* Remove from the connection's list. */
+	__wt_lock(session, conn->mtx);
+	TAILQ_FOREACH(ncomp, &conn->compqh, q) {
+		if (ncomp->compressor == compressor)
+			break;
+	}
+	if (ncomp != NULL)
+		TAILQ_REMOVE(&conn->compqh, ncomp, q);
+	__wt_unlock(session, conn->mtx);
+
+	/* Free associated memory */
+	if (ncomp != NULL) {
+		__wt_free(session, ncomp->name);
+		__wt_free(session, ncomp);
+		ret = 0;
+	}
+	else
+		ret = ENOENT;
+
+	return ret;
 }
 
 /*
@@ -134,7 +185,7 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	WT_UNUSED(extractor);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
+	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
 	API_END(session);
 
@@ -170,12 +221,17 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *s, *session, **tp;
 	WT_SESSION *wt_session;
+	WT_NAMED_COMPRESSOR *ncomp;
 
 	ret = 0;
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
+
+	/* Free memory for compressors */
+	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
+		WT_TRET(__conn_remove_compressor(wt_conn, ncomp->compressor));
 
 	/* Close open sessions. */
 	for (tp = conn->sessions; (s = *tp) != NULL;) {
