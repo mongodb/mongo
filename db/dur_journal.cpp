@@ -483,12 +483,6 @@ namespace mongo {
         /** called during recovery (the error message text below assumes that)
         */
         unsigned long long journalReadLSN() {
-            if( !debug ) {
-                // in nondebug build, for now, be conservative until more tests written, and apply the whole journal.
-                // however we will still write the lsn file to exercise that code, and use in _DEBUG build.
-                return 0;
-            }
-
             if( !MemoryMappedFile::exists(lsnPath()) ) {
                 log() << "info no lsn file in journal/ directory" << endl;
                 return 0;
