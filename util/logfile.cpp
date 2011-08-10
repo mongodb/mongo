@@ -77,9 +77,18 @@ namespace mongo {
             CloseHandle(_fd);
     }
 
+    void LogFile::truncate() {
+        verify(15870, _fd != INVALID_HANDLE_VALUE);
+
+        if (!SetEndOfFile(_fd)){
+            msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
+        }
+    }
+
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
         assert(_fd);
+        assert(_len % 4096 == 0);
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
@@ -88,7 +97,7 @@ namespace mongo {
             if( !WriteFile(_fd, buf, toWrite, &written, NULL) ) {
                 DWORD e = GetLastError();
                 if( e == 87 )
-                    msgasserted(13519, "error 87 appending to file - misaligned direct write?");
+                    msgasserted(13519, "error 87 appending to file - invalid parameter");
                 else
                     uasserted(13517, str::stream() << "error appending to file " << _name << ' ' << _len << ' ' << toWrite << ' ' << errnoWithDescription(e));
             }
@@ -150,8 +159,20 @@ namespace mongo {
         _fd = -1;
     }
 
+    void LogFile::truncate() {
+        verify(15872, _fd >= 0);
+
+        BOOST_STATIC_ASSERT(sizeof(off_t) == 8); // we don't want overflow here
+        const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+        if (ftruncate(_fd, pos) != 0){
+            msgasserted(15873, "Couldn't truncate file: " + errnoWithDescription());
+        }
+    }
+
     void LogFile::synchronousAppend(const void *b, size_t len) {
-        off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+#ifdef POSIX_FADV_DONTNEED
+        const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+#endif
 
         const char *buf = (char *) b;
         assert(_fd);

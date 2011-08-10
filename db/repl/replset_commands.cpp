@@ -45,14 +45,18 @@ namespace mongo {
             help << "Just for regression tests.\n";
         }
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+
+            if (!checkAuth(errmsg, result)) {
+                return false;
+            }
+
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
                 return true;
             }
 
-            // may not need this, but if removed check all tests still work:
             if( !check(errmsg, result) )
                 return false;
 
@@ -76,11 +80,11 @@ namespace mongo {
             help << "internal";
         }
         CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {
-            // this is ok but micros or combo with some rand() and/or 64 bits might be better -- 
+            // this is ok but micros or combo with some rand() and/or 64 bits might be better --
             // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
             rbid = (int) curTimeMillis64();
         }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             result.append("rbid",rbid);
@@ -108,7 +112,7 @@ namespace mongo {
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
@@ -128,17 +132,21 @@ namespace mongo {
             help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
-        virtual bool run(const string& a, BSONObj& b, string& errmsg, BSONObjBuilder& c, bool d) {
+        virtual bool run(const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
             try {
                 rwlock_try_write lk(mutex);
-                return _run(a,b,errmsg,c,d);
+                return _run(a,b,e,errmsg,c,d);
             }
             catch(rwlock_try_write::exception&) { }
             errmsg = "a replSetReconfig is already in progress";
             return false;
         }
     private:
-        bool _run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if ( !checkAuth(errmsg, result) ) {
+                return false;
+            }
+
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -209,7 +217,7 @@ namespace mongo {
         }
 
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             int secs = (int) cmdObj.firstElement().numberInt();
@@ -233,7 +241,7 @@ namespace mongo {
         }
 
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             if( !theReplSet->box.getState().primary() ) {
@@ -252,19 +260,19 @@ namespace mongo {
                 long long int diff = lastOp - closest;
                 result.append("closest", closest);
                 result.append("difference", diff);
-                
+
                 if (diff < 0) {
                     // not our problem, but we'll wait until thing settle down
                     errmsg = "someone is ahead of the primary?";
                     return false;
                 }
-                                
+
                 if (diff > 10) {
                     errmsg = "no secondaries within 10 seconds of my optime";
                     return false;
                 }
             }
-            
+
             int secs = (int) cmdObj.firstElement().numberInt();
             if( secs == 0 )
                 secs = 60;

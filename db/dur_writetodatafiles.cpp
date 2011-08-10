@@ -47,9 +47,9 @@ namespace mongo {
             @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc&hl=en
         */
 
-        void WRITETODATAFILES_Impl1() {
+        void WRITETODATAFILES_Impl1(const JSectHeader& h, AlignedBuilder& uncompressed) {
             RWLockRecursive::Shared lk(MongoFile::mmmutex);
-            RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len());
+            RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), 0);
         }
 
 #if 0
@@ -81,16 +81,14 @@ namespace mongo {
 #endif
 
         // concurrency: in mmmutex, not necessarily in dbMutex
-        void WRITETODATAFILES() {
+        void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed) {
             Timer t;
 #if defined(_EXPERIMENTAL)
             WRITETODATAFILES_Impl3();
 #else
-            WRITETODATAFILES_Impl1();
+            WRITETODATAFILES_Impl1(h, uncompressed);
 #endif
             stats.curr->_writeToDataFilesMicros += t.micros();
-
-
         }
 
     }

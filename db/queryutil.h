@@ -53,6 +53,8 @@ namespace mongo {
         /** @return true iff the interval is an equality constraint. */
         bool equality() const;
         mutable int _cachedEquality;
+
+        string toString() const;
     };
 
     /**
@@ -103,6 +105,8 @@ namespace mongo {
          * NOTE the resulting intervals might not be strictValid().
          */
         void reverse( FieldRange &ret ) const;
+
+        string toString() const;
     private:
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other );

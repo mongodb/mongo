@@ -64,8 +64,14 @@ namespace mongo {
         }
         ~Where() {
 
-            if ( scope.get() )
-                scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+            if ( scope.get() ){
+                try {
+                    scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+                }
+                catch( DBException& e ){
+                    warning() << "javascript scope cleanup interrupted" << causedBy( e ) << endl;
+                }
+            }
 
             if ( jsScope ) {
                 delete jsScope;
@@ -148,6 +154,9 @@ namespace mongo {
                     rm._prefix = prefix;
             }
             else {
+                uassert( 15882, "$elemMatch not allowed within $in",
+                         ie.type() != Object ||
+                         ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 _myset->insert(ie);
             }
         }

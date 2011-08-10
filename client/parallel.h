@@ -282,10 +282,11 @@ namespace mongo {
 
         private:
 
-            CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn );
+            CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn );
 
             string _server;
             string _db;
+            int _options;
             BSONObj _cmd;
             DBClientBase * _conn;
             scoped_ptr<ScopedDbConnection> _connHolder; // used if not provided a connection
@@ -306,7 +307,7 @@ namespace mongo {
          * @param cmd cmd to exec
          * @param conn optional connection to use.  will use standard pooled if non-specified
          */
-        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn = 0 );
+        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn = 0 );
     };
 
 

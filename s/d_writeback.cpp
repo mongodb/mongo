@@ -129,7 +129,7 @@ namespace mongo {
 
         void help(stringstream& h) const { h<<"internal"; }
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ) {
@@ -144,7 +144,7 @@ namespace mongo {
             // we want to do return at least at every 5 minutes so sockets don't timeout
             BSONObj z;
             if ( writeBackManager.getWritebackQueue(id.str())->queue.blockingPop( z, 5 * 60 /* 5 minutes */ ) ) {
-                log(1) << "WriteBackCommand got : " << z << endl;
+                LOG(1) << "WriteBackCommand got : " << z << endl;
                 result.append( "data" , z );
             }
             else {
@@ -168,7 +168,7 @@ namespace mongo {
                  << "This is an internal command";
         }
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             writeBackManager.appendStats( result );
             return true;
         }

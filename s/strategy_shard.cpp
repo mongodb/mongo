@@ -35,7 +35,9 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
-            log(3) << "shard query: " << q.ns << "  " << q.query << endl;
+            r.checkAuth();
+
+            LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
@@ -73,7 +75,7 @@ namespace mongo {
             try {
                 cursor->init();
 
-                log(5) << "   cursor type: " << cursor->type() << endl;
+                LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
                 if ( query.isExplain() ) {
@@ -92,7 +94,7 @@ namespace mongo {
             if ( ! cc->sendNextBatch( r ) ) {
                 return;
             }
-            log(6) << "storing cursor : " << cc->getId() << endl;
+            LOG(6) << "storing cursor : " << cc->getId() << endl;
             cursorCache.store( cc );
         }
 
@@ -100,11 +102,11 @@ namespace mongo {
             int ntoreturn = r.d().pullInt();
             long long id = r.d().pullInt64();
 
-            log(6) << "want cursor : " << id << endl;
+            LOG(6) << "want cursor : " << id << endl;
 
             ShardedClientCursorPtr cursor = cursorCache.get( id );
             if ( ! cursor ) {
-                log(6) << "\t invalid cursor :(" << endl;
+                LOG(6) << "\t invalid cursor :(" << endl;
                 replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                 return;
             }
@@ -121,7 +123,7 @@ namespace mongo {
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
             const int flags = d.reservedField();
-            bool keepGoing = flags & InsertOption_KeepGoing; // modified before assertion if should abort
+            bool keepGoing = flags & InsertOption_ContinueOnError; // modified before assertion if should abort
 
             while ( d.moreJSObjs() ) {
                 try {
@@ -139,8 +141,8 @@ namespace mongo {
                         }
 
                         if ( bad ) {
-                            log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
-                            uasserted( 8011 , "tried to insert object without shard key" );
+                            log() << "tried to insert object with no valid shard key: " << r.getns() << "  " << o << endl;
+                            uasserted( 8011 , "tried to insert object with no valid shard key" );
                         }
 
                     }
@@ -154,7 +156,7 @@ namespace mongo {
                     for ( int i=0; i<maxTries; i++ ) {
                         try {
                             ChunkPtr c = manager->findChunk( o );
-                            log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                            LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                             insert( c->getShard() , r.getns() , o , flags);
 
                             r.gotInsert();
@@ -167,20 +169,20 @@ namespace mongo {
                             int logLevel = i < ( maxTries / 2 );
                             LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
                             r.reset();
-                            
-                            unsigned long long old = manager->getSequenceNumber();
-                            manager = r.getChunkManager();
-                            
-                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
-                            if (!manager) {
+                            manager = r.getChunkManager();
+                            if( ! manager ) {
                                 keepGoing = false;
                                 uasserted(14804, "collection no longer sharded");
                             }
+
+                            unsigned long long old = manager->getSequenceNumber();
+                            
+                            LOG( logLevel ) << "  sequence number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
                         }
                         sleepmillis( i * 20 );
                     }
-                    
+
                     assert( inShutdown() || gotThrough ); // not caught below
                 } catch (const UserException&){
                     if (!keepGoing || !d.moreJSObjs()){
@@ -208,8 +210,8 @@ namespace mongo {
                 }
 
                 if ( bad ) {
-                    log() << "tried to insert object without shard key: " << nsChunkLookup << "  " << o << endl;
-                    uasserted( 14842 , "tried to insert object without shard key" );
+                    log() << "tried to insert object with no valid shard key: " << nsChunkLookup << "  " << o << endl;
+                    uasserted( 14842 , "tried to insert object with no valid shard key" );
                 }
 
             }
@@ -222,7 +224,7 @@ namespace mongo {
             for ( int i=0; i<maxTries; i++ ) {
                 try {
                     ChunkPtr c = manager->findChunk( o );
-                    log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                    LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                     insert( c->getShard() , ns , o , flags, safe);
                     break;
                 }
@@ -231,7 +233,7 @@ namespace mongo {
                     LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
 
                     unsigned long long old = manager->getSequenceNumber();
-                    manager = conf->getChunkManager(ns);
+                    manager = conf->getChunkManagerIfExists(ns);
 
                     LOG( logLevel ) << "  sequenece number - old: " << old << " new: " << manager->getSequenceNumber() << endl;
 
@@ -256,7 +258,7 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(8012, "can't upsert something without shard key",
+                uassert(8012, "can't upsert something without valid shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
@@ -271,7 +273,8 @@ namespace mongo {
                 if ( multi ) {
                 }
                 else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
-                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have the shard key" );
+                    log() << "Query " << query << endl;
+                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have a valid shard key" );
                 }
                 else {
                     save = true;
@@ -304,7 +307,7 @@ namespace mongo {
                 }
                 else {
                     uasserted(12376,
-                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
+                              str::stream() << "valid shard key must be in update object for collection: " << manager->getns() );
                 }
             }
 
@@ -349,7 +352,7 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
 
             if (upsert) {
-                uassert(14854, "can't upsert something without shard key",
+                uassert(14854, "can't upsert something without valid shard key",
                         (manager->hasShardKey(toupdate) ||
                          (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
 
@@ -364,7 +367,7 @@ namespace mongo {
                 if ( multi ) {
                 }
                 else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
-                    throw UserException( 14850 , "can't do non-multi update with query that doesn't have the shard key" );
+                    throw UserException( 14850 , "can't do non-multi update with query that doesn't have a valid shard key" );
                 }
                 else {
                     save = true;
@@ -397,7 +400,7 @@ namespace mongo {
                 }
                 else {
                     uasserted(14857,
-                              str::stream() << "shard key must be in update object for collection: " << manager->getns() );
+                              str::stream() << "valid shard key must be in update object for collection: " << manager->getns() );
                 }
             }
 
@@ -447,7 +450,7 @@ namespace mongo {
             while ( true ) {
                 try {
                     manager->getShardsForQuery( shards , pattern );
-                    log(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+                    LOG(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
                     if ( shards.size() == 1 ) {
                         doWrite( dbDelete , r , *shards.begin() );
                         return;
@@ -479,7 +482,7 @@ namespace mongo {
 
         virtual void writeOp( int op , Request& r ) {
             const char *ns = r.getns();
-            log(3) << "write: " << ns << endl;
+            LOG(3) << "write: " << ns << endl;
 
             DbMessage& d = r.d();
             ChunkManagerPtr info = r.getChunkManager();

@@ -28,6 +28,7 @@
 
 namespace mongo {
     extern BSONObj staticNull;
+    extern BSONObj staticUndefined;
 
     /** returns a string that when used as a matcher, would match a super set of regex()
         returns "" for complex regular expressions
@@ -79,6 +80,10 @@ namespace mongo {
                 r = r.substr( 0 , r.size() - 1 );
                 return r; //breaking here fails with /^a?/
             }
+            else if (c == '|') {
+                // whole match so far is optional. Nothing we can do here.
+                return string();
+            }
             else if (c == '\\') {
                 c = *(regex++);
                 if (c == 'Q'){
@@ -107,7 +112,7 @@ namespace mongo {
                     ss << c;
                 }
             }
-            else if (strchr("^$.[|()+{", c)) {
+            else if (strchr("^$.[()+{", c)) {
                 // list of "metacharacters" from man pcrepattern
                 r = ss.str();
                 break;
@@ -153,25 +158,33 @@ namespace mongo {
 
     FieldRange::FieldRange( const BSONElement &e, bool singleKey, bool isNot, bool optimize )
     : _singleKey( singleKey ) {
+        int op = e.getGtLtOp();
+
         // NOTE with $not, we could potentially form a complementary set of intervals.
-        if ( !isNot && !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
+        if ( !isNot && !e.eoo() && e.type() != RegEx && op == BSONObj::opIN ) {
             set<BSONElement,element_lt> vals;
             vector<FieldRange> regexes;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() ) {
                 BSONElement ie = i.next();
+                uassert( 15881, "$elemMatch not allowed within $in",
+                         ie.type() != Object ||
+                         ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 if ( ie.type() == RegEx ) {
                     regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
                 }
                 else {
-                    // A document array may be indexed by its first element, or
-                    // as a full array if it is embedded within another array.
+                    // A document array may be indexed by its first element, by undefined
+                    // if it is empty, or as a full array if it is embedded within another
+                    // array.
                     vals.insert( ie );                        
                     if ( ie.type() == Array ) {
-                        if ( !ie.embeddedObject().firstElement().eoo() ) {
-                         	vals.insert( ie.embeddedObject().firstElement() );
-                        }
+                        BSONElement temp = ie.embeddedObject().firstElement();
+                        if ( temp.eoo() ) {
+                            temp = staticUndefined.firstElement();
+                        }                        
+                        vals.insert( temp );
                     }
                 }
             }
@@ -185,17 +198,21 @@ namespace mongo {
             return;
         }
 
-        // A document array may be indexed by its first element, or
-        // as a full array if it is embedded within another array.
-        if ( e.type() == Array && e.getGtLtOp() == BSONObj::Equality ) {
+        // A document array may be indexed by its first element, by undefined
+        // if it is empty, or as a full array if it is embedded within another
+        // array.
+        if ( e.type() == Array && op == BSONObj::Equality ) {
 
             _intervals.push_back( FieldInterval(e) );
-            const BSONElement& temp = e.embeddedObject().firstElement();
-            if ( ! temp.eoo() ) {
-                if ( temp < e )
-                    _intervals.insert( _intervals.begin() , temp );
-                else
-                    _intervals.push_back( FieldInterval(temp) );
+            BSONElement temp = e.embeddedObject().firstElement();
+            if ( temp.eoo() ) {
+             	temp = staticUndefined.firstElement();
+            }
+            if ( temp < e ) {
+                _intervals.insert( _intervals.begin() , temp );
+            }
+            else {
+                _intervals.push_back( FieldInterval(temp) );
             }
 
             return;
@@ -214,8 +231,6 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
-
-        int op = e.getGtLtOp();
 
         bool existsSpec = false;
         if ( op == BSONObj::opEXISTS ) {
@@ -622,6 +637,27 @@ namespace mongo {
         return o;
     }
 
+    string FieldInterval::toString() const {
+        StringBuilder buf;
+        buf << ( _lower._inclusive ? "[" : "(" );
+        buf << _lower._bound;
+        buf << " , ";
+        buf << _upper._bound;
+        buf << ( _upper._inclusive ? "]" : ")" );
+        return buf.str();
+    }
+
+    string FieldRange::toString() const {
+        StringBuilder buf;
+        buf << "(FieldRange special: " << _special << " singleKey: " << _special << " intervals: ";
+        for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+            buf << i->toString();
+        }
+
+        buf << ")";
+        return buf.str();
+    }
+
     string FieldRangeSet::getSpecial() const {
         string s = "";
         for ( map<string,FieldRange>::const_iterator i=_ranges.begin(); i!=_ranges.end(); i++ ) {
@@ -773,30 +809,32 @@ namespace mongo {
     }
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
-        if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
-            uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
-            BSONObjIterator i( e.embeddedObject() );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                uassert( 14817 , "$and elements must be objects" , e.type() == Object );
-                BSONObjIterator j( e.embeddedObject() );
-                while( j.more() ) {
-                    processQueryField( j.next(), optimize );
-                }
-            }            
-        }
+        if ( e.fieldName()[ 0 ] == '$' ) {
+            if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
+                uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    uassert( 14817 , "$and elements must be objects" , e.type() == Object );
+                    BSONObjIterator j( e.embeddedObject() );
+                    while( j.more() ) {
+                        processQueryField( j.next(), optimize );
+                    }
+                }            
+            }
         
-        if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
-            return;
-        }
+            if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
+                return;
+            }
         
-        if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-            return;
-        }
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+                return;
+            }
         
-        if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
-            return;
-        }        
+            if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+                return;
+            }
+        }
         
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
@@ -1055,30 +1093,9 @@ namespace mongo {
         return ret;
     }
     
-    const FieldRangeSet &FieldRangeSetPair::frsForIndex( const NamespaceDetails* nsd, int idxNo ) const {
-        assertValidIndexOrNoIndex( nsd, idxNo );
-        if ( idxNo < 0 ) {
-            // An unindexed cursor cannot have a "single key" constraint.
-            return _multiKey;
-        }
-        return nsd->isMultikey( idxNo ) ? _multiKey : _singleKey;
-    }    
-
     bool FieldRangeSetPair::noNontrivialRanges() const {
         return _singleKey.matchPossible() && _singleKey.nNontrivialRanges() == 0 &&
                  _multiKey.matchPossible() && _multiKey.nNontrivialRanges() == 0;
-    }
-    
-    bool FieldRangeSetPair::matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
-        assertValidIndexOrNoIndex( d, idxNo );
-        if ( !matchPossible() ) {
-            return false;
-        }
-        if ( idxNo < 0 ) {
-            // multi key matchPossible() is true, so return true.
-            return true;   
-        }
-        return frsForIndex( d, idxNo ).matchPossibleForIndex( keyPattern );
     }
     
     FieldRangeSetPair &FieldRangeSetPair::operator&=( const FieldRangeSetPair &other ) {
@@ -1093,21 +1110,23 @@ namespace mongo {
         return *this;            
     }    
     
-    void FieldRangeSetPair::assertValidIndex( const NamespaceDetails *d, int idxNo ) const {
-        massert( 14048, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
-    }
-    
-    void FieldRangeSetPair::assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const {
-        massert( 14049, "FieldRangeSetPair invalid index specified", idxNo >= -1 );
-        if ( idxNo >= 0 ) {
-            assertValidIndex( d, idxNo );   
-        }
-    }    
-    
     BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
         return frsForIndex( d, idxNo ).simplifiedQuery( keyPattern );
     }    
     
+    void FieldRangeSetPair::assertValidIndex( const NamespaceDetails *d, int idxNo ) const {
+        massert( 14048, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
+    }
+        
+    const FieldRangeSet &FieldRangeSetPair::frsForIndex( const NamespaceDetails* nsd, int idxNo ) const {
+        assertValidIndexOrNoIndex( nsd, idxNo );
+        if ( idxNo < 0 ) {
+            // An unindexed cursor cannot have a "single key" constraint.
+            return _multiKey;
+        }
+        return nsd->isMultikey( idxNo ) ? _multiKey : _singleKey;
+    }    
+        
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
         bool eq;
         int l = matchingLowElement( e, i, forward, eq );

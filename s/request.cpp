@@ -43,7 +43,12 @@ namespace mongo {
 
         _clientInfo = ClientInfo::get();
         _clientInfo->newRequest( p );
+    }
 
+    void Request::checkAuth() const {
+        char cl[256];
+        nsToDatabase(getns(), cl);
+        uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
     }
 
     void Request::init() {
@@ -60,17 +65,21 @@ namespace mongo {
 
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
-        _config = grid.getDBConfig( getns() );
+        const string nsStr (getns()); // use in functions taking string rather than char*
+
+        _config = grid.getDBConfig( nsStr );
         if ( reload ) {
-            if ( _config->isSharded( getns() ) )
-                _config->getChunkManager( getns() , true );
+            if ( _config->isSharded( nsStr ) )
+                _config->getChunkManager( nsStr , true );
             else
                 _config->reload();
         }
 
-        if ( _config->isSharded( getns() ) ) {
-            _chunkManager = _config->getChunkManager( getns() , reload );
-            uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
+        if ( _config->isSharded( nsStr ) ) {
+            _chunkManager = _config->getChunkManager( nsStr , reload );
+            // TODO:  All of these uasserts are no longer necessary, getChunkManager() throws when
+            // not returning the right value.
+            uassert( 10193 ,  (string)"no shard info for: " + nsStr , _chunkManager );
         }
         else {
             _chunkManager.reset();
@@ -104,7 +113,7 @@ namespace mongo {
         }
 
 
-        log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
+        LOG(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
 
         Strategy * s = SINGLE;
         _counter = &opsNonSharded;
@@ -138,10 +147,7 @@ namespace mongo {
             s->getMore( *this );
         }
         else {
-            char cl[256];
-            nsToDatabase(getns(), cl);
-            uassert(15845, "unauthorized", _clientInfo->getAuthenticationInfo()->isAuthorized(cl));
-
+            checkAuth();
             s->writeOp( op, *this );
         }
 

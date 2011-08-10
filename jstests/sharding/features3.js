@@ -17,54 +17,79 @@ for ( i=0; i<N; i++ )
     db.foo.insert( { _id : i } )
 db.getLastError();
 x = db.foo.stats();
+assert.eq( "test.foo" , x.ns , "basic1" )
+assert( x.sharded , "basic2" )
 assert.eq( N , x.count , "total count" )
 assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
 assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
 assert( x.totalIndexSize > 0 )
 assert( x.numExtents > 0 )
 
+db.bar.insert( { x : 1 } )
+x = db.bar.stats();
+assert.eq( 1 , x.count , "XXX1" )
+assert.eq( "test.bar" , x.ns , "XXX2" )
+assert( ! x.sharded , "XXX3: " + tojson(x) )
+
+// Fork shell and start pulling back data
 start = new Date()
 
 print( "about to fork shell: " + Date() )
-join = startParallelShell( "db.foo.find( function(){ x = ''; for ( i=0; i<10000; i++ ){ x+=i; } return true; } ).itcount()" )
+
+// TODO:  Still potential problem when our sampling of current ops misses when $where is active - 
+// solution is to increase sleep time
+parallelCommand = "try { while(true){" +
+                  " db.foo.find( function(){ x = ''; for ( i=0; i<10000; i++ ){ x+=i; } sleep( 1000 ); return true; } ).itcount() " +
+                  "}} catch(e){ print('PShell execution ended:'); printjson( e ) }"
+
+join = startParallelShell( parallelCommand )
 print( "after forking shell: " + Date() )
 
+// Get all current $where operations
 function getMine( printInprog ){
+    
     var inprog = db.currentOp().inprog;
+    
     if ( printInprog )
         printjson( inprog )
+    
+    // Find all the where queries
     var mine = []
     for ( var x=0; x<inprog.length; x++ ){
         if ( inprog[x].query && inprog[x].query.$where ){
             mine.push( inprog[x] )
         }
     }
+    
     return mine;
 }
 
-state = 0; // 0 = not found, 1 = killed, 
-killTime = null;
+var state = 0; // 0 = not found, 1 = killed, 
+var killTime = null;
+var i = 0;
 
-for ( i=0; i<( 100* 1000 ); i++ ){
+assert.soon( function(){
+    
+    // Get all the current operations
     mine = getMine( state == 0 && i > 20 );
-    if ( state == 0 ){
-        if ( mine.length == 0 ){
-            sleep(1);
-            continue;
-        }
+    i++;
+    
+    // Wait for the queries to start
+    if ( state == 0 && mine.length > 0 ){
+        // Queries started
         state = 1;
+        // Kill all $where
         mine.forEach( function(z){ printjson( db.getSisterDB( "admin" ).killOp( z.opid ) ); }  )
         killTime = new Date()
     }
-    else if ( state == 1 ){
-        if ( mine.length == 0 ){
-            state = 2;
-            break;
-        }
-        sleep(1)
-        continue;
+    // Wait for killed queries to end
+    else if ( state == 1 && mine.length == 0 ){
+        // Queries ended
+        state = 2;
+        return true;
     }
-}
+    
+}, "Couldn't kill the $where operations.", 2 * 60 * 1000 )
 
 print( "after loop: " + Date() );
 assert( killTime , "timed out waiting too kill last mine:" + tojson(mine) )

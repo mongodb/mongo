@@ -52,7 +52,7 @@ var max = 0;
  */
 function doTest() {
     for( var i = max; i < oldMax; ++i ) {
-        tzz.save( val[ i ] );
+        tzz.insert( val[ i ] );
     }
     max = oldMax;
     count = tzz.count();

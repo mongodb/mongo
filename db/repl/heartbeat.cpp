@@ -39,6 +39,8 @@ namespace mongo {
     extern bool replSetBlind;
     extern ReplSettings replSettings;
 
+    unsigned int HeartbeatInfo::numPings;
+
     long long HeartbeatInfo::timeDown() const {
         if( up() ) return 0;
         if( downSince == 0 )
@@ -51,7 +53,7 @@ namespace mongo {
     public:
         virtual bool adminOnly() const { return false; }
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( replSetBlind )
                 return false;
 
@@ -59,6 +61,10 @@ namespace mongo {
                checks many things that are pre-initialization. */
             if( !replSet ) {
                 errmsg = "not running with --replSet";
+                return false;
+            }
+
+            if (!checkAuth(errmsg, result)) {
                 return false;
             }
 
@@ -147,7 +153,7 @@ namespace mongo {
         string name() const { return "rsHealthPoll"; }
         void doWork() {
             if ( !theReplSet ) {
-                log(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
+                LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
             }
 
@@ -169,7 +175,10 @@ namespace mongo {
                 time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
 
                 // weight new ping with old pings
-                mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
+                // on the first ping, just use the ping value
+                if (old.ping != 0) {
+                    mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
+                }
 
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
@@ -191,6 +200,8 @@ namespace mongo {
                         mem.hbstate = MemberState(state.Int());
                 }
                 if( ok ) {
+                    HeartbeatInfo::numPings++;
+
                     if( mem.upSince == 0 ) {
                         log() << "replSet info member " << h.toString() << " is up" << rsLog;
                         mem.upSince = mem.lastHeartbeat;
@@ -262,6 +273,7 @@ namespace mongo {
     private:
         void down(HeartbeatInfo& mem, string msg) {
             mem.health = 0.0;
+            mem.ping = 0;
             if( mem.upSince || mem.downSince == 0 ) {
                 mem.upSince = 0;
                 mem.downSince = jsTime();

@@ -166,6 +166,16 @@
     <ClCompile Include="..\util\net\message_port.cpp" />
     <ClCompile Include="dbmessage.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
+    <ClCompile Include="..\util\compress.cpp">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\snappy\snappy.cc">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="scanandorder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -313,6 +323,12 @@
     <ClInclude Include="..\util\net\message.h" />
     <ClInclude Include="..\util\net\message_server.h" />
     <ClInclude Include="..\util\net\sock.h" />
+    <ClInclude Include="..\third_party\snappy\config.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\snappy\snappy.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
@@ -346,5 +362,10 @@
     <Library Include="..\..\js\js32r.lib" />
     <Library Include="..\..\js\js64d.lib" />
     <Library Include="..\..\js\js64r.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="snappy">
+      <UniqueIdentifier>{bb99c086-7926-4f50-838d-f5f0c18397c0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

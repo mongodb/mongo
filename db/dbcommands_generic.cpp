@@ -57,7 +57,7 @@ namespace mongo {
             help << "get version #, etc.\n";
             help << "{ buildinfo:1 }";
         }
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
             result << "versionArray" << versionArray;
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
@@ -88,7 +88,7 @@ namespace mongo {
             help << "  syncdelay\n";
             help << "{ getParameter:'*' } to get everything\n";
         }
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             bool all = *cmdObj.firstElement().valuestrsafe() == '*';
 
             int before = result.len();
@@ -117,11 +117,6 @@ namespace mongo {
         }
     } cmdGet;
 
-    // dev - experimental. so only in set command for now.  may go away or change
-    namespace dur { 
-        int groupCommitIntervalMs = 100;
-    }
-
     // tempish
     bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl );
 
@@ -135,23 +130,24 @@ namespace mongo {
             help << "set administrative option(s)\n";
             help << "{ setParameter:1, <param>:<value> }\n";
             help << "supported so far:\n";
-            help << "  notablescan\n";
+            help << "  journalCommitInterval\n";
             help << "  logLevel\n";
+            help << "  notablescan\n";
             help << "  quiet\n";
             help << "  syncdelay\n";
         }
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
-            if( cmdObj.hasElement("groupCommitIntervalMs") ) { 
+            if( cmdObj.hasElement("journalCommitInterval") ) { 
                 if( !cmdLine.dur ) { 
                     errmsg = "journaling is off";
                     return false;
                 }
-                int x = (int) cmdObj["groupCommitIntervalMs"].Number();
-                assert( x > 0 && x < 500 );
-                dur::groupCommitIntervalMs = x;
-                log() << "groupCommitIntervalMs " << x << endl;
+                int x = (int) cmdObj["journalCommitInterval"].Number();
+                assert( x > 1 && x < 500 );
+                cmdLine.journalCommitInterval = x;
+                log() << "setParameter journalCommitInterval=" << x << endl;
                 s++;
             }
             if( cmdObj.hasElement("notablescan") ) {
@@ -208,7 +204,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const { help << "a way to check that the server is alive. responds immediately even if server is in a db lock."; }
         virtual LockType locktype() const { return NONE; }
         virtual bool requiresAuth() { return false; }
-        virtual bool run(const string& badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& badns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return true;
         }
@@ -221,7 +217,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool readOnly() { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( globalScriptEngine ) {
                 BSONObjBuilder bb( result.subobjStart( "js" ) );
                 result.append( "utf8" , globalScriptEngine->utf8Ok() );
@@ -243,7 +239,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             rotateLogs();
             return 1;
         }
@@ -257,7 +253,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
             for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
                 Command * c = i->second;
@@ -312,7 +308,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         CmdForceError() : Command("forceerror") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbnamne, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             uassert( 10038 , "forced error", false);
             return true;
         }
@@ -324,7 +320,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual bool requiresAuth() { return false; }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             result << "options" << QueryOption_AllSupported;
             return true;
         }
@@ -344,7 +340,7 @@ namespace mongo {
             help << "{ getLog : '*' }  OR { getLog : 'global' }";
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string p = cmdObj.firstElement().String();
             if ( p == "*" ) {
                 vector<string> names;

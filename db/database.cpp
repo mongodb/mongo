@@ -192,22 +192,31 @@ namespace mongo {
         return ret;
     }
 
+    bool fileIndexExceedsQuota( const char *ns, int fileIndex, bool enforceQuota ) {
+        return
+            cmdLine.quota &&
+            enforceQuota &&
+            fileIndex >= cmdLine.quotaFiles &&
+            // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
+            // rejecting an index insert after inserting the main record.
+            !NamespaceString::special( ns ) &&
+            NamespaceString( ns ).db != "local";
+    }
+    
     MongoDataFile* Database::suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota ) {
 
         // check existing files
         for ( int i=numFiles()-1; i>=0; i-- ) {
             MongoDataFile* f = getFile( i );
             if ( f->getHeader()->unusedLength >= sizeNeeded ) {
-                // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
-                // rejecting an index insert after inserting the main record.
-                if( cmdLine.quota && enforceQuota && i > cmdLine.quotaFiles && !NamespaceString::special(ns) )
+                if ( fileIndexExceedsQuota( ns, i-1, enforceQuota ) ) // NOTE i-1 is the value used historically for this check.
                     ;
                 else
                     return f;
             }
         }
 
-        if( cmdLine.quota && enforceQuota && numFiles() >= cmdLine.quotaFiles && !NamespaceString::special(ns) )
+        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
             uasserted(12501, "quota exceeded");
 
         // allocate files until we either get one big enough or hit maxSize
@@ -262,7 +271,7 @@ namespace mongo {
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", 131072.0 );
-            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , true ) ) {
+            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , false /* we don't replica profile messages */ ) ) {
                 return false;
             }
         }

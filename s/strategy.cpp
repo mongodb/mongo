@@ -38,13 +38,15 @@ namespace mongo {
             conn.donotCheckVersion();
         else if ( conn.setVersion() ) {
             conn.done();
-            throw StaleConfigException( r.getns() , "doWRite" , true );
+            throw StaleConfigException( r.getns() , "doWrite" , true );
         }
         conn->say( r.m() );
         conn.done();
     }
 
     void Strategy::doQuery( Request& r , const Shard& shard ) {
+
+        r.checkAuth();
 
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();

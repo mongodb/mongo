@@ -25,6 +25,8 @@
 #include "../db/json.h"
 
 #include "dbtests.h"
+#include "../db/oplog.h"
+#include "../db/queryoptimizer.h"
 
 namespace mongo {
     void createOplog();
@@ -1049,6 +1051,31 @@ namespace ReplTests {
         }
     };
     
+    /**
+     * Check against oldest document in the oplog before scanning backward
+     * from the newest document.
+     */
+    class FindingStartCursorStale : public Base {
+    public:
+        void run() {
+            for( int i = 0; i < 10; ++i ) {
+                client()->insert( ns(), BSON( "_id" << i ) );
+            }
+            dblock lk;
+            Client::Context ctx( cllNS() );
+            NamespaceDetails *nsd = nsdetails( cllNS() );
+            BSONObjBuilder b;
+            b.appendTimestamp( "$gte" );
+            BSONObj query = BSON( "ts" << b.obj() );
+            FieldRangeSetPair frsp( cllNS(), query );
+            BSONObj order = BSON( "$natural" << 1 );
+            QueryPlan qp( nsd, -1, frsp, &frsp, query, order );
+            FindingStartCursor fsc( qp );
+            ASSERT( fsc.done() );
+            ASSERT_EQUALS( 0, fsc.cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "repl" ) {
@@ -1103,6 +1130,7 @@ namespace ReplTests {
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
+            add< FindingStartCursorStale >();
         }
     } myall;
 

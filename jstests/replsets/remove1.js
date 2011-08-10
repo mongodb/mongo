@@ -92,8 +92,12 @@ print("reconfig with minority");
 replTest.stop(1);
 
 assert.soon(function() {
-    reconnect(master);
-    return master.getDB("admin").runCommand({isMaster : 1}).secondary;
+    try {
+        return master.getDB("admin").runCommand({isMaster : 1}).secondary;
+    }
+    catch(e) {
+        print("trying to get master: "+e);
+    }
 });
 
 config.version = 4;

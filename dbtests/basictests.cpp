@@ -26,6 +26,7 @@
 #include "../util/queue.h"
 #include "../util/paths.h"
 #include "../util/stringutils.h"
+#include "../util/compress.h"
 #include "../db/db.h"
 
 namespace BasicTests {
@@ -411,6 +412,21 @@ namespace BasicTests {
             ASSERT_EQUALS( -1 , lexNumCmp( "a.b.c.d0" , "a.b.c.d00" ) );
             ASSERT_EQUALS( 1 , lexNumCmp( "a.b.c.0.y" , "a.b.c.00.x" ) );
             
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "a-", "a" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-", "a-" ) );
+
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-c" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "a-c", "a" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-c", "a-c" ) );
+
+            ASSERT_EQUALS( 1, lexNumCmp( "a-c.t", "a.t" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "a-c.t" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "a-c.t", "a-c.t" ) );
+
+            ASSERT_EQUALS( 1, lexNumCmp( "ac.t", "a.t" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "ac.t" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "ac.t", "ac.t" ) );            
         }
     };
 
@@ -596,6 +612,40 @@ namespace BasicTests {
         }
     };
 
+    class CmdLineParseConfigTest {
+    public:
+        void run() {
+            stringstream ss1;
+            istringstream iss1("");
+            CmdLine::parseConfigFile( iss1, ss1 );
+            stringstream ss2;
+            istringstream iss2("password=\'foo bar baz\'");
+            CmdLine::parseConfigFile( iss2, ss2 );
+            stringstream ss3;
+            istringstream iss3("\t    this = false  \n#that = true\n  #another = whocares\n\n  other = monkeys  ");
+            CmdLine::parseConfigFile( iss3, ss3 );
+
+            ASSERT( ss1.str().compare("\n") == 0 );
+            ASSERT( ss2.str().compare("password=\'foo bar baz\'\n\n") == 0 );
+            ASSERT( ss3.str().compare("\n  other = monkeys  \n\n") == 0 );
+        }
+    };
+
+    struct CompressionTest1 { 
+        void run() { 
+            const char * c = "this is a test";
+            std::string s;
+            size_t len = compress(c, strlen(c)+1, &s);
+            assert( len > 0 );
+            
+            std::string out;
+            bool ok = uncompress(s.c_str(), s.size(), &out);
+            assert(ok);
+            assert( strcmp(out.c_str(), c) == 0 );
+        }
+    } ctest1;
+
+
     class All : public Suite {
     public:
         All() : Suite( "basic" ) {
@@ -632,6 +682,9 @@ namespace BasicTests {
 
             add< HostAndPortTests >();
             add< RelativePathTest >();
+            add< CmdLineParseConfigTest >();
+
+            add< CompressionTest1 >();
         }
     } myall;
 

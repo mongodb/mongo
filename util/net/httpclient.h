@@ -18,10 +18,11 @@
 #pragma once
 
 #include "../../pch.h"
+#include "sock.h"
 
 namespace mongo {
 
-    class HttpClient {
+    class HttpClient : boost::noncopyable {
     public:
 
         typedef map<string,string> Headers;
@@ -68,6 +69,11 @@ namespace mongo {
     private:
         int _go( const char * command , string url , const char * body , Result * result );
 
+#ifdef MONGO_SSL
+        void _checkSSLManager();
+
+        scoped_ptr<SSLManager> _sslManager;
+#endif
     };
 }
 

@@ -40,7 +40,7 @@ namespace mongo {
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
-        currentOp.debug().append( b );
+        currentOp.debug().append( currentOp , b );
 
         b.append("client", c.clientAddress() );
 

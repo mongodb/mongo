@@ -56,7 +56,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
-        bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             nonce64 *n = new nonce64(Security::getNonce());
             stringstream ss;
             ss << hex << *n;
@@ -68,7 +68,7 @@ namespace mongo {
 
     CmdLogout cmdLogout;
 
-    bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         log() << " authenticate: " << cmdObj << endl;
 
         string user = cmdObj.getStringField("user");

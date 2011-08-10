@@ -22,6 +22,8 @@ namespace mongo {
 
     namespace dur {
 
+        const unsigned Alignment = 8192;
+
 #pragma pack(1)
         /** beginning header for a journal/j._<n> file
             there is nothing important int this header at this time.  except perhaps version #.
@@ -34,7 +36,11 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near
             // that.  simply incrementing the version # is safe on a fwd basis.
+#if defined(_NOCOMPRESS)
             enum { CurrentVersion = 0x4148 };
+#else
+            enum { CurrentVersion = 0x4149 };
+#endif
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
@@ -55,11 +61,25 @@ namespace mongo {
 
         /** "Section" header.  A section corresponds to a group commit.
             len is length of the entire section including header and footer.
+            header and footer are not compressed, just the stuff in between.
         */
         struct JSectHeader {
-            unsigned len;                  // length in bytes of the whole section
+        private:
+            unsigned _sectionLen;          // unpadded length in bytes of the whole section
+        public:
             unsigned long long seqNumber;  // sequence number that can be used on recovery to not do too much work
             unsigned long long fileId;     // matches JHeader::fileId
+            unsigned sectionLen() const { return _sectionLen; }
+
+            // we store the unpadded length so we can use that when we uncompress. to 
+            // get the true total size this must be rounded up to the Alignment.
+            void setSectionLen(unsigned lenUnpadded) { _sectionLen = lenUnpadded; }
+
+            unsigned sectionLenWithPadding() const { 
+                unsigned x = (sectionLen() + (Alignment-1)) & (~(Alignment-1));
+                dassert( x % Alignment == 0 );
+                return x;
+            }
         };
 
         /** an individual write operation within a group commit section.  Either the entire section should
@@ -111,6 +131,7 @@ namespace mongo {
 
         /** group commit section footer. md5 is a key field. */
         struct JSectFooter {
+            JSectFooter();
             JSectFooter(const void* begin, int len); // needs buffer to compute hash
             unsigned sentinel;
             unsigned char hash[16];
@@ -123,6 +144,8 @@ namespace mongo {
                 @return true if buffer looks valid
             */
             bool checkHash(const void* begin, int len) const;
+
+            bool magicOk() const { return *((unsigned*)magic) == 0x0a0a0a0a; }
         };
 
         /** declares "the next entry(s) are for this database / file path prefix" */

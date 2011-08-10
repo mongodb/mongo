@@ -109,6 +109,8 @@ namespace mongo {
 // PRINTFL; prints file:line
 #define MONGO_PRINTFL cout << __FILE__ ":" << __LINE__ << endl
 #define PRINTFL MONGO_PRINTFL
+#define MONGO_FLOG log() << __FILE__ ":" << __LINE__ << endl
+#define FLOG MONGO_FLOG
 
 #undef assert
 #define assert MONGO_assert

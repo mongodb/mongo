@@ -278,12 +278,17 @@ namespace mongo {
             return *this;
         }
 
-        bool operator==(const GeoHash& h ) {
+        bool operator==(const GeoHash& h ) const {
             return _hash == h._hash && _bits == h._bits;
         }
 
-        bool operator!=(const GeoHash& h ) {
+        bool operator!=(const GeoHash& h ) const {
             return !( *this == h );
+        }
+
+        bool operator<(const GeoHash& h ) const {
+            if( _hash != h._hash ) return _hash < h._hash;
+            return _bits < h._bits;
         }
 
         GeoHash& operator+=( const char * s ) {

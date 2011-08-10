@@ -40,7 +40,11 @@ namespace mongo {
         return string(copy);
     }
 
-    // for convenience, '{' is greater than anything and stops number parsing
+    /**
+     * Non numeric characters are compared lexicographically; numeric substrings
+     * are compared numerically; dots separate ordered comparable subunits.
+     * For convenience, character 255 is greater than anything else.
+     */
     inline int lexNumCmp( const char *s1, const char *s2 ) {
         //cout << "START : " << s1 << "\t" << s2 << endl;
 
@@ -48,6 +52,18 @@ namespace mongo {
         
         while( *s1 && *s2 ) {
 
+            bool d1 = ( *s1 == '.' );
+            bool d2 = ( *s2 == '.' );
+            if ( d1 && !d2 )
+             	return -1;
+            if ( d2 && !d1 )
+             	return 1;
+            if ( d1 && d2 ) {
+             	++s1; ++s2;
+                startWord = true;
+                continue;
+            }
+            
             bool p1 = ( *s1 == (char)255 );
             bool p2 = ( *s2 == (char)255 );
             //cout << "\t\t " << p1 << "\t" << p2 << endl;
@@ -64,7 +80,6 @@ namespace mongo {
                 if ( startWord ) {
                     while ( *s1 == '0' ) s1++;
                     while ( *s2 == '0' ) s2++;
-                    startWord = false;
                 }
 
                 char * e1 = (char*)s1;
@@ -94,6 +109,7 @@ namespace mongo {
                 // otherwise, the numbers are equal
                 s1 = e1;
                 s2 = e2;
+                startWord = false;
                 continue;
             }
             
@@ -109,11 +125,8 @@ namespace mongo {
             if ( *s2 > *s1 )
                 return -1;
             
-            if ( *s1 == '.' )
-                startWord = true;
-            else
-                startWord = false;
             s1++; s2++;
+            startWord = false;
         }
 
         if ( *s1 )

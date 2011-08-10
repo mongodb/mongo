@@ -43,6 +43,8 @@ namespace mongo {
             inPort->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
+            p->postFork();
+
             string otherSide;
 
             Message m;
@@ -98,7 +100,7 @@ namespace mongo {
     class PortMessageServer : public MessageServer , public Listener {
     public:
         PortMessageServer(  const MessageServer::Options& opts, MessageHandler * handler ) :
-            Listener( opts.ipList, opts.port ) {
+            Listener( "" , opts.ipList, opts.port ) {
 
             uassert( 10275 ,  "multiple PortMessageServer not supported" , ! pms::handler );
             pms::handler = handler;

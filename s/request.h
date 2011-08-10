@@ -70,6 +70,8 @@ namespace mongo {
             return _clientInfo;
         }
 
+        void checkAuth() const;
+
         // ---- remote location info -----
 
 

@@ -104,7 +104,7 @@ namespace QueryOptimizerTests {
         auto_ptr< FieldRangeSetPair > FieldRangeSetPair_GLOBAL;
 #define FRSP(x) ( FieldRangeSetPair_GLOBAL.reset( new FieldRangeSetPair( ns(), x ) ), *FieldRangeSetPair_GLOBAL )
         auto_ptr< FieldRangeSetPair > FieldRangeSetPair_GLOBAL2;
-#define FRSP2(x) ( FieldRangeSetPair_GLOBAL2.reset( new FieldRangeSetPair( ns(), x ) ), *FieldRangeSetPair_GLOBAL2 )
+#define FRSP2(x) ( FieldRangeSetPair_GLOBAL2.reset( new FieldRangeSetPair( ns(), x ) ), FieldRangeSetPair_GLOBAL2.get() )
 
         class NoIndex : public Base {
         public:
@@ -886,7 +886,7 @@ namespace QueryOptimizerTests {
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, *frsp, fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 ASSERT( c->ok() );
@@ -908,7 +908,7 @@ namespace QueryOptimizerTests {
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, *frsp, fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 int matches[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -1900,18 +1900,19 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 _cli.createCollection( ns(), 1000, true );
-                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "x" << 1 ) );
                 
                 {
                     dblock lk;
                     Client::Context ctx( ns() );
-                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
-                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "x" ) );
                     ASSERT( prepareToYield() );
                 }
-                
-                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
-                 	_cli.insert( ns(), BSONObj() );   
+
+                int x = 2;
+                while( _cli.count( ns(), BSON( "x" << 1 ) ) > 0 ) {
+                 	_cli.insert( ns(), BSON( "x" << x++ ) );   
                 }
 
                 {
@@ -2088,26 +2089,26 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 _cli.createCollection( ns(), 1000, true );
-                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
-                _cli.ensureIndex( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
                 
                 shared_ptr<Cursor> c;
                 {
                     dblock lk;
                     Client::Context ctx( ns() );
-                    c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
-                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    c = newQueryOptimizerCursor( ns(), BSON( "a" << GT << 0 << "b" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "a" ) );
                     ASSERT( !c->getsetdup( c->currLoc() ) );
                     c->advance();
-                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "a" ) );
                     ASSERT( c->getsetdup( c->currLoc() ) );
                     ASSERT( c->prepareToYield() );
                 }
                 
                 int i = 1;
-                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                while( _cli.count( ns(), BSON( "a" << 1 ) ) > 0 ) {
                     ++i;
-                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );
+                 	_cli.insert( ns(), BSON( "a" << i << "b" << i ) );
                 }
                 
                 {
@@ -2116,7 +2117,7 @@ namespace QueryOptimizerTests {
                     c->recoverFromYield();
                     ASSERT( c->ok() );
                     // {$natural:1} plan does not recover, {_id:1} plan does.
-                    ASSERT( 1 < c->current().getIntField( "_id" ) );
+                    ASSERT( 1 < c->current().getIntField( "a" ) );
                 }                
             }
         };

@@ -36,6 +36,7 @@
 #include "../lasterror.h"
 #include "../../s/d_logic.h"
 #include "../repl_block.h"
+#include "../../server.h"
 
 namespace mongo {
 
@@ -92,21 +93,15 @@ namespace mongo {
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p.c();
 
-        int bufSize = 512;
-        if ( cc ) {
-            bufSize += sizeof( QueryResult );
-            bufSize += MaxBytesToReturnToClientAtOnce;
-        }
+        int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
 
         BufBuilder b( bufSize );
-
         b.skip(sizeof(QueryResult));
-
         int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
-        if ( !cc ) {
+        if ( unlikely(!cc) ) {
             log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
@@ -419,6 +414,8 @@ namespace mongo {
             *_b << "indexOnly" << indexOnly;
 
             *_b << "indexBounds" << c->prettyIndexBounds();
+
+            c->explainDetails( *_b );
 
             if ( !hint ) {
                 *_b << "allPlans" << _a->arr();
@@ -898,9 +895,6 @@ namespace mongo {
         }
 
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-
-            //NamespaceDetails* d = nsdetails(ns);
-            //uassert(14820, "capped collections have no _id index by default, can only query by _id if one added", d == NULL || d->haveIdIndex() );
 
             bool nsFound = false;
             bool indexFound = false;

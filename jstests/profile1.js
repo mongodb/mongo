@@ -1,3 +1,4 @@
+print("profile1.js BEGIN");
 
 try {
 
@@ -61,21 +62,50 @@ try {
     after = db.system.profile.count()
     assert.eq( before + 3 , after , "X1" )
 
+    /* sleep() could be inaccurate on certain platforms.  let's check */
+    print("\nsleep 2 time actual:");
+    for (var i = 0; i < 4; i++) {
+        print(db.eval("var x = new Date(); sleep(2); return new Date() - x;"));
+    }
+    print();
+    print("\nsleep 20 times actual:");
+    for (var i = 0; i < 4; i++) {
+        print(db.eval("var x = new Date(); sleep(20); return new Date() - x;"));
+    }
+    print();
+    print("\nsleep 120 times actual:");
+    for (var i = 0; i < 4; i++) {
+        print(db.eval("var x = new Date(); sleep(120); return new Date() - x;"));
+    }
+    print();
+
+    function evalSleepMoreThan(millis,max){
+        var start = new Date();
+        db.eval("sleep("+millis+")");
+        var end = new Date();
+        var actual = end.getTime() - start.getTime();
+        if ( actual > ( millis + 5 ) ) {
+            print( "warning wanted to sleep for: " + millis + " but took: " + actual );
+        }
+        return actual >= max ? 1 : 0;
+    }
+
     db.setProfilingLevel(1,100);
     before = db.system.profile.count();
-    db.eval( "sleep(25)" )
-    db.eval( "sleep(120)" )
+    var delta = 0;
+    delta += evalSleepMoreThan( 15 , 100 );
+    delta += evalSleepMoreThan( 120 , 100 );
     after = db.system.profile.count()
-    assert.eq( before + 1 , after , "X2 : " + getProfileAString() )
+    assert.eq( before + delta , after , "X2 : " + getProfileAString() )
 
     db.setProfilingLevel(1,20);
     before = db.system.profile.count();
-    db.eval( "sleep(25)" )
-    db.eval( "sleep(120)" )
+    delta = 0;
+    delta += evalSleepMoreThan( 5 , 20 );
+    delta += evalSleepMoreThan( 120 , 20 );
     after = db.system.profile.count()
-    assert.eq( before + 2 , after , "X3 : " + getProfileAString() )
-    
-    
+    assert.eq( before + delta , after , "X3 : " + getProfileAString() )
+        
     db.profile.drop();
     db.setProfilingLevel(2)
     var q = { _id : 5 };
@@ -85,7 +115,9 @@ try {
     assert.eq( q , r.query , "Y1" );
     assert.eq( u , r.updateobj , "Y2" );
     assert.eq( "update" , r.op , "Y3" );
-    assert.eq( "test.profile1" , r.ns , "Y4" );
+    assert.eq("test.profile1", r.ns, "Y4");
+
+    print("profile1.js SUCCESS OK");
     
 } finally {
     // disable profiling for subsequent tests

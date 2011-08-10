@@ -25,6 +25,7 @@
 #include <boost/program_options.hpp>
 
 #include <fcntl.h>
+#include <set>
 
 using namespace mongo;
 
@@ -40,6 +41,7 @@ public:
     bool _drop;
     string _curns;
     string _curdb;
+    set<string> _users; // For restoring users with --drop
 
     Restore() : BSONTool( "restore" ) , _drop(false) {
         add_options()
@@ -208,13 +210,31 @@ public:
         out() << "\t going into namespace [" << ns << "]" << endl;
 
         if ( _drop ) {
-            out() << "\t dropping" << endl;
-            conn().dropCollection( ns );
+            if (root.leaf() != "system.users.bson" ) {
+                out() << "\t dropping" << endl;
+                conn().dropCollection( ns );
+            } else {
+                // Create map of the users currently in the DB
+                BSONObj fields = BSON("user" << 1);
+                scoped_ptr<DBClientCursor> cursor(conn().query(ns, Query(), 0, 0, &fields));
+                while (cursor->more()) {
+                    BSONObj user = cursor->next();
+                    _users.insert(user["user"].String());
+                }
+            }
         }
 
         _curns = ns.c_str();
         _curdb = NamespaceString(_curns).db;
         processFile( root );
+        if (_drop && root.leaf() == "system.users.bson") {
+            // Delete any users that used to exist but weren't in the dump file
+            for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {
+                BSONObj userMatch = BSON("user" << *it);
+                conn().remove(ns, Query(userMatch));
+            }
+            _users.clear();
+        }
     }
 
     virtual void gotObject( const BSONObj& obj ) {
@@ -260,7 +280,13 @@ public:
                 ::abort();
             }
         }
-        else {
+        else if (_drop && endsWith(_curns.c_str(), ".system.users") && _users.count(obj["user"].String())) {
+            // Since system collections can't be dropped, we have to manually
+            // replace the contents of the system.users collection
+            BSONObj userMatch = BSON("user" << obj["user"].String());
+            conn().update(_curns, Query(userMatch), obj);
+            _users.erase(obj["user"].String());
+        } else {
             conn().insert( _curns , obj );
         }
     }

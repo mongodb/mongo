@@ -19,6 +19,13 @@ namespace mongo {
         the same time. Also detects and disallows recursion.
     */
 
+#ifdef _WIN32
+    typedef unsigned threadId_t;
+#else
+    typedef pthread_t threadId_t;
+#endif
+
+
 #if defined(_DEBUG)
 
     namespace race {
@@ -26,14 +33,14 @@ namespace mongo {
         class CodePoint { 
         public:
             string lastName;
-            unsigned lastTid;
+            threadId_t lastTid;
             string file;
             CodePoint(string f) : lastTid(0), file(f) { }
         };
         class Check {
         public:
             Check(CodePoint& p) {
-                unsigned t = GetCurrentThreadId();
+                threadId_t t = GetCurrentThreadId();
                 if( p.lastTid == 0 ) {
                     p.lastTid = t;
                     p.lastName = getThreadName();
@@ -47,15 +54,17 @@ namespace mongo {
             };
         };
 
-#define RACECHECK \
-        static race::CodePoint __cp(__FILE__); \
-        race::Check __ck(__cp);
-
     }
+
+#define RACECHECK
+        // dm TODO - the right code for this file is in a different branch at the moment (merge)
+        //#define RACECHECK 
+        //static race::CodePoint __cp(__FILE__); 
+        //race::Check __ck(__cp);
 
     class CodeBlock { 
         volatile int n;
-        unsigned tid;
+        threadId_t tid;
         void fail() { 
             log() << "synchronization (race condition) failure" << endl;
             printStackTrace();
@@ -90,6 +99,8 @@ namespace mongo {
     
 #else
 
+#define RACECHECK
+
     class CodeBlock{ 
     public:
         class Within { 
@@ -101,4 +112,4 @@ namespace mongo {
 
 #endif
 
-}
+} // namespace

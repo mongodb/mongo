@@ -55,7 +55,8 @@ namespace mongo {
            */
 
         for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
-            if(obj.getFieldDotted(it->c_str()).eoo())
+            BSONElement e = obj.getFieldDotted(it->c_str());
+            if(e.eoo() || e.type() == Array)
                 return false;
         }
         return true;
@@ -83,7 +84,7 @@ namespace mongo {
         vector<const char*> keysToMove;
         keysToMove.push_back("_id");
         BSONForEach(e, pattern) {
-            if (strchr(e.fieldName(), '.') == NULL)
+            if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
                 keysToMove.push_back(e.fieldName());
         }
 
@@ -263,7 +264,7 @@ namespace mongo {
                 moveToFrontBenchmark(100);
             }
 
-            log(1) << "shardKeyTest passed" << endl;
+            LOG(1) << "shardKeyTest passed" << endl;
         }
     } shardKeyTest;
 

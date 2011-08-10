@@ -91,7 +91,7 @@ namespace mongo {
         }
 
         string errmsg;
-        int ok = c->run( dbname , cmdObj , errmsg , result , fromRepl );
+        int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
         if ( ! ok )
             result.append( "errmsg" , errmsg );
         return ok;

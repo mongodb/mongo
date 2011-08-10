@@ -587,7 +587,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
-        const bool keepGoing = d.reservedField() & InsertOption_KeepGoing;
+        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
         int n = 0;
         BSONObj js(_js);
         while( 1 ) {

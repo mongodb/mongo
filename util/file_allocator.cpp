@@ -287,8 +287,8 @@ namespace mongo {
                     if ( fd > 0 )
                         close( fd );
                     log() << "error failed to allocate new file: " << name
-                          << " size: " << size << ' ' << errnoWithDescription() << endl;
-                    log() << "    will try again in 10 seconds" << endl;
+                          << " size: " << size << ' ' << errnoWithDescription() << warnings;
+                    log() << "    will try again in 10 seconds" << endl; // not going to warning logs
                     try {
                         if ( tmp.size() )
                             BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );

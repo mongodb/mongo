@@ -34,13 +34,29 @@
 # endif
 #endif
 
+#ifdef MONGO_SSL
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#endif
+
+
 namespace mongo {
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
     
-    // --- some global helpers -----
+    void setSockTimeouts(int sock, double secs) {
+        struct timeval tv;
+        tv.tv_sec = (int)secs;
+        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
+        bool report = logLevel > 3; // solaris doesn't provide these
+        DEV report = true;
+        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+    }
 
 #if defined(_WIN32)
     void disableNagle(int sock) {
@@ -299,28 +315,118 @@ namespace mongo {
     }
 
 
+    // ------------ SSLManager -----------------
+
+#ifdef MONGO_SSL
+    SSLManager::SSLManager( bool client ) {
+        _client = client;
+        SSL_library_init();
+        SSL_load_error_strings();
+        ERR_load_crypto_strings();
+        
+        _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
+        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
+        
+        SSL_CTX_set_options( _context, SSL_OP_ALL);   
+    }
+
+    void SSLManager::setupPubPriv( const string& privateKeyFile , const string& publicKeyFile ) {
+        massert( 15865 , 
+                 mongoutils::str::stream() << "Can't read SSL certificate from file " 
+                 << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
+                 SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM) );
+  
+
+        massert( 15866 , 
+                 mongoutils::str::stream() << "Can't read SSL private key from file " 
+                 << privateKeyFile << " : " << ERR_error_string(ERR_get_error(), NULL) ,
+                 SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM) );
+    }
+    
+    
+    int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata){
+        SSLManager* sm = (SSLManager*)userdata;
+        string pass = sm->_password;
+        strcpy(buf,pass.c_str());
+        return(pass.size());
+    }
+
+    void SSLManager::setupPEM( const string& keyFile , const string& password ) {
+        _password = password;
+        
+        massert( 15867 , "Can't read certificate file" , SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) );
+        
+        SSL_CTX_set_default_passwd_cb_userdata( _context , this );
+        SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
+        
+        massert( 15868 , "Can't read key file" , SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) );
+    }
+        
+    SSL * SSLManager::secure( int fd ) {
+        SSL * ssl = SSL_new( _context );
+        massert( 15861 , "can't create SSL" , ssl );
+        SSL_set_fd( ssl , fd );
+        return ssl;
+    }
+
+
+#endif
+
     // ------------ Socket -----------------
     
     Socket::Socket(int fd , const SockAddr& remote) : 
         _fd(fd), _remote(remote), _timeout(0) {
         _logLevel = 0;
-        _bytesOut = 0;
-        _bytesIn = 0;
+        _init();
     }
 
     Socket::Socket( double timeout, int ll ) {
         _logLevel = ll;
         _fd = -1;
         _timeout = timeout;
+        _init();
+    }
+    
+    void Socket::_init() {
         _bytesOut = 0;
         _bytesIn = 0;
+#ifdef MONGO_SSL
+        _sslAccepted = 0;
+#endif
     }
 
     void Socket::close() {
+#ifdef MONGO_SSL
+        _ssl.reset();
+#endif
         if ( _fd >= 0 ) {
             closesocket( _fd );
             _fd = -1;
         }
+    }
+    
+#ifdef MONGO_SSL
+    void Socket::secure( SSLManager * ssl ) {
+        assert( ssl );
+        assert( _fd >= 0 );
+        _ssl.reset( ssl->secure( _fd ) );
+        SSL_connect( _ssl.get() );
+    }
+
+    void Socket::secureAccepted( SSLManager * ssl ) { 
+        _sslAccepted = ssl;
+    }
+#endif
+
+    void Socket::postFork() {
+#ifdef MONGO_SSL
+        if ( _sslAccepted ) {
+            assert( _fd );
+            _ssl.reset( _sslAccepted->secure( _fd ) );
+            SSL_accept( _ssl.get() );
+            _sslAccepted = 0;
+        }
+#endif
     }
 
     class ConnectBG : public BackgroundJob {
@@ -347,7 +453,7 @@ namespace mongo {
         }
 
         if ( _timeout > 0 ) {
-            setSockTimeouts( _fd, _timeout );
+            setTimeout( _timeout );
         }
 
         ConnectBG bg(_fd, remote);
@@ -377,12 +483,29 @@ namespace mongo {
         return true;
     }
 
+    int Socket::_send( const char * data , int len ) {
+#ifdef MONGO_SSL
+        if ( _ssl ) {
+            return SSL_write( _ssl.get() , data , len );
+        }
+#endif
+        return ::send( _fd , data , len , portSendFlags );
+    }
 
     // sends all data or throws an exception
     void Socket::send( const char * data , int len, const char *context ) {
         while( len > 0 ) {
-            int ret = ::send( _fd , data , len , portSendFlags );
+            int ret = _send( data , len  );
             if ( ret == -1 ) {
+                
+#ifdef MONGO_SSL
+                if ( _ssl ) {
+                    log() << "SSL Error ret: " << ret << " err: " << SSL_get_error( _ssl.get() , ret ) 
+                          << " " << ERR_error_string(ERR_get_error(), NULL) 
+                          << endl;
+                }
+#endif
+
 #if defined(_WIN32)
                 if ( WSAGetLastError() == WSAETIMEDOUT && _timeout != 0 ) {
 #else
@@ -408,15 +531,27 @@ namespace mongo {
         }
     }
 
-    // sends all data or throws an exception
-    void Socket::send( const vector< pair< char *, int > > &data, const char *context ) {
-#if defined(_WIN32)
-        // TODO use scatter/gather api
+    void Socket::_send( const vector< pair< char *, int > > &data, const char *context ) {
         for( vector< pair< char *, int > >::const_iterator i = data.begin(); i != data.end(); ++i ) {
             char * data = i->first;
             int len = i->second;
             send( data, len, context );
         }
+    }
+
+    // sends all data or throws an exception
+    void Socket::send( const vector< pair< char *, int > > &data, const char *context ) {
+
+#ifdef MONGO_SSL
+        if ( _ssl ) {
+            _send( data , context );
+            return;
+        }
+#endif
+
+#if defined(_WIN32)
+        // TODO use scatter/gather api
+        _send( data , context );
 #else
         vector< struct iovec > d( data.size() );
         int i = 0;
@@ -479,23 +614,26 @@ namespace mongo {
                 log(3) << "Socket recv() conn closed? " << remoteString() << endl;
                 throw SocketException( SocketException::CLOSED , remoteString() );
             }
-            else { /* ret < 0  */
+            else { /* ret < 0  */                
+#if defined(_WIN32)
+                int e = WSAGetLastError();
+#else
                 int e = errno;
-                
-#if defined(EINTR) && !defined(_WIN32)
+# if defined(EINTR)
                 if( e == EINTR ) {
                     if( ++retries == 1 ) {
                         log() << "EINTR retry" << endl;
                         continue;
                     }
                 }
+# endif
 #endif
                 if ( ( e == EAGAIN 
 #if defined(_WIN32)
-
                        || e == WSAETIMEDOUT
 #endif
-                       ) && _timeout > 0 ) {
+                       ) && _timeout > 0 ) 
+                {
                     // this is a timeout
                     log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
                     throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
@@ -508,9 +646,31 @@ namespace mongo {
     }
 
     int Socket::unsafe_recv( char *buf, int max ) {
-        int x = ::recv( _fd , buf , max , portRecvFlags );
+        int x = _recv( buf , max );
         _bytesIn += x;
         return x;
+    }
+
+
+    int Socket::_recv( char *buf, int max ) {
+#ifdef MONGO_SSL
+        if ( _ssl ){
+            return SSL_read( _ssl.get() , buf , max );
+        }
+#endif
+        return ::recv( _fd , buf , max , portRecvFlags );
+    }
+
+    void Socket::setTimeout( double secs ) {
+        struct timeval tv;
+        tv.tv_sec = (int)secs;
+        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
+        bool report = logLevel > 3; // solaris doesn't provide these
+        DEV report = true;
+        bool ok = setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+        ok = setsockopt(_fd, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
     }
 
 #if defined(_WIN32)

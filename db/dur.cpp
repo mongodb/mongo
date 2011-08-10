@@ -62,11 +62,11 @@
 #include "dur_journal.h"
 #include "dur_commitjob.h"
 #include "dur_recover.h"
+#include "dur_stats.h"
 #include "../util/concurrency/race.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
-#include "dur_stats.h"
 
 using namespace mongoutils;
 
@@ -74,8 +74,9 @@ namespace mongo {
 
     namespace dur {
 
-        void WRITETODATAFILES();
-        void PREPLOGBUFFER();
+        void PREPLOGBUFFER(JSectHeader& outParm);
+        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
+        void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
 
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
@@ -129,6 +130,7 @@ namespace mongo {
                        "commits" << _commits <<
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
+                       "compression" << _journaledBytes / (_uncompressedBytes+1.0) <<
                        "commitsInWriteLock" << _commitsInWriteLock <<
                        "earlyCommits" << _earlyCommits << 
                        "timeMs" <<
@@ -143,6 +145,8 @@ namespace mongo {
                 b << "ageOutJournalFiles" << "mutex timeout";
             if( r == 0 )
                 b << "ageOutJournalFiles" << false;
+            if( cmdLine.journalCommitInterval != 0 )
+                b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
         }
 
@@ -269,6 +273,9 @@ namespace mongo {
         }
 
         bool DurableImpl::commitIfNeeded() {
+            if ( ! dbMutex.isWriteLocked() ) // we implicitly commit if needed when releasing write lock
+                return false;
+
             DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
@@ -324,15 +331,6 @@ namespace mongo {
             }
         }
 #endif
-
-        /** write the buffer we have built to the journal and fsync it.
-            outside of lock as that could be slow.
-        */
-        static void WRITETOJOURNAL(AlignedBuilder& ab) {
-            Timer t;
-            journal(ab);
-            stats.curr->_writeToJournalMicros += t.micros();
-        }
 
         // Functor to be called over all MongoFiles
 
@@ -486,6 +484,7 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
+        // lock order: dbMutex first, then this
         mutex groupCommitMutex("groupCommit");
 
         bool _groupCommitWithLimitedLocks() {
@@ -502,8 +501,8 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return true;
             }
-
-            PREPLOGBUFFER();
+            JSectHeader h;
+            PREPLOGBUFFER(h);
 
             RWLockRecursive::Shared lk3(MongoFile::mmmutex);
 
@@ -515,16 +514,15 @@ namespace mongo {
             lk1.reset();
 
             // ****** now other threads can do writes ******
-
-            WRITETOJOURNAL(commitJob._ab);
+            WRITETOJOURNAL(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES();
-            assert( abLen == commitJob._ab.len() ); // WRITETODATAFILES uses _ab also
+            WRITETODATAFILES(h, commitJob._ab);
+            assert( abLen == commitJob._ab.len() ); // check again wasn't modded
             commitJob._ab.reset();
 
             // can't : dbMutex._remapPrivateViewRequested = true;
@@ -570,18 +568,19 @@ namespace mongo {
             // (and we are only read locked in the dbMutex, so it could happen)
             scoped_lock lk(groupCommitMutex);
 
-            PREPLOGBUFFER();
+            JSectHeader h;
+            PREPLOGBUFFER(h);
 
             // todo : write to the journal outside locks, as this write can be slow.
             //        however, be careful then about remapprivateview as that cannot be done 
             //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(commitJob._ab);
+            WRITETOJOURNAL(h, commitJob._ab);
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES();
+            WRITETODATAFILES(h, commitJob._ab);
             debugValidateAllMapsMatch();
 
             commitJob.reset();
@@ -613,6 +612,7 @@ namespace mongo {
         }
 
         /** locking: in read lock when called
+                     or, for early commits (commitIfNeeded), in write lock
             @see MongoMMF::close()
         */
         static void groupCommit() {
@@ -685,32 +685,35 @@ namespace mongo {
             }
         }
 
-        CodeBlock durThreadMain;
-
-        extern int groupCommitIntervalMs;
+        filesystem::path getJournalDir();
 
         void durThread() {
             Client::initThread("journal");
-            while( !inShutdown() ) {
-                CodeBlock::Within w(durThreadMain);
-                try {
-                    int millis = groupCommitIntervalMs;
-                    {
-                        stats.rotate();
-                        {
-                            Timer t;
-                            journalRotate(); // note we do this part outside of mongomutex
-                            millis -= t.millis();
-                            wassert( millis <= groupCommitIntervalMs ); // race if groupCommitIntervalMs was changing by another thread so wassert
-                            if( millis < 2 )
-                                millis = 2;
-                        }
 
-                        // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
-                        // but is likely also less spiky on our cpu usage, which is good:
-                        sleepmillis(millis/2);
-                        commitJob.wi()._deferred.invoke();
-                        sleepmillis(millis/2);
+            bool samePartition = false;
+            try { samePartition = onSamePartition(getJournalDir().string(), dbpath); }
+            catch(...) { }
+
+            while( !inShutdown() ) {
+                unsigned ms = cmdLine.journalCommitInterval;
+                if( ms == 0 ) { 
+                    // use default
+                    ms = samePartition ? 100 : 30;
+                }
+
+                unsigned oneThird = (ms / 3) + 1; // +1 so never zero
+
+                try {
+                    stats.rotate();
+
+                    // we do this in a couple blocks (the invoke()), which makes it a tiny bit faster (only a little) on throughput,
+                    // but is likely also less spiky on our cpu usage, which is good.
+
+                    // commit sooner if one or more getLastError j:true is pending
+                    for( unsigned i = 1; i <= 2; i++ ) {
+                        sleepmillis(oneThird);
+                        if( commitJob._notify.nWaiting() )
+                            break;
                         commitJob.wi()._deferred.invoke();
                     }
 
@@ -773,6 +776,13 @@ namespace mongo {
 
         void DurableImpl::syncDataAndTruncateJournal() {
             dbMutex.assertWriteLocked();
+
+            // a commit from the commit thread won't begin while we are in the write lock,
+            // but it may already be in progress and the end of that work is done outside 
+            // (dbMutex) locks. This line waits for that to complete if already underway.
+            {
+                scoped_lock lk(groupCommitMutex);
+            }
 
             groupCommit();
             MongoFile::flushAll(true);

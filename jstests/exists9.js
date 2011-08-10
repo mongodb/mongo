@@ -25,8 +25,7 @@ assert.eq( 1, t.count( {a:{$exists:false}} ) );
 t.ensureIndex( {a:1} );
 assert.eq( 1, t.find( {a:{$exists:true}} ).hint( {a:1} ).itcount() );
 assert.eq( 1, t.find( {a:{$exists:false}} ).hint( {a:1} ).itcount() );
-// The empty array will be scanned, but not returned.
-assert.eq( 2, t.find( {a:{$exists:false}} ).hint( {a:1} ).explain().nscanned );
+assert.eq( 1, t.find( {a:{$exists:false}} ).hint( {a:1} ).explain().nscanned );
 
 t.drop();
 
@@ -39,6 +38,4 @@ assert.eq( 1, t.count( {'a.0':{$exists:false}} ) );
 // With index.
 t.ensureIndex( {'a.0':1} );
 assert.eq( 1, t.find( {'a.0':{$exists:true}} ).hint( {'a.0':1} ).itcount() );
-if ( 0 ) { // SERVER-2902
 assert.eq( 1, t.find( {'a.0':{$exists:false}} ).hint( {'a.0':1} ).itcount() );
-}

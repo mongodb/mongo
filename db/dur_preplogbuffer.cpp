@@ -60,7 +60,7 @@ namespace mongo {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
 
-            _IF( !mmf->willNeedRemap() ) {
+            if( unlikely(!mmf->willNeedRemap()) ) {
                 // tag this mmf as needed a remap of its private view later.
                 // usually it will already be dirty/already set, so we do the if above first
                 // to avoid possibility of cpu cache line contention
@@ -97,7 +97,7 @@ namespace mongo {
 #endif
             bb.appendBuf(i->start(), e.len);
 
-            _IF (e.len != (unsigned)i->length()) {
+            if (unlikely(e.len != (unsigned)i->length())) {
                 log() << "journal info splitting prepBasicWrite at boundary" << endl;
 
                 // This only happens if we write to the last byte in a file and
@@ -120,40 +120,25 @@ namespace mongo {
             // each time events switch to a different database we journal a JDbContext
             RelativePath lastDbPath;
 
-            set<WriteIntent>::iterator i = commitJob.writes().begin();
-
-            const WriteIntent *w = &(*i);
-            while(1) {
-                i++;
-                const WriteIntent *next = 0;
-                IF( i != commitJob.writes().end() ) {
-                    next = &(*i);
-                    PREFETCH(next);
-                }
-                prepBasicWrite_inlock(bb, w, lastDbPath);
-                _IF( next == 0 )
-                    break;
-                w = next;
-            };
+            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
+                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
+            }
         }
 
-        void resetLogBuffer(AlignedBuilder& bb) {
+        void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
             bb.reset();
 
-            // JSectHeader
-            JSectHeader h;
-            h.len = (unsigned) 0xffffffff;  // total length, will fill in later
+            h.setSectionLen(0xffffffff);  // total length, will fill in later
             h.seqNumber = getLastDataFileFlushTime();
             h.fileId = j.curFileId();
-
-            bb.appendStruct(h);
         }
 
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
+            @return partially populated sectheader and _ab set
         */
-        void _PREPLOGBUFFER() {
+        void _PREPLOGBUFFER(JSectHeader& h) {
             assert( cmdLine.dur );
 
             {
@@ -165,7 +150,7 @@ namespace mongo {
             }
 
             AlignedBuilder& bb = commitJob._ab;
-            resetLogBuffer(bb);
+            resetLogBuffer(h, bb); // adds JSectHeader
 
             // ops other than basic writes (DurOp's)
             {
@@ -174,34 +159,14 @@ namespace mongo {
                 }
             }
 
-            {
-                prepBasicWrites(bb);
-            }
-
-            // pad to alignment, and set the total section length in the JSectHeader
-            assert( 0xffffe000 == (~(Alignment-1)) );
-            unsigned lenWillBe = bb.len() + sizeof(JSectFooter);
-            unsigned L = (lenWillBe + Alignment-1) & (~(Alignment-1));
-            dassert( L >= lenWillBe );
-            *((unsigned*)bb.atOfs(0)) = L;
-
-            {
-                JSectFooter f(bb.buf(), bb.len());
-                bb.appendStruct(f);
-            }
-
-            {
-                unsigned padding = L - bb.len();
-                bb.skip(padding);
-                dassert( bb.len() % Alignment == 0 );
-            }
+            prepBasicWrites(bb);
 
             return;
         }
-        void PREPLOGBUFFER() {
+        void PREPLOGBUFFER(/*out*/ JSectHeader& h) {
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
-            _PREPLOGBUFFER();
+            _PREPLOGBUFFER(h);
             stats.curr->_prepLogBufferMicros += t.micros();
         }
 

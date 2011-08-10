@@ -361,6 +361,7 @@ namespace QueryTests {
 		void insertA(const char* ns, int a) {
 			BSONObjBuilder b;
 			b.appendOID("_id", 0, true);
+			b.appendOID("value", 0, true);
 			b.append("a", a);
 			insert(ns, b.obj());
 		}
@@ -374,7 +375,7 @@ namespace QueryTests {
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
             OID id;
             id.init("000000000000000000000000");
-            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "_id" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
+            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "value" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
             c1->next();
             c1->next();
             ASSERT( !c1->more() );
@@ -399,7 +400,6 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplayMode";
-            insert( ns, BSON( "ts" << 3 ) );
             insert( ns, BSON( "ts" << 0 ) );
             insert( ns, BSON( "ts" << 1 ) );
             insert( ns, BSON( "ts" << 2 ) );
@@ -407,6 +407,12 @@ namespace QueryTests {
             ASSERT( c->more() );
             ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
             ASSERT( !c->more() );
+
+            insert( ns, BSON( "ts" << 3 ) );
+            c = client().query( ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
+            ASSERT( c->more() );
         }
     };
 
@@ -1146,7 +1152,35 @@ namespace QueryTests {
     private:
         int _old;
     };
+    
+    /**
+     * Check OplogReplay mode where query timestamp is earlier than the earliest
+     * entry in the collection.
+     */
+    class FindingStartStale : public CollectionBase {
+    public:
+        FindingStartStale() : CollectionBase( "findingstart" ) {}
 
+        void run() {
+            unsigned startNumCursors = ClientCursor::numCursors();
+            
+            BSONObj info;
+            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
+            
+            // Check OplogReplay mode with empty collection.
+            auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( !c->more() );
+
+            // Check with some docs in the collection.
+            for( int i = 100; i < 150; client().insert( ns(), BSON( "ts" << i++ ) ) );
+            c = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 100, c->next()[ "ts" ].numberInt() );
+
+            // Check that no persistent cursors outlast our queries above.
+            ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
+        }
+    };
 
     class WhatsMyUri : public CollectionBase {
     public:
@@ -1362,6 +1396,7 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStartPartiallyFull >();
+            add< FindingStartStale >();
             add< WhatsMyUri >();
 
             add< parsedtests::basic1 >();

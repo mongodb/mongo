@@ -185,6 +185,16 @@ namespace mongo {
         return true;
     }
 
+    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload ){
+        try{
+            return getChunkManager( ns, shouldReload );
+        }
+        catch( AssertionException& e ){
+            warning() << "chunk manager not found for " << ns << causedBy( e ) << endl;
+            return ChunkManagerPtr();
+        }
+    }
+
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
         BSONObj key;
         bool unique;
@@ -201,8 +211,8 @@ namespace mongo {
                 _reload();
                 ci = _collections[ns];
             }
-            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() || ci.wasDropped() );
-            assert( ci.wasDropped() || ! ci.key().isEmpty() );
+            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
+            assert( ! ci.key().isEmpty() );
             
             if ( ! shouldReload || earlyReload )
                 return ci.getCM();
@@ -226,6 +236,7 @@ namespace mongo {
                 if ( v == oldVersion ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
+                    massert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
                 }
             }
@@ -244,7 +255,7 @@ namespace mongo {
         scoped_lock lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
-        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() || ci.wasDropped() );
+        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
         
         if ( temp->getVersion() > ci.getCM()->getVersion() ) {
             // we only want to reset if we're newer
@@ -252,6 +263,7 @@ namespace mongo {
             ci.resetCM( temp.release() );
         }
         
+        massert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
         return ci.getCM();
     }
 
@@ -268,7 +280,7 @@ namespace mongo {
     }
 
     void DBConfig::unserialize(const BSONObj& from) {
-        log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
+        LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
         assert( _name == from["_id"].String() );
 
         _shardingEnabled = from.getBoolField("partitioned");
@@ -300,13 +312,14 @@ namespace mongo {
         unserialize( o );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + _name + "." );
+        b.appendRegex( "_id" , (string)"^" + _name + "\\." );
 
         auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
         assert( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
-            _collections[o["_id"].String()] = CollectionInfo( o );
+            if( o["dropped"].trueValue() ) _collections.erase( o["_id"].String() );
+            else _collections[o["_id"].String()] = CollectionInfo( o );
         }
 
         conn.done();
@@ -369,7 +382,7 @@ namespace mongo {
 
         // 1
         if ( ! configServer.allUp( errmsg ) ) {
-            log(1) << "\t DBConfig::dropDatabase not all up" << endl;
+            LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
             return 0;
         }
 
@@ -392,7 +405,7 @@ namespace mongo {
             log() << "error removing from config server even after checking!" << endl;
             return 0;
         }
-        log(1) << "\t removed entry from config server for: " << _name << endl;
+        LOG(1) << "\t removed entry from config server for: " << _name << endl;
 
         set<Shard> allServers;
 
@@ -428,7 +441,7 @@ namespace mongo {
             conn.done();
         }
 
-        log(1) << "\t dropped primary db for: " << _name << endl;
+        LOG(1) << "\t dropped primary db for: " << _name << endl;
 
         configServer.logChange( "dropDatabase" , _name , BSONObj() );
         return true;
@@ -440,6 +453,7 @@ namespace mongo {
         while ( true ) {
             Collections::iterator i = _collections.begin();
             for ( ; i != _collections.end(); ++i ) {
+                // log() << "coll : " << i->first << " and " << i->second.isSharded() << endl;
                 if ( i->second.isSharded() )
                     break;
             }
@@ -453,7 +467,7 @@ namespace mongo {
             }
 
             seen.insert( i->first );
-            log(1) << "\t dropping sharded collection: " << i->first << endl;
+            LOG(1) << "\t dropping sharded collection: " << i->first << endl;
 
             i->second.getCM()->getAllShards( allServers );
             i->second.getCM()->drop( i->second.getCM() );
@@ -461,7 +475,7 @@ namespace mongo {
 
             num++;
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
-            log(2) << "\t\t dropped " << num << " so far" << endl;
+            LOG(2) << "\t\t dropped " << num << " so far" << endl;
         }
 
         return true;
@@ -528,7 +542,7 @@ namespace mongo {
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
         _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
-        log(1) << " config string : " << fullString << endl;
+        LOG(1) << " config string : " << fullString << endl;
 
         return true;
     }
@@ -609,7 +623,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                log( LL_ERROR ) << "config servers not in sync! " << errmsg << endl;
+                log( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
                 return false;
             }
         }
@@ -672,7 +686,7 @@ namespace mongo {
             string name = o["_id"].valuestrsafe();
             got.insert( name );
             if ( name == "chunksize" ) {
-                log(1) << "MaxChunkSize: " << o["value"] << endl;
+                LOG(1) << "MaxChunkSize: " << o["value"] << endl;
                 Chunk::MaxChunkSize = o["value"].numberInt() * 1024 * 1024;
             }
             else if ( name == "balancer" ) {
@@ -746,7 +760,7 @@ namespace mongo {
                     conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
                 }
                 catch ( UserException& e ) {
-                    log(1) << "couldn't create changelog (like race condition): " << e << endl;
+                    LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
                     // don't care
                 }
                 createdCapped = true;

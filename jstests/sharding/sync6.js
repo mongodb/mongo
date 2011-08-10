@@ -17,10 +17,13 @@ commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 1 } )
 // Have lots of threads, so use larger i
 // Can't test too many, we get socket exceptions... possibly due to the 
 // javascript console.
-for ( var i = 8; i < 12; i++ ) {
+for ( var i = 8; i < 9; i++ ) {
 
-	// Our force time is 2 seconds
-	var takeoverMS = 2000;
+	// Our force time is 4 seconds
+    // Slower machines can't keep up the LockPinger rate, which can lead to lock failures
+    // since our locks are only valid if the LockPinger pings faster than the force time.
+    // Actual lock timeout is 15 minutes, so a few seconds is extremely aggressive
+	var takeoverMS = 4000;
 
 	// Generate valid sleep and skew for this timeout
 	var threadSleepWithLock = takeoverMS / 2;

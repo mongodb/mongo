@@ -242,13 +242,19 @@ namespace mongo {
             const Member *primary;
         };
         const SP get() {
-            scoped_lock lk(m);
+            rwlock lk(m, false);
             return sp;
         }
-        MemberState getState() const { return sp.state; }
-        const Member* getPrimary() const { return sp.primary; }
+        MemberState getState() const {
+            rwlock lk(m, false);
+            return sp.state;
+        }
+        const Member* getPrimary() const {
+            rwlock lk(m, false);
+            return sp.primary;
+        }
         void change(MemberState s, const Member *self) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             if( sp.state != s ) {
                 log() << "replSet " << s.toString() << rsLog;
             }
@@ -262,24 +268,25 @@ namespace mongo {
             }
         }
         void set(MemberState s, const Member *p) {
-            scoped_lock lk(m);
-            sp.state = s; sp.primary = p;
+            rwlock lk(m, true);
+            sp.state = s;
+            sp.primary = p;
         }
         void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
         void setOtherPrimary(const Member *mem) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             assert( !sp.state.primary() );
             sp.primary = mem;
         }
         void noteRemoteIsPrimary(const Member *remote) {
-            scoped_lock lk(m);
+            rwlock lk(m, true);
             if( !sp.state.secondary() && !sp.state.fatal() )
                 sp.state = MemberState::RS_RECOVERING;
             sp.primary = remote;
         }
         StateBox() : m("StateBox") { }
     private:
-        mongo::mutex m;
+        RWLock m;
         SP sp;
     };
 
@@ -446,11 +453,20 @@ namespace mongo {
         List1<Member> _members; // all members of the set EXCEPT _self.
         ReplSetConfig::MemberCfg _config; // config of _self
         unsigned _id; // _id of _self
+
+        int _maintenanceMode; // if we should stay in recovering state
     public:
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
         GhostSync *ghost;
+        /**
+         * This forces a secondary to go into recovering state and stay there
+         * until this is called again, passing in "false".  Multiple threads can
+         * call this and it will leave maintenance mode once all of the callers
+         * have called it again, passing in false.
+         */
+        void setMaintenanceMode(const bool inc);
     private:
         Member* head() const { return _members.head(); }
     public:
@@ -553,11 +569,29 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help << "internal"; }
+
+        /**
+         * Some replica set commands call this and then call check(). This is
+         * intentional, as they might do things before theReplSet is initialized
+         * that still need to be checked for auth.
+         */
+        bool checkAuth(string& errmsg, BSONObjBuilder& result) {
+            if( !noauth && adminOnly() ) {
+                AuthenticationInfo *ai = cc().getAuthenticationInfo();
+                if (!ai->isAuthorizedForLock("admin", locktype())) {
+                    errmsg = "replSet command unauthorized";
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) {
                 errmsg = "not running with --replSet";
                 return false;
             }
+
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 string s;
@@ -566,7 +600,8 @@ namespace mongo {
                     result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;
             }
-            return true;
+
+            return checkAuth(errmsg, result);
         }
     };
 

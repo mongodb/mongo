@@ -22,6 +22,7 @@
 
 #include "indexkey.h"
 #include "queryutil.h"
+#include "projection.h"
 
 namespace mongo {
 
@@ -76,30 +77,9 @@ namespace mongo {
 
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
-        void _add(BSONObj& k, BSONObj o, DiskLoc* loc) {
-            if (!loc) {
-                _best.insert(make_pair(k.getOwned(),o.getOwned()));
-            }
-            else {
-                BSONObjBuilder b;
-                b.appendElements(o);
-                b.append("$diskLoc", loc->toBSONObj());
-                _best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
-            }
-        }
-
-        void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
-            /* todo : we don't correct _approxSize here. */
-            const BSONObj& worstBestKey = i->first;
-            int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
-            if ( c > 0 ) {
-                // k is better, 'upgrade'
-                _best.erase(i);
-                _add(k, o, loc);
-            }
-        }
-
     public:
+        static const unsigned MaxScanAndOrderBytes;
+
         ScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs) :
             _best( BSONObjCmp( order ) ),
             _startFrom(startFrom), _order(order, frs) {
@@ -107,60 +87,25 @@ namespace mongo {
             _approxSize = 0;
         }
 
-        int size() const {
-            return _best.size();
-        }
+        int size() const { return _best.size(); }
 
-        void add(BSONObj o, DiskLoc* loc) {
-            assert( o.isValid() );
-            BSONObj k = _order.getKeyFromObject(o);
-            if ( k.isEmpty() ) {
-                return;   
-            }
-            if ( (int) _best.size() < _limit ) {
-                _approxSize += k.objsize();
-                _approxSize += o.objsize();
-
-                /* note : adjust when bson return limit adjusts. note this limit should be a bit higher. */
-                uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", _approxSize < 32 * 1024 * 1024 );
-
-                _add(k, o, loc);
-                return;
-            }
-            BestMap::iterator i;
-            assert( _best.end() != _best.begin() );
-            i = _best.end();
-            i--;
-            _addIfBetter(k, o, i, loc);
-        }
-
-        void _fill(BufBuilder& b, Projection *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
-            int n = 0;
-            int nFilled = 0;
-            for ( BestMap::iterator i = begin; i != end; i++ ) {
-                n++;
-                if ( n <= _startFrom )
-                    continue;
-                BSONObj& o = i->second;
-                fillQueryResultFromObj(b, filter, o);
-                nFilled++;
-                if ( nFilled >= _limit )
-                    break;
-                uassert( 10129 ,  "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
-            }
-            nout = nFilled;
-        }
+        void add(BSONObj o, DiskLoc* loc);
 
         /* scanning complete. stick the query result in b for n objects. */
-        void fill(BufBuilder& b, Projection *filter, int& nout) {
-            _fill(b, filter, nout, _best.begin(), _best.end());
-        }
-        
+        void fill(BufBuilder& b, Projection *filter, int& nout ) const;
+
+    private:
+
+        void _add(BSONObj& k, BSONObj o, DiskLoc* loc);
+
+        void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc);
+
         BestMap _best; // key -> full object
         int _startFrom;
         int _limit;   // max to send back.
         KeyType _order;
         unsigned _approxSize;
+
     };
 
 } // namespace mongo

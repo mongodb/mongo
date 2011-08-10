@@ -263,6 +263,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
+        virtual bool maintenanceMode() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
@@ -274,7 +275,7 @@ namespace mongo {
         virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
 
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
             if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";

@@ -46,7 +46,7 @@ namespace mongo {
     class ObjectIdTest : public BasicDriverHelper {
     public:
         ObjectIdTest() : BasicDriverHelper( "driverOIDTest" ) {}
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj.firstElement().type() != jstOID ) {
                 errmsg = "not oid";
                 return false;

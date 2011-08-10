@@ -45,7 +45,7 @@ BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
-    BSONElement nullElement;
+    BSONElement eooElement;
 
     GENOIDLabeler GENOID;
 
@@ -508,6 +508,12 @@ namespace mongo {
     }
 
     BSONObj staticNull = fromjson( "{'':null}" );
+    BSONObj makeUndefined() {
+        BSONObjBuilder b;
+        b.appendUndefined( "" );
+        return b.obj();
+    }
+    BSONObj staticUndefined = makeUndefined();
 
     /* well ordered compare */
     int BSONObj::woSortOrder(const BSONObj& other, const BSONObj& sortKey , bool useDotted ) const {
@@ -613,13 +619,13 @@ namespace mongo {
         }
 
         if ( sub.eoo() )
-            return nullElement;
-        else if ( sub.type() == Array || name[0] == '\0')
+            return eooElement;
+        else if ( sub.type() == Array || name[0] == '\0' )
             return sub;
         else if ( sub.type() == Object )
             return sub.embeddedObject().getFieldDottedOrArray( name );
         else
-            return nullElement;
+            return eooElement;
     }
 
     /**
@@ -1167,13 +1173,9 @@ namespace mongo {
 
         while (l.more() && r.more()){
             if (strcmp(l.next().fieldName(), r.next().fieldName())) {
-                PRINTFL;
                 return false;
             }
         }
-        PRINT(l.more());
-        PRINT(r.more());
-        PRINT(l.more() || r.more());
 
         return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }

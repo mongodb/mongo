@@ -202,9 +202,24 @@ doTest = function (signal) {
     wait(function () { return B.isMaster().ismaster || B.isMaster().secondary; });
     
     // everyone is up here...
-    assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
-    assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
     replTest.awaitReplication();
+
+    // theoretically, a read could slip in between StateBox::change() printing
+    // replSet SECONDARY
+    // and the replset actually becoming secondary
+    // so we're trying to wait for that here
+    print("waiting for secondary");
+    assert.soon(function() {
+        try {
+          var aim = A.isMaster();
+          var bim = B.isMaster();
+          return (aim.ismaster || aim.secondary) &&
+            (bim.ismaster || bim.secondary);
+        }
+        catch(e) {
+          print("checking A and B: "+e);
+        }
+      });
     
     verify(a);
 

@@ -28,7 +28,8 @@ namespace mongo {
         extern bool okToCleanUp;
 
         /** at termination after db files closed & fsynced 
-            also after covery
+            also after recovery
+            closes and removes journal files
             @param log report in log that we are cleaning up if we actually do any work
         */
         void journalCleanup(bool log = false);
@@ -42,12 +43,6 @@ namespace mongo {
             only called by durThread.
          */
         void journalRotate();
-
-        /** write/append to journal file *
-            @param buf - a buffer that will be written to the journal.
-            will not return until on disk
-        */
-        void journal(const AlignedBuilder& buf);
 
         /** flag that something has gone wrong during writing to the journal
             (not for recovery mode)
@@ -66,6 +61,8 @@ namespace mongo {
 
         // in case disk controller buffers writes
         const long long ExtraKeepTimeMs = 10000;
+
+        const unsigned JournalCommitIntervalDefault = 100;
 
     }
 }

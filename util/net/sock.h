@@ -39,6 +39,10 @@
 
 #endif // _WIN32
 
+#ifdef MONGO_SSL
+#include <openssl/ssl.h>
+#endif
+
 namespace mongo {
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
@@ -68,24 +72,13 @@ namespace mongo {
         return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
     }
 
-    inline void setSockTimeouts(int sock, double secs) {
-        struct timeval tv;
-        tv.tv_sec = (int)secs;
-        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
-        bool report = logLevel > 3; // solaris doesn't provide these
-        DEV report = true;
-        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
-        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
-    }
-
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname);
 
     void enableIPv6(bool state=true);
     bool IPv6Enabled();
+    void setSockTimeouts(int sock, double secs);
 
     /**
      * wrapped around os representation of network address
@@ -157,6 +150,29 @@ namespace mongo {
         string _extra;
     };
 
+#ifdef MONGO_SSL
+    class SSLManager : boost::noncopyable {
+    public:
+        SSLManager( bool client );
+        
+        void setupPEM( const string& keyFile , const string& password );
+        void setupPubPriv( const string& privateKeyFile , const string& publicKeyFile );
+
+        /**
+         * creates an SSL context to be used for this file descriptor
+         * caller should delete
+         */
+        SSL * secure( int fd );
+        
+        static int password_cb( char *buf,int num, int rwflag,void *userdata );
+
+    private:
+        bool _client;
+        SSL_CTX* _context;
+        string _password;
+    };
+#endif
+
     /**
      * thin wrapped around file descriptor and system calls
      * todo: ssl
@@ -165,9 +181,12 @@ namespace mongo {
     public:
         Socket(int sock, const SockAddr& farEnd);
 
-        // in some cases the timeout will actually be 2x this value - eg we do a partial send,
-        // then the timeout fires, then we try to send again, then the timeout fires again with
-        // no data sent, then we detect that the other side is down
+        /** In some cases the timeout will actually be 2x this value - eg we do a partial send,
+            then the timeout fires, then we try to send again, then the timeout fires again with
+            no data sent, then we detect that the other side is down.
+
+            Generally you don't want a timeout, you should be very prepared for errors if you set one.
+        */
         Socket(double so_timeout = 0, int logLevel = 0 );
 
         bool connect(SockAddr& farEnd);
@@ -190,14 +209,43 @@ namespace mongo {
         void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
         long long getBytesIn() const { return _bytesIn; }
         long long getBytesOut() const { return _bytesOut; }
+        
+        void setTimeout( double secs );
 
+#ifdef MONGO_SSL
+        /** secures inline */
+        void secure( SSLManager * ssl );
+
+        void secureAccepted( SSLManager * ssl );
+#endif
+        
+        /**
+         * call this after a fork for server sockets
+         */
+        void postFork();
+        
     private:
+        void _init();
+        /** raw send, same semantics as ::send */
+        int _send( const char * data , int len );
+        
+        /** sends dumbly, just each buffer at a time */
+        void _send( const vector< pair< char *, int > > &data, const char *context );
+
+        /** raw recv, same semantics as ::recv */
+        int _recv( char * buf , int max );
+
         int _fd;
         SockAddr _remote;
         double _timeout;
 
         long long _bytesIn;
         long long _bytesOut;
+
+#ifdef MONGO_SSL
+        shared_ptr<SSL> _ssl;
+        SSLManager * _sslAccepted;
+#endif
 
     protected:
         int _logLevel; // passed to log() when logging errors

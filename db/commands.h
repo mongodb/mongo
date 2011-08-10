@@ -20,6 +20,7 @@
 #include "../pch.h"
 #include "jsobj.h"
 #include "../util/timer.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
 
@@ -45,7 +46,7 @@ namespace mongo {
 
            return value is true if succeeded.  if false, set errmsg text.
         */
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
+        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) = 0;
 
         /*
            note: logTheTop() MUST be false if READ
@@ -94,6 +95,11 @@ namespace mongo {
         */
         virtual bool requiresAuth() { return true; }
 
+        /* Return true if a replica set secondary should go into "recovering"
+           (unreadable) state while running this command.
+         */
+        virtual bool maintenanceMode() const { return false; }
+
         /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */
@@ -120,7 +126,7 @@ namespace mongo {
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const map<string,Command*>* webCommands() { return _webCommands; }
         /** @return if command was found and executed */
-        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions = 0);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );
     };
@@ -139,7 +145,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const;
         CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+        bool run(const string& dbname, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
     private:
         bool shutdownHelper();
     };

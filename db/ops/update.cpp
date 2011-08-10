@@ -1060,11 +1060,10 @@ namespace mongo {
         
         debug.updateobj = updateobj;
 
-        /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
-        /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
+        // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
+        // The pointers may be left invalid on a failed or terminal yield recovery.
         NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
         NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
-        /* end note */
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
@@ -1105,6 +1104,9 @@ namespace mongo {
         shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
 
+        d = nsdetails(ns);
+        nsdt = &NamespaceDetailsTransient::get_w(ns);
+
         if( c->ok() ) {
             set<DiskLoc> seenObjects;
             MatchDetails details;
@@ -1114,20 +1116,28 @@ namespace mongo {
 
                 bool atomic = c->matcher()->docMatcher().atomic();
                 
-                // *****************
-                if ( cc.get() == 0 ) {
-                    shared_ptr< Cursor > cPtr = c;
-                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                if ( !atomic ) {
+                    // *****************
+                    if ( cc.get() == 0 ) {
+                        shared_ptr< Cursor > cPtr = c;
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
+                    }
+    
+                    bool didYield;
+                    if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
+                        cc.release();
+                        break;
+                    }
+                    if ( !c->ok() ) {
+                        break;
+                    }
+                
+                    if ( didYield ) {
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
+                    }
+                    // *****************
                 }
-
-                if ( ! cc->yieldSometimes( ClientCursor::WillNeed ) ) {
-                    cc.release();
-                    break;
-                }
-                if ( !c->ok() ) {
-                    break;
-                }
-                // *****************
 
                 // May have already matched in UpdateOp, but do again to get details set correctly
                 if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
@@ -1146,6 +1156,8 @@ namespace mongo {
                         if ( !c->ok() ) {
                             break;
                         }
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
                     }
                     continue;
                 }
@@ -1276,10 +1288,11 @@ namespace mongo {
                         if ( !c->ok() ) {
                             break;
                         }
+                        d = nsdetails(ns);
+                        nsdt = &NamespaceDetailsTransient::get_w(ns);
                     }
 
-                    if (atomic)
-                        getDur().commitIfNeeded();
+                    getDur().commitIfNeeded();
 
                     continue;
                 }

@@ -36,6 +36,7 @@
 #include "../util/checksum.h"
 #include "../util/version.h"
 #include "../db/key.h"
+#include "../util/compress.h"
 
 using namespace bson;
 
@@ -118,7 +119,7 @@ namespace PerfTests {
 
         // optional 2nd test phase to be timed separately
         // return name of it
-        virtual const char * timed2() { return 0; }
+        virtual string timed2() { return ""; }
 
         virtual void post() { }
 
@@ -133,8 +134,68 @@ namespace PerfTests {
         virtual bool showDurStats() { return true; }
 
         static DBClientConnection *conn;
+        static unsigned once;
 
     public:
+        /* if you want recording of the timings, place the password for the perf database 
+            in ./../settings.py:
+                pstatspassword="<pwd>"
+        */
+        void connect() { 
+            if( once )
+                return;
+            ++once;
+
+            // no writing to perf db if _DEBUG
+            DEV return;
+            
+            const char *fn = "../../settings.py";
+            if( !exists(fn) ) { 
+                if( exists("settings.py") )
+                    fn = "settings.py";
+                else {
+                    cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
+                    cout << "it is recommended this be enabled even on dev boxes" << endl;
+                    return;
+                }
+            }
+
+            try {
+                if( conn == 0 ) {
+                    MemoryMappedFile f;
+                    const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
+                    string pwd;
+
+                    {
+                        const char *q = str::after(p, "pstatspassword=\"");
+                        if( *q == 0 ) {
+                            cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
+                            return;
+                        }
+                        else {
+                            pwd = str::before(q, '\"');
+                        }
+                    }
+
+                    DBClientConnection *c = new DBClientConnection(false, 0, 10);
+                    string err;
+                    if( c->connect("perfdb.10gen.cc", err) ) { 
+                        if( !c->auth("perf", "perf", pwd, err) ) { 
+                            cout << "info: authentication with stats db failed: " << err << endl;
+                            assert(false);
+                        }
+                        conn = c;
+                    }
+                    else { 
+                        cout << err << " (to log perfstats)" << endl;
+                    }
+                }
+            }
+            catch(...) { }
+        }
+
+        virtual unsigned batchSize() { return 50; }
+
         void say(unsigned long long n, int ms, string s) {
             unsigned long long rps = n*1000/ms;
             cout << "stats " << setw(33) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
@@ -142,124 +203,70 @@ namespace PerfTests {
                 cout << dur::stats.curr->_asCSV();
             cout << endl;
 
-            /* if you want recording of the timings, place the password for the perf database 
-               in ./../settings.py:
-                 pstatspassword="<pwd>"
-            */
-            const char *fn = "../../settings.py";
-            static bool ok = true;
-            if( ok ) {
-                DEV { 
-                    // no writing to perf db if dev
-                }
-                else if( !exists(fn) ) { 
-                    static int once;
-                    if( exists("settings.py") )
-                        fn = "settings.py";
-                    else if( once++ == 0 ) {
-                        cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
-                        cout << "it is recommended this be enabled even on dev boxes" << endl;
-                    }
-                }
-                else {
+            connect();
+
+            if( conn && !conn->isFailed() ) { 
+                const char *ns = "perf.pstats";
+                if( perfHist ) {
+                    static bool needver = true;
                     try {
-                        if( conn == 0 ) {
-                            MemoryMappedFile f;
-                            const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
-                            string pwd;
-
-                            {
-                                const char *q = str::after(p, "pstatspassword=\"");
-                                if( *q == 0 ) {
-                                    cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
-                                    ok = false;
+                        // try to report rps from last time */
+                        Query q;
+                        {
+                            BSONObjBuilder b;
+                            b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
+                            DEV { b.append("info.DEBUG",true); }
+                            else b.appendNull("info.DEBUG");
+                            if( sizeof(int*) == 4 ) 
+                                b.append("info.bits", 32);
+                            else 
+                                b.appendNull("info.bits");
+                            q = Query(b.obj()).sort("when",-1);
+                        }
+                        BSONObj fields = BSON( "rps" << 1 << "info" << 1 );
+                        vector<BSONObj> v;
+                        conn->findN(v, ns, q, perfHist, 0, &fields);
+                        for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
+                            BSONObj o = *i;
+                            double lastrps = o["rps"].Number();
+                            if( lastrps ) {
+                                cout << "stats " << setw(33) << right << "new/old:" << ' ' << setw(9);
+                                cout << fixed << setprecision(2) << rps / lastrps;
+                                if( needver ) {
+                                    cout << "         " << o.getFieldDotted("info.git").toString();
                                 }
-                                else {
-                                    pwd = str::before(q, '\"');
-                                }
-                            }
-
-                            if( ok ) {
-                                conn = new DBClientConnection(false, 0, 10);
-                                string err;
-                                if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
-                                    if( !conn->auth("perf", "perf", pwd, err) ) { 
-                                        cout << "info: authentication with stats db failed: " << err << endl;
-                                        assert(false);
-                                    }
-                                }
-                                else { 
-                                    cout << err << " (to log perfstats)" << endl;
-                                    ok = false;
-                                }
+                                cout << '\n';
                             }
                         }
-                        if( conn && !conn->isFailed() ) { 
-                            const char *ns = "perf.pstats";
-                            if( perfHist ) {
-                                static bool needver = true;
-                                try {
-                                    // try to report rps from last time */
-                                    Query q;
-                                    {
-                                        BSONObjBuilder b;
-                                        b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
-                                        DEV b.append("info.DEBUG",true);
-                                        else b.appendNull("info.DEBUG");
-                                        if( sizeof(int*) == 4 ) b.append("info.bits", 32);
-                                        else b.appendNull("info.bits");
-                                        q = Query(b.obj()).sort("when",-1);
-                                   }
-                                    //cout << q.toString() << endl;
-                                    BSONObj fields = BSON( "rps" << 1 << "info" << 1 );
-                                    vector<BSONObj> v;
-                                    conn->findN(v, ns, q, perfHist, 0, &fields);
-                                    for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
-                                        BSONObj o = *i;
-                                        double lastrps = o["rps"].Number();
-                                        if( lastrps ) {
-                                            cout << "stats " << setw(33) << right << "new/old:" << ' ' << setw(9);
-                                            cout << fixed << setprecision(2) << rps / lastrps;
-                                            if( needver ) {
-                                                cout << "         " << o.getFieldDotted("info.git").toString();
-                                            }
-                                            cout << '\n';
-                                        }
-                                    }
-                                } catch(...) { }
-                                cout.flush();
-                                needver = false;
-                            }
-                            {
-                                bob b;
-                                b.append("host", getHostName());
-                                b.appendTimeT("when", time(0));
-                                b.append("test", s);
-                                b.append("rps", (int) rps);
-                                b.append("millis", ms);
-                                b.appendBool("dur", cmdLine.dur);
-                                if( showDurStats() && cmdLine.dur ) 
-                                    b.append("durStats", dur::stats.curr->_asObj());
-                                {
-                                    bob inf;
-                                    inf.append("version", versionString);
-                                    if( sizeof(int*) == 4 ) inf.append("bits", 32);
-                                    DEV inf.append("DEBUG", true);
+                    } catch(...) { }
+                    cout.flush();
+                    needver = false;
+                }
+                {
+                    bob b;
+                    b.append("host", getHostName());
+                    b.appendTimeT("when", time(0));
+                    b.append("test", s);
+                    b.append("rps", (int) rps);
+                    b.append("millis", ms);
+                    b.appendBool("dur", cmdLine.dur);
+                    if( showDurStats() && cmdLine.dur ) 
+                        b.append("durStats", dur::stats.curr->_asObj());
+                    {
+                        bob inf;
+                        inf.append("version", versionString);
+                        if( sizeof(int*) == 4 ) inf.append("bits", 32);
+                        DEV inf.append("DEBUG", true);
 #if defined(_WIN32)
-                                    inf.append("os", "win");
+                        inf.append("os", "win");
 #endif
-                                    inf.append("git", gitVersion());
-                                    inf.append("boost", BOOST_VERSION);
-                                    b.append("info", inf.obj());
-                                }
-                                BSONObj o = b.obj();
-                                //cout << "inserting " << o.toString() << endl;
-                                conn->insert(ns, o);
-                            }
-                        }
+                        inf.append("git", gitVersion());
+                        inf.append("boost", BOOST_VERSION);
+                        b.append("info", inf.obj());
                     }
-                    catch(...) { 
-                    }
+                    BSONObj o = b.obj();
+                    //cout << "inserting " << o.toString() << endl;
+                    conn->insert(ns, o);
                 }
             }
         }
@@ -277,9 +284,9 @@ namespace PerfTests {
 
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
-            Timer t;
+            mongo::Timer t;
             unsigned long long n = 0;
-            const unsigned Batch = 50;
+            const unsigned Batch = batchSize();
 
             if( hlm == 0 ) { 
                 // means just do once
@@ -314,10 +321,10 @@ namespace PerfTests {
             post();
 
             {
-                const char *test2name = timed2();
-                if( test2name ) {
+                string test2name = timed2();
+                if( test2name.size() != 0 ) {
                     dur::stats.curr->reset();
-                    Timer t;
+                    mongo::Timer t;
                     unsigned long long n = 0;
                     while( 1 ) {
                         unsigned i;
@@ -335,6 +342,7 @@ namespace PerfTests {
     };
 
     DBClientConnection *B::conn;
+    unsigned B::once;
 
     unsigned dontOptimizeOutHopefully;
 
@@ -598,6 +606,48 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
     };
 
+    class Compress : public B {
+    public:
+        const unsigned sz;
+        void *p;
+        Compress() : sz(1024*1024*100+3) { }
+        virtual unsigned batchSize() { return 1; }
+        string name() { return "compress"; }
+        virtual bool showDurStats() { return false; }
+        virtual int howLongMillis() { return 4000; } 
+        unsigned long long expectation() { return 1000000; }
+        void prep() { 
+            p = malloc(sz);
+            // this isn't a fair test as it is mostly rands but we just want a rough perf check
+            static int last;
+            for (unsigned i = 0; i<sz; i++) {
+                int r = rand();
+                if( (r & 0x300) == 0x300 )
+                    r = last;
+                ((char*)p)[i] = r;
+                last = r;
+            }
+        }
+        size_t last;
+        string res;
+        void timed() {
+            mongo::Timer t;
+            string out;
+            size_t len = compress((const char *) p, sz, &out);
+            bool ok = uncompress(out.c_str(), out.size(), &res);
+            ASSERT(ok);
+            static unsigned once;
+            if( once++ == 0 )
+                cout << "compress round trip " << sz/(1024.0*1024) / (t.millis()/1000.0) << "MB/sec\n";
+            //cout << len / (1024.0/1024) << " compressed" << endl;
+            (void)len; //fix unused error while above line is commented out
+        }
+        void post() {
+            ASSERT( memcmp(res.c_str(), p, sz) == 0 );
+            free(p);
+        }
+    };
+
     // test speed of checksum method
     class ChecksumTest : public B {
     public:
@@ -607,6 +657,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 2000; } 
         int expectationTimeMillis() { return 5000; }
         virtual bool showDurStats() { return false; }
+        virtual unsigned batchSize() { return 1; }
 
         void *p;
 
@@ -684,7 +735,7 @@ namespace PerfTests {
         void timed() {
             client().insert( ns(), x );
         }
-        const char * timed2() {
+        string timed2() {
             client().findOne(ns(), query);
             return "findOne_by_id";
         }
@@ -753,7 +804,7 @@ namespace PerfTests {
             client().update(ns(), q, y, /*upsert*/true);
         }
 
-        const char * timed2() {
+        virtual string timed2() {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
 
             // test some $inc's
@@ -762,8 +813,7 @@ namespace PerfTests {
             BSONObj q = BSON("x" << x);
             client().update(ns(), q, I);
 
-            static string s = name()+"-inc";
-            return s.c_str();
+            return name()+"-inc";
         }
 
         unsigned long long expectation() { return 1000; }
@@ -778,6 +828,16 @@ namespace PerfTests {
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
+        
+        /*
+        virtual string timed2() {
+            string x = T::timed2();
+            if ( x.size() == 0 )
+                return x;
+            
+            return x + "-with-more-indexes";
+        }
+        */        
     };
 
     void t() {
@@ -822,6 +882,8 @@ namespace PerfTests {
             }
             else {
                 add< Dummy >();
+                add< ChecksumTest >();
+                add< Compress >();
                 add< TLS >();
                 add< Malloc >();
                 add< Timer >();
@@ -838,7 +900,6 @@ namespace PerfTests {
                 add< BSONIter >();
                 add< BSONGetFields1 >();
                 add< BSONGetFields2 >();
-                add< ChecksumTest >();
                 add< TaskQueueTest >();
                 add< InsertDup >();
                 add< Insert1 >();

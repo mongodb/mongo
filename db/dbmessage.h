@@ -122,7 +122,7 @@ namespace mongo {
 
         /** the 32 bit field before the ns 
          * track all bit usage here as its cross op
-         * 0: InsertOption_KeepGoing
+         * 0: InsertOption_ContinueOnError
          * 1: fromWriteback
          */
         int& reservedField() { return *reserved; }
@@ -233,7 +233,7 @@ namespace mongo {
 
     public:
         enum ReservedOptions {
-            Reserved_InsertOption_KeepGoing = 1 << 0 , 
+            Reserved_InsertOption_ContinueOnError = 1 << 0 , 
             Reserved_FromWriteback = 1 << 1 
         };
     };

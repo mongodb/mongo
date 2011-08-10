@@ -112,7 +112,7 @@ namespace mongo {
         }
 
         bool hasMore = sendMore && _cursor->more();
-        log(6) << "\t hasMore:" << hasMore << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
+        LOG(6) << "\t hasMore:" << hasMore << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
 
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? getId() : 0 );
         _totalSent += num;
@@ -131,13 +131,15 @@ namespace mongo {
 
     CursorCache::~CursorCache() {
         // TODO: delete old cursors?
-        int logLevel = 1;
+        bool print = logLevel > 0;
         if ( _cursors.size() || _refs.size() )
-            logLevel = 0;
-        log( logLevel ) << " CursorCache at shutdown - "
-                        << " sharded: " << _cursors.size()
-                        << " passthrough: " << _refs.size()
-                        << endl;
+            print = true;
+        
+        if ( print ) 
+            cout << " CursorCache at shutdown - "
+                 << " sharded: " << _cursors.size()
+                 << " passthrough: " << _refs.size()
+                 << endl;
     }
 
     ShardedClientCursorPtr CursorCache::get( long long id ) const {
@@ -300,7 +302,7 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
-        bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string&, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             cursorCache.appendInfo( result );
             if ( jsobj["setTimeout"].isNumber() )
                 CursorCache::TIMEOUT = jsobj["setTimeout"].numberLong();

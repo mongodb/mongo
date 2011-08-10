@@ -21,6 +21,25 @@ _parsePort = function() {
     return port;
 }
 
+connectionURLTheSame = function( a , b ){
+    if ( a == b )
+        return true;
+
+    if ( ! a || ! b )
+        return false;
+
+    a = a.split( "/" )[0]
+    b = b.split( "/" )[0]
+
+    return a == b;
+}
+
+assert( connectionURLTheSame( "foo" , "foo" ) )
+assert( ! connectionURLTheSame( "foo" , "bar" ) )
+
+assert( connectionURLTheSame( "foo/a,b" , "foo/b,a" ) )
+assert( ! connectionURLTheSame( "foo/a,b" , "bar/a,b" ) )
+
 createMongoArgs = function( binaryName , args ){
     var fullArgs = [ binaryName ];
 
@@ -79,6 +98,9 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
             oplogSize: "40",
             nohttpinterface: ""
         };
+    
+    if( jsTestOptions().noJournal ) options["nojournal"] = ""
+    if( jsTestOptions().noJournalPrealloc ) options["nopreallocj"] = ""
 
     if ( extraOptions )
         Object.extend( options , extraOptions );
@@ -158,6 +180,17 @@ myPort = function() {
  * * useHostname to use the hostname (instead of localhost)
  */
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
+    
+    // Check if testName is an object, if so, pull params from there
+    if( testName && ! testName.charAt ){
+        var params = testName
+        testName = params.name || "test"
+        numShards = params.shards || 2
+        verboseLevel = params.verbose || 0
+        numMongos = params.mongos || 1
+        otherParams = params.other || {} 
+    }
+    
     this._testName = testName;
 
     if ( ! otherParams )
@@ -170,8 +203,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     var localhost = otherParams.useHostname ? getHostName() : "localhost";
 
     this._alldbpaths = []
-
-
+    
     if ( otherParams.rs ){
         localhost = getHostName();
         // start replica sets
@@ -179,15 +211,18 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         for ( var i=0; i<numShards; i++){
             var setName = testName + "-rs" + i;
             
-            var rsDefaults = { oplogSize : 40 }
+            var rsDefaults = { oplogSize : 40, nodes : 3 }
             var rsParams = otherParams["rs" + i]
             
             for( var param in rsParams ){
                 rsDefaults[param] = rsParams[param]
             }
+
+            var numReplicas = rsDefaults.nodes || otherParams.numReplicas || 3
+            delete rsDefaults.nodes 
             
-            var rs = new ReplSetTest( { name : setName , nodes : 3 , startPort : 31100 + ( i * 100 ) } );
-            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsParams ) , url : rs.getURL() };
+            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ) } );
+            this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
             
         }
@@ -322,10 +357,9 @@ ShardingTest.prototype.getServer = function( dbname ){
     
     for ( var i=0; i<this._connections.length; i++ ){
         var c = this._connections[i];
-        if ( name == c.name )
+        if ( connectionURLTheSame( name , c.name ) || 
+             connectionURLTheSame( rsName , c.name ) )
             return c;
-	if ( rsName && c.name.startsWith( rsName ) )
-	    return c;
     }
     
     throw "can't find server for: " + dbname + " name:" + name;
@@ -683,7 +717,7 @@ ShardingTest.prototype.getShards = function( coll, query ){
     
     for( var i = 0; i < shards.length; i++ ){
         for( var j = 0; j < this._connections.length; j++ ){
-            if( this._connections[j].name == shards[i] ){
+            if ( connectionURLTheSame(  this._connections[j].name , shards[i] ) ){
                 shards[i] = this._connections[j]
                 break;
             }
@@ -730,21 +764,35 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
     if( collName.getDB )
         c = "" + collName
 
+    var isEmpty = this.s.getCollection( c ).count() == 0
+        
     if( ! this.isSharded( dbName ) )
         this.s.adminCommand( { enableSharding : dbName } )
     
-    this.s.adminCommand( { shardcollection : c , key : key } );
-    this.s.adminCommand( { split : c , middle : split } );
+    var result = this.s.adminCommand( { shardcollection : c , key : key } )
+    if( ! result.ok ){
+        printjson( result )
+        assert( false )
+    }
     
+    result = this.s.adminCommand( { split : c , middle : split } );
+    if( ! result.ok ){
+        printjson( result )
+        assert( false )
+    }
+        
     var result = null
     for( var i = 0; i < 5; i++ ){
         result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
         if( result.ok ) break;
         sleep( 5 * 1000 );
     }
+    printjson( result )
     assert( result.ok )
     
 };
+
+ShardingTest.prototype.shardColl = ShardingTest.prototype.shardGo
 
 ShardingTest.prototype.setBalancer = function( balancer ){
     if( balancer || balancer == undefined ){
@@ -902,6 +950,8 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     a.push( "--dbpath" );
     a.push( this.getPath( master ) );
     
+    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
 
     if ( !norepl ) {
         if ( master ){
@@ -1210,6 +1260,9 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     a.push( "--dbpath" );
     a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
     
+    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
+    
     for ( var k in extra ){
         var v = extra[k];        
         a.push( "--" + k );
@@ -1271,6 +1324,50 @@ ReplSetTest.prototype.callIsMaster = function() {
   return master || false;
 }
 
+ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
+    
+    if( host.length ){
+        for( var i = 0; i < host.length; i++ ) this.awaitOk( conn, host[i] )
+        return
+    }
+    
+    if( hostOk == undefined ) hostOk = { ok : true }
+    if( host.host ) host = host.host
+    if( rs && rs.getMaster ) rs = rs.name
+    
+    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" )
+    
+    var tests = 0
+    assert.soon( function() {
+        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
+        if( tests++ % 10 == 0 ) 
+            printjson( rsClientHosts )
+        
+        for ( rsName in rsClientHosts ){
+            if( rs && rs != rsName ) continue
+            for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
+                var clientHost = rsClientHosts[rsName].hosts[ i ];
+                if( clientHost.addr != host ) continue
+                
+                // Check that *all* host properties are set correctly
+                var propOk = true
+                for( var prop in hostOk ){
+                    if( clientHost[prop] != hostOk[prop] ){ 
+                        propOk = false
+                        break
+                    }
+                }
+                
+                if( propOk ) return true;
+
+            }
+        }
+        return false;
+    }, "timed out waiting for replica set client to recognize hosts",
+       3 * 20 * 1000 /* ReplicaSetMonitorWatcher updates every 20s */ )
+    
+}
+
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   var master = this.getMaster();
   var slaves = this.liveNodes.slaves;
@@ -1296,6 +1393,7 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
   return master;
 }
 
+ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster
 
 ReplSetTest.prototype.getSecondaries = function( timeout ){
     var master = this.getMaster( timeout )
@@ -1306,6 +1404,16 @@ ReplSetTest.prototype.getSecondaries = function( timeout ){
         }
     }
     return secs
+}
+
+ReplSetTest.prototype.getSecondary = function( timeout ){
+    return this.getSecondaries( timeout )[0];
+}
+
+ReplSetTest.prototype.status = function( timeout ){
+    var master = this.callIsMaster()
+    if( ! master ) master = this.liveNodes.slaves[0]
+    return master.getDB("admin").runCommand({replSetGetStatus: 1})
 }
 
 // Add a node to the test set
@@ -1379,62 +1487,76 @@ ReplSetTest.prototype.reInitiate = function() {
     this.initiate( config , 'replSetReconfig' );
 }
 
+ReplSetTest.prototype.getLastOpTimeWritten = function() {
+    this.getMaster();
+    this.attempt({context : this, desc : "awaiting oplog query"},
+                 function() {
+                     try {
+                         this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                     }
+                     catch(e) {
+                         print("ReplSetTest caught exception " + e);
+                         return false;
+                     }
+                     return true;
+                 });
+};
+
 ReplSetTest.prototype.awaitReplication = function(timeout) {
-   this.getMaster();
-   timeout = timeout || 30000;
+    timeout = timeout || 30000;
 
-   this.attempt({context : this, desc : "awaiting oplog query"},
-                function() {
-                    try {
-                        latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
-                    }
-                    catch(e) {
-                        print("ReplSetTest caught exception " + e);
-                        return false;
-                    }
-                    return true;
-                });
-   
-   print("ReplSetTest " + latest);
+    this.getLastOpTimeWritten();
 
-   this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
-       function() {
-           var synced = true;
-           for(var i=0; i<this.liveNodes.slaves.length; i++) {
-             var slave = this.liveNodes.slaves[i];
+    print("ReplSetTest " + this.latest);
 
-             // Continue if we're connected to an arbiter
-             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
-                 if(res.myState == 7) {
-                     continue;
-                 }
-             }
+    this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
+                 function() {
+                     try {
+                         var synced = true;
+                         for(var i=0; i<this.liveNodes.slaves.length; i++) {
+                             var slave = this.liveNodes.slaves[i];
 
-             slave.getDB("admin").getMongo().setSlaveOk();
-             var log = slave.getDB("local")['oplog.rs'];
-             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
-               var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
-               printjson( entry );
-               var ts = entry['ts'];
-               print("ReplSetTest await TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + latest.t+":"+latest.i);
-               
-               if (latest.t < ts.t || (latest.t == ts.t && latest.i < ts.i)) {
-                   latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
-               }
-               
-               print("ReplSetTest await oplog size for " + slave + " is " + log.count());
-               synced = (synced && friendlyEqual(latest,ts))
-             }
-             else {
-               synced = false;
-             }
-           }
+                             // Continue if we're connected to an arbiter
+                             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
+                                 if(res.myState == 7) {
+                                     continue;
+                                 }
+                             }
 
-           if(synced) {
-                print("ReplSetTest await synced=" + synced);
-           }
-           return synced;
-   });
+                             slave.getDB("admin").getMongo().setSlaveOk();
+                             var log = slave.getDB("local")['oplog.rs'];
+                             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
+                                 var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
+                                 printjson( entry );
+                                 var ts = entry['ts'];
+                                 print("ReplSetTest await TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + this.latest.t+":"+this.latest.i);
+
+                                 if (this.latest.t < ts.t || (this.latest.t == ts.t && this.latest.i < ts.i)) {
+                                     this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                                 }
+
+                                 print("ReplSetTest await oplog size for " + slave + " is " + log.count());
+                                 synced = (synced && friendlyEqual(this.latest,ts))
+                             }
+                             else {
+                                 synced = false;
+                             }
+                         }
+
+                         if(synced) {
+                             print("ReplSetTest await synced=" + synced);
+                         }
+                         return synced;
+                     }
+                     catch (e) {
+                         print("ReplSetTest.awaitReplication: caught exception "+e);
+
+                         // we might have a new master now
+                         this.getLastOpTimeWritten();
+
+                         return false;
+                     }
+                 });
 }
 
 ReplSetTest.prototype.getHashes = function( db ){
@@ -1704,10 +1826,10 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var lastTime = null
     var currTime = new Date().getTime()
     var status = undefined
-    
+        
     this.attempt({context: this, timeout: timeout, desc: "waiting for state indicator " + ind + " for " + timeout + "ms" }, function() {
         
-        status = this.getMaster().getDB("admin").runCommand({ replSetGetStatus : 1 })
+        status = this.status()
         
         if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ){
             if( lastTime == null ) print( "ReplSetTest waitForIndicator Initial status ( timeout : " + timeout + " ) :" )

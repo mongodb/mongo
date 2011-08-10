@@ -68,7 +68,7 @@ namespace mongo {
             return !currKeyNode().prevChildBucket.isNull();
         }
 
-        bool skipUnusedKeys( bool mayJump ) {
+        bool skipUnusedKeys() {
             int u = 0;
             while ( 1 ) {
                 if ( !ok() )
@@ -80,9 +80,6 @@ namespace mongo {
                 u++;
                 //don't include unused keys in nscanned
                 //++_nscanned;
-                if ( mayJump && ( u % 10 == 0 ) ) {
-                    skipOutOfRangeKeysAndCheckEnd();
-                }
             }
             if ( u > 10 )
                 OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
@@ -120,7 +117,7 @@ namespace mongo {
                                 if ( !kn.isUsed() ) {
                                     // we were deleted but still exist as an unused
                                     // marker key. advance.
-                                    skipUnusedKeys( false );
+                                    skipUnusedKeys();
                                 }
                                 return;
                             }
@@ -149,7 +146,7 @@ namespace mongo {
             bucket = _locate(keyAtKeyOfs, locAtKeyOfs);
             RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
             if ( ! bucket.isNull() )
-                skipUnusedKeys( false );
+                skipUnusedKeys();
 
         }
     
@@ -329,18 +326,24 @@ namespace mongo {
         if ( ok() ) {
             _nscanned = 1;
         }
-        skipUnusedKeys( false );
+        skipUnusedKeys();
         checkEnd();
     }
 
     void BtreeCursor::skipAndCheck() {
-        skipUnusedKeys( true );
+        int startNscanned = _nscanned;
+        skipUnusedKeys();
         while( 1 ) {
             if ( !skipOutOfRangeKeysAndCheckEnd() ) {
                 break;
             }
-            while( skipOutOfRangeKeysAndCheckEnd() );
-            if ( !skipUnusedKeys( true ) ) {
+            do {
+                if ( _nscanned > startNscanned + 20 ) {
+                    skipUnusedKeys();
+                    return;
+                }
+            } while( skipOutOfRangeKeysAndCheckEnd() );
+            if ( !skipUnusedKeys() ) {
                 break;
             }
         }
@@ -395,7 +398,7 @@ namespace mongo {
         bucket = _advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
 
         if ( !_independentFieldRanges ) {
-            skipUnusedKeys( false );
+            skipUnusedKeys();
             checkEnd();
             if ( ok() ) {
                 ++_nscanned;

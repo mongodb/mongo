@@ -150,14 +150,18 @@ namespace mongo {
             return io.getStringField("ns");
         }
 
-        int version() const {
-            BSONElement e = info.obj()["v"];
+        static int versionForIndexObj( const BSONObj &obj ) {
+            BSONElement e = obj["v"];
             if( e.type() == NumberInt ) 
                 return e._numberInt();
             // should normally be an int.  this is for backward compatibility
             int v = e.numberInt();
             uassert(14802, "index v field should be Integer type", v == 0);
-            return v;
+            return v;            
+        }
+        
+        int version() const {
+            return versionForIndexObj( info.obj() );
         }
 
         /** @return true if index has unique constraint */

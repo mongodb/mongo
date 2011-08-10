@@ -60,7 +60,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         virtual void help(stringstream& ss) const { ss << "internal"; }
         CmdAuthenticate() : Command("authenticate") {}
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+        bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
     private:
         bool getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd);
         void authenticate(const string& dbname, const string& user, const bool readOnly);
@@ -77,7 +77,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "de-authenticate"; }
         virtual LockType locktype() const { return NONE; }
         CmdLogout() : Command("logout") {}
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl);
+        bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
     };
 
 } // namespace mongo

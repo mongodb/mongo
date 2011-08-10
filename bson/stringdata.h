@@ -60,7 +60,7 @@ namespace mongo {
             : _data(&val[0]), _size(N-1) {}
 
         // accessors
-        const char* const data() const { return _data; }
+        const char* data() const { return _data; }
         const unsigned size() const { return _size; }
 
     private:

@@ -14,6 +14,6 @@ t.save( {a:'a'} );
 
 check();
 t.ensureIndex( {a:1} );
-if ( 0 ) { // SERVER-3298
+if ( 1 ) { // SERVER-3298
 check();
 }

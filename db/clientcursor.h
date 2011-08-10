@@ -186,9 +186,10 @@ namespace mongo {
         /**
          * @param needRecord whether or not the next record has to be read from disk for sure
          *                   if this is true, will yield of next record isn't in memory
+         * @param yielded true if a yield occurred, and potentially if a yield did not occur
          * @return same as yield()
          */
-        bool yieldSometimes( RecordNeeds need );
+        bool yieldSometimes( RecordNeeds need, bool *yielded = 0 );
 
         static int yieldSuggest();
         static void staticYield( int micros , const StringData& ns , Record * rec );

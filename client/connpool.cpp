@@ -238,13 +238,16 @@ namespace mongo {
     }
 
     void DBConnectionPool::appendInfo( BSONObjBuilder& b ) {
-        BSONObjBuilder bb( b.subobjStart( "hosts" ) );
+
         int avail = 0;
         long long created = 0;
 
 
         map<ConnectionString::ConnectionType,long long> createdByType;
 
+        set<string> replicaSets;
+        
+        BSONObjBuilder bb( b.subobjStart( "hosts" ) );
         {
             scoped_lock lk( _mutex );
             for ( PoolMap::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
@@ -263,9 +266,33 @@ namespace mongo {
 
                 long long& x = createdByType[i->second.type()];
                 x += i->second.numCreated();
+
+                {
+                    string setName = i->first.ident;
+                    if ( setName.find( "/" ) != string::npos ) {
+                        setName = setName.substr( 0 , setName.find( "/" ) );
+                        replicaSets.insert( setName );
+                    }
+                }
             }
         }
         bb.done();
+        
+        
+        BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
+        for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {
+            string rs = *i;
+            ReplicaSetMonitorPtr m = ReplicaSetMonitor::get( rs );
+            if ( ! m ) {
+                warning() << "no monitor for set: " << rs << endl;
+                continue;
+            }
+            
+            BSONObjBuilder temp( setBuilder.subobjStart( rs ) );
+            m->appendInfo( temp );
+            temp.done();
+        }
+        setBuilder.done();
 
         {
             BSONObjBuilder temp( bb.subobjStart( "createdByType" ) );
@@ -280,20 +307,36 @@ namespace mongo {
     }
 
     bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ) const{
-        string ap = str::before( a , "/" );
-        string bp = str::before( b , "/" );
-        
-        return ap < bp;
+        const char* ap = a.c_str();
+        const char* bp = b.c_str();
+       
+        while (true){
+            if (*ap == '\0' || *ap == '/'){
+                if (*bp == '\0' || *bp == '/')
+                    return false; // equal strings
+                else
+                    return true; // a is shorter
+            }
+
+            if (*bp == '\0' || *bp == '/')
+                return false; // b is shorter
+            
+            if ( *ap < *bp)
+                return true;
+            else if (*ap > *bp)
+                return false;
+
+            ++ap;
+            ++bp;
+        }
+        assert(false);
     }
     
     bool DBConnectionPool::poolKeyCompare::operator()( const PoolKey& a , const PoolKey& b ) const {
-        string ap = str::before( a.ident , "/" );
-        string bp = str::before( b.ident , "/" );
-        
-        if ( ap < bp )
+        if (DBConnectionPool::serverNameCompare()( a.ident , b.ident ))
             return true;
         
-        if ( ap > bp )
+        if (DBConnectionPool::serverNameCompare()( b.ident , a.ident ))
             return false;
 
         return a.timeout < b.timeout;
@@ -366,7 +409,7 @@ namespace mongo {
         PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
         virtual void help( stringstream &help ) const { help<<"internal"; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.flush();
             return true;
         }
@@ -381,7 +424,7 @@ namespace mongo {
         PoolStats() : Command( "connPoolStats" ) {}
         virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );

@@ -28,17 +28,13 @@ t.remove();
 t.save( { a: [ { b: 3, c: 6 }, { b: 1, c: 1 } ] } );
 
 assert.eq( 1, t.count( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ) );
-if ( 0 ) { // SERVER-3005
 assert.eq( 1, t.count( { a:{ b:3, c:6 }, 'a.c': { $lt:4 } } ) );
-}
 assert.eq( [[{$minElement:1},{$maxElement:1}]], t.find( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ).explain().indexBounds['a.c'] );
 assert.eq( [[{$minElement:1},{$maxElement:1}]], t.find( { a:{ b:3, c:6 }, 'a.c': { $lt:4 } } ).explain().indexBounds['a.c'] );
 
 // Check reverse direction.
 assert.eq( 1, t.find( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ).sort( {'a.b':-1} ).itcount() );
-if ( 0 ) { // SERVER-3005
 assert.eq( 1, t.find( { a:{ b:3, c:6 }, 'a.c': { $lt:4 } } ).sort( {a:-1} ).itcount() );
-}
 
 assert.eq( [[{$maxElement:1},{$minElement:1}]], t.find( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ).sort( {'a.b':-1} ).explain().indexBounds['a.c'] );
 assert.eq( [[{$maxElement:1},{$minElement:1}]], t.find( { a:{ b:3, c:6 }, 'a.c': { $lt:4 } } ).sort( {a:-1} ).explain().indexBounds['a.c'] );
