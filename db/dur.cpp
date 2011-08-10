@@ -690,27 +690,32 @@ namespace mongo {
         void durThread() {
             Client::initThread("journal");
 
-            bool same = false;
-            try { same = onSamePartition(getJournalDir().string(), dbpath); }
+            bool samePartition = false;
+            try { samePartition = onSamePartition(getJournalDir().string(), dbpath); }
             catch(...) { }
 
             while( !inShutdown() ) {
                 unsigned ms = cmdLine.journalCommitInterval;
                 if( ms == 0 ) { 
                     // use default
-                    ms = same ? 100 : 30;
+                    ms = samePartition ? 100 : 30;
                 }
-                assert( ms >= 2 );
+
+                unsigned oneThird = (ms / 3) + 1; // +1 so never zero
 
                 try {
                     stats.rotate();
 
-                    // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
-                    // but is likely also less spiky on our cpu usage, which is good:
-                    sleepmillis(ms/2);
-                    commitJob.wi()._deferred.invoke();
-                    sleepmillis(ms/2);
-                    commitJob.wi()._deferred.invoke();
+                    // we do this in a couple blocks (the invoke()), which makes it a tiny bit faster (only a little) on throughput,
+                    // but is likely also less spiky on our cpu usage, which is good.
+
+                    // commit sooner if one or more getLastError j:true is pending
+                    for( unsigned i = 1; i <= 2; i++ ) {
+                        sleepmillis(oneThird);
+                        if( commitJob._notify.nWaiting() )
+                            break;
+                        commitJob.wi()._deferred.invoke();
+                    }
 
                     go();
                 }
