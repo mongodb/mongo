@@ -10,19 +10,58 @@
 
 static int usage(void);
 
+static inline int
+next(WT_CURSOR *cursor)
+{
+	WT_ITEM key, value;
+	int ret;
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (ret);
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		if ((key.size != 0 && (
+		    fwrite(key.data, 1, key.size, stdout) != key.size ||
+		    fwrite("\n", 1, 1, stdout) != 1)) ||
+		    fwrite(value.data, 1, value.size, stdout) != value.size ||
+		    fwrite("\n", 1, 1, stdout) != 1)
+			return (errno);
+	}
+	return (ret);
+}
+
+static inline int
+prev(WT_CURSOR *cursor)
+{
+	WT_ITEM key, value;
+	int ret;
+
+	while ((ret = cursor->prev(cursor)) == 0) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (ret);
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		if ((key.size != 0 && (
+		    fwrite(key.data, 1, key.size, stdout) != key.size ||
+		    fwrite("\n", 1, 1, stdout) != 1)) ||
+		    fwrite(value.data, 1, value.size, stdout) != value.size ||
+		    fwrite("\n", 1, 1, stdout) != 1)
+			return (errno);
+	}
+	return (ret);
+}
+
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
-	char cursor_config[100];
-	int ch, printable, ret;
+	int ch, printable, ret, reverse;
 	char *name;
 
 	name = NULL;
-	printable = 0;
-
-	while ((ch = getopt(argc, argv, "f:p")) != EOF)
+	printable = reverse = 0;
+	while ((ch = getopt(argc, argv, "f:pr")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(optarg, "w", stdout) == NULL) {
@@ -33,6 +72,9 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case 'p':
 			printable = 1;
+			break;
+		case 'r':
+			reverse = 1;
 			break;
 		case '?':
 		default:
@@ -48,29 +90,14 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	snprintf(cursor_config, sizeof(cursor_config),
-	    "dump,%s", printable ? "printable" : "raw");
-	if ((ret = session->open_cursor(
-	    session, name, NULL, cursor_config, &cursor)) != 0) {
+	if ((ret = session->open_cursor(session, name, NULL,
+	    printable ? "dump,printable" : "dump,raw", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			break;
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			break;
-		if ((key.size != 0 && (
-		    fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1)) ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1) {
-			ret = errno;
-			break;
-		}
-	}
+	ret = reverse ? prev(cursor) : next(cursor);
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	else {
@@ -94,7 +121,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-p] [-f output-file] table\n",
+	    "dump [-pr] [-f output-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
