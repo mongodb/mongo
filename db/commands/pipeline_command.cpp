@@ -36,8 +36,8 @@ namespace mongo {
     public:
         // virtuals from Command
         virtual ~PipelineCommand();
-        virtual bool run(const string &db, BSONObj &cmdObj, string &errmsg,
-                         BSONObjBuilder &result, bool fromRepl);
+        virtual bool run(const string &db, BSONObj &cmdObj, int options,
+			 string &errmsg, BSONObjBuilder &result, bool fromRepl);
         virtual LockType locktype() const;
         virtual bool slaveOk() const;
         virtual void help(stringstream &help) const;
@@ -68,8 +68,8 @@ namespace mongo {
     }
 
     bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
-                       string &errmsg,
-                       BSONObjBuilder &result, bool fromRepl) {
+			      int options, string &errmsg,
+			      BSONObjBuilder &result, bool fromRepl) {
 
 	intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
 

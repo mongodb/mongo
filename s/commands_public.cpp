@@ -1312,8 +1312,8 @@ namespace mongo {
 
 	    // virtuals from Command
 	    virtual bool run(const string &dbName , BSONObj &cmdObj,
-			     string &errmsg, BSONObjBuilder &result,
-			     bool fromRepl);
+			     int options, string &errmsg,
+			     BSONObjBuilder &result, bool fromRepl);
 
 	private:
 	    
@@ -1329,8 +1329,8 @@ namespace mongo {
 	}
 
 	bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
-				  string &errmsg, BSONObjBuilder &result,
-				  bool fromRepl) {
+				  int options, string &errmsg,
+				  BSONObjBuilder &result, bool fromRepl) {
 	    //const string shardedOutputCollection = getTmpName( collection );
 
 	    intrusive_ptr<ExpressionContext> pCtx(
@@ -1384,7 +1384,7 @@ namespace mongo {
 		assert(temp->get());
 		futures.push_back(
 		    Future::spawnCommand(i->getConnString(), dbName,
-					 shardedCommand ,temp->get()));
+					 shardedCommand , 0, temp->get()));
 		shardConns.push_back(temp);
 	    }
                     
