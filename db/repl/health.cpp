@@ -372,6 +372,12 @@ namespace mongo {
             bb.append("stateStr", box.getState().toString());
             bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
             bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
+
+            int maintenance = _maintenanceMode;
+            if (maintenance) {
+                bb.append("maintenanceMode", maintenance);
+            }
+
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
