@@ -35,8 +35,10 @@ struct __wt_salvage_cookie {
  */
 struct __wt_walk_entry {
 	WT_PAGE	*page;		/* Page being traversed */
-	uint32_t indx;		/* Not-yet-visited slot on the page */
-	int	 visited;	/* If page itself been visited */
+	uint32_t indx;		/* Page's next child slot to return */
+
+	int	 child;		/* If all children have been returned */
+	int	 visited;	/* If the page itself has been returned */
 
 	WT_PAGE *hazard;	/* Last page returned -- has hazard reference */
 };

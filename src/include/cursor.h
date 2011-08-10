@@ -15,7 +15,10 @@ struct __wt_cursor_btree {
 
 	WT_COL	  *cip;				/* Col-store page slot ref */
 	WT_ROW	  *rip;				/* Row-store page slot ref */
+
+	WT_INSERT_HEAD *ins_head;		/* Insert chain head */
 	WT_INSERT *ins;				/* Insert chain */
+	uint32_t   ins_cnt;			/* Insert chain count */
 
 	uint64_t recno;				/* Cursor record number */
 	/*

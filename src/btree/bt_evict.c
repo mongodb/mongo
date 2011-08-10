@@ -396,10 +396,10 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 
 	/*
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
-	 * __wt_walk_begin restarts the process.
+	 * __wt_walk_first restarts the process.
 	 */
 	WT_RET(
-	    __wt_walk_begin(session, NULL, &btree->evict_walk, WT_WALK_CACHE));
+	    __wt_walk_first(session, NULL, &btree->evict_walk, WT_WALK_CACHE));
 
 	for (;;) {
 		WT_ERR(__wt_walk_next(session, &btree->evict_walk, &page));
@@ -607,7 +607,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int slot)
 
 	/* If we haven't yet started this walk, do so. */
 	if (btree->evict_walk.tree == NULL)
-walk:		WT_RET(__wt_walk_begin(
+walk:		WT_RET(__wt_walk_first(
 		    session, NULL, &btree->evict_walk, WT_WALK_CACHE));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */

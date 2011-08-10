@@ -19,6 +19,8 @@ src/btree/bt_cache.c
 src/btree/bt_cell.c
 src/btree/bt_cmp.c
 src/btree/bt_cursor.c
+src/btree/bt_curnext.c
+src/btree/bt_curprev.c
 src/btree/bt_debug.c
 src/btree/bt_desc.c
 src/btree/bt_discard.c
