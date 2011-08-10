@@ -23,5 +23,10 @@ print("joining");
 join();
 
 print("check secondary becomes a secondary again");
-assert.soon(function() { return conns[2].getDB("admin").isMaster().secondary; });
+var x = 0;
+assert.soon(function() {
+    var im = conns[2].getDB("admin").isMaster();
+    if (x++ % 5 == 0) printjson(im);
+    return im.secondary;
+});
 
