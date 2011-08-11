@@ -65,6 +65,9 @@ cp $t configure
 # Build make files.
 automake --add-missing --copy
 
+# Make sure any missing files are writable
+chmod 755 gnu-support/*
+
 # Cleanup
 rm -rf autom4te.cache config.hin~
 
