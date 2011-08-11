@@ -154,7 +154,7 @@ track(const char *s, uint64_t i)
 		    g.run_cnt, s, i);
 
 	if (lastlen > len) {
-		memset(msg + len, ' ', lastlen - len);
+		memset(msg + len, ' ', (size_t)(lastlen - len));
 		msg[lastlen] = '\0';
 	}
 	lastlen = len;
