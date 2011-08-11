@@ -77,15 +77,14 @@ main(int argc, char *argv[])
 		shutdown(0);			/* Clean up previous runs */
 		startup();			/* Start a run */
 
-		config_setup();
-		key_gen_setup();
+		config_setup();			/* Run configuration */
+		config_print(0);		/* Dump run configuration */
 
 		bdb_startup();			/* Initial file config */
 		if (wts_startup())
 			return (EXIT_FAILURE);
 
-		config_print(0);		/* Dump run configuration */
-
+		key_gen_setup();		/* Setup keys */
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 						/* Close, verify, re-open */
