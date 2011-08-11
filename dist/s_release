@@ -16,7 +16,7 @@ DEST="$RELEASE_DIR/$PKG"
 rm -rf "$DEST"
 
 echo "Running 'hg archive' to copy the tree"
-hg archive `sed -e '/^#/d' -e 's/^/--exclude ..\//' < s_release.exclude` "$DEST"
+hg archive `sed -e '/^#/d' -e 's/^/--exclude ..\//' < s_release.list` "$DEST"
 
 echo "Running 'dist/s_all' in the release tree"
 (cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
