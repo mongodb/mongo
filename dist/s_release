@@ -1,0 +1,25 @@
+#!/bin/sh
+# Build a WiredTiger release package.
+
+set -e
+RELEASE_DIR=../releases
+
+. RELEASE || exit 1
+
+pkgver="$1"
+if test -z "$pkgver" ; then
+	pkgver="$WIREDTIGER_VERSION"
+fi
+PKG="wiredtiger-$pkgver"
+DEST="$RELEASE_DIR/$PKG"
+
+rm -rf "$DEST"
+
+echo "Running 'hg archive' to copy the tree"
+hg archive `sed -e '/^#/d' -e 's/^/--exclude ..\//' < s_release.exclude` "$DEST"
+
+echo "Running 'dist/s_all' in the release tree"
+(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
+
+echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
+(cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)

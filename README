@@ -1,6 +1,8 @@
-WiredTiger 0.0.0: (December 22, 2009)
- 
-This is version 0.0.0 of WiredTiger.
+WiredTiger 0.7.0: (August 11, 2011)
+
+This is version 0.7.0 of WiredTiger.
+
+See the file LICENSE for redistribution information.
 
 To view release and installation documentation, load the distribution
 file docs/index.html into your web browser.
