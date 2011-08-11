@@ -125,12 +125,10 @@ config_print(int error_display)
 		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
-		else {
-			if (!strcmp(cp->name, "file_type"))
-				fprintf(fp,
-				    "# file type: %s\n", config_dtype());
+		else if (strcmp(cp->name, "file_type"))
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
-		}
+		else
+			fprintf(fp, "%s=%s\n", cp->name, config_dtype());
 
 	fprintf(fp, "############################################\n");
 	if (fp != stdout)
