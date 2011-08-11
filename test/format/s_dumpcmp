@@ -63,7 +63,6 @@ if test $colflag -eq 0; then
 else
 	$wt/wt dump -p file:__wt | strip_zeros > __wt_dump
 fi
+cmp __wt_dump __bdb_dump > /dev/null || exit 1
 
-cmp __wt_dump __bdb_dump > /dev/null
-
-exit $?
+exit 0
