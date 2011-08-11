@@ -200,7 +200,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
 	WT_UNUSED(config);
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	__wt_walk_end(session, &cbt->walk);
+	__wt_walk_end(session, &cbt->walk, 1);
 	__wt_buf_free(session, &cbt->value);
 	return (0);
 }

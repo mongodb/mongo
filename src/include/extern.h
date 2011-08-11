@@ -275,7 +275,9 @@ extern int __wt_walk_last( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_WALK *walk,
     uint32_t flags);
-extern void __wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk);
+extern void __wt_walk_end(WT_SESSION_IMPL *session,
+    WT_WALK *walk,
+    int discard_walk);
 extern int __wt_walk_next(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);

@@ -437,7 +437,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	}
 
 err:	/* End the walk cleanly. */
-	__wt_walk_end(session, &btree->evict_walk);
+	__wt_walk_end(session, &btree->evict_walk, 1);
 
 	return (ret);
 }

@@ -258,7 +258,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_btree_huffman_close(session);
 	__wt_buf_free(session, &btree->key_srch);
-	__wt_walk_end(session, &btree->evict_walk);
+	__wt_walk_end(session, &btree->evict_walk, 1);
 	__wt_rec_destroy(session);
 	__wt_free(session, btree->stats);
 

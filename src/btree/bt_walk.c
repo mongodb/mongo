@@ -98,11 +98,11 @@ __wt_walk_init(WT_SESSION_IMPL *session,
 	 * (and worse, our caller may be holding hazard references); clean up.
 	 */
 	if (walk->tree != NULL)
-		__wt_walk_end(session, walk);
+		__wt_walk_end(session, walk, 0);
 
-	walk->tree_len = 0;
-	WT_RET(__wt_realloc(
-	    session, &walk->tree_len, 20 * sizeof(WT_WALK_ENTRY), &walk->tree));
+	if (walk->tree_len == 0)
+		WT_RET(__wt_realloc(session,
+		    &walk->tree_len, 20 * sizeof(WT_WALK_ENTRY), &walk->tree));
 	walk->flags = flags;
 	walk->tree_slot = 0;
 
@@ -186,7 +186,7 @@ __wt_walk_last(
  *	End a tree walk.
  */
 void
-__wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk)
+__wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk, int discard_walk)
 {
 	WT_WALK_ENTRY *e;
 
@@ -203,9 +203,14 @@ __wt_walk_end(WT_SESSION_IMPL *session, WT_WALK *walk)
 		--walk->tree_slot;
 	}
 
-	/* Discard/reset the walk structures. */
-	walk->tree_len = 0;
-	__wt_free(session, walk->tree);
+	/* Optionally free the memory, else clear the walk structures. */
+	if (discard_walk) {
+		__wt_free(session, walk->tree);
+		walk->tree_len = 0;
+	} else
+		memset(walk->tree, 0, walk->tree_len);
+	walk->tree_slot = 0;
+	walk->flags = 0;
 }
 
 /*
