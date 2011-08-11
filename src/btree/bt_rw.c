@@ -274,7 +274,7 @@ __wt_disk_compress(WT_SESSION_IMPL *session,
 		 */
 		size = WT_ALIGN(dest.size + COMPRESS_SKIP, btree->allocsize);
 		memset((uint8_t *)dest.data + dest.size, 0,
-		    size - dest.size - COMPRESS_SKIP);
+		    size - (dest.size + COMPRESS_SKIP));
 		*psize = size;
 
 		/* save the compressed size, we'll need that on decompress */
