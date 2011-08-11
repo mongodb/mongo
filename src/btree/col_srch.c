@@ -70,6 +70,9 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	/* Search the internal pages of the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
+		WT_ASSERT(session, cref == NULL ||
+		    cref->recno == page->u.col_int.recno);
+
 		/* Binary search of internal pages. */
 		for (base = 0,
 		    limit = page->entries; limit != 0; limit >>= 1) {
@@ -108,6 +111,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		__wt_page_release(session, page);
 		page = WT_COL_REF_PAGE(cref);
 	}
+
+	WT_ASSERT(session, cref->recno == page->u.col_leaf.recno);
 
 	/*
 	 * Copy the leaf page's write generation value before reading the page.
