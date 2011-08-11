@@ -29,7 +29,7 @@ test -f $f || {
 	exit 0
 }
 
-(cat s_symbols.list &&
+(sed -e '/^#/d' s_symbols.list &&
 eval $NM |
 sed 's/.* //' |
 egrep -v '^__wt') |

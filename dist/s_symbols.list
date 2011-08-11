@@ -1,3 +1,4 @@
+# List of OK external symbols.
 wiredtiger_open
 wiredtiger_strerror
 wiredtiger_struct_pack
