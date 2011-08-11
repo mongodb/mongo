@@ -143,8 +143,7 @@ main(int argc, char *argv[])
 		if (wts_teardown())
 			goto err;
 
-		track(config_dtype(), 0ULL);
-		track("\n", 0ULL);
+		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
 	}
 
 	if (0) {

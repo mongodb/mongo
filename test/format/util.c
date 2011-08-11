@@ -140,24 +140,23 @@ void
 track(const char *s, uint64_t i)
 {
 	static int lastlen = 0;
-	int len, tlen;
-	char *p, msg[128];
+	int len;
+	char msg[128];
 
-	if (!g.track)
+	if (!g.track || s == NULL)
 		return;
 
-	if (s == NULL)
-		len = 0;
-	else if (i == 0)
-		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, s);
+	if (i == 0)
+		len = snprintf(msg, sizeof(msg), "%4d: %s",
+		    g.run_cnt, s);
 	else
-		len = snprintf(msg, sizeof(msg),
-		    "%4d: %s %" PRIu64, g.run_cnt, s, i);
-	tlen = len;
+		len = snprintf(msg, sizeof(msg), "%4d: %s %" PRIu64,
+		    g.run_cnt, s, i);
 
-	for (p = msg + len; tlen < lastlen; ++tlen)
-		*p++ = ' ';
-	*p = '\0';
+	if (lastlen > len) {
+		memset(msg + len, ' ', lastlen - len);
+		msg[lastlen] = '\0';
+	}
 	lastlen = len;
 
 	(void)printf("%s\r", msg);
