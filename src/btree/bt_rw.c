@@ -76,10 +76,9 @@ __wt_disk_decompress(
 	source.size = comp_dsk->size - COMPRESS_SKIP;
 	dest.data = (uint8_t *)mem_dsk + COMPRESS_SKIP;
 	dest.size = comp_dsk->memsize - COMPRESS_SKIP;
-	if ((ret = compressor->decompress(compressor,
-		    &session->iface, &source, &dest)) != 0) {
-		__wt_errx(session, "decompress error: %" PRIu32, ret);
-	}
+	if ((ret = compressor->decompress(
+	    compressor, &session->iface, &source, &dest)) != 0)
+		__wt_err(session, ret, "decompress error");
 	return (ret);
 }
 
@@ -226,17 +225,11 @@ __wt_disk_write(
 
 /*
  * __wt_disk_compress --
- *	Compress a file page.  On input, *psize is the size of
- *	both the source mem_dsk, and also the allocated size of
- *	the compressed comp_dsk.  On output, *psize is set to
- *	the size used in comp_dsk.  If the compressed page
- *	cannot fit into the allotted space, there will be
- *	no error, but *psize will be unchanged.
+ *	Compress a file page.
  */
 int
-__wt_disk_compress(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *mem_dsk, WT_PAGE_DISK *comp_dsk,
-    uint32_t *psize)
+__wt_disk_compress(WT_SESSION_IMPL *session,
+    WT_PAGE_DISK *mem_dsk, WT_PAGE_DISK *comp_dsk, uint32_t *psize)
 {
 	WT_BTREE *btree;
 	WT_ITEM source;
@@ -245,14 +238,22 @@ __wt_disk_compress(
 	uint32_t size;
 
 	btree = session->btree;
+
+	/*
+	 * On input, *psize is the size of both the source mem_dsk, and also
+	 * the allocated size of the compressed comp_dsk.  On output, *psize
+	 * is set to the size used in comp_dsk.  If the compressed page cannot
+	 * fit into the allotted space, there will be no error, but *psize will
+	 * be unchanged.
+	 */
 	size = *psize;
 
 	WT_ASSERT(session, btree->compressor != NULL);
 	WT_ASSERT(session, WT_ALIGN(*psize, btree->allocsize) == size);
 
 	/*
-	 * Set disk sizes for verify_dsk.  We have no disk address to
-	 * be used for verify_dsk's error messages, so use zero.
+	 * Set disk sizes for verify_dsk.  We have no disk address to use for
+	 * verify_dsk's error messages, so use zero.
 	 */
 	mem_dsk->size = mem_dsk->memsize = size;
 	WT_ASSERT(session, __wt_verify_dsk(session, mem_dsk, 0, size, 0) == 0);
@@ -261,8 +262,8 @@ __wt_disk_compress(
 	dest.data = (uint8_t *)comp_dsk + COMPRESS_SKIP;
 	source.size = dest.size = size - COMPRESS_SKIP;
 
-	if ((ret = btree->compressor->compress(btree->compressor,
-		    &session->iface, &source, &dest)) == 0 &&
+	if ((ret = btree->compressor->compress(
+	    btree->compressor, &session->iface, &source, &dest)) == 0 &&
 	    dest.size != source.size) {
 		memcpy(comp_dsk, mem_dsk, COMPRESS_SKIP);
 		comp_dsk->memsize = size;
@@ -278,13 +279,11 @@ __wt_disk_compress(
 
 		/* save the compressed size, we'll need that on decompress */
 		comp_dsk->size = dest.size + COMPRESS_SKIP;
-	}
-	else if (ret == WT_TOOSMALL) {
+	} else if (ret == WT_TOOSMALL)
 		/* Not a reportable error, don't change *psize */
 		ret = 0;
-	}
-	else if (ret != 0) {
-		__wt_errx(session, "compress error: %" PRIu32, ret);
-	}
+	else if (ret != 0)
+		__wt_err(session, ret, "compress error");
+
 	return (ret);
 }

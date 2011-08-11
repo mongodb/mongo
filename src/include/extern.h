@@ -241,7 +241,7 @@ extern int __wt_disk_write( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
     uint32_t size);
-extern int __wt_disk_compress( WT_SESSION_IMPL *session,
+extern int __wt_disk_compress(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *mem_dsk,
     WT_PAGE_DISK *comp_dsk,
     uint32_t *psize);
