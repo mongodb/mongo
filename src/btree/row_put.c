@@ -64,9 +64,8 @@ __wt_row_modify(
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
 		/* workQ: to insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(
-		    session, page, session->srch.write_gen,
-		    &new_upd, new_upd_size, session->srch.upd, &upd, upd_size);
+		ret = __wt_update_serial(session, &session->srch,
+		    &new_upd, new_upd_size, &upd, upd_size);
 	} else {
 		/*
 		 * Allocate an insert array and/or an insert list head as
@@ -266,17 +265,18 @@ int
 __wt_update_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, **srch_upd, *upd;
-	uint32_t write_gen;
+	WT_SEARCH *srch;
+	WT_UPDATE **new_upd, *upd;
 	int ret;
 
 	ret = 0;
 
 	__wt_update_unpack(
-	    session, &page, &write_gen, &new_upd, &srch_upd, &upd);
+	    session, &srch, &new_upd, &upd);
+	page = srch->page;
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	WT_ERR(__wt_page_write_gen_check(page, srch->write_gen));
 
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
@@ -294,9 +294,9 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * to ensure the list is never broken.
 	 */
 	__wt_update_upd_taken(session, page);
-	upd->next = *srch_upd;
+	upd->next = *srch->upd;
 	WT_MEMORY_FLUSH;
-	*srch_upd = upd;
+	*srch->upd = upd;
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);

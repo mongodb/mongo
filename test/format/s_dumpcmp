@@ -33,7 +33,7 @@ strip_zeros() {
 	cat > __t
 
 	lines=`wc -l __t | sed 's/[^0-9]//g'`
-	while test `sed -n -e ${lines}p < __t` = '\00' ; do
+	while test "`sed -n -e ${lines}p < __t`" = '\00' ; do
 		lines=`expr $lines - 1`
 	done
 	sed -e `expr $lines + 1`,'$d' < __t

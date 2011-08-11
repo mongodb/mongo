@@ -75,9 +75,8 @@ __wt_col_modify(
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
 		/* workQ: insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(
-		    session, page, session->srch.write_gen,
-		    NULL, 0, session->srch.upd, &upd, upd_size);
+		ret = __wt_update_serial(session, &session->srch,
+		    NULL, 0, &upd, upd_size);
 	} else {
 		/*
 		 * We may not have an WT_INSERT_HEAD array (in the case of

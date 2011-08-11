@@ -382,12 +382,10 @@ __wt_row_key_unpack(
 }
 
 typedef struct {
-	WT_PAGE *page;
-	uint32_t write_gen;
+	WT_SEARCH *srch;
 	WT_UPDATE **new_upd;
 	uint32_t new_upd_size;
 	int new_upd_taken;
-	WT_UPDATE **srch_upd;
 	WT_UPDATE *upd;
 	uint32_t upd_size;
 	int upd_taken;
@@ -395,16 +393,13 @@ typedef struct {
 
 static inline int
 __wt_update_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	***new_updp, uint32_t new_upd_size, WT_UPDATE **srch_upd, WT_UPDATE
-	**updp, uint32_t upd_size)
+	WT_SESSION_IMPL *session, WT_SEARCH *srch, WT_UPDATE ***new_updp,
+	uint32_t new_upd_size, WT_UPDATE **updp, uint32_t upd_size)
 {
 	__wt_update_args _args, *args = &_args;
 	int ret;
 
-	args->page = page;
-
-	args->write_gen = write_gen;
+	args->srch = srch;
 
 	if (new_updp == NULL)
 		args->new_upd = NULL;
@@ -414,8 +409,6 @@ __wt_update_serial(
 		args->new_upd_size = new_upd_size;
 	}
 	args->new_upd_taken = 0;
-
-	args->srch_upd = srch_upd;
 
 	if (updp == NULL)
 		args->upd = NULL;
@@ -438,16 +431,14 @@ __wt_update_serial(
 
 static inline void
 __wt_update_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t *write_genp,
-	WT_UPDATE ***new_updp, WT_UPDATE ***srch_updp, WT_UPDATE **updp)
+	WT_SESSION_IMPL *session, WT_SEARCH **srchp, WT_UPDATE ***new_updp,
+	WT_UPDATE **updp)
 {
 	__wt_update_args *args =
 	    (__wt_update_args *)session->wq_args;
 
-	*pagep = args->page;
-	*write_genp = args->write_gen;
+	*srchp = args->srch;
 	*new_updp = args->new_upd;
-	*srch_updp = args->srch_upd;
 	*updp = args->upd;
 }
 

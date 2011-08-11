@@ -53,10 +53,8 @@ Serial('row_key', 'WT_WORKQ_FUNC', 1, [
 	]),
 
 Serial('update', 'WT_WORKQ_FUNC', 1, [
-		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
+		SerialArg('WT_SEARCH *', 'srch'),
 		SerialArg('WT_UPDATE **', 'new_upd', 1),
-		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),
 	]),
 ]
