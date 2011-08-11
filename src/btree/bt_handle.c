@@ -299,7 +299,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Page compressor configuration. */
 	WT_RET(__wt_config_getones(session,
-	    btree->config, "page_compressor", &cval));
+	    btree->config, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
 			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
@@ -308,7 +308,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 			}
 		}
 		if (btree->compressor == NULL) {
-			__wt_errx(session, "Unknown page_compressor '%.*s'",
+			__wt_errx(session, "unknown block_compressor '%.*s'",
 			    (int)cval.len, cval.str);
 			return (EINVAL);
 		}

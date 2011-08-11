@@ -34,7 +34,7 @@ class test_compress01_base(wttest.WiredTigerTestCase):
         extra_params = ',internal_node_min=512,internal_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
         comp_params = ''
         if self.compressor_name != None:
-            comp_params = ',page_compressor=' + self.compressor_name
+            comp_params = ',block_compressor=' + self.compressor_name
         params = 'key_format=S,value_format=S' + extra_params + comp_params
         self.pr('create_table: ' + tablename + ', params: ' + params)
         self.session.create('file:' + tablename, params)

@@ -100,7 +100,7 @@ wts_startup(void)
 	    1U << g.c_leaf_node_max);
 	if (compressor)
 		p += snprintf(p, (size_t)(end - p),
-		    ",page_compressor=%s", compressor);
+		    ",block_compressor=%s", compressor);
 
 	switch (g.c_file_type) {
 	case FIX:

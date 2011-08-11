@@ -213,6 +213,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 				goto notfound;
 			}
 
+			WT_ASSERT(session, recno >= start_recno);
 			cip = page->u.col_leaf.d + start_indx +
 			    (uint32_t)(recno - start_recno);
 		}

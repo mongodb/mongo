@@ -245,14 +245,15 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 		}
 
 		/* Check if any referenced item is entirely in the file.
-		 * The check is only sensible if there is no compression.
+		 * With compression, only a partial check can be quickly made.
 		 */
 		switch (cell_type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
 		case WT_CELL_VALUE_OVFL:
-			if (btree->compressor == NULL && WT_ADDR_TO_OFF(btree,
-			    unpack->off.addr) + unpack->off.size > file_size)
+			if (WT_ADDR_TO_OFF(btree, unpack->off.addr) +
+			    (btree->compressor ? unpack->off.size : 0) >
+			    file_size)
 				goto eof;
 			break;
 		}
@@ -411,11 +412,11 @@ __verify_dsk_col_int(WT_SESSION_IMPL *session,
 			return (__err_eop(session, entry_num, addr, quiet));
 
 		/* Check if the reference is past the end-of-file.
-		 * The check is only sensible if there is no compression.
+		 * With compression, only a partial check can be quickly made.
 		 */
-		if (btree->compressor == NULL &&
-		    WT_ADDR_TO_OFF(btree, off_record->addr) +
-		    (off_t)off_record->size > btree->fh->file_size)
+		if (WT_ADDR_TO_OFF(btree, off_record->addr) +
+		    (btree->compressor ? (off_t)off_record->size : 0) >
+		    btree->fh->file_size)
 			return (__err_eof(session, entry_num, addr, quiet));
 	}
 
@@ -490,11 +491,12 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 		}
 
 		/* Check if any referenced item is entirely in the file.
-		 * The check is only sensible if there is no compression.
+		 * With compression, only a partial check can be quickly made.
 		 */
 		if (cell_type == WT_CELL_VALUE_OVFL) {
-			if (btree->compressor == NULL && WT_ADDR_TO_OFF(btree,
-			    unpack->off.addr) + unpack->off.size > file_size)
+			if (WT_ADDR_TO_OFF(btree, unpack->off.addr) +
+			    (btree->compressor ? unpack->off.size : 0) >
+			    file_size)
 				return (__err_eof(
 				    session, cell_num, addr, quiet));
 		}
