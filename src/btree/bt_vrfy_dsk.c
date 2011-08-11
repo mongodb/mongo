@@ -82,13 +82,14 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
+	/* Check the disk size. */
 	if (dsk->size != size) {
 		WT_VRFY_ERR(session, quiet,
-		    "page at addr %" PRIu32 " has an incorrect size",
-		    addr);
+		    "page at addr %" PRIu32 " has an incorrect size", addr);
 		return (WT_ERROR);
 	}
 
+	/* Unused bytes */
 	if (dsk->unused[0] != '\0' ||
 	    dsk->unused[1] != '\0' || dsk->unused[2] != '\0') {
 		WT_VRFY_ERR(session, quiet,
