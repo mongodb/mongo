@@ -412,7 +412,7 @@ __verify_dsk_col_int(WT_SESSION_IMPL *session,
 
 		/* Check if the reference is past the end-of-file.
 		 */
- 		if (WT_ADDR_TO_OFF(btree, off_record->addr) +
+		if (WT_ADDR_TO_OFF(btree, off_record->addr) +
 		    (off_t)off_record->size > btree->fh->file_size)
 			return (__err_eof(session, entry_num, addr, quiet));
 	}
