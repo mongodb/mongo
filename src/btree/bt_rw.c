@@ -58,10 +58,9 @@ int
 __wt_disk_decompress(
     WT_SESSION_IMPL *session, WT_PAGE_DISK *comp_dsk, WT_PAGE_DISK *mem_dsk)
 {
-	WT_ITEM source;
-	WT_ITEM dest;
-	int ret;
 	WT_COMPRESSOR *compressor;
+	WT_ITEM dest, source;
+	int ret;
 
 	compressor = session->btree->compressor;
 
@@ -84,9 +83,7 @@ __wt_disk_decompress(
 
 /*
  * __wt_disk_read_scr --
- *	Read a file page into scratch buffer.
- *	If compression is on, the scratch buffer is reallocated and returned.
- *	The size is also passed in and returned.
+ *	Read a file page into a scratch buffer.
  */
 int
 __wt_disk_read_scr(
@@ -100,70 +97,17 @@ __wt_disk_read_scr(
 	WT_RET(__wt_disk_read(session, dsk, addr, size));
 
 	/*
-	 * If the in-memory and on-disk sizes aren't the same, the buffer
-	 * is compressed.
+	 * If the in-memory and on-disk sizes aren't the same, the buffer is
+	 * compressed, allocate a scratch buffer and decompress into it.
 	 */
-	if (dsk->size != dsk->memsize) {
-		/* Get a new scratch buffer and decompress into it */
-		WT_RET(__wt_scr_alloc(session, dsk->memsize, &newbuf));
-		if ((ret =
-		    __wt_disk_decompress(session, dsk, newbuf->mem)) != 0) {
-			__wt_scr_release(&newbuf);
-			return (ret);
-		}
+	if (dsk->size == dsk->memsize)
+		return (0);
 
-		/* Caller gets the newbuf's data swapped into their orig buf */
-		__wt_buf_swap(newbuf, buf);
-		__wt_scr_release(&newbuf);
-	}
-
-	return (0);
-}
-
-/*
- * __wt_disk_read_realloc --
- *	Read a file page into a buffer that was malloced.
- *	If compression is on, a newly malloced buffer is returned
- *	with the uncompressed contents, while the original buffer is freed.
- *	The size is also passed in and returned.
- */
-int
-__wt_disk_read_realloc(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK **pdsk, uint32_t addr,
-    uint32_t *psize)
-{
-	WT_PAGE_DISK *dsk;
-	WT_PAGE_DISK *newdsk;
-	int ret;
-
-	dsk = *pdsk;
-
-	WT_RET(__wt_disk_read(session, dsk, addr, *psize));
-
-	/* dsk->size is the compressed size, should be what we just read */
-	WT_ASSERT(session, dsk->size == *psize);
-
-	/*
-	 * If the in-memory and on-disk sizes aren't the same, the buffer
-	 * is compressed.
-	 */
-	if (dsk->size != dsk->memsize) {
-
-		/* Get a new malloc buffer and decompress into it */
-		WT_RET(__wt_calloc(session, dsk->memsize,
-			sizeof(uint8_t), &newdsk));
-		if ((ret = __wt_disk_decompress(session, dsk, newdsk)) != 0) {
-			__wt_free(session, newdsk);
-			return (ret);
-		}
-
-		/* Caller gets the decompressed buffer */
-		*psize = dsk->memsize;
-		*pdsk = newdsk;
-		__wt_free(session, dsk);
-	}
-
-	return (0);
+	WT_RET(__wt_scr_alloc(session, dsk->memsize, &newbuf));
+	WT_ERR(__wt_disk_decompress(session, dsk, newbuf->mem));
+	__wt_buf_swap(newbuf, buf);
+err:	__wt_scr_release(&newbuf);
+	return (ret);
 }
 
 /*

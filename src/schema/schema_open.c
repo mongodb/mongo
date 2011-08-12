@@ -43,7 +43,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_CURSOR *cursor;
 	char *cgname;
 	const char *cgconf, *fileconf, *filename, *uri;
-	uint32_t plansize;
 	int i, ret;
 
 	if (table->is_complete)
@@ -111,7 +110,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_CLEAR(plan);
 		WT_ERR(__wt_struct_plan(session,
 		    table, table->colconf.str, table->colconf.len, &plan));
-		__wt_buf_steal(session, &plan, &table->plan, &plansize);
+		table->plan = __wt_buf_steal(session, &plan, NULL);
 	}
 
 	table->is_complete = 1;

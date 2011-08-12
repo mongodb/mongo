@@ -244,10 +244,12 @@ static int
 __cache_read(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
+	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, size, disk_size;
+	uint32_t addr, size;
 	int ret;
 
+	tmp = NULL;
 	dsk = NULL;
 	addr = ref->addr;
 	size = ref->size;
@@ -274,32 +276,33 @@ __cache_read(
 	WT_VERBOSE(
 	    session, READSERVER, "read %" PRIu32 "/%" PRIu32, addr, size);
 
-	/*
-	 * Allocate memory for the page (memory for the in-memory version of the
-	 * page is allocated later (they're two separate allocation calls so we
-	 * hopefully get better alignment from the underlying heap allocator).
-	 */
-	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
+	/* Allocate memory for the page's disk image. */
+	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-	/* Read the page, decompressing if needed. */
-	disk_size = size;
-	WT_ERR(__wt_disk_read_realloc(session, &dsk, addr, &size));
+	/* Read the page, then steal the resulting buffer. */
+	WT_ERR(__wt_disk_read_scr(session, tmp, addr, size));
+	dsk = __wt_buf_steal(session, tmp, &size);
+	__wt_scr_release(&tmp);
 
 	/* Verify the disk image on demand. */
 	if (dsk_verify)
-		WT_ERR(__wt_verify_dsk(session, dsk, addr, disk_size, 0));
+		WT_ERR(__wt_verify_dsk(session, dsk, addr, dsk->size, 0));
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
 
 	/* Add the page to our cache statistics. */
-	__wt_cache_page_read(session, ref->page, WT_SIZEOF32(WT_PAGE) + size);
+	__wt_cache_page_read(
+	    session, ref->page, WT_SIZEOF32(WT_PAGE) + dsk->memsize);
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;
 
 	return (0);
 
-err:	__wt_free(session, dsk);
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+	if (dsk != NULL)
+		__wt_free(session, dsk);
 	return (ret);
 }

@@ -103,10 +103,11 @@ __wt_buf_set(
  * __wt_buf_steal --
  *	Steal a buffer for another purpose.
  */
-void
-__wt_buf_steal(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const void *datap, uint32_t *sizep)
+void *
+__wt_buf_steal(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
 {
+	void *retp;
+
 	/*
 	 * Sometimes we steal a buffer for a different purpose, for example,
 	 * we've read in an overflow item, and now it's going to become a key
@@ -130,11 +131,14 @@ __wt_buf_steal(
 	}
 
 	/* Second, give our caller the buffer's memory. */
-	*(void **)datap = buf->mem;
-	*sizep = buf->size;
+	retp = buf->mem;
+	if (sizep != NULL)
+		*sizep = buf->size;
 
 	/* Third, discard the buffer's memory. */
 	__wt_buf_clear(buf);
+
+	return (retp);
 }
 
 /*

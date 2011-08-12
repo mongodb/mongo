@@ -492,7 +492,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_TABLE *ctable;
 	WT_TABLE *table;
 	size_t size;
-	uint32_t bufsz;
 	int ret;
 	const char *tablename, *columns;
 
@@ -541,11 +540,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), 1, &fmt));
-		__wt_buf_steal(session, &fmt, &cursor->value_format, &bufsz);
+		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
 
 		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), &plan));
-		__wt_buf_steal(session, &plan, &ctable->plan, &bufsz);
+		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
 
 	/*

@@ -233,10 +233,6 @@ extern int __wt_disk_read_scr( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
     uint32_t size);
-extern int __wt_disk_read_realloc( WT_SESSION_IMPL *session,
-    WT_PAGE_DISK **pdsk,
-    uint32_t addr,
-    uint32_t *psize);
 extern int __wt_disk_write( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
@@ -591,9 +587,8 @@ extern int __wt_buf_set( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const void *data,
     size_t size);
-extern void __wt_buf_steal( WT_SESSION_IMPL *session,
+extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
     WT_BUF *buf,
-    const void *datap,
     uint32_t *sizep);
 extern void __wt_buf_swap(WT_BUF *a, WT_BUF *b);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
