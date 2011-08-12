@@ -387,10 +387,10 @@ extern void __wt_free_int(WT_SESSION_IMPL *session, void *p_arg);
 extern int __wt_dlopen(WT_SESSION_IMPL *session,
     const char *path,
     WT_DLH **dlhp);
-extern int __wt_dlsym(WT_SESSION_IMPL *session,
+extern int __wt_dlsym( WT_SESSION_IMPL *session,
     WT_DLH *dlh,
     const char *name,
-    void **sym_ret);
+    void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_exist(const char *path);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);

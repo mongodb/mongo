@@ -111,8 +111,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	__wt_cache_destroy(conn);
 
 	/* Close extensions. */
-	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL)
+	__wt_lock(session, conn->mtx);
+	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
+		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
 		WT_TRET(__wt_dlclose(session, dlh));
+	}
+	__wt_unlock(session, conn->mtx);
 
 	if (conn->log_fh != NULL) {
 		WT_TRET(__wt_close(session, conn->log_fh));

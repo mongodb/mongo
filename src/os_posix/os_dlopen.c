@@ -14,14 +14,10 @@
 int
 __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DLH *dlh;
 	int ret;
 
-	conn = S2C(session);
-	ret = 0;
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_DLH), &dlh));
-
+	WT_RET(__wt_calloc_def(session, 1, &dlh));
 	WT_ERR(__wt_strdup(session, path, &dlh->name));
 
 	if ((dlh->handle = dlopen(path, RTLD_LAZY)) == NULL) {
@@ -30,18 +26,11 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 		goto err;
 	}
 
-	/* Link onto the environment's list of open libraries. */
-	__wt_lock(session, conn->mtx);
-	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
-	__wt_unlock(session, conn->mtx);
-
 	*dlhp = dlh;
-
 	if (0) {
 err:		__wt_free(session, dlh->name);
 		__wt_free(session, dlh);
 	}
-
 	return (ret);
 }
 
@@ -50,8 +39,8 @@ err:		__wt_free(session, dlh->name);
  *	Lookup a symbol in a dynamic library.
  */
 int
-__wt_dlsym(WT_SESSION_IMPL *session,
-    WT_DLH *dlh, const char *name, void **sym_ret)
+__wt_dlsym(
+    WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, void *sym_ret)
 {
 	void *sym;
 
@@ -61,7 +50,7 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 		return (WT_ERROR);
 	}
 
-	*sym_ret = sym;
+	*(void **)sym_ret = sym;
 	return (0);
 }
 
@@ -72,19 +61,9 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 int
 __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 {
-	WT_CONNECTION_IMPL *conn;
 	int ret;
 
-	conn = S2C(session);
 	ret = 0;
-
-	if (dlh == NULL)
-		return (0);
-
-	/* Remove from the list and discard the memory. */
-	__wt_lock(session, conn->mtx);
-	TAILQ_REMOVE(&conn->dlhqh, dlh, q);
-	__wt_unlock(session, conn->mtx);
 
 	if (dlclose(dlh->handle) != 0) {
 		__wt_err(session, errno, "dlclose: %s", dlerror());

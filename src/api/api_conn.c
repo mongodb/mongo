@@ -12,20 +12,19 @@
  *	WT_CONNECTION->load_extension method.
  */
 static int
-__conn_load_extension(WT_CONNECTION *wt_conn,
-    const char *path, const char *config)
+__conn_load_extension(
+    WT_CONNECTION *wt_conn, const char *path, const char *config)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-	const char *entry_name;
-	char namebuf[100];
-	int (*entry)(WT_CONNECTION *, const char *);
-	void *p;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DLH *dlh;
+	WT_SESSION_IMPL *session;
+	int (*entry)(WT_CONNECTION *, const char *);
 	int ret;
+	char namebuf[100];
+	const char *entry_name;
 
-	WT_UNUSED(path);
+	dlh = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
@@ -44,11 +43,30 @@ __conn_load_extension(WT_CONNECTION *wt_conn,
 			entry_name = namebuf;
 	}
 
+	/*
+	 * This assumes the underlying shared libraries are reference counted,
+	 * that is, that re-opening a shared library simply increments a ref
+	 * count, and closing it simply decrements the ref count, and the last
+	 * close discards the reference entirely -- in other words, we do not
+	 * check to see if we've already opened this shared library.
+	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, entry_name, &p));
-	entry = p;
+	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
+
+	/* Link onto the environment's list of open libraries. */
+	__wt_lock(session, conn->mtx);
+	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
+	__wt_unlock(session, conn->mtx);
+
+	/* Call the entry function. */
 	entry(wt_conn, config);
-err:	API_END(session);
+
+	if (0) {
+err:		if (dlh != NULL)
+			(void)__wt_dlclose(session, dlh);
+	}
+
+	API_END(session);
 
 	return (ret);
 }
