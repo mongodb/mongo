@@ -60,7 +60,7 @@ fi
 
 bzext="../../ext/compressors/bzip2_compress/bzip2_compress.so"
 if test -e $bzext ; then
-	config='extensions=["$bzext"]'
+	config='extensions=["'$bzext'"]'
 else
 	config=
 fi
