@@ -108,7 +108,28 @@ namespace mongo {
             }
 
             try {
+#ifndef __linux__  // TODO: consider making this ifdef _WIN32
                 boost::thread thr(boost::bind(&connThread,mp));
+#else
+                pthread_attr_t attrs;
+                pthread_attr_init(&attrs);
+                pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
+
+                static const size_t STACK_SIZE = 4*1024*1024;
+                pthread_attr_setstacksize(&attrs, (DEBUG_BUILD 
+                                                    ? (STACK_SIZE / 2)
+                                                    : STACK_SIZE));
+
+                pthread_t thread;
+                int failed = pthread_create(&thread, &attrs, (void*(*)(void*)) &connThread, mp);
+
+                pthread_attr_destroy(&attrs);
+
+                if (failed) {
+                    log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
+                    throw boost::thread_resource_error(); // for consistency with boost::thread
+                }
+#endif
             }
             catch ( boost::thread_resource_error& ) {
                 log() << "can't create new thread, closing connection" << endl;
