@@ -30,7 +30,7 @@
 namespace mongo {
 
     bool AuthenticationInfo::_warned = false;
-
+    /*
     void AuthenticationInfo::print() const {
         cout << "AuthenticationInfo: " << this << '\n';
         for ( MA::const_iterator i=_dbs.begin(); i!=_dbs.end(); i++ ) {
@@ -38,7 +38,7 @@ namespace mongo {
         }
         cout << "END" << endl;
     }
-
+    */
 
     string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
@@ -78,9 +78,9 @@ namespace mongo {
             pwd = internalSecurity.pwd;
         }
         else {
-            static BSONObj userPattern = fromjson("{\"user\":1}");
+            // static BSONObj userPattern = fromjson("{\"user\":1}");
             string systemUsers = dbname + ".system.users";
-            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
+            // OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
                 b << "user" << user;
