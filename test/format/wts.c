@@ -58,7 +58,15 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+	const char *ext;
 	char config[256];
+
+	/* If the bzip2 compression module has been built, use it. */
+	ext = "../../ext/compressors/bzip2_compress/bzip2_compress.so";
+	if (access(ext, R_OK) != 0) {
+		ext = "";
+		g.c_bzip = 0;
+	}
 
 	/*
 	 * Open configuration -- put command line configuration options at the
@@ -66,12 +74,8 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\""
-	    "../../ext/compressors/bzip2_compress/bzip2_compress.so"
-	    "\"]"
-	    "%s%s",
-	    g.progname, g.c_cache,
-	    g.config_open == NULL ? "" : ",",
+	    "extensions=[\"%s\"],%s",
+	    g.progname, g.c_cache, ext,
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =
