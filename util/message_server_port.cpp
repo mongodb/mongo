@@ -26,6 +26,10 @@
 #include "../db/lasterror.h"
 #include "../db/stats/counters.h"
 
+#ifdef __linux__
+# include <sys/resource.h>
+#endif
+
 namespace mongo {
 
     namespace pms {
@@ -113,9 +117,17 @@ namespace mongo {
                 pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
                 static const size_t STACK_SIZE = 4*1024*1024;
-                pthread_attr_setstacksize(&attrs, (DEBUG_BUILD 
-                                                    ? (STACK_SIZE / 2)
-                                                    : STACK_SIZE));
+
+                struct rlimit limits;
+                assert(getrlimit(RLIMIT_STACK, &limits) == 0);
+                if (limits.rlim_cur > STACK_SIZE) {
+                    pthread_attr_setstacksize(&attrs, (DEBUG_BUILD
+                                                        ? (STACK_SIZE / 2)
+                                                        : STACK_SIZE));
+                }
+                else if (limits.rlim_cur < 1024*1024) {
+                        warning() << "Stack size set to " << (limits.rlim_cur/1024) << "KB. We suggest at least 1MB" << endl;
+                }
 
                 pthread_t thread;
                 int failed = pthread_create(&thread, &attrs, (void*(*)(void*)) &pms::threadRun, p);
