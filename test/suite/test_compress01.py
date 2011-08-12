@@ -91,9 +91,12 @@ class test_compress01_base(wttest.WiredTigerTestCase):
 
     def extensionArg(self, name):
         if name != None:
-            extensionsdir = os.path.dirname(__file__) + os.sep + '../../ext/compressors';
-            extensionsarg = 'extensions=["' + extensionsdir + os.sep + name + os.sep + name + '.so"]'
-            return extensionsarg
+            testdir = os.path.dirname(__file__)
+            extdir = os.path.join(testdir, '../../ext/compressors')
+            extfile = os.path.join(extdir, name, name + '.so')
+            if not os.path.exists(extfile):
+                self.skipTest('Extension "' + name + '.so" not built')
+            return 'extensions=["' + extfile + '"]'
         else:
             return ''
 
