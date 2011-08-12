@@ -554,11 +554,11 @@ match_err:			ret = WT_ERROR;
 int
 __wt_verify_dsk_chunk(
     WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
-    uint32_t addr, uint32_t data_len, uint32_t size, int quiet)
+    uint32_t addr, uint32_t data_len, uint32_t memsize, int quiet)
 {
 	uint8_t *p, *end;
 
-	end = (uint8_t *)dsk + size;
+	end = (uint8_t *)dsk + memsize;
 
 	/*
 	 * Fixed-length column-store, overflow and freelist pages are simple

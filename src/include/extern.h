@@ -232,7 +232,7 @@ extern int __wt_disk_decompress( WT_SESSION_IMPL *session,
 extern int __wt_disk_read_scr( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
-    uint32_t *psize);
+    uint32_t size);
 extern int __wt_disk_read_realloc( WT_SESSION_IMPL *session,
     WT_PAGE_DISK **pdsk,
     uint32_t addr,
@@ -259,7 +259,7 @@ extern int __wt_verify_dsk_chunk( WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
     uint32_t data_len,
-    uint32_t size,
+    uint32_t memsize,
     int quiet);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     WT_PAGE *page,

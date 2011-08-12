@@ -90,15 +90,14 @@ __wt_disk_decompress(
  */
 int
 __wt_disk_read_scr(
-    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t *psize)
+    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t size)
 {
 	WT_BUF *newbuf;
 	WT_PAGE_DISK *dsk;
 	int ret;
 
 	dsk = buf->mem;
-
-	WT_RET(__wt_disk_read(session, dsk, addr, *psize));
+	WT_RET(__wt_disk_read(session, dsk, addr, size));
 
 	/*
 	 * If the in-memory and on-disk sizes aren't the same, the buffer
@@ -107,15 +106,14 @@ __wt_disk_read_scr(
 	if (dsk->size != dsk->memsize) {
 		/* Get a new scratch buffer and decompress into it */
 		WT_RET(__wt_scr_alloc(session, dsk->memsize, &newbuf));
-		if ((ret = __wt_disk_decompress(session, dsk,
-			    newbuf->mem)) != 0) {
+		if ((ret =
+		    __wt_disk_decompress(session, dsk, newbuf->mem)) != 0) {
 			__wt_scr_release(&newbuf);
 			return (ret);
 		}
 
 		/* Caller gets the newbuf's data swapped into their orig buf */
 		__wt_buf_swap(newbuf, buf);
-		*psize = dsk->memsize;
 		__wt_scr_release(&newbuf);
 	}
 
