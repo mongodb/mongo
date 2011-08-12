@@ -130,8 +130,7 @@ main(int argc, char *argv[])
 		 *
 		 * Close, salvage, verify, re-open, dump.
 		 */
-#if 0
-		if (g.c_delete_pct == 0 && (
+		if (g.c_delete_pct == 0 && !g.c_bzip && (
 		    wts_teardown() ||
 		    wts_salvage() ||
 		    wts_verify("salvage") ||
@@ -142,7 +141,6 @@ main(int argc, char *argv[])
 		track("shutting down WT", 0ULL);
 		if (wts_teardown())
 			goto err;
-#endif
 
 		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
 	}
