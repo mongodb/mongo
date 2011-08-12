@@ -23,7 +23,7 @@ while :
 done
 
 if test $# -ne 0; then
-	echo 'usage: s_dumpcmp [-c]' >&2
+	echo 'usage: s_dumpcmp [-bc]' >&2
 	exit 1
 fi
 
