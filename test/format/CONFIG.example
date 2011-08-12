@@ -1,6 +1,9 @@
 #bitcnt
 #	number of bits for fixed-length column-store files
 
+#bzip
+#	if blocks are BZIP2 encoded
+
 #cache
 #	size of the cache in MB
 

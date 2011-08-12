@@ -61,6 +61,7 @@ typedef struct {
 	char *key_gen_buf;
 
 	uint32_t c_bitcnt;			/* Config values */
+	uint32_t c_bzip;
 	uint32_t c_cache;
 	uint32_t c_delete_pct;
 	uint32_t c_file_type;

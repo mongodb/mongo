@@ -48,14 +48,15 @@ config_setup(void)
 		if (cp->flags & (C_IGNORE | C_PERM | C_TEMP))
 			continue;
 
-		*cp->v = CONF_RAND(cp);
 		/*
-		 * Boolean flags are 0 or 1, but only set 1 in N where the
-		 * variable's min/max values are 1 and N.  Set the flag if
-		 * we rolled a 1, otherwise don't.
+		 * Boolean flags are 0 or 1, but only set N in 100 where the
+		 * variable's min value is N.  Set the flag if we rolled >=
+		 * the min, 0 otherwise.
 		 */
 		if (cp->flags & C_BOOL)
-			*cp->v = *cp->v == 1 ? 1 : 0;
+			*cp->v = MMRAND(1, 100) <= cp->min ? 1 : 0;
+		else
+			*cp->v = CONF_RAND(cp);
 	}
 
 	/* Periodically, set the delete percentage to 0 so salvage gets run. */
@@ -193,7 +194,13 @@ config_single(const char *s, int perm)
 	cp->flags |= perm ? C_PERM : C_TEMP;
 
 	*cp->v = config_translate(ep + 1);
-	if (*cp->v < cp->min || *cp->v > cp->max) {
+	if (cp->flags & C_BOOL) {
+		if (*cp->v != 0 && *cp->v != 1) {
+			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
+			    g.progname, s);
+			exit(EXIT_FAILURE);
+		}
+	} else if (*cp->v < cp->min || *cp->v > cp->max) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
                     " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
 		    g.progname, s, *cp->v, cp->min, cp->max);

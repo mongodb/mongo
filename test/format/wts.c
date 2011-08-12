@@ -8,9 +8,11 @@
 #include "format.h"
 
 static int  bulk(WT_ITEM **, WT_ITEM **);
+static int  wts_close(WT_CONNECTION *);
 static int  wts_col_del(uint64_t);
 static int  wts_col_put(uint64_t, int);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
+static int  wts_open(WT_CONNECTION **, WT_SESSION **session);
 static int  wts_read(uint64_t);
 static int  wts_row_del(uint64_t);
 static int  wts_row_put(uint64_t, int);
@@ -50,6 +52,60 @@ static WT_EVENT_HANDLER event_handler = {
 	handle_progress
 };
 
+static int
+wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
+{
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	int ret;
+	char config[256];
+
+	/*
+	 * Open configuration -- put command line configuration options at the
+	 * end so they can override "standard" configuration.
+	 */
+	snprintf(config, sizeof(config),
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
+	    "extensions=[\""
+	    "../../ext/compressors/bzip2_compress/bzip2_compress.so"
+	    "\"]"
+	    "%s%s",
+	    g.progname, g.c_cache,
+	    g.config_open == NULL ? "" : ",",
+	    g.config_open == NULL ? "" : g.config_open);
+
+	if ((ret =
+	    wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
+		fprintf(stderr, "%s: wiredtiger_open: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		fprintf(stderr, "%s: conn.session: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		(void)conn->close(conn, NULL);
+		return (1);
+	}
+
+	*sessionp = session;
+	*connp = conn;
+	return (0);
+}
+
+static int
+wts_close(WT_CONNECTION *conn)
+{
+	int ret;
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr, "%s: conn.close: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
+	return (0);
+}
+
 int
 wts_startup(void)
 {
@@ -60,31 +116,8 @@ wts_startup(void)
 	int ret;
 	char config[512], *end, *p;
 
-#ifdef COMPRESSOR
-	char *compressor = COMPRESSOR;
-#else
-	char *compressor = NULL;
-#endif
-
-	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB%s%s",
-	    g.progname, g.c_cache,
-	    g.config_open == NULL ? "" : ",",
-	    g.config_open == NULL ? "" : g.config_open);
-
-	ret = wiredtiger_open(NULL, &event_handler, config, &conn);
-	if (ret != 0) {
-		fprintf(stderr, "%s: wiredtiger_open: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
+	if (wts_open(&conn, &session))
 		return (1);
-	}
-
-	if ((ret = conn->open_session(conn, NULL, NULL,
-	    &session)) != 0) {
-		fprintf(stderr, "%s: conn.session: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
 
 	p = config;
 	end = config + sizeof(config);
@@ -92,15 +125,14 @@ wts_startup(void)
 	    "key_format=%s,"
 	    "internal_node_min=%d,internal_node_max=%d,"
 	    "leaf_node_min=%d,leaf_node_max=%d,"
-	    "split_min",
+	    "split_min"
+	    "%s",
 	    (g.c_file_type == ROW) ? "u" : "r",
 	    1U << g.c_intl_node_min,
 	    1U << g.c_intl_node_max,
 	    1U << g.c_leaf_node_min,
-	    1U << g.c_leaf_node_max);
-	if (compressor)
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=%s", compressor);
+	    1U << g.c_leaf_node_max,
+	    g.c_bzip ? ",block_compressor=\"bzip2_compress\"" : "");
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -163,16 +195,8 @@ wts_teardown(void)
 		    ctime(&now));
 	}
 
-	if ((ret = wts_sync()) != 0)
-		return (ret);
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "%s: conn.close: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-
-	g.wts_session = NULL;
-	return (0);
+	ret = wts_sync();
+	return (wts_close(conn) ? 1 : ret);
 }
 
 int
@@ -251,41 +275,23 @@ wts_salvage(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
-	char config[200];
 
 	track("salvage", 0ULL);
 
 	/* Save a copy of the file before we salvage it. */
 	(void)system("cp __wt __salvage_copy");
 
-	snprintf(config, sizeof(config), "error_prefix=\"%s\"%s%s", g.progname,
-	    g.config_open == NULL ? "" : ",",
-	    g.config_open == NULL ? "" : g.config_open);
+	if (wts_open(&conn, &session))
+		return (1);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
-		fprintf(stderr, "%s: wiredtiger_open: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		fprintf(stderr, "%s: conn.session: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
 	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0) {
 		fprintf(stderr, "%s: salvage: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "%s: conn.close: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
 
-	return (0);
+	return (wts_close(conn));
 }
-
 
 static int
 wts_sync(void)
@@ -311,38 +317,17 @@ wts_verify(const char *tag)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
-	char config[200];
 
 	track("verify", 0ULL);
 
-	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB%s%s",
-	    g.progname, g.c_cache,
-	    g.config_open == NULL ? "" : ",",
-	    g.config_open == NULL ? "" : g.config_open);
+	if (wts_open(&conn, &session))
+		return (1);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
-		fprintf(stderr, "%s: wiredtiger_open: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		fprintf(stderr, "%s: conn.session: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0) {
+	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0)
 		fprintf(stderr, "%s: %s verify: %s\n",
 		    g.progname, tag, wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "%s: conn.close: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
 
-	return (0);
+	return (wts_close(conn) ? 1 : ret);
 }
 
 /*

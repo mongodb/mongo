@@ -58,10 +58,12 @@ if test $dump_bdb -eq 1; then
 	fi
 fi
 
+bzip2='extensions=["../../ext/compressors/bzip2_compress/bzip2_compress.so"]'
+
 if test $colflag -eq 0; then
-	$wt/wt dump -p file:__wt > __wt_dump
+	$wt/wt -C $bzip2 dump -p file:__wt > __wt_dump
 else
-	$wt/wt dump -p file:__wt | strip_zeros > __wt_dump
+	$wt/wt -C $bzip2 dump -p file:__wt | strip_zeros > __wt_dump
 fi
 cmp __wt_dump __bdb_dump > /dev/null || exit 1
 

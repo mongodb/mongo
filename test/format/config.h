@@ -11,7 +11,7 @@ typedef struct {
 #define	C_ROW		0x04
 	uint8_t	 	type_mask;		/* File type mask */
 
-	/* Value is a boolean, yes/no if roll 1 between 1 and N. */
+	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
 #define	C_BOOL		0x01
 
 	/* Not a simple randomization, handle outside the main loop. */ 
@@ -40,6 +40,10 @@ static CONFIG c[] = {
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0, 1, 8, &g.c_bitcnt },
 
+	{ "bzip",
+	  "if blocks are BZIP2 encoded",		/* 80% */
+	  0, C_BOOL, 80, 0, &g.c_bzip },
+
 	{ "cache",
 	  "size of the cache in MB",
 	  0, 0, 1, 30, &g.c_cache },
@@ -53,12 +57,12 @@ static CONFIG c[] = {
 	  0, C_IGNORE, 1, 3, &g.c_file_type },
 
 	{ "huffman_key",
-	  "if keys are huffman encoded",
-	  C_ROW, C_BOOL, 0, 10, &g.c_huffman_key },
+	  "if keys are huffman encoded",		/* 40% */
+	  C_ROW, C_BOOL, 40, 0, &g.c_huffman_key },
 
 	{ "huffman_value",
-	 "if values are huffman encoded",
-	 C_ROW|C_VAR, C_BOOL, 0, 10, &g.c_huffman_value },
+	 "if values are huffman encoded",		/* 40% */
+	 C_ROW|C_VAR, C_BOOL, 40, 0, &g.c_huffman_value },
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
