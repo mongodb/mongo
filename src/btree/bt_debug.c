@@ -173,22 +173,15 @@ int
 __wt_debug_addr(
     WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
 {
-	WT_DBG *ds, _ds;
+	WT_BUF *tmp;
 	int ret;
-	char *bp;
 
 	ret = 0;
 
-	ds = &_ds;
-	WT_RET(__debug_config(session, ds, ofile));
-
-	WT_RET(__wt_calloc_def(session, (size_t)size, &bp));
-	WT_ERR(__wt_disk_read_realloc(session, (WT_PAGE_DISK **)&bp,
-		addr, &size));
-	ret = __wt_debug_disk(session, (WT_PAGE_DISK *)bp, NULL);
-err:	__wt_free(session, bp);
-
-	__dmsg_wrapup(ds);
+	WT_RET(__wt_scr_alloc(session, size, &tmp));
+	WT_ERR(__wt_disk_read_scr(session, tmp, addr, size));
+	ret = __wt_debug_disk(session, tmp->mem, ofile);
+err:	__wt_scr_release(&tmp);
 
 	return (ret);
 }
