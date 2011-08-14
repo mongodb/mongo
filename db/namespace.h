@@ -319,17 +319,23 @@ namespace mongo {
         int fieldIsIndexed(const char *fieldName);
 
         void paddingFits() {
-            double x = paddingFactor - 0.01;
-            if ( x >= 1.0 ) {
-                *getDur().writing(&paddingFactor) = x;
-                //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
+            // do this on a sampled basis to journal less
+            MONGO_SOMETIMES(sometimes, 4) {              
+                double x = paddingFactor - 0.01;
+                if ( x >= 1.0 ) {
+                    *getDur().writing(&paddingFactor) = x;
+                    //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
+                }
             }
         }
         void paddingTooSmall() {
-            double x = paddingFactor + 0.6;
-            if ( x <= 2.0 ) {
-                *getDur().writing(&paddingFactor) = x;
-                //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
+            // do this on a sampled basis to journal less
+            MONGO_SOMETIMES(sometimes, 4) {              
+                double x = paddingFactor + 0.6;
+                if ( x <= 2.0 ) {
+                    *getDur().writing(&paddingFactor) = x;
+                    //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
+                }
             }
         }
 
