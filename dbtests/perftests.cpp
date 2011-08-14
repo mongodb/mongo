@@ -124,8 +124,6 @@ namespace PerfTests {
         virtual void post() { }
 
         virtual string name() = 0;
-        virtual unsigned long long expectation() { return 0; }
-        virtual int expectationTimeMillis() { return -1; }
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
         virtual int howLongMillis() { return profiling ? 60000 : 5000; } 
@@ -310,18 +308,6 @@ namespace PerfTests {
             int ms = t.millis();
 
             say(n, ms, name());
-
-            int etm = expectationTimeMillis();
-            DEV { 
-            }
-            else if( etm > 0 ) { 
-                if( ms > etm*2 ) { 
-                    cout << "test  " << name() << " seems slow expected ~" << etm << "ms" << endl;
-                }
-            }
-            else if( n < expectation() ) {
-                cout << "test  " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
-            }
 
             post();
 
@@ -579,7 +565,6 @@ namespace PerfTests {
         void timed() {
             dontOptimizeOutHopefully++;
         }
-        unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
     };
 
@@ -593,7 +578,6 @@ namespace PerfTests {
             if( &cc() )
                 dontOptimizeOutHopefully++;
         }
-        unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
     };
 
@@ -607,7 +591,6 @@ namespace PerfTests {
             if( dontOptimizeOutHopefully++ > 0 )
                 delete p;
         }
-        unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
     };
 
@@ -620,7 +603,6 @@ namespace PerfTests {
         string name() { return "compress"; }
         virtual bool showDurStats() { return false; }
         virtual int howLongMillis() { return 4000; } 
-        unsigned long long expectation() { return 1000000; }
         void prep() { 
             p = malloc(sz);
             // this isn't a fair test as it is mostly rands but we just want a rough perf check
@@ -660,7 +642,6 @@ namespace PerfTests {
         ChecksumTest() : sz(1024*1024*100+3) { }
         string name() { return "checksum"; }
         virtual int howLongMillis() { return 2000; } 
-        int expectationTimeMillis() { return 5000; }
         virtual bool showDurStats() { return false; }
         virtual unsigned batchSize() { return 1; }
 
@@ -724,7 +705,6 @@ namespace PerfTests {
         void post() {
             assert( client().count(ns()) == 1 );
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     class Insert1 : public B {
@@ -749,7 +729,6 @@ namespace PerfTests {
             assert( client().count(ns()) > 50 );
 #endif
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     class InsertBig : public B {
@@ -771,7 +750,6 @@ namespace PerfTests {
         void timed() {
             client().insert( ns(), x );
         }
-        unsigned long long expectation() { return 20; }
     };
 
     class InsertRandom : public B {
@@ -786,7 +764,6 @@ namespace PerfTests {
             BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
             client().insert(ns(), y);
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     /** upserts about 32k records and then keeps updating them
@@ -820,29 +797,17 @@ namespace PerfTests {
 
             return name()+"-inc";
         }
-
-        unsigned long long expectation() { return 1000; }
     };
 
     template <typename T>
     class MoreIndexes : public T {
     public:
-        string name() { return T::name() + "-with-more-indexes"; }
+        string name() { return T::name() + "-more-indexes"; }
         void prep() {
             T::prep();
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
-        
-        /*
-        virtual string timed2() {
-            string x = T::timed2();
-            if ( x.size() == 0 )
-                return x;
-            
-            return x + "-with-more-indexes";
-        }
-        */        
     };
 
     void t() {
