@@ -1169,17 +1169,13 @@ namespace mongo {
                     multiKeys.push_back(BSONObjSet());
                     multiKeys[multiKeys.size()-1].swap(keys);
                     BSONObjSet& q = multiKeys[0];
-                    cout << "x" << endl;
                 }
-                cout << multiKeys.size() << endl;
                 keys.clear();
-                cout << multiKeys.size() << endl;
             }
         }
 
         if( multiKeys.size() ) {
             BSONObjSet& q = multiKeys[0];
-            cout << multiKeys.size() << endl;
         }
 
         // update lock to writable here.  TODO
