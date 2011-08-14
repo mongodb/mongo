@@ -572,6 +572,9 @@ namespace mongo {
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
     };
 
+    template< class V>
+    struct Continuation;
+
     /**
      * This class adds functionality for manipulating buckets that are assembled
      * in a tree.  The requirements for const and non const functions and
@@ -603,6 +606,7 @@ namespace mongo {
     template< class V >
     class BtreeBucket : public BucketBasics<V> {
         friend class BtreeCursor;
+        friend struct Continuation<V>;
     public:
 	// make compiler happy:
         typedef typename V::Key Key;
@@ -678,6 +682,11 @@ namespace mongo {
         int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                       const BSONObj& key, const Ordering &order, bool dupsAllowed,
                       IndexDetails& idx, bool toplevel = true) const;
+
+        /** does the insert in two steps - can then use an upgradable lock for step 1, which 
+            is the part which may have page faults.  also that step is most of the computational work.
+        */
+        void twoStepInsert(DiskLoc thisLoc, Continuation<V> &c, bool dupsAllowed) const;
 
         /**
          * Preconditions:
@@ -926,7 +935,7 @@ namespace mongo {
          *  - The bucket may be packed or split, invalidating the specified value
          *    of keypos.
          * This function will always modify thisLoc, but it's marked const because
-         * it commonly relies on the specialized write intent mechanism of basicInsert().
+         * it commonly relies on the specialized writ]e intent mechanism of basicInsert().
          */
         void insertHere(const DiskLoc thisLoc, int keypos,
                         const DiskLoc recordLoc, const Key& key, const Ordering &order,
@@ -936,6 +945,8 @@ namespace mongo {
         int _insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                     const Key& key, const Ordering &order, bool dupsAllowed,
                     const DiskLoc lChild, const DiskLoc rChild, IndexDetails &idx) const;
+
+        void insertStepOne(DiskLoc thisLoc, Continuation<V>& c, bool dupsAllowed) const;
 
         bool find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, const Ordering &order, int& pos, bool assertIfDup) const;        
         bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) const;
@@ -1112,6 +1123,38 @@ namespace mongo {
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;
         long long _nscanned;
+    };
+
+    template< class V >
+    struct Continuation { 
+        //Continuation(const typename V::Key & k);
+        Continuation(DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
+                     Ordering _order, IndexDetails& _idx) :
+            bLoc(thisLoc), recordLoc(_recordLoc), key(_key), order(_order), idx(_idx) { 
+            op = Nothing;
+        }
+
+        DiskLoc bLoc;
+        DiskLoc recordLoc;
+        typename V::KeyOwned key;
+        const Ordering order;
+        IndexDetails& idx;
+        enum Op { Nothing, SetUsed, InsertHere } op;
+
+        int pos;
+        const BtreeBucket<V> *b;
+
+        void stepTwo() {
+            if( op == Nothing )
+                return;
+            else if( op == SetUsed ) {
+                const V::_KeyNode& kn = b->k(pos);
+                kn.writing().setUsed();
+            }
+            else {
+                b->insertHere(bLoc, pos, recordLoc, key, order, DiskLoc(), DiskLoc(), idx);
+            }
+        }
     };
 
     /** Renames the index namespace for this btree's index. */

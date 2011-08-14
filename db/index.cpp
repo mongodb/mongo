@@ -31,7 +31,32 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        typedef typename Continuation<V> Continuation;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
+
+        Continuation *c[NamespaceDetails::NIndexesMax];
+        unsigned n;
+
+    public:
+        IndexInterfaceImpl() { n = 0; }
+
+        /* CONCURRENCY this supports one writer only as-is */
+        void _phasedBegin() { 
+            for( unsigned i = 0; i < n; i++ )
+                delete c[i];
+            n = 0;
+        }
+        void phasedQueueItemToInsert(
+            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
+            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) { 
+            Continuation *C = c[n++] = new Continuation(thisLoc, _recordLoc, _key, _order, _idx);
+            thisLoc.btree<V>()->twoStepInsert(thisLoc, *C, dupsAllowed);
+        }
+        void _phasedFinish() {
+            for( unsigned i = 0; i < n; i++ ) { 
+                c[i]->stepTwo();
+            }
+        }
 
 /*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
             int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
@@ -99,6 +124,15 @@ namespace mongo {
     IndexInterfaceImpl<V1> iii_v1;
 
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
+
+    void IndexInterface::phasedBegin() { 
+        iii_v0._phasedBegin();
+        iii_v1._phasedBegin();
+    }
+    void IndexInterface::phasedFinish() { 
+        iii_v0._phasedFinish();
+        iii_v1._phasedFinish();
+    }
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";

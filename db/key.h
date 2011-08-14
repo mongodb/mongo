@@ -96,7 +96,6 @@ namespace mongo {
     };
 
     class KeyV1Owned : public KeyV1 { 
-        KeyV1Owned(const KeyV1Owned&); // not copyable -- StackBufBuilder is not copyable and that owns our buffer
         void operator=(const KeyV1Owned&);
     public:
         /** @obj a BSON object to be translated to KeyV1 format.  If the object isn't 
@@ -104,6 +103,10 @@ namespace mongo {
                  it will stay as bson herein.
         */
         KeyV1Owned(const BSONObj& obj);
+
+        /** makes a copy (memcpy's the whole thing) */
+        KeyV1Owned(const KeyV1& rhs);
+
     private:
         StackBufBuilder b;
         void traditional(const BSONObj& obj); // store as traditional bson not as compact format

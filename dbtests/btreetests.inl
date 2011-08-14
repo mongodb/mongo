@@ -67,7 +67,18 @@
         }
         void insert( BSONObj &key ) {
             const BtreeBucket *b = bt();
-            b->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
+
+#if defined(TESTTWOSTEP)
+            {
+                Continuation c(dl(), recordLoc(), key, Ordering::make(order()), id());
+                b->twoStepInsert(dl(), c, true);
+                c.stepTwo();
+            }
+#else
+            {
+                b->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
+            }
+#endif
             getDur().commitIfNeeded();
         }
         bool unindex( BSONObj &key ) {

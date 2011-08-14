@@ -27,6 +27,7 @@
 #define BtreeBucket BtreeBucket<V0>
 #define btree btree<V0>
 #define btreemod btreemod<V0>
+#define Continuation Continuation<V0>
 #define testName "btree"
 #define BTVERSION 0
 namespace BtreeTests0 {
@@ -36,9 +37,11 @@ namespace BtreeTests0 {
 #undef BtreeBucket
 #undef btree
 #undef btreemod
+#undef Continuation
 #define BtreeBucket BtreeBucket<V1>
 #define btree btree<V1>
 #define btreemod btreemod<V1>
+#define Continuation Continuation<V1>
 #undef testName
 #define testName "btree1"
 #undef BTVERSION
@@ -47,3 +50,10 @@ namespace BtreeTests1 {
  #include "btreetests.inl"
 }
 
+#undef testName
+#define testName "btree1_twostep"
+#define TESTTWOSTEP 1
+
+namespace BtreeTests2 {
+ #include "btreetests.inl"
+}
