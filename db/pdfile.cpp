@@ -1186,13 +1186,17 @@ namespace mongo {
 
         DEV {
             // verify we haven't written yet (usually)
-            static unsigned long long zeroes;
-            static unsigned long long tot;
-            tot++;
-            if( dur::notesThisLock == 0 )
-                zeroes++;
-            if( tot > 1000 ) {
-                assert( zeroes > tot / 2 );
+
+            // test binary does special things so this would assert there so don't check there
+            if( !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
+                static unsigned long long zeroes;
+                static unsigned long long tot;
+                tot++;
+                if( dur::notesThisLock == 0 )
+                    zeroes++;
+                if( tot > 1000 ) {
+                    assert( zeroes > tot / 2 );
+                }
             }
         }
 
