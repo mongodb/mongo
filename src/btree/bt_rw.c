@@ -171,7 +171,14 @@ not_compressed:	/*
 		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
 		dst.size = buf->size - COMPRESS_SKIP;
 
-		/* If compression fails, fallback to the original version. */
+		/*
+		 * If compression fails, fallback to the original version.  This
+		 * isn't unexpected: if compression doesn't work for some chunk
+		 * of bytes for some reason (noting there's likely additional
+		 * format/header information which compressed output requires),
+		 * it just means the uncompressed version is as good as it gets,
+		 * and that's what we use.
+		 */
 		if ((ret = btree->compressor->compress(
 		    btree->compressor, &session->iface, &src, &dst)) != 0)
 			goto not_compressed;
