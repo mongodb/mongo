@@ -4,3 +4,6 @@ all: nop_compress.so
 
 nop_compress.so: nop_compress.o
 	gcc -shared -o nop_compress.so nop_compress.o
+
+clean:
+	rm -f nop_compress.o nop_compress.so
