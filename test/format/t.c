@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 		 *
 		 * Close, salvage, verify, re-open, dump.
 		 */
-		if (g.c_delete_pct == 0 && !g.c_bzip && (
+		if (g.c_delete_pct == 0 && (
 		    wts_teardown() ||
 		    wts_salvage() ||
 		    wts_verify("salvage") ||

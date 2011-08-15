@@ -8,32 +8,42 @@
 #include "wt_internal.h"
 
 /*
- * Don't compress the first 32B of the page (that's the WT_PAGE_DISK
- * structure) because we need a place to store the in-memory size of
- * the page so we know how large a buffer we need to decompress this
- * particular chunk.  (We only really need 4B, but a 32B boundary is
- * probably better alignment for the underlying engine, and skipping
- * 32B won't matter in terms of compression efficiency.)
+ * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
+ * structure) because we need the block's checksum and on-disk and in-memory
+ * page sizes to be immediately available without decompression (the checksum
+ * and the on-disk page sizes are used during salvage to figure out where the
+ * pages are, and the in-memory page size tells us how large a buffer we need
+ * to decompress the file block.  We could take less than 32B, but a 32B
+ * boundary is probably better alignment for the underlying compression engine,
+ * and skipping 32B won't matter in terms of compression efficiency.
  */
 #define	COMPRESS_SKIP    32
 
 /*
  * __wt_disk_read --
- *	Read a file page.
+ *	Read a block into a buffer.
  */
 int
 __wt_disk_read(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t size)
 {
 	WT_BTREE *btree;
+	WT_BUF *tmp;
 	WT_FH *fh;
+	WT_ITEM src, dst;
+	WT_PAGE_DISK *dsk;
 	uint32_t checksum;
+	int ret;
 
 	btree = session->btree;
+	tmp = NULL;
 	fh = btree->fh;
+	dsk = buf->mem;
 
-	WT_RET(__wt_read(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
+	WT_RET(__wt_read(
+	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
 
+	dsk = buf->mem;
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size))
@@ -47,87 +57,158 @@ __wt_disk_read(
 	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
 	    addr, size, __wt_page_type_string(dsk->type));
 
-	return (0);
-}
-
-/*
- * __wt_disk_decompress --
- *	Decompress a file page into another buffer.
- */
-int
-__wt_disk_decompress(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *comp_dsk, WT_PAGE_DISK *mem_dsk)
-{
-	WT_COMPRESSOR *compressor;
-	WT_ITEM dest, source;
-	int ret;
-
-	compressor = session->btree->compressor;
-
-	WT_ASSERT(session, comp_dsk->size < comp_dsk->memsize);
-	WT_ASSERT(session, compressor != NULL);
-
-	/* Copy the skipped bytes of the original image into place. */
-	memcpy(mem_dsk, comp_dsk, COMPRESS_SKIP);
-
-	/* Decompress the buffer. */
-	source.data = (uint8_t *)comp_dsk + COMPRESS_SKIP;
-	source.size = comp_dsk->size - COMPRESS_SKIP;
-	dest.data = (uint8_t *)mem_dsk + COMPRESS_SKIP;
-	dest.size = comp_dsk->memsize - COMPRESS_SKIP;
-	if ((ret = compressor->decompress(
-	    compressor, &session->iface, &source, &dest)) != 0)
-		__wt_err(session, ret, "decompress error");
-	return (ret);
-}
-
-/*
- * __wt_disk_read_scr --
- *	Read a file page into a scratch buffer.
- */
-int
-__wt_disk_read_scr(
-    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t size)
-{
-	WT_BUF *newbuf;
-	WT_PAGE_DISK *dsk;
-	int ret;
-
-	dsk = buf->mem;
-	WT_RET(__wt_disk_read(session, dsk, addr, size));
-
 	/*
-	 * If the in-memory and on-disk sizes aren't the same, the buffer is
-	 * compressed, allocate a scratch buffer and decompress into it.
+	 * If the in-memory and on-disk sizes are the same, the buffer is not
+	 * compressed.  Otherwise, allocate a scratch buffer and decompress
+	 * into it.
 	 */
 	if (dsk->size == dsk->memsize)
 		return (0);
 
-	WT_RET(__wt_scr_alloc(session, dsk->memsize, &newbuf));
-	WT_ERR(__wt_disk_decompress(session, dsk, newbuf->mem));
-	__wt_buf_swap(newbuf, buf);
-err:	__wt_scr_release(&newbuf);
+	WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
+
+	/* Copy the skipped bytes of the original image into place. */
+	memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
+
+	/* Decompress the buffer. */
+	src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
+	src.size = buf->size - COMPRESS_SKIP;
+	dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
+	dst.size = tmp->size - COMPRESS_SKIP;
+	WT_ERR(btree->compressor->decompress(
+	    btree->compressor, &session->iface, &src, &dst));
+	__wt_buf_swap(tmp, buf);
+
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
 	return (ret);
 }
 
 /*
  * __wt_disk_write --
- *	Write a file page.
+ *	Write a buffer to disk, returning the addr/size pair.
  */
 int
 __wt_disk_write(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *addrp, uint32_t *sizep)
 {
+	WT_ITEM src, dst;
 	WT_BTREE *btree;
-	WT_FH *fh;
+	WT_BUF *tmp;
+	WT_PAGE_DISK *dsk;
+	uint32_t addr, align_size, orig_size, size;
+	uint8_t orig_type;
+	int ret;
 
 	btree = session->btree;
-	fh = btree->fh;
+	tmp = NULL;
+	ret = 0;
+
+	dsk = buf->mem;
+	orig_size = buf->size;
+	orig_type = dsk->type;
 
 	/*
-	 * The disk write function sets a few things in the WT_PAGE_DISK header
-	 * simply because it's easy to do it here.  In a transactional store,
-	 * things may be a little harder.
+	 * We're passed in a WT_BUF that references some chunk of memory that's
+	 * a table's page image.  WT_BUF->size is the byte count of the image,
+	 * and WT_BUF->data is the image itself.
+	 *
+	 * Diagnostics: verify the disk page.  We have to set the disk size to
+	 * the "current" value, otherwise verify will complain.  We have no
+	 * disk address to use for error messages, use 0 (WT_ADDR_INVALID is a
+	 * big, big number).  This violates some layering, but it's the place
+	 * we can ensure we never write a corrupted page.
+	 */
+	dsk->size = dsk->memsize = buf->size;
+	WT_ASSERT(session, __wt_verify_dsk(
+	    session, buf->mem, WT_ADDR_INVALID, buf->size, 0) == 0);
+
+	/* Align the in-memory size to an allocation unit. */
+	align_size = WT_ALIGN(buf->size, btree->allocsize);
+
+	/*
+	 * Optionally stream-compress the data, but don't compress blocks that
+	 * are already as small as they're going to get.
+	 */
+	if (btree->compressor == NULL || align_size == btree->allocsize) {
+not_compressed:	/*
+		 * If not compressing the buffer, we need to zero out any unused
+		 * bytes at the end.
+		 *
+		 * We know the buffer is big enough for us to zero to the next
+		 * allocsize boundary: our callers must allocate enough memory
+		 * for the buffer so that we can do this operation.  Why don't
+		 * our callers just zero out the buffer themselves?  Because we
+		 * have to zero out the end of the buffer in the compression
+		 * case: so, we can either test compression in our callers and
+		 * zero or not-zero based on that test, splitting the code to
+		 * zero out the buffer into two parts, or require our callers
+		 * allocate enough memory for us to zero here without copying.
+		 * Both choices suck.
+		 */
+		memset(
+		    (uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
+		buf->size = align_size;
+
+		/*
+		 * Set the in-memory size to the on-page size (we check the size
+		 * to decide if a block is compressed: if the sizes match, the
+		 * block is NOT compressed).
+		 */
+		dsk = buf->mem;
+		dsk->size = dsk->memsize = align_size;
+	} else {
+		/*
+		 * Allocate a buffer for disk compression; only allocate enough
+		 * memory for a copy of the original, if any compressed version
+		 * is bigger than the original, we won't use it.
+		 */
+		WT_RET(__wt_scr_alloc(session, buf->size, &tmp));
+
+		/* Skip the first 32B of the data. */
+		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
+		src.size = buf->size - COMPRESS_SKIP;
+		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
+		dst.size = buf->size - COMPRESS_SKIP;
+
+		/* If compression fails, fallback to the original version. */
+		if ((ret = btree->compressor->compress(
+		    btree->compressor, &session->iface, &src, &dst)) != 0)
+			goto not_compressed;
+
+		/*
+		 * Set the final data size and see if compression was useful
+		 * (if the final block size is smaller, use the compressed
+		 * version, else use an uncompressed version because it will
+		 * be faster to read).
+		 */
+		tmp->size = dst.size + COMPRESS_SKIP;
+		size = WT_ALIGN(tmp->size, btree->allocsize);
+		if (size >= align_size)
+			goto not_compressed;
+		align_size = size;
+
+		/*
+		 * Copy in the leading 32B of header (incidentally setting the
+		 * in-memory page size), zero out any unused bytes.
+		 *
+		 * Set the final on-disk page size.
+		 */
+		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
+		memset(
+		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
+
+		dsk = tmp->mem;
+		dsk->size = align_size;
+	}
+
+	/* Allocate blocks from the underlying file. */
+	WT_ERR(__wt_block_alloc(session, &addr, align_size));
+
+	/*
+	 * The disk write function sets things in the WT_PAGE_DISK header simply
+	 * because it's easy to do it here.  In a transactional store, things
+	 * may be a little harder.
 	 *
 	 * We increment the page LSN in non-transactional stores so it's easy
 	 * to identify newer versions of pages during salvage: both pages are
@@ -141,91 +222,30 @@ __wt_disk_write(
 	 */
 	WT_LSN_INCR(btree->lsn);
 	dsk->lsn = btree->lsn;
-	dsk->size = size;
 
-	WT_ASSERT(session, btree->compressor != NULL ||
-	    dsk->memsize == 0 || dsk->memsize == dsk->size);
-	if (dsk->memsize == 0)
-		dsk->memsize = size;
-
-	WT_ASSERT(session, btree->compressor != NULL ||
-	    __wt_verify_dsk(session, dsk, addr, size, 0) == 0);
-
+	/*
+	 * Update the block's checksum: checksum the compressed contents, not
+	 * the uncompressed contents.
+	 */
 	dsk->checksum = 0;
-	dsk->checksum = __wt_cksum(dsk, size);
-	WT_RET(
-	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
+	dsk->checksum = __wt_cksum(dsk, align_size);
+	WT_ERR(__wt_write(
+	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE(session, WRITE,
-	    "write addr/size %" PRIu32 "/%" PRIu32 ": %s",
-	    addr, size, __wt_page_type_string(dsk->type));
-	return (0);
-}
+	    "write %" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
+	    orig_size, addr, align_size,
+	    dsk->size == dsk->memsize ? "" : "compressed, ",
+	    __wt_page_type_string(orig_type));
 
-/*
- * __wt_disk_compress --
- *	Compress a file page.
- */
-int
-__wt_disk_compress(WT_SESSION_IMPL *session,
-    WT_PAGE_DISK *mem_dsk, WT_PAGE_DISK *comp_dsk, uint32_t *psize)
-{
-	WT_BTREE *btree;
-	WT_ITEM source;
-	WT_ITEM dest;
-	int ret;
-	uint32_t size;
+	*addrp = addr;
+	*sizep = align_size;
 
-	btree = session->btree;
-
-	/*
-	 * On input, *psize is the size of both the source mem_dsk, and also
-	 * the allocated size of the compressed comp_dsk.  On output, *psize
-	 * is set to the size used in comp_dsk.  If the compressed page cannot
-	 * fit into the allotted space, there will be no error, but *psize will
-	 * be unchanged.
-	 */
-	size = *psize;
-
-	WT_ASSERT(session, btree->compressor != NULL);
-	WT_ASSERT(session, WT_ALIGN(*psize, btree->allocsize) == size);
-
-	/*
-	 * Set disk sizes for verify_dsk.  We have no disk address to use for
-	 * verify_dsk's error messages, so use zero.
-	 */
-	mem_dsk->size = mem_dsk->memsize = size;
-	WT_ASSERT(session, __wt_verify_dsk(session, mem_dsk, 0, size, 0) == 0);
-
-	source.data = (uint8_t *)mem_dsk + COMPRESS_SKIP;
-	dest.data = (uint8_t *)comp_dsk + COMPRESS_SKIP;
-	source.size = dest.size = size - COMPRESS_SKIP;
-
-	if ((ret = btree->compressor->compress(
-	    btree->compressor, &session->iface, &source, &dest)) == 0 &&
-	    dest.size != source.size) {
-		memcpy(comp_dsk, mem_dsk, COMPRESS_SKIP);
-		comp_dsk->memsize = size;
-
-		/*
-		 * Align the returned compressed size to a buffer boundary.
-		 * Zero out the trailing end of the buffer.
-		 */
-		size = WT_ALIGN(dest.size + COMPRESS_SKIP, btree->allocsize);
-		memset((uint8_t *)dest.data + dest.size, 0,
-		    size - (dest.size + COMPRESS_SKIP));
-		*psize = size;
-
-		/* save the compressed size, we'll need that on decompress */
-		comp_dsk->size = dest.size + COMPRESS_SKIP;
-	} else if (ret == WT_TOOSMALL)
-		/* Not a reportable error, don't change *psize */
-		ret = 0;
-	else if (ret != 0)
-		__wt_err(session, ret, "compress error");
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }

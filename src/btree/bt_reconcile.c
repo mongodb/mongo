@@ -401,39 +401,6 @@ __rec_split_bnd_grow(WT_SESSION_IMPL *session)
 }
 
 /*
- * __rec_split_buf_prep --
- *	Get a page buffer ready for writing.
- */
-static inline void
-__rec_split_buf_prep(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
-{
-	WT_BTREE *btree;
-	uint32_t alloc_len, current_len, write_len;
-
-	btree = session->btree;
-
-	/*
-	 * Figure out the page's final size, and how many bytes need to be
-	 * cleared at the end.
-	 */
-	current_len = buf->size;
-	alloc_len = WT_ALIGN(current_len, btree->allocsize);
-	write_len = alloc_len - current_len;
-
-	/*
-	 * There are lots of offset calculations going on in this code, make
-	 * sure we don't overflow the end of the temporary buffer.
-	 */
-	WT_ASSERT(session, current_len + write_len <= buf->mem_size);
-
-	if (write_len != 0)
-		memset((uint8_t *)buf->mem + current_len, 0, write_len);
-
-	/* Return the page's final size. */
-	*sizep = alloc_len;
-}
-
-/*
  * __wt_page_reconcile --
  *	Format an in-memory page to its on-disk format, and write it.
  */
@@ -1412,17 +1379,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 {
 	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
-	WT_PAGE_DISK *ondsk;
 	WT_RECONCILE *r;
-	WT_BUF *comp_buf;
-	uint32_t addr, size;
-	int ret;
-	uint32_t comp_size;
-	uint32_t ondsk_size;
 
-	ret = 0;
-	comp_buf = NULL;
-	dsk = ondsk = buf->mem;
 	r = session->btree->reconcile;
 
 	/*
@@ -1438,6 +1396,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	 * see it.
 	 */
 #define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
+	dsk = buf->mem;
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
 		WT_ASSERT_RET(session, buf->size < buf->mem_size);
 
@@ -1446,31 +1405,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 		++buf->size;
 	}
 
-	/*
-	 * Set the disk block size and clear trailing bytes.
-	 * Allocate file space.
-	 * Write the disk block.
-	 * Return the addr/size pair.
-	 */
-	__rec_split_buf_prep(session, buf, &size);
-
-	ondsk_size = size;
-	dsk->memsize = 0;
-	if (session->btree->compressor != NULL) {
-		WT_RET(__wt_scr_alloc(session, size, &comp_buf));
-		comp_size = size;
-		WT_ERR(__wt_disk_compress(session, dsk, comp_buf->mem,
-			&comp_size));
-		if (comp_size != 0 && comp_size < size) {
-			ondsk = comp_buf->mem;
-			ondsk_size = comp_size;
-		}
-	}
-	WT_ERR(__wt_block_alloc(session, &addr, ondsk_size));
-	WT_ERR(__wt_disk_write(session, ondsk, addr, ondsk_size));
-
-	bnd->off.addr = addr;
-	bnd->off.size = ondsk_size;
+	/* Write the chunk. */
+	WT_RET(__wt_disk_write(session, buf, &bnd->off.addr, &bnd->off.size));
 
 	/*
 	 * If we're evicting the page, there's no more work to do.
@@ -1483,14 +1419,11 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	if (r->evict)
 		bnd->imp_dsk = NULL;
 	else {
-		WT_ERR(__wt_calloc(
-		    session, (size_t)size, sizeof(uint8_t), &bnd->imp_dsk));
-		memcpy(bnd->imp_dsk, dsk, size);
+		WT_RET(__wt_calloc(session,
+		    (size_t)buf->size, sizeof(uint8_t), &bnd->imp_dsk));
+		memcpy(bnd->imp_dsk, buf->mem, buf->size);
 	}
-err:
-	if (comp_buf != NULL)
-		__wt_scr_release(&comp_buf);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -3154,54 +3087,28 @@ __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BUF *tmp;
-	WT_BUF *comp_buf;
 	WT_PAGE_DISK *dsk;
-	WT_PAGE_DISK *ondsk;
-	uint32_t addr, size;
-	uint32_t comp_size;
-	uint32_t ondsk_size;
+	uint32_t size;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
-	comp_buf = NULL;
 
-	/* Allocate a scratch buffer big enough to hold the overflow chunk. */
+	/*
+	 * Allocate a scratch buffer big enough to hold the overflow chunk.
+	 *
+	 * Initialize the disk header and overflow chunk, write it.
+	 */
 	size = WT_DISK_REQUIRED(session, kv->buf.size);
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-	/*
-	 * Set up the chunk; clear any unused bytes so the contents are never
-	 * random.
-	 */
-	dsk = ondsk = tmp->mem;
+	dsk = tmp->mem;
 	memset(dsk, 0, WT_PAGE_DISK_SIZE);
 	dsk->type = WT_PAGE_OVFL;
 	dsk->u.datalen = kv->buf.size;
 	memcpy(WT_PAGE_DISK_BYTE(dsk), kv->buf.data, kv->buf.size);
-	memset((uint8_t *)WT_PAGE_DISK_BYTE(dsk) +
-	    kv->buf.size, 0, size - (WT_PAGE_DISK_SIZE + kv->buf.size));
-
-	ondsk_size = size;
-	dsk->memsize = 0;
-	if (session->btree->compressor != NULL) {
-		WT_RET(__wt_scr_alloc(session, size, &comp_buf));
-		comp_size = size;
-		WT_ERR(__wt_disk_compress(session, dsk, comp_buf->mem,
-			&comp_size));
-		if (comp_size != 0 && comp_size < size) {
-			ondsk = comp_buf->mem;
-			ondsk_size = comp_size;
-		}
-	}
-
-	/*
-	 * Allocate a file address (we're the only writer of the file, so we
-	 * can allocate file space on demand).  Fill in the WT_OFF structure.
-	 */
-	WT_ERR(__wt_block_alloc(session, &addr, ondsk_size));
-	kv->off.addr = addr;
-	kv->off.size = ondsk_size;
+	tmp->size = WT_PAGE_DISK_SIZE + kv->buf.size;
+	WT_ERR(__wt_disk_write(session, tmp, &kv->off.addr, &kv->off.size));
 
 	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;
@@ -3209,12 +3116,8 @@ __rec_cell_build_ovfl(
 	kv->cell_len = __wt_cell_pack_type(&kv->cell, type, rle);
 	kv->len = kv->cell_len + kv->buf.size;
 
-	ret = __wt_disk_write(session, ondsk, addr, ondsk_size);
-
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
-	if (comp_buf != NULL)
-		__wt_scr_release(&comp_buf);
 	return (ret);
 }
 

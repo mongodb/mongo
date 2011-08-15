@@ -324,7 +324,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_FH *fh;
 	WT_PAGE_DISK *dsk;
 	off_t off, max;
-	uint32_t addr, allocsize, checksum, size;
+	uint32_t addr, allocsize, size;
 	int ret;
 
 	btree = session->btree;
@@ -367,22 +367,15 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		    off + (off_t)size > max)
 			goto skip;
 
-		/* The page size isn't insane, read the entire page. */
-		WT_ERR(__wt_buf_initsize(session, t, size));
-		WT_ERR(__wt_read(session, fh, off, size, t->mem));
-		dsk = t->mem;
-
 		/*
-		 * If the checksum matches, assume we have a valid page, or, in
-		 * other words, assume corruption will always fail the checksum.
-		 * We could verify the page itself, but that's slow and we'd
-		 * have to modify the page verification routines to be silent
-		 * and to ignore off-page items, as it's reasonable for salvage
-		 * to see pages that reference non-existent objects.
+		 * The page size isn't insane, read the entire page: reading the
+		 * page validates the checksum and then decompresses the page as
+		 * needed.  If reading the page fails, it's probably corruption,
+		 * we ignore this block.
 		 */
-		checksum = dsk->checksum;
-		dsk->checksum = 0;
-		if (checksum != __wt_cksum(dsk, size))
+		WT_ERR(__wt_buf_initsize(session, t, size));
+		if (__wt_disk_read(
+		    session, t, WT_OFF_TO_ADDR(btree, off), size))
 			goto skip;
 
 		/*
@@ -393,6 +386,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * a corrupted file, like overflow references past the end of
 		 * the file.
 		 */
+		dsk = t->mem;
 		if (__wt_verify_dsk(session, dsk, addr, size, 1)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
@@ -1565,7 +1559,7 @@ __slvg_row_trk_update_start(
 	 * Read and instantiate the WT_TRACK page.
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(__wt_disk_read(session, dsk->mem, trk->addr, trk->size));
+	WT_ERR(__wt_disk_read(session, dsk, trk->addr, trk->size));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*

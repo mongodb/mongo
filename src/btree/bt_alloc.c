@@ -305,21 +305,20 @@ __wt_block_read(WT_SESSION_IMPL *session)
 	if (btree->free_addr == WT_ADDR_INVALID)
 		return (0);
 
-	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(session, btree->free_size, &tmp));
-
-	/* Read in the free-list. */
-	WT_ERR(__wt_disk_read(session,
-	    tmp->mem, btree->free_addr, btree->free_size));
-
-	/* The page is not compressed. */
-	WT_ASSERT(session, ((WT_PAGE_DISK *)tmp->mem)->size ==
-	    ((WT_PAGE_DISK *)tmp->mem)->memsize);
+	WT_ERR(__wt_disk_read(
+	    session, tmp, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)WT_PAGE_DISK_BYTE(tmp->mem);
 	    *p != WT_ADDR_INVALID; p += 2)
 		WT_ERR(__wt_block_free(session, p[0], p[1]));
+
+	/*
+	 * Insert the free-list itself into the linked list, but don't clear
+	 * the values, if the free-list is never modified, we don't write it.
+	 */
+	WT_ERR(__wt_block_free(session, btree->free_addr, btree->free_size));
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -338,7 +337,7 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	WT_BUF *tmp;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, size, *p, total_entries;
+	uint32_t addr, bytes, size, *p;
 	int ret;
 
 	btree = session->btree;
@@ -365,28 +364,21 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	WT_RET(__block_truncate(session));
 
 	/*
-	 * We allocate room for all of the free-list entries, plus 2 more.  The
-	 * first additional entry is for the free-list pages themselves, and the
-	 * second is for a list-terminating WT_ADDR_INVALID entry.
+	 * Get a scratch buffer, clear the page's header and data, initialize
+	 * the header.  Allocate an allocation-sized aligned buffer so the
+	 * block write function can zero-out unused bytes and write it without
+	 * copying to something larger.
+	 *
+	 * We allocate room for the free-list entries, plus 1 additional (the
+	 * list-terminating WT_ADDR_INVALID/0 pair).
 	 */
-	total_entries = btree->freelist_entries + 2;
-	size = WT_DISK_REQUIRED(session, total_entries * 2 * sizeof(uint32_t));
-
-	/* Get a scratch buffer and make it look like our work page. */
-	WT_RET(__wt_scr_alloc(session, size, &tmp));
-
-	/*
-	 * Allocate room for the free-list, which may shrink the free-list by
-	 * an entry.  That's OK, we don't use size for anything other than
-	 * sizing file and memory allocations.
-	 */
-	WT_RET(__wt_block_alloc(session, &addr, size));
-
-	/* Clear the page's header and data, initialize the header. */
+	bytes = (btree->freelist_entries + 1) * 2 * WT_SIZEOF32(uint32_t);
+	WT_RET(__wt_scr_alloc(session, WT_DISK_REQUIRED(session, bytes), &tmp));
 	dsk = tmp->mem;
-	memset(dsk, 0, size);
-	dsk->u.datalen = total_entries * 2 * WT_SIZEOF32(uint32_t);
+	memset(dsk, 0, WT_PAGE_DISK_SIZE);
+	dsk->u.datalen = bytes;
 	dsk->type = WT_PAGE_FREELIST;
+	tmp->size = WT_PAGE_DISK_SIZE + bytes;
 
 	/*
 	 * Fill the page's data.  We output the data in reverse order so we
@@ -398,33 +390,29 @@ __wt_block_write(WT_SESSION_IMPL *session)
 		*p++ = fe->addr;
 		*p++ = fe->size;
 	}
-	*p++ = addr;			/* The free-list chunk itself. */
-	*p++ = size;
 	*p++ = WT_ADDR_INVALID;		/* The list terminating values. */
 	*p = 0;
 
-	/* Write the free list to disk.  We don't compress this page
-	 * because it would introduce a circular dependency: the disk
-	 * address is needed to create the freelist itself, we need to
-	 * create the freelist before compressing, and we don't know
-	 * the final size (and hence the disk address) until we
-	 * compress.  Making the free list addresses to be relative on
-	 * disk would solve this.
+	/*
+	 * Discard the in-memory free-list: this has to happen before writing
+	 * the free-list because the underlying block write function is going
+	 * to allocate file space for the free-list block(s), and allocating
+	 * from the blocks on the free-list we just wrote won't work out well.
+	 * A workaround would be to not compress the free-list, which implies
+	 * some kind of "write but don't compress" code path, and that's more
+	 * complex than ordering these operations so the eventual allocation
+	 * in the write code always extends the file.
 	 */
-	WT_ERR(__wt_disk_write(session, dsk, addr, size));
+	__block_discard(session);
+
+	/* Write the free list to disk. */
+	WT_ERR(__wt_disk_write(session, tmp, &addr, &size));
 
 done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
 
-	/* Discard the in-memory free-list. */
-	__block_discard(session);
-
-	if (0) {
-err:		if (addr != WT_ADDR_INVALID)
-			(void)__wt_block_free(session, addr, size);
-	}
-	if (tmp != NULL)
+err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
