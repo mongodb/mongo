@@ -83,6 +83,30 @@ namespace mongo {
 #ifdef SO_KEEPALIVE
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
             log() << "ERROR: SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+
+#  ifdef __linux__
+        socklen_t len = sizeof(x);
+        if ( getsockopt(sock, level, TCP_KEEPIDLE, (char *) &x, &len) )
+            log() << "ERROR: can't get TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+
+        if (x > 300) {
+            x = 300;
+            if ( setsockopt(sock, level, TCP_KEEPIDLE, (char *) &x, sizeof(x)) ) {
+                log() << "ERROR: can't set TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+            }
+        }
+
+        len = sizeof(x); // just in case it changed
+        if ( getsockopt(sock, level, TCP_KEEPINTVL, (char *) &x, &len) )
+            log() << "ERROR: can't get TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+
+        if (x > 300) {
+            x = 300;
+            if ( setsockopt(sock, level, TCP_KEEPINTVL, (char *) &x, sizeof(x)) ) {
+                log() << "ERROR: can't set TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+            }
+        }
+#  endif
 #endif
 
     }
