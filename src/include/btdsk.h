@@ -153,15 +153,13 @@ struct __wt_page_disk {
 	 * expected page length, we'd have to read increasingly larger chunks
 	 * from the file until we find one that checksums, and that's going to
 	 * be unpleasant given WiredTiger's large page sizes.)
-	 */
-	uint32_t size;			/* 20-23: size of page */
-
-	/*
+	 *
 	 * If the page has been stream compressed, it has 2 sizes: the on-disk
 	 * compressed size, and the in-memory size.  Store the in-memory size
 	 * in the page header because otherwise we have no idea how big a chunk
 	 * of memory we need to expand the page.
 	 */
+	uint32_t size;			/* 20-23: on-disk page size */
 	uint32_t memsize;		/* 24-27: in-memory page size */
 
 	union {
