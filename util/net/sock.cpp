@@ -62,9 +62,9 @@ namespace mongo {
     void disableNagle(int sock) {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            out() << "ERROR: disableNagle failed" << endl;
+            error() << "disableNagle failed" << endl;
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            out() << "ERROR: SO_KEEPALIVE failed" << endl;
+            error() << "SO_KEEPALIVE failed" << endl;
     }
 #else
     
@@ -78,32 +78,32 @@ namespace mongo {
 #endif
 
         if ( setsockopt(sock, level, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            log() << "ERROR: disableNagle failed: " << errnoWithDescription() << endl;
+            error() << "disableNagle failed: " << errnoWithDescription() << endl;
 
 #ifdef SO_KEEPALIVE
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            log() << "ERROR: SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+            error() << "SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
 
 #  ifdef __linux__
         socklen_t len = sizeof(x);
         if ( getsockopt(sock, level, TCP_KEEPIDLE, (char *) &x, &len) )
-            log() << "ERROR: can't get TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+            error() << "can't get TCP_KEEPIDLE: " << errnoWithDescription() << endl;
 
         if (x > 300) {
             x = 300;
             if ( setsockopt(sock, level, TCP_KEEPIDLE, (char *) &x, sizeof(x)) ) {
-                log() << "ERROR: can't set TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+                error() << "can't set TCP_KEEPIDLE: " << errnoWithDescription() << endl;
             }
         }
 
         len = sizeof(x); // just in case it changed
         if ( getsockopt(sock, level, TCP_KEEPINTVL, (char *) &x, &len) )
-            log() << "ERROR: can't get TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+            error() << "can't get TCP_KEEPINTVL: " << errnoWithDescription() << endl;
 
         if (x > 300) {
             x = 300;
             if ( setsockopt(sock, level, TCP_KEEPINTVL, (char *) &x, sizeof(x)) ) {
-                log() << "ERROR: can't set TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+                error() << "can't set TCP_KEEPINTVL: " << errnoWithDescription() << endl;
             }
         }
 #  endif
