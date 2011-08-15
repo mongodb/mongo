@@ -734,7 +734,10 @@ namespace mongo {
 
         void recover();
 
+        unsigned notesThisLock = 0;
+
         void releasingWriteLock() {
+            DEV notesThisLock = 0;
             // implicit commitIfNeeded check on each write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {

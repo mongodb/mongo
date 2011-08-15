@@ -1148,6 +1148,10 @@ namespace mongo {
         }
     }
 
+    namespace dur { 
+        extern unsigned notesThisLock;
+    }
+
     /** add index keys for a newly inserted record 
         done in two steps/phases to defer write lock portion
      */
@@ -1179,6 +1183,18 @@ namespace mongo {
         }
 
         // update lock to writable here.  TODO
+
+        DEV {
+            // verify we haven't written yet (usually)
+            static unsigned long long zeroes;
+            static unsigned long long tot;
+            tot++;
+            if( dur::notesThisLock == 0 )
+                zeroes++;
+            if( tot > 1000 ) {
+                assert( zeroes > tot / 2 );
+            }
+        }
 
         IndexInterface::phasedFinish(); // step 2
 
@@ -1842,7 +1858,6 @@ namespace mongo {
         if ( d == 0 ) {
             d = insert_newNamespace(ns, len, god);
         }
-        d->paddingFits();
 
         NamespaceDetails *tableToIndex = 0;
 
@@ -1897,11 +1912,45 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+        bool earlyIndex = true;
+        DiskLoc loc;
+        if( addID || tableToIndex || d->capped ) {
+            // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
+            earlyIndex = false;
+            loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+        }
+        else {
+            loc = d->allocWillBeAt(ns, lenWHdr);
+            if( loc.isNull() ) {
+                // need to get a new extent so we have to do the true alloc now (not common case)
+                earlyIndex = false;
+                loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+            }
+        }
         if ( loc.isNull() ) {
             log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
             assert(d->capped);
             return DiskLoc();
+        }
+
+        if( earlyIndex ) { 
+            // add record to indexes using two step method so we can do the reading outside a write lock
+            if ( d->nIndexes ) {
+                assert( obuf );
+                BSONObj obj((const char *) obuf);
+                try {
+                    indexRecordUsingTwoSteps(d, obj, loc);
+                }
+                catch( AssertionException& ) {
+                    // should be a dup key error on _id index
+                    dassert( !tableToIndex && !d->capped );
+                    // no need to delete/rollback the record as it was not added yet
+                    throw;
+                }
+            }
+            // really allocate now
+            DiskLoc real = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+            assert( real == loc );
         }
 
         Record *r = loc.rec();
@@ -1938,10 +1987,12 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if ( d->nIndexes ) {
+        if ( !earlyIndex && d->nIndexes ) {
             try {
                 BSONObj obj(r->data);
-            //    oldIndexRecord(d, obj, loc);
+                // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
+                // but twosteps handles dup key errors more efficiently.
+                //oldIndexRecord(d, obj, loc);
                 indexRecordUsingTwoSteps(d, obj, loc);
 
             }
@@ -1961,6 +2012,8 @@ namespace mongo {
                 }
             }
         }
+
+        d->paddingFits();
 
         return loc;
     }

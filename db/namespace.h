@@ -377,8 +377,14 @@ namespace mongo {
             return Buckets-1;
         }
 
+        /* predetermine location of the next alloc without actually doing it. 
+           if cannot predetermine returns null (so still call alloc() then)
+        */
+        DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc);
+
         /* allocate a new record.  lenToAlloc includes headers. */
         DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
+
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
         void dumpDeleted(set<DiskLoc> *extents = 0);
@@ -403,7 +409,7 @@ namespace mongo {
     private:
         DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;
-        DiskLoc __stdAlloc(int len);
+        DiskLoc __stdAlloc(int len, bool willBeAt);
         void compact(); // combine adjacent deleted records
         friend class NamespaceIndex;
         struct ExtraOld {
