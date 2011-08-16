@@ -32,6 +32,7 @@ namespace mongo {
     public:
         static void phasedBegin();
         virtual void phasedQueueItemToInsert(
+            int idxNo,
             DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
             const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) = 0;
         static void phasedFinish();

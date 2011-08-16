@@ -35,26 +35,36 @@ namespace mongo {
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
 
         Continuation *c[NamespaceDetails::NIndexesMax];
-        unsigned n;
+        int n;
 
     public:
         IndexInterfaceImpl() { n = 0; }
 
-        /* CONCURRENCY this supports one writer only as-is */
-        void _phasedBegin() { 
-            for( unsigned i = 0; i < n; i++ )
+        /* lacking CONCURRENCY WRITE this supports only one writer */
+        void _phasedBegin() {
+            // we do this here as phasedFinish can throw exceptions (we could catch there, but just as easy to do here)
+            for( int i = 0; i < n; i++ ) {
                 delete c[i];
+                c[i] = 0; // defensive
+            }
             n = 0;
         }
         void phasedQueueItemToInsert(
+            int idxNo,
             DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
-            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) { 
-            Continuation *C = c[n++] = new Continuation(thisLoc, _recordLoc, _key, _order, _idx);
+            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) 
+        { 
+            if( idxNo >= n )
+                n = idxNo + 1;
+            Continuation *C = c[idxNo] = new Continuation(thisLoc, _recordLoc, _key, _order, _idx);
             thisLoc.btree<V>()->twoStepInsert(thisLoc, *C, dupsAllowed);
         }
         void _phasedFinish() {
-            for( unsigned i = 0; i < n; i++ ) { 
-                c[i]->stepTwo();
+            for( int i = 0; i < n; i++ ) {
+                // if mixing v0 and v1 indexes, in that case (only) there could be nulls in the list
+                if( c[i] ) {
+                    c[i]->stepTwo();
+                }
             }
         }
 
