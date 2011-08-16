@@ -1,4 +1,4 @@
-CFLAGS = -I../../../build_posix
+CFLAGS = -fPIC -I../../../src/include -I../../../build_posix
 
 all: nop_compress.so
 

@@ -4,7 +4,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#define	WT_UNUSED(v)	((void)(v))
+#define	__UNUSED(v)	((void)(v))
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
@@ -17,8 +17,8 @@ int
 wiredtiger_extension_init(
     WT_CONNECTION *conn, WT_EXTENSION_API *api, const char *config)
 {
-	WT_UNUSED(api);
-	WT_UNUSED(config);
+	__UNUSED(api);
+	__UNUSED(config);
 
 	(void)conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL);
 	return (0);
@@ -34,8 +34,8 @@ static int
 nop_compress(WT_COMPRESSOR *compressor,
     WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
 {
-	WT_UNUSED(compressor);
-	WT_UNUSED(session);
+	__UNUSED(compressor);
+	__UNUSED(session);
 
         if (dest->size < source->size) {
                 dest->size = source->size;
@@ -52,8 +52,8 @@ static int
 nop_decompress(WT_COMPRESSOR *compressor,
     WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
 {
-	WT_UNUSED(compressor);
-	WT_UNUSED(session);
+	__UNUSED(compressor);
+	__UNUSED(session);
 
         if (dest->size < source->size) {
                 dest->size = source->size;

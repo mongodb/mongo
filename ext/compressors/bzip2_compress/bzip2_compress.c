@@ -5,7 +5,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#define	WT_UNUSED(v)	((void)(v))
+#define	__UNUSED(v)	((void)(v))
 
 WT_EXTENSION_API *wt_api;
 
@@ -36,7 +36,7 @@ wiredtiger_extension_init(
     WT_CONNECTION *conn, WT_EXTENSION_API *api, const char *config)
 {
 	wt_api = api;
-        WT_UNUSED(config);
+        __UNUSED(config);
 
 	(void)conn->add_compressor(
 	    conn, "bzip2_compress", &bzip2_compressor, NULL);
@@ -54,7 +54,7 @@ bzip2_convert_error(WT_SESSION *wt_session, int bzret)
 {
 	const char *msg;
 
-	WT_UNUSED(wt_session);
+	__UNUSED(wt_session);
 
 	switch (bzret) {		/* Some errors are anticipated */
 	case BZ_MEM_ERROR:
@@ -106,7 +106,7 @@ bzip2_compress(WT_COMPRESSOR *compressor,
 	u_int destlen;
 	int bzret;
 
-	WT_UNUSED(compressor);
+	__UNUSED(compressor);
 
 	destlen = dest->size;
 	bzret = BZ2_bzBuffToBuffCompress((char *)dest->data, &destlen,
@@ -127,7 +127,7 @@ bzip2_decompress(WT_COMPRESSOR *compressor,
 	int bzret;
 	u_int destlen;
 
-	WT_UNUSED(compressor);
+	__UNUSED(compressor);
 
 	destlen = dest->size;
 	bzret = BZ2_bzBuffToBuffDecompress((char *)dest->data, &destlen,
