@@ -61,7 +61,7 @@ namespace mongo {
             int slaveDelay;       /* seconds.  int rather than unsigned for convenient to/front bson conversion. */
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
-            set<string> tags;     /* tagging for data center, rack, etc. */
+            map<string,string> tags;     /* tagging for data center, rack, etc. */
         private:
             set<TagSubgroup*> _groups; // the subgroups this member belongs to
         public:
