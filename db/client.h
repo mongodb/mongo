@@ -60,6 +60,12 @@ namespace mongo {
         */
         static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
+        static void initThreadIfNotAlready(const char *desc) { 
+            if( currentClient.get() )
+                return;
+            initThread(desc);
+        }
+
         ~Client();
 
         /*
@@ -87,6 +93,9 @@ namespace mongo {
         const char *desc() const { return _desc; }
         void setLastOp( ReplTime op ) { _lastOp = op; }
         ReplTime getLastOp() const { return _lastOp; }
+
+        /** caution -- use Context class instead */
+        void setContext(Context *c) { _context = c; }
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;
