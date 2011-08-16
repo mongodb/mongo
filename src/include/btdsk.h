@@ -126,9 +126,8 @@ struct __wt_btree_desc {
 struct __wt_page_disk {
 	/*
 	 * The record number of the first record of the page is stored on disk
-	 * because, if the internal page referencing a column-store leaf page
-	 * is corrupted, it's the only way to know where the leaf page fits in
-	 * the key space during salvage.
+	 * so we can figure out where the column-store leaf page fits into the
+	 * key space during salvage.
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
