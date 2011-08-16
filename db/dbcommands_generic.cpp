@@ -138,7 +138,7 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
-            setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
+            bool found = setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
             if( cmdObj.hasElement("journalCommitInterval") ) { 
                 if( !cmdLine.dur ) { 
                     errmsg = "journaling is off";
@@ -188,7 +188,7 @@ namespace mongo {
                 s++;
             }
 
-            if( s == 0 ) {
+            if( s == 0 && !found ) {
                 errmsg = "no option found to set, use help:true to see options ";
                 return false;
             }
