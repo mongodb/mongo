@@ -1,5 +1,5 @@
 DEBUGFLAG = -g
-CFLAGS = $(DEBUGFLAG) -fPIC -I../../../build_posix
+CFLAGS = $(DEBUGFLAG) -fPIC -I../../../src/include -I../../../build_posix
 LIBRARIES = -lbz2
 LDFLAGS = $(DEBUGFLAG) $(LIBRARIES)
 

@@ -12,8 +12,10 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress };
 
-int wiredtiger_extension_init(WT_CONNECTION *conn, const char *config)
+int wiredtiger_extension_init(WT_CONNECTION *conn,
+    WT_EXTENSION_API *api, const char *config)
 {
+        (void)api;
         (void)config;
         //fprintf(stderr, "nop_compress: extension_init called!\n");
 	conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL);

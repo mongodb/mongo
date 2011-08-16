@@ -518,6 +518,12 @@ extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
+extern void __wt_errv(WT_SESSION_IMPL *session,
+    int error,
+    const char *file_name,
+    int line_number,
+    const char *fmt,
+    va_list ap);
 extern void __wt_err(WT_SESSION_IMPL *session,
     int error,
     const char *fmt,

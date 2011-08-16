@@ -79,6 +79,11 @@ struct wt_extractor;	    typedef struct wt_extractor WT_EXTRACTOR;
 struct wt_item;		    typedef struct wt_item WT_ITEM;
 struct wt_session;	    typedef struct wt_session WT_SESSION;
 
+/*******************************************
+ * Forward structure declarations
+ *******************************************/
+struct wt_extension_api;    typedef struct wt_extension_api WT_EXTENSION_API;
+
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  Records consist of a
@@ -1271,7 +1276,7 @@ struct wt_extractor {
  * @errors
  */
 extern int wiredtiger_extension_init(WT_CONNECTION *connection,
-    const char *config);
+	WT_EXTENSION_API *api, const char *config);
 
 /*! @} */
 

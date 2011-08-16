@@ -8,6 +8,24 @@
 #include "wt_internal.h"
 
 /*
+ * api_err_printf --
+ *	Extension API call to print to the error stream.
+ */
+static void
+__api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	__wt_errv((WT_SESSION_IMPL *)wt_session, 0, NULL, 0, fmt, ap);
+	va_end(ap);
+}
+
+static WT_EXTENSION_API __api = {
+	__api_err_printf
+};
+
+/*
  * __conn_load_extension --
  *	WT_CONNECTION->load_extension method.
  */
@@ -19,7 +37,7 @@ __conn_load_extension(
 	WT_CONNECTION_IMPL *conn;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
-	int (*entry)(WT_CONNECTION *, const char *);
+	int (*entry)(WT_CONNECTION *, WT_EXTENSION_API *, const char *);
 	int ret;
 	char namebuf[100];
 	const char *entry_name;
@@ -59,7 +77,7 @@ __conn_load_extension(
 	__wt_unlock(session, conn->mtx);
 
 	/* Call the entry function. */
-	entry(wt_conn, config);
+	entry(wt_conn, &__api, config);
 
 	if (0) {
 err:		if (dlh != NULL)

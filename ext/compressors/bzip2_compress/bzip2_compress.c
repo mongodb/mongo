@@ -1,7 +1,9 @@
 #include <string.h>
 #include <errno.h>
-#include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 #include <bzlib.h>
+
+WT_EXTENSION_API *wt_api;
 
 static int
 bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
@@ -25,8 +27,10 @@ static const int bz_workfactor = 0;
 /* if nonzero, decompress using less memory, but slower (decompression only) */
 static const int bz_small = 0;
 
-int wiredtiger_extension_init(WT_CONNECTION *conn, const char *config)
+int wiredtiger_extension_init(WT_CONNECTION *conn, WT_EXTENSION_API *api, const char *config)
 {
+	wt_api = api;
+
         (void)config;
         /* fprintf(stderr, "bzip2_compress: extension_init called!\n"); */
 	conn->add_compressor(conn, "bzip2_compress", &bzip2_compressor, NULL);

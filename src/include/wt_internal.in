@@ -12,7 +12,7 @@ extern "C" {
 /*******************************************
  * WiredTiger public include file, and configuration control.
  *******************************************/
-#include "wiredtiger.h"
+#include "wiredtiger_ext.h"
 #include "wiredtiger_config.h"
 
 /*******************************************

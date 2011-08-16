@@ -17,14 +17,17 @@ more efficient access and storage.
 
 For full details about using WiredTiger, see:
 
+- @subpage using\n
+  how to write WiredTiger applications.
+
 - @ref wt\n
   the reference manual for the WiredTiger API.
 
+- @ref wt_ext\n
+  the reference manual for WiredTiger extensions.
+
 - @subpage utility\n
   the reference for the WiredTiger command-line utility.
-
-- @subpage using\n
-  how to write WiredTiger applications.
 
 - @subpage sql_mapping
 
