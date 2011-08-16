@@ -412,7 +412,7 @@ namespace mongo {
             getLastErrorDefault = new BSONObj( c.getLastErrorDefaults );
         }
 
-        list<const ReplSetConfig::MemberCfg*> newOnes;
+        list<ReplSetConfig::MemberCfg*> newOnes;
         // additive short-cuts the new config setup. If we are just adding a
         // node/nodes and nothing else is changing, this is additive. If it's
         // not a reconfig, we're not adding anything
@@ -421,8 +421,8 @@ namespace mongo {
             unsigned nfound = 0;
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) {
-                const ReplSetConfig::MemberCfg& m = *i;
                 
+                ReplSetConfig::MemberCfg& m = *i;
                 if( m.h.isSelf() ) {
                     me++;
                 }
@@ -473,8 +473,8 @@ namespace mongo {
         // this is a shortcut for simple changes
         if( additive ) {
             log() << "replSet info : additive change to configuration" << rsLog;
-            for( list<const ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
-                const ReplSetConfig::MemberCfg* m = *i;
+            for( list<ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
+                ReplSetConfig::MemberCfg *m = *i;
                 Member *mi = new Member(m->h, m->_id, m, false);
 
                 /** we will indicate that new members are up() initially so that we don't relinquish our
@@ -486,6 +486,11 @@ namespace mongo {
                 _members.push(mi);
                 startHealthTaskFor(mi);
             }
+
+            // if we aren't creating new members, we may have to update the
+            // groups for the current ones
+            _cfg->updateMembers(_members);
+
             return true;
         }
 
@@ -509,7 +514,7 @@ namespace mongo {
         string members = "";
 
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) {
-            const ReplSetConfig::MemberCfg& m = *i;
+            ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
             members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
