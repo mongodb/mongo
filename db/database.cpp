@@ -270,7 +270,7 @@ namespace mongo {
             log() << "creating profile collection: " << profileName << endl;
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
-            spec.append( "size", 131072.0 );
+            spec.append( "size", 1024*1024 );
             if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , false /* we don't replica profile messages */ ) ) {
                 return false;
             }
