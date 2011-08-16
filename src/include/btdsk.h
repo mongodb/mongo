@@ -17,7 +17,7 @@
  * these are called "addrs".  To simplify bookkeeping, page sizes must also be
  * a multiple of the allocation unit size.
  */
-#define	WT_ADDR_INVALID		(UINT32_MAX - 0)	/* Invalid address */
+#define	WT_ADDR_INVALID		(UINT32_MAX)		/* Invalid address */
 
 /*
  * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
