@@ -87,11 +87,14 @@ main(int argc, char *argv[])
 		key_gen_setup();		/* Setup keys */
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
-						/* Close, verify, re-open */
-		if (wts_teardown() || wts_verify("bulk") || wts_startup())
+						/* Close, verify */
+		if (wts_teardown() || wts_verify("bulk"))
 			goto err;
 						/* Loop reading & operations */
-		for (reps = 0; reps < 3; ++reps) {		
+		for (reps = 0; reps < 3; ++reps) {
+			if (wts_startup())
+				goto err;
+
 			if (wts_read_scan())
 				goto err;
 
@@ -109,10 +112,8 @@ main(int argc, char *argv[])
 			if (reps == 2 && wts_stats())
 				goto err;
 
-						/* Close the file */
-						/* Close, verify, re-open */
-			if (wts_teardown() ||
-			    wts_verify("ops") || wts_startup())
+						/* Close, verify */
+			if (wts_teardown() || wts_verify("ops"))
 				goto err;
 		}
 
@@ -131,15 +132,9 @@ main(int argc, char *argv[])
 		 * Close, salvage, verify, re-open, dump.
 		 */
 		if (g.c_delete_pct == 0 && (
-		    wts_teardown() ||
 		    wts_salvage() ||
 		    wts_verify("salvage") ||
-		    wts_startup() ||
 		    wts_dump("salvage", 0)))
-			goto err;
-
-		track("shutting down WT", 0ULL);
-		if (wts_teardown())
 			goto err;
 
 		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
