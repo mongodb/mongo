@@ -111,7 +111,7 @@ namespace mongo {
                     while( 1 ) {
                         //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
                         //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                        if ( keyAt(keyOfs).shallowEqual(keyAtKeyOfs) ) {
+                        if ( keyAt(keyOfs).binaryEqual(keyAtKeyOfs) ) {
                             const _KeyNode& kn = keyNode(keyOfs);
                             if( kn.recordLoc == locAtKeyOfs ) {
                                 if ( !kn.isUsed() ) {

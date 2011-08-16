@@ -925,7 +925,7 @@ namespace mongo {
             c.appendRegex("x", "goo");
             BSONObj p = c.done();
 
-            assert( !o.shallowEqual( p ) );
+            assert( !o.binaryEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
         }
@@ -1030,7 +1030,7 @@ namespace mongo {
             BSONObj a = A.done();
             BSONObj b = B.done();
             BSONObj c = C.done();
-            assert( !a.shallowEqual( b ) ); // comments on operator==
+            assert( !a.binaryEqual( b ) ); // comments on operator==
             int cmp = a.woCompare(b);
             assert( cmp == 0 );
             cmp = a.woCompare(c);
