@@ -30,10 +30,16 @@ struct __wt_table {
 
 	WT_BTREE **colgroup;
 	WT_BTREE **index;
+	size_t index_alloc;
 
 	TAILQ_ENTRY(__wt_table) q;
 
-	int is_complete, is_simple;
+	int cg_complete, idx_complete, is_simple;
 	int ncolgroups, nindices, nkey_columns;
 };
 
+/*
+ * Tables without explicit column groups have a single default column group
+ * containing all of the columns.
+ */
+#define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)

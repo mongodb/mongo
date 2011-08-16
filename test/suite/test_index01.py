@@ -14,10 +14,14 @@ import wiredtiger
 from wiredtiger import WT_NOTFOUND
 import wttest
 
-class test004(wttest.WiredTigerTestCase):
+class test_index01(wttest.WiredTigerTestCase):
 	'''Test various tree types becoming empty'''
 
-	tablename = 'table:test004'
+	basename = 'test_index01'
+	tablename = 'table:' + basename
+	indexbase = 'index:' + basename
+	NUM_INDICES = 6
+	index = ['%s:index%d' % (indexbase, i) for i in xrange(NUM_INDICES)]
 
 	def reopen(self):
 		self.conn.close()
@@ -26,7 +30,13 @@ class test004(wttest.WiredTigerTestCase):
 
 	def create_table(self):
 		self.pr('create table')
-		self.session.create(self.tablename, 'key_format=S,value_format=S')
+		self.session.create(self.tablename, 'key_format=Si,value_format=SSii,columns=(name,ID,dept,job,salary,year)')
+		self.session.create(self.index[0], 'columns=(dept)')
+		self.session.create(self.index[1], 'columns=(name,year)')
+		self.session.create(self.index[2], 'columns=(salary)')
+		self.session.create(self.index[3], 'columns=(dept,job,name)')
+		self.session.create(self.index[4], 'columns=(name,ID)')
+		self.session.create(self.index[5], 'columns=(ID,name)')
 
 	def drop_table(self):
 		self.pr('drop table')
@@ -34,65 +44,73 @@ class test004(wttest.WiredTigerTestCase):
 
 	def cursor(self):
 		self.pr('open cursor')
-		return self.session.open_cursor(self.tablename, None, None)
+		c = self.session.open_cursor(self.tablename, None, None)
+		self.assertNotEqual(c, None)
+		return c
 
-	def check_exists(self, key, expected):
+	def index_cursor(self, i):
+		self.pr('open index cursor(%d)' % i)
+		c = self.session.open_cursor(self.index[i], None, None)
+		self.assertNotEqual(c, None)
+		return c
+
+	def index_iter(self, i):
+		cursor = self.index_cursor(i)
+		for cols in cursor:
+			yield cols
+		cursor.close()
+
+	def check_exists(self, name, ID, expected):
 		cursor = self.cursor()
-		cursor.set_key(key)
+		cursor.set_key(name, ID)
 		self.pr('search')
 		self.assertEqual(cursor.search(), expected)
 		self.pr('closing cursor')
 		cursor.close(None)
 
-	def insert(self, key, value):
+	def insert(self, *cols):
 		self.pr('insert')
 		cursor = self.cursor()
-		cursor.set_key(key);
-		cursor.set_value(value)
-		cursor.insert()
+		cursor.set_key(*cols[:2]);
+		cursor.set_value(*cols[2:])
+		self.assertEqual(cursor.insert(), 0)
 		cursor.close(None)
 
-	def remove(self, key):
+	def remove(self, name, ID):
 		self.pr('remove')
 		cursor = self.cursor()
-		cursor.set_key(key);
-		cursor.remove()
+		cursor.set_key(name, ID);
+		self.assertEqual(cursor.remove(), 0)
 		cursor.close(None)
 
 	def test_empty(self):
 		'''Create a table, look for a nonexistent key'''
 		self.create_table()
-		self.check_exists('somekey', WT_NOTFOUND)
+		self.check_exists('jones', 10, WT_NOTFOUND)
+		for i in xrange(self.NUM_INDICES):
+			self.assertEqual(list(self.index_iter(i)), [])
 		self.drop_table()
 
 	def test_insert(self):
 		'''Create a table, add a key, get it back'''
 		self.create_table()
-		self.insert('key1', 'value1')
-		self.check_exists('key1', 0)
+		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
+		self.check_exists('smith', 1, 0)
+		for i in xrange(self.NUM_INDICES):
+			print 'Index(%d) contents:' % i
+			print '\n'.join(repr(cols) for cols in self.index_iter(i))
+			print
 		self.drop_table()
 
 	def test_insert_delete(self):
-		'''Create a table, add a key, get it back'''
+		'''Create a table, add a key, remove it'''
 		self.create_table()
-		self.insert('key1', 'value1')
-		self.check_exists('key1', 0)
-		self.remove('key1')
-		self.check_exists('key1', WT_NOTFOUND)
-		self.drop_table()
-
-	def test_reopen(self):
-		'''Create a table, add a key, get it back'''
-		self.create_table()
-		self.reopen()
-		self.insert('key1', 'value1')
-		self.reopen()
-		self.check_exists('key1', 0)
-		self.reopen()
-		self.remove('key1')
-		self.reopen()
-		self.check_exists('key1', WT_NOTFOUND)
-		self.reopen()
+		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
+		self.check_exists('smith', 1, 0)
+		self.remove('smith', 1)
+		self.check_exists('smith', 1, WT_NOTFOUND)
+		for i in xrange(self.NUM_INDICES):
+			self.assertEqual(list(self.index_iter(i)), [])
 		self.drop_table()
 
 if __name__ == '__main__':

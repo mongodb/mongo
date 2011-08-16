@@ -317,9 +317,12 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	/* TODO: handle projections. */
 
 	filename = name;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
+	if (WT_PREFIX_MATCH(name, "colgroup:"))
+		WT_RET(__wt_schema_get_btree(session, name, strlen(name)));
+	else if (WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET(__wt_session_get_btree(session, name, filename, NULL));
+	else
 		return (EINVAL);
-	WT_RET(__wt_session_get_btree(session, name, filename, NULL));
 
 	return (__wt_curfile_create(session, 1, config, cursorp));
 }

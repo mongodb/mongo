@@ -79,3 +79,21 @@ __wt_schema_remove_table(
 
 	return (0);
 }
+
+/*
+ * __wt_schema_close_tables --
+ *	Close all of the tables in a session.
+ */
+int
+__wt_schema_close_tables(WT_SESSION_IMPL *session)
+{
+	WT_TABLE *table;
+	int ret;
+
+	ret = 0;
+	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
+		WT_TRET(__wt_schema_remove_table(session, table));
+
+	return (ret);
+}
+

@@ -70,7 +70,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *name, const char *config)
 		WT_RET(__wt_schema_get_table(session,
 		    name, strlen(name), &table));
 
-		for (i = 0; i < table->ncolgroups; i++) {
+		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			if ((cg = table->colgroup[i]) == NULL)
 				continue;
 			table->colgroup[i] = NULL;

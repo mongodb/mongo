@@ -96,10 +96,10 @@ struct __wt_cursor_config {
 };
 
 struct __wt_cursor_index {
-	WT_CURSOR iface;
+	WT_CURSOR_BTREE cbt;
 
 	WT_TABLE *table;
-	const char *plan;
+	const char *key_plan, *value_plan;
 	WT_CURSOR **cg_cursors;
 };
 

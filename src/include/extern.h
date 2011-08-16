@@ -413,13 +413,21 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     size_t namelen,
     WT_TABLE **tablep);
 extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
+extern int __wt_schema_close_tables(WT_SESSION_IMPL *session);
 extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
     size_t len,
     char **namebufp);
+extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
+    const char *objname,
+    size_t len);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
     WT_TABLE *table);
+extern int __wt_schema_open_index( WT_SESSION_IMPL *session,
+    WT_TABLE *table,
+    const char *idxname,
+    size_t len);
 extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
@@ -458,11 +466,13 @@ extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *columns,
     size_t len,
+    int value_only,
     WT_BUF *plan);
 extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *columns,
     size_t len,
+    const char *extra_cols,
     int value_only,
     WT_BUF *format);
 extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
@@ -476,6 +486,7 @@ extern int __wt_schema_project_out(WT_SESSION_IMPL *session,
 extern int __wt_schema_project_slice(WT_SESSION_IMPL *session,
     WT_CURSOR **cp,
     const char *proj_arg,
+    int key_only,
     const char *vformat,
     WT_ITEM *value);
 extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,

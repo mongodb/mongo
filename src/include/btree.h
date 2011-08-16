@@ -91,6 +91,8 @@ struct __wt_btree {
 
 	const char *key_format;		/* Key format */
 	const char *value_format;	/* Value format */
+	const char *key_plan;		/* Key projection plan for indices */
+	const char *value_plan;		/* Value projection plan for indices */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */

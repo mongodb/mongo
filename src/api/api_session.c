@@ -33,6 +33,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_remove_btree(session, btree_session));
 
+	WT_TRET(__wt_schema_close_tables(session));
+
 	__wt_lock(session, conn->mtx);
 	/* Unpin the current per-WT_SESSION_IMPL buffer. */
 	if (session->sb != NULL)
@@ -91,7 +93,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 	/* Config parsing is done by each implementation. */
 	WT_UNUSED(cfg);
 
-	if (WT_PREFIX_MATCH(uri, "config:"))
+	if (WT_PREFIX_MATCH(uri, "colgroup:"))
+		ret = __wt_curfile_open(session, uri, config, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "config:"))
 		ret = __wt_curconfig_open(session, uri, config, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, config, cursorp);

@@ -19,11 +19,14 @@ __find_next_col(WT_SESSION_IMPL *session,
 	foundcg = foundcol = -1;
 
 	getnext = 1;
-	for (cg = 0; cg < table->ncolgroups; cg++) {
+	for (cg = 0; cg < WT_COLGROUPS(table); cg++) {
 		if ((cgtree = table->colgroup[cg]) == NULL)
 			continue;
-		WT_RET(__wt_config_getones(session,
-		    cgtree->config, "columns", &cval));
+		if (table->ncolgroups == 0)
+			cval = table->colconf;
+		else
+			WT_RET(__wt_config_getones(session,
+			    cgtree->config, "columns", &cval));
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
 		for (col = 0;
 		    __wt_config_next(&conf, &k, &v) == 0;
@@ -99,8 +102,8 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
  *	representing the plan will be appended to the plan buffer.
  */
 int
-__wt_struct_plan(WT_SESSION_IMPL *session,
-    WT_TABLE *table, const char *columns, size_t len, WT_BUF *plan)
+__wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
+    const char *columns, size_t len, int value_only, WT_BUF *plan)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
@@ -110,8 +113,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session,
 	/* Work through the value columns by skipping over the key columns. */
 	WT_RET(__wt_config_initn(session, &conf, columns, len));
 
-	for (i = 0; i < table->nkey_columns; i++)
-		WT_RET(__wt_config_next(&conf, &k, &v));
+	if (value_only)
+		for (i = 0; i < table->nkey_columns; i++)
+			WT_RET(__wt_config_next(&conf, &k, &v));
 
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
@@ -123,15 +127,27 @@ __wt_struct_plan(WT_SESSION_IMPL *session,
 			/*
 			 * First we move to the column.  If that is in a
 			 * different column group to the last column we
-			 * accessed (or before the last column in the same
-			 * column group), we need to switch column groups
-			 * (or rewind).
+			 * accessed, or before the last column in the same
+			 * column group, or moving from the key to the value,
+			 * we need to switch column groups or rewind.
 			 */
-			if (current_cg != cg || current_col > col) {
+			if (current_cg != cg || current_col > col ||
+			    (current_col < table->nkey_columns &&
+			    col >= table->nkey_columns)) {
+				WT_ASSERT(session, !value_only ||
+				    col >= table->nkey_columns);
 				WT_RET(__wt_buf_sprintf(session,
-				    plan, "%d%c", cg, WT_PROJ_VALUE));
+				    plan, "%d%c", cg,
+				    (col < table->nkey_columns) ?
+				    WT_PROJ_KEY : WT_PROJ_VALUE));
+
+				/*
+				 * Set the current column group and column
+				 * within the table.
+				 */
 				current_cg = cg;
-				current_col = 0;
+				current_col = (col < table->nkey_columns) ? 0 :
+				    table->nkey_columns;
 			}
 			/* Now move to the column we want. */
 			if (current_col < col) {
@@ -206,7 +222,8 @@ __find_column_format(WT_SESSION_IMPL *session,
  */
 int
 __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *columns, size_t len, int value_only, WT_BUF *format)
+    const char *columns, size_t len, const char *extra_cols, int value_only,
+    WT_BUF *format)
 {
 	WT_CONFIG config;
 	WT_CONFIG_ITEM k, next_k, next_v;
@@ -221,6 +238,13 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 		if (ret != 0 && ret != WT_NOTFOUND)
 			return (ret);
 		have_next = (ret == 0);
+
+		if (!have_next && extra_cols != NULL) {
+			WT_RET(__wt_config_init(session, &config, extra_cols));
+			WT_RET(__wt_config_next(&config, &next_k, &next_v));
+			have_next = 1;
+			extra_cols = NULL;
+		}
 
 		if ((ret = __find_column_format(session,
 		    table, &k, value_only, &pv)) != 0) {

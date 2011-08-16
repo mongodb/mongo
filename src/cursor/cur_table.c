@@ -7,28 +7,30 @@
 
 #include "wt_internal.h"
 
-static int __curtable_open_indices(WT_CURSOR_TABLE *ctable);
+static int __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config);
 
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
 	int __i;							\
 	for (__i = 0, __cp = ctable->cg_cursors;			\
-	     __i < ctable->table->ncolgroups;				\
+	     __i < WT_COLGROUPS(ctable->table);				\
 	     __i++, __cp++)						\
 		WT_RET((*__cp)->f(*__cp));				\
 } while (0)
 
 #define	APPLY_IDX(ctable, f) do {					\
+	WT_BTREE *btree;						\
 	WT_CURSOR **__cp;						\
 	int __i;							\
-	if (ctable->table->nindices == 0)				\
-		break;							\
-	if ((__cp = (ctable)->idx_cursors) == NULL) {			\
-		WT_RET(__curtable_open_indices(ctable));		\
-		__cp = (ctable)->idx_cursors;				\
-	}								\
-	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++)	\
+	WT_RET(__curtable_open_indices(ctable, NULL));			\
+	__cp = (ctable)->idx_cursors;					\
+	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
+		btree = ((WT_CURSOR_BTREE *)*__cp)->btree;		\
+		WT_RET(__wt_schema_project_merge(session,		\
+		    ctable->cg_cursors,					\
+		    btree->key_plan, btree->key_format, &(*__cp)->key));\
 		WT_RET((*__cp)->f(*__cp));				\
+	}								\
 } while (0)
 
 /*
@@ -140,7 +142,7 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 		sz = __wt_struct_sizev(session, cursor->key_format, ap);
 		va_end(ap);
 		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
+		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
 		    (ret = __wt_struct_packv(session, buf->mem, sz,
 		    cursor->key_format, ap)) != 0) {
 			cursor->saved_err = ret;
@@ -152,7 +154,7 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	for (i = 0, cp = ctable->cg_cursors;
-	     i < ctable->table->ncolgroups;
+	     i < WT_COLGROUPS(ctable->table);
 	     i++, cp++) {
 		(*cp)->recno = cursor->recno;
 		(*cp)->key.data = cursor->key.data;
@@ -185,7 +187,7 @@ __curtable_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;
 		ret = __wt_schema_project_slice(session,
-		    ctable->cg_cursors, ctable->plan,
+		    ctable->cg_cursors, ctable->plan, 0,
 		    cursor->value_format, (WT_ITEM *)&cursor->value);
 	} else
 		ret = __wt_schema_project_in(session,
@@ -293,7 +295,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 	primary = *cp;
 	WT_RET(primary->search_near(primary, exact));
 
-	for (i = 1, ++cp; i < ctable->table->ncolgroups; i++) {
+	for (i = 1, ++cp; i < WT_COLGROUPS(ctable->table); i++) {
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
 		(*cp)->recno = primary->recno;
@@ -319,13 +321,16 @@ __curtable_insert(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, insert, NULL);
 	cp = ctable->cg_cursors;
+
+	/* Split out the first insert, it may be allocating a recno. */
 	primary = *cp++;
 	WT_RET(primary->insert(primary));
-
-	for (i = 1; i < ctable->table->ncolgroups; i++, cp++) {
+	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
 		(*cp)->recno = primary->recno;
 		WT_RET((*cp)->insert(*cp));
 	}
+
+	APPLY_IDX(ctable, insert);
 	API_END(session);
 
 	return (0);
@@ -362,8 +367,15 @@ __curtable_remove(WT_CURSOR *cursor)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, remove, NULL);
+
+	/* Find the old record so it can be removed from indices */
+	WT_RET(__curtable_open_indices(ctable, NULL));
+	if (ctable->table->nindices > 0) {
+		APPLY_CG(ctable, search);
+		APPLY_IDX(ctable, remove);
+	}
+
 	APPLY_CG(ctable, remove);
-	APPLY_IDX(ctable, remove);
 	API_END(session);
 
 	return (0);
@@ -387,21 +399,24 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 
 	ret = 0;
 	for (i = 0, cp = (ctable)->cg_cursors;
-	    i < ctable->table->ncolgroups; i++, cp++)
+	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (*cp != NULL) {
 			WT_TRET((*cp)->close(*cp, config));
 			*cp = NULL;
 		}
 
-	for (i = 0, cp = (ctable)->idx_cursors;
-	    i < ctable->table->nindices; i++, cp++)
-		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp, config));
-			*cp = NULL;
-		}
+	if (ctable->idx_cursors != NULL)
+		for (i = 0, cp = (ctable)->idx_cursors;
+		    i < ctable->table->nindices; i++, cp++)
+			if (*cp != NULL) {
+				WT_TRET((*cp)->close(*cp, config));
+				*cp = NULL;
+			}
 
 	if (ctable->plan != ctable->table->plan)
 		__wt_free(session, ctable->plan);
+	__wt_free(session, ctable->cg_cursors);
+	__wt_free(session, ctable->idx_cursors);
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END(session);
 
@@ -419,18 +434,19 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *config)
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	if (!table->is_complete) {
+	if (!table->cg_complete) {
 		__wt_errx(session,
 		    "Can't use table '%s' until all column groups are created",
 		    table->name);
 		return (EINVAL);
 	}
 
-	WT_ASSERT(session, table->ncolgroups > 0);
 	WT_RET(__wt_calloc_def(session,
-	    table->ncolgroups, &ctable->cg_cursors));
+	    WT_COLGROUPS(table), &ctable->cg_cursors));
 
-	for (i = 0, cp = ctable->cg_cursors; i < table->ncolgroups; i++, cp++) {
+	for (i = 0, cp = ctable->cg_cursors;
+	    i < WT_COLGROUPS(table);
+	    i++, cp++) {
 		session->btree = table->colgroup[i];
 		WT_RET(__wt_curfile_create(session, 0, config, cp));
 	}
@@ -438,17 +454,25 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *config)
 }
 
 static int
-__curtable_open_indices(WT_CURSOR_TABLE *ctable)
+__curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config)
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
+	WT_CURSOR **cp;
+	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
+	if (!ctable->table->idx_complete)
+		WT_RET(__wt_schema_open_index(session, table, NULL, 0));
 	if (table->nindices == 0)
 		return (0);
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
+	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
+		session->btree = table->index[i];
+		WT_RET(__wt_curfile_create(session, 0, config, cp));
+	}
 	return (0);
 }
 
@@ -515,7 +539,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		return (ret);
 	}
 
-	if (!table->is_complete) {
+	if (!table->cg_complete) {
 		__wt_errx(session,
 		    "Cannot open cursor '%s' on incomplete table", uri);
 		return (EINVAL);
@@ -537,11 +561,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	/* Handle projections. */
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), 1, &fmt));
+		    columns, strlen(columns), NULL, 1, &fmt));
 		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
 
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), &plan));
+		    columns, strlen(columns), 0, &plan));
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
 

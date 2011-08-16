@@ -178,8 +178,8 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
  *	a raw buffer.
  */
 int
-__wt_schema_project_slice(WT_SESSION_IMPL *session,
-    WT_CURSOR **cp, const char *proj_arg, const char *vformat, WT_ITEM *value)
+__wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
+    const char *proj_arg, int key_only, const char *vformat, WT_ITEM *value)
 {
 	WT_BUF *buf;
 	WT_CURSOR *c;
@@ -190,6 +190,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 	const uint8_t *vp, *vend;
 	size_t len;
 	uint32_t arg, offset;
+	int skip;
 
 	WT_RET(__pack_init(session, &vpack, vformat));
 	vp = (uint8_t *)value->data;
@@ -201,17 +202,19 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 		if (*proj == WT_PROJ_KEY) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->key, 0));
-		} else if (*proj == WT_PROJ_VALUE) {
+		} else if (*proj == WT_PROJ_VALUE && !key_only) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->value, 0));
 		}
 	}
 
+	skip = key_only;
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
 		arg = (uint32_t)strtoul(proj, &proj, 10);
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
+			skip = 0;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
 			buf = &c->key;
@@ -220,6 +223,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 			continue;
 
 		case WT_PROJ_VALUE:
+			skip = key_only;
+			if (skip)
+				continue;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
@@ -236,8 +242,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
-				WT_RET(__pack_next(&pack, &pv));
-				if (*proj == WT_PROJ_SKIP) {
+				if (!skip) {
+					WT_RET(__pack_next(&pack, &pv));
 					/*
 					 * A nasty case: if we are inserting
 					 * out-of-order, we may reach the end
@@ -245,10 +251,13 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 					 * to append in that case, and we're
 					 * positioned to do that.
 					 */
-					if (p < end) {
-						WT_RET(__unpack_read(session,
-						    &pv, (const uint8_t **)&p,
-						    (size_t)(end - p)));
+					if (*proj == WT_PROJ_SKIP) {
+						if (p < end)
+							WT_RET(__unpack_read(
+							    session, &pv,
+							    (const uint8_t **)
+							    &p,
+							    (size_t)(end - p)));
 						break;
 					}
 				}
@@ -257,6 +266,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 				    &vp, (size_t)(vend - vp)));
 				/* FALLTHROUGH */
 			case WT_PROJ_REUSE:
+				if (skip)
+					break;
 				/*
 				 * There is subtlety here: the value format
 				 * may not exactly match the cursor's format.

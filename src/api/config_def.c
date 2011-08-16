@@ -4,12 +4,11 @@
 
 const char *
 __wt_confdfl_colgroup_meta =
-    "columns=,filename=,key_format=u,value_format=u";
+    "columns=,filename=";
 
 const char *
 __wt_confchk_colgroup_meta =
-    "columns=(type=list),filename=(),key_format=(type=format),"
-    "value_format=(type=format)";
+    "columns=(type=list),filename=()";
 
 const char *
 __wt_confdfl_connection_add_collator =
@@ -100,12 +99,11 @@ __wt_confchk_file_meta =
 
 const char *
 __wt_confdfl_index_meta =
-    "columns=,filename=,key_format=u,value_format=u";
+    "columns=,filename=";
 
 const char *
 __wt_confchk_index_meta =
-    "columns=(type=list),filename=(),key_format=(type=format),"
-    "value_format=(type=format)";
+    "columns=(type=list),filename=()";
 
 const char *
 __wt_confdfl_session_begin_transaction =
@@ -255,11 +253,11 @@ __wt_confchk_session_verify =
 
 const char *
 __wt_confdfl_table_meta =
-    "colgroups=,columns=,filename=,key_format=u,value_format=u";
+    "colgroups=,columns=,key_format=u,value_format=u";
 
 const char *
 __wt_confchk_table_meta =
-    "colgroups=(),columns=(type=list),filename=(),key_format=(type=format),"
+    "colgroups=(),columns=(type=list),key_format=(type=format),"
     "value_format=(type=format)";
 
 const char *

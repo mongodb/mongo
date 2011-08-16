@@ -28,7 +28,6 @@ class test_schema01(wttest.WiredTigerTestCase):
 	basename = 'test_schema01'
 	tablename = 'table:' + basename
 	cgname = 'colgroup:' + basename
-	indexname = 'index:' + basename
 
 	def __init__(self, *args, **kwargs):
 		wttest.WiredTigerTestCase.__init__(self, *args, **kwargs)
@@ -46,7 +45,6 @@ class test_schema01(wttest.WiredTigerTestCase):
 				'colgroups=(year,population)')
 		self.session.create(self.cgname + ':year', 'columns=(year)')
 		self.session.create(self.cgname + ':population', 'columns=(population)')
-		#self.session.create(self.indexname + ':year', 'columns=(year)')
 
 	def drop_table(self):
 		self.pr('drop table')

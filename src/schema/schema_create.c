@@ -128,13 +128,13 @@ __create_colgroup(
 		}
 		WT_ERR(__wt_buf_sprintf(session, &fmt, ",value_format="));
 		WT_ERR(__wt_struct_reformat(session,
-		    table, cval.str, cval.len, 1, &fmt));
+		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
 	WT_ERR(__create_file(session, name, filename, fileconf));
+	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -148,17 +148,21 @@ err:    __wt_free(session, cgconf);
 static int
 __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	WT_BUF fmt;
-	WT_CONFIG_ITEM cval;
+	WT_BUF extra_cols, fmt;
+	WT_CONFIG pkcols;
+	WT_CONFIG_ITEM ckey, cval, icols;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
 	const char *fileconf, *idxconf, *idxname, *tablename;
 	char *filename, *namebuf;
 	size_t namelen, tlen;
-	int ret;
+	int i, ret;
 
 	idxconf = fileconf = namebuf = NULL;
+	WT_CLEAR(fmt);
+	WT_CLEAR(extra_cols);
+
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
 		return (EINVAL);
@@ -193,29 +197,51 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 
 	/* Calculate the key/value formats -- these go into the file config. */
-	WT_CLEAR(fmt);
-	/* Index values are empty: the primary key columns are in the key. */
-	WT_ERR(__wt_buf_sprintf(session, &fmt, "value_format="));
 	if (__wt_config_getones(session,
-	    config, "columns", &cval) != 0) {
+	    config, "columns", &icols) != 0) {
 		__wt_errx(session,
 		    "No 'columns' configuration for '%s'", name);
 		WT_ERR(EINVAL);
 	}
-	WT_ERR(__wt_buf_sprintf(session, &fmt, ",key_format="));
-	/* TODO: append missing primary key columns. */
-	WT_ERR(__wt_struct_reformat(session,
-	    table, cval.str, cval.len, 1, &fmt));
+
+	/*
+	 * The key format for an index is somewhat subtle: the application
+	 * specifies a set of columns that it will use for the key, but the
+	 * engine usually adds some hidden columns in order to derive the
+	 * primary key.  These hidden columns are part of the file's
+	 * key_format, which we are calculating now, but not part of an index
+	 * cursor's key_format.
+	 */
+	WT_ERR(__wt_config_subinit(session, &pkcols, &table->colconf));
+	for (i = 0; i < table->nkey_columns &&
+	    (ret = __wt_config_next(&pkcols, &ckey, &cval)) == 0;
+	    i++) {
+		/*
+		 * If the primary key column is already in the secondary key,
+		 * don't add it again.
+		 */
+		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
+			continue;
+		WT_ERR(__wt_buf_sprintf(session, &extra_cols, "%.*s,",
+		    (int)ckey.len, ckey.str));
+	}
+	if (ret != 0 && ret != WT_NOTFOUND)
+		goto err;
+	/* Index values are empty: all columns are packed into the index key. */
+	WT_ERR(__wt_buf_sprintf(session, &fmt, "value_format=,key_format="));
+	WT_ERR(__wt_struct_reformat(session, table,
+	     icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
 	WT_ERR(__create_file(session, name, filename, fileconf));
+	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
 	__wt_free(session, namebuf);
 	__wt_buf_free(session, &fmt);
+	__wt_buf_free(session, &extra_cols);
 	return (ret);
 }
 
