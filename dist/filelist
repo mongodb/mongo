@@ -13,14 +13,15 @@ src/api/config_def.c
 src/api/event_handler.c
 src/api/session_btree.c
 src/api/strerror.c
-src/btree/bt_alloc.c
+src/block/alloc.c
+src/block/io.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
 src/btree/bt_cell.c
 src/btree/bt_cmp.c
-src/btree/bt_cursor.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
+src/btree/bt_cursor.c
 src/btree/bt_debug.c
 src/btree/bt_desc.c
 src/btree/bt_discard.c
@@ -33,7 +34,6 @@ src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_reconcile.c
 src/btree/bt_ret.c
-src/btree/bt_rw.c
 src/btree/bt_salvage.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c

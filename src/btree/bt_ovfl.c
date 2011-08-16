@@ -28,7 +28,7 @@ __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store)
 	WT_RET(__wt_buf_initsize(session, store, ovfl->size));
 
 	/* Read the page. */
-	WT_RET(__wt_disk_read(session, store, ovfl->addr, ovfl->size));
+	WT_RET(__wt_block_read(session, store, ovfl->addr, ovfl->size));
 
 	/* Reference the start of the data and set the data's length. */
 	store->data = WT_PAGE_DISK_BYTE(store->mem);

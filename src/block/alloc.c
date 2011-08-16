@@ -277,11 +277,11 @@ combine:/*
 }
 
 /*
- * __wt_block_read --
+ * __wt_block_freelist_read --
  *	Read the free-list at the tail of the file.
  */
 int
-__wt_block_read(WT_SESSION_IMPL *session)
+__wt_block_freelist_read(WT_SESSION_IMPL *session)
 {
 	WT_BUF *tmp;
 	WT_BTREE *btree;
@@ -306,7 +306,7 @@ __wt_block_read(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, btree->free_size, &tmp));
-	WT_ERR(__wt_disk_read(
+	WT_ERR(__wt_block_read(
 	    session, tmp, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
@@ -327,11 +327,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_block_write --
+ * __wt_block_freelist_write --
  *	Write the free-list at the tail of the file.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session)
+__wt_block_freelist_write(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
@@ -406,7 +406,7 @@ __wt_block_write(WT_SESSION_IMPL *session)
 	__block_discard(session);
 
 	/* Write the free list to disk. */
-	WT_ERR(__wt_disk_write(session, tmp, &addr, &size));
+	WT_ERR(__wt_block_write(session, tmp, &addr, &size));
 
 done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;

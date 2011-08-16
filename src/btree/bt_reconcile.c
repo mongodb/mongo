@@ -1406,7 +1406,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 	}
 
 	/* Write the chunk. */
-	WT_RET(__wt_disk_write(session, buf, &bnd->off.addr, &bnd->off.size));
+	WT_RET(__wt_block_write(session, buf, &bnd->off.addr, &bnd->off.size));
 
 	/*
 	 * If we're evicting the page, there's no more work to do.
@@ -3108,7 +3108,7 @@ __rec_cell_build_ovfl(
 	dsk->u.datalen = kv->buf.size;
 	memcpy(WT_PAGE_DISK_BYTE(dsk), kv->buf.data, kv->buf.size);
 	tmp->size = WT_PAGE_DISK_SIZE + kv->buf.size;
-	WT_ERR(__wt_disk_write(session, tmp, &kv->off.addr, &kv->off.size));
+	WT_ERR(__wt_block_write(session, tmp, &kv->off.addr, &kv->off.size));
 
 	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;

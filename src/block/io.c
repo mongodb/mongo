@@ -10,9 +10,9 @@
 /*
  * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
  * structure) because we need the block's checksum and on-disk and in-memory
- * page sizes to be immediately available without decompression (the checksum
- * and the on-disk page sizes are used during salvage to figure out where the
- * pages are, and the in-memory page size tells us how large a buffer we need
+ * sizes to be immediately available without decompression (the checksum and
+ * the on-disk block sizes are used during salvage to figure out where the
+ * blocks are, and the in-memory page size tells us how large a buffer we need
  * to decompress the file block.  We could take less than 32B, but a 32B
  * boundary is probably better alignment for the underlying compression engine,
  * and skipping 32B won't matter in terms of compression efficiency.
@@ -20,11 +20,11 @@
 #define	COMPRESS_SKIP    32
 
 /*
- * __wt_disk_read --
+ * __wt_block_read --
  *	Read a block into a buffer.
  */
 int
-__wt_disk_read(
+__wt_block_read(
     WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t size)
 {
 	WT_BTREE *btree;
@@ -85,11 +85,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_disk_write --
- *	Write a buffer to disk, returning the addr/size pair.
+ * __wt_block_write --
+ *	Write a buffer to disk, returning the addr/size pair for the block.
  */
 int
-__wt_disk_write(
+__wt_block_write(
     WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *addrp, uint32_t *sizep)
 {
 	WT_ITEM src, dst;
@@ -199,7 +199,7 @@ not_compressed:	/*
 		 * Copy in the leading 32B of header (incidentally setting the
 		 * in-memory page size), zero out any unused bytes.
 		 *
-		 * Set the final on-disk page size.
+		 * Set the final on-disk block size.
 		 */
 		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
 		memset(
@@ -217,11 +217,11 @@ not_compressed:	/*
 	 * because it's easy to do it here.  In a transactional store, things
 	 * may be a little harder.
 	 *
-	 * We increment the page LSN in non-transactional stores so it's easy
-	 * to identify newer versions of pages during salvage: both pages are
+	 * We increment the block's LSN in non-transactional stores so it's easy
+	 * to identify newer versions of blocks during salvage: both blocks are
 	 * likely to be internally consistent, and might have the same initial
 	 * and last keys, so we need a way to know the most recent state of the
-	 * page.  Alternatively, we could check to see which leaf is referenced
+	 * block.  Alternatively, we could check to see which leaf is referenced
 	 * by the internal page, which implies salvaging internal pages (which
 	 * I don't want to do), and it's not quite as good anyway, because the
 	 * internal page may not have been written to disk after the leaf page

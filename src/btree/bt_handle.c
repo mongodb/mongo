@@ -143,7 +143,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		goto done;
 
 	/* Read in the free list. */
-	WT_ERR(__wt_block_read(session));
+	WT_ERR(__wt_block_freelist_read(session));
 
 	/*
 	 * Get a root page.  If there's a root page in the file, read it in and
@@ -246,7 +246,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	 * Update the file's description.
 	 * Close the underlying file handle.
 	 */
-	WT_TRET(__wt_block_write(session));
+	WT_TRET(__wt_block_freelist_write(session));
 	WT_TRET(__wt_desc_update(session));
 	WT_TRET(__wt_close(session, btree->fh));
 

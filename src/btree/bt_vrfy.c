@@ -501,7 +501,7 @@ __verify_overflow(
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the overflow item. */
-	WT_ERR(__wt_disk_read(session, tmp, addr, size));
+	WT_ERR(__wt_block_read(session, tmp, addr, size));
 	dsk = tmp->mem;
 
 	/*
