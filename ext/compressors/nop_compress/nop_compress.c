@@ -4,7 +4,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#define	__UNUSED(v)	((void)(v))
+WT_EXTENSION_API *wt_api;
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
@@ -12,6 +12,8 @@ static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
 static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress };
+
+#define	__UNUSED(v)	((void)(v))
 
 int
 wiredtiger_extension_init(

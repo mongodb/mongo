@@ -5,8 +5,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#define	__UNUSED(v)	((void)(v))
-
 WT_EXTENSION_API *wt_api;
 
 static int
@@ -15,6 +13,8 @@ static int
 bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
 static WT_COMPRESSOR bzip2_compressor = { bzip2_compress, bzip2_decompress };
+
+#define	__UNUSED(v)	((void)(v))
 
 /* between 0-4: set the amount of verbosity to stderr */
 static const int bz_verbosity = 0;
@@ -54,8 +54,6 @@ bzip2_convert_error(WT_SESSION *wt_session, int bzret)
 {
 	const char *msg;
 
-	__UNUSED(wt_session);
-
 	switch (bzret) {		/* Some errors are anticipated */
 	case BZ_MEM_ERROR:
 		return (ENOMEM);
@@ -94,7 +92,7 @@ bzip2_convert_error(WT_SESSION *wt_session, int bzret)
 	 * XXX
 	 * This needs to get pushed back to the session handle somehow.
 	 */
-	fprintf(stderr, "bzip2 error: %s: %d\n", msg, bzret);
+	wiredtiger_err_printf(wt_session, "bzip2 error: %s: %d\n", msg, bzret);
 	return (WT_ERROR);
 }
 
