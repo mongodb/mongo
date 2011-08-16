@@ -58,10 +58,11 @@ namespace mongo {
         ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
         Member(const Member&); 
     public:
-        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
+        Member(HostAndPort h, unsigned ord, ReplSetConfig::MemberCfg *c, bool self);
 
         string fullName() const { return h().toString(); }
         const ReplSetConfig::MemberCfg& config() const { return _config; }
+        ReplSetConfig::MemberCfg& configw() { return _config; }
         const HeartbeatInfo& hbinfo() const { return _hbinfo; }
         HeartbeatInfo& get_hbinfo() { return _hbinfo; }
         string lhb() const { return _hbinfo.lastHeartbeatMsg; }
@@ -74,7 +75,7 @@ namespace mongo {
 
     private:
         friend class ReplSetImpl;
-        const ReplSetConfig::MemberCfg _config;
+        ReplSetConfig::MemberCfg _config;
         const HostAndPort _h;
         HeartbeatInfo _hbinfo;
     };
@@ -613,7 +614,7 @@ namespace mongo {
 
     /** inlines ----------------- */
 
-    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
+    inline Member::Member(HostAndPort h, unsigned ord, ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
         assert(c);
         if( self )

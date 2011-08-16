@@ -25,7 +25,7 @@
 #include "health.h"
 
 namespace mongo {
-
+    class Member;
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
@@ -68,8 +68,7 @@ namespace mongo {
             const set<TagSubgroup*>& groups() const { 
                 return _groups;
             }
-            set<TagSubgroup*>& groupsw(ReplSetConfig *c) { 
-                assert(!c->_constructed);
+            set<TagSubgroup*>& groupsw() {
                 return _groups;
             }
             void check() const;   /* check validity, assert if not. */
@@ -112,6 +111,11 @@ namespace mongo {
         //static void receivedNewConfig(BSONObj);
         void saveConfigLocally(BSONObj comment); // to local db
         string saveConfigEverywhere(); // returns textual info on what happened
+
+        /**
+         * Update members' groups when the config changes but members stay the same.
+         */
+        void updateMembers(List1<Member> &dest);
 
         BSONObj asBson() const;
 

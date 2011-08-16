@@ -91,6 +91,16 @@ namespace mongo {
         return b.obj();
     }
 
+    void ReplSetConfig::updateMembers(List1<Member> &dest) {
+        for (vector<MemberCfg>::iterator source = members.begin(); source < members.end(); source++) {
+            for( Member *d = dest.head(); d; d = d->next() ) {
+                if (d->fullName() == (*source).h.toString()) {
+                    d->configw().groupsw() = (*source).groups();
+                }
+            }
+        }
+    }
+
     bo ReplSetConfig::asBson() const {
         bob b;
         b.append("_id", _id).append("version", version);
@@ -440,7 +450,7 @@ namespace mongo {
 
                     for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
-                        (*cfg)->groupsw(this).insert((*sgs).second);
+                        (*cfg)->groupsw().insert((*sgs).second);
                     }
                 }
 
