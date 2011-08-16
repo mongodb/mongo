@@ -175,7 +175,7 @@ namespace PerfTests {
                         }
                     }
 
-                    DBClientConnection *c = new DBClientConnection(false, 0, 10);
+                    DBClientConnection *c = new DBClientConnection(false, 0, 60);
                     string err;
                     if( c->connect("perfdb.10gen.cc", err) ) { 
                         if( !c->auth("perf", "perf", pwd, err) ) { 
@@ -426,6 +426,18 @@ namespace PerfTests {
         void timed() {
             mongo::Timer t;
             aaa += t.millis();
+        }
+    };
+
+    class Sleep0Ms : public B { 
+    public:
+        string name() { return "Sleep0Ms"; }
+        virtual int howLongMillis() { return 400; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            sleepmillis(0);
+            mongo::Timer t;
+            aaa++;
         }
     };
 
@@ -754,6 +766,7 @@ namespace PerfTests {
 
     class InsertRandom : public B {
     public:
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; } 
         string name() { return "random-inserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
@@ -848,7 +861,9 @@ namespace PerfTests {
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
             if( profiling ) { 
-                add< Update1 >();
+                add< Sleep0Ms >();
+                add< InsertRandom >();
+                add< MoreIndexes<InsertRandom> >();
             }
             else {
                 add< Dummy >();
@@ -857,6 +872,7 @@ namespace PerfTests {
                 add< TLS >();
                 add< Malloc >();
                 add< Timer >();
+                add< Sleep0Ms >();
                 add< rlock >();
                 add< wlock >();
                 //add< ulock >();
