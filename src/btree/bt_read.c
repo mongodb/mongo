@@ -290,10 +290,13 @@ __cache_read(
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
+	
+	/* The disk image may have been discarderd, use the one in the page. */
+	dsk = ref->page->dsk;
 
 	/* Add the page to our cache statistics. */
-	__wt_cache_page_read(
-	    session, ref->page, WT_SIZEOF32(WT_PAGE) + dsk->memsize);
+	__wt_cache_page_read(session, ref->page,
+	    WT_SIZEOF32(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;
