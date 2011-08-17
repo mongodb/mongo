@@ -690,7 +690,7 @@ namespace mongo {
         void durThread() {
             Client::initThread("journal");
 
-            bool samePartition = false;
+            bool samePartition = true;
             try {
                 const string dbpathDir = boost::filesystem::path(dbpath).native_directory_string();
                 samePartition = onSamePartition(getJournalDir().string(), dbpathDir);
