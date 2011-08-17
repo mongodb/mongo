@@ -24,8 +24,8 @@
  *	Read a block into a buffer.
  */
 int
-__wt_block_read(
-    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t addr, uint32_t size)
+__wt_block_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf, uint32_t addr, uint32_t size, int quiet)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
@@ -46,9 +46,12 @@ __wt_block_read(
 	dsk = buf->mem;
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
-	if (checksum != __wt_cksum(dsk, size))
+	if (checksum != __wt_cksum(dsk, size)) {
+		if (quiet)
+			return (WT_ERROR);
 		WT_FAILURE_RET(session, WT_ERROR,
 		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
+	}
 
 	WT_BSTAT_INCR(session, page_read);
 	WT_CSTAT_INCR(session, block_read);

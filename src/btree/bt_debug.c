@@ -179,7 +179,7 @@ __wt_debug_addr(
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
-	WT_ERR(__wt_block_read(session, tmp, addr, size));
+	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
 	ret = __wt_debug_disk(session, tmp->mem, ofile);
 err:	__wt_scr_release(&tmp);
 

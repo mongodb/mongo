@@ -375,7 +375,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 */
 		WT_ERR(__wt_buf_initsize(session, t, size));
 		if (__wt_block_read(
-		    session, t, WT_OFF_TO_ADDR(btree, off), size))
+		    session, t, WT_OFF_TO_ADDR(btree, off), size, 1))
 			goto skip;
 
 		/*
@@ -1559,7 +1559,7 @@ __slvg_row_trk_update_start(
 	 * Read and instantiate the WT_TRACK page.
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(__wt_block_read(session, dsk, trk->addr, trk->size));
+	WT_ERR(__wt_block_read(session, dsk, trk->addr, trk->size, 0));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*

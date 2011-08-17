@@ -280,7 +280,7 @@ __cache_read(
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the page, then steal the resulting buffer. */
-	WT_ERR(__wt_block_read(session, tmp, addr, size));
+	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
 	dsk = __wt_buf_steal(session, tmp, &size);
 	__wt_scr_release(&tmp);
 

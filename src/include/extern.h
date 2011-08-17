@@ -137,10 +137,11 @@ extern int __wt_block_freelist_read(WT_SESSION_IMPL *session);
 extern int __wt_block_freelist_write(WT_SESSION_IMPL *session);
 extern void __wt_block_stat(WT_SESSION_IMPL *session);
 extern void __wt_block_dump(WT_SESSION_IMPL *session);
-extern int __wt_block_read( WT_SESSION_IMPL *session,
+extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
-    uint32_t size);
+    uint32_t size,
+    int quiet);
 extern int __wt_block_write( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *addrp,
