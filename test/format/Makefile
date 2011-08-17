@@ -13,7 +13,7 @@ OBJS=	bdb.o config.o t.o util.o wts.o
 all: t tags
 
 t: ${OBJS} ${LIB}
-	cc ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
+	${CC} ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
 clean distclean realclean:
 	rm -f t ${OBJS} __* *.core vgcore* vgout.* tags
