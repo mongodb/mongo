@@ -327,6 +327,11 @@ namespace mongo {
             return *p == EOO ? "" : p+1;
         }
 
+        BSONType firstElementType() const { 
+            const char *p = objdata() + 4;
+            return (BSONType) *p;
+        }
+
         /** Get the _id field from the object.  For good performance drivers should
             assure that _id is the first element of the object; however, correct operation
             is assured regardless.

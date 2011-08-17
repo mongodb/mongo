@@ -740,6 +740,8 @@ namespace mongo {
      * returns n if it goes after the last existing key.
      * note result might be an Unused location!
      */
+
+    bool guessIncreasing = false;
     template< class V >
     bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &rl, 
 			      const Ordering &order, int& pos, bool assertIfDup) const {
@@ -751,8 +753,11 @@ namespace mongo {
         bool dupsChecked = false;
         int l=0;
         int h=this->n-1;
+        int m = (l+h)/2;
+        if( guessIncreasing ) {
+            m = h;
+        }
         while ( l <= h ) {
-            int m = (l+h)/2;
             KeyNode M = this->keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) {
@@ -792,6 +797,7 @@ namespace mongo {
                 pos = m;
                 return true;
             }
+            m = (l+h)/2;
         }
         // not found
         pos = l;
@@ -1766,6 +1772,7 @@ namespace mongo {
                                const BSONObj& _key, const Ordering &order, bool dupsAllowed,
                                IndexDetails& idx, bool toplevel) const 
     {
+        guessIncreasing = _key.firstElementType() == jstOID && idx.isIdIndex();
         KeyOwned key(_key);
 
         if ( toplevel ) {
@@ -1775,9 +1782,16 @@ namespace mongo {
             }
         }
 
-        int x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
-        this->assertValid( order );
-
+        int x;
+        try {
+            x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+            this->assertValid( order );
+        }
+        catch( ... ) { 
+            guessIncreasing = false;
+            throw;
+        }
+        guessIncreasing = false;
         return x;
     }
 

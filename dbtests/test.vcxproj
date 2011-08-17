@@ -184,6 +184,7 @@
       <DisableSpecificWarnings>4355;4800;4267;4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
