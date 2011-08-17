@@ -768,11 +768,11 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 		break;
 	case WT_CELL_DEL:
 deleted:	p = (uint8_t *)"deleted";
-		size = strlen("deleted");
+		size = (uint32_t)strlen("deleted");
 		break;
 	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";
-		size = strlen("offpage");
+		size = (uint32_t)strlen("offpage");
 		break;
 	WT_ILLEGAL_FORMAT_ERR(session);
 	}
