@@ -288,9 +288,12 @@ __cache_read(
 	if (dsk_verify)
 		WT_ERR(__wt_verify_dsk(session, dsk, addr, dsk->size, 0));
 
-	/* Build the in-memory version of the page. */
+	/*
+	 * Build the in-memory version of the page, then re-load the disk
+	 * reference: the disk image may have been discarded, use whatever
+	 * the page has, or NULL if it doesn't have one.
+	 */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
-
 	/* The disk image may have been discarded, use the one in the page. */
 	dsk = ref->page->dsk;
 
