@@ -83,6 +83,7 @@ namespace mongo {
         }
 
         bool isMaster();
+        bool isMongos();
 
         virtual void preSetup() {}
 
