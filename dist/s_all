@@ -2,7 +2,13 @@
 
 # Run standard scripts.
 t=__wt.$$
-trap 'rm -f $t *.pyc __tmp __wt.*; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t *.pyc __tmp __wt.*' 0 1 2 3 13 15
+
+# We require python which may not be installed.
+type xpython > /dev/null 2>&1 || {
+	echo 's_all: python not found'
+	return 1
+}
 
 run()
 {
@@ -66,3 +72,5 @@ run "sh ./s_whitespace" "Checking whitespace"
 run "sh ./s_docs" "Generating documentation"
 
 echo 'dist/s_all run finished'
+
+return 0
