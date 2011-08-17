@@ -73,6 +73,7 @@ namespace mongo {
     }
 
     void BtreeCursor::audit() {
+        indexDetails.checkVersion();
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
 
         if ( otherTraceLevel >= 12 ) {
