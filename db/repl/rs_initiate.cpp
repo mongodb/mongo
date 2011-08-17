@@ -150,7 +150,7 @@ namespace mongo {
             h << "Initiate/christen a replica set.";
             h << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
             if( !replSet ) {

@@ -38,20 +38,22 @@ namespace mongo {
             DEV mutexDebugger.leaving(_name);
             RWLockBase::unlock();
         }
+
+        void lock_shared() { RWLockBase::lock_shared(); }
+        void unlock_shared() { RWLockBase::unlock_shared(); }
+
         void lockAsUpgradable() { RWLockBase::lockAsUpgradable(); }
         void unlockFromUpgradable() { // upgradable -> unlocked
             RWLockBase::unlockFromUpgradable();
         }
         void upgrade() { // upgradable -> exclusive lock
             RWLockBase::upgrade();
-            DEV mutexDebugger.entering(_name);
         }
-        void lock_shared() { RWLockBase::lock_shared(); }
-        void unlock_shared() { RWLockBase::unlock_shared(); }
+
         bool lock_shared_try( int millis ) { return RWLockBase::lock_shared_try(millis); }
+
         bool lock_try( int millis = 0 ) {
             if( RWLockBase::lock_try(millis) ) {
-                DEV mutexDebugger.entering(_name);
                 return true;
             }
             return false;

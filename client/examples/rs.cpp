@@ -57,13 +57,18 @@ int main( int argc , const char ** argv ) {
     
     unsigned nThreads = 1;
     bool print = false;
+    bool testTimeout = false;
 
     for ( int i=1; i<argc; i++ ) {
         if ( mongoutils::str::equals( "--threads" , argv[i] ) ) {
             nThreads = atoi( argv[++i] );
         }
-        else if ( mongoutils::str::equals( "--print" , argv[1] ) ) {
+        else if ( mongoutils::str::equals( "--print" , argv[i] ) ) {
             print = true;
+        }
+        // Run a special mode to demonstrate the DBClientReplicaSet so_timeout option.
+        else if ( mongoutils::str::equals( "--testTimeout" , argv[i] ) ) {
+            testTimeout = true;
         }
         else {
             cerr << "unknown option: " << argv[i] << endl;
@@ -79,7 +84,7 @@ int main( int argc , const char ** argv ) {
         return 1;
     }
 
-    DBClientReplicaSet * conn = (DBClientReplicaSet*)cs.connect( errmsg );
+    DBClientReplicaSet * conn = dynamic_cast<DBClientReplicaSet*>(cs.connect( errmsg, testTimeout ? 10 : 0 ));
     if ( ! conn ) {
         cout << "error connecting: " << errmsg << endl;
         return 2;
@@ -88,6 +93,17 @@ int main( int argc , const char ** argv ) {
     string collName = "test.rs1";
 
     conn->dropCollection( collName );
+
+    if ( testTimeout ) {
+        conn->insert( collName, BSONObj() );
+        try {
+            conn->count( collName, BSON( "$where" << "sleep(40000)" ) );
+        } catch( DBException& ) {
+            return 0;
+        }
+        cout << "expected socket exception" << endl;
+        return 1;
+    }
     
     vector<boost::shared_ptr<boost::thread> > threads;
     for ( unsigned i=0; i<nThreads; i++ ) {

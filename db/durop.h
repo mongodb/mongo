@@ -28,8 +28,6 @@ namespace mongo {
 
     namespace dur {
 
-        const unsigned Alignment = 8192;
-
         /** DurOp - Operations we journal that aren't just basic writes.
          *
          *  Basic writes are logged as JEntry's, and indicated in ram temporarily as struct dur::WriteIntent.

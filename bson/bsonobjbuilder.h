@@ -28,9 +28,9 @@
 #include "bsonobj.h"
 #include "bsonmisc.h"
 
-using namespace std;
-
 namespace mongo {
+
+    using namespace std;
 
 #if defined(_WIN32)
 // warning: 'this' : used in base member initializer list

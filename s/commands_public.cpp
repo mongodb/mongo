@@ -53,22 +53,34 @@ namespace mongo {
                 return false;
             }
 
+            // Override if passthrough should also send query options
+            // Safer as off by default, can slowly enable as we add more tests
+            virtual bool passOptions() const { return false; }
+
             // all grid commands are designed not to lock
             virtual LockType locktype() const { return NONE; }
 
         protected:
+
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
-                return _passthrough(conf->getName(), conf, cmdObj, result);
+                return _passthrough(conf->getName(), conf, cmdObj, 0, result);
             }
             bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
-                return _passthrough("admin", conf, cmdObj, result);
+                return _passthrough("admin", conf, cmdObj, 0, result);
+            }
+
+            bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
+                return _passthrough(conf->getName(), conf, cmdObj, options, result);
+            }
+            bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
+                return _passthrough("admin", conf, cmdObj, options, result);
             }
 
         private:
-            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
+            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , int options , BSONObjBuilder& result ) {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
-                bool ok = conn->runCommand( db , cmdObj , res );
+                bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
                 if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
                     conn.done();
                     throw StaleConfigException("foo","command failed because of stale config");
@@ -99,13 +111,14 @@ namespace mongo {
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {}
 
             // don't override
-            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& output, bool) {
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& output, bool) {
+                LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj << endl;
                 set<Shard> shards;
                 getShards(dbName, cmdObj, shards);
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, 0 ) );
                 }
 
                 vector<BSONObj> results;
@@ -159,13 +172,13 @@ namespace mongo {
 
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
 
-            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = getFullNS( dbName , cmdObj );
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    return passthrough( conf , cmdObj , result );
+                    return passthrough( conf , cmdObj , options, result );
                 }
                 errmsg = "can't do command: " + name + " on sharded collection";
                 return false;
@@ -183,6 +196,16 @@ namespace mongo {
         public:
             ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
         } reIndexCmd;
+
+        class ProfileCmd : public PublicGridCommand {
+        public:
+            ProfileCmd() :  PublicGridCommand("profile") {}
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg = "profile currently not supported via mongos";
+                return false;
+            }
+        } profileCmd;
+        
 
         class ValidateCmd : public AllShardsCollectionCommand {
         public:
@@ -255,7 +278,7 @@ namespace mongo {
         class DropCmd : public PublicGridCommand {
         public:
             DropCmd() : PublicGridCommand( "drop" ) {}
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
@@ -280,7 +303,7 @@ namespace mongo {
         class DropDBCmd : public PublicGridCommand {
         public:
             DropDBCmd() : PublicGridCommand( "dropDatabase" ) {}
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
                 BSONElement e = cmdObj.firstElement();
 
@@ -309,7 +332,7 @@ namespace mongo {
         class RenameCollectionCmd : public PublicGridCommand {
         public:
             RenameCollectionCmd() : PublicGridCommand( "renameCollection" ) {}
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
                 string dbNameFrom = nsToDatabase( fullnsFrom.c_str() );
                 DBConfigPtr confFrom = grid.getDBConfig( dbNameFrom , false );
@@ -334,7 +357,7 @@ namespace mongo {
         class CopyDBCmd : public PublicGridCommand {
         public:
             CopyDBCmd() : PublicGridCommand( "copydb" ) {}
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
                 uassert(13402, "need a todb argument", !todb.empty());
 
@@ -370,7 +393,8 @@ namespace mongo {
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool l) {
+            virtual bool passOptions() const { return true; }
+            bool run(const string& dbName, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
@@ -379,12 +403,11 @@ namespace mongo {
                     filter = cmdObj["query"].Obj();
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
-
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
                     ShardConnection conn( conf->getPrimary() , fullns );
 
                     BSONObj temp;
-                    bool ok = conn->runCommand( dbName , cmdObj , temp );
+                    bool ok = conn->runCommand( dbName , cmdObj , temp, options );
                     conn.done();
 
                     if ( ok ) {
@@ -399,7 +422,7 @@ namespace mongo {
                     }
 
                     // this collection got sharded
-                    ChunkManagerPtr cm = conf->getChunkManager( fullns , true );
+                    ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns , true );
                     if ( ! cm ) {
                         errmsg = "should be sharded now";
                         result.append( "root" , temp );
@@ -410,11 +433,11 @@ namespace mongo {
                 long long total = 0;
                 map<string,long long> shardCounts;
 
-                ChunkManagerPtr cm = conf->getChunkManager( fullns );
+                ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns );
                 while ( true ) {
                     if ( ! cm ) {
                         // probably unsharded now
-                        return run( dbName , cmdObj , errmsg , result , l );
+                        return run( dbName , cmdObj , options , errmsg , result, false );
                     }
 
                     set<Shard> shards;
@@ -428,14 +451,14 @@ namespace mongo {
                         if ( conn.setVersion() ) {
                             total = 0;
                             shardCounts.clear();
-                            cm = conf->getChunkManager( fullns );
+                            cm = conf->getChunkManagerIfExists( fullns );
                             conn.done();
                             hadToBreak = true;
                             break;
                         }
 
                         BSONObj temp;
-                        bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp );
+                        bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp, options );
                         conn.done();
 
                         if ( ok ) {
@@ -449,7 +472,7 @@ namespace mongo {
                             // my version is old
                             total = 0;
                             shardCounts.clear();
-                            cm = conf->getChunkManager( fullns , true );
+                            cm = conf->getChunkManagerIfExists( fullns , true );
                             hadToBreak = true;
                             break;
                         }
@@ -476,14 +499,13 @@ namespace mongo {
         class CollectionStats : public PublicGridCommand {
         public:
             CollectionStats() : PublicGridCommand("collStats", "collstats") { }
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    result.append( "ns" , fullns );
                     result.appendBool("sharded", false);
                     result.append( "primary" , conf->getPrimary().getName() );
                     return passthrough( conf , cmdObj , result);
@@ -602,7 +624,7 @@ namespace mongo {
         class FindAndModifyCmd : public PublicGridCommand {
         public:
             FindAndModifyCmd() : PublicGridCommand("findAndModify", "findandmodify") { }
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
@@ -639,7 +661,7 @@ namespace mongo {
         class DataSizeCmd : public PublicGridCommand {
         public:
             DataSizeCmd() : PublicGridCommand("dataSize", "datasize") { }
-            bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = cmdObj.firstElement().String();
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
@@ -703,7 +725,7 @@ namespace mongo {
         class GroupCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
             GroupCmd() : NotAllowedOnShardedCollectionCmd("group") {}
-
+            virtual bool passOptions() const { return true; }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
             }
@@ -716,14 +738,15 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
             }
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool passOptions() const { return true; }
+            bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    return passthrough( conf , cmdObj , result );
+                    return passthrough( conf , cmdObj , options, result );
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
@@ -739,7 +762,7 @@ namespace mongo {
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
                     ShardConnection conn( *i , fullns );
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    bool ok = conn->runCommand( conf->getName() , cmdObj , res, options );
                     conn.done();
 
                     if ( ! ok ) {
@@ -774,7 +797,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
             }
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = dbName;
                 fullns += ".";
                 {
@@ -811,15 +834,15 @@ namespace mongo {
         public:
             Geo2dFindNearCmd() : PublicGridCommand( "geoNear" ) {}
             void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
-
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool passOptions() const { return true; }
+            bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    return passthrough( conf , cmdObj , result );
+                    return passthrough( conf , cmdObj , options, result );
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
@@ -836,7 +859,7 @@ namespace mongo {
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj ) );
+                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, options ) );
                     shardArray.append(i->getName());
                 }
 
@@ -946,7 +969,7 @@ namespace mongo {
                 return b.obj();
             }
 
-            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 Timer t;
 
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -1009,7 +1032,7 @@ namespace mongo {
                     for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                         shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , fullns ) );
                         assert( temp->get() );
-                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , temp->get() ) );
+                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , 0 , temp->get() ) );
                         shardConns.push_back( temp );
                     }
                     
@@ -1096,7 +1119,7 @@ namespace mongo {
 
                     mr_shard::Config config( dbName , cmdObj );
                     mr_shard::State state(config);
-                    log(1) << "mr sharded output ns: " << config.ns << endl;
+                    LOG(1) << "mr sharded output ns: " << config.ns << endl;
 
                     if (config.outType == mr_shard::Config::INMEMORY) {
                         errmsg = "This Map Reduce mode is not supported with sharded output";
@@ -1200,7 +1223,7 @@ namespace mongo {
                         BSONObj finalCmdObj = finalCmd.obj();
                         for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                             shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , outns ) );
-                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , temp->get() ) );
+                            futures.push_back( Future::spawnCommand( i->getConnString() , dbName , finalCmdObj , 0 , temp->get() ) );
                             shardConns.push_back( temp );
                         }
 
@@ -1268,7 +1291,7 @@ namespace mongo {
         class ApplyOpsCmd : public PublicGridCommand {
         public:
             ApplyOpsCmd() : PublicGridCommand( "applyOps" ) {}
-            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
             }
@@ -1277,7 +1300,7 @@ namespace mongo {
         class CompactCmd : public PublicGridCommand {
         public:
             CompactCmd() : PublicGridCommand( "compact" ) {}
-            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "compact not allowed through mongos";
                 return false;
             }
@@ -1285,7 +1308,7 @@ namespace mongo {
 
     }
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions) {
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
@@ -1326,7 +1349,7 @@ namespace mongo {
                 anObjBuilder.append( "help" , help.str() );
             }
             else {
-                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
+                ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
             }
 
             BSONObj tmp = anObjBuilder.asTempObj();

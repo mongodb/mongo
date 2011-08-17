@@ -14,16 +14,22 @@ db.getCollectionNames().forEach( function( x ) {
                                 }
                                 } );
 
+function dbhash( mydb ) {
+    var ret = mydb.runCommand( "dbhash" );
+    assert.commandWorked( ret, "dbhash failure" );
+    return ret;
+}
+
 function gh( coll , mydb ){
     if ( ! mydb ) mydb = db;
-    var x = mydb.runCommand( "dbhash" ).collections[coll.getName()];
+    var x = dbhash( mydb ).collections[coll.getName()];
     if ( ! x )
         return "";
     return x;
 }
 
 function dbh( mydb ){
-    return mydb.runCommand( "dbhash" ).md5;
+    return dbhash( mydb ).md5;
 }
 
 assert.eq( gh( a ) , gh( b ) , "A1" );

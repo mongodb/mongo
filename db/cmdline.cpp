@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "cmdline.h"
 #include "commands.h"
+#include "../util/password.h"
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "security_common.h"
@@ -26,6 +27,8 @@
 #ifdef _WIN32
 #include <direct.h>
 #endif
+
+#define MAX_LINE_LENGTH 256
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -64,6 +67,14 @@ namespace mongo {
         ("fork" , "fork server process" )
 #endif
         ;
+        
+        hidden.add_options()
+#ifdef MONGO_SSL
+        ("sslOnNormalPorts" , "use ssl on configured ports" )
+        ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
+        ("sslPEMKeyPassword" , new PasswordValue(&cmdLine.sslPEMKeyPassword) , "PEM file password" )
+#endif
+        ;
 
     }
 
@@ -84,6 +95,32 @@ namespace mongo {
         hidden.add_options()("service", "start mongodb service");
     }
 #endif
+
+    void CmdLine::parseConfigFile( istream &f, stringstream &ss ) {
+        string s;
+        char line[MAX_LINE_LENGTH];
+
+        while ( f ) {
+            f.getline(line, MAX_LINE_LENGTH);
+            s = line;
+            std::remove(s.begin(), s.end(), ' ');
+            std::remove(s.begin(), s.end(), '\t');
+            boost::to_upper(s);
+
+            if ( s.find( "FASTSYNC" ) != string::npos )
+                cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
+
+            if ( s.c_str()[0] == '#' ) { 
+                // skipping commented line
+            } else if ( s.find( "=FALSE" ) == string::npos ) {
+                ss << line << endl;
+            } else {
+                cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
+            }
+        }
+        return;
+    }
+
 
 
     bool CmdLine::store( int argc , char ** argv ,
@@ -141,7 +178,9 @@ namespace mongo {
                     return false;
                 }
 
-                po::store( po::parse_config_file( f , all ) , params );
+                stringstream ss;
+                CmdLine::parseConfigFile( f, ss );
+                po::store( po::parse_config_file( ss , all ) , params );
                 f.close();
             }
 
@@ -287,7 +326,25 @@ namespace mongo {
             noauth = false;
         }
 
+#ifdef MONGO_SSL
+        if (params.count("sslOnNormalPorts") ) {
+            cmdLine.sslOnNormalPorts = true;
 
+            if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
+                log() << "need sslPEMKeyPassword" << endl;
+                dbexit(EXIT_BADOPTIONS);
+            }
+            
+            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
+                log() << "need sslPEMKeyFile" << endl;
+                dbexit(EXIT_BADOPTIONS);
+            }
+            
+            cmdLine.sslServerManager = new SSLManager( false );
+            cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword );
+        }
+#endif
+        
         {
             BSONObjBuilder b;
             for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){
@@ -354,7 +411,7 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return true; }
 
-        virtual bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             result.append("argv", argvArray);
             result.append("parsed", parsedOpts);
             return true;

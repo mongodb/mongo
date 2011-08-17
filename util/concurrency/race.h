@@ -7,6 +7,12 @@ namespace mongo {
 
     namespace race {
 
+#ifdef _WIN32
+    typedef unsigned threadId_t;
+#else
+    typedef pthread_t threadId_t;
+#endif
+
 #if defined(_DEBUG)
 
         class Block { 

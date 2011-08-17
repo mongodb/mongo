@@ -56,7 +56,7 @@ s.s = s._mongos[0] = s["s0"] = conn;
 
 login(adminUser);
 
-d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 34000});
+d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100});
 d1.startSet({keyFile : "jstests/libs/key2"});
 d1.initiate();
 
@@ -102,6 +102,18 @@ s.getDB(testUser.db).addUser(testUser.username, testUser.password);
 
 logout(adminUser);
 
+print("query try");
+var e = assert.throws(function() {
+    conn.getDB("foo").bar.findOne();
+});
+printjson(e);
+
+print("cmd try");
+e = assert.throws(function() {
+    conn.getDB("foo").runCommand({listdbs:1});
+});
+printjson(e);
+
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
 result = s.getDB("test").runCommand({getLastError : 1});
@@ -118,7 +130,7 @@ assert.eq(result.err, null);
 
 logout(testUser);
 
-d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 36000});
+d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200});
 d2.startSet({keyFile : "jstests/libs/key1"});
 d2.initiate();
 
@@ -155,5 +167,11 @@ while (cursor.hasNext()) {
 }
 
 assert.eq(count, 501);
+
+// check that dump doesn't get stuck with auth
+var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);
+
+print("result: "+x);
+
 
 s.stop();

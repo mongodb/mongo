@@ -95,7 +95,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( cmdLine.usingReplSets() ) {
                 errmsg = "resync command not currently supported with replica sets.  See RS102 info in the mongodb documentations";
                 result.append("info", "http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member");
@@ -232,7 +232,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         CmdIsMaster() : Command("isMaster", true, "ismaster") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
                authenticated.
                we allow unauthenticated ismaster but we aren't as verbose informationally if
@@ -1407,6 +1407,7 @@ namespace mongo {
 
     void newRepl();
     void oldRepl();
+    void startReplSets(ReplSetCmdline*);
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
         if( !cmdLine._replSet.empty() ) {
@@ -1416,6 +1417,11 @@ namespace mongo {
                 log() << "***" << endl;
             }
             newRepl();
+
+            replSet = true;
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
+            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
+
             return;
         }
 

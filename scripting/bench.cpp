@@ -142,7 +142,7 @@ namespace mongo {
                     conn->remove( ns , fixQuery( e["query"].Obj() ) );
                 }
                 else if ( op == "update" ) {
-                    conn->update( ns , fixQuery( e["query"].Obj() ) , e["update"].Obj() );
+                    conn->update( ns , fixQuery( e["query"].Obj() ) , e["update"].Obj() , e["upsert"].trueValue() );
                 }
                 else {
                     log() << "don't understand op: " << op << endl;

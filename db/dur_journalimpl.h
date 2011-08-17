@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "dur_journalformat.h"
 #include "../util/logfile.h"
 
 namespace mongo {
@@ -40,14 +41,14 @@ namespace mongo {
              */
             void rotate();
 
-            /** write to journal
+            /** append to the journal file
             */
-            void journal(const AlignedBuilder& b);
+            void journal(const JSectHeader& h, const AlignedBuilder& b);
 
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
-            void cleanup(bool log);
+            void cleanup(bool log); // closes and removes journal files
 
             unsigned long long curFileId() const { return _curFileId; }
 
@@ -61,6 +62,11 @@ namespace mongo {
             void open();
 
         private:
+            /** check if time to rotate files.  assure a file is open.
+             *  internally called with every commit
+             */
+            void _rotate();
+
             void _open();
             void closeCurrentJournalFile();
             void removeUnneededJournalFiles();

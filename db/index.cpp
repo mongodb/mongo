@@ -27,11 +27,6 @@
 
 namespace mongo {
 
-    /** old (<= v1.8) : 0
-        1 is new version
-    */
-    const int DefaultIndexVersionNumber = 1;
-
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:

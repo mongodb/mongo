@@ -264,7 +264,7 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 

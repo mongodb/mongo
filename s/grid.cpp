@@ -125,6 +125,8 @@ namespace mongo {
             name = &nameInternal;
         }
 
+        ReplicaSetMonitorPtr rsMonitor;
+
         // Check whether the host (or set) exists and run several sanity checks on this request.
         // There are two set of sanity checks: making sure adding this particular shard is consistent
         // with the replica set state (if it exists) and making sure this shards databases can be
@@ -140,7 +142,7 @@ namespace mongo {
                 errMsg = "can't use sync cluster as a shard.  for replica set, have to use <setname>/<server1>,<server2>,...";
                 return false;
             }
-
+            
             BSONObj resIsMongos;
             bool ok = newShardConn->runCommand( "admin" , BSON( "isdbgrid" << 1 ) , resIsMongos );
 
@@ -264,6 +266,9 @@ namespace mongo {
                 }
             }
 
+            if ( newShardConn->type() == ConnectionString::SET ) 
+                rsMonitor = ReplicaSetMonitor::get( setName );
+
             newShardConn.done();
         }
         catch ( DBException& e ) {
@@ -295,7 +300,7 @@ namespace mongo {
         // build the ConfigDB shard document
         BSONObjBuilder b;
         b.append( "_id" , *name );
-        b.append( "host" , servers.toString() );
+        b.append( "host" , rsMonitor ? rsMonitor->getServerAddress() : servers.toString() );
         if ( maxSize > 0 ) {
             b.append( ShardFields::maxSize.name() , maxSize );
         }
@@ -508,7 +513,7 @@ namespace mongo {
             assert( Grid::_inBalancingWindow( w8 , now ) );
             assert( Grid::_inBalancingWindow( w9 , now ) );
 
-            log(1) << "BalancingWidowObjTest passed" << endl;
+            LOG(1) << "BalancingWidowObjTest passed" << endl;
         }
     } BalancingWindowObjTest;
 

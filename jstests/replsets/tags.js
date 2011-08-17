@@ -8,16 +8,16 @@ var nodes = replTest.startSet();
 var port = replTest.ports;
 replTest.initiate({_id : name, members :
         [
-         {_id:0, host : host+":"+port[0], tags : ["0", "dc.ny.rk1", "machine"]},
-         {_id:1, host : host+":"+port[1], tags : ["1", "dc.ny.rk1", "machine"]},
-         {_id:2, host : host+":"+port[2], tags : ["2", "dc.ny.rk2", "machine"]},
-         {_id:3, host : host+":"+port[3], tags : ["3", "dc.sf.rk1", "machine"]},
-         {_id:4, host : host+":"+port[4], tags : ["4", "dc.sf.rk2", "machine"]},
+            {_id:0, host : host+":"+port[0], tags : {"server" : "0", "dc" : "ny", "ny" : "1", "rack" : "ny.rk1"}},
+            {_id:1, host : host+":"+port[1], tags : {"server" : "1", "dc" : "ny", "ny" : "2", "rack" : "ny.rk1"}},
+            {_id:2, host : host+":"+port[2], tags : {"server" : "2", "dc" : "ny", "ny" : "3", "rack" : "ny.rk2", "2" : "this"}},
+            {_id:3, host : host+":"+port[3], tags : {"server" : "3", "dc" : "sf", "sf" : "1", "rack" : "sf.rk1"}},
+            {_id:4, host : host+":"+port[4], tags : {"server" : "4", "dc" : "sf", "sf" : "2", "rack" : "sf.rk2"}},
         ],
         settings : {
             getLastErrorModes : {
-                "important" : {"dc" : 2, "machine" : 3},
-                "a machine" : {"machine" : 1}
+                "important" : {"dc" : 2, "server" : 3},
+                "a machine" : {"server" : 1}
             }
         }});
 
@@ -29,14 +29,14 @@ printjson(config);
 var modes = config.settings.getLastErrorModes;
 assert.eq(typeof modes, "object");
 assert.eq(modes.important.dc, 2);
-assert.eq(modes.important.machine, 3);
-assert.eq(modes["a machine"]["machine"], 1);
+assert.eq(modes.important.server, 3);
+assert.eq(modes["a machine"]["server"], 1);
 
 config.version++;
 config.members[1].priority = 1.5;
 config.members[2].priority = 2;
-modes.rack = {"dc.sf" : 1};
-modes.niceRack = {"dc.sf" : 2};
+modes.rack = {"sf" : 1};
+modes.niceRack = {"sf" : 2};
 modes["a machine"]["2"] = 1;
 modes.on2 = {"2" : 1}
 
@@ -57,10 +57,10 @@ printjson(config);
 modes = config.settings.getLastErrorModes;
 assert.eq(typeof modes, "object");
 assert.eq(modes.important.dc, 2);
-assert.eq(modes.important.machine, 3);
-assert.eq(modes["a machine"]["machine"], 1);
-assert.eq(modes.rack["dc.sf"], 1);
-assert.eq(modes.niceRack["dc.sf"], 2);
+assert.eq(modes.important.server, 3);
+assert.eq(modes["a machine"]["server"], 1);
+assert.eq(modes.rack["sf"], 1);
+assert.eq(modes.niceRack["sf"], 2);
 
 print("bridging");
 replTest.bridge();
@@ -75,7 +75,10 @@ replTest.partition(3, 4);
 print("done bridging");
 
 print("test1");
+print("2 should be primary");
 master = replTest.getMaster();
+
+printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
 var timeout = 20000;
 

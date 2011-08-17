@@ -86,7 +86,7 @@ namespace mongo {
             }
         }
 
-        bool run(const string&, BSONObj& cmdObj, string& errmsg,
+        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
             Timer t;
             DistributedLock lk(ConnectionString(cmdObj["host"].String(),
@@ -288,7 +288,7 @@ namespace mongo {
             return;
         }
 
-        bool run(const string&, BSONObj& cmdObj, string& errmsg,
+        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
 
             Timer t;
@@ -417,7 +417,7 @@ namespace mongo {
             return NONE;
         }
 
-        bool run(const string&, BSONObj& cmdObj, string& errmsg,
+        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
 
             long long skew = (long long) number_field(cmdObj, "skew", 0);

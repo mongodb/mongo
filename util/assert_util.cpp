@@ -66,11 +66,23 @@ namespace mongo {
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
-        problem() << "warning Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        static bool rateLimited;
+        static time_t lastWhen;
+        static unsigned lastLine;
+        if( lastLine == line && time(0)-lastWhen < 5 ) { 
+            if( rateLimited++ == 0 ) { 
+                log() << "rate limiting wassert" << endl;
+            }
+            return;
+        }
+        lastWhen = time(0);
+        lastLine = line;
+
+        problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
         abort();
@@ -86,7 +98,7 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after assert() failure in a debug/test build\n\n" << endl;
         abort();
@@ -103,7 +115,7 @@ namespace mongo {
         temp << msgid;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after verify() failure in a debug/test build\n\n" << endl;
         abort();

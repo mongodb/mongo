@@ -62,17 +62,17 @@ files.forEach(
      * clean (apitest_dbcollection)
      * logout and getnonce
      */
-	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|dropdb_race|unix_socket\d*)\.js$/.test(x.name)) {
+	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile\d*|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|dropdb_race|unix_socket\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These are bugs (some might be fixed now):
-	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4|profile1)\.js$/.test(x.name)) {
+	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4|profile\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact.*|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact.*|check_shard_index|bench_test.*|mr_replaceIntoDB)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}

@@ -126,10 +126,10 @@ add_option( "staticlibpath", "comma separated list of dirs to search for staticl
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
-
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
+add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
@@ -138,12 +138,13 @@ add_option( "usev8" , "use v8 for javascript" , 0 , True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
-add_option( "osnew", "use newer operating system API features" , 0 , False )
+add_option( "win2008plus", "use newer operating system API features" , 0 , False )
 
 # dev tools
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , False , "debugBuildAndLogging" )
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
+add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
@@ -233,6 +234,9 @@ if has_option( "safeshell" ):
 
 if has_option( "durableDefaultOn" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTON" ] )
+
+if has_option( "durableDefaultOff" ):
+    env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:
@@ -343,25 +347,27 @@ processInfoFiles = [ "util/processinfo.cpp" ]
 
 if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
     processInfoFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+elif os.sys.platform == "linux3":
+    processInfoFiles += [ "util/processinfo_linux2.cpp" ]
 else:
     processInfoFiles += [ "util/processinfo_none.cpp" ]
 
 coreServerFiles += processInfoFiles
 
-
-
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
-serverOnlyFiles = Split( "db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
+serverOnlyFiles = Split( "util/compress.cpp db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
 
-serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
+serverOnlyFiles += [ "db/index.cpp" , "db/scanandorder.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
 serverOnlyFiles += Glob( "db/commands/*.cpp" )
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+
+snappyFiles = ["third_party/snappy/snappy.cc", "third_party/snappy/snappy-sinksource.cc"]
 
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
@@ -474,7 +480,7 @@ if "darwin" == os.sys.platform:
         env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
         env.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
-elif "linux2" == os.sys.platform:
+elif "linux2" == os.sys.platform or "linux3" == os.sys.platform:
     linux = True
     platform = "linux"
 
@@ -519,7 +525,7 @@ elif "win32" == os.sys.platform:
     #if force64:
     #    release = True
 
-    if has_option( "osnew" ):
+    if has_option( "win2008plus" ):
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
@@ -689,6 +695,7 @@ if nix:
         if not has_option('clang'): 
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
+    env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
@@ -704,7 +711,7 @@ if nix:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
-        env.Append( CPPFLAGS=" -O3" )
+        env.Append( CPPFLAGS=" -O3 " )
         #env.Append( CPPFLAGS=" -fprofile-generate" )
         #env.Append( LINKFLAGS=" -fprofile-generate" )
         # then:
@@ -751,6 +758,10 @@ if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
     if hacks is not None:
         hacks.insert( env , { "linux64" : linux64 } )
+
+if has_option( "ssl" ):
+    env.Append( CPPDEFINES=["MONGO_SSL"] )
+    env.Append( LIBS=["ssl"] )
 
 try:
     umask = os.umask(022)
@@ -1106,6 +1117,12 @@ def checkErrorCodes():
         Exit(-1)
 
 checkErrorCodes()
+
+snappyEnv = env.Clone()
+if not windows:
+    snappyEnv.Append(CPPFLAGS=" -Wno-sign-compare -Wno-unused-function ") #snappy doesn't compile cleanly
+serverOnlyFiles += [snappyEnv.Object(f) for f in snappyFiles]
+
 
 # main db target
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]

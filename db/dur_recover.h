@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "dur_journalformat.h"
 #include "../util/concurrency/mutex.h"
 #include "../util/file.h"
 
@@ -15,10 +16,14 @@ namespace mongo {
          */
         class RecoveryJob : boost::noncopyable {
         public:
-            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
+            RecoveryJob() : _lastDataSyncedFromLastRun(0), 
+                _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
             void go(vector<path>& files);
             ~RecoveryJob();
-            void processSection(const void *, unsigned len);
+
+            /** @param data data between header and footer. compressed if recovering. */
+            void processSection(const JSectHeader *h, const void *data, unsigned len, const JSectFooter *f);
+
             void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }

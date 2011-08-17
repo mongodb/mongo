@@ -460,7 +460,7 @@ namespace mongo {
             help << "{ clone : \"host13\" }";
         }
         CmdClone() : Command("clone") { }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
@@ -486,7 +486,7 @@ namespace mongo {
                  "Warning: the local copy of 'ns' is emptied before the copying begins. Any existing data will be lost there."
                  ;
         }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing 'from' parameter";
@@ -538,7 +538,7 @@ namespace mongo {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
         }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
                 /* copy from self */
@@ -579,7 +579,7 @@ namespace mongo {
             help << "copy a database from another host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool slaveOk = cmdObj["slaveOk"].trueValue();
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
@@ -633,7 +633,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
             if ( source.empty() || target.empty() ) {
@@ -671,6 +671,8 @@ namespace mongo {
                 nsToDatabase( target.c_str(), to );
                 if ( strcmp( from, to ) == 0 ) {
                     renameNamespace( source.c_str(), target.c_str() );
+                    // make sure we drop counters etc
+                    Top::global.collectionDropped( source );
                     return true;
                 }
             }

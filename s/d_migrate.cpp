@@ -156,13 +156,28 @@ namespace mongo {
         string toString() const {
             return str::stream() << ns << " from " << min << " -> " << max;
         }
-
+        
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
-            writelock lk(ns);
-            RemoveSaver rs("moveChunk",ns,"post-cleanup");
-            long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
-            log() << "moveChunk deleted: " << num << migrateLog;
+            {
+                writelock lk(ns);
+                RemoveSaver rs("moveChunk",ns,"post-cleanup");
+                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                log() << "moveChunk deleted: " << numDeleted << migrateLog;
+            }
+            
+            ReplTime lastOpApplied = cc().getLastOp();
+            
+            Timer t;
+            for ( int i=0; i<3600; i++ ) {
+                if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
+                    LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
+                    return;
+                }
+                sleepsecs(1);
+            }
+            
+            warning() << "moveChunk repl sync timed out after " << t.seconds() << " seconds" << migrateLog;
         }
 
     };
@@ -646,7 +661,7 @@ namespace mongo {
     public:
         TransferModsCommand() : ChunkCommandHelper( "_transferMods" ) {}
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.transferMods( errmsg, result );
         }
     } transferModsCommand;
@@ -656,7 +671,7 @@ namespace mongo {
     public:
         InitialCloneCommand() : ChunkCommandHelper( "_migrateClone" ) {}
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.clone( errmsg, result );
         }
     } initialCloneCommand;
@@ -680,7 +695,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
 
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             // 1. parse options
             // 2. make sure my view is complete and lock
             // 3. start migrate
@@ -1064,7 +1079,7 @@ namespace mongo {
                 preCond.done();
 
                 BSONObj cmd = cmdBuilder.obj();
-                log(7) << "moveChunk update: " << cmd << migrateLog;
+                LOG(7) << "moveChunk update: " << cmd << migrateLog;
 
                 bool ok = false;
                 BSONObj cmdResult;
@@ -1177,7 +1192,7 @@ namespace mongo {
 
     class MigrateStatus {
     public:
-
+        
         MigrateStatus() : m_active("MigrateStatus") { active = false; }
 
         void prepare() {
@@ -1345,9 +1360,19 @@ namespace mongo {
                 timing.done(4);
             }
 
+            { 
+                // pause to wait for replication
+                // this will prevent us from going into critical section until we're ready
+                Timer t;
+                while ( t.minutes() < 600 ) {
+                    if ( flushPendingWrites( lastOpApplied ) )
+                        break;
+                    sleepsecs(1);
+                }
+            }
+
             {
                 // 5. wait for commit
-                Timer timeWaitingForCommit;
 
                 state = STEADY;
                 while ( state == STEADY || state == COMMIT_START ) {
@@ -1371,15 +1396,14 @@ namespace mongo {
                     if ( state == COMMIT_START ) {
                         if ( flushPendingWrites( lastOpApplied ) )
                             break;
-                        
-                        if ( timeWaitingForCommit.seconds() > 86400 ) {
-                            state = FAIL;
-                            errmsg = "timed out waiting for commit";
-                            return;
-                        }
                     }
                     
                     sleepmillis( 10 );
+                }
+
+                if ( state == FAIL ) {
+                    errmsg = "imted out waiting for commit";
+                    return;
                 }
 
                 timing.done(5);
@@ -1516,12 +1540,14 @@ namespace mongo {
                 return false;
             state = COMMIT_START;
             
-            // we wait 5 minutes for the commit to succeed before giving up
-            for ( int i=0; i<5*60*1000; i++ ) {
+            Timer t;
+            // we wait for the commit to succeed before giving up
+            while ( t.minutes() <= 5 ) {
                 sleepmillis(1);
                 if ( state == DONE )
                     return true;
             }
+            state = FAIL;
             log() << "startCommit never finished!" << migrateLog;
             return false;
         }
@@ -1571,7 +1597,7 @@ namespace mongo {
 
         virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             if ( migrateStatus.getActive() ) {
                 errmsg = "migrate already in progress";
@@ -1608,7 +1634,7 @@ namespace mongo {
     public:
         RecvChunkStatusCommand() : ChunkCommandHelper( "_recvChunkStatus" ) {}
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.status( result );
             return 1;
         }
@@ -1619,7 +1645,7 @@ namespace mongo {
     public:
         RecvChunkCommitCommand() : ChunkCommandHelper( "_recvChunkCommit" ) {}
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             bool ok = migrateStatus.startCommit();
             migrateStatus.status( result );
             return ok;
@@ -1631,7 +1657,7 @@ namespace mongo {
     public:
         RecvChunkAbortCommand() : ChunkCommandHelper( "_recvChunkAbort" ) {}
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.abort();
             migrateStatus.status( result );
             return true;
@@ -1653,7 +1679,7 @@ namespace mongo {
             assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
 
-            log(1) << "isInRangeTest passed" << migrateLog;
+            LOG(1) << "isInRangeTest passed" << migrateLog;
         }
     } isInRangeTest;
 }

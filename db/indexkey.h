@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    extern const int DefaultIndexVersionNumber;
+    
     class Cursor;
     class IndexSpec;
     class IndexType; // TODO: this name sucks
@@ -161,16 +163,21 @@ namespace mongo {
 
     protected:
 
+        int indexVersion() const;
+        
         IndexSuitability _suitability( const BSONObj& query , const BSONObj& order ) const ;
-
-        void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSet &keys ) const;
 
         BSONSizeTracker _sizeTracker;
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
+
         BSONObj _nullKey; // a full key with all fields null
         BSONObj _nullObj; // only used for _nullElt
         BSONElement _nullElt; // jstNull
+
+        BSONObj _undefinedObj; // only used for _undefinedElt
+        BSONElement _undefinedElt; // undefined
+
         int _nFields; // number of fields in the index
         bool _sparse; // if the index is sparse
         shared_ptr<IndexType> _indexType;
@@ -179,6 +186,8 @@ namespace mongo {
         void _init();
 
         friend class IndexType;
+        friend class KeyGeneratorV0;
+        friend class KeyGeneratorV1;
     public:
         bool _finishedInit;
     };

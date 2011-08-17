@@ -44,7 +44,7 @@ namespace mongo {
     }
 
     /** data check. like assert, but gives a reasonable error message to the user. */
-#define check(expr) _IF(!(expr)) { checkFailed(__LINE__); }
+#define check(expr) if(!(expr) ) { checkFailed(__LINE__); }
 
 #define VERIFYTHISLOC dassert( thisLoc.btree<V>() == this );
 

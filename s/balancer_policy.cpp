@@ -96,13 +96,13 @@ namespace mongo {
             return NULL;
         }
 
-        log(1) << "collection : " << ns << endl;
-        log(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
-        log(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
+        LOG(1) << "collection : " << ns << endl;
+        LOG(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
+        LOG(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
         if ( ! drainingShards.empty() ) {
             string drainingStr;
             joinStringDelim( drainingShards, &drainingStr, ',' );
-            log(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
+            LOG(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
         }
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can

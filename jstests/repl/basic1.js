@@ -160,6 +160,8 @@ assert.eq( 0 , as.system.profile.count() , "P2" )
 assert.eq( 1 , as.foo.findOne().x , "P3" );
 assert.eq( 0 , as.system.profile.count() , "P4" )
 
+assert( as.getCollectionNames().indexOf( "system.profile" ) < 0 , "P4.5" )
+
 as.setProfilingLevel(2)
 as.foo.findOne();
 assert.eq( 1 , as.system.profile.count() , "P5" )

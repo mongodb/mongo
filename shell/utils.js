@@ -84,6 +84,26 @@ assert.neq = function( a , b , msg ){
     doassert( "[" + a + "] != [" + b + "] are equal : " + msg );
 }
 
+assert.contains = function( o, arr, msg ){
+    var wasIn = false
+    
+    if( ! arr.length ){
+        for( i in arr ){
+            wasIn = arr[i] == o || ( ( arr[i] != null && o != null ) && friendlyEqual( arr[i] , o ) )
+                return;
+            if( wasIn ) break
+        }
+    }
+    else {
+        for( var i = 0; i < arr.length; i++ ){
+            wasIn = arr[i] == o || ( ( arr[i] != null && o != null ) && friendlyEqual( arr[i] , o ) )
+            if( wasIn ) break
+        }
+    }
+    
+    if( ! wasIn ) doassert( tojson( o ) + " was not in " + tojson( arr ) + " : " + msg )
+}
+
 assert.repeat = function( f, msg, timeout, interval ) {
     if ( assert._debug && msg ) print( "in assert for: " + msg );
 
@@ -211,6 +231,18 @@ assert.gte = function( a , b , msg ){
     doassert( a + " is not greater than or eq " + b + " : " + msg );
 }
 
+assert.between = function( a, b, c, msg, inclusive ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    if( ( inclusive == undefined || inclusive == true ) &&
+        a <= b && b <= c ) return;
+    else if( a < b && b < c ) return;
+    
+    doassert( b + " is not between " + a + " and " + c + " : " + msg );
+}
+
+assert.betweenIn = function( a, b, c, msg ){ assert.between( a, b, c, msg, true ) }
+assert.betweenEx = function( a, b, c, msg ){ assert.between( a, b, c, msg, false ) }
 
 assert.close = function( a , b , msg , places ){
     if (places === undefined) {
@@ -236,6 +268,11 @@ Object.extend = function( dst , src , deep ){
         dst[k] = v;
     }
     return dst;
+}
+
+Object.merge = function( dst, src, deep ){
+    var clone = Object.extend( {}, dst, deep )
+    return Object.extend( clone, src, deep )
 }
 
 argumentsToArray = function( a ){
@@ -938,6 +975,35 @@ printjsononeline = function(x){
     print( tojsononeline( x ) );
 }
 
+if ( typeof TestData == "undefined" ){
+    TestData = undefined
+}
+
+jsTestName = function(){
+    if( TestData ) return TestData.testName
+    return "__unknown_name__"
+}
+
+jsTestFile = function(){
+    if( TestData ) return TestData.testFile
+    return "__unknown_file__"
+}
+
+jsTestPath = function(){
+    if( TestData ) return TestData.testPath
+    return "__unknown_path__"
+}
+
+jsTestOptions = function(){
+    if( TestData ) return { noJournal : TestData.noJournal,
+                            noJournalPrealloc : TestData.noJournalPrealloc }
+    return {}
+}
+
+testLog = function(x){
+    print( jsTestFile() + " - " + x )
+}
+
 shellPrintHelper = function (x) {
 
     if (typeof (x) == "undefined") {
@@ -1475,6 +1541,41 @@ rs.remove = function (hn) {
 
     return "error: couldn't find "+hn+" in "+tojson(c.members);
 };
+
+rs.debug = {};
+
+rs.debug.nullLastOpWritten = function(primary, secondary) {
+    var p = connect(primary+"/local");
+    var s = connect(secondary+"/local");
+    s.getMongo().setSlaveOk();
+
+    var secondToLast = s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
+    var last = p.runCommand({findAndModify : "oplog.rs",
+                             query : {ts : {$gt : secondToLast.ts}},
+                             sort : {$natural : 1},
+                             update : {$set : {op : "n"}}});
+
+    if (!last.value.o || !last.value.o._id) {
+        print("couldn't find an _id?");
+    }
+    else {
+        last.value.o = {_id : last.value.o._id};
+    }
+
+    print("nulling out this op:");
+    printjson(last);
+};
+
+rs.debug.getLastOpWritten = function(server) {
+    var s = db.getSisterDB("local");
+    if (server) {
+        s = connect(server+"/local");
+    }
+    s.getMongo().setSlaveOk();
+
+    return s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
+};
+
 
 help = shellHelper.help = function (x) {
     if (x == "mr") {

@@ -45,7 +45,7 @@ BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
-    BSONElement nullElement;
+    BSONElement eooElement;
 
     GENOIDLabeler GENOID;
 
@@ -508,6 +508,12 @@ namespace mongo {
     }
 
     BSONObj staticNull = fromjson( "{'':null}" );
+    BSONObj makeUndefined() {
+        BSONObjBuilder b;
+        b.appendUndefined( "" );
+        return b.obj();
+    }
+    BSONObj staticUndefined = makeUndefined();
 
     /* well ordered compare */
     int BSONObj::woSortOrder(const BSONObj& other, const BSONObj& sortKey , bool useDotted ) const {
@@ -613,13 +619,13 @@ namespace mongo {
         }
 
         if ( sub.eoo() )
-            return nullElement;
-        else if ( sub.type() == Array || name[0] == '\0')
+            return eooElement;
+        else if ( sub.type() == Array || name[0] == '\0' )
             return sub;
         else if ( sub.type() == Object )
             return sub.embeddedObject().getFieldDottedOrArray( name );
         else
-            return nullElement;
+            return eooElement;
     }
 
     /**
@@ -919,7 +925,7 @@ namespace mongo {
             c.appendRegex("x", "goo");
             BSONObj p = c.done();
 
-            assert( !o.shallowEqual( p ) );
+            assert( !o.binaryEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
         }
@@ -1024,7 +1030,7 @@ namespace mongo {
             BSONObj a = A.done();
             BSONObj b = B.done();
             BSONObj c = C.done();
-            assert( !a.shallowEqual( b ) ); // comments on operator==
+            assert( !a.binaryEqual( b ) ); // comments on operator==
             int cmp = a.woCompare(b);
             assert( cmp == 0 );
             cmp = a.woCompare(c);
@@ -1167,13 +1173,9 @@ namespace mongo {
 
         while (l.more() && r.more()){
             if (strcmp(l.next().fieldName(), r.next().fieldName())) {
-                PRINTFL;
                 return false;
             }
         }
-        PRINT(l.more());
-        PRINT(r.more());
-        PRINT(l.more() || r.more());
 
         return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }

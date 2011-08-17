@@ -10,6 +10,4 @@ assert.eq( 2, t.count( {'a.0':5} ) );
 
 // Test with index.
 t.ensureIndex( {'a.0':1} );
-if ( 0 ) { // SERVER-2902
 assert.eq( 2, t.count( {'a.0':5} ) );
-}

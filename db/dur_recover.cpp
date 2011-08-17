@@ -27,6 +27,7 @@
 #include "namespace.h"
 #include "../util/mongoutils/str.h"
 #include "../util/bufreader.h"
+#include "../util/concurrency/race.h"
 #include "pdfile.h"
 #include "database.h"
 #include "db.h"
@@ -35,6 +36,7 @@
 #include "cmdline.h"
 #include "curop.h"
 #include "mongommf.h"
+#include "../util/compress.h"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -92,59 +94,73 @@ namespace mongo {
             throws
         */
         class JournalSectionIterator : boost::noncopyable {
+            auto_ptr<BufReader> _entries;
+            const JSectHeader _h;
+            const char *_lastDbName; // pointer into mmaped journal file
+            const bool _doDurOps;
+            string _uncompressed;
         public:
-            JournalSectionIterator(const void *p, unsigned len, bool doDurOps)
-                : _br(p, len)
-                , _sectHead(static_cast<const JSectHeader*>(_br.skip(sizeof(JSectHeader))))
-                , _lastDbName(NULL)
-                , _doDurOps(doDurOps)
-            {}
+            JournalSectionIterator(const JSectHeader& h, const void *compressed, unsigned compressedLen, bool doDurOpsRecovering) :
+                _h(h),
+                _lastDbName(0)
+                , _doDurOps(doDurOpsRecovering)
+            {
+                assert( doDurOpsRecovering );
+                bool ok = uncompress((const char *)compressed, compressedLen, &_uncompressed);
+                if( !ok ) { 
+                    // it should always be ok (i think?) as there is a previous check to see that the JSectFooter is ok
+                    log() << "couldn't uncompress journal section" << endl;
+                    msgasserted(15874, "couldn't uncompress journal section");
+                }
+                const char *p = _uncompressed.c_str();
+                assert( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
+                _entries = auto_ptr<BufReader>( new BufReader(p, _uncompressed.size()) );
+            }
 
-            bool atEof() const { return _br.atEof(); }
+            // we work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
+            JournalSectionIterator(const JSectHeader &h, const void *p, unsigned len) :
+                _entries( new BufReader((const char *) p, len) ),
+                _h(h),
+                _lastDbName(0)
+                , _doDurOps(false)
 
-            unsigned long long seqNumber() const { return _sectHead->seqNumber; }
+                { }
+
+            bool atEof() const { return _entries->atEof(); }
+
+            unsigned long long seqNumber() const { return _h.seqNumber; }
 
             /** get the next entry from the log.  this function parses and combines JDbContext and JEntry's.
-             *  @return true if got an entry.  false at successful end of section (and no entry returned).
              *  throws on premature end of section.
              */
-            bool next(ParsedJournalEntry& e) {
+            void next(ParsedJournalEntry& e) {
                 unsigned lenOrOpCode;
-                _br.read(lenOrOpCode);
+                _entries->read(lenOrOpCode);
 
                 if (lenOrOpCode > JEntry::OpCode_Min) {
                     switch( lenOrOpCode ) {
 
                     case JEntry::OpCode_Footer: {
-                        if (_doDurOps) {
-                            const char* pos = (const char*) _br.pos();
-                            pos -= sizeof(lenOrOpCode); // rewind to include OpCode
-                            const JSectFooter& footer = *(const JSectFooter*)pos;
-                            int len = pos - (char*)_sectHead;
-                            if (!footer.checkHash(_sectHead, len)) {
-                                massert(13594, "journal checksum doesn't match", false);
-                            }
-                        }
-                        return false; // false return value denotes end of section
+                        assert( false );
                     }
 
                     case JEntry::OpCode_FileCreated:
                     case JEntry::OpCode_DropDb: {
                         e.dbName = 0;
-                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, _br);
+                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, *_entries);
                         if (_doDurOps) {
                             e.op = op;
                         }
-                        return true;
+                        return;
                     }
 
                     case JEntry::OpCode_DbContext: {
-                        _lastDbName = (const char*) _br.pos();
-                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _br.remaining());
+                        _lastDbName = (const char*) _entries->pos();
+                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _entries->remaining());
                         const unsigned len = strnlen(_lastDbName, limit);
                         massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
-                        _br.skip(len+1); // skip '\0' too
-                        _br.read(lenOrOpCode);
+                        _entries->skip(len+1); // skip '\0' too
+                        _entries->read(lenOrOpCode); // read this for the fall through
                     }
                     // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
 
@@ -156,18 +172,13 @@ namespace mongo {
 
                 // JEntry - a basic write
                 assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
-                _br.rewind(4);
-                e.e = (JEntry *) _br.skip(sizeof(JEntry));
+                _entries->rewind(4);
+                e.e = (JEntry *) _entries->skip(sizeof(JEntry));
                 e.dbName = e.e->isLocalDbContext() ? "local" : _lastDbName;
                 assert( e.e->len == lenOrOpCode );
-                _br.skip(e.e->len);
-                return true;
+                _entries->skip(e.e->len);
             }
-        private:
-            BufReader _br;
-            const JSectHeader* _sectHead;
-            const char *_lastDbName; // pointer into mmaped journal file
-            const bool _doDurOps;
+
         };
 
         static string fileName(const char* dbName, int fileNo) {
@@ -289,25 +300,62 @@ namespace mongo {
                 log() << "END section" << endl;
         }
 
-        void RecoveryJob::processSection(const void *p, unsigned len) {
+        void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
             scoped_lock lk(_mx);
+            RACECHECK
 
-            vector<ParsedJournalEntry> entries;
-            JournalSectionIterator i(p, len, _recovering);
-
-            //DEV log() << "recovery processSection seq:" << i.seqNumber() << endl;
-            if( _recovering && _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
-                if( i.seqNumber() != _lastSeqMentionedInConsoleLog ) {
-                    log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
-                    _lastSeqMentionedInConsoleLog = i.seqNumber();
+            /** todo: we should really verify the checksum to see that seqNumber is ok?
+                      that is expensive maybe there is some sort of checksum of just the header 
+                      within the header itself
+            */
+            if( _recovering && _lastDataSyncedFromLastRun > h->seqNumber + ExtraKeepTimeMs ) {
+                if( h->seqNumber != _lastSeqMentionedInConsoleLog ) {
+                    static int n;
+                    if( ++n < 10 ) {
+                        log() << "recover skipping application of section seq:" << h->seqNumber << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                    }
+                    else if( n == 10 ) { 
+                        log() << "recover skipping application of section more..." << endl;
+                    }
+                    _lastSeqMentionedInConsoleLog = h->seqNumber;
                 }
                 return;
             }
 
+            auto_ptr<JournalSectionIterator> i;
+            if( _recovering ) {
+                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, p, len, _recovering));
+            }
+            else { 
+                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, /*after header*/p, /*w/out header*/len));
+            }
+
+            // we use a static so that we don't have to reallocate every time through.  occasionally we 
+            // go back to a small allocation so that if there were a spiky growth it won't stick forever.
+            static vector<ParsedJournalEntry> entries;
+            entries.clear();
+/** TEMP uncomment
+            RARELY OCCASIONALLY {
+                if( entries.capacity() > 2048 ) {
+                    entries.shrink_to_fit();
+                    entries.reserve(2048);
+                }
+            }
+*/
+
             // first read all entries to make sure this section is valid
             ParsedJournalEntry e;
-            while( i.next(e) ) {
+            while( !i->atEof() ) {
+                i->next(e);
                 entries.push_back(e);
+            }
+
+            // after the entries check the footer checksum
+            if( _recovering ) {
+                assert( ((const char *)h) + sizeof(JSectHeader) == p );
+                if( !f->checkHash(h, len + sizeof(JSectHeader)) ) { 
+                    msgasserted(13594, "journal checksum doesn't match");
+                }
             }
 
             // got all the entries for one group commit.  apply them:
@@ -345,11 +393,16 @@ namespace mongo {
                     if( h.fileId != fileId ) {
                         if( debug || (cmdLine.durOptions & CmdLine::DurDumpJournal) ) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
-                            log() << "  sect len:" << h.len << " seqnum:" << h.seqNumber << endl;
+                            log() << "  sect len:" << h.sectionLen() << " seqnum:" << h.seqNumber << endl;
                         }
                         return true;
                     }
-                    processSection(br.skip(h.len), h.len);
+                    unsigned slen = h.sectionLen();
+                    unsigned dataLen = slen - sizeof(JSectHeader) - sizeof(JSectFooter);
+                    const char *hdr = (const char *) br.skip(h.sectionLenWithPadding());
+                    const char *data = hdr + sizeof(JSectHeader);
+                    const char *footer = data + dataLen;
+                    processSection((const JSectHeader*) hdr, data, dataLen, (const JSectFooter*) footer);
 
                     // ctrl c check
                     killCurrentOp.checkForInterrupt(false);
@@ -367,6 +420,17 @@ namespace mongo {
         /** apply a specific journal file */
         bool RecoveryJob::processFile(path journalfile) {
             log() << "recover " << journalfile.string() << endl;
+
+            try { 
+                if( boost::filesystem::file_size( journalfile.string() ) == 0 ) {
+                    log() << "recover info " << journalfile.string() << " has zero length" << endl;
+                    return true;
+                }
+            } catch(...) { 
+                // if something weird like a permissions problem keep going so the massert down below can happen (presumably)
+                log() << "recover exception checking filesize" << endl;
+            }
+
             MemoryMappedFile f;
             void *p = f.mapWithOptions(journalfile.string().c_str(), MongoFile::READONLY | MongoFile::SEQUENTIAL);
             massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
@@ -382,13 +446,19 @@ namespace mongo {
             _lastDataSyncedFromLastRun = journalReadLSN();
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
+            // todo: we could truncate the journal file at rotation time to the right length, then this abruptEnd 
+            // check can be turned back on.  this is relevant when prealloc is being used.
             for( unsigned i = 0; i != files.size(); ++i ) {
-	      /*bool abruptEnd = */processFile(files[i]);
-                /*if( abruptEnd && i+1 < files.size() ) {
+	      bool abruptEnd = processFile(files[i]);
+                if( abruptEnd && i+1 < files.size() ) {
+#if 1 // Leaving this as a warning for now. TODO: make this an error post 2.0
+                    log() << "recover warning: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
+#else
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();
                     uasserted(13535, "recover abrupt journal file end");
-                }*/
+#endif
+                }
             }
 
             close();

@@ -259,8 +259,16 @@
     <ClInclude Include="..\db\resource.h" />
     <ClInclude Include="..\db\scanandorder.h" />
     <ClInclude Include="..\db\security.h" />
+    <ClInclude Include="..\third_party\snappy\config.h" />
+    <ClInclude Include="..\third_party\snappy\snappy-c.h" />
+    <ClInclude Include="..\third_party\snappy\snappy-internal.h" />
+    <ClInclude Include="..\third_party\snappy\snappy-sinksource.h" />
+    <ClInclude Include="..\third_party\snappy\snappy-stubs-internal.h" />
+    <ClInclude Include="..\third_party\snappy\snappy-stubs-public.h" />
+    <ClInclude Include="..\third_party\snappy\snappy.h" />
     <ClInclude Include="..\util\builder.h" />
     <ClInclude Include="..\util\checksum.h" />
+    <ClInclude Include="..\util\compress.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
@@ -325,6 +333,7 @@
     <ClCompile Include="..\db\repl\rs_rollback.cpp" />
     <ClCompile Include="..\db\repl\rs_sync.cpp" />
     <ClCompile Include="..\db\restapi.cpp" />
+    <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -609,8 +618,26 @@
     <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
     <ClCompile Include="..\s\shardkey.cpp" />
+    <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\third_party\snappy\snappy.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\util\compress.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

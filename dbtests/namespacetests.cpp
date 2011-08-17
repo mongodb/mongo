@@ -44,12 +44,13 @@ namespace NamespaceTests {
                 ASSERT( theDataFileMgr.findAll( ns() )->eof() );
             }
         protected:
-            void create() {
+            void create( bool sparse = false ) {
                 NamespaceDetailsTransient::get_w( ns() ).deletedIndex();
                 BSONObjBuilder builder;
                 builder.append( "ns", ns() );
                 builder.append( "name", "testIndex" );
                 builder.append( "key", key() );
+                builder.append( "sparse", sparse );
                 BSONObj bobj = builder.done();
                 id_.info = theDataFileMgr.insert( ns(), bobj.objdata(), bobj.objsize() );
                 // head not needed for current tests
@@ -339,12 +340,13 @@ namespace NamespaceTests {
                     elts.push_back( simpleBC( i ) );
                 BSONObjBuilder b;
                 b.append( "a", elts );
-
+                BSONObj obj = b.obj();
+                
                 BSONObjSet keys;
-                id().getKeysFromObject( b.done(), keys );
+                id().getKeysFromObject( obj, keys );
                 checkSize( 4, keys );
                 BSONObjSet::iterator i = keys.begin();
-                assertEquals( nullObj(), *i++ );
+                assertEquals( nullObj(), *i++ ); // see SERVER-3377
                 for ( int j = 1; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
@@ -532,7 +534,47 @@ namespace NamespaceTests {
 
                 id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
                 checkSize(1, keys );
+                ASSERT_EQUALS( Undefined, keys.begin()->firstElement().type() );
                 keys.clear();
+            }
+        };
+ 
+        class DoubleArray : Base {
+        public:
+            void run() {
+             	create();   
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
+                checkSize(2, keys );
+                BSONObjSet::const_iterator i = keys.begin();
+                ASSERT_EQUALS( BSON( "" << 1 << "" << 1 ), *i );
+                ++i;
+                ASSERT_EQUALS( BSON( "" << 2 << "" << 2 ), *i );
+                keys.clear();
+            }
+            
+        protected:
+            BSONObj key() const {
+                return BSON( "a" << 1 << "a" << 1 );
+            }
+        };
+        
+        class DoubleEmptyArray : Base {
+        public:
+            void run() {
+             	create();   
+
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize(1, keys );
+                ASSERT_EQUALS( fromjson( "{'':undefined,'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+            
+        protected:
+            BSONObj key() const {
+                return BSON( "a" << 1 << "a" << 1 );
             }
         };
 
@@ -558,7 +600,9 @@ namespace NamespaceTests {
                 id().getKeysFromObject( fromjson( "{a:1,b:[]}" ), keys );
                 checkSize(1, keys );
                 //cout << "YO : " << *(keys.begin()) << endl;
-                ASSERT_EQUALS( NumberInt , keys.begin()->firstElement().type() );
+                BSONObjIterator i( *keys.begin() );
+                ASSERT_EQUALS( NumberInt , i.next().type() );
+                ASSERT_EQUALS( Undefined , i.next().type() );
                 keys.clear();
             }
 
@@ -567,8 +611,313 @@ namespace NamespaceTests {
                 return aAndB();
             }
         };
+        
+        class NestedEmptyArray : Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 ); }
+        };
+        
+		class MultiNestedEmptyArray : Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null,'':null}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 << "a.c" << 1 ); }
+        };
+        
+        class UnevenNestedEmptyArray : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':undefined,'':null}" ), *keys.begin() );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[{b:1}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':{b:1},'':1}" ), *keys.begin() );
+                keys.clear();
 
+                id().getKeysFromObject( fromjson( "{a:[{b:[]}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':{b:[]},'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a" << 1 << "a.b" << 1 ); }            
+        };
 
+        class ReverseUnevenNestedEmptyArray : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null,'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 << "a" << 1 ); }            
+        };
+        
+        class SparseReverseUnevenNestedEmptyArray : public Base {
+        public:
+            void run() {
+             	create( true );
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null,'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 << "a" << 1 ); }            
+        };
+        
+        class SparseEmptyArray : public Base {
+        public:
+            void run() {
+             	create( true );
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:1}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[{c:1}]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 ); }            
+        };
+
+        class SparseEmptyArraySecond : public Base {
+        public:
+            void run() {
+             	create( true );
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:1}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[{c:1}]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "z" << 1 << "a.b" << 1 ); }
+        };
+        
+        class NonObjectMissingNestedField : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *keys.begin() );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[1]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[1,{b:1}]}" ), keys );
+                checkSize( 2, keys );
+                BSONObjSet::const_iterator c = keys.begin();
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *c );
+                ++c;
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *c );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 ); }
+        };
+
+        class SparseNonObjectMissingNestedField : public Base {
+        public:
+            void run() {
+             	create( true );
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[1]}" ), keys );
+                checkSize( 0, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[1,{b:1}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.b" << 1 ); }
+        };
+        
+        class IndexedArrayIndex : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[1]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( BSON( "" << 1 ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[1]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':[1]}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':undefined}" ), *keys.begin() );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:{'0':1}}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( BSON( "" << 1 ), *keys.begin() );
+                keys.clear();
+
+                ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[{'0':1}]}" ), keys ), UserException );
+
+                ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[1,{'0':2}]}" ), keys ), UserException );
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.0" << 1 ); }
+        };
+
+        class DoubleIndexedArrayIndex : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[[1]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':null}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[[]]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.0.0" << 1 ); }
+        };
+        
+        class ObjectWithinArray : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[{b:1}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[{b:[1]}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[{b:[[1]]}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':[1]}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[{b:1}]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[{b:[1]}]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[[{b:[[1]]}]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':[1]}" ), *keys.begin() );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[[{b:[]}]]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':undefined}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.0.b" << 1 ); }
+        };
+
+        class ArrayWithinObjectWithinArray : public Base {
+        public:
+            void run() {
+             	create();
+                
+                BSONObjSet keys;
+                id().getKeysFromObject( fromjson( "{a:[{b:[1]}]}" ), keys );
+                checkSize( 1, keys );
+                ASSERT_EQUALS( fromjson( "{'':1}" ), *keys.begin() );
+                keys.clear();
+            }
+        protected:
+            BSONObj key() const { return BSON( "a.0.b.0" << 1 ); }
+        };
+        
+        // also test numeric string field names
+        
     } // namespace IndexDetailsTests
 
     namespace NamespaceDetailsTests {
@@ -862,7 +1211,22 @@ namespace NamespaceTests {
             add< IndexDetailsTests::AlternateMissing >();
             add< IndexDetailsTests::MultiComplex >();
             add< IndexDetailsTests::EmptyArray >();
+            add< IndexDetailsTests::DoubleArray >();
+            add< IndexDetailsTests::DoubleEmptyArray >();
             add< IndexDetailsTests::MultiEmptyArray >();
+            add< IndexDetailsTests::NestedEmptyArray >();
+            add< IndexDetailsTests::MultiNestedEmptyArray >();
+            add< IndexDetailsTests::UnevenNestedEmptyArray >();
+            add< IndexDetailsTests::ReverseUnevenNestedEmptyArray >();
+            add< IndexDetailsTests::SparseReverseUnevenNestedEmptyArray >();
+            add< IndexDetailsTests::SparseEmptyArray >();
+            add< IndexDetailsTests::SparseEmptyArraySecond >();
+            add< IndexDetailsTests::NonObjectMissingNestedField >();
+            add< IndexDetailsTests::SparseNonObjectMissingNestedField >();
+            add< IndexDetailsTests::IndexedArrayIndex >();
+            add< IndexDetailsTests::DoubleIndexedArrayIndex >();
+            add< IndexDetailsTests::ObjectWithinArray >();
+            add< IndexDetailsTests::ArrayWithinObjectWithinArray >();
             add< IndexDetailsTests::MissingField >();
             add< IndexDetailsTests::SubobjectMissing >();
             add< IndexDetailsTests::CompoundMissing >();

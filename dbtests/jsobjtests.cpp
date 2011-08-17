@@ -569,6 +569,13 @@ namespace JsobjTests {
                 }
 
                 {
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 33, (BinDataType) 1, "123456789012345678901234567890123");
+                    BSONObj o = b.obj();
+                    keyTest( o, false );
+                }
+
+                {
                     for( int i = 1; i <= 3; i++ ) {
                         for( int j = 1; j <= 3; j++ ) {
                             BSONObjBuilder b;

@@ -120,14 +120,16 @@ namespace mongo {
 
             /**
              * after this call, we assume the page is in ram
+             * @param doHalf if this is a known good access, want to put in first half
              * @return whether we know the page is in ram
              */
-            bool access( size_t region , short offset ) {
+            bool access( size_t region , short offset , bool doHalf ) {
                 int regionHash = hash(region);
                 
                 scoped_spinlock lk( _lock );
-
-                RARELY {
+                
+                static int rarely_count = 0;
+                if ( rarely_count++ % 2048 == 0 ) {
                     long long now = Listener::getElapsedTimeMillis();
                     RARELY if ( now == 0 ) {
                         tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
@@ -137,8 +139,8 @@ namespace mongo {
                         _rotate();
                     }
                 }
-
-                for ( int i=0; i<NumSlices; i++ ) {
+                
+                for ( int i=0; i<NumSlices / ( doHalf ? 2 : 1 ); i++ ) {
                     int pos = (_curSlice+i)%NumSlices;
                     State s = _slices[pos].get( regionHash , region , offset );
 
@@ -205,7 +207,7 @@ namespace mongo {
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
-        if ( ps::rolling.access( region , offset ) )
+        if ( ps::rolling.access( region , offset , false ) )
             return true;
 
         if ( ! blockSupported )
@@ -214,14 +216,11 @@ namespace mongo {
     }
 
     Record* Record::accessed() {
-        if ( ! MemoryTrackingEnabled ) 
-            return this;
-
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
-
-        ps::rolling.access( region , offset );
+        
+        ps::rolling.access( region , offset , true );
         return this;
     }
     

@@ -80,7 +80,8 @@ namespace mongo {
         DiagStr lastHeartbeatMsg;
         OpTime opTime;
         int skew;
-        unsigned int ping; // microseconds
+        unsigned int ping; // milliseconds
+        static unsigned int numPings;
 
         bool up() const { return health > 0; }
 

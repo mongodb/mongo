@@ -81,6 +81,10 @@ function doQueryOn(p) {
 
 doQueryOn(slave);
 master.adminCommand({logout:1});
+
+print("unauthorized:");
+printjson(master.adminCommand({replSetGetStatus : 1}));
+
 doQueryOn(master);
 
 

@@ -55,7 +55,8 @@ namespace mongo {
            */
 
         for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
-            if(obj.getFieldDotted(it->c_str()).eoo())
+            BSONElement e = obj.getFieldDotted(it->c_str());
+            if(e.eoo() || e.type() == Array)
                 return false;
         }
         return true;
@@ -83,7 +84,7 @@ namespace mongo {
         vector<const char*> keysToMove;
         keysToMove.push_back("_id");
         BSONForEach(e, pattern) {
-            if (strchr(e.fieldName(), '.') == NULL)
+            if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
                 keysToMove.push_back(e.fieldName());
         }
 
@@ -185,8 +186,8 @@ namespace mongo {
             ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
 
             BSONObj x = fromjson("{a:1,'sub.b':2,'sub.c':3}");
-            assert( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).shallowEqual(x) );
-            assert( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).shallowEqual(x) );
+            assert( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
+            assert( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
         void moveToFrontTest() {
             ShardKeyPattern sk (BSON("a" << 1 << "b" << 1));
@@ -194,13 +195,13 @@ namespace mongo {
             BSONObj ret;
 
             ret = sk.moveToFront(BSON("z" << 1 << "_id" << 1 << "y" << 1 << "a" << 1 << "x" << 1 << "b" << 1 << "w" << 1));
-            assert(ret.shallowEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
+            assert(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
 
             ret = sk.moveToFront(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1));
-            assert(ret.shallowEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
+            assert(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
 
             ret = sk.moveToFront(BSON("z" << 1 << "y" << 1 << "a" << 1 << "b" << 1 << "Z" << 1 << "Y" << 1));
-            assert(ret.shallowEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
+            assert(ret.binaryEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
 
         }
 
@@ -263,7 +264,7 @@ namespace mongo {
                 moveToFrontBenchmark(100);
             }
 
-            log(1) << "shardKeyTest passed" << endl;
+            LOG(1) << "shardKeyTest passed" << endl;
         }
     } shardKeyTest;
 

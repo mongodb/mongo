@@ -298,6 +298,9 @@ namespace mongo {
         }
     public:
         static Logstream& get() {
+            if ( StaticObserver::_destroyingStatics ) {
+                cout << "Logstream::get called in uninitialized state" << endl;
+            }
             Logstream *p = tsp.get();
             if( p == 0 )
                 tsp.reset( p = new Logstream() );
@@ -342,7 +345,7 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
-#define MONGO_LOG(level) MONGO_IF ( logLevel >= (level) ) log( level )
+#define MONGO_LOG(level) if ( MONGO_unlikely(logLevel >= (level)) ) log( level )
 #define LOG MONGO_LOG
 
     inline Nullstream& log( LogLevel l ) {
@@ -516,5 +519,7 @@ namespace mongo {
             Logstream::get().indentDec();
         }
     };
+
+    extern Tee* const warnings; // Things put here go in serverStatus
 
 } // namespace mongo

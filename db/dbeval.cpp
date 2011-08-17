@@ -121,7 +121,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         CmdEval() : Command("eval", false, "$eval") { }
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );

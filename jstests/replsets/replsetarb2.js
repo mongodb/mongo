@@ -8,11 +8,11 @@ doTest = function( signal ) {
     print(tojson(nodes));
 
     var conns = replTest.startSet();
-    var r = replTest.initiate({"_id" : "unicomplex", 
+    var r = replTest.initiate({"_id" : "unicomplex",
                 "members" : [
-                             {"_id" : 0, "host" : nodes[0] },
-                             {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 1},
-                             {"_id" : 2, "host" : nodes[2] }]});
+                    {"_id" : 0, "host" : nodes[0] },
+                    {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 1, "priority" : 0},
+                    {"_id" : 2, "host" : nodes[2] }]});
 
     // Make sure we have a master
     var master = replTest.getMaster();
@@ -23,6 +23,10 @@ doTest = function( signal ) {
         printjson(res);
         return res.myState == 7;
     }, "Aribiter failed to initialize.");
+
+    var result = conns[1].getDB("admin").runCommand({isMaster : 1});
+    assert(result.arbiterOnly);
+    assert(!result.passive);
 
     // Wait for initial replication
     master.getDB("foo").foo.insert({a: "foo"});

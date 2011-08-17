@@ -879,8 +879,6 @@ namespace mongo {
             }
         }
 
-//        boost::thread_specific_ptr<State*> _tl;
-
         /**
          * emit that will be called by js function
          */
@@ -932,7 +930,7 @@ namespace mongo {
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
             virtual LockType locktype() const { return NONE; }
-            bool run(const string& dbname , BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client::GodScope cg;
                 Client& client = cc();
@@ -968,12 +966,6 @@ namespace mongo {
                     state.init();
                     state.prepTempCollection();
 
-                    {
-                        State** s = new State*();
-                        s[0] = &state;
-//                        _tl.reset( s );
-                    }
-
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
                     ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
                     long long mapTime = 0;
@@ -988,7 +980,9 @@ namespace mongo {
 
                         // obtain cursor on data to apply mr to, sorted
                         shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
+                        uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
+                        uassert( 15877, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
 
                         Timer mt;
                         // go through each doc
@@ -1065,11 +1059,19 @@ namespace mongo {
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
-
-//                    _tl.reset();
+                }
+                // TODO:  The error handling code for queries is v. fragile,
+                // *requires* rethrow AssertionExceptions - should probably fix.
+                catch ( AssertionException& e ){
+                    log() << "mr failed, removing collection" << causedBy(e) << endl;
+                    throw e;
+                }
+                catch ( std::exception& e ){
+                    log() << "mr failed, removing collection" << causedBy(e) << endl;
+                    throw e;
                 }
                 catch ( ... ) {
-                    log() << "mr failed, removing collection" << endl;
+                    log() << "mr failed for unknown reason, removing collection" << endl;
                     throw;
                 }
 
@@ -1116,7 +1118,7 @@ namespace mongo {
             virtual bool slaveOverrideOk() { return true; }
 
             virtual LockType locktype() const { return NONE; }
-            bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
                 bool postProcessOnly = !(postProcessCollection.empty());

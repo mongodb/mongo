@@ -26,6 +26,7 @@
 #include "../util/ramlog.h"
 #include "../util/signal_handlers.h"
 #include "../util/admin_access.h"
+#include "../util/concurrency/task.h"
 #include "../db/dbwebserver.h"
 #include "../scripting/engine.h"
 
@@ -94,7 +95,7 @@ namespace mongo {
                 r.process();
             }
             catch ( AssertionException & e ) {
-                log( e.isUserAssertion() ? 1 : 0 ) << "AssertionException in process: " << e.what() << endl;
+                log( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
 
                 le->raiseError( e.getCode() , e.what() );
 
@@ -158,9 +159,6 @@ namespace mongo {
         cursorCache.startTimeoutThread();
         PeriodicTask::theRunner->go();
 
-        log() << "waiting for connections on port " << cmdLine.port << endl;
-        //DbGridListener l(port);
-        //l.listen();
         ShardedMessageHandler handler;
         MessageServer * server = createServer( opts , &handler );
         server->setAsTimeTracker();
@@ -319,6 +317,16 @@ int _main(int argc, char* argv[]) {
     if ( ! configServer.ok( true ) ) {
         cout << "configServer startup check failed" << endl;
         return 8;
+    }
+
+    {
+        class CheckConfigServers : public task::Task {
+            virtual string name() const { return "CheckConfigServers"; }
+            virtual void doWork() { configServer.ok(true); }
+        };
+        static CheckConfigServers checkConfigServers;
+
+        task::repeat(&checkConfigServers, 60*1000);
     }
 
     int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );

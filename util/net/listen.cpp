@@ -95,20 +95,42 @@ namespace mongo {
         return out;
 
     }
+    
+    Listener::Listener(const string& name, const string &ip, int port, bool logConnect ) 
+        : _port(port), _name(name), _ip(ip), _logConnect(logConnect), _elapsedTime(0) { 
+#ifdef MONGO_SSL
+        _ssl = 0;
+        _sslPort = 0;
 
-    void Listener::initAndListen() {
-        checkTicketNumbers();
-        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!cmdLine.noUnixSocket && useUnixSockets()));
-        vector<int> socks;
-        SOCKET maxfd = 0; // needed for select()
+        if ( cmdLine.sslOnNormalPorts && cmdLine.sslServerManager ) {
+            secure( cmdLine.sslServerManager );
+        }
+#endif
+    }
+    
+    Listener::~Listener() {
+        if ( _timeTracker == this )
+            _timeTracker = 0;
+    }
 
-        for (vector<SockAddr>::iterator it=mine.begin(), end=mine.end(); it != end; ++it) {
-            SockAddr& me = *it;
+#ifdef MONGO_SSL
+    void Listener::secure( SSLManager* manager ) {
+        _ssl = manager;
+    }
+
+    void Listener::addSecurePort( SSLManager* manager , int additionalPort ) {
+        _ssl = manager;
+        _sslPort = additionalPort;
+    }
+
+#endif
+
+    bool Listener::_setupSockets( const vector<SockAddr>& mine , vector<int>& socks ) {
+        for (vector<SockAddr>::const_iterator it=mine.begin(), end=mine.end(); it != end; ++it) {
+            const SockAddr& me = *it;
 
             SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
-            if ( sock == INVALID_SOCKET ) {
-                log() << "ERROR: listen(): invalid socket? " << errnoWithDescription() << endl;
-            }
+            massert( 15863 , str::stream() << "listen(): invalid socket? " << errnoWithDescription() , sock >= 0 );
 
             if (me.getType() == AF_UNIX) {
 #if !defined(_WIN32)
@@ -138,42 +160,90 @@ namespace mongo {
 
             if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
                 int x = errno;
-                log() << "listen(): bind() failed " << errnoWithDescription(x) << " for socket: " << me.toString() << endl;
+                error() << "listen(): bind() failed " << errnoWithDescription(x) << " for socket: " << me.toString() << endl;
                 if ( x == EADDRINUSE )
-                    log() << "  addr already in use" << endl;
+                    error() << "  addr already in use" << endl;
                 closesocket(sock);
-                return;
+                return false;
             }
 
 #if !defined(_WIN32)
             if (me.getType() == AF_UNIX) {
                 if (chmod(me.getAddr().c_str(), 0777) == -1) {
-                    log() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
+                    error() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
                 }
-
                 ListeningSockets::get()->addPath( me.getAddr() );
             }
 #endif
-
+            
             if ( ::listen(sock, 128) != 0 ) {
-                log() << "listen(): listen() failed " << errnoWithDescription() << endl;
+                error() << "listen(): listen() failed " << errnoWithDescription() << endl;
                 closesocket(sock);
-                return;
+                return false;
             }
 
             ListeningSockets::get()->add( sock );
 
             socks.push_back(sock);
-            if (sock > maxfd)
-                maxfd = sock;
         }
+        
+        return true;
+    }
+    
+    void Listener::initAndListen() {
+        checkTicketNumbers();
+        vector<int> socks;
+        set<int> sslSocks;
+        
+        { // normal sockets
+            vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!cmdLine.noUnixSocket && useUnixSockets()));
+            if ( ! _setupSockets( mine , socks ) )
+                return;
+        }
+        
+#ifdef MONGO_SSL
+        if ( _ssl && _sslPort > 0 ) {
+            unsigned prev = socks.size();
+            
+            vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _sslPort, false );
+            if ( ! _setupSockets( mine , socks ) )
+                return;
+            
+            for ( unsigned i=prev; i<socks.size(); i++ ) {
+                sslSocks.insert( socks[i] );
+            }
+
+        }
+#endif
+
+        SOCKET maxfd = 0; // needed for select()
+        for ( unsigned i=0; i<socks.size(); i++ ) {
+            if ( socks[i] > maxfd )
+                maxfd = socks[i];
+        }
+        
+#ifdef MONGO_SSL
+        if ( _ssl == 0 ) {
+            _logListen( _port , false );
+        }
+        else if ( _sslPort == 0 ) {
+            _logListen( _port , true );
+        }
+        else {
+            // both
+            _logListen( _port , false );
+            _logListen( _sslPort , true );
+        }
+#else
+        _logListen( _port , false );
+#endif
 
         static long connNumber = 0;
         struct timeval maxSelectTime;
         while ( ! inShutdown() ) {
             fd_set fds[1];
             FD_ZERO(fds);
-
+            
             for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 FD_SET(*it, fds);
             }
@@ -233,13 +303,25 @@ namespace mongo {
                     disableNagle(s);
                 if ( _logConnect && ! cmdLine.quiet )
                     log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
-                accepted(s, from);
+                
+                Socket newSock = Socket(s, from);
+#ifdef MONGO_SSL
+                if ( _ssl && ( _sslPort == 0 || sslSocks.count(*it) ) ) {
+                    newSock.secureAccepted( _ssl );
+                }
+#endif
+                accepted( newSock );
             }
         }
     }
 
-    void Listener::accepted(int sock, const SockAddr& from) {
-        accepted( new MessagingPort(sock, from) );
+    void Listener::_logListen( int port , bool ssl ) {
+        log() << _name << ( _name.size() ? " " : "" ) << "waiting for connections on port " << port << ( ssl ? " ssl" : "" ) << endl;
+    }
+
+
+    void Listener::accepted(Socket socket) {
+        accepted( new MessagingPort(socket) );
     }
     
     void Listener::accepted(MessagingPort *mp) {

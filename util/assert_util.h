@@ -175,15 +175,15 @@ namespace mongo {
 #undef assert
 #endif
 
-#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 #define assert MONGO_assert
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-#define MONGO_uassert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
+#define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
 #define uassert MONGO_uassert
 
     /* warning only - keeps going */
-#define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
 #define wassert MONGO_wassert
 
     /* display a message, no context, and throw assertionexception
@@ -191,7 +191,7 @@ namespace mongo {
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define MONGO_massert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
+#define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
 #define massert MONGO_massert
 
     /* dassert is 'debug assert' -- might want to turn off for production as these

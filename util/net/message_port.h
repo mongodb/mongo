@@ -56,6 +56,8 @@ namespace mongo {
         // no data sent, then we detect that the other side is down
         MessagingPort(double so_timeout = 0, int logLevel = 0 );
 
+        MessagingPort(Socket& socket);
+
         virtual ~MessagingPort();
 
         void shutdown();

@@ -70,7 +70,6 @@ namespace mongo {
     extern string repairpath;
 
     void setupSignals( bool inFork );
-    void startReplSets(ReplSetCmdline*);
     void startReplication();
     void exitCleanly( ExitCode code );
 
@@ -216,8 +215,6 @@ namespace mongo {
 
     void listen(int port) {
         //testTheDb();
-        log() << "waiting for connections on port " << port << endl;
-
         MessageServer::Options options;
         options.port = port;
         options.ipList = cmdLine.bind_ip;
@@ -483,12 +480,6 @@ namespace mongo {
         clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
 
-        if( !cmdLine._replSet.empty() ) {
-            replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
-            boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
-        }
-
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -575,10 +566,12 @@ int main(int argc, char* argv[]) {
     ("directoryperdb", "each database will be stored in a separate directory")
     ("journal", "enable journaling")
     ("journalOptions", po::value<int>(), "journal diagnostic options")
+    ("journalCommitInterval", po::value<unsigned>(), "how often to group/batch commit (ms)")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
+    ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
@@ -631,12 +624,11 @@ int main(int argc, char* argv[]) {
     ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-    // these move to unhidden later:
     ("nodur", "disable journaling (currently the default)")
-    ("nojournal", "disable journaling (currently the default)")
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
+    ("nopreallocj", "don't preallocate journal files")
     ("dur", "enable journaling") // deprecated version
     ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
     // deprecated pairing command line options
@@ -745,6 +737,15 @@ int main(int argc, char* argv[]) {
         if (params.count("durOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();
         }
+        if( params.count("journalCommitInterval") ) { 
+            // don't check if dur is false here as many will just use the default, and will default to off on win32. 
+            // ie no point making life a little more complex by giving an error on a dev environment.
+            cmdLine.journalCommitInterval = params["journalCommitInterval"].as<unsigned>();
+            if( cmdLine.journalCommitInterval <= 1 || cmdLine.journalCommitInterval > 300 ) {
+                out() << "--journalCommitInterval out of allowed range (0-300ms)" << endl;
+                dbexit( EXIT_BADOPTIONS );
+            }
+        }
         if (params.count("journalOptions")) {
             cmdLine.durOptions = params["journalOptions"].as<int>();
         }
@@ -760,6 +761,9 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("nohints")) {
             useHints = false;
+        }
+        if (params.count("nopreallocj")) {
+            cmdLine.preallocj = false;
         }
         if (params.count("nohttpinterface")) {
             noHttpInterface = true;

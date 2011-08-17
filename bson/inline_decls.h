@@ -31,24 +31,38 @@
 
 #endif
 
+namespace mongo {
 
 /* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
 
 #if !defined(__GNUC__)
 
-// branch prediction.  indicate we expect to enter the if statement body
-# define MONGOIF(x) if( (x) )
+// branch prediction.  indicate we expect to be true
+# define MONGO_likely(x) ((bool)(x))
 
-// branch prediction.  indicate we expect to not enter the if statement body
-# define MONGO_IF(x) if( (x) )
+// branch prediction.  indicate we expect to be false
+# define MONGO_unlikely(x) ((bool)(x))
 
-// prefetch data from memory
-# define MONGOPREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
+# if defined(_WIN32)
+    // prefetch data from memory
+    inline void prefetch(const void *p) { 
+#if defined(_MM_HINT_T0)
+        _mm_prefetch((char *) p, _MM_HINT_T0);
+#endif
+    }
+#else
+    inline void prefetch(void *p) { }
+#endif
 
 #else
 
-# define MONGOIF(x) if( __builtin_expect((x), 1) )
-# define MONGO_IF(x) if( __builtin_expect((x), 0) )
-# define MONGOPREFETCH(x) { /*just check we compile:*/ assert(sizeof(*x)); }
+# define MONGO_likely(x) ( __builtin_expect((bool)(x), 1) )
+# define MONGO_unlikely(x) ( __builtin_expect((bool)(x), 0) )
+
+    inline void prefetch(void *p) { 
+        __builtin_prefetch(p);
+    }
 
 #endif
+
+}

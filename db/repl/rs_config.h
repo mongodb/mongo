@@ -25,7 +25,7 @@
 #include "health.h"
 
 namespace mongo {
-
+    class Member;
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
@@ -61,15 +61,14 @@ namespace mongo {
             int slaveDelay;       /* seconds.  int rather than unsigned for convenient to/front bson conversion. */
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
-            set<string> tags;     /* tagging for data center, rack, etc. */
+            map<string,string> tags;     /* tagging for data center, rack, etc. */
         private:
             set<TagSubgroup*> _groups; // the subgroups this member belongs to
         public:
             const set<TagSubgroup*>& groups() const { 
                 return _groups;
             }
-            set<TagSubgroup*>& groupsw(ReplSetConfig *c) { 
-                assert(!c->_constructed);
+            set<TagSubgroup*>& groupsw() {
                 return _groups;
             }
             void check() const;   /* check validity, assert if not. */
@@ -113,6 +112,11 @@ namespace mongo {
         //static void receivedNewConfig(BSONObj);
         void saveConfigLocally(BSONObj comment); // to local db
         string saveConfigEverywhere(); // returns textual info on what happened
+
+        /**
+         * Update members' groups when the config changes but members stay the same.
+         */
+        void updateMembers(List1<Member> &dest);
 
         BSONObj asBson() const;
 

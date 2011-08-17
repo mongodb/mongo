@@ -33,6 +33,7 @@ namespace CursorTests {
 
         class Base {
         protected:
+            static const char *ns() { return "unittests.cursortests.Base"; }
             FieldRangeVector *vec( int *vals, int len, int direction = 1 ) {
                 FieldRangeSet s( "", BSON( "a" << 1 ), true );
                 for( int i = 0; i < len; i += 2 ) {
@@ -49,6 +50,7 @@ namespace CursorTests {
                 IndexSpec *idxSpec = new IndexSpec( BSON( "a" << 1 ) );
                 return new FieldRangeVector( s, *idxSpec, direction );
             }
+            DBDirectClient _c;
         private:
             vector< BSONObj > _objs;
         };
@@ -258,6 +260,29 @@ namespace CursorTests {
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
         };
+        
+        class AbortImplicitScan : public Base {
+        public:
+            void run() {
+                dblock lk;
+                IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
+                _c.ensureIndex( ns(), idx.keyPattern );
+                for( int i = 0; i < 300; ++i ) {
+                    _c.insert( ns(), BSON( "a" << i << "b" << 5 ) );
+                }
+                FieldRangeSet frs( ns(), BSON( "b" << 3 ), true );
+                boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
+                Client::Context ctx( ns() );
+                scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), 1, nsdetails( ns() )->idx(1), frv, 1 ) );
+                int initialNscanned = c->nscanned();
+                ASSERT( initialNscanned < 200 );
+                ASSERT( c->ok() );
+                c->advance();
+                ASSERT( c->nscanned() > initialNscanned );
+                ASSERT( c->nscanned() < 200 );
+                ASSERT( c->ok() );
+            }
+        };
 
     } // namespace BtreeCursorTests
 
@@ -274,6 +299,7 @@ namespace CursorTests {
             add< BtreeCursorTests::EqIn >();
             add< BtreeCursorTests::RangeEq >();
             add< BtreeCursorTests::RangeIn >();
+            add< BtreeCursorTests::AbortImplicitScan >();
         }
     } myall;
 } // namespace CursorTests

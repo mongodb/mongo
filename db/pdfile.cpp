@@ -869,6 +869,7 @@ namespace mongo {
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         Top::global.collectionDropped( name );
+        NamespaceDetailsTransient::eraseForPrefix( name.c_str() );
         dropNS(name);
     }
 
@@ -967,7 +968,7 @@ namespace mongo {
         }
     }
 
-    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn) {
+    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
         dassert( todelete == dl.rec() );
 
         NamespaceDetails* d = nsdetails(ns);
@@ -975,6 +976,14 @@ namespace mongo {
             out() << "failing remove on a capped ns " << ns << endl;
             uassert( 10089 ,  "can't remove from a capped collection" , 0 );
             return;
+        }
+        
+        BSONObj toDelete;
+        if ( doLog ) {
+            BSONElement e = dl.obj()["_id"];
+            if ( e.type() ) {
+                toDelete = e.wrap();
+            }
         }
 
         /* check if any cursors point to us.  if so, advance them. */
@@ -984,6 +993,10 @@ namespace mongo {
 
         _deleteRecord(d, ns, todelete, dl);
         NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+
+        if ( ! toDelete.isEmpty() ) {
+            logOp( "d" , ns , toDelete );
+        }
     }
 
 
@@ -1181,7 +1194,13 @@ namespace mongo {
             BSONObjExternalSorter::Data d = i->next();
 
             try {
-                btBuilder.addKey(d.first, d.second);
+                if ( !dupsAllowed && dropDups ) {
+                    LastError::Disabled led( lastError.get() );
+                    btBuilder.addKey(d.first, d.second);
+                }
+                else {
+                    btBuilder.addKey(d.first, d.second);                    
+                }
             }
             catch( AssertionException& e ) {
                 if ( dupsAllowed ) {
@@ -1189,8 +1208,9 @@ namespace mongo {
                     throw;
                 }
 
-                if( e.interrupted() )
-                    throw;
+                if( e.interrupted() ) {
+                    killCurrentOp.checkForInterrupt();
+                }
 
                 if ( ! dropDups )
                     throw;
@@ -1276,7 +1296,7 @@ namespace mongo {
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
         for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
-            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
+            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true , true );
             getDur().commitIfNeeded();
         }
 
@@ -1302,18 +1322,27 @@ namespace mongo {
             while ( cc->ok() ) {
                 BSONObj js = cc->current();
                 try {
-                    _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                    {
+                        if ( !dupsAllowed && dropDups ) {
+                            LastError::Disabled led( lastError.get() );
+                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                        }
+                        else {
+                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                        }
+                    }
                     cc->advance();
                 }
                 catch( AssertionException& e ) {
-                    if( e.interrupted() )
-                        throw;
+                    if( e.interrupted() ) {
+                        killCurrentOp.checkForInterrupt();
+                    }
 
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->currLoc();
                         bool ok = cc->advance();
                         cc->updateLocation();
-                        theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                        theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true , true );
                         if( ClientCursor::find(id, false) == 0 ) {
                             cc.release();
                             if( !ok ) {

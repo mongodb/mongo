@@ -28,6 +28,8 @@
 
 namespace mongo {
 
+    class CurOp;
+
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
@@ -36,7 +38,7 @@ namespace mongo {
         void reset();
         
         string toString() const;
-        void append( BSONObjBuilder& b ) const;
+        void append( const CurOp& curop, BSONObjBuilder& b ) const;
 
         // -------------------
         
@@ -119,7 +121,7 @@ namespace mongo {
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
 
-        BSONObj get() {
+        BSONObj get() const {
             _lock.lock();
             BSONObj o;
             try {
@@ -133,7 +135,7 @@ namespace mongo {
             return o;
         }
 
-        void append( BSONObjBuilder& b , const StringData& name ) {
+        void append( BSONObjBuilder& b , const StringData& name ) const {
             scoped_spinlock lk(_lock);
             BSONObj temp = _get();
             b.append( name , temp );
@@ -141,7 +143,7 @@ namespace mongo {
 
     private:
         /** you have to be locked when you call this */
-        BSONObj _get() {
+        BSONObj _get() const {
             int sz = size();
             if ( sz == 0 )
                 return BSONObj();
@@ -153,7 +155,7 @@ namespace mongo {
         /** you have to be locked when you call this */
         void _reset( int sz ) { _size[0] = sz; }
 
-        SpinLock _lock;
+        mutable SpinLock _lock;
         int * _size;
         char _buf[512];
     };
@@ -168,7 +170,8 @@ namespace mongo {
 
         bool haveQuery() const { return _query.have(); }
         BSONObj query() { return _query.get();  }
-
+        void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
+        
         void ensureStarted() {
             if ( _start == 0 )
                 _start = _checkpoint = curTimeMicros64();

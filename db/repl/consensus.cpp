@@ -25,6 +25,7 @@ namespace mongo {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
     private:
+
         bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
             unsigned id = cmdObj["id"].Int();
             const Member* primary = theReplSet->box.getPrimary();
@@ -66,7 +67,7 @@ namespace mongo {
             return false;
         }
 
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
 
@@ -101,7 +102,7 @@ namespace mongo {
     public:
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
     private:
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             theReplSet->elect.electCmdReceived(cmdObj, &result);
@@ -152,7 +153,7 @@ namespace mongo {
         LastYea &L = this->ly.ref(lk);
         time_t now = time(0);
         if( L.when + LeaseTime >= now && L.who != memberId ) {
-            log(1) << "replSet not voting yea for " << memberId <<
+            LOG(1) << "replSet not voting yea for " << memberId <<
                    " voted for " << L.who << ' ' << now-L.when << " secs ago" << rsLog;
             throw VoteException();
         }
@@ -176,7 +177,7 @@ namespace mongo {
     void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) {
         BSONObjBuilder& b = *_b;
         DEV log() << "replSet received elect msg " << cmd.toString() << rsLog;
-        else log(2) << "replSet received elect msg " << cmd.toString() << rsLog;
+        else LOG(2) << "replSet received elect msg " << cmd.toString() << rsLog;
         string set = cmd["set"].String();
         unsigned whoid = cmd["whoid"].Int();
         int cfgver = cmd["cfgver"].Int();
@@ -309,7 +310,7 @@ namespace mongo {
                 allUp = false;
             }
         }
-        log(1) << "replSet dev we are freshest of up nodes, nok:" << nok << " nTies:" << nTies << rsLog;
+        LOG(1) << "replSet dev we are freshest of up nodes, nok:" << nok << " nTies:" << nTies << rsLog;
         assert( ord <= theReplSet->lastOpTimeWritten ); // <= as this may change while we are working...
         return true;
     }

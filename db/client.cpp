@@ -122,10 +122,13 @@ namespace mongo {
             error() << "Client::shutdown not called: " << _desc << endl;
         }
 
-        scoped_lock bl(clientsMutex);
-        if ( ! _shutdown )
-            clients.erase(this);
-        delete _curOp;
+        if ( ! inShutdown() ) {
+            // we can't clean up safely once we're in shutdown
+            scoped_lock bl(clientsMutex);
+            if ( ! _shutdown )
+                clients.erase(this);
+            delete _curOp;
+        }
     }
 
     bool Client::shutdown() {
@@ -469,7 +472,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();
             c.gotHandshake( cmdObj );
             return 1;
@@ -688,11 +691,14 @@ namespace mongo {
 
 #define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
-    void OpDebug::append( BSONObjBuilder& b ) const {
+    void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );
         b.append( "ns" , ns.toString() );
         if ( ! query.isEmpty() )
             b.append( iscommand ? "command" : "query" , query );
+        else if ( ! iscommand && curop.haveQuery() )
+            curop.appendQuery( b , "query" );
+
         if ( ! updateobj.isEmpty() )
             b.append( "updateobj" , updateobj );
         

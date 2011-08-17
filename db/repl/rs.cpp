@@ -24,9 +24,12 @@
 #include "rs.h"
 #include "connections.h"
 #include "../repl.h"
+#include "../instance.h"
+
+using namespace std;
 
 namespace mongo {
-
+    
     using namespace bson;
 
     bool replSet = false;
@@ -60,18 +63,43 @@ namespace mongo {
     }
 
     void ReplSetImpl::assumePrimary() {
-        log(2) << "assuming primary" << endl;
+        LOG(2) << "replSet assuming primary" << endl;
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
+
+        // Make sure that new OpTimes are higher than existing ones even with clock skew
+        DBDirectClient c;
+        BSONObj lastOp = c.findOne( "local.oplog.rs", Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk );
+        if ( !lastOp.isEmpty() ) {
+            OpTime::setLast( lastOp[ "ts" ].date() );
+        }
+
         changeState(MemberState::RS_PRIMARY);
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
+    void ReplSetImpl::setMaintenanceMode(const bool inc) {
+        lock lk(this);
+
+        if (inc) {
+            log() << "replSet going into maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+
+            _maintenanceMode++;
+            changeState(MemberState::RS_RECOVERING);
+        }
+        else {
+            _maintenanceMode--;
+            // no need to change state, syncTail will try to go live as a secondary soon
+
+            log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+        }
+    }
+
     Member* ReplSetImpl::getMostElectable() {
         lock lk(this);
-        
-        Member *max = 0;        
+
+        Member *max = 0;
 
         for (set<unsigned>::iterator it = _electableSet.begin(); it != _electableSet.end(); it++) {
             const Member *temp = findById(*it);
@@ -91,7 +119,7 @@ namespace mongo {
     const bool closeOnRelinquish = true;
 
     void ReplSetImpl::relinquish() {
-        log(2) << "attempting to relinquish" << endl;
+        LOG(2) << "replSet attempting to relinquish" << endl;
         if( box.getState().primary() ) {
             {
                 writelock lk("admin."); // so we are synchronized with _logOp()
@@ -239,7 +267,7 @@ namespace mongo {
 
         if( myConfig().arbiterOnly )
             b.append("arbiterOnly", true);
-        if( myConfig().priority == 0 )
+        if( myConfig().priority == 0 && !myConfig().arbiterOnly)
             b.append("passive", true);
         if( myConfig().slaveDelay )
             b.append("slaveDelay", myConfig().slaveDelay);
@@ -296,8 +324,10 @@ namespace mongo {
         _currentSyncTarget(0),
         _hbmsgTime(0),
         _self(0),
+        _maintenanceMode(0),
         mgr( new Manager(this) ),
         ghost( new GhostSync(this) ) {
+
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         strcpy( _hbmsg , "initial startup" );
@@ -306,7 +336,7 @@ namespace mongo {
 
         _seeds = &replSetCmdline.seeds;
 
-        log(1) << "replSet beginning startup..." << rsLog;
+        LOG(1) << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 
@@ -317,7 +347,7 @@ namespace mongo {
         for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
             if( i->isSelf() ) {
                 if( sss == 1 )
-                    log(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+                    LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
             }
             else
                 log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
@@ -382,7 +412,7 @@ namespace mongo {
             getLastErrorDefault = new BSONObj( c.getLastErrorDefaults );
         }
 
-        list<const ReplSetConfig::MemberCfg*> newOnes;
+        list<ReplSetConfig::MemberCfg*> newOnes;
         // additive short-cuts the new config setup. If we are just adding a
         // node/nodes and nothing else is changing, this is additive. If it's
         // not a reconfig, we're not adding anything
@@ -391,8 +421,8 @@ namespace mongo {
             unsigned nfound = 0;
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) {
-                const ReplSetConfig::MemberCfg& m = *i;
                 
+                ReplSetConfig::MemberCfg& m = *i;
                 if( m.h.isSelf() ) {
                     me++;
                 }
@@ -443,8 +473,8 @@ namespace mongo {
         // this is a shortcut for simple changes
         if( additive ) {
             log() << "replSet info : additive change to configuration" << rsLog;
-            for( list<const ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
-                const ReplSetConfig::MemberCfg* m = *i;
+            for( list<ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
+                ReplSetConfig::MemberCfg *m = *i;
                 Member *mi = new Member(m->h, m->_id, m, false);
 
                 /** we will indicate that new members are up() initially so that we don't relinquish our
@@ -456,6 +486,11 @@ namespace mongo {
                 _members.push(mi);
                 startHealthTaskFor(mi);
             }
+
+            // if we aren't creating new members, we may have to update the
+            // groups for the current ones
+            _cfg->updateMembers(_members);
+
             return true;
         }
 
@@ -479,7 +514,7 @@ namespace mongo {
         string members = "";
 
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) {
-            const ReplSetConfig::MemberCfg& m = *i;
+            ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
             members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
@@ -594,7 +629,7 @@ namespace mongo {
                         if( ++once == 1 )
                             log() << "replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done" << rsLog;
                         if( _seeds->size() == 0 )
-                            log(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
+                            LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;

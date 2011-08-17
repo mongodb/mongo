@@ -28,6 +28,9 @@ namespace mongo {
         AlignedBuilder(unsigned init_size);
         ~AlignedBuilder() { kill(); }
 
+        /** reset with a hint as to the upcoming needed size specified */
+        void reset(unsigned sz);
+
         /** reset for a re-use. shrinks if > 128MB */
         void reset();
 
@@ -43,7 +46,11 @@ namespace mongo {
             return l;
         }
 
+        /** if buffer grows pointer no longer valid */
         char* atOfs(unsigned ofs) { return _p._data + ofs; }
+
+        /** if buffer grows pointer no longer valid */
+        char* cur() { return _p._data + _len; }
 
         void appendChar(char j) {
             *((char*)grow(sizeof(char))) = j;
@@ -94,7 +101,7 @@ namespace mongo {
         inline char* grow(unsigned by) {
             unsigned oldlen = _len;
             _len += by;
-            if ( _len > _p._size ) {
+            if (MONGO_unlikely( _len > _p._size )) {
                 growReallocate(oldlen);
             }
             return _p._data + oldlen;

@@ -117,7 +117,7 @@ namespace mongo {
         while ( ! inShutdown() ) {
             
             if ( ! Shard::isAShardNode( _addr ) ) {
-                log(1) << _addr << " is not a shard node" << endl;
+                LOG(1) << _addr << " is not a shard node" << endl;
                 sleepsecs( 60 );
                 continue;
             }
@@ -216,7 +216,10 @@ namespace mongo {
                             
                             if ( gle["code"].numberInt() == 9517 ) {
                                 log() << "writeback failed because of stale config, retrying attempts: " << attempts << endl;
-                                db->getChunkManager( ns , true );
+                                if( ! db->getChunkManagerIfExists( ns , true ) ){
+                                    uassert( 15884, str::stream() << "Could not reload chunk manager after " << attempts << " attempts.", attempts <= 4 );
+                                    sleepsecs( attempts - 1 );
+                                }
                                 continue;
                             }
 

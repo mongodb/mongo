@@ -38,8 +38,15 @@ namespace mongo {
     }
 
     int HttpClient::_go( const char * command , string url , const char * body , Result * result ) {
-        uassert( 10271 ,  "invalid url" , url.find( "http://" ) == 0 );
-        url = url.substr( 7 );
+        bool ssl = false;
+        if ( url.find( "https://" ) == 0 ) {
+            ssl = true;
+            url = url.substr( 8 );
+        }
+        else {
+            uassert( 10271 ,  "invalid url" , url.find( "http://" ) == 0 );
+            url = url.substr( 7 );
+        }
 
         string host , path;
         if ( url.find( "/" ) == string::npos ) {
@@ -56,7 +63,7 @@ namespace mongo {
         HD( "path [" << path << "]" );
 
         string server = host;
-        int port = 80;
+        int port = ssl ? 443 : 80;
 
         string::size_type idx = host.find( ":" );
         if ( idx != string::npos ) {
@@ -92,6 +99,15 @@ namespace mongo {
         Socket sock;
         if ( ! sock.connect( addr ) )
             return -1;
+        
+        if ( ssl ) {
+#ifdef MONGO_SSL
+            _checkSSLManager();
+            sock.secure( _sslManager.get() );
+#else
+            uasserted( 15862 , "no ssl support" );
+#endif
+        }
 
         {
             const char * out = req.c_str();
@@ -152,5 +168,10 @@ namespace mongo {
         _body = entire;
     }
 
+#ifdef MONGO_SSL
+    void HttpClient::_checkSSLManager() {
+        _sslManager.reset( new SSLManager( true ) );
+    }
+#endif
 
 }

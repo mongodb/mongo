@@ -44,7 +44,20 @@
 # include <windows.h>
 #endif
 
+#if defined(__linux__) && defined(MONGO_EXPOSE_MACROS)
+// glibc's optimized versions are better than g++ builtins
+# define __builtin_strcmp strcmp
+# define __builtin_strlen strlen
+# define __builtin_memchr memchr
+# define __builtin_memcmp memcmp
+# define __builtin_memcpy memcpy
+# define __builtin_memset memset
+# define __builtin_memmove memmove
+#endif
+
+
 #include <ctime>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <memory>
@@ -138,7 +151,11 @@ namespace mongo {
     void asserted(const char *msg, const char *file, unsigned line);
 }
 
-#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+
+
+// TODO: Rework the headers so we don't need this craziness
+#include "bson/inline_decls.h"
+#define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include "util/debug_util.h"
 #include "util/goodies.h"

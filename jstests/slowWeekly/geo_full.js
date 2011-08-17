@@ -25,17 +25,25 @@ var randEnvironment = function(){
 		return { max : 180, 
 				 min : -180, 
 				 bits : Math.floor( Random.rand() * 32 ) + 1, 
-				 earth : true }
+				 earth : true,
+				 bucketSize : 360 / ( 4 * 1024 * 1024 * 1024 ) }
 	}
 	
 	var scales = [ 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000 ]
 	var scale = scales[ Math.floor( Random.rand() * scales.length ) ]
 	var offset = Random.rand() * scale
 	
-	return { max : Random.rand() * scale + offset,
-		     min : - Random.rand() * scale + offset,
-		     bits : Math.floor( Random.rand() * 32 ) + 1,
-		     earth : false }
+    var max = Random.rand() * scale + offset
+	var min = - Random.rand() * scale + offset
+	var bits = Math.floor( Random.rand() * 32 ) + 1
+	var range = max - min
+    var bucketSize = range / ( 4 * 1024 * 1024 * 1024 )
+    	
+	return { max : max,
+		     min : min,
+		     bits : bits,
+		     earth : false,
+		     bucketSize : bucketSize }
 	
 }
 
@@ -271,6 +279,7 @@ var randYesQuery = function(){
 
 var locArray = function( loc ){
 	if( loc.x ) return [ loc.x, loc.y ]
+	if( ! loc.length ) return [ loc[0], loc[1] ]
 	return loc
 }
 
@@ -287,32 +296,54 @@ var locsArray = function( locs ){
 	}
 }
 
-var numTests = 30
+var minBoxSize = function( env, box ){
+    return env.bucketSize * Math.pow( 2, minBucketScale( env, box ) )
+}
+
+var minBucketScale = function( env, box ){
+        
+    if( box.length && box[0].length )
+        box = [ box[0][0] - box[1][0], box[0][1] - box[1][1] ]
+    
+    if( box.length )
+        box = Math.max( box[0], box[1] )
+        
+    print( box )
+    print( env.bucketSize )
+        
+    return Math.ceil( Math.log( box / env.bucketSize ) / Math.log( 2 ) )
+
+}
+
+// TODO:  Add spherical $uniqueDocs tests
+var numTests = 100
 
 // Our seed will change every time this is run, but 
 // each individual test will be reproducible given
 // that seed and test number
-var seed = Math.floor( Random.rand() * ( 10 ^ 30) ) 
+var seed = new Date().getTime()
 
 for ( var test = 0; test < numTests; test++ ) {
 	
 	Random.srand( seed + test );
-	
+	//Random.srand( 42240 )
+	//Random.srand( 7344 )
 	var t = db.testAllGeo
 	t.drop()
 	
 	print( "Generating test environment #" + test )
 	var env = randEnvironment()
+	//env.bits = 11
 	var query = randQuery( env )
 	var data = randDataType()
-	
+	//data.numDocs = 100; data.maxLocs = 3;
 	var results = {}
 	var totalPoints = 0
 	print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
 
 	// Index after a random number of docs added
 	var indexIt = Math.floor( Random.rand() * data.numDocs )
-	
+		
 	for ( var i = 0; i < data.numDocs; i++ ) {
 
 		if( indexIt == i ){
@@ -346,7 +377,7 @@ for ( var test = 0; test < numTests; test++ ) {
 		randQueryAdditions( doc, indResults )
 		
 		//printjson( doc )
-		
+		doc._id = i
 		t.insert( doc )
 		
 	}
@@ -362,27 +393,33 @@ for ( var test = 0; test < numTests; test++ ) {
 	// exact
 	print( "Exact query..." )
 	assert.eq( results.exact.docsIn, t.find( { "locs.loc" : randLocType( query.exact ), "exact.docIn" : randYesQuery() } ).count() )
-	
+		
 	// $center
 	print( "Center query..." )
-	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ] } }, "center.docIn" : randYesQuery() } ).count() )
+	print( "Min box : " + minBoxSize( env, query.radius ) )
+	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.center.locsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() } ).count() )
 	if( query.sphereRadius >= 0 ){
 		print( "Center sphere query...")
 		// $centerSphere
 		assert.eq( results.sphere.docsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ] } }, "sphere.docIn" : randYesQuery() } ).count() )
+		assert.eq( results.sphere.locsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : 0.0 } }, "sphere.docIn" : randYesQuery() } ).count() )
 	}
 	
 	// $box
 	print( "Box query..." )
-	assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box } }, "box.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : true } }, "box.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.box.locsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : false } }, "box.docIn" : randYesQuery() } ).count() )
 	
 	// $polygon
 	print( "Polygon query..." )
 	assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() )
+	assert.eq( results.poly.locsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly, $uniqueDocs : 0 } }, "poly.docIn" : randYesQuery() } ).count() )
 					 
 	// $near
 	print( "Near query..." )
 	assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.find( { "locs.loc" : { $near : query.center, $maxDistance : query.radius } } ).count( true ) )
+
 	if( query.sphereRadius >= 0 ){
 		print( "Near sphere query...")
 		// $centerSphere
@@ -391,27 +428,39 @@ for ( var test = 0; test < numTests; test++ ) {
 	
 	
 	// geoNear
+	// results limited by size of objects
 	if( data.maxLocs < 100 ){
-		
+	    
+	    // GeoNear query
+	    print( "GeoNear query..." )
+	    assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius }).results.length )
+	    // GeoNear query
+        assert.eq( results.center.docsIn > 100 ? 100 : results.center.docsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius, uniqueDocs : true }).results.length )
+       
+	    
 		var num = 2 * results.center.locsIn;
 		if( num > 200 ) num = 200;
 		
 		var output = db.runCommand( {
 			geoNear : "testAllGeo", 
 			near : query.center, 
-			maxDistance : query.radius , 
+			maxDistance : query.radius ,
+			includeLocs : true,
 			num : num } ).results
-			
+				
 		assert.eq( Math.min( 200, results.center.locsIn ), output.length )
 	
 		var distance = 0;
 		for ( var i = 0; i < output.length; i++ ) {
 			var retDistance = output[i].dis
-	
+			var retLoc = locArray( output[i].loc )
+			
 			// print( "Dist from : " + results[i].loc + " to " + startPoint + " is "
 			// + retDistance + " vs " + radius )
 			
 			var arrLocs = locsArray( output[i].obj.locs )
+						
+			assert.contains( retLoc, arrLocs )
 			
 			// printjson( arrLocs )
 			
@@ -422,6 +471,7 @@ for ( var test = 0; test < numTests; test++ ) {
 			}
 			
 			assert( distInObj )
+			assert.between( retDistance - 0.0001 , Geo.distance( locArray( query.center ), retLoc ), retDistance + 0.0001 )
 			assert.lte( retDistance, query.radius )
 			assert.gte( retDistance, distance )
 			distance = retDistance

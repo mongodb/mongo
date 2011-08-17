@@ -17,7 +17,5 @@ t.drop();
 t.ensureIndex( {a:1,'a.b':1} );
 t.save( { a: [ { b: 3 } ] } );
 assert.eq( ib, t.find( { a:{ b:3 } } ).explain().indexBounds );
-if ( 0 ) { // SERVER-3005
 assert.eq( 1, t.find( { a:{ b:3 } } ).explain().nscanned );
 assert.eq( 1, t.count( { a:{ b:3 } } ) );
-}

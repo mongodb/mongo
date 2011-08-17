@@ -40,7 +40,7 @@ namespace mongo {
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
-        currentOp.debug().append( b );
+        currentOp.debug().append( currentOp , b );
 
         b.append("client", c.clientAddress() );
 
@@ -48,6 +48,26 @@ namespace mongo {
             b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
 
         BSONObj p = b.done();
+
+        if (p.objsize() > 100*1024){
+            string small = p.toString(/*isArray*/false, /*full*/false);
+
+            warning() << "can't add full line to system.profile: " << small;
+
+            // rebuild with limited info
+            BSONObjBuilder b(profileBufBuilder);
+            b.appendDate("ts", jsTime());
+            b.append("client", c.clientAddress() );
+            if ( c.getAuthenticationInfo() )
+                b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
+
+            b.append("err", "profile line too large (max is 100KB)");
+            if (small.size() < 100*1024){ // should be much smaller but if not don't break anything
+                b.append("abbreviated", small);
+            }
+
+            p = b.done();
+        }
 
         // write: not replicated
         NamespaceDetails *d = db->namespaceIndex.details(ns);

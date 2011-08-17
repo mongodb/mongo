@@ -235,7 +235,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
 
-        virtual bool run(const string&, mongo::BSONObj&, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );
         }
     } cmdGetShardMap;
@@ -346,7 +346,7 @@ namespace mongo {
                 best = t;
         }
 
-        log(1) << "best shard for new allocation is " << best << endl;
+        LOG(1) << "best shard for new allocation is " << best << endl;
         return best.shard();
     }
 
@@ -360,7 +360,7 @@ namespace mongo {
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
         if( !noauth ) {
             string err;
-            log(2) << "calling onCreate auth for " << conn->toString() << endl;
+            LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
             uassert( 15847, "can't authenticate to shard server",
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
         }

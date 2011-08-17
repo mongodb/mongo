@@ -80,7 +80,7 @@ namespace mongo {
 
         case PAIR:
         case SET: {
-            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers );
+            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
             if( ! set->connect() ) {
                 delete set;
                 errmsg = "connect failed to set ";
@@ -589,6 +589,13 @@ namespace mongo {
             _failed = true;
             return false;
         }
+
+#ifdef MONGO_SSL
+        if ( cmdLine.sslOnNormalPorts ) {
+            p->secure( sslManager() );
+        }
+#endif
+
         return true;
     }
 
@@ -996,6 +1003,19 @@ namespace mongo {
         else
             say(m);
     }
+
+#ifdef MONGO_SSL
+    SSLManager* DBClientConnection::sslManager() {
+        if ( _sslManager )
+            return _sslManager;
+        
+        SSLManager* s = new SSLManager(true);
+        _sslManager = s;
+        return s;
+    }
+
+    SSLManager* DBClientConnection::_sslManager = 0;
+#endif
 
     AtomicUInt DBClientConnection::_numConnections;
     bool DBClientConnection::_lazyKillCursor = true;

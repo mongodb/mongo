@@ -43,10 +43,16 @@ namespace mongo {
         static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
 
         /**
+         * gets a cached Monitor per name or will return none if it doesn't exist
+         */
+        static ReplicaSetMonitorPtr get( const string& name );
+
+
+        /**
          * checks all sets for current master and new secondaries
          * usually only called from a BackgroundJob
          */
-        static void checkAll();
+        static void checkAll( bool checkAllSecondaries );
 
         /**
          * this is called whenever the config of any repclia set changes
@@ -81,13 +87,15 @@ namespace mongo {
         /**
          * checks for current master and new secondaries
          */
-        void check();
+        void check( bool checkAllSecondaries );
 
         string getName() const { return _name; }
 
         string getServerAddress() const;
         
         bool contains( const string& server ) const;
+        
+        void appendInfo( BSONObjBuilder& b ) const;
 
     private:
         /**
@@ -98,7 +106,7 @@ namespace mongo {
          */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
-        void _check();
+        void _check( bool checkAllSecondaries );
 
         /**
          * Use replSetGetStatus command to make sure hosts in host list are up
@@ -119,9 +127,10 @@ namespace mongo {
          * @param c the connection to check
          * @param maybePrimary OUT
          * @param verbose
+         * @param nodesOffset - offset into _nodes array, -1 for not in it
          * @return if the connection is good
          */
-        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
+        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset );
 
         int _find( const string& server ) const ;
         int _find_inlock( const string& server ) const ;
@@ -132,14 +141,44 @@ namespace mongo {
 
         string _name;
         struct Node {
-            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c) , ok(true) {}
+            Node( const HostAndPort& a , DBClientConnection* c ) 
+                : addr( a ) , conn(c) , ok(true) , 
+                  ismaster(false), secondary( false ) , hidden( false ) , pingTimeMillis(0) {
+            }
+
+            bool okForSecondaryQueries() const {
+                return ok && secondary && ! hidden;
+            }
+
+            BSONObj toBSON() const {
+                return BSON( "addr" << addr.toString() <<
+                             "isMaster" << ismaster <<
+                             "secondary" << secondary <<
+                             "hidden" << hidden <<
+                             "ok" << ok );
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
             HostAndPort addr;
-            DBClientConnection* conn;
+            shared_ptr<DBClientConnection> conn;
 
             // if this node is in a failure state
             // used for slave routing
             // this is too simple, should make it better
             bool ok;
+
+            // as reported by ismaster
+            BSONObj lastIsMaster;
+
+            bool ismaster;
+            bool secondary; 
+            bool hidden;
+            
+            int pingTimeMillis;
+
         };
 
         /**
@@ -168,7 +207,7 @@ namespace mongo {
 
     public:
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
-        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers );
+        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
         /** Returns false if nomember of the set were reachable, or neither is
@@ -228,16 +267,14 @@ namespace mongo {
 
         // ----- informational ----
 
-        /**
-         * timeout not supported in DBClientReplicaSet yet
-         */
-        double getSoTimeout() const { return 0; }
+        double getSoTimeout() const { return _so_timeout; }
 
         string toString() { return getServerAddress(); }
 
         string getServerAddress() const { return _monitor->getServerAddress(); }
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
+        virtual bool lazySupported() const { return true; }
 
         // ---- low level ------
 
@@ -265,6 +302,8 @@ namespace mongo {
 
         HostAndPort _slaveHost;
         scoped_ptr<DBClientConnection> _slave;
+        
+        double _so_timeout;
 
         /**
          * for storing authentication info
