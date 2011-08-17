@@ -34,7 +34,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_CSTAT_INCR(session, memalloc);
 
-	if ((p = calloc(number, (size_t)size)) == NULL) {
+	if ((p = calloc(number, size)) == NULL) {
 		__wt_err(session, errno, "memory allocation");
 		return (WT_ERROR);
 	}
