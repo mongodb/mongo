@@ -126,7 +126,7 @@ value_gen(void *valuep, uint32_t *sizep)
 	    g.c_repeat_data_pct != 0 &&
 	    (u_int)wts_rand() % 100 > g.c_repeat_data_pct) {
 		*(void **)valuep = (void *)dup_data;
-		*sizep = (uint32_t *)strlen(dup_data);
+		*sizep = (uint32_t)strlen(dup_data);
 		return;
 	}
 
