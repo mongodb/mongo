@@ -1,5 +1,5 @@
 
-t = db.profile2;
+t = db.profile3;
 t.drop();
 
 try {
