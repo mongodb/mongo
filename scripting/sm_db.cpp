@@ -308,16 +308,43 @@ namespace mongo {
         }
 
         DBClientWithCommands * conn = getConnection( cx, obj );
+
         uassert( 10248 ,  "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
 
         try {
-            BSONObj o = c.toObject( argv[1] );
-            // TODO: add _id
+            JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
 
-            conn->insert( ns , o );
-            return JS_TRUE;
+            log() << "Is array? " << JS_IsArrayObject( cx, insertObj ) << endl;
+            if( JS_IsArrayObject( cx, insertObj ) ){
+                vector<BSONObj> bos;
+
+                jsuint len;
+                JSBool gotLen = JS_GetArrayLength( cx, insertObj, &len );
+                smuassert( cx, "could not get length of array", gotLen );
+
+                for( jsuint i = 0; i < len; i++ ){
+
+                    jsval el;
+                    JSBool inserted = JS_GetElement( cx, insertObj, i, &el);
+                    smuassert( cx, "could not find element in array object", inserted );
+
+                    bos.push_back( c.toObject( el ) );
+                }
+
+                conn->insert( ns, bos );
+
+                return JS_TRUE;
+            }
+            else {
+                BSONObj o = c.toObject( argv[1] );
+                // TODO: add _id
+
+                conn->insert( ns , o );
+                return JS_TRUE;
+
+            }
         }
         catch ( std::exception& e ) {
             stringstream ss;

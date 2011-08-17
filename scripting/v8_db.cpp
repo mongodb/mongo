@@ -351,22 +351,51 @@ namespace mongo {
         DBClientBase * conn = getConnection( args );
         GETNS;
 
-        v8::Handle<v8::Object> in = args[1]->ToObject();
+        if( args[1]->IsArray() ){
 
-        if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
-            v8::Handle<v8::Value> argv[1];
-            in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
+            v8::Local<v8::Array> arr = Array::Cast( *args[1] );
+
+            vector<BSONObj> bos;
+            uint32_t len = arr->Length();
+            for( uint32_t i = 0; i < len; i++ ){
+
+                v8::Local<v8::Object> el = arr->CloneElementAt( i );
+                if ( ! el->Has( scope->getV8Str( "_id" ) ) ) {
+                    v8::Handle<v8::Value> argv[1];
+                    el->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
+                }
+
+                bos.push_back( scope->v8ToMongo( arr->CloneElementAt( i ) ) );
+            }
+
+            DDD( "want to save batch : " << bos.length );
+            try {
+                V8Unlock u;
+                conn->insert( ns , bos );
+            }
+            catch ( ... ) {
+                return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+            }
         }
+        else {
 
-        BSONObj o = scope->v8ToMongo( in );
+            v8::Handle<v8::Object> in = args[1]->ToObject();
 
-        DDD( "want to save : " << o.jsonString() );
-        try {
-            V8Unlock u;
-            conn->insert( ns , o );
-        }
-        catch ( ... ) {
-            return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+            if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
+                v8::Handle<v8::Value> argv[1];
+                in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
+            }
+
+            BSONObj o = scope->v8ToMongo( in );
+
+            DDD( "want to save : " << o.jsonString() );
+            try {
+                V8Unlock u;
+                conn->insert( ns , o );
+            }
+            catch ( ... ) {
+                return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+            }
         }
 
         return v8::Undefined();

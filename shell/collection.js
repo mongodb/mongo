@@ -165,7 +165,7 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
     if ( ! _allow_dot ) {
         this._validateForStorage( obj );
     }
-    if ( typeof( obj._id ) == "undefined" ){
+    if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
         var tmp = obj; // don't want to modify input
         obj = {_id: new ObjectId()};
         for (var key in tmp){
