@@ -9,7 +9,7 @@ load('articles.js');
 load('utils.js');
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
-db = db.getSisterDB("aggdb");
+db = db.getSiblingDB("aggdb");
 
 
 // just passing through fields
@@ -404,10 +404,10 @@ var p8result = [
         "author" : "dave",
         "comments" : [
             {
-                "author" : "barbarella"
+                "author" : "barbara"
             },
             {
-                "author" : "leia"
+                "author" : "jenny"
             }
         ],
         "tag" : "fun"
@@ -416,10 +416,10 @@ var p8result = [
         "author" : "dave",
         "comments" : [
             {
-                "author" : "barbarella"
+                "author" : "barbara"
             },
             {
-                "author" : "leia"
+                "author" : "jenny"
             }
         ],
         "tag" : "nasty"
@@ -428,10 +428,10 @@ var p8result = [
         "author" : "jane",
         "comments" : [
             {
-                "author" : "r2"
+                "author" : "will"
             },
             {
-                "author" : "leia"
+                "author" : "jenny"
             }
         ],
         "tag" : "nasty"
@@ -440,10 +440,10 @@ var p8result = [
         "author" : "jane",
         "comments" : [
             {
-                "author" : "r2"
+                "author" : "will"
             },
             {
-                "author" : "leia"
+                "author" : "jenny"
             }
         ],
         "tag" : "filthy"
@@ -474,15 +474,15 @@ var p9result = [
     {
         "author" : "dave",
         "commentsAuthor" : [
-            "barbarella",
-            "leia"
+            "barbara",
+            "jenny"
         ]
     },
     {
         "author" : "jane",
         "commentsAuthor" : [
-            "r2",
-            "leia"
+            "will",
+            "jenny"
         ]
     }
 ];
@@ -537,12 +537,12 @@ var p10result = [
         ],
         "comments" : [
             {
-                "author" : "r2",
-                "text" : "beep boop"
+                "author" : "will",
+                "text" : "i don't like the color"
             },
             {
-                "author" : "leia",
-                "text" : "this is too smutty"
+                "author" : "jenny",
+                "text" : "can i get that in green?"
             }
         ],
         "other" : {
@@ -561,12 +561,12 @@ var p10result = [
         ],
         "comments" : [
             {
-                "author" : "barbarella",
-                "text" : "this is hot"
+                "author" : "barbara",
+                "text" : "this is interesting"
             },
             {
-                "author" : "leia",
-                "text" : "i prefer the brass bikini",
+                "author" : "jenny",
+                "text" : "i like to play pinball",
                 "votes" : 10
             }
         ],
@@ -920,12 +920,12 @@ var m1result = [
         ],
         "comments" : [
             {
-                "author" : "barbarella",
-                "text" : "this is hot"
+                "author" : "barbara",
+                "text" : "this is interesting"
             },
             {
-                "author" : "leia",
-                "text" : "i prefer the brass bikini",
+                "author" : "jenny",
+                "text" : "i like to play pinball",
                 "votes" : 10
             }
         ],
@@ -959,12 +959,12 @@ var m2result = [
         "pageViews" : 7,
         "comments" : [
             {
-                "author" : "barbarella",
-                "text" : "this is hot"
+                "author" : "barbara",
+                "text" : "this is interesting"
             },
             {
-                "author" : "leia",
-                "text" : "i prefer the brass bikini",
+                "author" : "jenny",
+                "text" : "i like to play pinball",
                 "votes" : 10
             }
         ],
@@ -977,12 +977,12 @@ var m2result = [
         "pageViews" : 6,
         "comments" : [
             {
-                "author" : "r2",
-                "text" : "beep boop"
+                "author" : "will",
+                "text" : "i don't like the color"
             },
             {
-                "author" : "leia",
-                "text" : "this is too smutty"
+                "author" : "jenny",
+                "text" : "can i get that in green?"
             }
         ],
         "tag" : "nasty"

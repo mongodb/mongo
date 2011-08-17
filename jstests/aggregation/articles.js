@@ -1,7 +1,7 @@
 /* sample articles for aggregation demonstrations */
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
-db = db.getSisterDB("aggdb");
+db = db.getSiblingDB("aggdb");
 db.article.drop();
 
 db.article.save( {
@@ -24,8 +24,8 @@ db.article.save( {
     pageViews : 7 , 
     tags : [ "fun" , "nasty" ] ,
     comments : [ 
-        { author :"barbarella" , text : "this is hot" } , 
-        { author :"leia" , text : "i prefer the brass bikini", votes: 10 } 
+        { author :"barbara" , text : "this is interesting" } , 
+        { author :"jenny" , text : "i like to play pinball", votes: 10 } 
     ],
     other : { bar : 14 }
 });
@@ -37,8 +37,8 @@ db.article.save( {
     pageViews : 6 , 
     tags : [ "nasty" , "filthy" ] ,
     comments : [ 
-        { author :"r2" , text : "beep boop" } , 
-        { author :"leia" , text : "this is too smutty" } 
+        { author :"will" , text : "i don't like the color" } , 
+        { author :"jenny" , text : "can i get that in green?" } 
     ],
     other : { bar : 14 }
 });
