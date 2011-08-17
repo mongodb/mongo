@@ -1136,7 +1136,7 @@ namespace mongo {
         try {
             // we can't do the two step method with multi keys as insertion of one key changes the indexes 
             // structure.  however we can do the first key of the set so we go ahead and do that FWIW
-            ii.phasedQueueItemToInsert(idx.head, recordLoc, *keys.begin(), ordering, idx, dupsAllowed);
+            ii.phasedQueueItemToInsert(idxNo, idx.head, recordLoc, *keys.begin(), ordering, idx, dupsAllowed);
         }
         catch (AssertionException& e) {
             if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
