@@ -92,7 +92,7 @@ bzip2_convert_error(WT_SESSION *wt_session, int bzret)
 	 * XXX
 	 * This needs to get pushed back to the session handle somehow.
 	 */
-	wiredtiger_err_printf(wt_session, "bzip2 error: %s: %d\n", msg, bzret);
+	wiredtiger_err_printf(wt_session, "bzip2 error: %s: %d", msg, bzret);
 	return (WT_ERROR);
 }
 
