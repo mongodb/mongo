@@ -98,7 +98,7 @@ __wt_block_write(
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, align_size, orig_size, size;
+	uint32_t addr, align_size, size;
 	uint8_t orig_type;
 	int ret;
 
@@ -119,11 +119,15 @@ __wt_block_write(
 	WT_ASSERT(session,
 	    __wt_verify_dsk(session, buf->mem, 0, buf->size, 0) == 0);
 
+	/*
+	 * The WT_PAGE_DISK->type field is after the 32B we leave uncompressed
+	 * in the block, so we have to save a copy for our eventual verbose
+	 * message.
+	 */
 	dsk = buf->mem;
-	orig_size = buf->size;
 	orig_type = dsk->type;
 
-	/* Align the in-memory size to an allocation unit. */
+	/* Set the in-memory size, then align it to an allocation unit. */
 	dsk->memsize = buf->size;
 	align_size = WT_ALIGN(buf->size, btree->allocsize);
 
@@ -240,7 +244,7 @@ not_compressed:	/*
 
 	WT_VERBOSE(session, WRITE,
 	    "write %" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
-	    orig_size, addr, align_size,
+	    dsk->memsize, addr, dsk->size,
 	    dsk->size < dsk->memsize ? "compressed, " : "",
 	    __wt_page_type_string(orig_type));
 
