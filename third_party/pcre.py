@@ -22,7 +22,7 @@ def getFiles():
     
     return files
 
-def configure( env , fileLists ):
+def configure( env , fileLists , options ):
     #fileLists = { "serverOnlyFiles" : [] }
 
     env.Append( CPPPATH=["./third_party/pcre-7.4/"] )

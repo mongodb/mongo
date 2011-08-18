@@ -367,8 +367,6 @@ serverOnlyFiles += Glob( "db/commands/*.cpp" )
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
-snappyFiles = ["third_party/snappy/snappy.cc", "third_party/snappy/snappy-sinksource.cc"]
-
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
 if usesm:
@@ -761,7 +759,10 @@ for x in os.listdir( "third_party" ):
 
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles }
-    myModule.configure( env , fileLists )
+    
+    options = { "windows" : windows }
+    
+    myModule.configure( env , fileLists , options )
 
 # --- check system ---
 
@@ -1097,12 +1098,6 @@ def checkErrorCodes():
         Exit(-1)
 
 checkErrorCodes()
-
-snappyEnv = env.Clone()
-if not windows:
-    snappyEnv.Append(CPPFLAGS=" -Wno-sign-compare -Wno-unused-function ") #snappy doesn't compile cleanly
-serverOnlyFiles += [snappyEnv.Object(f) for f in snappyFiles]
-
 
 # main db target
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
