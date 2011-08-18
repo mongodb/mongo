@@ -17,9 +17,13 @@ for( j = 0; j < 5; ++j ) {
     }
     t.ensureIndex( {a:1} );
     t.ensureIndex( {b:1} );
-    t.find( {$or:clauses} ).itcount();
-    t.find( {$or:clauses} ).count();
-    t.update( {$or:clauses}, {} );
-    t.remove( {$or:clauses} );
+    try {
+      t.find( {$or:clauses} ).itcount();
+      t.find( {$or:clauses} ).count();
+      t.update( {$or:clauses}, {} );
+      t.remove( {$or:clauses} );
+    } catch ( e ) {
+    }
+    db.getLastError();
 }
 p();
