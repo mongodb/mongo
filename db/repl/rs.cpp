@@ -578,7 +578,6 @@ namespace mongo {
                 }
                 catch(DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
-                    throw;
                 }
                 for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ ) {
                     try {
