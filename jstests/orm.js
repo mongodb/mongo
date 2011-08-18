@@ -1,5 +1,7 @@
 // Test dropping during a $or yield SERVER-3555
 
+if ( 0 ) { // SERVER-3555
+
 t = db.jstests_orm;
 t.drop();
 
@@ -27,3 +29,5 @@ for( j = 0; j < 5; ++j ) {
     db.getLastError();
 }
 p();
+
+}
