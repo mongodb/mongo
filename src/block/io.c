@@ -38,6 +38,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	tmp = NULL;
 	fh = btree->fh;
+	ret = 0;
 
 	WT_RET(__wt_read(
 	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
@@ -53,37 +54,33 @@ __wt_block_read(WT_SESSION_IMPL *session,
 		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
 	}
 
+	/*
+	 * If the in-memory and on-disk sizes are not the same, the buffer is
+	 * compressed: allocate a scratch buffer, copy the skipped bytes of
+	 * the original image into place, then decompress into the scratch
+	 * buffer.
+	 */
+	if (dsk->size != dsk->memsize) {
+		WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
+		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
+		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
+		src.size = buf->size - COMPRESS_SKIP;
+		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
+		dst.size = dsk->memsize - COMPRESS_SKIP;
+		WT_ERR(btree->compressor->decompress(
+		    btree->compressor, &session->iface, &src, &dst));
+		tmp->size = dsk->memsize;
+
+		__wt_buf_swap(tmp, buf);
+		dsk = buf->mem;
+	}
+
 	WT_BSTAT_INCR(session, page_read);
 	WT_CSTAT_INCR(session, block_read);
 
 	WT_VERBOSE(session, READ,
 	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
 	    addr, size, __wt_page_type_string(dsk->type));
-
-	/*
-	 * If the in-memory and on-disk sizes are the same, the buffer is not
-	 * compressed.  Otherwise, allocate a scratch buffer and decompress
-	 * into it.
-	 */
-	if (dsk->size == dsk->memsize)
-		return (0);
-
-	WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
-
-	/*
-	 * Copy the skipped bytes of the original image into place, then
-	 * decompress the buffer.
-	 */
-	memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
-	src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
-	src.size = buf->size - COMPRESS_SKIP;
-	dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
-	dst.size = dsk->memsize - COMPRESS_SKIP;
-	WT_ERR(btree->compressor->decompress(
-	    btree->compressor, &session->iface, &src, &dst));
-	tmp->size = dsk->memsize;
-
-	__wt_buf_swap(tmp, buf);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
