@@ -110,26 +110,25 @@ __wt_block_write(
 	tmp = NULL;
 	ret = 0;
 
-	dsk = buf->mem;
-	orig_size = buf->size;
-	orig_type = dsk->type;
-
 	/*
 	 * We're passed in a WT_BUF that references some chunk of memory that's
 	 * a table's page image.  WT_BUF->size is the byte count of the image,
 	 * and WT_BUF->data is the image itself.
 	 *
-	 * Diagnostics: verify the disk page.  We have to set the disk size to
-	 * the "current" value, otherwise verify will complain.  We have no
-	 * disk address to use for error messages, use 0 (WT_ADDR_INVALID is a
-	 * big, big number).  This violates some layering, but it's the place
-	 * we can ensure we never write a corrupted page.
+	 * Diagnostics: verify the disk page.  We have no disk address to use
+	 * for error messages, use 0 (WT_ADDR_INVALID is a big, big number).
+	 * This violates layering, but it's the place we can ensure we never
+	 * write a corrupted page.
 	 */
-	dsk->size = dsk->memsize = buf->size;
-	WT_ASSERT(session, __wt_verify_dsk(
-	    session, buf->mem, WT_ADDR_INVALID, buf->size, 0) == 0);
+	WT_ASSERT(session,
+	    __wt_verify_dsk(session, buf->mem, 0, buf->size, 0) == 0);
+
+	dsk = buf->mem;
+	orig_size = buf->size;
+	orig_type = dsk->type;
 
 	/* Align the in-memory size to an allocation unit. */
+	dsk->memsize = buf->size;
 	align_size = WT_ALIGN(buf->size, btree->allocsize);
 
 	/*
