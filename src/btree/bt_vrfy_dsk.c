@@ -12,6 +12,8 @@ static int __err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, uint32_t, uint8_t, WT_PAGE_DISK *, int);
 static int __err_eof(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
 static int __err_eop(WT_SESSION_IMPL *, uint32_t, uint32_t, int);
+static int __verify_dsk_chunk(
+	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, uint32_t, int);
 static int __verify_dsk_col_fix(
 	WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, uint32_t, int);
 static int __verify_dsk_col_int(
@@ -106,7 +108,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 		return (__verify_dsk_row(session, dsk, addr, size, quiet));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
-		return (__wt_verify_dsk_chunk(
+		return (__verify_dsk_chunk(
 		    session, dsk, addr, dsk->u.datalen, size, quiet));
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -421,8 +423,7 @@ __verify_dsk_col_fix(WT_SESSION_IMPL *session,
 	btree = session->btree;
 
 	datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
-	return (__wt_verify_dsk_chunk(session,
-	    dsk, addr, datalen, size, quiet));
+	return (__verify_dsk_chunk(session, dsk, addr, datalen, size, quiet));
 }
 
 /*
@@ -529,12 +530,11 @@ match_err:			ret = WT_ERROR;
 }
 
 /*
- * __wt_verify_dsk_chunk --
+ * __verify_dsk_chunk --
  *	Verify a Chunk O' Data on a Btree page.
  */
-int
-__wt_verify_dsk_chunk(
-    WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
+static int
+__verify_dsk_chunk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
     uint32_t addr, uint32_t data_len, uint32_t size, int quiet)
 {
 	uint8_t *p, *end;

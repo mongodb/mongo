@@ -449,15 +449,16 @@ __verify_row_leaf_key_order(
  *	Verify any overflow cells on the page.
  */
 static int
-__verify_overflow_cell(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
+__verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
-	uint32_t i;
+	uint32_t cell_num, i;
+	int ret;
 
 	unpack = &_unpack;
+	ret = 0;
 
 	/*
 	 * Row-store internal page disk images are discarded when there's no
@@ -469,17 +470,25 @@ __verify_overflow_cell(
 	}
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
+	cell_num = 0;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		++cell_num;
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			WT_RET(__verify_overflow(
+			WT_ERR(__verify_overflow(
 			    session, unpack->off.addr, unpack->off.size, vs));
 			break;
 		}
 	}
 	return (0);
+
+err:	__wt_errx(session,
+	    "cell %" PRIu32 " on page at addr %" PRIu32 " references an "
+	    "overflow item at addr %" PRIu32 " that failed verification",
+	    cell_num - 1, WT_PADDR(page), unpack->off.addr);
+	return (ret);
 }
 
 /*
@@ -501,7 +510,7 @@ __verify_overflow(
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the overflow item. */
-	WT_ERR(__wt_block_read(session, tmp, addr, size, 1));
+	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
 	dsk = tmp->mem;
 
 	/*
@@ -511,12 +520,15 @@ __verify_overflow(
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_verify_dsk_chunk(session,
-	    dsk, addr, dsk->u.datalen, dsk->memsize, 0));
+	if (dsk->type != WT_PAGE_OVFL) {
+		__wt_errx(session,
+		    "page at addr %" PRIu32 "is not an overflow page", addr);
+		return (WT_ERROR);
+	}
+	WT_ERR(__wt_verify_dsk(session, dsk, addr, dsk->memsize, 0));
 
 	/* Add the fragments. */
-	WT_ERR(__verify_addfrag(session, addr,
-	    WT_ALIGN(dsk->size, session->btree->allocsize), vs));
+	WT_ERR(__verify_addfrag(session, addr, size, vs));
 
 err:	__wt_scr_release(&tmp);
 
