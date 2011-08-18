@@ -301,7 +301,7 @@ namespace PerfTests {
                     for( i = 0; i < Batch; i++ )
                         timed();
                     n += i;
-                } while( t.millis() < hlm );
+                } while( t.micros() < hlm * 1000 );
             }
 
             client().getLastError(); // block until all ops are finished

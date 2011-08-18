@@ -70,7 +70,10 @@ namespace mongo {
             return now() / countsPerSecond;
         }
 
-        int millis() const { return (int)(micros() / 1000); }
+        int millis() const { 
+            return (int)
+                    ((now() - old) * 1000.0 / countsPerSecond);
+        }
 
         int minutes() const { return seconds() / 60; }
         
@@ -80,7 +83,7 @@ namespace mongo {
         */
         int millisReset() { 
             unsigned long long nw = now();
-            int m = (nw - old) / (countsPerSecond * 1000);
+            int m = (nw - old) * 1000.0 / countsPerSecond;
             old = nw;
             return m;
        } 
@@ -90,7 +93,8 @@ namespace mongo {
         }            
 
         unsigned long long micros() const {
-            return (now() - old) / (countsPerSecond * 1000000);
+            return (unsigned long long)
+                    ((now() - old) * 1000000.0 / countsPerSecond);
         }
 
         static long long countsPerSecond;
@@ -99,7 +103,7 @@ namespace mongo {
         unsigned long long now() const {
             LARGE_INTEGER i;
             QueryPerformanceCounter(&i);
-            return i.QuadPart - old;
+            return i.QuadPart;
         }
 
         unsigned long long old;
