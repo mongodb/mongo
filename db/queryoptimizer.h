@@ -44,6 +44,7 @@ namespace mongo {
                   const FieldRangeSetPair *originalFrsp,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
+                  bool mustAssertOnYieldFailure = true,
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
@@ -82,6 +83,8 @@ namespace mongo {
 
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
         
+        bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
+        
         /** just for testing */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
@@ -109,6 +112,7 @@ namespace mongo {
         string _special;
         IndexType * _type;
         bool _startOrEndSpec;
+        bool _mustAssertOnYieldFailure;
     };
 
     /**
@@ -256,6 +260,7 @@ namespace mongo {
                       auto_ptr<FieldRangeSetPair> originalFrsp,
                       const BSONObj &originalQuery,
                       const BSONObj &order,
+                      bool mustAssertOnYieldFailure = true,
                       const BSONElement *hint = 0,
                       bool honorRecordedPlan = true,
                       const BSONObj &min = BSONObj(),
@@ -372,6 +377,7 @@ namespace mongo {
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
         shared_ptr<Runner> _runner;
+        bool _mustAssertOnYieldFailure;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
