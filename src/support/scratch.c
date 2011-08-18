@@ -20,7 +20,7 @@ __wt_buf_clear(WT_BUF *buf)
 	buf->size = 0;
 
 	buf->mem = NULL;
-	buf->mem_size = 0;
+	buf->memsize = 0;
 
 	/* Note: don't clear the flags, the buffer remains marked in-use. */
 }
@@ -34,8 +34,8 @@ __wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	WT_ASSERT(session, size <= UINT32_MAX);
 
-	if (size > buf->mem_size)
-		WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
+	if (size > buf->memsize)
+		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
 
 	buf->data = buf->mem;
 	buf->size = 0;
@@ -68,7 +68,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 
 	WT_ASSERT(session, size <= UINT32_MAX);
 
-	if (size > buf->mem_size) {
+	if (size > buf->memsize) {
 		/*
 		 * Reallocate the buffer's memory, but maintain the previous
 		 * data reference.
@@ -76,7 +76,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 		offset = (buf->data == NULL) ? 0 :
 		    WT_PTRDIFF(buf->data, buf->mem);
 
-		WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
+		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
 
 		buf->data = (uint8_t *)buf->mem + offset;
 	}
@@ -124,9 +124,9 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
 		WT_ASSERT(session,
 		    buf->data > buf->mem &&
 		    (uint8_t *)buf->data <
-		    (uint8_t *)buf->mem + buf->mem_size &&
+		    (uint8_t *)buf->mem + buf->memsize &&
 		    (uint8_t *)buf->data + buf->size <=
-		    (uint8_t *)buf->mem + buf->mem_size);
+		    (uint8_t *)buf->mem + buf->memsize);
 		memmove(buf->mem, buf->data, buf->size);
 	}
 
@@ -181,8 +181,8 @@ __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
 	for (;;) {
 		va_start(ap, fmt);
 		p = (char *)((uint8_t *)buf->mem + buf->size);
-		WT_ASSERT(session, buf->mem_size >= buf->size);
-		space = buf->mem_size - buf->size;
+		WT_ASSERT(session, buf->memsize >= buf->size);
+		space = buf->memsize - buf->size;
 		len = (size_t)vsnprintf(p, (size_t)space, fmt, ap);
 		va_end(ap);
 
@@ -197,7 +197,7 @@ __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
 		 * strings, and we don't expect these numbers to get huge.
 		 */
 		WT_RET(__wt_buf_grow(session, buf,
-		    WT_MAX(buf->size + len + 1, buf->mem_size * 2)));
+		    WT_MAX(buf->size + len + 1, buf->memsize * 2)));
 	}
 }
 
@@ -244,8 +244,8 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 		 * it.  If we don't want this one, remember it -- if we have two
 		 * buffers we can "remember", then remember the smallest one.
 		 */
-		if (buf->mem_size >= size &&
-		    (buf->mem_size - size) < 4 * 1024) {
+		if (buf->memsize >= size &&
+		    (buf->memsize - size) < 4 * 1024) {
 			WT_ERR(__wt_buf_init(session, buf, size));
 			F_SET(buf, WT_BUF_INUSE);
 			*scratchp = buf;
@@ -253,7 +253,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 		}
 		if (small == NULL)
 			small = buf;
-		else if (small->mem_size > buf->mem_size)
+		else if (small->memsize > buf->memsize)
 			small = buf;
 	}
 

@@ -126,7 +126,7 @@ struct wt_buf {
 	 * Managed memory chunk.
 	 */
 	void *mem;
-	size_t mem_size;
+	size_t memsize;
 };
 #endif
 

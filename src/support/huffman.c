@@ -663,14 +663,14 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 		bitpos += len;
 		while (valid >= 8) {
 			WT_ASSERT(session,
-			    WT_PTR_IN_RANGE(out, tmp->mem, tmp->mem_size));
+			    WT_PTR_IN_RANGE(out, tmp->mem, tmp->memsize));
 			*out++ = (uint8_t)(bits >> (valid - 8));
 			valid -= 8;
 		}
 	}
 	if (valid > 0) {		/* Flush shift register. */
 		WT_ASSERT(session,
-		    WT_PTR_IN_RANGE(out, tmp->mem, tmp->mem_size));
+		    WT_PTR_IN_RANGE(out, tmp->mem, tmp->memsize));
 		*out = (uint8_t)(bits << (8 - valid));
 	}
 
@@ -806,7 +806,7 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		from_len_bits -= len;
 
 		WT_ASSERT(session,
-		    WT_PTR_IN_RANGE(to, tmp->mem, tmp->mem_size));
+		    WT_PTR_IN_RANGE(to, tmp->mem, tmp->memsize));
 		*to++ = symbol;
 	}
 

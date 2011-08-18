@@ -1397,7 +1397,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 #define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
 	dsk = buf->mem;
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
-		WT_ASSERT_RET(session, buf->size < buf->mem_size);
+		WT_ASSERT_RET(session, buf->size < buf->memsize);
 
 		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
 		(void)__wt_cell_pack_type(cell, WT_CELL_KEY, (uint64_t)0);

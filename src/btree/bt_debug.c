@@ -132,7 +132,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		msg = ds->msg;
 		for (;;) {
 			p = (char *)msg->mem + msg->size;
-			space = msg->mem_size - msg->size;
+			space = msg->memsize - msg->size;
 			va_start(ap, fmt);
 			len = (size_t)vsnprintf(p, space, fmt, ap);
 			va_end(ap);
@@ -150,7 +150,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 			 * going to worry about it.
 			 */
 			if (__wt_buf_grow(
-			    session, msg, msg->mem_size + len + 128) != 0)
+			    session, msg, msg->memsize + len + 128) != 0)
 				return;
 		}
 		if (((uint8_t *)msg->mem)[msg->size - 1] == '\n') {
