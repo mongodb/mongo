@@ -377,8 +377,6 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		if (__wt_block_read(
 		    session, t, WT_OFF_TO_ADDR(btree, off), size, 1))
 			goto skip;
-		/* Compression may switch buffers on us, reset reference. */
-		dsk = t->mem;
 
 		/*
 		 * Verify the page: it's vanishingly unlikely a page could pass
