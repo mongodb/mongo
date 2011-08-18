@@ -80,7 +80,8 @@ static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	__wt_free(session, r->retry);
-	r->retry_next = r->retry_entries = r->retry_allocated = 0;
+	r->retry_next = r->retry_entries = 0;
+	r->retry_allocated = 0;
 
 	r->session = NULL;
 	WT_MEMORY_FLUSH;		/* Turn entry off */

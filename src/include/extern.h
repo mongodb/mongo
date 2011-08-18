@@ -287,12 +287,12 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *key,
     uint32_t skipdepth,
     WT_INSERT **insp,
-    uint32_t *ins_sizep);
+    size_t *ins_sizep);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
-    uint32_t *upd_sizep);
+    size_t *upd_sizep);
 extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -352,7 +352,7 @@ extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t size,
     void *retp);
 extern int __wt_realloc(WT_SESSION_IMPL *session,
-    uint32_t *bytes_allocated_ret,
+    size_t *bytes_allocated_ret,
     size_t bytes_to_allocate,
     void *retp);
 extern int __wt_strndup(WT_SESSION_IMPL *session,

@@ -9,7 +9,7 @@
 
 /*
  * __wt_row_modify --
- *	Row-store delete insert, and update.
+ *	Row-store insert, update and delete.
  */
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
@@ -20,8 +20,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_PAGE *page;
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
-	uint32_t ins_size, new_inshead_size, new_inslist_size, new_upd_size;
-	uint32_t skipdepth, upd_size;
+	size_t ins_size, new_inshead_size, new_inslist_size;
+	size_t new_upd_size, upd_size;
+	uint32_t skipdepth;
 	int i, ret;
 
 	key = (WT_ITEM *)&cbt->iface.key;
@@ -57,7 +58,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_upd));
 				new_upd_size =
-				    page->entries * WT_SIZEOF32(WT_UPDATE *);
+				    page->entries * sizeof(WT_UPDATE *);
 				upd_entry = &new_upd[cbt->slot];
 			} else
 				upd_entry = &page->u.row_leaf.upd[cbt->slot];
@@ -83,7 +84,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &new_inslist));
 			new_inslist_size =
-			    (page->entries + 1) * WT_SIZEOF32(WT_INSERT_HEAD *);
+			    (page->entries + 1) * sizeof(WT_INSERT_HEAD *);
 			inshead = &new_inslist[cbt->slot];
 		} else
 			inshead = &page->u.row_leaf.ins[cbt->slot];
@@ -96,7 +97,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * well, search couldn't have.
 		 */
 		if (*inshead == NULL) {
-			new_inshead_size = WT_SIZEOF32(WT_INSERT_HEAD);
+			new_inshead_size = sizeof(WT_INSERT_HEAD);
 			WT_ERR(__wt_sb_alloc(session,
 			    sizeof(WT_INSERT_HEAD), &new_inshead, &sb));
 			new_inshead->sb = sb;
@@ -150,27 +151,28 @@ err:		if (ins != NULL)
  */
 int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *key, uint32_t skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
+    WT_ITEM *key, uint32_t skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
-	uint32_t ins_size;
+	size_t ins_size;
 
 	/*
 	 * Allocate the WT_INSERT structure, next pointers for the skip list,
 	 * and room for the key.  Then copy the key into place.
 	 */
-	ins_size = WT_SIZEOF32(WT_INSERT) +
-	    skipdepth * WT_SIZEOF32(WT_INSERT *) + key->size;
+	ins_size = sizeof(WT_INSERT) +
+	    skipdepth * sizeof(WT_INSERT *) + key->size;
 	WT_RET(__wt_sb_alloc(session, ins_size, &ins, &sb));
 
 	ins->sb = sb;
-	ins->u.key.offset = ins_size - key->size;
+	ins->u.key.offset = WT_STORE_SIZE(ins_size - key->size);
 	WT_INSERT_KEY_SIZE(ins) = key->size;
 	memcpy(WT_INSERT_KEY(ins), key->data, key->size);
 
 	*insp = ins;
-	*ins_sizep = ins_size;
+	if (ins_sizep != NULL)
+		*ins_sizep = ins_size;
 
 	return (0);
 }
@@ -244,11 +246,11 @@ err:	__wt_session_serialize_wrapup(session, page, 0);
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, uint32_t *upd_sizep)
+    WT_ITEM *value, WT_UPDATE **updp, size_t *upd_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
-	uint32_t size;
+	size_t size;
 
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
@@ -260,11 +262,12 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	if (value == NULL)
 		WT_UPDATE_DELETED_SET(upd);
 	else {
-		upd->size = size;
+		upd->size = WT_STORE_SIZE(size);
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	*upd_sizep = size + WT_SIZEOF32(WT_UPDATE);
+	if (upd_sizep != NULL)
+		*upd_sizep = size + sizeof(WT_UPDATE);
 	*updp = upd;
 
 	return (0);

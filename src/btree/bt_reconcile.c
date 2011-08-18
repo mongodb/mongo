@@ -48,7 +48,7 @@ typedef struct {
 	} *discard;			/* List of discard objects */
 	uint32_t discard_next;		/* Next discard slot */
 	uint32_t discard_entries;	/* Total discard slots */
-	uint32_t discard_allocated;	/* Bytes allocated */
+	size_t   discard_allocated;	/* Bytes allocated */
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -111,7 +111,7 @@ typedef struct {
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
 	uint32_t bnd_entries;		/* Total boundary slots */
-	uint32_t bnd_allocated;		/* Bytes allocated */
+	size_t   bnd_allocated;		/* Bytes allocated */
 
 	/*
 	 * We track the total number of page entries copied into split chunks
@@ -164,7 +164,7 @@ typedef struct {
 	WT_REF **imref;			/* In-memory subtree reference list */
 	uint32_t imref_next;		/* Next list slot */
 	uint32_t imref_entries;		/* Total list slots */
-	uint32_t imref_allocated;	/* Bytes allocated */
+	size_t   imref_allocated;	/* Bytes allocated */
 	uint32_t imref_found;		/* Fast check for search */
 
 	int	    cell_zero;		/* Row-store internal page 0th key */
@@ -292,7 +292,7 @@ __rec_incrv(
 	 */
 	WT_ASSERT(session, r->space_avail >= size);
 	WT_ASSERT(session,
-	    WT_PTRDIFF32(r->first_free + size, r->dsk.mem) <= r->page_size);
+	    WT_BLOCK_FITS(r->first_free, size, r->dsk.mem, r->page_size));
 
 	r->entries += v;
 	r->space_avail -= size;
@@ -1590,7 +1590,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		off.size = WT_COL_REF_SIZE(cref);
 		WT_RECNO(&off) = cref->recno;
 		memcpy(r->first_free, &off, sizeof(WT_OFF_RECORD));
-		__rec_incr(session, r, WT_SIZEOF32(WT_OFF_RECORD));
+		__rec_incr(session, r, sizeof(WT_OFF_RECORD));
 	}
 
 	return (0);
@@ -2200,8 +2200,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	val->cell_len =
 	    __wt_cell_pack_type(&val->cell, WT_CELL_OFF, (uint64_t)0);
 	val->buf.data = &val->off;
-	val->buf.size = WT_SIZEOF32(WT_OFF);
-	val->len = val->cell_len + WT_SIZEOF32(WT_OFF);
+	val->buf.size = sizeof(WT_OFF);
+	val->len = WT_STORE_SIZE(val->cell_len + sizeof(WT_OFF));
 
 	/* For each entry in the in-memory page... */
 	WT_ROW_REF_FOREACH(page, rref, i) {

@@ -148,7 +148,6 @@ __bulk_col_var(WT_CURSOR_BULK *cbulk)
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
-	uint32_t not_used;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
@@ -160,7 +159,7 @@ __bulk_col_var(WT_CURSOR_BULK *cbulk)
 	 * update list.
 	 */
 	WT_RET(__wt_update_alloc(
-	    session, (WT_ITEM *)&cursor->value, &upd, &not_used));
+	    session, (WT_ITEM *)&cursor->value, &upd, NULL));
 	(*cbulk->updp) = upd;
 	cbulk->updp = &upd->next;
 
@@ -186,7 +185,6 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
-	uint32_t not_used;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
@@ -199,9 +197,9 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	 * page's insert list.
 	 */
 	WT_RET(__wt_row_insert_alloc(
-	    session, (WT_ITEM *)&cursor->key, 1, &ins, &not_used));
+	    session, (WT_ITEM *)&cursor->key, 1, &ins, NULL));
 	WT_ERR(__wt_update_alloc(
-	    session, (WT_ITEM *)&cursor->value, &ins->upd, &not_used));
+	    session, (WT_ITEM *)&cursor->value, &ins->upd, NULL));
 	*cbulk->insp = ins;
 	cbulk->insp = &WT_SKIP_NEXT(ins);
 

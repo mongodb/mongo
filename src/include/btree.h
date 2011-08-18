@@ -50,7 +50,7 @@ struct __wt_walk_entry {
 struct __wt_walk {
 	WT_WALK_ENTRY *tree;
 
-	uint32_t tree_len;	/* Tree stack in bytes */
+	size_t   tree_len;	/* Tree stack in bytes */
 	u_int	 tree_slot;	/* Current tree stack slot */
 
 	uint32_t flags;		/* Flags specified for the walk */

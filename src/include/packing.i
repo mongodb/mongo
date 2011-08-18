@@ -66,7 +66,7 @@ __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 next:	if (pack->cur == pack->end)
 		return (WT_NOTFOUND);
 
-	pv->size = (uint32_t)strtoul(pack->cur, &endsize, 10);
+	pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
 	pv->havesize = (endsize > pack->cur);
 	if (!pv->havesize)
 		pv->size = 1;
@@ -342,7 +342,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = maxlen;
 		WT_SIZE_CHECK(s, maxlen);
 		pv->u.item.data = *pp;
-		pv->u.item.size = (uint32_t)s;
+		pv->u.item.size = WT_STORE_SIZE(s);
 		*pp += s;
 		break;
 	case 'b':

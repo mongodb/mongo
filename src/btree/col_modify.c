@@ -9,7 +9,7 @@
 
 static int __col_extend(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int __col_insert_alloc(
-		WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, uint32_t *);
+		WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, size_t *);
 static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
 
 /*
@@ -26,8 +26,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_PAGE *page;
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
+	size_t ins_size, new_inslist_size, new_inshead_size, upd_size;
 	uint64_t recno;
-	uint32_t ins_size, new_inslist_size, new_inshead_size, upd_size;
 	u_int skipdepth;
 	int hazard_ref, i, ret;
 
@@ -102,14 +102,13 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				new_inslist_size = 1 *
-				    WT_SIZEOF32(WT_INSERT_HEAD *);
-				WT_ERR(__wt_calloc_def(
-				    session, 1, &new_inslist));
-				inshead = &new_inslist[0];
+				    sizeof(WT_INSERT_HEAD *);
+				WT_ERR(__wt_calloc(session,
+				    new_inslist_size, 1, &new_inslist));
 				break;
 			case WT_PAGE_COL_VAR:
 				new_inslist_size = page->entries *
-				    WT_SIZEOF32(WT_INSERT_HEAD *);
+				    sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_inslist));
 				inshead = &new_inslist[cbt->slot];
@@ -128,7 +127,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			}
 
 		if (*inshead == NULL) {
-			new_inshead_size = WT_SIZEOF32(WT_INSERT_HEAD);
+			new_inshead_size = sizeof(WT_INSERT_HEAD);
 			WT_RET(__wt_sb_alloc(session,
 			    sizeof(WT_INSERT_HEAD), &new_inshead, &sb));
 			new_inshead->sb = sb;
@@ -186,18 +185,18 @@ err:		if (ins != NULL)
  */
 static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
-    uint64_t recno, u_int skipdepth, WT_INSERT **insp, uint32_t *ins_sizep)
+    uint64_t recno, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
-	uint32_t ins_size;
+	size_t ins_size;
 
 	/*
 	 * Allocate the WT_INSERT structure and skiplist pointers, then copy
 	 * the record number into place.
 	 */
-	ins_size = WT_SIZEOF32(WT_INSERT) +
-	    skipdepth * WT_SIZEOF32(WT_INSERT *);
+	ins_size = sizeof(WT_INSERT) +
+	    skipdepth * sizeof(WT_INSERT *);
 	WT_RET(__wt_sb_alloc(session, ins_size, &ins, &sb));
 
 	ins->sb = sb;
@@ -221,7 +220,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	WT_CONFIG_ITEM cval;
 	WT_PAGE *new_intl, *new_leaf, *parent;
 	uint64_t next;
-	uint32_t entries_size, new_intl_size, new_leaf_size, t_size;
+	size_t entries_size, new_intl_size, new_leaf_size, t_size;
 	uint32_t internal_extend, leaf_extend;
 	uint8_t *bitf;
 	int ret;
@@ -279,7 +278,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 
 		WT_RET(__wt_calloc_def(session, (size_t)leaf_extend, &d));
 		entries = d;
-		entries_size = leaf_extend * WT_SIZEOF32(WT_COL);
+		entries_size = leaf_extend * sizeof(WT_COL);
 		break;
 	}
 
@@ -307,7 +306,7 @@ __col_extend(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno)
 	    session->btree->config, "column_internal_extend", &cval));
 	internal_extend = (uint32_t)cval.val;
 	WT_ERR(__wt_calloc_def(session, (size_t)internal_extend, &t));
-	t_size = internal_extend * WT_SIZEOF32(WT_COL_REF);
+	t_size = internal_extend * sizeof(WT_COL_REF);
 
 done:	return (__wt_col_extend_serial(session, page, &new_intl, new_intl_size,
 	    &t, t_size, internal_extend, &new_leaf, new_leaf_size, &entries,

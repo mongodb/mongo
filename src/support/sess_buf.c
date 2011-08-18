@@ -16,7 +16,8 @@ __wt_sb_alloc(
     WT_SESSION_IMPL *session, size_t size, void *retp, WT_SESSION_BUFFER **sbp)
 {
 	WT_SESSION_BUFFER *sb;
-	uint32_t alloc_size, align_size;
+	size_t alloc_size;
+	uint32_t align_size;
 	int single_use;
 
 	/*
@@ -94,7 +95,7 @@ __wt_sb_alloc(
 	 * larger, up to 8MB.
 	 */
 	if (align_size > session->update_alloc_size) {
-		alloc_size = WT_SIZEOF32(WT_SESSION_BUFFER) + align_size;
+		alloc_size = sizeof(WT_SESSION_BUFFER) + align_size;
 		single_use = 1;
 	} else {
 		if (session->update_alloc_size < 8 * WT_MEGABYTE)
@@ -105,9 +106,8 @@ __wt_sb_alloc(
 	}
 
 	WT_RET(__wt_calloc(session, 1, alloc_size, &sb));
-	WT_ASSERT(session, alloc_size == (uint32_t)alloc_size);
-	sb->len = alloc_size;
-	sb->space_avail = alloc_size - WT_SIZEOF32(WT_SESSION_BUFFER);
+	sb->len = WT_STORE_SIZE(alloc_size);
+	sb->space_avail = WT_STORE_SIZE(alloc_size - sizeof(WT_SESSION_BUFFER));
 	sb->first_free = (uint8_t *)sb + sizeof(WT_SESSION_BUFFER);
 
 	/*

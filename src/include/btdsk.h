@@ -190,7 +190,7 @@ struct __wt_page_disk {
  *	Return the offset/pointer of a pointer/offset in a page disk image.
  */
 #define	WT_DISK_OFFSET(dsk, p)						\
-	((uint32_t)((uint8_t *)(p) - (uint8_t *)(dsk)))
+	WT_PTRDIFF32(p, dsk)
 #define	WT_REF_OFFSET(page, o)						\
 	((void *)((uint8_t *)((page)->dsk) + (o)))
 

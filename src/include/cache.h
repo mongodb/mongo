@@ -26,7 +26,7 @@ struct __wt_evict_req {
 	WT_PAGE **retry;			/* Pages to retry */
 	uint32_t  retry_next;			/* Next retry slot */
 	uint32_t  retry_entries;		/* Total retry slots */
-	uint32_t  retry_allocated;		/* Bytes allocated */
+	size_t    retry_allocated;		/* Bytes allocated */
 };
 
 /*
@@ -54,7 +54,7 @@ struct __wt_cache {
 
 	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
 	uint32_t evict_entries;		/* Total evict slots */
-	uint32_t evict_allocated;	/* Bytes allocated */
+	size_t   evict_allocated;	/* Bytes allocated */
 
 	/*
 	 * File sync can temporarily fail when a tree is active, that is, we may

@@ -148,8 +148,7 @@ __curtable_set_key(WT_CURSOR *cursor, ...)
 			goto err;
 		}
 	}
-	WT_ASSERT(session, sz <= UINT32_MAX);
-	cursor->key.size = (uint32_t)sz;
+	cursor->key.size = WT_STORE_SIZE(sz);
 	va_end(ap);
 
 	for (i = 0, cp = ctable->cg_cursors;

@@ -42,17 +42,17 @@ __wt_cache_read_unpack(
 typedef struct {
 	WT_PAGE *page;
 	WT_PAGE *new_intl;
-	uint32_t new_intl_size;
+	size_t new_intl_size;
 	int new_intl_taken;
 	WT_COL_REF *t;
-	uint32_t t_size;
+	size_t t_size;
 	int t_taken;
 	uint32_t internal_extend;
 	WT_PAGE *new_leaf;
-	uint32_t new_leaf_size;
+	size_t new_leaf_size;
 	int new_leaf_taken;
 	void *entries;
-	uint32_t entries_size;
+	size_t entries_size;
 	int entries_taken;
 	uint32_t leaf_extend;
 	uint64_t recno;
@@ -60,11 +60,10 @@ typedef struct {
 
 static inline int
 __wt_col_extend_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE **new_intlp, uint32_t
-	new_intl_size, WT_COL_REF **tp, uint32_t t_size, uint32_t
-	internal_extend, WT_PAGE **new_leafp, uint32_t new_leaf_size, void
-	**entriesp, uint32_t entries_size, uint32_t leaf_extend, uint64_t
-	recno)
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE **new_intlp, size_t
+	new_intl_size, WT_COL_REF **tp, size_t t_size, uint32_t
+	internal_extend, WT_PAGE **new_leafp, size_t new_leaf_size, void
+	**entriesp, size_t entries_size, uint32_t leaf_extend, uint64_t recno)
 {
 	__wt_col_extend_args _args, *args = &_args;
 	int ret;
@@ -229,13 +228,13 @@ typedef struct {
 	WT_INSERT_HEAD **inshead;
 	WT_INSERT ***ins_stack;
 	WT_INSERT_HEAD **new_inslist;
-	uint32_t new_inslist_size;
+	size_t new_inslist_size;
 	int new_inslist_taken;
 	WT_INSERT_HEAD *new_inshead;
-	uint32_t new_inshead_size;
+	size_t new_inshead_size;
 	int new_inshead_taken;
 	WT_INSERT *ins;
-	uint32_t ins_size;
+	size_t ins_size;
 	int ins_taken;
 	uint32_t depth;
 } __wt_insert_args;
@@ -244,8 +243,8 @@ static inline int
 __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
 	WT_INSERT_HEAD **inshead, WT_INSERT ***ins_stack, WT_INSERT_HEAD
-	***new_inslistp, uint32_t new_inslist_size, WT_INSERT_HEAD
-	**new_insheadp, uint32_t new_inshead_size, WT_INSERT **insp, uint32_t
+	***new_inslistp, size_t new_inslist_size, WT_INSERT_HEAD
+	**new_insheadp, size_t new_inshead_size, WT_INSERT **insp, size_t
 	ins_size, uint32_t depth)
 {
 	__wt_insert_args _args, *args = &_args;
@@ -400,18 +399,18 @@ typedef struct {
 	uint32_t write_gen;
 	WT_UPDATE **srch_upd;
 	WT_UPDATE **new_upd;
-	uint32_t new_upd_size;
+	size_t new_upd_size;
 	int new_upd_taken;
 	WT_UPDATE *upd;
-	uint32_t upd_size;
+	size_t upd_size;
 	int upd_taken;
 } __wt_update_args;
 
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	**srch_upd, WT_UPDATE ***new_updp, uint32_t new_upd_size, WT_UPDATE
-	**updp, uint32_t upd_size)
+	**srch_upd, WT_UPDATE ***new_updp, size_t new_upd_size, WT_UPDATE
+	**updp, size_t upd_size)
 {
 	__wt_update_args _args, *args = &_args;
 	int ret;

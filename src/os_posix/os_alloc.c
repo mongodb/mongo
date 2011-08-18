@@ -49,7 +49,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
  */
 int
 __wt_realloc(WT_SESSION_IMPL *session,
-    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
+    size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
 	void *p;
 	size_t bytes_allocated;
@@ -90,11 +90,8 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
 	/* Update caller's bytes allocated value. */
-	if (bytes_allocated_ret != NULL) {
-		WT_ASSERT(session,
-		    bytes_to_allocate == (uint32_t)bytes_to_allocate);
-		*bytes_allocated_ret = (uint32_t)bytes_to_allocate;
-	}
+	if (bytes_allocated_ret != NULL)
+		*bytes_allocated_ret = bytes_to_allocate;
 
 	*(void **)retp = p;
 	return (0);

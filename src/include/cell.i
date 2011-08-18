@@ -327,7 +327,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		CHK(p, sizeof(WT_OFF));			/* check WT_OFF */
 		unpack->ovfl = 1;
 		memcpy(&unpack->off, p, sizeof(WT_OFF));
-		unpack->len = WT_PTRDIFF32(p, cell) + WT_SIZEOF32(WT_OFF);
+		unpack->len = WT_PTRDIFF32(p + sizeof(WT_OFF), cell);
 		break;
 	case WT_CELL_DEL:
 		unpack->len = WT_PTRDIFF32(p, cell);
@@ -337,8 +337,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		unpack->data = p;
-		unpack->size = (uint32_t)v;
-		unpack->len = WT_PTRDIFF32(p, cell) + (uint32_t)v;
+		unpack->size = WT_STORE_SIZE(v);
+		unpack->len = WT_PTRDIFF32(p + unpack->size, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */

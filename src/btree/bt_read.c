@@ -297,7 +297,7 @@ __cache_read(
 
 	/* Add the page to our cache statistics. */
 	__wt_cache_page_read(session, ref->page,
-	    WT_SIZEOF32(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
+	    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;

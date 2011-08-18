@@ -22,7 +22,7 @@ typedef struct {
 } WT_DBG;
 
 #ifdef HAVE_DIAGNOSTIC
-static void __debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
+static void __debug_byte_string(WT_DBG *, const uint8_t *, size_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
 static void __debug_col_insert(WT_DBG *, WT_INSERT_HEAD *, int);
@@ -31,7 +31,7 @@ static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_int(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_ikey(WT_DBG *, WT_IKEY *);
-static void __debug_item(WT_DBG *, const char *, const void *, uint32_t);
+static void __debug_item(WT_DBG *, const char *, const void *, size_t);
 static void __debug_page_col_fix(WT_DBG *, WT_PAGE *);
 static int  __debug_page_col_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __debug_page_col_var(WT_DBG *, WT_PAGE *);
@@ -116,7 +116,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 	va_list ap;
 	WT_BUF *msg;
 	WT_SESSION_IMPL *session;
-	uint32_t len, space;
+	size_t len, space;
 	char *p;
 
 	session = ds->session;
@@ -131,15 +131,15 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 	if (ds->fp == NULL) {
 		msg = ds->msg;
 		for (;;) {
-			p = (char *)((uint8_t *)msg->mem + msg->size);
+			p = (char *)msg->mem + msg->size;
 			space = msg->mem_size - msg->size;
 			va_start(ap, fmt);
-			len = (uint32_t)vsnprintf(p, (size_t)space, fmt, ap);
+			len = (size_t)vsnprintf(p, space, fmt, ap);
 			va_end(ap);
 
 			/* Check if there was enough space. */
 			if (len < space) {
-				msg->size += len;
+				msg->size += (uint32_t)len;
 				break;
 			}
 
@@ -740,7 +740,7 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
 	WT_BUF *tmp;
 	WT_SESSION_IMPL *session;
-	uint32_t size;
+	size_t size;
 	const uint8_t *p;
 	int ret;
 
@@ -767,11 +767,11 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 		break;
 	case WT_CELL_DEL:
 deleted:	p = (uint8_t *)"deleted";
-		size = (uint32_t)strlen("deleted");
+		size = strlen("deleted");
 		break;
 	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";
-		size = (uint32_t)strlen("offpage");
+		size = strlen("offpage");
 		break;
 	WT_ILLEGAL_FORMAT_ERR(session);
 	}
@@ -797,7 +797,7 @@ __debug_ikey(WT_DBG *ds, WT_IKEY *ikey)
  *	Dump a single data/size pair, with an optional tag.
  */
 static void
-__debug_item(WT_DBG *ds, const char *tag, const void *data, uint32_t size)
+__debug_item(WT_DBG *ds, const char *tag, const void *data, size_t size)
 {
 	__dmsg(ds,
 	    "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
@@ -845,7 +845,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
  *	Output a single byte string in printable characters, where possible.
  */
 static void
-__debug_byte_string(WT_DBG *ds, const uint8_t *data, uint32_t size)
+__debug_byte_string(WT_DBG *ds, const uint8_t *data, size_t size)
 {
 	int ch;
 

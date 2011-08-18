@@ -91,7 +91,7 @@ typedef struct {
 	for l in entry.args:
 		f.write('\t' + decl(l) + ';\n')
 		if l.sized:
-			f.write('\tuint32_t ' + l.name + '_size;\n')
+			f.write('\tsize_t ' + l.name + '_size;\n')
 			f.write('\tint ' + l.name + '_taken;\n')
 	f.write('} __wt_' + entry.name + '_args;\n\n')
 
@@ -100,7 +100,7 @@ typedef struct {
 	o = 'WT_SESSION_IMPL *session'
 	for l in entry.args:
 		if l.sized:
-			o += ', ' + decl_p(l) + ', uint32_t ' + l.name + '_size'
+			o += ', ' + decl_p(l) + ', size_t ' + l.name + '_size'
 		else:
 			o += ', ' + decl(l)
 	o += ')'

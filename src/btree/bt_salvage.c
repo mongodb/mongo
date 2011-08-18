@@ -19,11 +19,11 @@ struct __wt_stuff {
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
-	uint32_t   pages_allocated;		/* Bytes allocated */
+	size_t     pages_allocated;		/* Bytes allocated */
 
 	WT_TRACK **ovfl;			/* Overflow pages */
 	uint32_t   ovfl_next;			/* Next empty slot */
-	uint32_t   ovfl_allocated;		/* Bytes allocated */
+	size_t     ovfl_allocated;		/* Bytes allocated */
 
 	uint8_t    page_type;			/* Page type */
 

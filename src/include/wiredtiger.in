@@ -118,15 +118,15 @@ struct wt_buf {
 	const void *data;
 	uint32_t size;
 
-	/*
-	 * Managed memory chunk.  We swap the order here to avoid padding on
-	 * 64-bit systems.
-	 */
-	uint32_t mem_size;
-	void *mem;
-
+	/* This appears in the middle of the struct to avoid padding. */
 #define	WT_BUF_INUSE					0x00000001
 	uint32_t flags;
+
+	/*
+	 * Managed memory chunk.
+	 */
+	void *mem;
+	size_t mem_size;
 };
 #endif
 

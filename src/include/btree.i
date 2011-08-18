@@ -25,14 +25,14 @@ __wt_cache_page_workq(WT_SESSION_IMPL *session)
  */
 static inline void
 __wt_cache_page_workq_incr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
 	cache->bytes_workq += size;
-	page->memory_footprint += size;
+	page->memory_footprint += WT_STORE_SIZE(size);
 }
 
 /*
@@ -40,7 +40,7 @@ __wt_cache_page_workq_incr(
  *	Read pages into the cache.
  */
 static inline void
-__wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
+__wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
@@ -52,7 +52,7 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t size)
 	++cache->pages_read;
 	cache->bytes_read += size;
 
-	page->memory_footprint = size;
+	page->memory_footprint = WT_STORE_SIZE(size);
 }
 
 /*

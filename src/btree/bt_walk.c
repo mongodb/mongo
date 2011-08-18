@@ -165,7 +165,7 @@ __wt_walk_next(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_WALK_ENTRY *e;
-	u_int elem;
+	size_t elem;
 
 	e = &walk->tree[walk->tree_slot];
 	page = e->page;
@@ -277,7 +277,7 @@ eop:		e->child = e->visited = 1;
 		 * Check to see if we grew past the end of our stack, then push
 		 * the child onto the stack and recursively descend the tree.
 		 */
-		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
+		elem = walk->tree_len / sizeof(WT_WALK_ENTRY);
 		if (walk->tree_slot + 1 >= elem)
 			WT_RET(__wt_realloc(session, &walk->tree_len,
 			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));
@@ -313,7 +313,7 @@ __wt_walk_prev(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_WALK_ENTRY *e;
-	u_int elem;
+	size_t elem;
 
 	e = &walk->tree[walk->tree_slot];
 	page = e->page;
@@ -389,7 +389,7 @@ __wt_walk_prev(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
 		 * Check to see if we grew past the end of our stack, then push
 		 * the child onto the stack and recursively descend the tree.
 		 */
-		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
+		elem = walk->tree_len / sizeof(WT_WALK_ENTRY);
 		if (walk->tree_slot + 1 >= elem)
 			WT_RET(__wt_realloc(session, &walk->tree_len,
 			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));

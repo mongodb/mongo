@@ -96,7 +96,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					memmove(p + len, p, buf->size - offset);
 				WT_RET(__pack_write(session,
 				    &pv, &p, (size_t)(end - p)));
-				buf->size += (uint32_t)len;
+				buf->size += WT_STORE_SIZE(len);
 				break;
 
 			default:
@@ -267,7 +267,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 				pv.u = vpv.u;
 
 				len = __pack_size(session, &pv);
-				offset = (uint32_t)(p - (uint8_t *)buf->data);
+				offset = WT_PTRDIFF32(p, buf->data);
 				WT_RET(__wt_buf_grow(session,
 				    buf, buf->size + len));
 				p = (uint8_t *)buf->data + offset;
@@ -277,7 +277,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 					memmove(p + len, p, buf->size - offset);
 				WT_RET(__pack_write(session,
 				    &pv, &p, (size_t)(end - p)));
-				buf->size += (uint32_t)len;
+				buf->size += WT_STORE_SIZE(len);
 				break;
 			default:
 				WT_FAILURE(session,
@@ -353,7 +353,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				    value, value->size + len));
 				vp = (uint8_t *)value->data + value->size;
 				WT_RET(__pack_write(session, &vpv, &vp, len));
-				value->size += (uint32_t)len;
+				value->size += WT_STORE_SIZE(len);
 				/* FALLTHROUGH */
 
 			case WT_PROJ_REUSE:

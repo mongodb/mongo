@@ -197,7 +197,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	uint64_t recno;
-	uint32_t bytes_allocated, i, indx, max_repeats, nrepeats;
+	size_t bytes_allocated;
+	uint32_t i, indx, max_repeats, nrepeats;
 
 	dsk = page->dsk;
 	unpack = &_unpack;

@@ -336,7 +336,8 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	WT_BUF *tmp;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, bytes, size, *p;
+	uint32_t addr, size, *p;
+	size_t bytes;
 	int ret;
 
 	btree = session->btree;
@@ -371,13 +372,13 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	 * We allocate room for the free-list entries, plus 1 additional (the
 	 * list-terminating WT_ADDR_INVALID/0 pair).
 	 */
-	bytes = (btree->freelist_entries + 1) * 2 * WT_SIZEOF32(uint32_t);
+	bytes = (btree->freelist_entries + 1) * 2 * sizeof(uint32_t);
 	WT_RET(__wt_scr_alloc(session, WT_DISK_REQUIRED(session, bytes), &tmp));
 	dsk = tmp->mem;
 	memset(dsk, 0, WT_PAGE_DISK_SIZE);
-	dsk->u.datalen = bytes;
+	dsk->u.datalen = WT_STORE_SIZE(bytes);
 	dsk->type = WT_PAGE_FREELIST;
-	tmp->size = WT_PAGE_DISK_SIZE + bytes;
+	tmp->size = WT_STORE_SIZE(WT_PAGE_DISK_SIZE + bytes);
 
 	/*
 	 * Fill the page's data.  We output the data in reverse order so we

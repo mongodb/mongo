@@ -52,7 +52,7 @@ __wt_buf_initsize(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
 
-	buf->size = (uint32_t)size;		/* Set the data length. */
+	buf->size = WT_STORE_SIZE(size);	/* Set the data length. */
 
 	return (0);
 }
@@ -64,7 +64,7 @@ __wt_buf_initsize(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
-	uint32_t offset;
+	size_t offset;
 
 	WT_ASSERT(session, size <= UINT32_MAX);
 
@@ -73,8 +73,8 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 		 * Reallocate the buffer's memory, but maintain the previous
 		 * data reference.
 		 */
-		offset = buf->data == NULL ?
-		    0 : WT_PTRDIFF32(buf->data, buf->mem);
+		offset = (buf->data == NULL) ? 0 :
+		    WT_PTRDIFF(buf->data, buf->mem);
 
 		WT_RET(__wt_realloc(session, &buf->mem_size, size, &buf->mem));
 
@@ -175,7 +175,7 @@ __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
     WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
 {
 	va_list ap;
-	uint32_t len, space;
+	size_t len, space;
 	char *p;
 
 	for (;;) {
@@ -183,12 +183,12 @@ __wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
 		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->mem_size >= buf->size);
 		space = buf->mem_size - buf->size;
-		len = (uint32_t)vsnprintf(p, (size_t)space, fmt, ap);
+		len = (size_t)vsnprintf(p, (size_t)space, fmt, ap);
 		va_end(ap);
 
 		/* Check if there was enough space. */
 		if (len < space) {
-			buf->size += len;
+			buf->size += WT_STORE_SIZE(len);
 			return (0);
 		}
 
@@ -209,7 +209,7 @@ int
 __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 {
 	WT_BUF *buf, **p, *small, **slot;
-	uint32_t allocated;
+	size_t allocated;
 	u_int i;
 	int ret;
 
@@ -282,7 +282,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	 * Resize the array, we need more scratch buffers, then call recursively
 	 * to find the empty slot, and so on and so forth.
 	 */
-	allocated = session->scratch_alloc * WT_SIZEOF32(WT_BUF *);
+	allocated = session->scratch_alloc * sizeof(WT_BUF *);
 	WT_ERR(__wt_realloc(session, &allocated,
 	    (session->scratch_alloc + 10) * sizeof(WT_BUF *),
 	    &session->scratch));

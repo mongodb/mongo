@@ -11,16 +11,20 @@
 #define	WT_MILLION	(1000000)
 
 /*
- * 32-bit version of sizeof: many sizes that cannot be larger than 2**32 are
- * stored in uint32_t variables to save bytes.  To avoid size_t to uint32_t
- * conversion warnings, we use this macro for sizeof calculations in 32-bit
- * space.
- *
- * And, a similar solution for pointer arithmetic.
+ * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
+ * common structures to save space.  To minimize conversions from size_t to
+ * uint32_t through the code, we use the following macros.
  */
-#define	WT_SIZEOF32(e)	((uint32_t)sizeof(e))
+#define	WT_STORE_SIZE(s)	((uint32_t)(s))
+#define	WT_PTRDIFF(end, begin)						\
+	((size_t)((uint8_t *)(end) - (uint8_t *)(begin)))
 #define	WT_PTRDIFF32(end, begin)					\
-	((uint32_t)((uint8_t *)(end) - ((uint8_t *)(begin))))
+	WT_STORE_SIZE(WT_PTRDIFF((end), (begin)))
+#define	WT_BLOCK_FITS(p, len, begin, maxlen)				\
+	((uint8_t *)(p) >= (uint8_t *)(begin) &&			\
+	((uint8_t *)(p) + (len) <= (uint8_t *)(begin) + (maxlen)))
+#define	WT_PTR_IN_RANGE(p, begin, maxlen)				\
+	WT_BLOCK_FITS((p), 1, (begin), (maxlen))
 
 /*
  * XXX
