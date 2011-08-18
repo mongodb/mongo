@@ -320,7 +320,7 @@ static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
-	WT_BUF *t;
+	WT_BUF *tmp;
 	WT_FH *fh;
 	WT_PAGE_DISK *dsk;
 	off_t off, max;
@@ -332,7 +332,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	allocsize = btree->allocsize;
 
 	ret = 0;
-	WT_RET(__wt_scr_alloc(session, allocsize, &t));
+	WT_RET(__wt_scr_alloc(session, allocsize, &tmp));
 
 	/*
 	 * Read through the file, looking for pages we can trust -- a page
@@ -353,8 +353,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * Read the start of a possible page (an allocation-size block),
 		 * and get a page length from it.
 		 */
-		WT_ERR(__wt_read(session, fh, off, allocsize, t->mem));
-		dsk = t->mem;
+		WT_ERR(__wt_read(session, fh, off, allocsize, tmp->mem));
+		dsk = tmp->mem;
 
 		/*
 		 * The page can't be more than the min/max page size, or past
@@ -373,9 +373,9 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
 		 */
-		WT_ERR(__wt_buf_initsize(session, t, size));
+		WT_ERR(__wt_buf_initsize(session, tmp, size));
 		if (__wt_block_read(
-		    session, t, WT_OFF_TO_ADDR(btree, off), size, 1))
+		    session, tmp, WT_OFF_TO_ADDR(btree, off), size, 1))
 			goto skip;
 
 		/*
@@ -386,8 +386,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * a corrupted file, like overflow references past the end of
 		 * the file.
 		 */
-		dsk = t->mem;
-		if (__wt_verify_dsk(session, dsk, addr, size, 1)) {
+		dsk = tmp->mem;
+		if (__wt_verify_dsk(session, tmp->mem, addr, tmp->size, 1)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
@@ -465,7 +465,7 @@ skip:			WT_VERBOSE(session, SALVAGE,
 		}
 	}
 
-err:	__wt_scr_release(&t);
+err:	__wt_scr_release(&tmp);
 
 	return (ret);
 }

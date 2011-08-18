@@ -38,10 +38,10 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	tmp = NULL;
 	fh = btree->fh;
-	dsk = buf->mem;
 
 	WT_RET(__wt_read(
 	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
+	buf->size = size;
 
 	dsk = buf->mem;
 	checksum = dsk->checksum;
@@ -70,16 +70,19 @@ __wt_block_read(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
 
-	/* Copy the skipped bytes of the original image into place. */
+	/*
+	 * Copy the skipped bytes of the original image into place, then
+	 * decompress the buffer.
+	 */
 	memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
-
-	/* Decompress the buffer. */
 	src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
 	src.size = buf->size - COMPRESS_SKIP;
 	dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
-	dst.size = tmp->size - COMPRESS_SKIP;
+	dst.size = dsk->memsize - COMPRESS_SKIP;
 	WT_ERR(btree->compressor->decompress(
 	    btree->compressor, &session->iface, &src, &dst));
+	tmp->size = dsk->memsize;
+
 	__wt_buf_swap(tmp, buf);
 
 err:	if (tmp != NULL)
@@ -172,7 +175,7 @@ not_compressed:	/*
 		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
 		src.size = buf->size - COMPRESS_SKIP;
 		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
-		dst.size = buf->size - COMPRESS_SKIP;
+		dst.size = src.size;
 
 		/*
 		 * If compression fails, fallback to the original version.  This

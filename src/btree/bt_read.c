@@ -279,14 +279,16 @@ __cache_read(
 	/* Allocate memory for the page's disk image. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-	/* Read the page, then steal the resulting buffer. */
+	/* Read the page. */
 	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
-	dsk = __wt_buf_steal(session, tmp, &size);
-	__wt_scr_release(&tmp);
 
 	/* Verify the disk image on demand. */
 	if (dsk_verify)
-		WT_ERR(__wt_verify_dsk(session, dsk, addr, dsk->size, 0));
+		WT_ERR(__wt_verify_dsk(session, tmp->mem, addr, tmp->size, 0));
+
+	/* Steal the resulting buffer. */
+	dsk = __wt_buf_steal(session, tmp, &size);
+	__wt_scr_release(&tmp);
 
 	/*
 	 * Build the in-memory version of the page, then re-load the disk

@@ -76,18 +76,12 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * FUTURE:
-	 * Check the LSN against the existing log files.
+	 * Ignore the LSN.
+	 *
+	 * Ignore the checksum -- it verified when we first read the page.
+	 *
+	 * Ignore the disk sizes.
 	 */
-
-	/* Ignore the checksum -- it verified when we first read the page. */
-
-	/* Check the disk size. */
-	if (dsk->size != size) {
-		WT_VRFY_ERR(session, quiet,
-		    "page at addr %" PRIu32 " has an incorrect size", addr);
-		return (WT_ERROR);
-	}
 
 	/* Unused bytes */
 	if (dsk->unused[0] != '\0' ||
@@ -102,25 +96,18 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	/* Verify the items on the page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
-		return (
-		    __verify_dsk_col_int(session, dsk, addr, dsk->memsize,
-			quiet));
+		return (__verify_dsk_col_int(session, dsk, addr, size, quiet));
 	case WT_PAGE_COL_FIX:
-		return (
-		    __verify_dsk_col_fix(session, dsk, addr, dsk->memsize,
-			quiet));
+		return (__verify_dsk_col_fix(session, dsk, addr, size, quiet));
 	case WT_PAGE_COL_VAR:
-		return (
-		    __verify_dsk_col_var(session, dsk, addr, dsk->memsize,
-			quiet));
+		return (__verify_dsk_col_var(session, dsk, addr, size, quiet));
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		return (__verify_dsk_row(session, dsk, addr, dsk->memsize,
-			quiet));
+		return (__verify_dsk_row(session, dsk, addr, size, quiet));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 		return (__wt_verify_dsk_chunk(
-		    session, dsk, addr, dsk->u.datalen, dsk->memsize, quiet));
+		    session, dsk, addr, dsk->u.datalen, size, quiet));
 	WT_ILLEGAL_FORMAT(session);
 	}
 	/* NOTREACHED */
