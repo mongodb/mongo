@@ -55,12 +55,11 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If the in-memory and on-disk sizes are not the same, the buffer is
-	 * compressed: allocate a scratch buffer, copy the skipped bytes of
-	 * the original image into place, then decompress into the scratch
-	 * buffer.
+	 * If the in-memory page size is larger than the on-disk page size, the
+	 * buffer is compressed: allocate a temporary buffer, copy the skipped
+	 * bytes of the original image into place, then decompress.
 	 */
-	if (dsk->size != dsk->memsize) {
+	if (dsk->size < dsk->memsize) {
 		WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
 		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
 		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
@@ -158,7 +157,7 @@ not_compressed:	/*
 		 * block is NOT compressed).
 		 */
 		dsk = buf->mem;
-		dsk->size = dsk->memsize = align_size;
+		dsk->size = align_size;
 	} else {
 		/*
 		 * Allocate a buffer for disk compression; only allocate enough
@@ -186,10 +185,10 @@ not_compressed:	/*
 			goto not_compressed;
 
 		/*
-		 * Set the final data size and see if compression was useful
-		 * (if the final block size is smaller, use the compressed
-		 * version, else use an uncompressed version because it will
-		 * be faster to read).
+		 * Set the final data size and see if compression gave us back
+		 * at least one allocation unit (if we don't get at least one
+		 * file allocation unit, use the uncompressed version because
+		 * it will be faster to read).
 		 */
 		tmp->size = dst.size + COMPRESS_SKIP;
 		size = WT_ALIGN(tmp->size, btree->allocsize);
@@ -197,12 +196,7 @@ not_compressed:	/*
 			goto not_compressed;
 		align_size = size;
 
-		/*
-		 * Copy in the leading 32B of header (incidentally setting the
-		 * in-memory page size), zero out any unused bytes.
-		 *
-		 * Set the final on-disk block size.
-		 */
+		/* Copy in the skipped header bytes, zero out unused bytes. */
 		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
 		memset(
 		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
@@ -247,7 +241,7 @@ not_compressed:	/*
 	WT_VERBOSE(session, WRITE,
 	    "write %" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
 	    orig_size, addr, align_size,
-	    dsk->size == dsk->memsize ? "" : "compressed, ",
+	    dsk->size < dsk->memsize ? "compressed, " : "",
 	    __wt_page_type_string(orig_type));
 
 	*addrp = addr;
