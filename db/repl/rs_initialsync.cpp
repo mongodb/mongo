@@ -87,7 +87,7 @@ namespace mongo {
             int needMorePings = config().members.size()*2 - HeartbeatInfo::numPings;
 
             if (needMorePings > 0) {
-                log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
+                OCCASIONALLY log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
                 return NULL;
             }
         }
