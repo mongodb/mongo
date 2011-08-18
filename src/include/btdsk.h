@@ -146,17 +146,14 @@ struct __wt_page_disk {
 	uint32_t checksum;		/* 16-19: checksum */
 
 	/*
-	 * We don't need the page length for normal processing as the page's
-	 * parent knows how big it is.  However, we write the page size in the
-	 * page header because it makes salvage easier.  (If we don't know the
-	 * expected page length, we'd have to read increasingly larger chunks
-	 * from the file until we find one that checksums, and that's going to
-	 * be unpleasant given WiredTiger's large page sizes.)
+	 * We write the page size in the on-disk page header because it makes
+	 * salvage easier.  (If we don't know the expected page length, we'd
+	 * have to read increasingly larger chunks from the file until we find
+	 * one that checksums, and that's going to be harsh given WiredTiger's
+	 * large page sizes.)
 	 *
-	 * If the page has been stream compressed, it has 2 sizes: the on-disk
-	 * compressed size, and the in-memory size.  Store the in-memory size
-	 * in the page header because otherwise we have no idea how big a chunk
-	 * of memory we need to expand the page.
+	 * We also store an in-memory size because otherwise we'd have no idea
+	 * how much memory to allocate in order to expand a compressed page.
 	 */
 	uint32_t size;			/* 20-23: on-disk page size */
 	uint32_t memsize;		/* 24-27: in-memory page size */
