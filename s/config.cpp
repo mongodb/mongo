@@ -560,7 +560,7 @@ namespace mongo {
                 ScopedDbConnection conn( _config[i], 30.0 );
 
                 // check auth
-                conn->update("foo.bar", BSONObj(), BSON("x" << 1));
+                conn->update("config.foo.bar", BSONObj(), BSON("x" << 1));
                 conn->simpleCommand( "admin", &x, "getlasterror");
                 if (x["err"].type() == String && x["err"].String() == "unauthorized") {
                     errmsg = "not authorized, did you start with --keyFile?";
