@@ -193,9 +193,9 @@ extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
 extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
+extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
-extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
@@ -222,9 +222,9 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
 extern void __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force);
+extern void __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
-extern void __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,

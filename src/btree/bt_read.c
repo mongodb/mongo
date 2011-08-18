@@ -89,7 +89,31 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 		return;
 
 	cache->read_sleeping = 0;
-	__wt_unlock(&conn->default_session, cache->mtx_read);
+	__wt_unlock(session, cache->mtx_read);
+}
+
+/*
+ * __wt_workq_read_server_exit --
+ *	The exit flag is set, wake the read server to exit.
+ */
+void
+__wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
+{
+	WT_CACHE *cache;
+	WT_SESSION_IMPL *session;
+
+	cache = conn->cache;
+	session = &conn->default_session;
+
+	/*
+	 * Wait until any current operation completes because the read server
+	 * only checks the WT_SERVER_RUN flag on waking from sleep.
+	 */
+	while (!cache->read_sleeping)
+		__wt_yield();
+
+	cache->read_sleeping = 0;
+	__wt_unlock(session, cache->mtx_read);
 }
 
 /*
@@ -210,30 +234,6 @@ __wt_cache_read_server(void *arg)
 	(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
-}
-
-/*
- * __wt_workq_read_server_exit --
- *	The exit flag is set, wake the read server to exit.
- */
-void
-__wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
-{
-	WT_SESSION_IMPL *session;
-	WT_CACHE *cache;
-
-	session = &conn->default_session;
-	cache = conn->cache;
-
-	/*
-	 * Wait until any current operation completes because the read server
-	 * only checks the WT_SERVER_RUN flag on waking from sleep.
-	 */
-	while (!cache->read_sleeping)
-		__wt_yield();
-
-	cache->read_sleeping = 0;
-	__wt_unlock(session, cache->mtx_read);
 }
 
 /*

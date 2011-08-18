@@ -93,12 +93,12 @@ __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 void
 __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 {
-	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
+	WT_SESSION_IMPL *session;
 	uint64_t bytes_inuse, bytes_max;
 
-	session = &conn->default_session;
 	cache = conn->cache;
+	session = &conn->default_session;
 
 	/* If the eviction server is running, there's nothing to do. */
 	if (!cache->evict_sleeping)
@@ -121,6 +121,30 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
+
+	cache->evict_sleeping = 0;
+	__wt_unlock(session, cache->mtx_evict);
+}
+
+/*
+ * __wt_workq_evict_server_exit --
+ *	The exit flag is set, wake the eviction server to exit.
+ */
+void
+__wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
+{
+	WT_CACHE *cache;
+	WT_SESSION_IMPL *session;
+
+	cache = conn->cache;
+	session = &conn->default_session;
+
+	/*
+	 * Wait until any current operation completes because the eviction
+	 * server only checks the WT_SERVER_RUN flag on waking from sleep.
+	 */
+	while (!cache->evict_sleeping)
+		__wt_yield();
 
 	cache->evict_sleeping = 0;
 	__wt_unlock(session, cache->mtx_evict);
@@ -223,30 +247,6 @@ err:		__wt_err(session, ret, "cache eviction server error");
 		(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
-}
-
-/*
- * __wt_workq_evict_server_exit --
- *	The exit flag is set, wake the eviction server to exit.
- */
-void
-__wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
-{
-	WT_SESSION_IMPL *session;
-	WT_CACHE *cache;
-
-	session = &conn->default_session;
-	cache = conn->cache;
-
-	/*
-	 * Wait until any current operation completes because the eviction
-	 * server only checks the WT_SERVER_RUN flag on waking from sleep.
-	 */
-	while (!cache->evict_sleeping)
-		__wt_yield();
-
-	cache->evict_sleeping = 0;
-	__wt_unlock(session, cache->mtx_evict);
 }
 
 /*
