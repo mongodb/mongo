@@ -574,7 +574,7 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
+    env.Append( CPPPATH=[ boostDir , winSDKHome + "/Include" ] )
 
     # consider adding /MP build with multiple processes option.
 
@@ -586,9 +586,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
     # PSAPI_VERSION relates to process api dll Psapi.dll.
-    # HAVE_CONFIG_H for pcre
-    # SUPPORT_UTF8 and SUPPORT_UCP are for pcre.  not sure if SUPPORT_UCP is needed - that is for unicode.
-    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
+    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","PSAPI_VERSION=1" ] )
 
     # this would be for pre-compiled headers, could play with it later  
     #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
@@ -636,26 +634,6 @@ elif "win32" == os.sys.platform:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
-
-    def pcreFilter(x):
-        name = x.name
-        if x.name.endswith( "dftables.c" ):
-            return False
-        if x.name.endswith( "pcredemo.c" ):
-            return False
-        if x.name.endswith( "pcretest.c" ):
-            return False
-        if x.name.endswith( "unittest.cc" ):
-            return False
-        if x.name.endswith( "pcregrep.c" ):
-            return False
-        return True
-
-    pcreFiles = []
-    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
-    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
-    commonFiles += pcreFiles
-    allClientFiles += pcreFiles
 
     winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
 
@@ -819,7 +797,7 @@ def bigLibString( myenv ):
     return s
 
 
-def doConfigure( myenv , needPcre=True , shell=False ):
+def doConfigure( myenv , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
@@ -872,10 +850,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
         return False
 
-    if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
-        print( "can't find pcre" )
-        Exit(1)
-
     if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
         print( "can't find boost headers" )
         if shell:
@@ -901,10 +875,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
-
-    if nix and needPcre:
-        myCheckLib( "pcrecpp" , True )
-        myCheckLib( "pcre" , True )
 
     myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
@@ -1093,8 +1063,6 @@ clientEnv.Prepend( LIBS=[ "mongoclient"] )
 clientEnv.Prepend( LIBPATH=["."] )
 clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
 l = clientEnv[ "LIBS" ]
-removeIfInList( l , "pcre" )
-removeIfInList( l , "pcrecpp" )
 
 # profile guided
 #if windows:
@@ -1107,6 +1075,19 @@ testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
 testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 testEnv.Prepend( LIBPATH=["."] )
+
+for x in os.listdir( "third_party" ):
+    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+        continue
+         
+    shortName = x.rpartition( "." )[0]
+    path = "third_party/%s" % x
+
+
+    myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles }
+    myModule.configure( env , fileLists )
+
 
 # ----- TARGETS ------
 
@@ -1206,9 +1187,6 @@ if noshell:
 elif not onlyServer:
     l = shellEnv["LIBS"]
 
-    removeIfInList( l , "pcre" )
-    removeIfInList( l , "pcrecpp" )
-
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
@@ -1218,7 +1196,7 @@ elif not onlyServer:
 
     shellEnv.Prepend( LIBPATH=[ "." ] )
         
-    shellEnv = doConfigure( shellEnv , needPcre=False , shell=True )
+    shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
     mongo = shellEnv.Program( "mongo" , coreShellFiles )

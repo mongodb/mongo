@@ -79,7 +79,9 @@ them both to 0; an emulation function will be used. */
 
 /* Define to 1 if you have the `strtoll' function. */
 // dm: visual studio
-//#define HAVE_STRTOLL 1
+#ifndef _WIN32
+#define HAVE_STRTOLL 1
+#endif
 
 /* Define to 1 if you have the `strtoq' function. */
 // dm: visual studio
@@ -106,7 +108,9 @@ them both to 0; an emulation function will be used. */
 /* Define to 1 if you have the `_strtoi64' function. */
 /* #undef HAVE__STRTOI64 */
 // dm: visual studio
+#ifdef _WIN32
 #define HAVE__STRTOI64 1
+#endif
 
 /* The value of LINK_SIZE determines the number of bytes used to store links
    as offsets within the compiled regex. The default is 2, which allows for
@@ -195,7 +199,8 @@ them both to 0; an emulation function will be used. */
 /* #undef PCRE_EXP_DEFN */
 
 /* Define if linking statically (TODO: make nice with Libtool) */
-/* #undef PCRE_STATIC */
+/* mongodb */
+#define PCRE_STATIC 
 
 /* When calling PCRE via the POSIX interface, additional working storage is
    required for holding the pointers to capturing substrings because PCRE
@@ -211,12 +216,14 @@ them both to 0; an emulation function will be used. */
 #define STDC_HEADERS 1
 
 /* Define to enable support for Unicode properties */
-/* #undef SUPPORT_UCP */
+/* mongodb */
+#define SUPPORT_UCP 
+
 
 /* Define to enable support for the UTF-8 Unicode encoding. */
-#if( !defined(SUPPORT_UTF8) )
+/* mongodb */
 #define SUPPORT_UTF8 
-#endif
+
 
 /* Version number of package */
 #define VERSION "7.4"

@@ -19,7 +19,7 @@
 #include "miniwebserver.h"
 #include "../hex.h"
 
-#include <pcrecpp.h>
+#include "../../third_party/pcre-7.4/pcrecpp.h"
 
 namespace mongo {
 
