@@ -386,6 +386,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * a corrupted file, like overflow references past the end of
 		 * the file.
 		 */
+		dsk = t->mem;
 		if (__wt_verify_dsk(session, dsk, addr, size, 1)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
