@@ -308,8 +308,6 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'bt_search_col' : [ 'WRITE' ],
-	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],

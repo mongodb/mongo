@@ -57,7 +57,7 @@ __wt_col_ins_search(
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
+__wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -137,7 +137,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		if (recno >= page->u.col_leaf.recno + page->entries) {
-			if (LF_ISSET(WT_WRITE))
+			if (is_write)
 				goto append;
 			goto notfound;
 		}
@@ -208,7 +208,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 
 			if (recno >= start_recno +
 			    (page->entries - start_indx)) {
-				if (LF_ISSET(WT_WRITE))
+				if (is_write)
 					goto append;
 				goto notfound;
 			}
@@ -250,7 +250,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, uint32_t flags)
 		 * WT_INSERT's WT_UPDATE value.  If we didn't find a match, use
 		 * use the original data.
 		 */
-		if (LF_ISSET(WT_WRITE))
+		if (is_write)
 			break;
 
 		if (match) {

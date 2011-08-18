@@ -62,7 +62,7 @@ __insert_search(
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
+__wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, int is_write)
 {
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
@@ -249,7 +249,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, uint32_t flags)
 		 * No match found.
 		 * If not doing an insert, we've failed.
 		 */
-		if (!LF_ISSET(WT_WRITE))
+		if (!is_write)
 			goto notfound;
 	}
 
@@ -257,7 +257,7 @@ done:	/*
 	 * If we found a match and it's not an insert operation, review any
 	 * updates to the key's value: a deleted object returns not-found.
 	 */
-	if (!LF_ISSET(WT_WRITE) &&
+	if (!is_write &&
 	    session->srch.upd != NULL &&
 	    *session->srch.upd != NULL &&
 	    WT_UPDATE_DELETED_ISSET(*session->srch.upd))

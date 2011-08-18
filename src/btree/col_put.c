@@ -37,7 +37,7 @@ __wt_col_modify(
 	ret = skipdepth = 0;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_col_search(session, recno, is_write ? WT_WRITE : 0));
+	WT_RET(__wt_col_search(session, recno, is_write));
 	page = session->srch.page;
 
 	/*

@@ -257,7 +257,6 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_VERB_WRITE					0x00000001
 #define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
-#define	WT_WRITE					0x00000001
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api_flags.py.

@@ -34,7 +34,7 @@ __wt_row_modify(
 	ret = 0;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_row_search(session, key, is_write ? WT_WRITE : 0));
+	WT_RET(__wt_row_search(session, key, is_write));
 	page = session->srch.page;
 
 	/*

@@ -271,7 +271,7 @@ extern int __wt_col_modify( WT_SESSION_IMPL *session,
 extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
-    uint32_t flags);
+    int is_write);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
@@ -300,7 +300,7 @@ extern int __wt_update_alloc(WT_SESSION_IMPL *session,
 extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *key,
-    uint32_t flags);
+    int is_write);
 extern int __wt_connection_config(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
