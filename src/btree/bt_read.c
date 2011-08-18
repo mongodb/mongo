@@ -290,8 +290,8 @@ __cache_read(
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
-	
-	/* The disk image may have been discarderd, use the one in the page. */
+
+	/* The disk image may have been discarded, use the one in the page. */
 	dsk = ref->page->dsk;
 
 	/* Add the page to our cache statistics. */
