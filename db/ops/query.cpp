@@ -257,6 +257,9 @@ namespace mongo {
                 if ( _capped ) {
                     msgassertedNoTrace( 13337, str::stream() << "capped cursor overrun during count: " << _ns );
                 }
+                else if ( qp().mustAssertOnYieldFailure() ) {
+                    msgassertedNoTrace( 15891, str::stream() << "CountOp::recoverFromYield() failed to recover: " << _ns );
+                }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
                 }
@@ -534,6 +537,9 @@ namespace mongo {
 
                 if ( _capped ) {
                     msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun during query: " << _pq.ns() );
+                }
+                else if ( qp().mustAssertOnYieldFailure() ) {
+                    msgassertedNoTrace( 15890, str::stream() << "UserQueryOp::recoverFromYield() failed to recover: " << _pq.ns() );
                 }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped

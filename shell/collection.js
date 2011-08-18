@@ -613,7 +613,7 @@ DBCollection.prototype.convertToSingleObject = function(valueField){
 */
 DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString ){
     var c = { mapreduce : this._shortName , map : map , reduce : reduce };
-    assert( optionsOrOutString , "need to an optionsOrOutString" )
+    assert( optionsOrOutString , "need to supply an optionsOrOutString" )
 
     if ( typeof( optionsOrOutString ) == "string" )
         c["out"] = optionsOrOutString;

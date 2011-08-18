@@ -1076,6 +1076,32 @@ namespace ReplTests {
         }
     };
     
+    /** Check unsuccessful yield recovery with FindingStartCursor */
+    class FindingStartCursorYield : public Base {
+    public:
+        void run() {
+            for( int i = 0; i < 10; ++i ) {
+                client()->insert( ns(), BSON( "_id" << i ) );
+            }
+            Date_t ts = client()->query( "local.oplog.$main", Query().sort( BSON( "$natural" << 1 ) ), 1, 4 )->next()[ "ts" ].date();
+            Client::Context ctx( cllNS() );
+            NamespaceDetails *nsd = nsdetails( cllNS() );
+            BSONObjBuilder b;
+            b.appendDate( "$gte", ts );
+            BSONObj query = BSON( "ts" << b.obj() );
+            FieldRangeSetPair frsp( cllNS(), query );
+            BSONObj order = BSON( "$natural" << 1 );
+            QueryPlan qp( nsd, -1, frsp, &frsp, query, order );
+            FindingStartCursor fsc( qp );
+            ASSERT( !fsc.done() );
+            fsc.next();
+            ASSERT( !fsc.done() );
+            ASSERT( fsc.prepareToYield() );
+            ClientCursor::invalidate( "local.oplog.$main" );
+            ASSERT_EXCEPTION( fsc.recoverFromYield(), MsgAssertionException );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "repl" ) {
@@ -1131,6 +1157,7 @@ namespace ReplTests {
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
             add< FindingStartCursorStale >();
+            add< FindingStartCursorYield >();
         }
     } myall;
 

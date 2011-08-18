@@ -379,12 +379,7 @@ public:
             }
         }
 
-        {
-            // TODO: when mongos supports QueryOption_Exaust add a version check (SERVER-2628)
-            BSONObj isdbgrid;
-            conn("true").simpleCommand("admin", &isdbgrid, "isdbgrid");
-            _usingMongos = isdbgrid["isdbgrid"].trueValue();
-        }
+        _usingMongos = isMongos();
 
         path root( out );
         string db = _db;

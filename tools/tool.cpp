@@ -323,6 +323,13 @@ namespace mongo {
         return true;
     }
 
+    bool Tool::isMongos() {
+        // TODO: when mongos supports QueryOption_Exaust add a version check (SERVER-2628)
+        BSONObj isdbgrid;
+        conn("true").simpleCommand("admin", &isdbgrid, "isdbgrid");
+        return isdbgrid["isdbgrid"].trueValue();
+    }
+
     void Tool::addFieldOptions() {
         add_options()
         ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )

@@ -3767,7 +3767,7 @@ const StringData _jscode_raw_collection =
 "*/\n" 
 "DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString ){\n" 
 "var c = { mapreduce : this._shortName , map : map , reduce : reduce };\n" 
-"assert( optionsOrOutString , \"need to an optionsOrOutString\" )\n" 
+"assert( optionsOrOutString , \"need to supply an optionsOrOutString\" )\n" 
 "\n" 
 "if ( typeof( optionsOrOutString ) == \"string\" )\n" 
 "c[\"out\"] = optionsOrOutString;\n" 

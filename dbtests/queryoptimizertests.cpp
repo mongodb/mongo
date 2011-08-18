@@ -420,7 +420,7 @@ namespace QueryOptimizerTests {
                 BSONElement e = b.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -434,7 +434,7 @@ namespace QueryOptimizerTests {
                 BSONElement e = b.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -448,7 +448,7 @@ namespace QueryOptimizerTests {
                 BSONElement e = b.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -472,7 +472,7 @@ namespace QueryOptimizerTests {
                 BSONElement e = b.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                ASSERT_EXCEPTION( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), &e ),
+                ASSERT_EXCEPTION( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e ),
                                   AssertionException );
             }
         };
@@ -647,7 +647,7 @@ namespace QueryOptimizerTests {
                 BSONElement hintElt = hint.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp2( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp2 ) );
-                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ), &hintElt );
+                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ), true, &hintElt );
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
                 // No plan recorded when a hint is used.
@@ -851,7 +851,7 @@ namespace QueryOptimizerTests {
                 BSONElement hintElt = hint.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj(), true, &hintElt );
                 QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
@@ -864,7 +864,7 @@ namespace QueryOptimizerTests {
                 {
                     auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                    QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ), &hintElt );
+                    QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ), true, &hintElt );
                     QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ) );
                     boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
@@ -1894,7 +1894,33 @@ namespace QueryOptimizerTests {
                 }                
             }
         };
-        
+
+        /** Yield and drop collection with $or query. */
+        class YieldDropOr : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 ) << BSON( "_id" << 2 ) ) ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.dropCollection( ns() );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT_EXCEPTION( recoverFromYield(), MsgAssertionException );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+
         /** Yield and overwrite current in capped collection. */
         class YieldCappedOverwrite : public Base {
         public:
@@ -2676,6 +2702,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::YieldDeleteContinueFurther>();
             add<QueryOptimizerCursorTests::YieldUpdate>();
             add<QueryOptimizerCursorTests::YieldDrop>();
+            add<QueryOptimizerCursorTests::YieldDropOr>();
             add<QueryOptimizerCursorTests::YieldCappedOverwrite>();
             add<QueryOptimizerCursorTests::YieldDropIndex>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansNoOp>();

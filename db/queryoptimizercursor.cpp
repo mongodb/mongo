@@ -70,6 +70,9 @@ namespace mongo {
                 if ( _capped ) {
                     msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun: " << qp().ns() );
                 }
+                else if ( qp().mustAssertOnYieldFailure() ) {
+                    msgassertedNoTrace( 15892, str::stream() << "QueryOptimizerCursorOp::recoverFromYield() failed to recover" );
+                }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
                     // also, see SERVER-2454
