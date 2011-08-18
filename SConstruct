@@ -751,6 +751,18 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+for x in os.listdir( "third_party" ):
+    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+        continue
+         
+    shortName = x.rpartition( "." )[0]
+    path = "third_party/%s" % x
+
+
+    myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles }
+    myModule.configure( env , fileLists )
+
 # --- check system ---
 
 def getSysInfo():
@@ -1075,19 +1087,6 @@ testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
 testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 testEnv.Prepend( LIBPATH=["."] )
-
-for x in os.listdir( "third_party" ):
-    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-        continue
-         
-    shortName = x.rpartition( "." )[0]
-    path = "third_party/%s" % x
-
-
-    myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles }
-    myModule.configure( env , fileLists )
-
 
 # ----- TARGETS ------
 
