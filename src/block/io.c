@@ -25,7 +25,7 @@
  */
 int
 __wt_block_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint32_t addr, uint32_t size, int quiet)
+    WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
@@ -48,7 +48,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		if (quiet)
+		if (LF_ISSET(WT_ERR_QUIET))
 			return (WT_ERROR);
 		WT_FAILURE_RET(session, WT_ERROR,
 		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
@@ -80,6 +80,11 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	WT_VERBOSE(session, READ,
 	    "read addr/size %" PRIu32 "/%" PRIu32 ": %s",
 	    addr, size, __wt_page_type_string(dsk->type));
+
+	/* Optionally verify the page: used by salvage and verify. */
+	if (LF_ISSET(WT_VERIFY))
+		WT_ERR(__wt_verify_dsk(session,
+		    buf->mem, addr, buf->size, LF_ISSET(WT_ERR_QUIET) ? 1 : 0));
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);

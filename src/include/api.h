@@ -239,6 +239,7 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
  * API flags section: BEGIN
  */
 #define	WT_BUF_INUSE					0x00000001
+#define	WT_ERR_QUIET					0x00000002
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_EVICT					0x00000004
 #define	WT_REC_LOCKED					0x00000002
@@ -255,6 +256,7 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_VERB_RECONCILE				0x00000004
 #define	WT_VERB_SALVAGE					0x00000002
 #define	WT_VERB_WRITE					0x00000001
+#define	WT_VERIFY					0x00000001
 #define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 /*

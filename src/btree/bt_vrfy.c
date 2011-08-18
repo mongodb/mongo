@@ -509,23 +509,20 @@ __verify_overflow(
 	/* Allocate enough memory to hold the overflow pages. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-	/* Read the overflow item. */
-	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
-	dsk = tmp->mem;
+	/* Read and verify the overflow item. */
+	WT_ERR(__wt_block_read(session, tmp, addr, size, WT_VERIFY));
 
 	/*
-	 * Verify the disk image -- this function would normally be called
-	 * from the asynchronous read server, but overflow pages are read
-	 * synchronously. Regardless, we break the overflow verification code
-	 * into two parts, on-disk format checking and internal checking,
-	 * just so it looks like all of the other page type checking.
+	 * The page has already been verified, but we haven't confirmed that
+	 * it was an overflow page, only that it was a valid page.  Confirm
+	 * it's the type of page we expected.
 	 */
+	dsk = tmp->mem;
 	if (dsk->type != WT_PAGE_OVFL) {
 		__wt_errx(session,
 		    "page at addr %" PRIu32 "is not an overflow page", addr);
 		return (WT_ERROR);
 	}
-	WT_ERR(__wt_verify_dsk(session, dsk, addr, dsk->memsize, 0));
 
 	/* Add the fragments. */
 	WT_ERR(__verify_addfrag(session, addr, size, vs));

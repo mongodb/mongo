@@ -141,7 +141,7 @@ extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
     uint32_t size,
-    int quiet);
+    uint32_t flags);
 extern int __wt_block_write( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *addrp,

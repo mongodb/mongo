@@ -372,22 +372,18 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * page validates the checksum and then decompresses the page as
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
+		 *
+		 * Have the read function verify the page, too: it's vanishingly
+		 * unlikely a page could pass checksum and still be broken, but
+		 * a degree of paranoia is healthy in salvage.  Regardless,
+		 * verify does return failure because it detects failures we'd
+		 * expect to see in a corrupted file, like overflow references
+		 * past the end of the file.
 		 */
 		WT_ERR(__wt_buf_initsize(session, tmp, size));
-		if (__wt_block_read(
-		    session, tmp, WT_OFF_TO_ADDR(btree, off), size, 1))
-			goto skip;
-
-		/*
-		 * Verify the page: it's vanishingly unlikely a page could pass
-		 * checksum and still be broken, but a degree of paranoia is
-		 * healthy in salvage.  Regardless, verify does return failure
-		 * here because it detects some failures we'd expect to see in
-		 * a corrupted file, like overflow references past the end of
-		 * the file.
-		 */
-		dsk = tmp->mem;
-		if (__wt_verify_dsk(session, tmp->mem, addr, tmp->size, 1)) {
+		if (__wt_block_read(session, tmp,
+		    WT_OFF_TO_ADDR(btree, off),
+		    size, WT_ERR_QUIET | WT_VERIFY)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
@@ -396,6 +392,9 @@ skip:			WT_VERBOSE(session, SALVAGE,
 			off += allocsize;
 			continue;
 		}
+
+		/* The buffer may have been reallocated, reset our reference. */
+		dsk = tmp->mem;
 
 		/* Move past this page. */
 		off += size;
@@ -1556,7 +1555,9 @@ __slvg_row_trk_update_start(
 	 *
 	 * First, update the WT_TRACK start key based on the specified stop key.
 	 *
-	 * Read and instantiate the WT_TRACK page.
+	 * Read and instantiate the WT_TRACK page (we don't have to verify the
+	 * page, nor do we have to be quiet on error, we've already read this
+	 * page successfully).
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
 	WT_ERR(__wt_block_read(session, dsk, trk->addr, trk->size, 0));
