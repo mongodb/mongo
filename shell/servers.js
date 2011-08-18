@@ -191,6 +191,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numMongos = params.mongos || 1
         otherParams = params.other || {}
         keyFile = params.keyFile || otherParams.keyFile
+        otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
+        otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
     }
     
     this._testName = testName;
