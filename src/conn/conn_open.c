@@ -94,9 +94,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Force the cache server threads to run and wait for them to exit. */
 	__wt_workq_evict_server_exit(conn);
-	__wt_thread_join(conn->cache_evict_tid);
+	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
 	__wt_workq_read_server_exit(conn);
-	__wt_thread_join(conn->cache_read_tid);
+	WT_TRET(__wt_thread_join(conn->cache_read_tid));
 
 	/*
 	 * Close down and wait for the workQ thread; this only happens after
@@ -105,7 +105,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	F_CLR(conn, WT_WORKQ_RUN);
 	WT_MEMORY_FLUSH;
-	__wt_thread_join(conn->workq_tid);
+	WT_TRET(__wt_thread_join(conn->workq_tid));
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);

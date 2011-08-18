@@ -22,8 +22,8 @@ __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
  * __wt_thread_join --
  *	Wait for a thread of control to exit.
  */
-void
+int
 __wt_thread_join(pthread_t tid)
 {
-	(void)pthread_join(tid, NULL);
+	return (pthread_join(tid, NULL) == 0 ? 0 : WT_ERROR);
 }
