@@ -66,6 +66,17 @@ DESTRUCTOR(wt_session, close)
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
 
+/*
+ * Release the Global Interpreter Lock so that WT calls will be
+ * multi-threaded.  Using %exception to wrap every call seems to be a
+ * commonly used trick for this.
+ */
+%exception {
+        Py_BEGIN_ALLOW_THREADS
+        $action
+        Py_END_ALLOW_THREADS
+}
+
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
  * Use our own exception type, in future tailored to the kind
