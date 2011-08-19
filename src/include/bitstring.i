@@ -264,7 +264,7 @@ __bit_getv(uint8_t *bitf, uint32_t entry, uint8_t width)
 }
 
 /*
- * __wt_fix_getv_recno --
+ * __bit_getv_recno --
  *	Return a record number's bit-field value.
  */
 static inline uint8_t
