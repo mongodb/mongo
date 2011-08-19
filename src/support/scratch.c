@@ -324,3 +324,44 @@ __wt_scr_free(WT_SESSION_IMPL *session)
 
 	__wt_free(session, session->scratch);
 }
+
+/*
+ * __wt_scr_alloc_ext --
+ *	Allocate a scratch buffer, and return the memory reference.
+ */
+void *
+__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size)
+{
+	WT_BUF *buf;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	return (__wt_scr_alloc(
+	    session, (uint32_t)size, &buf) == 0 ? buf->mem : NULL);
+}
+
+/*
+ * __wt_scr_free_ext --
+ *	Free a scratch buffer based on the memory reference.
+ */
+void
+__wt_scr_free_ext(WT_SESSION *wt_session, void *p)
+{
+	WT_BUF **bufp;
+	WT_SESSION_IMPL *session;
+	u_int i;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	for (i = 0,
+	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp)
+		if (*bufp != NULL && (*bufp)->mem == p) {
+			/*
+			 * Do NOT call __wt_scr_release() here, it clears the
+			 * caller's pointer, which would truncate the list.
+			 */
+			F_CLR(*bufp, WT_BUF_INUSE);
+			return;
+		}
+}

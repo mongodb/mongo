@@ -25,17 +25,22 @@ extern "C" {
  */
 /* !!! To maintain backwards compatibility, this structure is append-only. */
 struct wt_extension_api {
-	/*! Put an error message on the WiredTiger error stream.
-	 * Usually called via ::wiredtiger_err_printf
-	 */
+	/*! Put an error message on the WiredTiger error stream.  */
+#define	wiredtiger_err_printf	wt_api->err_printf
 	void (*err_printf)(WT_SESSION *, const char *fmt, ...);
+
+	/*! Allocate short-term use scratch memory. */
+#define	wiredtiger_scr_alloc	wt_api->scr_alloc
+	void *(*scr_alloc)(WT_SESSION *, size_t);
+
+	/*! Free short-term use scratch memory. */
+#define	wiredtiger_scr_free	wt_api->scr_free
+	void (*scr_free)(WT_SESSION *, void *);
+
 };
 
 /*! This global variable must appear in each extension module. */
 extern WT_EXTENSION_API	*wt_api;
-
-/*! Wrapper to call wt_extension_api::err_printf */
-#define	wiredtiger_err_printf	wt_api->err_printf
 
 /*! @} */
 

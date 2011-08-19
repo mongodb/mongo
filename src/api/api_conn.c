@@ -22,7 +22,9 @@ __api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
 }
 
 static WT_EXTENSION_API __api = {
-	__api_err_printf
+	__api_err_printf,
+	__wt_scr_alloc_ext,
+	__wt_scr_free_ext
 };
 
 /*
