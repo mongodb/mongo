@@ -245,11 +245,12 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session,
 					 * to append in that case, and we're
 					 * positioned to do that.
 					 */
-					if (p < end)
+					if (p < end) {
 						WT_RET(__unpack_read(session,
 						    &pv, (const uint8_t **)&p,
 						    (size_t)(end - p)));
 						break;
+					}
 				}
 				WT_RET(__pack_next(&vpack, &vpv));
 				WT_RET(__unpack_read(session, &vpv,
