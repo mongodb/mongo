@@ -16,11 +16,9 @@ __wt_session_add_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE_SESSION *btree_session;
-	WT_CONNECTION_IMPL *conn;
 
 	WT_RET(__wt_calloc_def(session, 1, &btree_session));
 	btree_session->btree = session->btree;
-	conn = S2C(session);
 
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
 
@@ -95,10 +93,6 @@ int
 __wt_session_remove_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
