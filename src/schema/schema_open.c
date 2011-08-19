@@ -53,6 +53,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	cgname = NULL;
 	WT_CLEAR(keybuf);
 	WT_CLEAR(uribuf);
+	ret = 0;
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
