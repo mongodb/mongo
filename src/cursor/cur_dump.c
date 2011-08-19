@@ -15,7 +15,7 @@
 static int
 __convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 {
-	static const char hex[] = "0123456789abcdef";
+	static const u_char hex[] = "0123456789abcdef";
 	WT_BUF *tmp;
 	uint32_t i, size;
 	const uint8_t *p;
