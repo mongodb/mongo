@@ -111,11 +111,7 @@ __curconfig_remove(WT_CURSOR *cursor)
 static int
 __curconfig_close(WT_CURSOR *cursor, const char *config)
 {
-	int ret;
-
-	ret = 0;
-	WT_TRET(__wt_cursor_close(cursor, config));
-	return (ret);
+	return (__wt_cursor_close(cursor, config));
 }
 
 /*
@@ -151,14 +147,11 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	const char *configitem;
 	WT_CURSOR_CONFIG *cconfig;
 	WT_CURSOR *cursor;
-	int ret;
 
 	WT_UNUSED(config);
-	configitem = uri + 7;
-	ret = 0;
+	WT_UNUSED(uri);
 
 	WT_RET(__wt_calloc_def(session, 1, &cconfig));
 
@@ -171,6 +164,5 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	__wt_cursor_init(cursor, 1, config);
 	*cursorp = cursor;
 
-	return (ret);
+	return (0);
 }
-
