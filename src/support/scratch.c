@@ -239,17 +239,21 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 			continue;
 
 		/*
-		 * If we find a buffer that's not in-use, check its size.  If it
-		 * is large enough, we're done; otherwise, remember it.
+		 * If we find a buffer that's not in-use, check its size: if it
+		 * is large enough, and we'd only waste 4KB by taking it, take
+		 * it.  If we don't want this one, remember it -- if we have two
+		 * buffers we can "remember", then remember the smallest one.
 		 */
-		if (buf->mem_size >= size) {
+		if (buf->mem_size >= size &&
+		    (buf->mem_size - size) < 4 * 1024) {
 			WT_ERR(__wt_buf_init(session, buf, size));
 			F_SET(buf, WT_BUF_INUSE);
-
 			*scratchp = buf;
 			return (0);
 		}
 		if (small == NULL)
+			small = buf;
+		else if (small->mem_size > buf->mem_size)
 			small = buf;
 	}
 
