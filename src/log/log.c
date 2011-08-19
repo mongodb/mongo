@@ -56,7 +56,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	buf = &session->logprint_buf;
 
 	va_copy(ap_copy, ap);
-	len = vsnprintf(NULL, 0, fmt, ap_copy) + 2;
+	len = (size_t)vsnprintf(NULL, 0, fmt, ap_copy) + 2;
 	va_end(ap_copy);
 
 	WT_RET(__wt_buf_initsize(session, buf, len));
