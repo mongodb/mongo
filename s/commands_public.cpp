@@ -200,6 +200,16 @@ namespace mongo {
             ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
         } reIndexCmd;
 
+        class ProfileCmd : public PublicGridCommand {
+        public:
+            ProfileCmd() :  PublicGridCommand("profile") {}
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg = "profile currently not supported via mongos";
+                return false;
+            }
+        } profileCmd;
+        
+
         class ValidateCmd : public AllShardsCollectionCommand {
         public:
             ValidateCmd() :  AllShardsCollectionCommand("validate") {}

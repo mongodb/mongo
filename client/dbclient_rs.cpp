@@ -308,7 +308,7 @@ namespace mongo {
             string host = member["name"].String();
 
             int m = -1;
-            if ((m = _find(host)) <= 0) {
+            if ((m = _find(host)) < 0) {
                 continue;
             }
 

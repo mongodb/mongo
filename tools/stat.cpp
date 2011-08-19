@@ -360,12 +360,16 @@ namespace mongo {
             }
 
             if ( hasParam( "discover" ) ) {
-                _noconnection = true;
                 _many = true;
             }
         }
 
         int run() {
+            if ( !(_username.empty() || _password.empty()) && isMongos()) {
+                cout << "You cannot use mongostat on a mongos running with authentication enabled" << endl;
+                return -1;
+            }
+
             _sleep = getParam( "sleep" , _sleep );
             _all = hasParam( "all" );
             if ( _many )

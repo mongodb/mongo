@@ -21,7 +21,7 @@
 #pragma once
 
 #include "jsobj.h"
-#include <pcrecpp.h>
+#include "../third_party/pcre-7.4/pcrecpp.h"
 
 namespace mongo {
 

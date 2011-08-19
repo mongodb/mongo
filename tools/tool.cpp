@@ -21,7 +21,7 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
-#include <pcrecpp.h>
+#include "../third_party/pcre-7.4/pcrecpp.h"
 
 #include "util/file_allocator.h"
 #include "util/password.h"
@@ -321,6 +321,13 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    bool Tool::isMongos() {
+        // TODO: when mongos supports QueryOption_Exaust add a version check (SERVER-2628)
+        BSONObj isdbgrid;
+        conn("true").simpleCommand("admin", &isdbgrid, "isdbgrid");
+        return isdbgrid["isdbgrid"].trueValue();
     }
 
     void Tool::addFieldOptions() {

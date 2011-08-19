@@ -4,7 +4,7 @@
     <Filter Include="misc and third party">
       <UniqueIdentifier>{17c97725-06a4-41a6-bc1c-f0e05eada682}</UniqueIdentifier>
     </Filter>
-    <Filter Include="misc and third party\pcre">
+    <Filter Include="misc and third party">
       <UniqueIdentifier>{0a50fb63-4ac3-4e30-a9d4-b0841878ee73}</UniqueIdentifier>
     </Filter>
     <Filter Include="client">
@@ -64,20 +64,11 @@
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
       <Filter>misc and third party</Filter>
     </ClInclude>
-    <ClInclude Include="..\pcre-7.4\pcrecpp.h">
-      <Filter>misc and third party</Filter>
-    </ClInclude>
     <ClInclude Include="..\targetver.h">
       <Filter>misc and third party</Filter>
     </ClInclude>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp">
       <Filter>misc and third party</Filter>
-    </ClInclude>
-    <ClInclude Include="..\pcre-7.4\config.h">
-      <Filter>misc and third party\pcre</Filter>
-    </ClInclude>
-    <ClInclude Include="..\pcre-7.4\pcre.h">
-      <Filter>misc and third party\pcre</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client</Filter>
@@ -347,78 +338,6 @@
     </Library>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
-      <Filter>misc and third party</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_chartables.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_compile.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_config.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_dfa_exec.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_exec.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_fullinfo.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_get.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_globals.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_info.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_maketables.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_newline.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_ord2utf8.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_refcount.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_scanner.cc">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_stringpiece.cc">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_study.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_tables.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_try_flipped.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_ucp_searchfuncs.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_valid_utf8.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_version.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_xclass.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcreposix.c">
-      <Filter>misc and third party\pcre</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\connpool.cpp">
       <Filter>client</Filter>
     </ClCompile>

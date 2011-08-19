@@ -54,14 +54,16 @@ namespace mongo {
     namespace dur { 
         void setAgeOutJournalFiles(bool rotate);
     }
+    /** @return true if fields found */
     bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) { 
         BSONElement e = cmdObj["ageOutJournalFiles"];
         if( !e.eoo() ) {
             bool r = e.trueValue();
             log() << "ageOutJournalFiles " << r << endl;
             dur::setAgeOutJournalFiles(r);
+            return true;
         }
-        return true;
+        return false;
     }
 
     void flushDiagLog();
@@ -862,6 +864,7 @@ namespace mongo {
                 "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            uassert(15888, "must pass name of collection to create", cmdObj.firstElement().valuestrsafe()[0] != '\0');
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
             string err;
             uassert(14832, "specify size:<n> when capped is true", !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() || cmdObj.hasField("$nExtents"));

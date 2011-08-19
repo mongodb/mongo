@@ -97,6 +97,7 @@ namespace mongo {
             if ( _findingStartCursor ) {
                 if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
                     _findingStartCursor.reset( 0 );
+                    msgassertedNoTrace( 15889, "FindingStartCursor::recoverFromYield() failed to recover" );
                 }
             }
         }

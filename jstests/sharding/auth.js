@@ -168,4 +168,10 @@ while (cursor.hasNext()) {
 
 assert.eq(count, 501);
 
+// check that dump doesn't get stuck with auth
+var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);
+
+print("result: "+x);
+
+
 s.stop();

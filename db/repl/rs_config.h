@@ -25,7 +25,7 @@
 #include "health.h"
 
 namespace mongo {
-
+    class Member;
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
@@ -61,15 +61,14 @@ namespace mongo {
             int slaveDelay;       /* seconds.  int rather than unsigned for convenient to/front bson conversion. */
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
-            set<string> tags;     /* tagging for data center, rack, etc. */
+            map<string,string> tags;     /* tagging for data center, rack, etc. */
         private:
             set<TagSubgroup*> _groups; // the subgroups this member belongs to
         public:
             const set<TagSubgroup*>& groups() const { 
                 return _groups;
             }
-            set<TagSubgroup*>& groupsw(ReplSetConfig *c) { 
-                assert(!c->_constructed);
+            set<TagSubgroup*>& groupsw() {
                 return _groups;
             }
             void check() const;   /* check validity, assert if not. */
@@ -113,6 +112,11 @@ namespace mongo {
         void saveConfigLocally(BSONObj comment); // to local db
         string saveConfigEverywhere(); // returns textual info on what happened
 
+        /**
+         * Update members' groups when the config changes but members stay the same.
+         */
+        void updateMembers(List1<Member> &dest);
+
         BSONObj asBson() const;
 
         bool _constructed;
@@ -127,7 +131,7 @@ namespace mongo {
          * This is a logical grouping of servers.  It is pointed to by a set of
          * servers with a certain tag.
          *
-         * For example, suppose servers A, B, and C have the tag "dc.nyc". If we
+         * For example, suppose servers A, B, and C have the tag "dc" : "nyc". If we
          * have a rule {"dc" : 2}, then we want A _or_ B _or_ C to have the
          * write for one of the "dc" critiria to be fulfilled, so all three will
          * point to this subgroup. When one of their oplog-tailing cursors is
@@ -163,8 +167,7 @@ namespace mongo {
          * machines : 3}, "dc" : 2 and "machines" : 3 would be two TagClauses.
          *
          * Each tag clause has a set of associated subgroups.  For example, if
-         * we had "dc" : 2, our subgroups might be "dc.nyc", "dc.sf", and
-         * "dc.hk".
+         * we had "dc" : 2, our subgroups might be "nyc", "sf", and "hk".
          */
         struct TagClause {
             OpTime last;
@@ -194,20 +197,16 @@ namespace mongo {
          * rule and the servers related to that clause.
          *
          * For example, suppose we have the following servers:
-         * A ["dc.ny.rk1"]
-         * B ["dc.ny.rk1"]
-         * C ["dc.ny.rk2"]
-         * D ["dc.sf.rk1"]
-         * E ["dc.sf.rk2"]
+         * A {"dc" : "ny", "ny" : "rk1"}
+         * B {"dc" : "ny", "ny" : "rk1"}
+         * C {"dc" : "ny", "ny" : "rk2"}
+         * D {"dc" : "sf", "sf" : "rk1"}
+         * E {"dc" : "sf", "sf" : "rk2"}
          *
          * This would give us the possible criteria:
-         * "dc.ny.rk1" -> {A},{B}
-         * "dc.ny.rk2" -> {C}
-         * "dc.ny"     -> {A,B},{C}
-         * "dc.sf.rk1" -> {D}
-         * "dc.sf.rk2" -> {E}
-         * "dc.sf"     -> {D},{E}
-         * "dc"        -> {A,B,C},{D,E}
+         * "dc" -> {A, B, C},{D, E}
+         * "ny" -> {A, B},{C}
+         * "sf" -> {D},{E}
          */
         void _populateTagMap(map<string,TagClause> &tagMap);
 

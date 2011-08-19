@@ -31,7 +31,7 @@
 #include "commands.h"
 #include "../util/version.h"
 #include "../util/ramlog.h"
-#include <pcrecpp.h>
+#include "../third_party/pcre-7.4/pcrecpp.h"
 #include "../util/admin_access.h"
 #include "dbwebserver.h"
 #include <boost/date_time/posix_time/posix_time.hpp>

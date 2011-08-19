@@ -690,9 +690,13 @@ namespace mongo {
         void durThread() {
             Client::initThread("journal");
 
-            bool samePartition = false;
-            try { samePartition = onSamePartition(getJournalDir().string(), dbpath); }
-            catch(...) { }
+            bool samePartition = true;
+            try {
+                const string dbpathDir = boost::filesystem::path(dbpath).native_directory_string();
+                samePartition = onSamePartition(getJournalDir().string(), dbpathDir);
+            }
+            catch(...) {
+            }
 
             while( !inShutdown() ) {
                 unsigned ms = cmdLine.journalCommitInterval;

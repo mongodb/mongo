@@ -37,7 +37,7 @@ namespace mongo {
         while( i.more() ) {
             BSONElement e = i.next();
             if( !fields.count( e.fieldName() ) ) {
-                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
+                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "' in object");
             }
         }
     }
@@ -83,12 +83,22 @@ namespace mongo {
         if( hidden ) b << "hidden" << hidden;
         if( !buildIndexes ) b << "buildIndexes" << buildIndexes;
         if( !tags.empty() ) {
-            BSONArrayBuilder a;
-            for( set<string>::const_iterator i = tags.begin(); i != tags.end(); i++ )
-                a.append(*i);
-            b.appendArray("tags", a.done());
+            BSONObjBuilder a;
+            for( map<string,string>::const_iterator i = tags.begin(); i != tags.end(); i++ )
+                a.append((*i).first, (*i).second);
+            b.append("tags", a.done());
         }
         return b.obj();
+    }
+
+    void ReplSetConfig::updateMembers(List1<Member> &dest) {
+        for (vector<MemberCfg>::iterator source = members.begin(); source < members.end(); source++) {
+            for( Member *d = dest.head(); d; d = d->next() ) {
+                if (d->fullName() == (*source).h.toString()) {
+                    d->configw().groupsw() = (*source).groups();
+                }
+            }
+        }
     }
 
     bo ReplSetConfig::asBson() const {
@@ -305,83 +315,37 @@ namespace mongo {
     }
 
     void ReplSetConfig::_populateTagMap(map<string,TagClause> &tagMap) {
-        // stage 1: create subgroups for each server corresponding to each of
-        // its tags. If a server has three tags, we want it to end up in three
-        // subgroups, e.g.: A is tagged with ["A", "dc.ny", "m"].  At the end of
-        // this step, tagMap will contain:
-        // "A" => {"A.A" : A}
-        // "dc.ny" => {"dc.ny.A" : A}
-        // "m" => {"m.A" : A}
-        // If we have more than one server with the same tag, we end up with
-        // something like "x.y.z" => [{"x.y.z.A" : A},{"x.y.z.B" : B}] (if A
-        // and B were tagged with "x.y.z").
+        // create subgroups for each server corresponding to each of
+        // its tags. E.g.:
+        //
+        // A is tagged with {"server" : "A", "dc" : "ny"}
+        // B is tagged with {"server" : "B", "dc" : "ny"}
+        //
+        // At the end of this step, tagMap will contain:
+        //
+        // "server" => {"A" : [A], "B" : [B]}
+        // "dc" => {"ny" : [A,B]}
+
         for (unsigned i=0; i<members.size(); i++) {
             MemberCfg member = members[i];
 
-            for (set<string>::iterator tag = member.tags.begin(); tag != member.tags.end(); tag++) {
-                TagClause& clause = tagMap[*tag];
-                clause.name = *tag;
+            for (map<string,string>::iterator tag = member.tags.begin(); tag != member.tags.end(); tag++) {
+                string label = (*tag).first;
+                string value = (*tag).second;
 
-                // we also populate the map, to be used by step 2... I think
-                // this is correct, as step 2 condenses the groups anyway
-                string perServerName = *tag+"."+members[i].h.toString();
+                TagClause& clause = tagMap[label];
+                clause.name = label;
 
                 TagSubgroup* subgroup;
-                if (clause.subgroups.find(perServerName) == clause.subgroups.end()) {
-                    clause.subgroups[perServerName] = subgroup = new TagSubgroup(perServerName);
+                // search for "ny" in "dc"'s clause
+                if (clause.subgroups.find(value) == clause.subgroups.end()) {
+                    clause.subgroups[value] = subgroup = new TagSubgroup(value);
                 }
                 else {
-                    subgroup = clause.subgroups[perServerName];
+                    subgroup = clause.subgroups[value];
                 }
 
                 subgroup->m.insert(&members[i]);
-            }
-        }
-
-        // stage 2: generate all parent tags.  If we have "x.y.z", this
-        // generates "x.y" and "x" and creates a map for each clause, e.g.,
-        // "x"'s clause might have a map that looks like:
-        // "x.y" => {A, B} {C}
-        // "x.w" => {D} {E, F}
-        for (map<string,TagClause>::iterator baseClause = tagMap.begin(); baseClause != tagMap.end(); baseClause++) {
-            string prevPrefix = (*baseClause).first;
-            const char *dot = strrchr(prevPrefix.c_str(), '.');
-
-            while (dot) {
-                // get x.y
-                string xyTag = string(prevPrefix.c_str(), dot - prevPrefix.c_str());
-                LOG(1) << "replSet generating tag " << xyTag << rsLog;
-                TagClause& xyClause = tagMap[xyTag];
-                xyClause.name = xyTag;
-
-                // get all of x.y.z's subgroups, add them as a single subgroup of x.y
-                TagSubgroup* condensedSubgroup;;
-                if (xyClause.subgroups.find(prevPrefix) == xyClause.subgroups.end()) {
-                    // label this subgroup one higher than the current, e.g.,
-                    // "x.y.z" if we're creating the "x.y" clause
-                    condensedSubgroup = new TagSubgroup(prevPrefix);
-                    xyClause.subgroups[prevPrefix] = condensedSubgroup;
-                }
-                else {
-                    condensedSubgroup = xyClause.subgroups[prevPrefix];
-                    assert(condensedSubgroup->name == prevPrefix);
-                }
-
-                TagClause& xyzClause = tagMap[prevPrefix];
-
-                for (map<string,TagSubgroup*>::iterator xyzSubgroup = xyzClause.subgroups.begin();
-                     xyzSubgroup != xyzClause.subgroups.end(); xyzSubgroup++) {
-                    for (set<MemberCfg*>::const_iterator xyzMember = (*xyzSubgroup).second->m.begin();
-                         xyzMember != (*xyzSubgroup).second->m.end(); xyzMember++) {
-                        condensedSubgroup->m.insert(*xyzMember);
-                        // we'll link the member back with the group later, to
-                        // avoid creating extra link-backs
-                    }
-                }
-
-                // advance: if we were handling "x.y", now do "x"
-                prevPrefix = xyTag;
-                dot = strrchr(prevPrefix.c_str(), '.');
             }
         }
     }
@@ -440,7 +404,7 @@ namespace mongo {
 
                     for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
-                        (*cfg)->groupsw(this).insert((*sgs).second);
+                        (*cfg)->groupsw().insert((*sgs).second);
                     }
                 }
 
@@ -530,9 +494,10 @@ namespace mongo {
                 if( mobj.hasElement("votes") )
                     m.votes = (unsigned) mobj["votes"].Number();
                 if( mobj.hasElement("tags") ) {
-                    vector<BSONElement> v = mobj["tags"].Array();
-                    for( unsigned i = 0; i < v.size(); i++ )
-                        m.tags.insert( v[i].String() );
+                    const BSONObj &t = mobj["tags"].Obj();
+                    for (BSONObj::iterator c = t.begin(); c.more(); c.next()) {
+                        m.tags[(*c).fieldName()] = (*c).String();
+                    }
                 }
                 m.check();
             }

@@ -17,7 +17,7 @@ checkArrs = function( a, b ) {
     bStr = [];
     a.forEach( function( x ) { aStr.push( tojson( x ) ); } );
     b.forEach( function( x ) { bStr.push( tojson( x ) ); } );
-    for ( i in aStr ) {
+    for ( i = 0; i < aStr.length; ++i ) {
         assert( -1 != bStr.indexOf( aStr[ i ] ), m );
     }
 }

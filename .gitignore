@@ -3,6 +3,7 @@
 .sconsign.dblite
 .sconf_temp
 perf.data
+massif.out.*
 
 *~
 *.swp

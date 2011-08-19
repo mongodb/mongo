@@ -308,7 +308,7 @@ namespace mongo {
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */
-        bool shallowEqual(const BSONObj& r) const {
+        bool binaryEqual(const BSONObj& r) const {
             int os = objsize();
             if ( os == r.objsize() ) {
                 return (os == 0 || memcmp(objdata(),r.objdata(),os)==0);

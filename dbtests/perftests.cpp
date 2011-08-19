@@ -266,7 +266,12 @@ namespace PerfTests {
                     }
                     BSONObj o = b.obj();
                     //cout << "inserting " << o.toString() << endl;
-                    conn->insert(ns, o);
+                    try {
+                        conn->insert(ns, o);
+                    }
+                    catch ( std::exception& e ) {
+                        warning() << "couldn't save perf results: " << e.what() << endl;
+                    }
                 }
             }
         }
