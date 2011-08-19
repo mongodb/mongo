@@ -478,9 +478,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	if (0) {
 err:		if (opened)
-			__wt_connection_close(conn);
+			(void)__wt_connection_close(conn);
 		else
-			__wt_connection_destroy(conn);
+			(void)__wt_connection_destroy(conn);
 	}
 
 	return (ret);
