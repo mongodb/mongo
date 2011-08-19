@@ -410,6 +410,8 @@ namespace mongo {
         _timeout = timeout;
         _init();
     }
+
+    Socket::~Socket() {}
     
     void Socket::_init() {
         _bytesOut = 0;

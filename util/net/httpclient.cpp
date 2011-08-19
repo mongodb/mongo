@@ -137,6 +137,7 @@ namespace mongo {
             result->_init( rc , sb.str() );
         }
 
+        sock.close();
         return rc;
     }
 
