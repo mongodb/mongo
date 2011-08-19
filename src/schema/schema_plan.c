@@ -14,7 +14,7 @@ __find_next_col(WT_SESSION_IMPL *session,
 	WT_BTREE *cgtree;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
-	int cg, col, foundcg, foundcol, getnext, ret;
+	int cg, col, foundcg, foundcol, getnext;
 
 	foundcg = foundcol = -1;
 
@@ -26,7 +26,7 @@ __find_next_col(WT_SESSION_IMPL *session,
 		    cgtree->config, "columns", &cval));
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
 		for (col = 0;
-		    (ret = __wt_config_next(&conf, &k, &v)) == 0;
+		    __wt_config_next(&conf, &k, &v) == 0;
 		    col++) {
 			if (cg == *cgnump && col == *colnump)
 				getnext = 1;
@@ -105,7 +105,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session,
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	int cg, col, current_cg, current_col, start_cg, start_col;
-	int i, have_it, ret;
+	int i, have_it;
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_RET(__wt_config_initn(session, &conf, columns, len));
@@ -115,11 +115,10 @@ __wt_struct_plan(WT_SESSION_IMPL *session,
 
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
-	while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
+	while (__wt_config_next(&conf, &k, &v) == 0) {
 		have_it = 0;
 
-		while ((ret =
-		    __find_next_col(session, table, &k, &cg, &col)) == 0 &&
+		while (__find_next_col(session, table, &k, &cg, &col) == 0 &&
 		    (!have_it || cg != start_cg || col != start_col)) {
 			/*
 			 * First we move to the column.  If that is in a
@@ -210,7 +209,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *columns, size_t len, int value_only, WT_BUF *format)
 {
 	WT_CONFIG config;
-	WT_CONFIG_ITEM k, v, next_k, next_v;
+	WT_CONFIG_ITEM k, next_k, next_v;
 	WT_PACK_VALUE pv;
 	int have_next, ret;
 
@@ -218,7 +217,6 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_RET(__wt_config_next(&config, &next_k, &next_v));
 	do {
 		k = next_k;
-		v = next_v;
 		ret = __wt_config_next(&config, &next_k, &next_v);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			return (ret);
