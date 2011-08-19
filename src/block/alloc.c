@@ -321,7 +321,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_block_free(session, btree->free_addr, btree->free_size));
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 
 	return (ret);
 }
@@ -413,7 +413,7 @@ done:	/* Update the file's meta-data. */
 	btree->free_size = size;
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 
 	return (ret);
 }

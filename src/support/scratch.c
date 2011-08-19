@@ -295,22 +295,22 @@ err:	__wt_errx(session,
 }
 
 /*
- * __wt_scr_release --
+ * __wt_scr_free --
  *	Release a scratch buffer.
  */
 void
-__wt_scr_release(WT_BUF **bufp)
+__wt_scr_free(WT_BUF **bufp)
 {
 	F_CLR(*bufp, WT_BUF_INUSE);
 	*bufp = NULL;
 }
 
 /*
- * __wt_scr_free --
+ * __wt_scr_discard --
  *	Free all memory associated with the scratch buffers.
  */
 void
-__wt_scr_free(WT_SESSION_IMPL *session)
+__wt_scr_discard(WT_SESSION_IMPL *session)
 {
 	WT_BUF **bufp;
 	u_int i;
@@ -358,7 +358,7 @@ __wt_scr_free_ext(WT_SESSION *wt_session, void *p)
 	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp)
 		if (*bufp != NULL && (*bufp)->mem == p) {
 			/*
-			 * Do NOT call __wt_scr_release() here, it clears the
+			 * Do NOT call __wt_scr_free() here, it clears the
 			 * caller's pointer, which would truncate the list.
 			 */
 			F_CLR(*bufp, WT_BUF_INUSE);

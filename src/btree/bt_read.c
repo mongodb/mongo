@@ -284,7 +284,7 @@ __cache_read(
 	    session, tmp, addr, size, dsk_verify ? WT_VERIFY : 0));
 
 	dsk = __wt_buf_steal(session, tmp, &size);
-	__wt_scr_release(&tmp);
+	__wt_scr_free(&tmp);
 
 	/*
 	 * Build the in-memory version of the page, then re-load the disk
@@ -305,7 +305,7 @@ __cache_read(
 	return (0);
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 	if (dsk != NULL)
 		__wt_free(session, dsk);
 	return (ret);

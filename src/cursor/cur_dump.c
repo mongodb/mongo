@@ -43,7 +43,7 @@ __convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 	tmp->size = size;
 
 	__wt_buf_swap(buf, tmp);
-	__wt_scr_release(&tmp);
+	__wt_scr_free(&tmp);
 
 	return (0);
 }

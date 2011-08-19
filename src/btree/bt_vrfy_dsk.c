@@ -367,11 +367,11 @@ err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
 	if (current != NULL)
-		__wt_scr_release(&current);
+		__wt_scr_free(&current);
 	if (last_pfx != NULL)
-		__wt_scr_release(&last_pfx);
+		__wt_scr_free(&last_pfx);
 	if (last_ovfl != NULL)
-		__wt_scr_release(&last_ovfl);
+		__wt_scr_free(&last_ovfl);
 	return (ret);
 }
 

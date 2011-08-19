@@ -696,7 +696,7 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 #endif
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 	return (ret);
 
 }
@@ -819,7 +819,7 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 #endif
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 	return (ret);
 }
 

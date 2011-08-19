@@ -148,7 +148,7 @@ err:		if (ret == 0)
 		/* Free allocated memory. */
 		__wt_free(session, vs->fragbits);
 		if (vs->max_key != NULL)
-			__wt_scr_release(&vs->max_key);
+			__wt_scr_free(&vs->max_key);
 	}
 
 	return (ret);
@@ -433,7 +433,7 @@ __verify_row_leaf_key_order(
 			ret = WT_ERROR;
 		}
 
-		__wt_scr_release(&key);
+		__wt_scr_free(&key);
 		if (ret != 0)
 			return (ret);
 	}
@@ -527,7 +527,7 @@ __verify_overflow(
 	/* Add the fragments. */
 	WT_ERR(__verify_addfrag(session, addr, size, vs));
 
-err:	__wt_scr_release(&tmp);
+err:	__wt_scr_free(&tmp);
 
 	return (ret);
 }

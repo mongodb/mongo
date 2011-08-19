@@ -97,7 +97,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	if (msg != NULL) {
 		if (msg->size != 0)
 			__wt_msg(session, "%s", (char *)msg->mem);
-		__wt_scr_release(&ds->msg);
+		__wt_scr_free(&ds->msg);
 	}
 
 	/* Close any file we opened. */
@@ -181,7 +181,7 @@ __wt_debug_addr(
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	WT_ERR(__wt_block_read(session, tmp, addr, size, 0));
 	ret = __wt_debug_disk(session, tmp->mem, ofile);
-err:	__wt_scr_release(&tmp);
+err:	__wt_scr_free(&tmp);
 
 	return (ret);
 }
@@ -780,7 +780,7 @@ deleted:	p = (uint8_t *)"deleted";
 	__debug_item(ds, tag, p, size);
 
 err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 	return (ret);
 }
 

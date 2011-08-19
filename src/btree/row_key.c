@@ -220,7 +220,7 @@ next:		switch (direction) {
 	}
 
 	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 
 	/*
 	 * If a return buffer was specified, the caller just wants a copy and
@@ -244,14 +244,14 @@ next:		switch (direction) {
 	if (rip_arg->key != ikey)
 		__wt_sb_decrement(session, ikey->sb);
 
-	__wt_scr_release(&retb);
+	__wt_scr_free(&retb);
 
 	return (ret);
 
 err:	if (is_local && retb != NULL)
-		__wt_scr_release(&retb);
+		__wt_scr_free(&retb);
 	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+		__wt_scr_free(&tmp);
 	return (ret);
 }
 

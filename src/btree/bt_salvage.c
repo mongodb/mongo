@@ -304,7 +304,7 @@ err:		if (ret == 0)
 
 	/* Discard verbose print buffer. */
 	if (ss->vbuf != NULL)
-		__wt_scr_release(&ss->vbuf);
+		__wt_scr_free(&ss->vbuf);
 
 	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);
@@ -464,7 +464,7 @@ skip:			WT_VERBOSE(session, SALVAGE,
 		}
 	}
 
-err:	__wt_scr_release(&tmp);
+err:	__wt_scr_free(&tmp);
 
 	return (ret);
 }
@@ -1613,8 +1613,8 @@ __slvg_row_trk_update_start(
 	if (page != NULL)
 		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
 
-err:	__wt_scr_release(&dsk);
-	__wt_scr_release(&key);
+err:	__wt_scr_free(&dsk);
+	__wt_scr_free(&key);
 
 	return (ret);
 }
@@ -1885,7 +1885,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 err:	__wt_hazard_clear(session, page);
 	__wt_page_out(session, page, 0);
 
-	__wt_scr_release(&key);
+	__wt_scr_free(&key);
 
 	return (ret);
 }

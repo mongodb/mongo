@@ -39,7 +39,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		__wt_sb_decrement(session, session->sb);
 
 	/* Discard scratch buffers. */
-	__wt_scr_free(session);
+	__wt_scr_discard(session);
 
 	/* Confirm we're not holding any hazard references. */
 	__wt_hazard_empty(session);
