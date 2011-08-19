@@ -117,6 +117,9 @@ debian/mongodb
 #osx
 .DS_Store
 
+#third party
+third_party/js-1.7/jsautocfg.h
+
 # QtCreator
 *.config
 *.creator

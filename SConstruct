@@ -36,6 +36,8 @@ def findSettingsSetup():
 
 options = {}
 
+options_topass = {}
+
 def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 
     if dest is None:
@@ -56,7 +58,7 @@ def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 def get_option( name ):
     return GetOption( name )
 
-def has_option( name ):
+def _has_option( name ):
     x = get_option( name )
     if x is None:
         return False
@@ -68,6 +70,12 @@ def has_option( name ):
         return False
 
     return True
+
+def has_option( name ):
+    x = _has_option(name)
+    options_topass[name] = x
+    return x
+
 
 def get_variant_dir():
     
@@ -252,6 +260,7 @@ else:
 
 if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
+    options_topass["usesm"] = True
 
 distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 
@@ -375,8 +384,6 @@ elif usev8:
     scriptingFiles += [ Glob( "scripting/*v8*.cpp" ) ]
 else:
     scriptingFiles += [ "scripting/engine_none.cpp" ]
-
-coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp", "s/mr_shard.cpp", "s/security.cpp" ]
@@ -559,12 +566,6 @@ elif "win32" == os.sys.platform:
 
     boostLibs = []
 
-    env.Append(CPPPATH=[ "js/src/" ])
-    env.Append(CPPPATH=["../js/src/"])
-    env.Append(LIBPATH=["../js/src"])
-    env.Append(LIBPATH=["../js/"])
-
-    env.Append( CPPDEFINES=[ "OLDJS" ] )
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
@@ -758,11 +759,14 @@ for x in os.listdir( "third_party" ):
 
 
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles }
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles }
     
-    options = { "windows" : windows }
+    options_topass["windows"] = windows
+    options_topass["nix"] = nix
     
-    myModule.configure( env , fileLists , options )
+    myModule.configure( env , fileLists , options_topass )
+
+coreServerFiles += scriptingFiles
 
 # --- check system ---
 
@@ -899,46 +903,8 @@ def doConfigure( myenv , shell=False ):
         else:
             m.configure( conf , myenv )
 
-    # XP_* is for spidermonkey.
-    # this is outside of usesm block so don't have to rebuild for java
-    if windows:
-        myenv.Append( CPPDEFINES=[ "XP_WIN" ] )
-    else:
-        myenv.Append( CPPDEFINES=[ "XP_UNIX" ] )
-
     if solaris:
         conf.CheckLib( "nsl" )
-
-    if usesm:
-
-        # see http://www.mongodb.org/pages/viewpageattachments.action?pageId=12157032
-        J = [ "mozjs" , "js", "js_static" ]
-        if windows:
-            if msarch == "amd64":
-                if release:
-                    J = [ "js64r", "js", "mozjs" , "js_static" ]
-                else:
-                    J = "js64d"
-                    print( "looking for js64d.lib for spidermonkey. (available at mongodb.org prebuilt)" );
-            else:
-                if not force32:
-                    print( "Assuming a 32 bit build is desired" )
-                if release:
-                    J = [ "js32r", "js", "mozjs" , "js_static" ]
-                else:
-                    J = [ "js32d", "js", "mozjs" , "js_static" ]
-                
-        myCheckLib( J , True )
-        mozHeader = "js"
-        if bigLibString(myenv).find( "mozjs" ) >= 0:
-            mozHeader = "mozjs"
-
-        if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
-            if conf.CheckHeader( "jsapi.h" ):
-                myenv.Append( CPPDEFINES=[ "OLDJS" ] )
-            else:
-                print( "no spider monkey headers!" )
-                Exit(1)
 
     if usev8:
         if debugBuild:
