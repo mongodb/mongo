@@ -275,6 +275,13 @@ namespace mongo {
             b.append("hidden", true);
         if( !myConfig().buildIndexes )
             b.append("buildIndexes", false);
+        if( !myConfig().tags.empty() ) {
+            BSONObjBuilder a;
+            for( map<string,string>::const_iterator i = myConfig().tags.begin(); i != myConfig().tags.end(); i++ )
+                a.append((*i).first, (*i).second);
+            b.append("tags", a.done());
+        }
+        b.append("me", myConfig().h.toString());
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
