@@ -52,18 +52,14 @@ __wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	size_t total;
-	int ret;
-
-	total = 0;
 
 	if (__pack_init(session, &pack, fmt) != 0)
-		return (size_t)-1;
+		return ((size_t)-1);
 
-	while ((ret = __pack_next(&pack, &pv)) == 0) {
+	for (total = 0; __pack_next(&pack, &pv) == 0;) {
 		WT_PACK_GET(session, pv, ap);
 		total += __pack_size(session, &pv);
 	}
-
 	return (total);
 }
 
