@@ -18,15 +18,17 @@
  *	have brackets.
  */
 int
-__wt_config_concat(WT_SESSION_IMPL *session,
-    const char **cfg, const char **config_ret)
+__wt_config_concat(
+    WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
 {
-	char *config, *end, *p;
-	const char **cp;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
-	int ret;
 	size_t len;
+	int ret;
+	const char **cp;
+	char *config, *end, *p;
+
+	ret = 0;
 
 	/*
 	 * Be conservative when allocating the buffer: it can't be longer
