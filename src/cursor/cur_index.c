@@ -111,11 +111,7 @@ __curindex_remove(WT_CURSOR *cursor)
 static int
 __curindex_close(WT_CURSOR *cursor, const char *config)
 {
-	int ret;
-
-	ret = 0;
-	WT_TRET(__wt_cursor_close(cursor, config));
-	return (ret);
+	return (__wt_cursor_close(cursor, config));
 }
 
 /*
@@ -151,13 +147,10 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	const char *indexitem;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
-	int ret;
 
-	indexitem = uri + 7;
-	ret = 0;
+	WT_UNUSED(uri);
 
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
 
@@ -170,6 +163,5 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	__wt_cursor_init(cursor, 1, config);
 	*cursorp = cursor;
 
-	return (ret);
+	return (0);
 }
-
