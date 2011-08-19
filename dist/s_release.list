@@ -2,5 +2,7 @@
 # Each non-comment line is passed as an "--exclude" argument to "hg archive".
 lang/java
 lang/python/src
+src/bdb
 src/server
+src/txn
 test/insert
