@@ -8,7 +8,8 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-bzip2_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+bzip2_compress(
+    WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
 static int
 bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
@@ -48,20 +49,22 @@ __attribute__((destructor))
 static void _fini(void) {
 }
 
-/* Convert a Bzip2 library return code to WT error code */
+/*
+ * bzip2_error --
+ *	Output an error message, and return a standard error code.
+ */
 static int
-bzip2_convert_error(WT_SESSION *wt_session, int bzret)
+bzip2_error(WT_SESSION *wt_session, int bzret)
 {
 	const char *msg;
 
-	switch (bzret) {		/* Some errors are anticipated */
+	switch (bzret) {
 	case BZ_MEM_ERROR:
-		return (ENOMEM);
+		msg = "BZ_MEM_ERROR";
+		break;
 	case BZ_OUTBUFF_FULL:
-		return (WT_TOOSMALL);
-	}
-
-	switch (bzret) {		/* Some errors are unexpected */
+		msg = "BZ_OUTBUFF_FULL";
+		break;
 	case BZ_SEQUENCE_ERROR:
 		msg = "BZ_SEQUENCE_ERROR";
 		break;
@@ -88,31 +91,33 @@ bzip2_convert_error(WT_SESSION *wt_session, int bzret)
 		break;
 	}
 
-	/*
-	 * XXX
-	 * This needs to get pushed back to the session handle somehow.
-	 */
 	wiredtiger_err_printf(wt_session, "bzip2 error: %s: %d", msg, bzret);
 	return (WT_ERROR);
 }
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
-bzip2_compress(WT_COMPRESSOR *compressor,
-    WT_SESSION *wt_session, const WT_ITEM *source, WT_ITEM *dest)
+bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *wt_session,
+    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed)
 {
 	u_int destlen;
 	int bzret;
 
 	__UNUSED(compressor);
+	*compression_failed = 0;
 
 	destlen = dest->size;
 	bzret = BZ2_bzBuffToBuffCompress((char *)dest->data, &destlen,
 	    (char *)source->data, source->size,
 	    bz_blocksize100k, bz_verbosity, bz_workfactor);
 
-	if (bzret == BZ_OK) {
+	switch (bzret) {
+	case BZ_OK:
 		dest->size = destlen;
+		return (0);
+	case BZ_MEM_ERROR:			/* Expected errors. */
+	case BZ_OUTBUFF_FULL:
+		*compression_failed = 1;
 		return (0);
 	}
 	return (bzip2_convert_error(wt_session, bzret));

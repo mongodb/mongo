@@ -7,7 +7,7 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
 static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
@@ -33,15 +33,16 @@ static void _fini(void) {
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
-nop_compress(WT_COMPRESSOR *compressor,
-    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
+nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed)
 {
 	__UNUSED(compressor);
 	__UNUSED(session);
 
+	*compression_failed = 0;
         if (dest->size < source->size) {
-                dest->size = source->size;
-                return (ENOMEM);
+		*compression_failed = 1;
+                return (0);
         }
 
         memcpy((void *)dest->data, source->data, source->size);
@@ -57,10 +58,8 @@ nop_decompress(WT_COMPRESSOR *compressor,
 	__UNUSED(compressor);
 	__UNUSED(session);
 
-        if (dest->size < source->size) {
-                dest->size = source->size;
+        if (dest->size < source->size)
                 return (ENOMEM);
-        }
 
         memcpy((void *)dest->data, source->data, source->size);
         dest->size = source->size;

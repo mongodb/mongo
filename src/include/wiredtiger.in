@@ -1195,17 +1195,19 @@ struct wt_compressor {
 	 * to the number of bytes required for the compressed representation.
 	 *
 	 * If the \c dest buffer is not big enough to hold the compressed data,
-	 * the callback should set \c dest->size to the required size and
-	 * return \c ENOMEM.
+	 * the callback should set \c compression_failed to a non-zero value
+	 * and return 0.
 	 *
 	 * @param[in] source the data to compress
 	 * @param[in] dest \c data field points to allocated memory;
 	 *	\c size set to maximum permitted size of compressed data
 	 * @param[out] dest \c size the actual size of the compressed data
+	 * @param[out] compression_failed \c non-zero if compression did not
+	 * decrease the size of the data (compression may not have completed)
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
-	    const WT_ITEM *source, WT_ITEM *dest);
+	    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed);
 
 	/*! Callback to decompress a chunk of data.
 	 *
@@ -1215,8 +1217,7 @@ struct wt_compressor {
 	 * to the number of bytes required for the decompressed representation.
 	 *
 	 * If the \c dest buffer is not big enough to hold the decompressed
-	 * data, the callback should set \c dest->size to the required size and
-	 * return \c ENOMEM.
+	 * data, the callback should return an error.
 	 *
 	 * @param[in] source the compressed data
 	 * @param[in] dest \c data field points to allocated memory;

@@ -105,7 +105,7 @@ __wt_block_write(
 	WT_PAGE_DISK *dsk;
 	uint32_t addr, align_size, size;
 	uint8_t orig_type;
-	int ret;
+	int compression_failed, ret;
 
 	btree = session->btree;
 	tmp = NULL;
@@ -189,8 +189,10 @@ not_compressed:	/*
 		 * it just means the uncompressed version is as good as it gets,
 		 * and that's what we use.
 		 */
-		if ((ret = btree->compressor->compress(
-		    btree->compressor, &session->iface, &src, &dst)) != 0)
+		compression_failed = 0;
+		WT_ERR(btree->compressor->compress(btree->compressor,
+		    &session->iface, &src, &dst, &compression_failed));
+		if (compression_failed)
 			goto not_compressed;
 
 		/*

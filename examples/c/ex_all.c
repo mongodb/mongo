@@ -175,15 +175,16 @@ add_collator(WT_CONNECTION *conn)
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
 my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest)
+    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed)
 {
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
 
+	*compression_failed = 0;
 	if (dest->size < source->size) {
-		dest->size = source->size;
-		return (ENOMEM);
+		*compression_failed = 1;
+		return (0);
 	}
 	memcpy((void *)dest->data, source->data, source->size);
 	dest->size = source->size;
@@ -191,17 +192,16 @@ my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 static int
-my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest)
+my_decompress(WT_COMPRESSOR *compressor,
+    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
 {
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
 
-	if (dest->size < source->size) {
-		dest->size = source->size;
+	if (dest->size < source->size)
 		return (ENOMEM);
-	}
+
 	memcpy((void *)dest->data, source->data, source->size);
 	dest->size = source->size;
 	return (0);
