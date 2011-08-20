@@ -301,6 +301,8 @@ err:	__wt_errx(session,
 void
 __wt_scr_free(WT_BUF **bufp)
 {
+	if (*bufp == NULL)
+		return;
 	F_CLR(*bufp, WT_BUF_INUSE);
 	*bufp = NULL;
 }
