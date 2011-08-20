@@ -304,9 +304,7 @@ __cache_read(
 
 	return (0);
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
-	if (dsk != NULL)
-		__wt_free(session, dsk);
+err:	__wt_scr_free(&tmp);
+	__wt_free(session, dsk);
 	return (ret);
 }

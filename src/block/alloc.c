@@ -288,6 +288,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session)
 	uint32_t *p;
 	int ret;
 
+	tmp = NULL;
 	btree = session->btree;
 	ret = 0;
 
@@ -320,9 +321,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(__wt_block_free(session, btree->free_addr, btree->free_size));
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
-
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -412,9 +411,7 @@ done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
-
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 

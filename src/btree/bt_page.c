@@ -379,10 +379,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (!found_ovfl)
 		__wt_free(session, page->dsk);
 
-err:	if (current != NULL)
-		__wt_scr_free(&current);
-	if (last != NULL)
-		__wt_scr_free(&last);
+err:	__wt_scr_free(&current);
+	__wt_scr_free(&last);
 	return (ret);
 }
 

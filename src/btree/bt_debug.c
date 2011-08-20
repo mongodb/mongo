@@ -779,8 +779,7 @@ deleted:	p = (uint8_t *)"deleted";
 
 	__debug_item(ds, tag, p, size);
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 

@@ -1365,8 +1365,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	r->first_free = dsk_start + len;
 	r->space_avail = (r->split_size - WT_PAGE_DISK_SIZE) - len;
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -2623,8 +2622,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 	/* Write the remnant page. */
 	ret = __rec_split_finish(session);
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -3116,8 +3114,7 @@ __rec_cell_build_ovfl(
 	kv->cell_len = __wt_cell_pack_type(&kv->cell, type, rle);
 	kv->len = kv->cell_len + kv->buf.size;
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 

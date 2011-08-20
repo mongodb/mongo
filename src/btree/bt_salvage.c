@@ -303,8 +303,7 @@ err:		if (ret == 0)
 	WT_TRET(__slvg_cleanup(session, ss));
 
 	/* Discard verbose print buffer. */
-	if (ss->vbuf != NULL)
-		__wt_scr_free(&ss->vbuf);
+	__wt_scr_free(&ss->vbuf);
 
 	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);

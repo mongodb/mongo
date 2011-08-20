@@ -147,8 +147,7 @@ err:		if (ret == 0)
 
 		/* Free allocated memory. */
 		__wt_free(session, vs->fragbits);
-		if (vs->max_key != NULL)
-			__wt_scr_free(&vs->max_key);
+		__wt_scr_free(&vs->max_key);
 	}
 
 	return (ret);

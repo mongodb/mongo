@@ -86,8 +86,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session,
 		    buf->mem, addr, buf->size, LF_ISSET(WT_ERR_QUIET) ? 1 : 0));
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -258,8 +257,6 @@ not_compressed:	/*
 	*addrp = addr;
 	*sizep = align_size;
 
-err:	if (tmp != NULL)
-		__wt_scr_free(&tmp);
-
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }

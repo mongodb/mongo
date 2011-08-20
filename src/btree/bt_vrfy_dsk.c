@@ -366,12 +366,9 @@ eof:		ret = __err_eof(session, cell_num, addr, quiet);
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
-	if (current != NULL)
-		__wt_scr_free(&current);
-	if (last_pfx != NULL)
-		__wt_scr_free(&last_pfx);
-	if (last_ovfl != NULL)
-		__wt_scr_free(&last_ovfl);
+	__wt_scr_free(&current);
+	__wt_scr_free(&last_pfx);
+	__wt_scr_free(&last_ovfl);
 	return (ret);
 }
 
