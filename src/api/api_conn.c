@@ -361,16 +361,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "write",	WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
+	WT_BUF *expath, *exconfig;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
 	const char *cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
-	char expath[256], exconfig[100];
 	int opened, ret;
 
-	opened = 0;
 	*wt_connp = NULL;
+	expath = exconfig = NULL;
+	opened = 0;
 
 	/*
 	 * If the application didn't configure an event handler, use the default
@@ -452,23 +453,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
-		if (snprintf(expath, sizeof(expath), "%.*s",
-		    (int)skey.len, skey.str) >= (int)sizeof (expath)) {
-			__wt_err(session, ret = EINVAL,
-			    "extension filename too long: %.*s",
-			    (int)skey.len, skey.str);
-			goto err;
+		WT_ERR(
+		    __wt_scr_alloc(session, (uint32_t)skey.len + 10, &expath));
+		WT_ERR(__wt_buf_sprintf(
+		    session, expath, "%.*s", (int)skey.len, skey.str));
+		if (sval.len > 0) {
+			WT_ERR(__wt_scr_alloc(
+			    session, (uint32_t)sval.len + 32, &exconfig));
+			WT_ERR(__wt_buf_sprintf(session, exconfig,
+			    "entry=%.*s\n", (int)sval.len, sval.str));
 		}
-		if (sval.len > 0 &&
-		    snprintf(exconfig, sizeof(exconfig), "entry=%.*s\n",
-		    (int)sval.len, sval.str) > (int)sizeof (exconfig)) {
-			__wt_err(session, ret = EINVAL,
-			    "extension name too long: %.*s",
-			    (int)skey.len, skey.str);
-			goto err;
-		}
-		WT_ERR(conn->iface.load_extension(&conn->iface, expath,
-		    (sval.len > 0) ? exconfig : NULL));
+		WT_ERR(conn->iface.load_extension(&conn->iface,
+		    expath->data, exconfig == NULL ? NULL : exconfig->data));
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -484,6 +480,8 @@ err:		if (opened)
 		else
 			(void)__wt_connection_destroy(conn);
 	}
+	__wt_scr_free(&expath);
+	__wt_scr_free(&exconfig);
 
 	return (ret);
 }
