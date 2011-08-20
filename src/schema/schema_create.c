@@ -104,12 +104,12 @@ __create_colgroup(
 		WT_ERR(__wt_buf_sprintf(session, &namebuf,
 		    "filename=%.*s.wt", (int)tlen, tablename));
 		cfg[2] = filename = namebuf.data;
-		WT_PREFIX_SKIP(filename, "filename=");
+		(void)WT_PREFIX_SKIP(filename, "filename=");
 	} else {
 		WT_ERR(__wt_buf_sprintf(session, &namebuf,
 		    "filename=%.*s_%s.wt", (int)tlen, tablename, cgname));
 		cfg[2] = filename = namebuf.data;
-		WT_PREFIX_SKIP(filename, "filename=");
+		(void)WT_PREFIX_SKIP(filename, "filename=");
 	}
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
@@ -189,7 +189,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 		snprintf(namebuf, namelen, "filename=%.*s_%s.wti",
 		    (int)tlen, tablename, idxname);
 		cfg[2] = filename = namebuf;
-		WT_PREFIX_SKIP(filename, "filename=");
+		(void)WT_PREFIX_SKIP(filename, "filename=");
 	}
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 
