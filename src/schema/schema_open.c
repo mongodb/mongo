@@ -88,7 +88,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
 		    (int)cval.len, cval.str));
 		filename = uri = uribuf.data;
-		WT_PREFIX_SKIP(filename, "file:");
+		(void)WT_PREFIX_SKIP(filename, "file:");
 
 		ret = __wt_session_get_btree(session, uri, filename, NULL);
 		if (ret == ENOENT)
