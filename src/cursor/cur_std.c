@@ -19,6 +19,8 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
+	ret = 0;
+
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	va_start(ap, cursor);
