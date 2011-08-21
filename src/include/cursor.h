@@ -9,30 +9,48 @@ struct __wt_cursor_btree {
 	WT_CURSOR iface;
 
 	WT_BTREE *btree;			/* Enclosing btree */
+
+	/*
+	 * WT_WALK is the stack of pages to the current cursor location, a
+	 * page.
+	 */
 	WT_WALK	  walk;				/* Current walk */
 	WT_PAGE	 *page;				/* Current page */
-	uint32_t  nitems;			/* Total page slots */
 
-	WT_COL	  *cip;				/* Col-store page slot ref */
-	WT_ROW	  *rip;				/* Row-store page slot ref */
+	/* The following fields give us a location within a single page. */
+	WT_COL	  *cip;				/* Col-store page slot */
+	WT_ROW	  *rip;				/* Row-store page slot */
+	uint32_t  nslots;			/* Counting page slots */
 
+	/*
+	 * Insert lists override the slot, that is, if the insert list is
+	 * set, then we're walking an insert list, and ignoring the slot.
+	 */
 	WT_INSERT_HEAD *ins_head;		/* Insert chain head */
 	WT_INSERT *ins;				/* Insert chain */
-	uint32_t   ins_cnt;			/* Insert chain count */
+	/*
+	 * We can't walk an insert list in reverse order.  We count the insert
+	 * list entries, then repeatedly walk the list in the forward direction,
+	 * each time returning one entry earlier in the list.
+	 */
+	uint32_t   ins_prev_cnt;		/* Insert chain counting back */
 
+	/*
+	 * The following fields are cached information when returning items
+	 * from the page.
+	 */
 	uint64_t recno;				/* Cursor record number */
+
 	/*
 	 * Column-store variable length items are optionally run-length encoded.
-	 * WT_CURSOR_BTREE->rle is the count of items to return, decremented to
-	 * 0.
-	 */
-	uint64_t rle;				/* RLE count */
-	/*
+	 * WT_CURSOR_BTREE->rle is item return count, decremented to 0.
+	 *
 	 * Column-store variable length items are optionally Huffman encoded.
 	 * WT_CURSOR_BTREE->value is a buffer that contains a copy of the item
-	 * we're returning, so we don't repeatedly decode them.  The buffer is
-	 * NULL if the item was deleted.
+	 * we're returning, so we don't repeatedly decode them if the RLE count
+	 * is non-zero.  The buffer is NULL if the item was deleted.
 	 */
+	uint64_t rle_return_cnt;		/* RLE count */
 	WT_BUF  value;				/* Cursor value copy */
 };
 

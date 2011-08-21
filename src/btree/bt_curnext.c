@@ -27,13 +27,13 @@ __btcur_next_fix(
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
-		cbt->nitems = cbt->page->entries;
+		cbt->nslots = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
 	}
 
 	/* This loop moves through a page, including after reading a record. */
-	for (found = 0; !found; ++cbt->recno, --cbt->nitems) {
-		if (cbt->nitems == 0)
+	for (found = 0; !found; ++cbt->recno, --cbt->nslots) {
+		if (cbt->nslots == 0)
 			return (WT_NOTFOUND);
 
 		*recnop = cbt->recno;
@@ -85,22 +85,22 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->cip = cbt->page->u.col_leaf.d;
-		cbt->nitems = cbt->page->entries;
+		cbt->nslots = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
 		newcell = 1;
 	} else
 		newcell = 0;
 
 	/* This loop moves through a page. */
-	for (; cbt->rle > 0 || cbt->nitems > 0;
-	    ++cbt->cip, --cbt->nitems, newcell = 1) {
+	for (; cbt->rle_return_cnt > 0 || cbt->nslots > 0;
+	    ++cbt->cip, --cbt->nslots, newcell = 1) {
 		/* Unpack each cell, find out how many times it's repeated. */
 		if (newcell) {
 			if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
 				__wt_cell_unpack(cell, unpack);
-				cbt->rle = unpack->rle;
+				cbt->rle_return_cnt = unpack->rle;
 			} else
-				cbt->rle = 1;
+				cbt->rle_return_cnt = 1;
 
 			cbt->ins = WT_SKIP_FIRST(
 			    WT_COL_INSERT(cbt->page, cbt->cip));
@@ -110,8 +110,8 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 			 * of them.
 			 */
 			if (cbt->ins == NULL && unpack->type == WT_CELL_DEL) {
-				cbt->recno += cbt->rle;
-				cbt->rle = 0;
+				cbt->recno += cbt->rle_return_cnt;
+				cbt->rle_return_cnt = 0;
 				continue;
 			}
 
@@ -128,8 +128,8 @@ __btcur_next_var(WT_CURSOR_BTREE *cbt,
 		}
 
 		/* Return the data RLE-count number of times. */
-		while (cbt->rle > 0) {
-			--cbt->rle;
+		while (cbt->rle_return_cnt > 0) {
+			--cbt->rle_return_cnt;
 			*recnop = cbt->recno++;
 
 			/*
@@ -174,14 +174,14 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->rip = cbt->page->u.row_leaf.d;
-		cbt->nitems = cbt->page->entries;
+		cbt->nslots = cbt->page->entries;
 		cbt->ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(cbt->page));
 	}
 
 	/* This loop moves through a page, including after reading a record. */
 	for (found = 0; !found;
 	    cbt->ins = WT_SKIP_FIRST(WT_ROW_INSERT(cbt->page, cbt->rip)),
-	    ++cbt->rip, --cbt->nitems) {
+	    ++cbt->rip, --cbt->nslots) {
 		/* Continue traversing any insert list. */
 		while ((ins = cbt->ins) != NULL) {
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
@@ -196,7 +196,7 @@ __btcur_next_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 		}
 
 		/* Check to see if we've completed the page. */
-		if (cbt->nitems == 0)
+		if (cbt->nslots == 0)
 			return (WT_NOTFOUND);
 
 		/* If the slot has been deleted, we don't have a record. */
