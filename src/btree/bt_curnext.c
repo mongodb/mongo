@@ -269,13 +269,13 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	int newpage, ret;
 
+	if (cbt->walk.tree == NULL)		/* If "first" not yet called. */
+		return (__wt_btcur_first(cbt));
+
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	WT_BSTAT_INCR(session, file_reads);
-
-	if (cbt->walk.tree == NULL)
-		return (__wt_btcur_first(cbt));
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
