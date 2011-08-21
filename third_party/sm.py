@@ -57,6 +57,10 @@ def configure( env , fileLists , options ):
     myenv.Append( CPPDEFINES=[ "JSFILE" , "EXPORT_JS_API" , "JS_C_STRINGS_ARE_UTF8" ] )
     myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "-Werror" , "" )
 
+    if options["windows"]:
+        myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "/TP" , "" )
+    
+
     if os.sys.platform.startswith( "linux" ) or os.sys.platform == "darwin":
         myenv["CPPDEFINES"] += [ "HAVE_VA_COPY" , "VA_COPY=va_copy" ]
 
