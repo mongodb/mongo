@@ -119,6 +119,9 @@ debian/mongodb
 
 #third party
 third_party/js-1.7/jsautocfg.h
+third_party/js-1.7/jsautokw.h
+third_party/js-1.7/jskwgen
+third_party/js-1.7/jscpucfg
 
 # QtCreator
 *.config
