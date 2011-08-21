@@ -261,6 +261,12 @@ namespace mongo {
                 if (o.hasElement("db")) {
                     outDB = o["db"].String();
                 }
+
+                if (o.hasElement("nonAtomic")) {
+                    outNonAtomic = o["nonAtomic"].Bool();
+                    if (outNonAtomic)
+                        uassert( 15889 , "nonAtomic option cannot be used with this output type", (outType == REDUCE || outType == MERGE) );
+                }
             }
             else {
                 uasserted( 13606 , "'out' has to be a string or an object" );
@@ -422,12 +428,19 @@ namespace mongo {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
-            dblock lock;
+            if (_config.outNonAtomic)
+                return postProcessCollectionNonAtomic();
+            writelock lock;
+            return postProcessCollectionNonAtomic();
+        }
+
+        long long State::postProcessCollectionNonAtomic() {
 
             if ( _config.finalLong == _config.tempLong )
                 return _db.count( _config.finalLong );
 
             if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
+                writelock lock;
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
@@ -441,6 +454,7 @@ namespace mongo {
                 // merge: upsert new docs into old collection
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
+                    writelock lock;
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                     getDur().commitIfNeeded();
@@ -453,6 +467,7 @@ namespace mongo {
 
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
+                    writelock lock;
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
