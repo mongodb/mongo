@@ -18,6 +18,6 @@ struct __wt_config {
 struct __wt_config_item {
 	const char *str;
 	size_t len;
-	uint64_t val;
+	int64_t val;
 	enum { ITEM_STRING, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
 };

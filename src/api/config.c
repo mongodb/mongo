@@ -323,7 +323,6 @@ static int8_t goesc[256] = {
 static int
 __process_value(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *value)
 {
-	long long val;
 	char *endptr;
 
 	/* Empty values are okay: we can't do anything interesting with them. */
@@ -340,13 +339,12 @@ __process_value(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *value)
 		}
 	} else if (value->type == ITEM_NUM) {
 		errno = 0;
-		val = strtoll(value->str, &endptr, 10);
-		if (val < 0 || errno == ERANGE) {
+		value->val = strtoll(value->str, &endptr, 10);
+		if (errno == ERANGE) {
 			__wt_errx(session, "config value out of range: %.*s",
 			    (int)value->len, value->str);
 			return (ERANGE);
 		}
-		value->val = (uint64_t)val;
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)
