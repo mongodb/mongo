@@ -51,7 +51,7 @@ def configure( env , fileLists , options ):
     else:
         env.Append( CPPDEFINES=[ "XP_UNIX" ] )
 
-    env.Append( CPPPATH=[root] )
+    env.Prepend( CPPPATH=[root] )
 
     myenv = env.Clone()
     myenv.Append( CPPDEFINES=[ "JSFILE" , "EXPORT_JS_API" , "JS_C_STRINGS_ARE_UTF8" ] )
