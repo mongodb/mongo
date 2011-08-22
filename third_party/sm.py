@@ -87,6 +87,8 @@ def configure( env , fileLists , options ):
 
     autoBuilder = myenv.Builder( action = buildAutoFile , suffix = '.h')
 
-    env.Append( BUILDERS={ 'Auto' : autoBuilder } )
-    env.Auto( r("jsautokw.h") , [ jskwgen ] )
-    env.Auto( r("jsautocfg.h") , [ jscpucfg ] )
+    myenv.Append( BUILDERS={ 'Auto' : autoBuilder } )
+    myenv.Auto( r("jsautokw.h") , [ jskwgen ] )
+    myenv.Auto( r("jsautocfg.h") , [ jscpucfg ] )
+    
+    myenv.Depends( r("jsscan.c") , r("jsautokw.h") )
