@@ -26,16 +26,20 @@ namespace mongo {
     // Just try to identify best plan.
     class DeleteOp : public MultiCursor::CursorOp {
     public:
-        DeleteOp( bool justOne, int& bestCount ) :
+        DeleteOp( bool justOne, int& bestCount, int orClauseIndex = -1 ) :
             justOne_( justOne ),
             count_(),
             bestCount_( bestCount ),
-            _nscanned() {
+            _nscanned(),
+            _orClauseIndex( orClauseIndex ) {
         }
         virtual void _init() {
             c_ = qp().newCursor();
         }
         virtual bool prepareToYield() {
+            if ( _orClauseIndex > 0 ) {
+                return false;
+            }
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , qp().ns() ) );
             }
@@ -66,6 +70,12 @@ namespace mongo {
 
             c_->advance();
             _nscanned = c_->nscanned();
+            
+            if ( _orClauseIndex > 0 && _nscanned >= 100 ) {
+                setComplete();
+                return;
+            }
+            
             if ( count_ > bestCount_ )
                 bestCount_ = count_;
 
@@ -79,7 +89,7 @@ namespace mongo {
         virtual bool mayRecordPlan() const { return !justOne_; }
         virtual QueryOp *_createChild() const {
             bestCount_ = 0; // should be safe to reset this in contexts where createChild() is called
-            return new DeleteOp( justOne_, bestCount_ );
+            return new DeleteOp( justOne_, bestCount_, _orClauseIndex + 1 );
         }
         virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
     private:
@@ -90,6 +100,8 @@ namespace mongo {
         shared_ptr<Cursor> c_;
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
+        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.
+        int _orClauseIndex;
     };
 
     /* ns:      namespace, e.g. <database>.<collection>
@@ -112,10 +124,12 @@ namespace mongo {
             }
         }
 
-        NamespaceDetails *d = nsdetails( ns );
-        if ( ! d )
-            return 0;
-        uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
+        {
+            NamespaceDetails *d = nsdetails( ns );
+            if ( ! d )
+                return 0;
+            uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
+        }
 
         long long nDeleted = 0;
 
