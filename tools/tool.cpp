@@ -21,7 +21,7 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
-#include "../third_party/pcre-7.4/pcrecpp.h"
+#include "pcrecpp.h"
 
 #include "util/file_allocator.h"
 #include "util/password.h"
