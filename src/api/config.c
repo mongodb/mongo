@@ -320,12 +320,16 @@ static int8_t goesc[256] = {
  * __process_value
  *	Deal with special config values like true / false.
  */
-static void
-__process_value(WT_CONFIG_ITEM *value)
+static int
+__process_value(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *value)
 {
 	char *endptr;
 
-	if (value->type == ITEM_ID && value->len > 0) {
+	/* Empty values are okay: we can't do anything interesting with them. */
+	if (value->len == 0)
+		return (0);
+
+	if (value->type == ITEM_ID) {
 		if (strncasecmp(value->str, "true", value->len) == 0) {
 			value->type = ITEM_NUM;
 			value->val = 1;
@@ -333,42 +337,54 @@ __process_value(WT_CONFIG_ITEM *value)
 			value->type = ITEM_NUM;
 			value->val = 0;
 		}
-	} else if (value->type == ITEM_NUM && value->len > 0) {
-		value->val = strtol(value->str, &endptr, 10);
-		if (endptr >= value->str + value->len)
-			return;
-
-		switch (*endptr) {
-		case 'k':
-		case 'K':
-			value->val <<= 10;
-			break;
-		case 'm':
-		case 'M':
-			value->val <<= 20;
-			break;
-		case 'g':
-		case 'G':
-			value->val <<= 30;
-			break;
-		case 't':
-		case 'T':
-			value->val <<= 40;
-			break;
-		case 'p':
-		case 'P':
-			value->val <<= 50;
-			break;
-		default:
-			/*
-			 * We didn't get a well-formed number.  That might be
-			 * okay, the required type will be checked by
-			 * __wt_config_check.
-			 */
-			value->type = ITEM_ID;
-			break;
+	} else if (value->type == ITEM_NUM) {
+		errno = 0;
+		value->val = strtoll(value->str, &endptr, 10);
+		if (errno == ERANGE) {
+			__wt_errx(session, "Config value out of range: %.*s",
+			    (int)value->len, value->str);
+			return (ERANGE);
 		}
+
+		/* Check any leftover characters. */
+		while (endptr < value->str + value->len)
+			switch (*endptr++) {
+			case 'b':
+			case 'B':
+				/* Byte: no change. */
+				break;
+			case 'k':
+			case 'K':
+				value->val <<= 10;
+				break;
+			case 'm':
+			case 'M':
+				value->val <<= 20;
+				break;
+			case 'g':
+			case 'G':
+				value->val <<= 30;
+				break;
+			case 't':
+			case 'T':
+				value->val <<= 40;
+				break;
+			case 'p':
+			case 'P':
+				value->val <<= 50;
+				break;
+			default:
+				/*
+				 * We didn't get a well-formed number.  That
+				 * might be okay, the required type will be
+				 * checked by __wt_config_check.
+				 */
+				value->type = ITEM_ID;
+				break;
+			}
 	}
+
+	return (0);
 }
 
 /*
@@ -432,6 +448,10 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_NEXT:
+			/*
+			 * If we're at the top level and we have a complete
+			 * key (and optional value), we're done.
+			 */
 			if (conf->depth == conf->top && key->len > 0) {
 				++conf->cur;
 				goto val;
@@ -502,10 +522,8 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	}
 
 	/* Did we find something? */
-	if (conf->depth <= conf->top && key->len > 0) {
-val:		__process_value(value);
-		return (0);
-	}
+	if (conf->depth <= conf->top && key->len > 0)
+val:		return (__process_value(conf->session, value));
 
 	/* We're either at the end of the string or we failed to parse. */
 	if (conf->depth == 0)
