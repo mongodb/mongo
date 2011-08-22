@@ -64,6 +64,9 @@ def configure( env , fileLists , options ):
     if os.sys.platform.startswith( "linux" ) or os.sys.platform == "darwin":
         myenv["CPPDEFINES"] += [ "HAVE_VA_COPY" , "VA_COPY=va_copy" ]
 
+    elif "sunos5" == os.sys.platform:
+        myenv.append( CPPDEFINES=[ "SOLARIS" ] )
+
     fileLists["scriptingFiles"] += [ myenv.Object(root + "/" + f) for f in basicFiles ]
 
     jskwgen = str( myenv.Program( r("jskwgen") , [ r("jskwgen.c") ] )[0] )
