@@ -15,23 +15,24 @@ static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress };
 
 #define	__UNUSED(v)	((void)(v))
 
+/* For OS X */
+__attribute__((destructor))
+static void _fini(void) {
+}
+
 int
 wiredtiger_extension_init(
     WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
 {
 	WT_CONNECTION *conn;
 
-	__UNUSED(api);
 	__UNUSED(config);
+
+	wt_api = api;
 	conn = session->connection;
 
-	(void)conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL);
-	return (0);
-}
-
-/* For OS X */
-__attribute__((destructor))
-static void _fini(void) {
+	return (
+	    conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL));
 }
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
