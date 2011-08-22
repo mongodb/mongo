@@ -65,7 +65,7 @@ def configure( env , fileLists , options ):
         myenv["CPPDEFINES"] += [ "HAVE_VA_COPY" , "VA_COPY=va_copy" ]
 
     elif "sunos5" == os.sys.platform:
-        myenv.Append( CPPDEFINES=[ "SOLARIS" ] )
+        myenv.Append( CPPDEFINES=[ "SOLARIS" , "HAVE_VA_LIST_AS_ARRAY" , "SVR4" , "SYSV" , "HAVE_LOCALTIME_R" ] )
 
     fileLists["scriptingFiles"] += [ myenv.Object(root + "/" + f) for f in basicFiles ]
 
