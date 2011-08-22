@@ -336,7 +336,7 @@ __btree_type(WT_SESSION_IMPL *session)
 	/* Validate types and check for fixed-length data. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
 	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
-	if (cval.len > 0 && cval.str[0] == 'r')
+	if (cval.len > 0 && strncmp(cval.str, "r", cval.len) == 0)
 		btree->type = BTREE_COL_VAR;
 	else
 		btree->type = BTREE_ROW;
