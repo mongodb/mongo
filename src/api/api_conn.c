@@ -360,27 +360,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	int opened, ret;
 
 	*wt_connp = NULL;
+	session = NULL;
 	WT_CLEAR(expath);
 	WT_CLEAR(exconfig);
 	opened = 0;
-
-	/*
-	 * If the application didn't configure an event handler, use the default
-	 * one, use the default entries for any not set by the application.
-	 */
-	if (event_handler == NULL)
-		event_handler = __wt_event_handler_default;
-	else {
-		if (event_handler->handle_error == NULL)
-			event_handler->handle_error =
-			    __wt_event_handler_default->handle_error;
-		if (event_handler->handle_message == NULL)
-			event_handler->handle_message =
-			    __wt_event_handler_default->handle_message;
-		if (event_handler->handle_progress == NULL)
-			event_handler->handle_progress =
-			    __wt_event_handler_default->handle_progress;
-	}
 
 	/*
 	 * We end up here before we do any real work.   Check the build itself,
@@ -402,8 +385,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	session = &conn->default_session;
 	session->iface.connection = &conn->iface;
-	session->event_handler = event_handler;
 	session->name = "wiredtiger_open";
+
+	/*
+	 * If the application didn't configure an event handler, use the default
+	 * one, use the default entries for any not set by the application.
+	 */
+	if (event_handler == NULL)
+		event_handler = __wt_event_handler_default;
+	else {
+		if (event_handler->handle_error == NULL)
+			event_handler->handle_error =
+			    __wt_event_handler_default->handle_error;
+		if (event_handler->handle_message == NULL)
+			event_handler->handle_message =
+			    __wt_event_handler_default->handle_message;
+		if (event_handler->handle_progress == NULL)
+			event_handler->handle_progress =
+			    __wt_event_handler_default->handle_progress;
+	}
+	session->event_handler = event_handler;
 
 	WT_ERR(__wt_connection_config(conn));
 
@@ -421,8 +422,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 #ifdef HAVE_VERBOSE
 	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
 	for (vt = verbtypes; vt->vname != NULL; vt++) {
-		WT_ERR(
-		    __wt_config_subinit(session, &subconfig, &cval));
+		WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
 		skey.str = vt->vname;
 		skey.len = strlen(vt->vname);
 		ret = __wt_config_getraw(&subconfig, &skey, &sval);
