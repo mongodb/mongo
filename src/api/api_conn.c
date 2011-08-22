@@ -39,9 +39,8 @@ __conn_load_extension(
 	WT_CONNECTION_IMPL *conn;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
-	int (*entry)(WT_CONNECTION *, WT_EXTENSION_API *, const char *);
+	int (*entry)(WT_SESSION *, WT_EXTENSION_API *, const char *);
 	int ret;
-	char namebuf[100];
 	const char *entry_name;
 
 	dlh = NULL;
@@ -49,19 +48,9 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	entry_name = "wiredtiger_extension_init";
+	entry_name = NULL;
 	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
-	if (cval.len > 0) {
-		if (snprintf(namebuf, sizeof(namebuf), "%.*s",
-		    (int)cval.len, cval.str) >= (int)sizeof (namebuf)) {
-			__wt_errx(session,
-			    "extension entry name too long: %.*s",
-			    (int)cval.len, cval.str);
-			ret = EINVAL;
-			goto err;
-		} else
-			entry_name = namebuf;
-	}
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
 
 	/*
 	 * This assumes the underlying shared libraries are reference counted,
@@ -73,18 +62,19 @@ __conn_load_extension(
 	WT_ERR(__wt_dlopen(session, path, &dlh));
 	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
 
+	/* Call the entry function. */
+	WT_ERR(entry(&session->iface, &__api, config));
+
 	/* Link onto the environment's list of open libraries. */
 	__wt_lock(session, conn->mtx);
 	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
 	__wt_unlock(session, conn->mtx);
 
-	/* Call the entry function. */
-	entry(wt_conn, &__api, config);
-
 	if (0) {
 err:		if (dlh != NULL)
 			(void)__wt_dlclose(session, dlh);
 	}
+	__wt_free(session, entry_name);
 
 	API_END(session);
 
@@ -361,7 +351,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "write",	WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
-	WT_BUF *expath, *exconfig;
+	WT_BUF expath, exconfig;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
@@ -370,7 +360,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	int opened, ret;
 
 	*wt_connp = NULL;
-	expath = exconfig = NULL;
+	WT_CLEAR(expath);
+	WT_CLEAR(exconfig);
 	opened = 0;
 
 	/*
@@ -453,18 +444,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
-		WT_ERR(
-		    __wt_scr_alloc(session, (uint32_t)skey.len + 10, &expath));
-		WT_ERR(__wt_buf_sprintf(
-		    session, expath, "%.*s", (int)skey.len, skey.str));
+		WT_ERR(__wt_buf_sprintf(session, &expath,
+		    "%.*s", (int)skey.len, skey.str));
 		if (sval.len > 0) {
-			WT_ERR(__wt_scr_alloc(
-			    session, (uint32_t)sval.len + 32, &exconfig));
-			WT_ERR(__wt_buf_sprintf(session, exconfig,
+			WT_ERR(__wt_buf_sprintf(session, &exconfig,
 			    "entry=%.*s\n", (int)sval.len, sval.str));
 		}
 		WT_ERR(conn->iface.load_extension(&conn->iface,
-		    expath->data, exconfig == NULL ? NULL : exconfig->data));
+		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -480,8 +467,8 @@ err:		if (opened)
 		else
 			(void)__wt_connection_destroy(conn);
 	}
-	__wt_scr_free(&expath);
-	__wt_scr_free(&exconfig);
+	__wt_buf_free(session, &expath);
+	__wt_buf_free(session, &exconfig);
 
 	return (ret);
 }

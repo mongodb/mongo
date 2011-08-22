@@ -40,11 +40,14 @@ static void _fini(void) {
 
 int
 wiredtiger_extension_init(
-    WT_CONNECTION *conn, WT_EXTENSION_API *api, const char *config)
+    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
 {
+	WT_CONNECTION *conn;
+
         __UNUSED(config);
 
 	wt_api = api;
+	conn = session->connection;
 
 	return (conn->add_compressor(
 	    conn, "bzip2_compress", &bzip2_compressor, NULL));
@@ -56,7 +59,7 @@ wiredtiger_extension_init(
  *	Output an error message, and return a standard error code.
  */
 static int
-bzip2_error(WT_SESSION *wt_session, const char *call, int bzret)
+bzip2_error(WT_SESSION *session, const char *call, int bzret)
 {
 	const char *msg;
 
@@ -94,7 +97,7 @@ bzip2_error(WT_SESSION *wt_session, const char *call, int bzret)
 	}
 
 	wiredtiger_err_printf(
-	    wt_session, "bzip2 error: %s: %s: %d", call, msg, bzret);
+	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }
 
@@ -111,7 +114,7 @@ bzfree(void *cookie, void *p)
 }
 
 static int
-bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *wt_session,
+bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     const WT_ITEM *src, WT_ITEM *dst, int *compression_failed)
 {
 	bz_stream bz;
@@ -122,11 +125,11 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *wt_session,
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
 	bz.bzfree = bzfree;
-	bz.opaque = wt_session;
+	bz.opaque = session;
 
 	if ((ret = BZ2_bzCompressInit(&bz,
 	    bz_blocksize100k, bz_verbosity, bz_workfactor)) != BZ_OK)
-		return (bzip2_error(wt_session, "BZ2_bzCompressInit", ret));
+		return (bzip2_error(session, "BZ2_bzCompressInit", ret));
 
 	bz.next_in = (char *)src->data;
 	bz.avail_in = src->size;
@@ -139,14 +142,14 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *wt_session,
 		*compression_failed = 1;
 
 	if ((ret = BZ2_bzCompressEnd(&bz)) != BZ_OK)
-		return (bzip2_error(wt_session, "BZ2_bzCompressEnd", ret));
+		return (bzip2_error(session, "BZ2_bzCompressEnd", ret));
 
 	return (0);
 }
 
 static int
 bzip2_decompress(WT_COMPRESSOR *compressor,
-    WT_SESSION *wt_session, const WT_ITEM *src, WT_ITEM *dst)
+    WT_SESSION *session, const WT_ITEM *src, WT_ITEM *dst)
 {
 	bz_stream bz;
 	int ret, tret;
@@ -156,10 +159,10 @@ bzip2_decompress(WT_COMPRESSOR *compressor,
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
 	bz.bzfree = bzfree;
-	bz.opaque = wt_session;
+	bz.opaque = session;
 
 	if ((ret = BZ2_bzDecompressInit(&bz, bz_small, bz_verbosity)) != BZ_OK)
-		return (bzip2_error(wt_session, "BZ2_bzDecompressInit", ret));
+		return (bzip2_error(session, "BZ2_bzDecompressInit", ret));
 
 	bz.next_in = (char *)src->data;
 	bz.avail_in = src->size;
@@ -169,12 +172,12 @@ bzip2_decompress(WT_COMPRESSOR *compressor,
 		dst->size -= bz.avail_out;
 		ret = 0;
 	} else
-		bzip2_error(wt_session, "BZ2_bzDecompress", ret);
+		bzip2_error(session, "BZ2_bzDecompress", ret);
 
 	if ((tret = BZ2_bzDecompressEnd(&bz)) != BZ_OK)
-		return (bzip2_error(wt_session, "BZ2_bzDecompressEnd", tret));
+		return (bzip2_error(session, "BZ2_bzDecompressEnd", tret));
 
 	return (ret == 0 ?
-	    0 : bzip2_error(wt_session, "BZ2_bzDecompressEnd", ret));
+	    0 : bzip2_error(session, "BZ2_bzDecompressEnd", ret));
 }
 /* End Bzip2 WT_COMPRESSOR implementation for WT_CONNECTION::add_compressor. */

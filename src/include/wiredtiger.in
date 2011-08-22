@@ -1272,12 +1272,12 @@ struct wt_extractor {
 
 /*! Entry point to an extension, implemented by loadable modules.
  *
- * @param connection the connection handle
+ * @param session the session handle
  * @param config the config string passed to WT_CONNECTION::load_extension
  * @errors
  */
-extern int wiredtiger_extension_init(WT_CONNECTION *connection,
-	WT_EXTENSION_API *api, const char *config);
+extern int wiredtiger_extension_init(WT_SESSION *session,
+    WT_EXTENSION_API *api, const char *config);
 
 /*! @} */
 
