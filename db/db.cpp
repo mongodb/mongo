@@ -728,10 +728,13 @@ int main(int argc, char* argv[]) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
+        bool journalExplicit = false;
         if( params.count("nodur") || params.count( "nojournal" ) ) {
+            journalExplicit = true;
             cmdLine.dur = false;
         }
         if( params.count("dur") || params.count( "journal" ) ) {
+            journalExplicit = true;
             cmdLine.dur = true;
         }
         if (params.count("durOptions")) {
@@ -1029,6 +1032,15 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 #endif
+
+
+        if (sizeof(void*) == 4 && !journalExplicit){
+            // trying to make this stand out more like startup warnings
+            log() << endl;
+            warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
+            log() << endl;
+        }
+
     }
 
     UnitTest::runTests();
