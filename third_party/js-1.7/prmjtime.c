@@ -58,8 +58,7 @@
 #include <sys/timeb.h>
 #endif
 #ifdef XP_WIN
-#include <windef.h>
-#include <winbase.h>
+#include <windows.h>
 #endif
 
 #if defined(XP_UNIX) || defined(XP_BEOS)
