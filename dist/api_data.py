@@ -6,7 +6,6 @@ errors = [
 	('WT_NOTFOUND', 'item not found'),
 	('WT_READONLY', 'attempt to modify a read-only value'),
 	('WT_RESTART', 'restart the operation (internal)'),
-	('WT_TOOSMALL', 'buffer too small'),
 ]
 
 class Method:

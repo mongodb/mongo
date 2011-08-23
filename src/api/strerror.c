@@ -26,8 +26,6 @@ wiredtiger_strerror(int error)
 		return ("WT_READONLY: attempt to modify a read-only value");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
-	case WT_TOOSMALL:
-		return ("WT_TOOSMALL: buffer too small");
 	default:
 		if (error > 0 && (p = strerror(error)) != NULL)
 			return (p);
