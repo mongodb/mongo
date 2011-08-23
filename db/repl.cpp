@@ -535,7 +535,8 @@ namespace mongo {
             // Database is already present.
             return true;   
         }
-        if ( ___databaseIgnorer.ignoreAt( db, op.getField( "ts" ).date() ) ) {
+        BSONElement ts = op.getField( "ts" );
+        if ( ( ts.type() == Date || ts.type() == Timestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
             // Database is ignored due to a previous indication that it is
             // missing from master after optime "ts".
             return false;   
