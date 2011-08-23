@@ -339,6 +339,7 @@ namespace mongo {
     }
 
     BSONObj KeyV1::toBson() const { 
+        assert( _keyData != 0 );
         if( !isCompactFormat() )
             return bson();
 
