@@ -100,7 +100,7 @@ namespace mongo {
         shared_ptr<Cursor> c_;
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
-        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.
+        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.  SERVER-3555
         int _orClauseIndex;
     };
 
