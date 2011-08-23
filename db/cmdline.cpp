@@ -323,7 +323,11 @@ namespace mongo {
                 dbexit(EXIT_BADOPTIONS);
             }
 
+            cmdLine.keyFile = true;
             noauth = false;
+        }
+        else {
+            cmdLine.keyFile = false;
         }
 
 #ifdef MONGO_SSL

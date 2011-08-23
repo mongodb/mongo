@@ -3,8 +3,18 @@
 load("jstests/replsets/rslib.js");
 
 var name = "rs_auth1";
-var port = allocatePorts(4);
+var port = allocatePorts(5);
 var path = "jstests/libs/";
+
+
+print("try starting mongod with auth");
+var m = runMongoProgram( "mongod", "--auth", "--port", port[4], "--dbpath", "/data/db/wrong-auth");
+
+assert.throws(function() {
+    m.getDB("local").auth("__system", "");
+});
+
+stopMongod(port[4]);
 
 
 print("reset permissions");
@@ -13,7 +23,7 @@ run("chmod", "644", path+"key2");
 
 
 print("try starting mongod");
-var m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", "/data/db/" + name);
+m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", "/data/db/" + name);
 
 
 print("should fail with wrong permissions");
