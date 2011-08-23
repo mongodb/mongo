@@ -139,6 +139,7 @@ namespace mongo {
             string pwd;
 
             if (user == internalSecurity.user) {
+                uassert(15889, "key file must be used to log in with internal user", cmdLine.keyFile);
                 pwd = internalSecurity.pwd;
             }
             else {

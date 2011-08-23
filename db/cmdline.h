@@ -100,6 +100,8 @@ namespace mongo {
 
         string socket;         // UNIX domain socket directory
 
+        bool keyFile;
+
         static void addGlobalOptions( boost::program_options::options_description& general ,
                                       boost::program_options::options_description& hidden );
 
