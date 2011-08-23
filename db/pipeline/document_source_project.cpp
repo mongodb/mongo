@@ -73,7 +73,7 @@ namespace mongo {
 	    pNoUnwindDocument = Document::create(sizeHint);
 
 	    if (!excludeId) {
-		shared_ptr<const Value> pId(
+		intrusive_ptr<const Value> pId(
 		    pInDocument->getField(Document::idName));
 		pNoUnwindDocument->addField(Document::idName, pId);
 	    }

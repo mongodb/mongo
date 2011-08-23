@@ -26,7 +26,7 @@ namespace mongo {
     const char AccumulatorAvg::subTotalName[] = "subTotal";
     const char AccumulatorAvg::countName[] = "count";
 
-    shared_ptr<const Value> AccumulatorAvg::evaluate(
+    intrusive_ptr<const Value> AccumulatorAvg::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
 	if (!pCtx->getInRouter()) {
 	    Super::evaluate(pDocument);
@@ -38,12 +38,12 @@ namespace mongo {
 	      both a subtotal and a count.  This is what getValue() produced
 	      below.
 	     */
-	    shared_ptr<const Value> prhs(
+	    intrusive_ptr<const Value> prhs(
 		vpOperand[0]->evaluate(pDocument));
 	    assert(prhs->getType() == Object);
 	    intrusive_ptr<Document> pShardDoc(prhs->getDocument());
 
-	    shared_ptr<const Value> pSubTotal(
+	    intrusive_ptr<const Value> pSubTotal(
 		pShardDoc->getValue(subTotalName));
 	    assert(pSubTotal.get());
 	    BSONType subTotalType = pSubTotal->getType();
@@ -67,7 +67,7 @@ namespace mongo {
 		doubleTotal += v;
 	    }
 		
-	    shared_ptr<const Value> pCount(pShardDoc->getValue(countName));
+	    intrusive_ptr<const Value> pCount(pShardDoc->getValue(countName));
 	    count += pCount->getLong();
 	}
 
@@ -80,7 +80,7 @@ namespace mongo {
         return pA;
     }
 
-    shared_ptr<const Value> AccumulatorAvg::getValue() const {
+    intrusive_ptr<const Value> AccumulatorAvg::getValue() const {
 	if (!pCtx->getInShard()) {
 	    double avg = 0;
 	    if (count) {
@@ -95,7 +95,7 @@ namespace mongo {
 
 	intrusive_ptr<Document> pDocument(Document::create());
 
-	shared_ptr<const Value> pSubTotal;
+	intrusive_ptr<const Value> pSubTotal;
 	if (totalType == NumberInt)
 	    pSubTotal = Value::createInt((int)longTotal);
 	else if (totalType == NumberLong)
@@ -104,7 +104,7 @@ namespace mongo {
 	    pSubTotal = Value::createDouble(doubleTotal);
 	pDocument->addField(subTotalName, pSubTotal);
 
-	shared_ptr<const Value> pCount(Value::createLong(count));
+	intrusive_ptr<const Value> pCount(Value::createLong(count));
 	pDocument->addField(countName, pCount);
 
 	return Value::createDocument(pDocument);

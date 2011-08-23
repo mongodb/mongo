@@ -225,7 +225,7 @@ namespace mongo {
             intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
             /* get the _id document */
-            shared_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
+            intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
 
             /*
               Look for the _id value in the map; if it's not there, add a
@@ -240,7 +240,7 @@ namespace mongo {
             else {
                 /* insert a new group into the map */
                 groups.insert(it,
-                              pair<shared_ptr<const Value>,
+                              pair<intrusive_ptr<const Value>,
                               vector<shared_ptr<Accumulator> > >(
                                   pId, vector<shared_ptr<Accumulator> >()));
 
@@ -286,7 +286,7 @@ namespace mongo {
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<const Value> pValue((*pGroup)[i]->getValue());
+	    intrusive_ptr<const Value> pValue((*pGroup)[i]->getValue());
 	    if (pValue->getType() != Undefined)
 		pResult->addField(vFieldName[i], pValue);
 	}

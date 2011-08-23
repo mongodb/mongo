@@ -455,7 +455,7 @@ namespace mongo {
 
         shared_ptr<Expression> pIdExpression;
 
-	typedef boost::unordered_map<shared_ptr<const Value>,
+	typedef boost::unordered_map<intrusive_ptr<const Value>,
 	    vector<shared_ptr<Accumulator> >, Value::Hash> GroupsType;
         GroupsType groups;
 
@@ -644,9 +644,9 @@ namespace mongo {
         // iteration state
         intrusive_ptr<Document> pNoUnwindDocument;
                                               // document to return, pre-unwind
-        shared_ptr<const Value> pUnwindArray; // field being unwound
+        intrusive_ptr<const Value> pUnwindArray; // field being unwound
         shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
-        shared_ptr<const Value> pUnwindValue; // current value
+        intrusive_ptr<const Value> pUnwindValue; // current value
     };
 
 

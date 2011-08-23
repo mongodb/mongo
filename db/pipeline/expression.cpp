@@ -326,7 +326,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    shared_ptr<const Value> ExpressionAdd::evaluate(
+    intrusive_ptr<const Value> ExpressionAdd::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -339,7 +339,7 @@ namespace mongo {
         const size_t n = vpOperand.size();
 
         for (size_t i = 0; i < n; ++i) {
-            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (pValue->getType() == String)
                 ++stringCount;
             if (pValue->getType() == Date) {
@@ -361,7 +361,7 @@ namespace mongo {
         if (stringCount) {
             stringstream stringTotal;
             for (size_t i = 0; i < n; ++i) {
-                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
                 stringTotal << pValue->coerceToString();
             }
             return Value::createString(stringTotal.str());
@@ -370,7 +370,7 @@ namespace mongo {
         if (dateCount) {
             long long dateTotal = 0;
             for (size_t i = 0; i < n; ++i) {
-                shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
                 if (pValue->getType() == Date) 
                     dateTotal += pValue->coerceToDate();
                 else 
@@ -383,7 +383,7 @@ namespace mongo {
         long long longTotal = 0;
         BSONType totalType = NumberInt;
         for(size_t i = 0; i < n; ++i) {
-            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
 
             totalType = Value::getWidestNumeric(totalType, pValue->getType());
             doubleTotal += pValue->coerceToDouble();
@@ -474,11 +474,11 @@ namespace mongo {
 	return pE;
     }
 
-    shared_ptr<const Value> ExpressionAnd::evaluate(
+    intrusive_ptr<const Value> ExpressionAnd::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (!pValue->coerceToBool())
                 return Value::getFalse();
         }
@@ -541,10 +541,10 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<const Value> ExpressionCoerceToBool::evaluate(
+    intrusive_ptr<const Value> ExpressionCoerceToBool::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
 
-	shared_ptr<const Value> pResult(pExpression->evaluate(pDocument));
+	intrusive_ptr<const Value> pResult(pExpression->evaluate(pDocument));
         bool b = pResult->coerceToBool();
         if (b)
             return Value::getTrue();
@@ -693,11 +693,11 @@ namespace mongo {
 	    pFieldPath, newOp, pConstant->getValue());
     }
 
-    shared_ptr<const Value> ExpressionCompare::evaluate(
+    intrusive_ptr<const Value> ExpressionCompare::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
         BSONType leftType = pLeft->getType();
         BSONType rightType = pRight->getType();
@@ -782,13 +782,13 @@ namespace mongo {
     }
 
     shared_ptr<ExpressionConstant> ExpressionConstant::create(
-        const shared_ptr<const Value> &pValue) {
+        const intrusive_ptr<const Value> &pValue) {
         shared_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
         return pEC;
     }
 
     ExpressionConstant::ExpressionConstant(
-	const shared_ptr<const Value> &pTheValue):
+	const intrusive_ptr<const Value> &pTheValue):
         pValue(pTheValue) {
     }
 
@@ -798,7 +798,7 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<const Value> ExpressionConstant::evaluate(
+    intrusive_ptr<const Value> ExpressionConstant::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         return pValue;
     }
@@ -862,10 +862,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionDayOfMonth::evaluate(
+    intrusive_ptr<const Value> ExpressionDayOfMonth::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_mday); 
@@ -894,10 +894,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionDayOfWeek::evaluate(
+    intrusive_ptr<const Value> ExpressionDayOfWeek::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
@@ -926,10 +926,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionDayOfYear::evaluate(
+    intrusive_ptr<const Value> ExpressionDayOfYear::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
@@ -959,11 +959,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionDivide::evaluate(
+    intrusive_ptr<const Value> ExpressionDivide::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
         double right = pRight->coerceToDouble();
 	if (right == 0)
@@ -1021,7 +1021,7 @@ namespace mongo {
 	    auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
 	    if (excludePaths) {
 		while(pIter->more()) {
-		    pair<string, shared_ptr<const Value> > field(pIter->next());
+		    pair<string, intrusive_ptr<const Value> > field(pIter->next());
 
 		    /*
 		      If the field in the document is not in the exclusion set,
@@ -1038,7 +1038,7 @@ namespace mongo {
 	    }
 	    else { /* !excludePaths */
 		while(pIter->more()) {
-		    pair<string, shared_ptr<const Value> > field(
+		    pair<string, intrusive_ptr<const Value> > field(
 			pIter->next());
 		    /*
 		      If the field in the document is in the inclusion set,
@@ -1096,7 +1096,7 @@ namespace mongo {
 			      but to each array element.  Then, add the array
 			      of results to the current document.
 			    */
-			    vector<shared_ptr<const Value> > result;
+			    vector<intrusive_ptr<const Value> > result;
 			    shared_ptr<ValueIterator> pVI(
 				field.second->getArray());
 			    while(pVI->more()) {
@@ -1123,7 +1123,7 @@ namespace mongo {
 	    if (path.find(fieldName) != end)
 		continue;
 
-	    shared_ptr<const Value> pValue(
+	    intrusive_ptr<const Value> pValue(
 		vpExpression[i]->evaluate(pDocument));
 
 	    /*
@@ -1167,7 +1167,7 @@ namespace mongo {
         return pResult;
     }
 
-    shared_ptr<const Value> ExpressionObject::evaluate(
+    intrusive_ptr<const Value> ExpressionObject::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
 	return Value::createDocument(evaluateDocument(pDocument));
     }
@@ -1403,10 +1403,10 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<const Value> ExpressionFieldPath::evaluatePath(
+    intrusive_ptr<const Value> ExpressionFieldPath::evaluatePath(
 	size_t index, const size_t pathLength,
 	intrusive_ptr<Document> pDocument) const {
-        shared_ptr<const Value> pValue; /* the return value */
+        intrusive_ptr<const Value> pValue; /* the return value */
 
 	pValue = pDocument->getValue(fieldPath.getFieldName(index));
 
@@ -1436,10 +1436,10 @@ namespace mongo {
 	      We're going to repeat this for each member of the array,
 	      building up a new array as we go.
 	    */
-	    vector<shared_ptr<const Value> > result;
+	    vector<intrusive_ptr<const Value> > result;
 	    shared_ptr<ValueIterator> pIter(pValue->getArray());
 	    while(pIter->more()) {
-		shared_ptr<const Value> pItem(pIter->next());
+		intrusive_ptr<const Value> pItem(pIter->next());
 		BSONType iType = pItem->getType();
 		if ((iType == Undefined) || (iType == jstNULL)) {
 		    result.push_back(pItem);
@@ -1447,7 +1447,7 @@ namespace mongo {
 		}
 
 		assert(iType == Object); // CW TODO error, can't navigate this
-		shared_ptr<const Value> itemResult(
+		intrusive_ptr<const Value> itemResult(
 		    evaluatePath(index, pathLength, pItem->getDocument()));
 		result.push_back(itemResult);
 	    }
@@ -1456,10 +1456,10 @@ namespace mongo {
 	}
 
 	assert(false); // CW TODO user error:  must be a document
-	return shared_ptr<const Value>();
+	return intrusive_ptr<const Value>();
     }
 
-    shared_ptr<const Value> ExpressionFieldPath::evaluate(
+    intrusive_ptr<const Value> ExpressionFieldPath::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
 	return evaluatePath(0, fieldPath.getPathLength(), pDocument);
     }
@@ -1500,14 +1500,14 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<const Value> ExpressionFieldRange::evaluate(
+    intrusive_ptr<const Value> ExpressionFieldRange::evaluate(
 	const intrusive_ptr<Document> &pDocument) const {
 	/* if there's no range, there can't be a match */
 	if (!pRange.get())
 	    return Value::getFalse();
 
 	/* get the value of the specified field */
-	shared_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
+	intrusive_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
 
 	/* see if it fits within any of the ranges */
 	if (pRange->contains(pValue))
@@ -1624,7 +1624,7 @@ namespace mongo {
 
     shared_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
 	const shared_ptr<ExpressionFieldPath> &pFieldPath, CmpOp cmpOp,
-	const shared_ptr<const Value> &pValue) {
+	const intrusive_ptr<const Value> &pValue) {
 	shared_ptr<ExpressionFieldRange> pE(
 	    new ExpressionFieldRange(pFieldPath, cmpOp, pValue));
 	return pE;
@@ -1632,13 +1632,13 @@ namespace mongo {
 
     ExpressionFieldRange::ExpressionFieldRange(
 	const shared_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
-	const shared_ptr<const Value> &pValue):
+	const intrusive_ptr<const Value> &pValue):
         pFieldPath(pTheFieldPath),
 	pRange(new Range(cmpOp, pValue)) {
     }
 
     void ExpressionFieldRange::intersect(
-	CmpOp cmpOp, const shared_ptr<const Value> &pValue) {
+	CmpOp cmpOp, const intrusive_ptr<const Value> &pValue) {
 
 	/* create the new range */
 	scoped_ptr<Range> pNew(new Range(cmpOp, pValue));
@@ -1653,7 +1653,7 @@ namespace mongo {
     }
 
     ExpressionFieldRange::Range::Range(
-	CmpOp cmpOp, const shared_ptr<const Value> &pValue):
+	CmpOp cmpOp, const intrusive_ptr<const Value> &pValue):
 	bottomOpen(false),
 	topOpen(false),
 	pBottom(),
@@ -1696,8 +1696,8 @@ namespace mongo {
     }
 
     ExpressionFieldRange::Range::Range(
-	const shared_ptr<const Value> &pTheBottom, bool theBottomOpen,
-	const shared_ptr<const Value> &pTheTop, bool theTopOpen):
+	const intrusive_ptr<const Value> &pTheBottom, bool theBottomOpen,
+	const intrusive_ptr<const Value> &pTheTop, bool theTopOpen):
 	bottomOpen(theBottomOpen),
 	topOpen(theTopOpen),
 	pBottom(pTheBottom),
@@ -1712,7 +1712,7 @@ namespace mongo {
 	  Start by assuming the maximum is from pRange.  Then, if we have
 	  values of our own, see if they're greater.
 	*/
-	shared_ptr<const Value> pMaxBottom(pRange->pBottom);
+	intrusive_ptr<const Value> pMaxBottom(pRange->pBottom);
 	bool maxBottomOpen = pRange->bottomOpen;
 	if (pBottom.get()) {
 	    if (!pRange->pBottom.get()) {
@@ -1736,7 +1736,7 @@ namespace mongo {
 	  Start by assuming the minimum is from pRange.  Then, if we have
 	  values of our own, see if they are less.
 	*/
-	shared_ptr<const Value> pMinTop(pRange->pTop);
+	intrusive_ptr<const Value> pMinTop(pRange->pTop);
 	bool minTopOpen = pRange->topOpen;
 	if (pTop.get()) {
 	    if (!pRange->pTop.get()) {
@@ -1766,7 +1766,7 @@ namespace mongo {
     }
 
     bool ExpressionFieldRange::Range::contains(
-	const shared_ptr<const Value> &pValue) const {
+	const intrusive_ptr<const Value> &pValue) const {
 	if (pBottom.get()) {
 	    const int cmp = Value::compare(pValue, pBottom);
 	    if (cmp < 0)
@@ -1805,10 +1805,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionMinute::evaluate(
+    intrusive_ptr<const Value> ExpressionMinute::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_min);
@@ -1838,12 +1838,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionMod::evaluate(
+    intrusive_ptr<const Value> ExpressionMod::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
         productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
 
@@ -1880,10 +1880,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionMonth::evaluate(
+    intrusive_ptr<const Value> ExpressionMonth::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_mon+1); // MySQL uses 1-12 tm uses 0-11
@@ -1907,7 +1907,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    shared_ptr<const Value> ExpressionMultiply::evaluate(
+    intrusive_ptr<const Value> ExpressionMultiply::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -1921,7 +1921,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
 
             productType = Value::getWidestNumeric(productType, pValue->getType());
             doubleProduct *= pValue->coerceToDouble();
@@ -1962,10 +1962,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionHour::evaluate(
+    intrusive_ptr<const Value> ExpressionHour::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_hour);
@@ -1995,16 +1995,16 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionIfNull::evaluate(
+    intrusive_ptr<const Value> ExpressionIfNull::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
 	BSONType leftType = pLeft->getType();
 
         if ((leftType != Undefined) && (leftType != jstNULL))
             return pLeft;
 
-        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
         return pRight;
     }
 
@@ -2039,7 +2039,7 @@ namespace mongo {
 	  ExpressionConstant never refers to the argument Document.
 	*/
 	if (nConst == n) {
-	    shared_ptr<const Value> pResult(
+	    intrusive_ptr<const Value> pResult(
 		evaluate(intrusive_ptr<Document>()));
 	    shared_ptr<Expression> pReplacement(
 		ExpressionConstant::create(pResult));
@@ -2120,7 +2120,7 @@ namespace mongo {
 	      together before adding the result to the end of the expression
 	      operand vector.
 	    */
-	    shared_ptr<const Value> pResult(
+	    intrusive_ptr<const Value> pResult(
 		pConst->evaluate(intrusive_ptr<Document>()));
 	    pNew->addOperand(ExpressionConstant::create(pResult));
 	}
@@ -2193,10 +2193,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionNoOp::evaluate(
+    intrusive_ptr<const Value> ExpressionNoOp::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
 	return pValue;
     }
 
@@ -2223,10 +2223,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionNot::evaluate(
+    intrusive_ptr<const Value> ExpressionNot::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
 
         bool b = pOp->coerceToBool();
         if (b)
@@ -2252,11 +2252,11 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    shared_ptr<const Value> ExpressionOr::evaluate(
+    intrusive_ptr<const Value> ExpressionOr::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (pValue->coerceToBool())
                 return Value::getTrue();
         }
@@ -2352,10 +2352,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionSecond::evaluate(
+    intrusive_ptr<const Value> ExpressionSecond::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_sec);
@@ -2385,11 +2385,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionStrcasecmp::evaluate(
+    intrusive_ptr<const Value> ExpressionStrcasecmp::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
 
         /* boost::iequals returns a bool not an int so strings must actually be allocated */
         string str1 = boost::to_upper_copy( pString1->coerceToString() );
@@ -2427,12 +2427,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionSubstr::evaluate(
+    intrusive_ptr<const Value> ExpressionSubstr::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 3); // CW TODO user error
-        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
-        shared_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
+        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
 
         string str = pString->coerceToString();
         assert(pLower->getType() == NumberInt 
@@ -2470,12 +2470,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionSubtract::evaluate(
+    intrusive_ptr<const Value> ExpressionSubtract::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
-        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
         if (pLeft->getType() == Date) {
             long long right;
             long long left = pLeft->coerceToDate();
@@ -2530,10 +2530,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionToLower::evaluate(
+    intrusive_ptr<const Value> ExpressionToLower::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str = pString->coerceToString();
         boost::to_lower(str);
         return Value::createString(str);
@@ -2563,10 +2563,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionToUpper::evaluate(
+    intrusive_ptr<const Value> ExpressionToUpper::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str(pString->coerceToString());
         boost::to_upper(str);
         return Value::createString(str);
@@ -2595,10 +2595,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionWeek::evaluate(
+    intrusive_ptr<const Value> ExpressionWeek::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         int dayOfWeek = date.tm_wday+1;
@@ -2636,10 +2636,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionYear::evaluate(
+    intrusive_ptr<const Value> ExpressionYear::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
         return Value::createInt(date.tm_year+1900); // tm_year is years since 1900

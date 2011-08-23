@@ -20,10 +20,10 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<const Value> AccumulatorMinMax::evaluate(
+    intrusive_ptr<const Value> AccumulatorMinMax::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* if this is the first value, just use it */
         if (!pValue.get())
@@ -38,13 +38,13 @@ namespace mongo {
         return pValue;
     }
 
-    shared_ptr<const Value> AccumulatorMinMax::getValue() const {
+    intrusive_ptr<const Value> AccumulatorMinMax::getValue() const {
         return pValue;
     }
 
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
         sense(theSense),
-        pValue(shared_ptr<const Value>()) {
+        pValue(intrusive_ptr<const Value>()) {
         assert((sense == 1) || (sense == -1)); // CW TODO error
     }
 

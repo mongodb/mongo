@@ -207,8 +207,8 @@ namespace mongo {
 	for(size_t i = 0; i < n; ++i) {
 	    /* evaluate the sort keys */
 	    ExpressionFieldPath *pE = vSortKey[i].get();
-	    shared_ptr<const Value> pLeft(pE->evaluate(pL));
-	    shared_ptr<const Value> pRight(pE->evaluate(pR));
+	    intrusive_ptr<const Value> pLeft(pE->evaluate(pL));
+	    intrusive_ptr<const Value> pRight(pE->evaluate(pR));
 
 	    /*
 	      Compare the two values; if they differ, return.  If they are

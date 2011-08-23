@@ -21,10 +21,10 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<const Value> AccumulatorAddToSet::evaluate(
+    intrusive_ptr<const Value> AccumulatorAddToSet::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
 	if (prhs->getType() == Undefined)
 	    ; /* nothing to add to the array */
@@ -41,7 +41,7 @@ namespace mongo {
 	    
 	    shared_ptr<ValueIterator> pvi(prhs->getArray());
 	    while(pvi->more()) {
-		shared_ptr<const Value> pElement(pvi->next());
+		intrusive_ptr<const Value> pElement(pvi->next());
 		set.insert(pElement);
 	    }
 	}
@@ -49,8 +49,8 @@ namespace mongo {
         return Value::getNull();
     }
 
-    shared_ptr<const Value> AccumulatorAddToSet::getValue() const {
-        vector<shared_ptr<const Value> > valVec;
+    intrusive_ptr<const Value> AccumulatorAddToSet::getValue() const {
+        vector<intrusive_ptr<const Value> > valVec;
 
         for (itr = set.begin(); itr != set.end(); ++itr) {
             valVec.push_back(*itr);

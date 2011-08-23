@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "bson/bsontypes.h"
+#include "util/intrusive_counter.h"
 
 namespace mongo {
     class BSONElement;
@@ -41,17 +42,16 @@ namespace mongo {
 
           @returns the next field's <name, Value>
         */
-        virtual shared_ptr<const Value> next() = 0;
+        virtual intrusive_ptr<const Value> next() = 0;
     };
 
 
     /*
       Values are immutable, so these are passed around as
-      shared_ptr<const Value>.
+      intrusive_ptr<const Value>.
      */
     class Value :
-        public boost::enable_shared_from_this<Value>,
-            boost::noncopyable {
+        public IntrusiveCounter {
     public:
         ~Value();
 
@@ -60,7 +60,7 @@ namespace mongo {
 
           @returns a new Value initialized from the bsonElement
         */
-        static shared_ptr<const Value> createFromBsonElement(
+        static intrusive_ptr<const Value> createFromBsonElement(
             BSONElement *pBsonElement);
 
         /*
@@ -72,7 +72,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createInt(int value);
+        static intrusive_ptr<const Value> createInt(int value);
 
         /*
           Construct an long(long)-valued Value.
@@ -83,7 +83,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createLong(long long value);
+        static intrusive_ptr<const Value> createLong(long long value);
 
         /*
           Construct a double-valued Value.
@@ -91,7 +91,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDouble(double value);
+        static intrusive_ptr<const Value> createDouble(double value);
 
         /*
           Construct a string-valued Value.
@@ -99,7 +99,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createString(const string &value);
+        static intrusive_ptr<const Value> createString(const string &value);
 
         /*
           Construct a date-valued Value.
@@ -107,7 +107,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDate(const Date_t &value);
+        static intrusive_ptr<const Value> createDate(const Date_t &value);
 
         /*
           Construct a document-valued Value.
@@ -115,7 +115,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDocument(
+        static intrusive_ptr<const Value> createDocument(
             const intrusive_ptr<Document> &pDocument);
 
         /*
@@ -124,8 +124,8 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createArray(
-            const vector<shared_ptr<const Value> > &vpValue);
+        static intrusive_ptr<const Value> createArray(
+            const vector<intrusive_ptr<const Value> > &vpValue);
 
         /*
           Get the BSON type of the field.
@@ -170,13 +170,13 @@ namespace mongo {
         /*
           Get references to singleton instances of commonly used field values.
          */
-	static shared_ptr<const Value> getUndefined();
-        static shared_ptr<const Value> getNull();
-        static shared_ptr<const Value> getTrue();
-        static shared_ptr<const Value> getFalse();
-        static shared_ptr<const Value> getMinusOne();
-        static shared_ptr<const Value> getZero();
-        static shared_ptr<const Value> getOne();
+	static intrusive_ptr<const Value> getUndefined();
+        static intrusive_ptr<const Value> getNull();
+        static intrusive_ptr<const Value> getTrue();
+        static intrusive_ptr<const Value> getFalse();
+        static intrusive_ptr<const Value> getMinusOne();
+        static intrusive_ptr<const Value> getZero();
+        static intrusive_ptr<const Value> getOne();
 
         /*
           Coerce (cast) a value to a native bool, using JSON rules.
@@ -190,7 +190,7 @@ namespace mongo {
 
           @returns the Boolean Value value
         */
-        shared_ptr<const Value> coerceToBoolean() const;
+        intrusive_ptr<const Value> coerceToBoolean() const;
 
         /*
           Coerce (cast) a value to an int, using JSON rules.
@@ -235,8 +235,8 @@ namespace mongo {
           @returns an integer less than zero, zero, or an integer greater than
             zero, depending on whether rL < rR, rL == rR, or rL > rR
          */
-        static int compare(const shared_ptr<const Value> &rL,
-                           const shared_ptr<const Value> &rR);
+        static int compare(const intrusive_ptr<const Value> &rL,
+                           const intrusive_ptr<const Value> &rR);
 
 
         /*
@@ -266,11 +266,11 @@ namespace mongo {
 	  keys in boost::unordered_map<>.
 
 	  Values are always referenced as immutables in the form
-	  shared_ptr<const Value>, so these operate on that construction.
+	  intrusive_ptr<const Value>, so these operate on that construction.
 	*/
 	struct Hash :
-	    unary_function<shared_ptr<const Value>, size_t> {
-	    size_t operator()(const shared_ptr<const Value> &rV) const;
+	    unary_function<intrusive_ptr<const Value>, size_t> {
+	    size_t operator()(const intrusive_ptr<const Value> &rV) const;
 	};
 	
     private:
@@ -286,7 +286,7 @@ namespace mongo {
         Value(const Date_t &dateValue);
         Value(const string &stringValue);
         Value(const intrusive_ptr<Document> &pDocument);
-        Value(const vector<shared_ptr<const Value> > &vpValue);
+        Value(const vector<intrusive_ptr<const Value> > &vpValue);
 
 	void addToBson(Builder *pBuilder) const;
 
@@ -305,7 +305,7 @@ namespace mongo {
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
         intrusive_ptr<Document> pDocumentValue;
-        vector<shared_ptr<const Value> > vpValue; // for arrays
+        vector<intrusive_ptr<const Value> > vpValue; // for arrays
 
 
         /*
@@ -318,18 +318,13 @@ namespace mongo {
 
         These are obtained via public static getters defined above.
         */
-	static const Value fieldUndefined;
-        static const Value fieldNull;
-        static const Value fieldTrue;
-        static const Value fieldFalse;
-        static const Value fieldMinusOne;
-        static const Value fieldZero;
-        static const Value fieldOne;
-
-        struct null_deleter {
-            void operator()(void const *) const {
-            }
-        };
+	static const intrusive_ptr<const Value> pFieldUndefined;
+        static const intrusive_ptr<const Value> pFieldNull;
+        static const intrusive_ptr<const Value> pFieldTrue;
+        static const intrusive_ptr<const Value> pFieldFalse;
+        static const intrusive_ptr<const Value> pFieldMinusOne;
+        static const intrusive_ptr<const Value> pFieldZero;
+        static const intrusive_ptr<const Value> pFieldOne;
 
         /* this implementation is used for getArray() */
         class vi :
@@ -339,16 +334,16 @@ namespace mongo {
             // virtuals from ValueIterator
 	    virtual ~vi();
             virtual bool more() const;
-            virtual shared_ptr<const Value> next();
+            virtual intrusive_ptr<const Value> next();
 
         private:
             friend class Value;
-            vi(const shared_ptr<const Value> &pSource,
-               const vector<shared_ptr<const Value> > *pvpValue);
+            vi(const intrusive_ptr<const Value> &pSource,
+               const vector<intrusive_ptr<const Value> > *pvpValue);
 
             size_t size;
             size_t nextIndex;
-            const vector<shared_ptr<const Value> > *pvpValue;
+            const vector<intrusive_ptr<const Value> > *pvpValue;
 	}; /* class vi */
 
     };
@@ -358,8 +353,8 @@ namespace mongo {
 
       Useful for unordered_map<>, etc.
      */
-    inline bool operator==(const shared_ptr<const Value> &v1,
-		    const shared_ptr<const Value> &v2) {
+    inline bool operator==(const intrusive_ptr<const Value> &v1,
+		    const intrusive_ptr<const Value> &v2) {
 	return (Value::compare(v1, v2) == 0);
     }
 }
@@ -372,43 +367,36 @@ namespace mongo {
         return type;
     }
 
-    inline shared_ptr<const Value> Value::getUndefined() {
-	shared_ptr<const Value> pValue(&fieldUndefined, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getUndefined() {
+        return pFieldUndefined;
     }
 
-    inline shared_ptr<const Value> Value::getNull() {
-	shared_ptr<const Value> pValue(&fieldNull, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getNull() {
+        return pFieldNull;
     }
 
-    inline shared_ptr<const Value> Value::getTrue() {
-	shared_ptr<const Value> pValue(&fieldTrue, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getTrue() {
+        return pFieldTrue;
     }
 
-    inline shared_ptr<const Value> Value::getFalse() {
-	shared_ptr<const Value> pValue(&fieldFalse, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getFalse() {
+        return pFieldFalse;
     }
 
-    inline shared_ptr<const Value> Value::getMinusOne() {
-	shared_ptr<const Value> pValue(&fieldMinusOne, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getMinusOne() {
+        return pFieldMinusOne;
     }
 
-    inline shared_ptr<const Value> Value::getZero() {
-	shared_ptr<const Value> pValue(&fieldZero, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getZero() {
+        return pFieldZero;
     }
 
-    inline shared_ptr<const Value> Value::getOne() {
-	shared_ptr<const Value> pValue(&fieldOne, null_deleter());
-        return pValue;
+    inline intrusive_ptr<const Value> Value::getOne() {
+        return pFieldOne;
     }
 
     inline size_t Value::Hash::operator()(
-	const shared_ptr<const Value> &rV) const {
+	const intrusive_ptr<const Value> &rV) const {
 	size_t seed = 0xf0afbeef;
 	rV->hash_combine(seed);
 	return seed;

@@ -74,7 +74,7 @@ namespace mongo {
           @param fieldName the name of the field
           @return point to the requested field
         */
-        shared_ptr<const Value> getValue(const string &fieldName);
+        intrusive_ptr<const Value> getValue(const string &fieldName);
 
         /*
           Add the given field to the Document.
@@ -86,7 +86,7 @@ namespace mongo {
           field.
         */
         void addField(const string &fieldName,
-		      const shared_ptr<const Value> &pValue);
+		      const intrusive_ptr<const Value> &pValue);
 
         /*
           Set the given field to be at the specified position in the
@@ -100,12 +100,12 @@ namespace mongo {
         */
         void setField(size_t index,
                       const string &fieldName,
-		      const shared_ptr<const Value> &pValue);
+		      const intrusive_ptr<const Value> &pValue);
 
 	/*
 	  Convenience type for dealing with fields.
 	 */
-	typedef pair<string, shared_ptr<const Value> > FieldPair;
+	typedef pair<string, intrusive_ptr<const Value> > FieldPair;
 
 	/*
 	  Get the indicated field.
@@ -137,7 +137,7 @@ namespace mongo {
 	  @param fieldName the name of the field
 	  @returns the value of the field
 	*/
-	shared_ptr<const Value> getField(const string &fieldName) const;
+	intrusive_ptr<const Value> getField(const string &fieldName) const;
 	
         /*
           Compare two documents.
@@ -170,7 +170,7 @@ namespace mongo {
 
         /* these two vectors parallel each other */
         vector<string> vFieldName;
-        vector<shared_ptr<const Value> > vpValue;
+        vector<intrusive_ptr<const Value> > vpValue;
     };
 
 

@@ -21,10 +21,10 @@
 
 namespace mongo {
 
-    shared_ptr<const Value> AccumulatorSum::evaluate(
+    intrusive_ptr<const Value> AccumulatorSum::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */
 	totalType = Value::getWidestNumeric(totalType, prhs->getType());
@@ -53,7 +53,7 @@ namespace mongo {
         return pSummer;
     }
 
-    shared_ptr<const Value> AccumulatorSum::getValue() const {
+    intrusive_ptr<const Value> AccumulatorSum::getValue() const {
         if (totalType == NumberInt)
             return Value::createInt((int)longTotal);
         if (totalType == NumberLong)

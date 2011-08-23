@@ -20,6 +20,16 @@
 
 namespace mongo {
 
+/*
+  IntrusiveCounter is a sharable implementation of a reference counter that
+  objects can use to be compatible with boost::intrusive_ptr<>.
+
+  Some objects that use IntrusiveCounter are immutable, and only have
+  const methods.  This may require their pointers to be declared as
+  intrusive_ptr<const ClassName> .  In order to be able to share pointers to
+  these immutables, the methods associated with IntrusiveCounter are declared
+  as const, and the counter itself is marked as mutable.
+ */
     class IntrusiveCounter :
         boost::noncopyable {
     public:
@@ -27,16 +37,16 @@ namespace mongo {
 
 	IntrusiveCounter();
 
-	friend inline void intrusive_ptr_add_ref(IntrusiveCounter *pIC) {
+	friend inline void intrusive_ptr_add_ref(const IntrusiveCounter *pIC) {
 	    pIC->addRef(); };
-	friend inline void intrusive_ptr_release(IntrusiveCounter *pIC) {
+	friend inline void intrusive_ptr_release(const IntrusiveCounter *pIC) {
 	    pIC->release(); };
 
-	void addRef();
-	void release();
+	void addRef() const;
+	void release() const;
 
     private:
-	unsigned counter;
+	mutable unsigned counter;
     };
 };
 
@@ -44,11 +54,11 @@ namespace mongo {
 
 namespace mongo {
 
-    inline void IntrusiveCounter::addRef() {
+    inline void IntrusiveCounter::addRef() const {
 	++counter;
     }
 
-    inline void IntrusiveCounter::release() {
+    inline void IntrusiveCounter::release() const {
 	if (!--counter)
 	    delete this;
     }

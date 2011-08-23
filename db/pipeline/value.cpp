@@ -23,13 +23,14 @@
 #include "db/pipeline/document.h"
 
 namespace mongo {
-    const Value Value::fieldUndefined(Undefined);
-    const Value Value::fieldNull;
-    const Value Value::fieldTrue(true);
-    const Value Value::fieldFalse(false);
-    const Value Value::fieldMinusOne(-1);
-    const Value Value::fieldZero(0);
-    const Value Value::fieldOne(1);
+    const intrusive_ptr<const Value> Value::pFieldUndefined(
+	new Value(Undefined));
+    const intrusive_ptr<const Value> Value::pFieldNull(new Value());
+    const intrusive_ptr<const Value> Value::pFieldTrue(new Value(true));
+    const intrusive_ptr<const Value> Value::pFieldFalse(new Value(false));
+    const intrusive_ptr<const Value> Value::pFieldMinusOne(new Value(-1));
+    const intrusive_ptr<const Value> Value::pFieldZero(new Value(0));
+    const intrusive_ptr<const Value> Value::pFieldOne(new Value(1));
 
     Value::~Value() {
     }
@@ -90,9 +91,9 @@ namespace mongo {
         simple.boolValue = boolValue;
     }
 
-    shared_ptr<const Value> Value::createFromBsonElement(
+    intrusive_ptr<const Value> Value::createFromBsonElement(
         BSONElement *pBsonElement) {
-        shared_ptr<const Value> pValue(new Value(pBsonElement));
+        intrusive_ptr<const Value> pValue(new Value(pBsonElement));
         return pValue;
     }
 
@@ -192,8 +193,8 @@ namespace mongo {
         simple.intValue = intValue;
     }
 
-    shared_ptr<const Value> Value::createInt(int value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createInt(int value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -204,8 +205,8 @@ namespace mongo {
         simple.longValue = longValue;
     }
 
-    shared_ptr<const Value> Value::createLong(long long value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createLong(long long value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -216,8 +217,8 @@ namespace mongo {
         simple.doubleValue = value;
     }
 
-    shared_ptr<const Value> Value::createDouble(double value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createDouble(double value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -228,8 +229,8 @@ namespace mongo {
         dateValue = value;
     }
 
-    shared_ptr<const Value> Value::createDate(const Date_t &value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createDate(const Date_t &value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -240,8 +241,8 @@ namespace mongo {
         stringValue = value;
     }
 
-    shared_ptr<const Value> Value::createString(const string &value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createString(const string &value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -251,21 +252,21 @@ namespace mongo {
         vpValue() {
     }
 
-    shared_ptr<const Value> Value::createDocument(
+    intrusive_ptr<const Value> Value::createDocument(
         const intrusive_ptr<Document> &pDocument) {
-        shared_ptr<const Value> pValue(new Value(pDocument));
+        intrusive_ptr<const Value> pValue(new Value(pDocument));
         return pValue;
     }
 
-    Value::Value(const vector<shared_ptr<const Value> > &thevpValue):
+    Value::Value(const vector<intrusive_ptr<const Value> > &thevpValue):
         type(Array),
         pDocumentValue(),
         vpValue(thevpValue) {
     }
 
-    shared_ptr<const Value> Value::createArray(
-        const vector<shared_ptr<const Value> > &vpValue) {
-        shared_ptr<const Value> pValue(new Value(vpValue));
+    intrusive_ptr<const Value> Value::createArray(
+        const vector<intrusive_ptr<const Value> > &vpValue) {
+        intrusive_ptr<const Value> pValue(new Value(vpValue));
         return pValue;
     }
 
@@ -300,13 +301,13 @@ namespace mongo {
         return (nextIndex < size);
     }
 
-    shared_ptr<const Value> Value::vi::next() {
+    intrusive_ptr<const Value> Value::vi::next() {
         assert(more());
         return (*pvpValue)[nextIndex++];
     }
 
-    Value::vi::vi(const shared_ptr<const Value> &pValue,
-                  const vector<shared_ptr<const Value> > *thepvpValue):
+    Value::vi::vi(const intrusive_ptr<const Value> &pValue,
+                  const vector<intrusive_ptr<const Value> > *thepvpValue):
         size(thepvpValue->size()),
         nextIndex(0),
         pvpValue(thepvpValue) {
@@ -314,7 +315,8 @@ namespace mongo {
 
     shared_ptr<ValueIterator> Value::getArray() const {
         assert(getType() == Array);
-        shared_ptr<ValueIterator> pVI(new vi(shared_from_this(), &vpValue));
+        shared_ptr<ValueIterator> pVI(
+	    new vi(intrusive_ptr<const Value>(this), &vpValue));
         return pVI;
     }
 
@@ -515,7 +517,7 @@ namespace mongo {
         return false;
     }
 
-    shared_ptr<const Value> Value::coerceToBoolean() const {
+    intrusive_ptr<const Value> Value::coerceToBoolean() const {
         bool result = coerceToBool();
 
         /* always normalize to the singletons */
@@ -652,8 +654,8 @@ namespace mongo {
         return "";
     }
 
-    int Value::compare(const shared_ptr<const Value> &rL,
-                       const shared_ptr<const Value> &rR) {
+    int Value::compare(const intrusive_ptr<const Value> &rL,
+                       const intrusive_ptr<const Value> &rR) {
         BSONType lType = rL->getType();
 	BSONType rType = rR->getType();
 
@@ -725,8 +727,8 @@ namespace mongo {
                     return 1; // the right array is shorter
 
                 /* compare the two corresponding elements */
-                shared_ptr<const Value> plv(pli->next());
-                shared_ptr<const Value> prv(pri->next());
+                intrusive_ptr<const Value> plv(pli->next());
+                intrusive_ptr<const Value> prv(pri->next());
                 const int cmp = Value::compare(plv, prv);
                 if (cmp)
                     return cmp; // values are unequal
@@ -833,7 +835,7 @@ namespace mongo {
         case Array: {
 	    shared_ptr<ValueIterator> pIter(getArray());
 	    while(pIter->more()) {
-		shared_ptr<const Value> pValue(pIter->next());
+		intrusive_ptr<const Value> pValue(pIter->next());
 		pValue->hash_combine(seed);
 	    };
             break;

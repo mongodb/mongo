@@ -35,7 +35,7 @@ namespace mongo {
         while(bsonIterator.more()) {
             BSONElement bsonElement(bsonIterator.next());
             string fieldName(bsonElement.fieldName());
-	    shared_ptr<const Value> pValue(
+	    intrusive_ptr<const Value> pValue(
                 Value::createFromBsonElement(&bsonElement));
 
             vFieldName.push_back(fieldName);
@@ -79,7 +79,7 @@ namespace mongo {
         return new FieldIterator(intrusive_ptr<Document>(this));
     }
 
-    shared_ptr<const Value> Document::getValue(const string &fieldName) {
+    intrusive_ptr<const Value> Document::getValue(const string &fieldName) {
         /*
           For now, assume the number of fields is small enough that iteration
           is ok.  Later, if this gets large, we can create a map into the
@@ -96,11 +96,11 @@ namespace mongo {
                 return vpValue[i];
         }
 
-        return(shared_ptr<const Value>());
+        return(intrusive_ptr<const Value>());
     }
 
     void Document::addField(const string &fieldName,
-			    const shared_ptr<const Value> &pValue) {
+			    const intrusive_ptr<const Value> &pValue) {
 	assert(pValue->getType() != Undefined);
 
         vFieldName.push_back(fieldName);
@@ -109,14 +109,14 @@ namespace mongo {
 
     void Document::setField(size_t index,
                             const string &fieldName,
-			    const shared_ptr<const Value> &pValue) {
+			    const intrusive_ptr<const Value> &pValue) {
 	assert(pValue->getType() != Undefined);
 
         vFieldName[index] = fieldName;
         vpValue[index] = pValue;
     }
 
-    shared_ptr<const Value> Document::getField(const string &fieldName) const {
+    intrusive_ptr<const Value> Document::getField(const string &fieldName) const {
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
 	    if (fieldName.compare(vFieldName[i]) == 0)
@@ -124,7 +124,7 @@ namespace mongo {
 	}
 
 	/* if we got here, there's no such field */
-	return shared_ptr<const Value>();
+	return intrusive_ptr<const Value>();
     }
 
     size_t Document::getFieldIndex(const string &fieldName) const {
@@ -187,9 +187,9 @@ namespace mongo {
         return (index < pDocument->vFieldName.size());
     }
 
-    pair<string, shared_ptr<const Value> > FieldIterator::next() {
+    pair<string, intrusive_ptr<const Value> > FieldIterator::next() {
         assert(more());
-        pair<string, shared_ptr<const Value> > result(
+        pair<string, intrusive_ptr<const Value> > result(
             pDocument->vFieldName[index], pDocument->vpValue[index]);
         ++index;
         return result;
