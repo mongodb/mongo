@@ -215,9 +215,9 @@ run(void)
 			cursor->set_value(cursor, vbuf);
 			break;
 		}
-		if ((ret = cursor->update(cursor)) != 0) {
+		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr,
-			    "cursor->update: %s\n", wiredtiger_strerror(ret));
+			    "cursor->insert: %s\n", wiredtiger_strerror(ret));
 			exit (EXIT_FAILURE);
 		}
 	}
@@ -232,9 +232,9 @@ run(void)
 			cursor->set_key(cursor, kbuf);
 			snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", cnt);
 			cursor->set_value(cursor, vbuf);
-			if ((ret = cursor->update(cursor)) != 0) {
+			if ((ret = cursor->insert(cursor)) != 0) {
 				fprintf(stderr,
-				    "cursor->update: %s\n",
+				    "cursor->insert: %s\n",
 				    wiredtiger_strerror(ret));
 				exit (EXIT_FAILURE);
 			}
