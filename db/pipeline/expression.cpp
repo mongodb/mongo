@@ -327,7 +327,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionAdd::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -444,7 +444,7 @@ namespace mongo {
 	  Evaluate and coerce the last argument to a boolean.  If it's false,
 	  then we can replace this entire expression.
 	 */
-	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
+	bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
 	if (!last) {
 	    shared_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getFalse()));
@@ -475,7 +475,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionAnd::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
@@ -542,7 +542,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionCoerceToBool::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
 
 	shared_ptr<const Value> pResult(pExpression->evaluate(pDocument));
         bool b = pResult->coerceToBool();
@@ -694,7 +694,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionCompare::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
@@ -799,7 +799,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionConstant::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         return pValue;
     }
 
@@ -863,7 +863,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionDayOfMonth::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -895,7 +895,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionDayOfWeek::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -927,7 +927,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionDayOfYear::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -960,7 +960,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionDivide::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
@@ -1006,8 +1006,8 @@ namespace mongo {
     }
 
     void ExpressionObject::addToDocument(
-	const shared_ptr<Document> &pResult,
-        const shared_ptr<Document> &pDocument) const {
+	const intrusive_ptr<Document> &pResult,
+        const intrusive_ptr<Document> &pDocument) const {
 	const size_t pathSize = path.size();
 	set<string>::const_iterator end(path.end());
 
@@ -1084,7 +1084,7 @@ namespace mongo {
 			*/
 			BSONType valueType = field.second->getType();
 			if (valueType == Object) {
-			    shared_ptr<Document> pD(
+			    intrusive_ptr<Document> pD(
 				pChild->evaluateDocument(
 				    field.second->getDocument()));
 			    pResult->addField(field.first,
@@ -1100,7 +1100,7 @@ namespace mongo {
 			    shared_ptr<ValueIterator> pVI(
 				field.second->getArray());
 			    while(pVI->more()) {
-				shared_ptr<Document> pD(
+				intrusive_ptr<Document> pD(
 				    pChild->evaluateDocument(
 					pVI->next()->getDocument()));
 				result.push_back(Value::createDocument(pD));
@@ -1139,7 +1139,7 @@ namespace mongo {
     }
 
     size_t ExpressionObject::getSizeHint(
-	const shared_ptr<Document> &pDocument) const {
+	const intrusive_ptr<Document> &pDocument) const {
 	size_t sizeHint = pDocument->getFieldCount();
 	const size_t pathSize = path.size();
 	if (!excludePaths)
@@ -1158,17 +1158,17 @@ namespace mongo {
 	return sizeHint;
     }
 
-    shared_ptr<Document> ExpressionObject::evaluateDocument(
-        const shared_ptr<Document> &pDocument) const {
+    intrusive_ptr<Document> ExpressionObject::evaluateDocument(
+        const intrusive_ptr<Document> &pDocument) const {
 	/* create and populate the result */
-        shared_ptr<Document> pResult(
+        intrusive_ptr<Document> pResult(
 	    Document::create(getSizeHint(pDocument)));
 	addToDocument(pResult, pDocument);
         return pResult;
     }
 
     shared_ptr<const Value> ExpressionObject::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
 	return Value::createDocument(evaluateDocument(pDocument));
     }
 
@@ -1405,7 +1405,7 @@ namespace mongo {
 
     shared_ptr<const Value> ExpressionFieldPath::evaluatePath(
 	size_t index, const size_t pathLength,
-	shared_ptr<Document> pDocument) const {
+	intrusive_ptr<Document> pDocument) const {
         shared_ptr<const Value> pValue; /* the return value */
 
 	pValue = pDocument->getValue(fieldPath.getFieldName(index));
@@ -1460,7 +1460,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionFieldPath::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
 	return evaluatePath(0, fieldPath.getPathLength(), pDocument);
     }
 
@@ -1501,7 +1501,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionFieldRange::evaluate(
-	const shared_ptr<Document> &pDocument) const {
+	const intrusive_ptr<Document> &pDocument) const {
 	/* if there's no range, there can't be a match */
 	if (!pRange.get())
 	    return Value::getFalse();
@@ -1806,7 +1806,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionMinute::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -1839,7 +1839,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionMod::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
@@ -1881,7 +1881,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionMonth::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -1908,7 +1908,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionMultiply::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -1963,7 +1963,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionHour::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -1996,7 +1996,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionIfNull::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
 	BSONType leftType = pLeft->getType();
@@ -2040,7 +2040,7 @@ namespace mongo {
 	*/
 	if (nConst == n) {
 	    shared_ptr<const Value> pResult(
-		evaluate(shared_ptr<Document>()));
+		evaluate(intrusive_ptr<Document>()));
 	    shared_ptr<Expression> pReplacement(
 		ExpressionConstant::create(pResult));
 	    return pReplacement;
@@ -2121,7 +2121,7 @@ namespace mongo {
 	      operand vector.
 	    */
 	    shared_ptr<const Value> pResult(
-		pConst->evaluate(shared_ptr<Document>()));
+		pConst->evaluate(intrusive_ptr<Document>()));
 	    pNew->addOperand(ExpressionConstant::create(pResult));
 	}
 
@@ -2194,7 +2194,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionNoOp::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
 	return pValue;
@@ -2224,7 +2224,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionNot::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
 
@@ -2253,7 +2253,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionOr::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
@@ -2303,7 +2303,7 @@ namespace mongo {
 	  Evaluate and coerce the last argument to a boolean.  If it's true,
 	  then we can replace this entire expression.
 	 */
-	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
+	bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
 	if (last) {
 	    shared_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getTrue()));
@@ -2353,7 +2353,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionSecond::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -2386,7 +2386,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionStrcasecmp::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
@@ -2428,7 +2428,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionSubstr::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 3); // CW TODO user error
         shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         shared_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
@@ -2471,7 +2471,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionSubtract::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
@@ -2531,7 +2531,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionToLower::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str = pString->coerceToString();
@@ -2564,7 +2564,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionToUpper::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str(pString->coerceToString());
@@ -2596,7 +2596,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionWeek::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
@@ -2637,7 +2637,7 @@ namespace mongo {
     }
 
     shared_ptr<const Value> ExpressionYear::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
         shared_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;

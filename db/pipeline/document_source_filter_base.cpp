@@ -35,7 +35,7 @@ namespace mongo {
         }
 
         while(hasNext) {
-            boost::shared_ptr<Document> pDocument(pSource->getCurrent());
+            boost::intrusive_ptr<Document> pDocument(pSource->getCurrent());
             hasNext = pSource->advance();
 
             if (accept(pDocument)) {
@@ -69,7 +69,7 @@ namespace mongo {
         return (pCurrent.get() != NULL);
     }
 
-    boost::shared_ptr<Document> DocumentSourceFilterBase::getCurrent() {
+    boost::intrusive_ptr<Document> DocumentSourceFilterBase::getCurrent() {
         if (unstarted)
             findNext();
 

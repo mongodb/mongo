@@ -42,10 +42,10 @@ namespace mongo {
 	return true;
     }
 
-    shared_ptr<Document> DocumentSourceBsonArray::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceBsonArray::getCurrent() {
 	assert(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
-        shared_ptr<Document> pDocument(
+        intrusive_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
         return pDocument;
     }

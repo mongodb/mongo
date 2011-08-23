@@ -57,7 +57,7 @@ namespace mongo {
         return true;
     }
 
-    shared_ptr<Document> DocumentSourceSort::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceSort::getCurrent() {
         if (!populated)
             populate();
 
@@ -194,7 +194,7 @@ namespace mongo {
     }
 
     int DocumentSourceSort::compare(
-	const shared_ptr<Document> &pL, const shared_ptr<Document> &pR) {
+	const intrusive_ptr<Document> &pL, const intrusive_ptr<Document> &pR) {
 
 	/*
 	  populate() already checked that there is a non-empty sort key,

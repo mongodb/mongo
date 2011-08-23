@@ -43,7 +43,7 @@ namespace mongo {
         return (pCurrent.get() != NULL);
     }
 
-    shared_ptr<Document> DocumentSourceCursor::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceCursor::getCurrent() {
 	/* if we haven't gotten the first one yet, do so now */
 	if (!pCurrent.get())
 	    findNext();

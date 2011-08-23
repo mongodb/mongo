@@ -41,7 +41,7 @@ namespace mongo {
 	return (pCurrent.get() != NULL);
     }
 
-    shared_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
 	assert(!eof());
 	return pCurrent;
     }

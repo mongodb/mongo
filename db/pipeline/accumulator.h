@@ -66,7 +66,7 @@ namespace mongo {
     public:
         // virtuals from Expression
 	virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
@@ -93,7 +93,7 @@ namespace mongo {
     public:
         // virtuals from Expression
 	virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
@@ -121,7 +121,7 @@ namespace mongo {
     public:
         // virtuals from Expression
 	virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
@@ -147,7 +147,7 @@ namespace mongo {
     public:
         // virtuals from Accumulator
 	virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
@@ -175,7 +175,7 @@ namespace mongo {
     public:
         // virtuals from Accumulator
 	virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 

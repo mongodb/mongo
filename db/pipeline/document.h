@@ -18,14 +18,15 @@
 
 #include "pch.h"
 
+#include "util/intrusive_counter.h"
+
 namespace mongo {
     class BSONObj;
     class FieldIterator;
     class Value;
 
     class Document :
-        public boost::enable_shared_from_this<Document>,
-            boost::noncopyable {
+        public IntrusiveCounter {
     public:
         ~Document();
 
@@ -37,7 +38,7 @@ namespace mongo {
 
           @returns shared pointer to the newly created Document
         */
-        static shared_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
+        static intrusive_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
 
         /*
           Create a new empty Document.
@@ -46,14 +47,14 @@ namespace mongo {
             known, this can be used to increase memory allocation efficiency
           @returns shared pointer to the newly created Document
         */
-        static shared_ptr<Document> create(size_t sizeHint = 0);
+        static intrusive_ptr<Document> create(size_t sizeHint = 0);
 
         /*
           Clone a document.
 
           The new document shares all the fields' values with the original.
         */
-        shared_ptr<Document> clone();
+        intrusive_ptr<Document> clone();
 
         /*
           Add this document to the BSONObj under construction with the
@@ -146,8 +147,8 @@ namespace mongo {
           as strings are compared, but comparing one field at a time instead
           of one character at a time.
         */
-        static int compare(const shared_ptr<Document> &rL,
-                           const shared_ptr<Document> &rR);
+        static int compare(const intrusive_ptr<Document> &rL,
+                           const intrusive_ptr<Document> &rR);
 
 	static string idName; // shared "_id"
 
@@ -199,13 +200,13 @@ namespace mongo {
           @param pDocument points to the document whose fields are being
               iterated
         */
-        FieldIterator(const shared_ptr<Document> &pDocument);
+        FieldIterator(const intrusive_ptr<Document> &pDocument);
 
         /*
           We'll hang on to the original document to ensure we keep the
           fieldPtr vector alive.
         */
-	shared_ptr<Document> pDocument;
+	intrusive_ptr<Document> pDocument;
         size_t index; // current field in iteration
     };
 }

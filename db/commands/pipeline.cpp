@@ -38,7 +38,7 @@ namespace mongo {
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
 	collectionName(),
 	sourceList(),
-        splitMongodPipeline(DEBUG_BUILD == 1), /* always split for DEV */
+        splitMongodPipeline(false /*DEBUG_BUILD == 1*/), /* always split for DEV */
         pCtx(pTheCtx) {
     }
 
@@ -327,7 +327,7 @@ namespace mongo {
         BSONArrayBuilder resultArray; // where we'll stash the results
         for(bool hasDocument = !pSource->eof(); hasDocument;
                 hasDocument = pSource->advance()) {
-	    boost::shared_ptr<Document> pDocument(pSource->getCurrent());
+	    boost::intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
             /* add the document to the result set */
             BSONObjBuilder documentBuilder;

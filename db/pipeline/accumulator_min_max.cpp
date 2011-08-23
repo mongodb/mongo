@@ -21,7 +21,7 @@
 
 namespace mongo {
     shared_ptr<const Value> AccumulatorMinMax::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
 	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 

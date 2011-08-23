@@ -56,7 +56,7 @@ namespace mongo {
           @returns the computed value
         */
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const = 0;
+            const intrusive_ptr<Document> &pDocument) const = 0;
 
 	/*
 	  Add the Expression (and any descendant Expressions) into a BSON
@@ -273,7 +273,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionAdd();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 
 	// virtuals from ExpressionNary
@@ -298,7 +298,7 @@ namespace mongo {
         virtual ~ExpressionAnd();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void toMatcherBson(
 	    BSONObjBuilder *pBuilder, unsigned depth) const;
@@ -330,7 +330,7 @@ namespace mongo {
         virtual ~ExpressionCoerceToBool();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
@@ -353,7 +353,7 @@ namespace mongo {
         virtual ~ExpressionCompare();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -388,7 +388,7 @@ namespace mongo {
         virtual ~ExpressionConstant();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
@@ -421,7 +421,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionDayOfMonth();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -438,7 +438,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionDayOfWeek();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -455,7 +455,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionDayOfYear();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -472,7 +472,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionDivide();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -491,7 +491,7 @@ namespace mongo {
         virtual ~ExpressionFieldPath();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
@@ -547,7 +547,7 @@ namespace mongo {
 	 */
 	shared_ptr<const Value> evaluatePath(
 	    size_t index, const size_t pathLength, 
-	    shared_ptr<Document> pDocument) const;
+	    intrusive_ptr<Document> pDocument) const;
 
 	FieldPath fieldPath;
     };
@@ -561,7 +561,7 @@ namespace mongo {
         virtual ~ExpressionFieldRange();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
@@ -653,7 +653,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionHour();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -670,7 +670,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionIfNull();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -687,7 +687,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionMinute();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -704,7 +704,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionMod();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -721,7 +721,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionMultiply();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
 
         // virtuals from ExpressionNary
@@ -745,7 +745,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionMonth();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -763,7 +763,7 @@ namespace mongo {
         virtual ~ExpressionNoOp();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -780,7 +780,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionNot();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -799,7 +799,7 @@ namespace mongo {
         virtual ~ExpressionObject();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
@@ -812,8 +812,8 @@ namespace mongo {
 	  @param pDocument the input Document
 	  @returns the result document
 	 */
-	shared_ptr<Document> evaluateDocument(
-	    const shared_ptr<Document> &pDocument) const;
+	intrusive_ptr<Document> evaluateDocument(
+	    const intrusive_ptr<Document> &pDocument) const;
 
 	/*
 	  evaluate(), but add the evaluated fields to a given document
@@ -822,8 +822,8 @@ namespace mongo {
 	  @param pResult the Document to add the evaluated expressions to
 	  @param pDocument the input Document
 	 */
-	void addToDocument(const shared_ptr<Document> &pResult,
-			   const shared_ptr<Document> &pDocument) const;
+	void addToDocument(const intrusive_ptr<Document> &pResult,
+			   const intrusive_ptr<Document> &pDocument) const;
 
 	/*
 	  Estimate the number of fields that will result from evaluating
@@ -836,7 +836,7 @@ namespace mongo {
 	  @param pDocument the input document
 	  @returns estimated number of fields that will result
 	 */
-	size_t getSizeHint(const shared_ptr<Document> &pDocument) const;
+	size_t getSizeHint(const intrusive_ptr<Document> &pDocument) const;
 
         /*
           Create an empty expression.  Until fields are added, this
@@ -956,7 +956,7 @@ namespace mongo {
         virtual ~ExpressionOr();
 	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void toMatcherBson(
 	    BSONObjBuilder *pBuilder, unsigned depth) const;
@@ -986,7 +986,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionSecond();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1003,7 +1003,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionStrcasecmp();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1020,7 +1020,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionSubstr();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1037,7 +1037,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionSubtract();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1054,7 +1054,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionToLower();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1071,7 +1071,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionToUpper();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1088,7 +1088,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionWeek();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
@@ -1105,7 +1105,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionYear();
         virtual shared_ptr<const Value> evaluate(
-            const shared_ptr<Document> &pDocument) const;
+            const intrusive_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
         virtual void addOperand(const shared_ptr<Expression> &pExpression);
 

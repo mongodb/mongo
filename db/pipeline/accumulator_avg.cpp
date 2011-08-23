@@ -27,7 +27,7 @@ namespace mongo {
     const char AccumulatorAvg::countName[] = "count";
 
     shared_ptr<const Value> AccumulatorAvg::evaluate(
-        const shared_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
 	if (!pCtx->getInRouter()) {
 	    Super::evaluate(pDocument);
 	    ++count;
@@ -41,7 +41,7 @@ namespace mongo {
 	    shared_ptr<const Value> prhs(
 		vpOperand[0]->evaluate(pDocument));
 	    assert(prhs->getType() == Object);
-	    shared_ptr<Document> pShardDoc(prhs->getDocument());
+	    intrusive_ptr<Document> pShardDoc(prhs->getDocument());
 
 	    shared_ptr<const Value> pSubTotal(
 		pShardDoc->getValue(subTotalName));
@@ -93,7 +93,7 @@ namespace mongo {
 	    return Value::createDouble(avg);
 	}
 
-	shared_ptr<Document> pDocument(Document::create());
+	intrusive_ptr<Document> pDocument(Document::create());
 
 	shared_ptr<const Value> pSubTotal;
 	if (totalType == NumberInt)

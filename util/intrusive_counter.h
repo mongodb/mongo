@@ -27,9 +27,9 @@ namespace mongo {
 
 	IntrusiveCounter();
 
-	friend void intrusive_ptr_add_ref(IntrusiveCounter *pIC) {
+	friend inline void intrusive_ptr_add_ref(IntrusiveCounter *pIC) {
 	    pIC->addRef(); };
-	friend void intrusive_ptr_release(IntrusiveCounter *pIC) {
+	friend inline void intrusive_ptr_release(IntrusiveCounter *pIC) {
 	    pIC->release(); };
 
 	void addRef();

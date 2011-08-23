@@ -63,9 +63,9 @@ namespace mongo {
         return pSource->advance();
     }
 
-    shared_ptr<Document> DocumentSourceProject::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceProject::getCurrent() {
         if (!pNoUnwindDocument.get()) {
-            shared_ptr<Document> pInDocument(pSource->getCurrent());
+            intrusive_ptr<Document> pInDocument(pSource->getCurrent());
 
 	    /* create the result document */
 	    const size_t sizeHint =
@@ -120,7 +120,7 @@ namespace mongo {
          */
         if (pUnwindArray.get()) {
             /* clone the document with an array we're unwinding */
-            shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
+            intrusive_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
 
             /* substitute the named field into the prototype document */
             pUnwindDocument->setField(unwindWhich, unwindName, pUnwindValue);

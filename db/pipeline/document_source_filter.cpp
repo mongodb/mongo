@@ -59,7 +59,7 @@ namespace mongo {
     }
 
     bool DocumentSourceFilter::accept(
-	const shared_ptr<Document> &pDocument) const {
+	const intrusive_ptr<Document> &pDocument) const {
 	shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
 	return pValue->coerceToBool();
     }

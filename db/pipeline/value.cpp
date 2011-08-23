@@ -245,14 +245,14 @@ namespace mongo {
         return pValue;
     }
 
-    Value::Value(const shared_ptr<Document> &pDocument):
+    Value::Value(const intrusive_ptr<Document> &pDocument):
         type(Object),
         pDocumentValue(pDocument),
         vpValue() {
     }
 
     shared_ptr<const Value> Value::createDocument(
-        const shared_ptr<Document> &pDocument) {
+        const intrusive_ptr<Document> &pDocument) {
         shared_ptr<const Value> pValue(new Value(pDocument));
         return pValue;
     }
@@ -285,7 +285,7 @@ namespace mongo {
         return stringValue;
     }
 
-    shared_ptr<Document> Value::getDocument() const {
+    intrusive_ptr<Document> Value::getDocument() const {
         assert(getType() == Object);
         return pDocumentValue;
     }
@@ -373,7 +373,7 @@ namespace mongo {
             break;
 
         case Object: {
-            shared_ptr<Document> pDocument(getDocument());
+            intrusive_ptr<Document> pDocument(getDocument());
             BSONObjBuilder subBuilder;
             pDocument->toBson(&subBuilder);
             subBuilder.done();

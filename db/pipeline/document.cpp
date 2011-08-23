@@ -23,8 +23,8 @@ namespace mongo {
 
     string Document::idName("_id");
 
-    shared_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
-	shared_ptr<Document> pDocument(new Document(pBsonObj));
+    intrusive_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
+	intrusive_ptr<Document> pDocument(new Document(pBsonObj));
         return pDocument;
     }
 
@@ -49,8 +49,8 @@ namespace mongo {
             vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
     }
 
-    shared_ptr<Document> Document::create(size_t sizeHint) {
-	shared_ptr<Document> pDocument(new Document(sizeHint));
+    intrusive_ptr<Document> Document::create(size_t sizeHint) {
+	intrusive_ptr<Document> pDocument(new Document(sizeHint));
         return pDocument;
     }
 
@@ -63,9 +63,9 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Document> Document::clone() {
+    intrusive_ptr<Document> Document::clone() {
         const size_t n = vFieldName.size();
-	shared_ptr<Document> pNew(Document::create(n));
+	intrusive_ptr<Document> pNew(Document::create(n));
         for(size_t i = 0; i < n; ++i)
             pNew->addField(vFieldName[i], vpValue[i]);
 
@@ -76,7 +76,7 @@ namespace mongo {
     }
 
     FieldIterator *Document::createFieldIterator() {
-        return new FieldIterator(shared_from_this());
+        return new FieldIterator(intrusive_ptr<Document>(this));
     }
 
     shared_ptr<const Value> Document::getValue(const string &fieldName) {
@@ -146,8 +146,8 @@ namespace mongo {
 	}
     }
 
-    int Document::compare(const shared_ptr<Document> &rL,
-                          const shared_ptr<Document> &rR) {
+    int Document::compare(const intrusive_ptr<Document> &rL,
+                          const intrusive_ptr<Document> &rR) {
         const size_t lSize = rL->vFieldName.size();
         const size_t rSize = rR->vFieldName.size();
 
@@ -178,7 +178,7 @@ namespace mongo {
 
     /* ----------------------- FieldIterator ------------------------------- */
 
-    FieldIterator::FieldIterator(const shared_ptr<Document> &pTheDocument):
+    FieldIterator::FieldIterator(const intrusive_ptr<Document> &pTheDocument):
         pDocument(pTheDocument),
         index(0) {
     }

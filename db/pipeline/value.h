@@ -116,7 +116,7 @@ namespace mongo {
           @returns a Value with the given value
         */
         static shared_ptr<const Value> createDocument(
-            const shared_ptr<Document> &pDocument);
+            const intrusive_ptr<Document> &pDocument);
 
         /*
           Construct an array-valued Value.
@@ -144,7 +144,7 @@ namespace mongo {
         */
         double getDouble() const;
         string getString() const;
-        shared_ptr<Document> getDocument() const;
+        intrusive_ptr<Document> getDocument() const;
         shared_ptr<ValueIterator> getArray() const;
         OID getOid() const;
         bool getBool() const;
@@ -285,7 +285,7 @@ namespace mongo {
         Value(double doubleValue);
         Value(const Date_t &dateValue);
         Value(const string &stringValue);
-        Value(const shared_ptr<Document> &pDocument);
+        Value(const intrusive_ptr<Document> &pDocument);
         Value(const vector<shared_ptr<const Value> > &vpValue);
 
 	void addToBson(Builder *pBuilder) const;
@@ -304,7 +304,7 @@ namespace mongo {
         OID oidValue;
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
-        shared_ptr<Document> pDocumentValue;
+        intrusive_ptr<Document> pDocumentValue;
         vector<shared_ptr<const Value> > vpValue; // for arrays
 
 

@@ -34,7 +34,7 @@ namespace mongo {
 	return pSource->advance();
     }
 
-    boost::shared_ptr<Document> DocumentSourceOut::getCurrent() {
+    boost::intrusive_ptr<Document> DocumentSourceOut::getCurrent() {
 	return pSource->getCurrent();
     }
 

@@ -21,6 +21,7 @@
 #include <boost/unordered_map.hpp>
 #include "client/parallel.h"
 #include "db/jsobj.h"
+#include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -60,7 +61,7 @@ namespace mongo {
 	  @returns the current Document
           TODO throws an exception if there are no more expressions to return.
         */
-        virtual shared_ptr<Document> getCurrent() = 0;
+        virtual intrusive_ptr<Document> getCurrent() = 0;
 
 	/*
 	  Set the underlying source this source should use to get Documents
@@ -143,7 +144,7 @@ namespace mongo {
         virtual ~DocumentSourceBsonArray();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
 
 	/*
@@ -183,7 +184,7 @@ namespace mongo {
 	virtual ~DocumentSourceCommandFutures();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
 
 	/* convenient shorthand for a commonly used type */
@@ -217,7 +218,7 @@ namespace mongo {
 
 	bool newSource; // set to true for the first item of a new source
 	shared_ptr<DocumentSourceBsonArray> pBsonSource;
-	shared_ptr<Document> pCurrent;
+	intrusive_ptr<Document> pCurrent;
 	FuturesList::iterator iterator;
 	FuturesList::iterator listEnd;
 	string &errmsg;
@@ -231,7 +232,7 @@ namespace mongo {
         virtual ~DocumentSourceCursor();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
 
 	/*
@@ -254,7 +255,7 @@ namespace mongo {
 
 	void findNext();
         shared_ptr<Cursor> pCursor;
-	shared_ptr<Document> pCurrent;
+	intrusive_ptr<Document> pCurrent;
     };
 
 
@@ -271,7 +272,7 @@ namespace mongo {
         virtual ~DocumentSourceFilterBase();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 
 	/*
 	  Create a BSONObj suitable for Matcher construction.
@@ -296,7 +297,7 @@ namespace mongo {
 	  @param pDocument the document to test
 	  @returns true if the document matches the filter, false otherwise
 	 */
-	virtual bool accept(const shared_ptr<Document> &pDocument) const = 0;
+	virtual bool accept(const intrusive_ptr<Document> &pDocument) const = 0;
 
     private:
 
@@ -304,7 +305,7 @@ namespace mongo {
 
         bool unstarted;
         bool hasNext;
-        shared_ptr<Document> pCurrent;
+        intrusive_ptr<Document> pCurrent;
     };
 
 
@@ -355,7 +356,7 @@ namespace mongo {
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from DocumentSourceFilterBase
-	virtual bool accept(const shared_ptr<Document> &pDocument) const;
+	virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
 
     private:
         DocumentSourceFilter(const shared_ptr<Expression> &pFilter);
@@ -371,7 +372,7 @@ namespace mongo {
         virtual ~DocumentSourceGroup();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 
         /*
           Create a new grouping DocumentSource.
@@ -476,11 +477,11 @@ namespace mongo {
         vector<shared_ptr<Expression> > vpExpression;
 
 
-        shared_ptr<Document> makeDocument(
+        intrusive_ptr<Document> makeDocument(
 	    const GroupsType::iterator &rIter);
 
         GroupsType::iterator groupsIterator;
-        shared_ptr<Document> pCurrent;
+        intrusive_ptr<Document> pCurrent;
 
 	intrusive_ptr<ExpressionContext> pCtx;
     };
@@ -522,7 +523,7 @@ namespace mongo {
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from DocumentSourceFilterBase
-	virtual bool accept(const shared_ptr<Document> &pDocument) const;
+	virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
 
     private:
         DocumentSourceMatch(const BSONObj &query);
@@ -538,7 +539,7 @@ namespace mongo {
         virtual ~DocumentSourceOut();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 
 	/*
 	  Create a document source for output and pass-through.
@@ -570,7 +571,7 @@ namespace mongo {
         virtual ~DocumentSourceProject();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 	virtual void optimize();
 
         /*
@@ -641,7 +642,7 @@ namespace mongo {
         size_t unwindWhich; // if unwinding, current Document's index
 
         // iteration state
-        shared_ptr<Document> pNoUnwindDocument;
+        intrusive_ptr<Document> pNoUnwindDocument;
                                               // document to return, pre-unwind
         shared_ptr<const Value> pUnwindArray; // field being unwound
         shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
@@ -656,7 +657,7 @@ namespace mongo {
         virtual ~DocumentSourceSort();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual intrusive_ptr<Document> getCurrent();
 
         /*
           Create a new sorting DocumentSource.
@@ -728,10 +729,10 @@ namespace mongo {
 	    */
 	    DocumentSourceSort *pSort;
 
-	    shared_ptr<Document> pDocument;
+	    intrusive_ptr<Document> pDocument;
 
 	    Carrier(DocumentSourceSort *pSort,
-		    const shared_ptr<Document> &pDocument);
+		    const intrusive_ptr<Document> &pDocument);
 
 	    static bool lessThan(const Carrier &rL, const Carrier &rR);
 	};
@@ -744,14 +745,14 @@ namespace mongo {
 	  @returns a number less than, equal to, or greater than zero,
 	    indicating pL < pR, pL == pR, or pL > pR, respectively
 	 */
-	int compare(const shared_ptr<Document> &pL,
-		    const shared_ptr<Document> &pR);
+	int compare(const intrusive_ptr<Document> &pL,
+		    const intrusive_ptr<Document> &pR);
 
 	typedef list<Carrier> ListType;
 	ListType documents;
 
         ListType::iterator listIterator;
-        shared_ptr<Document> pCurrent;
+        intrusive_ptr<Document> pCurrent;
 
 	intrusive_ptr<ExpressionContext> pCtx;
     };
@@ -769,7 +770,8 @@ namespace mongo {
     }
 
     inline DocumentSourceSort::Carrier::Carrier(
-	DocumentSourceSort *pTheSort, const shared_ptr<Document> &pTheDocument):
+	DocumentSourceSort *pTheSort,
+	const intrusive_ptr<Document> &pTheDocument):
 	pSort(pTheSort),
 	pDocument(pTheDocument) {
     }

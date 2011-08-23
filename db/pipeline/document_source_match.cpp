@@ -36,7 +36,7 @@ namespace mongo {
     }
 
     bool DocumentSourceMatch::accept(
-	const shared_ptr<Document> &pDocument) const {
+	const intrusive_ptr<Document> &pDocument) const {
 
 	/*
 	  The matcher only takes BSON documents, so we have to make one.

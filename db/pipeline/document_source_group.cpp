@@ -54,7 +54,7 @@ namespace mongo {
         return true;
     }
 
-    shared_ptr<Document> DocumentSourceGroup::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceGroup::getCurrent() {
         if (!populated)
             populate();
 
@@ -222,7 +222,7 @@ namespace mongo {
     void DocumentSourceGroup::populate() {
         for(bool hasNext = !pSource->eof(); hasNext;
                 hasNext = pSource->advance()) {
-            shared_ptr<Document> pDocument(pSource->getCurrent());
+            intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
             /* get the _id document */
             shared_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
@@ -275,11 +275,11 @@ namespace mongo {
         populated = true;
     }
 
-    shared_ptr<Document> DocumentSourceGroup::makeDocument(
+    intrusive_ptr<Document> DocumentSourceGroup::makeDocument(
         const GroupsType::iterator &rIter) {
         vector<shared_ptr<Accumulator> > *pGroup = &rIter->second;
         const size_t n = vFieldName.size();
-        shared_ptr<Document> pResult(Document::create(1 + n));
+        intrusive_ptr<Document> pResult(Document::create(1 + n));
 
         /* add the _id field */
         pResult->addField(Document::idName, rIter->first);
