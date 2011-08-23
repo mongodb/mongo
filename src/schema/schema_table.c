@@ -20,6 +20,8 @@ __open_schema_table(WT_SESSION_IMPL *session)
 	const char *schemaconf;
 	int ret;
 
+	ret = 0;
+
 	if (session->schematab != NULL)
 		return (0);
 
@@ -54,8 +56,9 @@ __wt_schema_table_insert(
 	WT_CURSOR *cursor;
 	int ret;
 
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
 	ret = 0;
+
+	WT_RET(__wt_schema_table_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
@@ -73,8 +76,9 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_CURSOR *cursor;
 	int ret;
 
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
 	ret = 0;
+
+	WT_RET(__wt_schema_table_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	WT_TRET(cursor->remove(cursor));
 	WT_TRET(cursor->close(cursor, NULL));
@@ -94,6 +98,8 @@ __wt_schema_table_read(
 	const char *value;
 	int ret;
 
+	ret = 0;
+
 	WT_RET(__wt_schema_table_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
@@ -103,4 +109,3 @@ __wt_schema_table_read(
 err:    WT_TRET(cursor->close(cursor, NULL));
 	return (ret);
 }
-
