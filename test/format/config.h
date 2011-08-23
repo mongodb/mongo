@@ -118,7 +118,7 @@ static CONFIG c[] = {
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  0, 0, 0, 45, &g.c_write_pct },
+	  0, 0, 0, 90, &g.c_write_pct },
 
 	{ NULL, NULL, 0, 0, 0, 0, NULL }
 };
