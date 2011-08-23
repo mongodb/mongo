@@ -22,8 +22,6 @@ wiredtiger_strerror(int error)
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:
 		return ("WT_NOTFOUND: item not found");
-	case WT_READONLY:
-		return ("WT_READONLY: attempt to modify a read-only value");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
 	default:

@@ -4,7 +4,6 @@ errors = [
 	('WT_DEADLOCK', 'conflict with concurrent operation'),
 	('WT_ERROR', 'non-specific WiredTiger error'),
 	('WT_NOTFOUND', 'item not found'),
-	('WT_READONLY', 'attempt to modify a read-only value'),
 	('WT_RESTART', 'restart the operation (internal)'),
 ]
 
