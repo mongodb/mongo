@@ -59,7 +59,9 @@ def configure( env , fileLists , options ):
 
     if options["windows"]:
         myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "/TP" , "" )
-    
+
+    if "NDEBUG" in myenv["CPPDEFINES"]:
+        myenv["CPPDEFINES"].remove( "NDEBUG" )
 
     if os.sys.platform.startswith( "linux" ) or os.sys.platform == "darwin":
         myenv["CPPDEFINES"] += [ "HAVE_VA_COPY" , "VA_COPY=va_copy" ]
