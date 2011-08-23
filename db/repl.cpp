@@ -535,11 +535,19 @@ namespace mongo {
             // Database is already present.
             return true;   
         }
-        if ( ___databaseIgnorer.ignoreAt( db, op.getField( "ts" ).date() ) ) {
-            // Database is ignored due to a previous indication that it is
-            // missing from master after optime "ts".
-            return false;   
+        
+        {
+            const BSONElement e = op.getField( "ts" );
+            if ( e.eoo() ) {
+                warning() << "why is ts null: " << op << endl;
+            }
+            else if ( ___databaseIgnorer.ignoreAt( db, e._opTime() ) ) {
+                // Database is ignored due to a previous indication that it is
+                // missing from master after optime "ts".
+                return false;   
+            }
         }
+        
         if ( Database::duplicateUncasedName( db, dbpath ).empty() ) {
             // No duplicate database names are present.
             return true;
