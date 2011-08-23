@@ -12,6 +12,8 @@
 import os
 import sys
 import unittest
+import glob
+from testscenarios.scenarios import generate_scenarios
 
 # Set paths
 suitedir = sys.path[0]
@@ -26,6 +28,35 @@ sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
 #os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = wt_builddir
 
 #export ARCH="x86_64"  # may be needed on OS/X
+
+def addScenarioTests(tests, loader, testname):
+	loaded = loader.loadTestsFromName(testname)
+	tests.addTests(generate_scenarios(loaded))
+
+def testsFromArg(tests, loader, arg):
+
+	# If a group of test is mentioned, do all tests in that group
+        # e.g. 'run.py base'
+        groupedfiles = glob.glob(suitedir + os.sep + 'test_' + arg + '*.py')
+        if len(groupedfiles) > 0:
+		for file in groupedfiles:
+			testsFromArg(tests, loader, os.path.basename(file))
+		return
+
+	# Explicit test class names
+	if not arg[0].isdigit():
+		if arg.endswith('.py'):
+			arg = arg[:-3]
+		addScenarioTests(tests, loader, arg)
+		return
+
+	# Deal with ranges
+	if '-' in arg:
+		start, end = (int(a) for a in arg.split('-'))
+	else:
+		start, end = int(arg), int(arg)
+	for t in xrange(start, end+1):
+		addScenarioTests(tests, loader, 'test%03d' % t)
 
 
 tests = unittest.TestSuite()
@@ -49,20 +80,7 @@ for arg in sys.argv[1:]:
                         preserve = True
                         continue
 
-	# Explicit test class names
-	if not arg[0].isdigit():
-		if arg.endswith('.py'):
-			arg = arg[:-3]
-		tests.addTests(loader.loadTestsFromName(arg))
-		continue
-
-	# Deal with ranges
-	if '-' in arg:
-		start, end = (int(a) for a in arg.split('-'))
-	else:
-		start, end = int(arg), int(arg)
-	for t in xrange(start, end+1):
-		tests.addTests(loader.loadTestsFromName('test%03d' % t))
+        testsFromArg(tests, loader, arg)
 
 import wttest
 wttest.WiredTigerTestCase.globallyPreserveFiles(preserve)
