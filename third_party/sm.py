@@ -59,6 +59,10 @@ def configure( env , fileLists , options ):
 
     if options["windows"]:
         myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "/TP" , "" )
+        myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "/O2" , "" )
+        myenv["CPPFLAGS"] = myenv["CPPFLAGS"].replace( "/Gy" , "" )
+        myenv.Append( CPPFLAGS=" /wd4748 " )
+
 
     if "NDEBUG" in myenv["CPPDEFINES"]:
         myenv["CPPDEFINES"].remove( "NDEBUG" )

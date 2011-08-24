@@ -599,7 +599,8 @@ elif "win32" == os.sys.platform:
     # /Gm is minimal rebuild, but may not work in parallel mode.
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /MT /Gy /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS= " /O2 /Gy " )
+        env.Append( CPPFLAGS= " /MT /Zi /TP /errorReport:none " )
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
