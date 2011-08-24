@@ -94,7 +94,7 @@ namespace mongo {
 		fullName.c_str(), query));
 
 	/* wrap the cursor with a DocumentSource */
-	boost::shared_ptr<DocumentSource> pSource(
+	intrusive_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 
 	/* this is the normal non-debug path */
@@ -113,7 +113,7 @@ namespace mongo {
 
 	  Start by splitting the pipeline.
 	 */
-	boost::shared_ptr<Pipeline> pShardSplit(
+	shared_ptr<Pipeline> pShardSplit(
 	    pPipeline->splitForSharded());
 
 	/*
@@ -138,7 +138,7 @@ namespace mongo {
 
 	/* on the shard servers, create the local pipeline */
 	intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
-	boost::shared_ptr<Pipeline> pShardPipeline(
+	shared_ptr<Pipeline> pShardPipeline(
 	    Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
 	if (!pShardPipeline.get()) {
 	    return false;
@@ -151,7 +151,7 @@ namespace mongo {
 	BSONObj shardResult(shardResultBuilder.done());
 
 	/* pick out the shard result, and prepare to read it */
-	boost::shared_ptr<DocumentSourceBsonArray> pShardSource;
+	intrusive_ptr<DocumentSourceBsonArray> pShardSource;
 	BSONObjIterator shardIter(shardResult);
 	while(shardIter.more()) {
 	    BSONElement shardElement(shardIter.next());

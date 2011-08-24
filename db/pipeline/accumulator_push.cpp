@@ -39,7 +39,7 @@ namespace mongo {
 	     */
 	    assert(prhs->getType() == Array);
 	    
-	    shared_ptr<ValueIterator> pvi(prhs->getArray());
+	    intrusive_ptr<ValueIterator> pvi(prhs->getArray());
 	    while(pvi->more()) {
 		intrusive_ptr<const Value> pElement(pvi->next());
 		vpValue.push_back(pElement);

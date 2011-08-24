@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include <boost/unordered_map.hpp>
+#include "util/intrusive_counter.h"
 #include "client/parallel.h"
 #include "db/jsobj.h"
 #include "db/pipeline/document.h"
@@ -36,7 +37,7 @@ namespace mongo {
     class Matcher;
 
     class DocumentSource :
-            boost::noncopyable {
+        public IntrusiveCounter {
     public:
 	virtual ~DocumentSource();
 
@@ -74,7 +75,7 @@ namespace mongo {
 
 	  @param pSource the underlying source to use
 	 */
-	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
+	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
 	/*
 	  Attempt to coalesce this DocumentSource with its successor in the
@@ -90,7 +91,7 @@ namespace mongo {
 	  @returns whether or not the attempt to coalesce was successful or not;
 	    if the attempt was not successful, nothing has been changed
 	 */
-	virtual bool coalesce(const shared_ptr<DocumentSource> &pNextSource);
+	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
 	/*
 	  Optimize the pipeline operation, if possible.  This is a local
@@ -134,7 +135,7 @@ namespace mongo {
 	  need a source, override that to assert().  The default is to
 	  assert() if this has already been set.
 	*/
-	shared_ptr<DocumentSource> pSource;
+	intrusive_ptr<DocumentSource> pSource;
     };
 
 
@@ -146,7 +147,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
+	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
 	/*
 	  Create a document source based on a BSON array.
@@ -161,7 +162,7 @@ namespace mongo {
 	  @param pBsonElement the BSON array to treat as a document source
 	  @returns the newly created document source
 	*/
-	static shared_ptr<DocumentSourceBsonArray> create(
+	static intrusive_ptr<DocumentSourceBsonArray> create(
 	    BSONElement *pBsonElement);
 
     protected:
@@ -186,7 +187,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
+	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
 	/* convenient shorthand for a commonly used type */
 	typedef list<shared_ptr<Future::CommandResult> > FuturesList;
@@ -198,7 +199,7 @@ namespace mongo {
 	    lifetime of the created DocumentSourceCommandFutures
 	  @param pList the list of futures
 	 */
-	static shared_ptr<DocumentSourceCommandFutures> create(
+	static intrusive_ptr<DocumentSourceCommandFutures> create(
 	    string &errmsg, FuturesList *pList);
 
     protected:
@@ -218,7 +219,7 @@ namespace mongo {
 	void getNextDocument();
 
 	bool newSource; // set to true for the first item of a new source
-	shared_ptr<DocumentSourceBsonArray> pBsonSource;
+	intrusive_ptr<DocumentSourceBsonArray> pBsonSource;
 	intrusive_ptr<Document> pCurrent;
 	FuturesList::iterator iterator;
 	FuturesList::iterator listEnd;
@@ -234,7 +235,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-	virtual void setSource(const shared_ptr<DocumentSource> &pSource);
+	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
 	/*
 	  Create a document source based on a cursor.
@@ -244,7 +245,7 @@ namespace mongo {
 
 	  @param pCursor the cursor to use to fetch data
 	*/
-	static shared_ptr<DocumentSourceCursor> create(
+	static intrusive_ptr<DocumentSourceCursor> create(
 	    const shared_ptr<Cursor> &pCursor);
 
     protected:
@@ -315,7 +316,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceFilter();
-	virtual bool coalesce(const shared_ptr<DocumentSource> &pNextSource);
+	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 	virtual void optimize();
 
 	/*
@@ -324,7 +325,7 @@ namespace mongo {
           @param pBsonElement the raw BSON specification for the filter
           @returns the filter
 	 */
-	static shared_ptr<DocumentSource> createFromBson(
+	static intrusive_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
@@ -334,7 +335,7 @@ namespace mongo {
           @param pFilter the expression to use to filter
           @returns the filter
          */
-        static shared_ptr<DocumentSourceFilter> create(
+        static intrusive_ptr<DocumentSourceFilter> create(
             const intrusive_ptr<Expression> &pFilter);
 
 	/*
@@ -381,7 +382,7 @@ namespace mongo {
 	  @param pCtx the expression context
 	  @returns the DocumentSource
          */
-        static shared_ptr<DocumentSourceGroup> create(
+        static intrusive_ptr<DocumentSourceGroup> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
         /*
@@ -423,7 +424,7 @@ namespace mongo {
 	  @param pCtx the expression context
 	  @returns the grouping DocumentSource
 	 */
-        static shared_ptr<DocumentSource> createFromBson(
+        static intrusive_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
@@ -434,7 +435,7 @@ namespace mongo {
 
 	  @returns the grouping DocumentSource
 	*/
-	shared_ptr<DocumentSource> createMerger();
+	intrusive_ptr<DocumentSource> createMerger();
 
 	static const char groupName[];
 
@@ -500,7 +501,7 @@ namespace mongo {
           @param pBsonElement the raw BSON specification for the filter
           @returns the filter
 	 */
-	static shared_ptr<DocumentSource> createFromBson(
+	static intrusive_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
@@ -550,7 +551,7 @@ namespace mongo {
 
 	  @returns the newly created document source
 	*/
-	static shared_ptr<DocumentSourceOut> createFromBson(
+	static intrusive_ptr<DocumentSourceOut> createFromBson(
 	    BSONElement *pBsonElement);
 
 	static const char outName[];
@@ -580,7 +581,7 @@ namespace mongo {
 
 	  @returns the projection DocumentSource
         */
-        static shared_ptr<DocumentSourceProject> create();
+        static intrusive_ptr<DocumentSourceProject> create();
 
 	/*
 	  Include a field path in a projection.
@@ -623,7 +624,7 @@ namespace mongo {
 	  @params pBsonElement the BSONElement with an object named $project
 	  @returns the created projection
 	 */
-        static shared_ptr<DocumentSource> createFromBson(
+        static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
@@ -646,7 +647,7 @@ namespace mongo {
         intrusive_ptr<Document> pNoUnwindDocument;
                                               // document to return, pre-unwind
         intrusive_ptr<const Value> pUnwindArray; // field being unwound
-        shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
+        intrusive_ptr<ValueIterator> pUnwind; // iterator used for unwinding
         intrusive_ptr<const Value> pUnwindValue; // current value
     };
 
@@ -666,7 +667,7 @@ namespace mongo {
 	  @param pCtx the expression context
 	  @returns the DocumentSource
          */
-        static shared_ptr<DocumentSourceSort> create(
+        static intrusive_ptr<DocumentSourceSort> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 	/*
@@ -692,7 +693,7 @@ namespace mongo {
 	  @param pCtx the expression context
 	  @returns the grouping DocumentSource
 	 */
-        static shared_ptr<DocumentSource> createFromBson(
+        static intrusive_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 

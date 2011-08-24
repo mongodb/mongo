@@ -42,9 +42,9 @@ namespace mongo {
 	assert(false && "unimplemented");
     }
 
-    boost::shared_ptr<DocumentSourceOut> DocumentSourceOut::createFromBson(
+    intrusive_ptr<DocumentSourceOut> DocumentSourceOut::createFromBson(
 	BSONElement *pBsonElement) {
-	boost::shared_ptr<DocumentSourceOut> pSource(
+	intrusive_ptr<DocumentSourceOut> pSource(
 	    new DocumentSourceOut(pBsonElement));
 
 	return pSource;

@@ -81,9 +81,9 @@ namespace mongo {
 	pBuilder->append(sortName, insides.done());
     }
 
-    shared_ptr<DocumentSourceSort> DocumentSourceSort::create(
+    intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        shared_ptr<DocumentSourceSort> pSource(
+        intrusive_ptr<DocumentSourceSort> pSource(
             new DocumentSourceSort(pCtx));
         return pSource;
     }
@@ -104,14 +104,15 @@ namespace mongo {
 	vAscending.push_back(ascending);
     }
 
-    shared_ptr<DocumentSource> DocumentSourceSort::createFromBson(
+    intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object); // CW TODO must be an object
 
-        shared_ptr<DocumentSourceSort> pSort(DocumentSourceSort::create(pCtx));
+        intrusive_ptr<DocumentSourceSort> pSort(
+	    DocumentSourceSort::create(pCtx));
 
-        for (BSONObjIterator sortObjIterator = pBsonElement->Obj().begin();
+        for (BSONObjIterator sortObjIterator(pBsonElement->Obj().begin());
                 sortObjIterator.more(); ) {
             BSONElement sortVarField(sortObjIterator.next());
             const char *pFieldName = sortVarField.fieldName();

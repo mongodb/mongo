@@ -74,7 +74,7 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::setSource(
-	const shared_ptr<DocumentSource> &pSource) {
+	const intrusive_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -90,9 +90,9 @@ namespace mongo {
         pCurrent() {
     }
 
-    shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
+    intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
 	const shared_ptr<Cursor> &pCursor) {
-	shared_ptr<DocumentSourceCursor> pSource(
+	intrusive_ptr<DocumentSourceCursor> pSource(
 	    new DocumentSourceCursor(pCursor));
 	    return pSource;
     }

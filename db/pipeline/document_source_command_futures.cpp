@@ -47,7 +47,7 @@ namespace mongo {
     }
 
     void DocumentSourceCommandFutures::setSource(
-	const shared_ptr<DocumentSource> &pSource) {
+	const intrusive_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -68,10 +68,10 @@ namespace mongo {
         errmsg(theErrmsg) {
     }
 
-    shared_ptr<DocumentSourceCommandFutures>
+    intrusive_ptr<DocumentSourceCommandFutures>
     DocumentSourceCommandFutures::create(
 	string &errmsg, FuturesList *pList) {
-	shared_ptr<DocumentSourceCommandFutures> pSource(
+	intrusive_ptr<DocumentSourceCommandFutures> pSource(
 	    new DocumentSourceCommandFutures(errmsg, pList));
 	return pSource;
     }

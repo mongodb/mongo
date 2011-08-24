@@ -1399,7 +1399,7 @@ namespace mongo {
 	    }
                     
 	    /* wrap the list of futures with a source */
-	    shared_ptr<DocumentSourceCommandFutures> pSource(
+	    intrusive_ptr<DocumentSourceCommandFutures> pSource(
 		DocumentSourceCommandFutures::create(errmsg, &futures));
 
 	    /* run the pipeline */

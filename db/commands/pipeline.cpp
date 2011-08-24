@@ -47,7 +47,7 @@ namespace mongo {
     /* this structure is used to make a lookup table of operators */
     struct StageDesc {
 	const char *pName;
-	shared_ptr<DocumentSource> (*pFactory)(
+	intrusive_ptr<DocumentSource> (*pFactory)(
 	    BSONElement *, const intrusive_ptr<ExpressionContext> &);
     };
 
@@ -135,7 +135,7 @@ namespace mongo {
             assert(pipeElement.type() == Object); // CW TODO user error
             BSONObj bsonObj(pipeElement.Obj());
 
-	    boost::shared_ptr<DocumentSource> pSource;
+	    intrusive_ptr<DocumentSource> pSource;
 
             /* use the object to add a DocumentSource to the processing chain */
             BSONObjIterator bsonIterator(bsonObj);
@@ -157,7 +157,7 @@ namespace mongo {
                        "Pipeline::run(): unrecognized pipeline op \"" <<
                        pFieldName;
                     errmsg = sb.str();
-		    return boost::shared_ptr<Pipeline>();
+		    return shared_ptr<Pipeline>();
                 }
             }
 
@@ -190,7 +190,7 @@ namespace mongo {
 	tempList.splice(tempList.begin(), *pSourceList);
 
 	/* move the first one to the final list */
-	boost::shared_ptr<DocumentSource> pLastSource(tempList.front());
+	intrusive_ptr<DocumentSource> pLastSource(tempList.front());
 	pSourceList->push_back(pLastSource);
 	tempList.pop_front();
 
@@ -219,9 +219,9 @@ namespace mongo {
 	return pPipeline;
     }
 
-    boost::shared_ptr<Pipeline> Pipeline::splitForSharded() {
+    shared_ptr<Pipeline> Pipeline::splitForSharded() {
 	/* create an initialize the shard spec we'll return */
-	boost::shared_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
+	shared_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
 	pShardPipeline->collectionName = collectionName;
 
 	/* put the source list aside */
@@ -233,7 +233,7 @@ namespace mongo {
 	  shard pipelines, and the rest.
 	 */
 	while(!tempList.empty()) {
-	    boost::shared_ptr<DocumentSource> &pSource = tempList.front();
+	    intrusive_ptr<DocumentSource> &pSource = tempList.front();
 
 	    DocumentSourceSort *pSort =
 		dynamic_cast<DocumentSourceSort *>(pSource.get());
@@ -273,8 +273,8 @@ namespace mongo {
     }
 
     void Pipeline::getMatcherQuery(BSONObjBuilder *pQueryBuilder) const {
-	const shared_ptr<DocumentSource> &pFirst = sourceList.front();
-	shared_ptr<DocumentSourceMatch> pMatch(
+	const intrusive_ptr<DocumentSource> &pFirst = sourceList.front();
+	intrusive_ptr<DocumentSourceMatch> pMatch(
 	    dynamic_pointer_cast<DocumentSourceMatch>(pFirst));
 	if (!pMatch.get())
 	    return;
@@ -283,7 +283,7 @@ namespace mongo {
     }
 
     void Pipeline::removeMatcherQuery() {
-	const shared_ptr<DocumentSource> &pFirst = sourceList.front();
+	const intrusive_ptr<DocumentSource> &pFirst = sourceList.front();
 	if (dynamic_cast<DocumentSourceMatch *>(pFirst.get()))
 	    sourceList.pop_front();
     }
@@ -293,7 +293,7 @@ namespace mongo {
 	BSONArrayBuilder arrayBuilder;
 	for(SourceList::const_iterator iter(sourceList.begin()),
 		listEnd(sourceList.end()); iter != listEnd; ++iter) {
-	    boost::shared_ptr<DocumentSource> pSource(*iter);
+	    intrusive_ptr<DocumentSource> pSource(*iter);
 	    pSource->addToBsonArray(&arrayBuilder);
 	}
 
@@ -311,11 +311,11 @@ namespace mongo {
     }
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
-		       boost::shared_ptr<DocumentSource> pSource) {
+		       intrusive_ptr<DocumentSource> pSource) {
 	/* chain together the sources we found */
 	for(SourceList::iterator iter(sourceList.begin()),
 		listEnd(sourceList.end()); iter != listEnd; ++iter) {
-	    boost::shared_ptr<DocumentSource> pTemp(*iter);
+	    intrusive_ptr<DocumentSource> pTemp(*iter);
 	    pTemp->setSource(pSource);
 	    pSource = pTemp;
 	}

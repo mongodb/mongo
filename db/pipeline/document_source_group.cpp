@@ -78,9 +78,9 @@ namespace mongo {
 	pBuilder->append(groupName, insides.done());
     }
 
-    shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
+    intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        shared_ptr<DocumentSourceGroup> pSource(
+        intrusive_ptr<DocumentSourceGroup> pSource(
             new DocumentSourceGroup(pCtx));
         return pSource;
     }
@@ -133,12 +133,12 @@ namespace mongo {
 
     static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
 
-    shared_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
+    intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object); // CW TODO must be an object
 
-        shared_ptr<DocumentSourceGroup> pGroup(
+        intrusive_ptr<DocumentSourceGroup> pGroup(
 	    DocumentSourceGroup::create(pCtx));
         bool idSet = false;
 
@@ -294,8 +294,8 @@ namespace mongo {
         return pResult;
     }
 
-    shared_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
-	shared_ptr<DocumentSourceGroup> pMerger(
+    intrusive_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
+	intrusive_ptr<DocumentSourceGroup> pMerger(
 	    DocumentSourceGroup::create(pCtx));
 
 	/* the merger will use the same grouping key */

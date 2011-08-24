@@ -56,13 +56,13 @@ namespace mongo {
 	return matcher.matches(obj);
     }
 
-    shared_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
+    intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object);
         // CW TODO error: expression object must be an object
 
-        boost::shared_ptr<DocumentSourceMatch> pMatcher(
+        intrusive_ptr<DocumentSourceMatch> pMatcher(
 	    new DocumentSourceMatch(pBsonElement->Obj()));
 
         return pMatcher;

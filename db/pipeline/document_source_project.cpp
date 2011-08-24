@@ -144,8 +144,8 @@ namespace mongo {
 	pBuilder->append("$project", insides.done());
     }
 
-    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
-        shared_ptr<DocumentSourceProject> pSource(
+    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+        intrusive_ptr<DocumentSourceProject> pSource(
             new DocumentSourceProject());
         return pSource;
     }
@@ -189,14 +189,14 @@ namespace mongo {
 	pEO->excludePath(fieldPath);
     }
 
-    shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+    intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         /* validate */
         assert(pBsonElement->type() == Object); // CW TODO user error
 
         /* chain the projection onto the original source */
-        shared_ptr<DocumentSourceProject> pProject(
+        intrusive_ptr<DocumentSourceProject> pProject(
 	    DocumentSourceProject::create());
 
         /*

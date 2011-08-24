@@ -313,9 +313,9 @@ namespace mongo {
         pvpValue(thepvpValue) {
     }
 
-    shared_ptr<ValueIterator> Value::getArray() const {
+    intrusive_ptr<ValueIterator> Value::getArray() const {
         assert(getType() == Array);
-        shared_ptr<ValueIterator> pVI(
+        intrusive_ptr<ValueIterator> pVI(
 	    new vi(intrusive_ptr<const Value>(this), &vpValue));
         return pVI;
     }
@@ -710,8 +710,8 @@ namespace mongo {
             return Document::compare(rL->getDocument(), rR->getDocument());
 
         case Array: {
-            shared_ptr<ValueIterator> pli(rL->getArray());
-            shared_ptr<ValueIterator> pri(rR->getArray());
+            intrusive_ptr<ValueIterator> pli(rL->getArray());
+            intrusive_ptr<ValueIterator> pri(rR->getArray());
 
             while(true) {
                 /* have we run out of left array? */
@@ -833,7 +833,7 @@ namespace mongo {
 	    break;
 
         case Array: {
-	    shared_ptr<ValueIterator> pIter(getArray());
+	    intrusive_ptr<ValueIterator> pIter(getArray());
 	    while(pIter->more()) {
 		intrusive_ptr<const Value> pValue(pIter->next());
 		pValue->hash_combine(seed);

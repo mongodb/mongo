@@ -23,13 +23,13 @@ namespace mongo {
     }
 
     void DocumentSource::setSource(
-	const shared_ptr<DocumentSource> &pTheSource) {
+	const intrusive_ptr<DocumentSource> &pTheSource) {
 	assert(!pSource.get());
 	pSource = pTheSource;
     }
 
     bool DocumentSource::coalesce(
-	const shared_ptr<DocumentSource> &pNextSource) {
+	const intrusive_ptr<DocumentSource> &pNextSource) {
 	return false;
     }
 

@@ -112,7 +112,7 @@ namespace mongo {
 	  @returns true on success, false if an error occurs
 	*/
 	bool run(BSONObjBuilder &result, string &errmsg,
-		 boost::shared_ptr<DocumentSource> pSource);
+		 intrusive_ptr<DocumentSource> pSource);
 
 	/*
 	  Debugging:  should the processing pipeline be split within
@@ -140,7 +140,7 @@ namespace mongo {
         Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
 
 	string collectionName;
-	typedef list<boost::shared_ptr<DocumentSource> > SourceList;
+	typedef list<intrusive_ptr<DocumentSource> > SourceList;
 	SourceList sourceList;
 
 	bool splitMongodPipeline;

@@ -26,7 +26,8 @@ namespace mongo {
     class Document;
     class Value;
 
-    class ValueIterator {
+    class ValueIterator :
+        public IntrusiveCounter {
     public:
         virtual ~ValueIterator();
 
@@ -145,7 +146,7 @@ namespace mongo {
         double getDouble() const;
         string getString() const;
         intrusive_ptr<Document> getDocument() const;
-        shared_ptr<ValueIterator> getArray() const;
+        intrusive_ptr<ValueIterator> getArray() const;
         OID getOid() const;
         bool getBool() const;
         Date_t getDate() const;
@@ -310,11 +311,7 @@ namespace mongo {
 
         /*
         These are often used as the result of boolean or comparison
-        expressions.  Because these are static, and because Values are
-        passed around as shared_ptr<>, returns of these must be wrapped
-        as per this pattern:
-        http://live.boost.org/doc/libs/1_46_0/libs/smart_ptr/sp_techniques.html#static
-        Use the null_deleter defined below.
+        expressions.
 
         These are obtained via public static getters defined above.
         */
@@ -328,8 +325,7 @@ namespace mongo {
 
         /* this implementation is used for getArray() */
         class vi :
-            public ValueIterator,
-                boost::noncopyable {
+            public ValueIterator {
         public:
             // virtuals from ValueIterator
 	    virtual ~vi();

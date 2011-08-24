@@ -1097,7 +1097,7 @@ namespace mongo {
 			      of results to the current document.
 			    */
 			    vector<intrusive_ptr<const Value> > result;
-			    shared_ptr<ValueIterator> pVI(
+			    intrusive_ptr<ValueIterator> pVI(
 				field.second->getArray());
 			    while(pVI->more()) {
 				intrusive_ptr<Document> pD(
@@ -1437,7 +1437,7 @@ namespace mongo {
 	      building up a new array as we go.
 	    */
 	    vector<intrusive_ptr<const Value> > result;
-	    shared_ptr<ValueIterator> pIter(pValue->getArray());
+	    intrusive_ptr<ValueIterator> pIter(pValue->getArray());
 	    while(pIter->more()) {
 		intrusive_ptr<const Value> pItem(pIter->next());
 		BSONType iType = pItem->getType();

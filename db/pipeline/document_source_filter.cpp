@@ -30,7 +30,7 @@ namespace mongo {
     }
 
     bool DocumentSourceFilter::coalesce(
-	const shared_ptr<DocumentSource> &pNextSource) {
+	const intrusive_ptr<DocumentSource> &pNextSource) {
 
 	/* we only know how to coalesce other filters */
 	DocumentSourceFilter *pDocFilter =
@@ -64,7 +64,7 @@ namespace mongo {
 	return pValue->coerceToBool();
     }
 
-    shared_ptr<DocumentSource> DocumentSourceFilter::createFromBson(
+    intrusive_ptr<DocumentSource> DocumentSourceFilter::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object);
@@ -73,15 +73,15 @@ namespace mongo {
 	Expression::ObjectCtx oCtx(0);
         intrusive_ptr<Expression> pExpression(
 	    Expression::parseObject(pBsonElement, &oCtx));
-        shared_ptr<DocumentSourceFilter> pFilter(
+        intrusive_ptr<DocumentSourceFilter> pFilter(
             DocumentSourceFilter::create(pExpression));
 
         return pFilter;
     }
 
-    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
+    intrusive_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
         const intrusive_ptr<Expression> &pFilter) {
-        shared_ptr<DocumentSourceFilter> pSource(
+        intrusive_ptr<DocumentSourceFilter> pSource(
             new DocumentSourceFilter(pFilter));
         return pSource;
     }

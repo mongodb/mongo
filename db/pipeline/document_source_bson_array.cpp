@@ -51,7 +51,7 @@ namespace mongo {
     }
 
     void DocumentSourceBsonArray::setSource(
-	const shared_ptr<DocumentSource> &pSource) {
+	const intrusive_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -67,11 +67,11 @@ namespace mongo {
 	}
     }
 
-    shared_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
+    intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
 	BSONElement *pBsonElement) {
 
 	assert(pBsonElement->type() == Array);
-	shared_ptr<DocumentSourceBsonArray> pSource(
+	intrusive_ptr<DocumentSourceBsonArray> pSource(
 	    new DocumentSourceBsonArray(pBsonElement));
 
 	return pSource;
