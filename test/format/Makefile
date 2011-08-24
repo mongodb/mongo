@@ -15,11 +15,18 @@ all: t tags
 t: ${OBJS} ${LIB}
 	${CC} ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
-clean distclean realclean:
-	rm -f t ${OBJS} __* *.core vgcore* vgout.* tags
-
 tags: ${HDRS} ${SRCS}
 	@type ctags > /dev/null 2>&1 && ctags -w ${HDRS} ${SRCS} || exit 0
+
+backup:
+	@rm -rf BACKUP && mkdir BACKUP && cp -p -r __* BACKUP
+	@echo 'make: current state files saved to BACKUP directory'
+
+distclean realclean: clean
+	rm -rf BACKUP
+
+clean:
+	rm -f t ${OBJS} __* *.core vgcore* vgout.* tags
 
 ${SRCS}: ${HDRS}
 ${OBJS}: ${SRCS}
