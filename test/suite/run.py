@@ -13,16 +13,19 @@ import os
 import sys
 import unittest
 import glob
-from testscenarios.scenarios import generate_scenarios
 
 # Set paths
 suitedir = sys.path[0]
 wt_disttop = os.path.dirname(os.path.dirname(suitedir))
 wt_builddir = os.path.join(wt_disttop, 'build_posix')
 
-# Cannot import wiredtiger until we set up paths
+# Cannot import wiredtiger and supporting utils until we set up paths
 sys.path.append(wt_builddir)
 sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
+sys.path.append(os.path.join(wt_disttop, 'test', 'suiteutil'))
+
+import wttest
+from testscenarios.scenarios import generate_scenarios
 
 # These may be needed on some systems
 #os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = wt_builddir
@@ -82,7 +85,6 @@ for arg in sys.argv[1:]:
 
         testsFromArg(tests, loader, arg)
 
-import wttest
 wttest.WiredTigerTestCase.globallyPreserveFiles(preserve)
 result = wttest.runsuite(tests)
 sys.exit(not result.wasSuccessful())
