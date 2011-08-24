@@ -101,7 +101,7 @@ assert.soon(function() {
 });
 
 config.version = 4;
-var oldHost = config.members.pop();
+config.members.pop();
 try {
     master.getDB("admin").runCommand({replSetReconfig : config, force : true});
 }
@@ -117,26 +117,6 @@ assert.soon(function() {
 config = master.getDB("local").system.replset.findOne();
 printjson(config);
 assert(config.version > 4);
-
-print("re-add host removed with force");
-replTest.start(1);
-config.version++;
-config.members.push(oldHost);
-try {
-    master.adminCommand({replSetReconfig : config});
-}
-catch(e) {
-    print(e);
-    throw e;
-}
-
-var sentinel = {sentinel:1};
-master.getDB("foo").bar.baz.insert(sentinel);
-var out = master.adminCommand({getLastError:1, w:2, wtimeout:30*1000})
-assert.eq(out.err, null);
-
-reconnect(replTest.nodes[1]);
-assert.eq(replTest.nodes[1].getDB("foo").bar.baz.count(sentinel), 1)
 
 replTest.stopSet();
 
