@@ -14,7 +14,7 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_BUF keybuf;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *treeconf;
-	int ret;
+	int is_schema, ret;
 
 	WT_CLEAR(keybuf);
 
@@ -22,19 +22,18 @@ __create_file(WT_SESSION_IMPL *session,
 	 * Opening the schema table is a special case, use the config
 	 * string we were passed to open the file.
 	 */
-	if (strcmp(filename, WT_SCHEMA_FILENAME) == 0)
-		WT_RET(__wt_strdup(session, config, &treeconf));
-	else
-		treeconf = NULL;
+	is_schema = (strcmp(filename, WT_SCHEMA_FILENAME) == 0);
 
 	/* If the file exists, don't try to recreate it. */
-	ret = __wt_session_get_btree(session, name, filename, treeconf);
-	if (ret != WT_NOTFOUND)
+	if ((ret = __wt_session_get_btree(session,
+	    name, filename, is_schema ? config : NULL)) != WT_NOTFOUND)
 		return (ret);
 
 	WT_RET(__wt_btree_create(session, filename));
 
-	if (treeconf == NULL) {
+	if (is_schema)
+		WT_RET(__wt_strdup(session, config, &treeconf));
+	else {
 		WT_RET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
 
 		WT_ERR(__wt_config_collapse(session, cfg, &treeconf));
