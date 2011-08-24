@@ -2,7 +2,7 @@
 // Tests polygon edge cases
 //
 
-var coll = db.getCollection( jsTestName() )
+var coll = db.getCollection( 'jstests_geo_poly_edge' )
 
 coll.ensureIndex({ loc : "2d" })
 
