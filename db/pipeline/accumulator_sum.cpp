@@ -47,9 +47,9 @@ namespace mongo {
         return Value::getZero();
     }
 
-    shared_ptr<Accumulator> AccumulatorSum::create(
+    intrusive_ptr<Accumulator> AccumulatorSum::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
+	intrusive_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
         return pSummer;
     }
 

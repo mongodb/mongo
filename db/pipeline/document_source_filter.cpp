@@ -42,7 +42,7 @@ namespace mongo {
 	  Two adjacent filters can be combined by creating a conjunction of
 	  their predicates.
 	 */
-	shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
+	intrusive_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
 	pAnd->addOperand(pFilter);
 	pAnd->addOperand(pDocFilter->pFilter);
 	pFilter = pAnd;
@@ -71,7 +71,7 @@ namespace mongo {
         // CW TODO error: expression object must be an object
 
 	Expression::ObjectCtx oCtx(0);
-        shared_ptr<Expression> pExpression(
+        intrusive_ptr<Expression> pExpression(
 	    Expression::parseObject(pBsonElement, &oCtx));
         shared_ptr<DocumentSourceFilter> pFilter(
             DocumentSourceFilter::create(pExpression));
@@ -80,14 +80,14 @@ namespace mongo {
     }
 
     shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
-        const shared_ptr<Expression> &pFilter) {
+        const intrusive_ptr<Expression> &pFilter) {
         shared_ptr<DocumentSourceFilter> pSource(
             new DocumentSourceFilter(pFilter));
         return pSource;
     }
 
     DocumentSourceFilter::DocumentSourceFilter(
-        const shared_ptr<Expression> &pTheFilter):
+        const intrusive_ptr<Expression> &pTheFilter):
 	DocumentSourceFilterBase(),
         pFilter(pTheFilter) {
     }

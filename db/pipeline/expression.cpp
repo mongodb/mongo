@@ -58,7 +58,7 @@ namespace mongo {
 	return string(pPrefixedField + 1);
     }
 
-    shared_ptr<Expression> Expression::parseObject(
+    intrusive_ptr<Expression> Expression::parseObject(
         BSONElement *pBsonElement, ObjectCtx *pCtx) {
         /*
           An object expression can take any of the following forms:
@@ -72,8 +72,8 @@ namespace mongo {
           code that parses the expression and returns an expression.
         */
 
-        shared_ptr<Expression> pExpression; // the result
-        shared_ptr<ExpressionObject> pExpressionObject; // alt result
+        intrusive_ptr<Expression> pExpression; // the result
+        intrusive_ptr<ExpressionObject> pExpressionObject; // alt result
         int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
@@ -133,14 +133,14 @@ namespace mongo {
                     /* it's a nested document */
 		    ObjectCtx oCtx(
 			(pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
-                    shared_ptr<Expression> pNested(
+                    intrusive_ptr<Expression> pNested(
                         parseObject(&fieldElement, &oCtx));
                     pExpressionObject->addField(fieldName, pNested);
                 }
                 else if (fieldType == String) {
                     /* it's a renamed field */
 		    // CW TODO could also be a constant
-                    shared_ptr<Expression> pPath(
+                    intrusive_ptr<Expression> pPath(
                         ExpressionFieldPath::create(
 			    removeFieldPrefix(fieldElement.String())));
                     pExpressionObject->addField(fieldName, pPath);
@@ -175,7 +175,7 @@ namespace mongo {
 
     struct OpDesc {
         const char *pName;
-        shared_ptr<ExpressionNary> (*pFactory)(void);
+        intrusive_ptr<ExpressionNary> (*pFactory)(void);
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
@@ -221,7 +221,7 @@ namespace mongo {
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
 
-    shared_ptr<Expression> Expression::parseExpression(
+    intrusive_ptr<Expression> Expression::parseExpression(
         const char *pOpName, BSONElement *pBsonElement) {
         /* look for the specified operator */
         OpDesc key;
@@ -232,7 +232,7 @@ namespace mongo {
         assert(pOp); // CW TODO error: invalid operator
 
         /* make the expression node */
-        shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
+        intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
 
         /* add the operands to the expression node */
         BSONType elementType = pBsonElement->type();
@@ -240,7 +240,7 @@ namespace mongo {
             /* the operator must be unary and accept an object argument */
             BSONObj objOperand(pBsonElement->Obj());
 	    ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            shared_ptr<Expression> pOperand(
+            intrusive_ptr<Expression> pOperand(
                 Expression::parseObject(pBsonElement, &oCtx));
             pExpression->addOperand(pOperand);
         }
@@ -250,13 +250,13 @@ namespace mongo {
             const size_t n = bsonArray.size();
             for(size_t i = 0; i < n; ++i) {
                 BSONElement *pBsonOperand = &bsonArray[i];
-                shared_ptr<Expression> pOperand(
+                intrusive_ptr<Expression> pOperand(
 		    Expression::parseOperand(pBsonOperand));
                 pExpression->addOperand(pOperand);
             }
         }
         else { /* assume it's an atomic operand */
-            shared_ptr<Expression> pOperand(
+            intrusive_ptr<Expression> pOperand(
 		Expression::parseOperand(pBsonElement));
             pExpression->addOperand(pOperand);
         }
@@ -264,7 +264,7 @@ namespace mongo {
         return pExpression;
     }
 
-    shared_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
+    intrusive_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
         BSONType type = pBsonElement->type();
 
         switch(type) {
@@ -286,21 +286,21 @@ namespace mongo {
 
             /* if we got here, this is a field path expression */
 	    string fieldPath(removeFieldPrefix(value));
-            shared_ptr<Expression> pFieldExpr(
+            intrusive_ptr<Expression> pFieldExpr(
                 ExpressionFieldPath::create(fieldPath));
             return pFieldExpr;
         }
 
         case Object: {
 	    ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            shared_ptr<Expression> pSubExpression(
+            intrusive_ptr<Expression> pSubExpression(
                 Expression::parseObject(pBsonElement, &oCtx));
             return pSubExpression;
         }
 
         default:
 	ExpectConstant: {
-                shared_ptr<Expression> pOperand(
+                intrusive_ptr<Expression> pOperand(
                     ExpressionConstant::createFromBsonElement(pBsonElement));
                 return pOperand;
             }
@@ -309,7 +309,7 @@ namespace mongo {
 
         /* NOTREACHED */
         assert(false);
-        return shared_ptr<Expression>();
+        return intrusive_ptr<Expression>();
     }
 
     /* ------------------------- ExpressionAdd ----------------------------- */
@@ -317,8 +317,8 @@ namespace mongo {
     ExpressionAdd::~ExpressionAdd() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionAdd::create() {
-        shared_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
+    intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
+        intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
@@ -401,7 +401,7 @@ namespace mongo {
 	return "$add";
     }
 
-    shared_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
+    intrusive_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
 	return ExpressionAdd::create;
     }
 
@@ -410,8 +410,8 @@ namespace mongo {
     ExpressionAnd::~ExpressionAnd() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionAnd::create() {
-        shared_ptr<ExpressionNary> pExpression(new ExpressionAnd());
+    intrusive_ptr<ExpressionNary> ExpressionAnd::create() {
+        intrusive_ptr<ExpressionNary> pExpression(new ExpressionAnd());
         return pExpression;
     }
 
@@ -419,9 +419,9 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    shared_ptr<Expression> ExpressionAnd::optimize() {
+    intrusive_ptr<Expression> ExpressionAnd::optimize() {
 	/* optimize the conjunction as much as possible */
-	shared_ptr<Expression> pE(ExpressionNary::optimize());
+	intrusive_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/* if the result isn't a conjunction, we can't do anything */
 	ExpressionAnd *pAnd = dynamic_cast<ExpressionAnd *>(pE.get());
@@ -434,7 +434,7 @@ namespace mongo {
 	  we can do.
 	*/
 	const size_t n = pAnd->vpOperand.size();
-	shared_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
+	intrusive_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
 	const ExpressionConstant *pConst =
 	    dynamic_cast<ExpressionConstant *>(pLast.get());
 	if (!pConst)
@@ -446,7 +446,7 @@ namespace mongo {
 	 */
 	bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
 	if (!last) {
-	    shared_ptr<ExpressionConstant> pFinal(
+	    intrusive_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getFalse()));
 	    return pFinal;
 	}
@@ -458,7 +458,7 @@ namespace mongo {
 	  the result will be a boolean.
 	 */
 	if (n == 2) {
-	    shared_ptr<Expression> pFinal(
+	    intrusive_ptr<Expression> pFinal(
 		ExpressionCoerceToBool::create(pAnd->vpOperand[0]));
 	    return pFinal;
 	}
@@ -503,7 +503,7 @@ namespace mongo {
 	assert(false && "unimplemented");
     }
 
-    shared_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
+    intrusive_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
 	return ExpressionAnd::create;
     }
 
@@ -512,20 +512,20 @@ namespace mongo {
     ExpressionCoerceToBool::~ExpressionCoerceToBool() {
     }
 
-    shared_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
-	const shared_ptr<Expression> &pExpression) {
-        shared_ptr<ExpressionCoerceToBool> pNew(
+    intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
+	const intrusive_ptr<Expression> &pExpression) {
+        intrusive_ptr<ExpressionCoerceToBool> pNew(
 	    new ExpressionCoerceToBool(pExpression));
         return pNew;
     }
 
     ExpressionCoerceToBool::ExpressionCoerceToBool(
-	const shared_ptr<Expression> &pTheExpression):
+	const intrusive_ptr<Expression> &pTheExpression):
         Expression(),
         pExpression(pTheExpression) {
     }
 
-    shared_ptr<Expression> ExpressionCoerceToBool::optimize() {
+    intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
 	/* optimize the operand */
 	pExpression = pExpression->optimize();
 
@@ -538,7 +538,7 @@ namespace mongo {
 	    dynamic_cast<ExpressionCoerceToBool *>(pE))
 	    return pExpression;
 
-	return shared_from_this();
+	return intrusive_ptr<Expression>(this);
     }
 
     intrusive_ptr<const Value> ExpressionCoerceToBool::evaluate(
@@ -566,44 +566,44 @@ namespace mongo {
     ExpressionCompare::~ExpressionCompare() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createEq() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createEq() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(EQ));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createNe() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createNe() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(NE));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createGt() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createGt() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(GT));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createGte() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createGte() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(GTE));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createLt() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createLt() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(LT));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createLte() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createLte() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(LTE));
         return pExpression;
     }
 
-    shared_ptr<ExpressionNary> ExpressionCompare::createCmp() {
-        shared_ptr<ExpressionCompare> pExpression(
+    intrusive_ptr<ExpressionNary> ExpressionCompare::createCmp() {
+        intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(CMP));
         return pExpression;
     }
@@ -614,7 +614,7 @@ namespace mongo {
     }
 
     void ExpressionCompare::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -638,9 +638,9 @@ namespace mongo {
         /* CMP */ { { false, false, false }, Expression::CMP, "$cmp" },
     };
 
-    shared_ptr<Expression> ExpressionCompare::optimize() {
+    intrusive_ptr<Expression> ExpressionCompare::optimize() {
 	/* first optimize the comparison operands */
-	shared_ptr<Expression> pE(ExpressionNary::optimize());
+	intrusive_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/*
 	  If the result of optimization is no longer a comparison, there's
@@ -664,11 +664,11 @@ namespace mongo {
 	  in any order.  If we need to reverse the sense of the comparison to
 	  put it into the required canonical form, do so.
 	 */
-	shared_ptr<Expression> pLeft(pCmp->vpOperand[0]);
-	shared_ptr<Expression> pRight(pCmp->vpOperand[1]);
-	shared_ptr<ExpressionFieldPath> pFieldPath(
+	intrusive_ptr<Expression> pLeft(pCmp->vpOperand[0]);
+	intrusive_ptr<Expression> pRight(pCmp->vpOperand[1]);
+	intrusive_ptr<ExpressionFieldPath> pFieldPath(
 	    dynamic_pointer_cast<ExpressionFieldPath>(pLeft));
-	shared_ptr<ExpressionConstant> pConstant;
+	intrusive_ptr<ExpressionConstant> pConstant;
 	if (pFieldPath.get()) {
 	    pConstant = dynamic_pointer_cast<ExpressionConstant>(pRight);
 	    if (!pConstant.get())
@@ -770,9 +770,9 @@ namespace mongo {
     ExpressionConstant::~ExpressionConstant() {
     }
 
-    shared_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
+    intrusive_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
         BSONElement *pBsonElement) {
-        shared_ptr<ExpressionConstant> pEC(
+        intrusive_ptr<ExpressionConstant> pEC(
             new ExpressionConstant(pBsonElement));
         return pEC;
     }
@@ -781,9 +781,9 @@ namespace mongo {
         pValue(Value::createFromBsonElement(pBsonElement)) {
     }
 
-    shared_ptr<ExpressionConstant> ExpressionConstant::create(
+    intrusive_ptr<ExpressionConstant> ExpressionConstant::create(
         const intrusive_ptr<const Value> &pValue) {
-        shared_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
+        intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
         return pEC;
     }
 
@@ -793,9 +793,9 @@ namespace mongo {
     }
 
 
-    shared_ptr<Expression> ExpressionConstant::optimize() {
+    intrusive_ptr<Expression> ExpressionConstant::optimize() {
 	/* nothing to do */
-	return shared_from_this();
+	return intrusive_ptr<Expression>(this);
     }
 
     intrusive_ptr<const Value> ExpressionConstant::evaluate(
@@ -848,8 +848,8 @@ namespace mongo {
     ExpressionDayOfMonth::~ExpressionDayOfMonth() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
-        shared_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
+    intrusive_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
+        intrusive_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
         return pExpression;
     }
 
@@ -857,7 +857,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionDayOfMonth::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionDayOfMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -880,8 +880,8 @@ namespace mongo {
     ExpressionDayOfWeek::~ExpressionDayOfWeek() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
-        shared_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
+    intrusive_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
+        intrusive_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
         return pExpression;
     }
 
@@ -889,7 +889,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionDayOfWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionDayOfWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -912,8 +912,8 @@ namespace mongo {
     ExpressionDayOfYear::~ExpressionDayOfYear() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionDayOfYear::create() {
-        shared_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
+    intrusive_ptr<ExpressionNary> ExpressionDayOfYear::create() {
+        intrusive_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
         return pExpression;
     }
 
@@ -921,7 +921,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionDayOfYear::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionDayOfYear::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -944,8 +944,8 @@ namespace mongo {
     ExpressionDivide::~ExpressionDivide() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionDivide::create() {
-        shared_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
+    intrusive_ptr<ExpressionNary> ExpressionDivide::create() {
+        intrusive_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
         return pExpression;
     }
 
@@ -954,7 +954,7 @@ namespace mongo {
     }
 
     void ExpressionDivide::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -983,8 +983,8 @@ namespace mongo {
     ExpressionObject::~ExpressionObject() {
     }
 
-    shared_ptr<ExpressionObject> ExpressionObject::create() {
-        shared_ptr<ExpressionObject> pExpression(new ExpressionObject());
+    intrusive_ptr<ExpressionObject> ExpressionObject::create() {
+        intrusive_ptr<ExpressionObject> pExpression(new ExpressionObject());
         return pExpression;
     }
 
@@ -995,14 +995,14 @@ namespace mongo {
         vpExpression() {
     }
 
-    shared_ptr<Expression> ExpressionObject::optimize() {
+    intrusive_ptr<Expression> ExpressionObject::optimize() {
 	const size_t n = vpExpression.size();
 	for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<Expression> pE(vpExpression[i]->optimize());
+	    intrusive_ptr<Expression> pE(vpExpression[i]->optimize());
 	    vpExpression[i] = pE;
 	}
 
-	return shared_from_this();
+	return intrusive_ptr<Expression>(this);
     }
 
     void ExpressionObject::addToDocument(
@@ -1173,7 +1173,7 @@ namespace mongo {
     }
 
     void ExpressionObject::addField(const string &fieldName,
-				    const shared_ptr<Expression> &pExpression) {
+				    const intrusive_ptr<Expression> &pExpression) {
 	/* must have an expression */
 	assert(pExpression.get());
 
@@ -1242,7 +1242,7 @@ namespace mongo {
 	      If we get here, the intervening child isn't already there,
 	      so create it.
 	    */
-	    shared_ptr<ExpressionObject> pSharedChild(
+	    intrusive_ptr<ExpressionObject> pSharedChild(
 		ExpressionObject::create());
 	    path.insert(fieldName);
 	    vFieldName.push_back(fieldName);
@@ -1266,7 +1266,7 @@ namespace mongo {
 	includePath(&fieldPath, 0, fieldPath.getPathLength(), true);
     }
 
-    shared_ptr<Expression> ExpressionObject::getField(
+    intrusive_ptr<Expression> ExpressionObject::getField(
 	const string &fieldName) const {
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
@@ -1275,7 +1275,7 @@ namespace mongo {
 	}
 
 	/* if we got here, we didn't find it */
-	return shared_ptr<Expression>();
+	return intrusive_ptr<Expression>();
     }
 
     void ExpressionObject::emitPaths(
@@ -1386,9 +1386,9 @@ namespace mongo {
     ExpressionFieldPath::~ExpressionFieldPath() {
     }
 
-    shared_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
         const string &fieldPath) {
-        shared_ptr<ExpressionFieldPath> pExpression(
+        intrusive_ptr<ExpressionFieldPath> pExpression(
             new ExpressionFieldPath(fieldPath));
         return pExpression;
     }
@@ -1398,9 +1398,9 @@ namespace mongo {
         fieldPath(theFieldPath) {
     }
 
-    shared_ptr<Expression> ExpressionFieldPath::optimize() {
+    intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
 	/* nothing can be done for these */
-	return shared_from_this();
+	return intrusive_ptr<Expression>(this);
     }
 
     intrusive_ptr<const Value> ExpressionFieldPath::evaluatePath(
@@ -1479,7 +1479,7 @@ namespace mongo {
     ExpressionFieldRange::~ExpressionFieldRange() {
     }
 
-    shared_ptr<Expression> ExpressionFieldRange::optimize() {
+    intrusive_ptr<Expression> ExpressionFieldRange::optimize() {
 	/* if there is no range to match, this will never evaluate true */
 	if (!pRange.get())
 	    return ExpressionConstant::create(Value::getFalse());
@@ -1497,7 +1497,7 @@ namespace mongo {
 	  intersect() method has already optimized those tests, so there
 	  aren't any more optimizations to look for here.
 	*/
-	return shared_from_this();
+	return intrusive_ptr<Expression>(this);
     }
 
     intrusive_ptr<const Value> ExpressionFieldRange::evaluate(
@@ -1622,16 +1622,16 @@ namespace mongo {
 	pBuilder->append(fieldPath, range.done());
     }
 
-    shared_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
-	const shared_ptr<ExpressionFieldPath> &pFieldPath, CmpOp cmpOp,
+    intrusive_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
+	const intrusive_ptr<ExpressionFieldPath> &pFieldPath, CmpOp cmpOp,
 	const intrusive_ptr<const Value> &pValue) {
-	shared_ptr<ExpressionFieldRange> pE(
+	intrusive_ptr<ExpressionFieldRange> pE(
 	    new ExpressionFieldRange(pFieldPath, cmpOp, pValue));
 	return pE;
     }
 
     ExpressionFieldRange::ExpressionFieldRange(
-	const shared_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
+	const intrusive_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
 	const intrusive_ptr<const Value> &pValue):
         pFieldPath(pTheFieldPath),
 	pRange(new Range(cmpOp, pValue)) {
@@ -1791,8 +1791,8 @@ namespace mongo {
     ExpressionMinute::~ExpressionMinute() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionMinute::create() {
-        shared_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
+    intrusive_ptr<ExpressionNary> ExpressionMinute::create() {
+        intrusive_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
         return pExpression;
     }
 
@@ -1800,7 +1800,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionMinute::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionMinute::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -1823,8 +1823,8 @@ namespace mongo {
     ExpressionMod::~ExpressionMod() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionMod::create() {
-        shared_ptr<ExpressionMod> pExpression(new ExpressionMod());
+    intrusive_ptr<ExpressionNary> ExpressionMod::create() {
+        intrusive_ptr<ExpressionMod> pExpression(new ExpressionMod());
         return pExpression;
     }
 
@@ -1833,7 +1833,7 @@ namespace mongo {
     }
 
     void ExpressionMod::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -1866,8 +1866,8 @@ namespace mongo {
     ExpressionMonth::~ExpressionMonth() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionMonth::create() {
-        shared_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
+    intrusive_ptr<ExpressionNary> ExpressionMonth::create() {
+        intrusive_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
         return pExpression;
     }
 
@@ -1875,7 +1875,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionMonth::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -1898,8 +1898,8 @@ namespace mongo {
     ExpressionMultiply::~ExpressionMultiply() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionMultiply::create() {
-        shared_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
+    intrusive_ptr<ExpressionNary> ExpressionMultiply::create() {
+        intrusive_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
         return pExpression;
     }
 
@@ -1939,7 +1939,7 @@ namespace mongo {
     return "$multiply";
     }
 
-    shared_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
+    intrusive_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
     return ExpressionMultiply::create;
     }
 
@@ -1948,8 +1948,8 @@ namespace mongo {
     ExpressionHour::~ExpressionHour() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionHour::create() {
-        shared_ptr<ExpressionHour> pExpression(new ExpressionHour());
+    intrusive_ptr<ExpressionNary> ExpressionHour::create() {
+        intrusive_ptr<ExpressionHour> pExpression(new ExpressionHour());
         return pExpression;
     }
 
@@ -1957,7 +1957,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionHour::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionHour::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -1980,8 +1980,8 @@ namespace mongo {
     ExpressionIfNull::~ExpressionIfNull() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionIfNull::create() {
-        shared_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
+    intrusive_ptr<ExpressionNary> ExpressionIfNull::create() {
+        intrusive_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
         return pExpression;
     }
 
@@ -1990,7 +1990,7 @@ namespace mongo {
     }
 
     void ExpressionIfNull::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2018,11 +2018,11 @@ namespace mongo {
         vpOperand() {
     }
 
-    shared_ptr<Expression> ExpressionNary::optimize() {
+    intrusive_ptr<Expression> ExpressionNary::optimize() {
 	size_t nConst = 0; // count of constant operands
 	const size_t n = vpOperand.size();
 	for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<Expression> pNew(vpOperand[i]->optimize());
+	    intrusive_ptr<Expression> pNew(vpOperand[i]->optimize());
 
 	    /* subsitute the optimized expression */
 	    vpOperand[i] = pNew;
@@ -2041,7 +2041,7 @@ namespace mongo {
 	if (nConst == n) {
 	    intrusive_ptr<const Value> pResult(
 		evaluate(intrusive_ptr<Document>()));
-	    shared_ptr<Expression> pReplacement(
+	    intrusive_ptr<Expression> pReplacement(
 		ExpressionConstant::create(pResult));
 	    return pReplacement;
 	}
@@ -2053,9 +2053,9 @@ namespace mongo {
 	  we'll evaluate to collapse as many constants as we can down to
 	  a single one.
 	 */
-	shared_ptr<ExpressionNary> (*const pFactory)() = getFactory();
+	intrusive_ptr<ExpressionNary> (*const pFactory)() = getFactory();
 	if (!pFactory)
-	    return shared_from_this();
+	    return intrusive_ptr<Expression>(this);
 
 	/*
 	  Create a new Expression that will be the replacement for this one.
@@ -2065,10 +2065,10 @@ namespace mongo {
 	  We then add this operand to the end of the non-constant expression,
 	  and return that.
 	 */
-	shared_ptr<ExpressionNary> pNew((*pFactory)());
-	shared_ptr<ExpressionNary> pConst((*pFactory)());
+	intrusive_ptr<ExpressionNary> pNew((*pFactory)());
+	intrusive_ptr<ExpressionNary> pConst((*pFactory)());
 	for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<Expression> pE(vpOperand[i]);
+	    intrusive_ptr<Expression> pE(vpOperand[i]);
 	    if (dynamic_cast<ExpressionConstant *>(pE.get()))
 		pConst->addOperand(pE);
 	    else {
@@ -2088,7 +2088,7 @@ namespace mongo {
 		if (!pNary)
 		    pNew->addOperand(pE);
 		else {
-		    shared_ptr<ExpressionNary> (*const pChildFactory)() =
+		    intrusive_ptr<ExpressionNary> (*const pChildFactory)() =
 			pNary->getFactory();
 		    if (pChildFactory != pFactory)
 			pNew->addOperand(pE);
@@ -2096,7 +2096,7 @@ namespace mongo {
 			/* same factory, so flatten */
 			size_t nChild = pNary->vpOperand.size();
 			for(size_t iChild = 0; iChild < nChild; ++iChild) {
-			    shared_ptr<Expression> pCE(
+			    intrusive_ptr<Expression> pCE(
 				pNary->vpOperand[iChild]);
 			    if (dynamic_cast<ExpressionConstant *>(pCE.get()))
 				pConst->addOperand(pCE);
@@ -2129,11 +2129,11 @@ namespace mongo {
     }
 
     void ExpressionNary::addOperand(
-        const shared_ptr<Expression> &pExpression) {
+        const intrusive_ptr<Expression> &pExpression) {
         vpOperand.push_back(pExpression);
     }
 
-    shared_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
+    intrusive_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
 	return NULL;
     }
 
@@ -2173,14 +2173,14 @@ namespace mongo {
     ExpressionNoOp::~ExpressionNoOp() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionNoOp::create() {
-        shared_ptr<ExpressionNoOp> pExpression(new ExpressionNoOp());
+    intrusive_ptr<ExpressionNary> ExpressionNoOp::create() {
+        intrusive_ptr<ExpressionNoOp> pExpression(new ExpressionNoOp());
         return pExpression;
     }
 
-    shared_ptr<Expression> ExpressionNoOp::optimize() {
+    intrusive_ptr<Expression> ExpressionNoOp::optimize() {
         assert(vpOperand.size() == 1); // CW TODO user error
-	shared_ptr<Expression> pR(vpOperand[0]->optimize());
+	intrusive_ptr<Expression> pR(vpOperand[0]->optimize());
 	return pR;
     }
 
@@ -2188,7 +2188,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionNoOp::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionNoOp::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2209,8 +2209,8 @@ namespace mongo {
     ExpressionNot::~ExpressionNot() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionNot::create() {
-        shared_ptr<ExpressionNot> pExpression(new ExpressionNot());
+    intrusive_ptr<ExpressionNary> ExpressionNot::create() {
+        intrusive_ptr<ExpressionNot> pExpression(new ExpressionNot());
         return pExpression;
     }
 
@@ -2218,7 +2218,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionNot::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionNot::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2243,8 +2243,8 @@ namespace mongo {
     ExpressionOr::~ExpressionOr() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionOr::create() {
-        shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
+    intrusive_ptr<ExpressionNary> ExpressionOr::create() {
+        intrusive_ptr<ExpressionNary> pExpression(new ExpressionOr());
         return pExpression;
     }
 
@@ -2274,13 +2274,13 @@ namespace mongo {
 	pBuilder->append("$or", opArray.done());
     }
 
-    shared_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
+    intrusive_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
 	return ExpressionOr::create;
     }
 
-    shared_ptr<Expression> ExpressionOr::optimize() {
+    intrusive_ptr<Expression> ExpressionOr::optimize() {
 	/* optimize the disjunction as much as possible */
-	shared_ptr<Expression> pE(ExpressionNary::optimize());
+	intrusive_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/* if the result isn't a conjunction, we can't do anything */
 	ExpressionOr *pOr = dynamic_cast<ExpressionOr *>(pE.get());
@@ -2293,7 +2293,7 @@ namespace mongo {
 	  we can do.
 	*/
 	const size_t n = pOr->vpOperand.size();
-	shared_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
+	intrusive_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
 	const ExpressionConstant *pConst =
 	    dynamic_cast<ExpressionConstant *>(pLast.get());
 	if (!pConst)
@@ -2305,7 +2305,7 @@ namespace mongo {
 	 */
 	bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
 	if (last) {
-	    shared_ptr<ExpressionConstant> pFinal(
+	    intrusive_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getTrue()));
 	    return pFinal;
 	}
@@ -2317,7 +2317,7 @@ namespace mongo {
 	  the result will be a boolean.
 	 */
 	if (n == 2) {
-	    shared_ptr<Expression> pFinal(
+	    intrusive_ptr<Expression> pFinal(
 		ExpressionCoerceToBool::create(pOr->vpOperand[0]));
 	    return pFinal;
 	}
@@ -2338,8 +2338,8 @@ namespace mongo {
     ExpressionSecond::~ExpressionSecond() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionSecond::create() {
-        shared_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
+    intrusive_ptr<ExpressionNary> ExpressionSecond::create() {
+        intrusive_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
         return pExpression;
     }
 
@@ -2347,7 +2347,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionSecond::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionSecond::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2370,8 +2370,8 @@ namespace mongo {
     ExpressionStrcasecmp::~ExpressionStrcasecmp() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
-        shared_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
+    intrusive_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
+        intrusive_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
         return pExpression;
     }
 
@@ -2380,7 +2380,7 @@ namespace mongo {
     }
 
     void ExpressionStrcasecmp::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2412,8 +2412,8 @@ namespace mongo {
     ExpressionSubstr::~ExpressionSubstr() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionSubstr::create() {
-        shared_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
+    intrusive_ptr<ExpressionNary> ExpressionSubstr::create() {
+        intrusive_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
         return pExpression;
     }
 
@@ -2422,7 +2422,7 @@ namespace mongo {
     }
 
     void ExpressionSubstr::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 3); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2455,8 +2455,8 @@ namespace mongo {
     ExpressionSubtract::~ExpressionSubtract() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionSubtract::create() {
-        shared_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
+    intrusive_ptr<ExpressionNary> ExpressionSubtract::create() {
+        intrusive_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
         return pExpression;
     }
 
@@ -2465,7 +2465,7 @@ namespace mongo {
     }
 
     void ExpressionSubtract::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2516,8 +2516,8 @@ namespace mongo {
     ExpressionToLower::~ExpressionToLower() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionToLower::create() {
-        shared_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
+    intrusive_ptr<ExpressionNary> ExpressionToLower::create() {
+        intrusive_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
         return pExpression;
     }
 
@@ -2525,7 +2525,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionToLower::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionToLower::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2548,8 +2548,8 @@ namespace mongo {
     ExpressionToUpper::~ExpressionToUpper() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionToUpper::create() {
-        shared_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
+    intrusive_ptr<ExpressionNary> ExpressionToUpper::create() {
+        intrusive_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
         return pExpression;
     }
 
@@ -2558,7 +2558,7 @@ namespace mongo {
     }
 
     void ExpressionToUpper::addOperand(
-	const shared_ptr<Expression> &pExpression) {
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2581,8 +2581,8 @@ namespace mongo {
     ExpressionWeek::~ExpressionWeek() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionWeek::create() {
-        shared_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
+    intrusive_ptr<ExpressionNary> ExpressionWeek::create() {
+        intrusive_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
         return pExpression;
     }
 
@@ -2590,7 +2590,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionWeek::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -2622,8 +2622,8 @@ namespace mongo {
     ExpressionYear::~ExpressionYear() {
     }
 
-    shared_ptr<ExpressionNary> ExpressionYear::create() {
-        shared_ptr<ExpressionYear> pExpression(new ExpressionYear());
+    intrusive_ptr<ExpressionNary> ExpressionYear::create() {
+        intrusive_ptr<ExpressionYear> pExpression(new ExpressionYear());
         return pExpression;
     }
 
@@ -2631,7 +2631,8 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionYear::addOperand(const shared_ptr<Expression> &pExpression) {
+    void ExpressionYear::addOperand(
+	const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }

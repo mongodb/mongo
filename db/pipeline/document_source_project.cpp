@@ -132,7 +132,7 @@ namespace mongo {
     }
 
     void DocumentSourceProject::optimize() {
-	shared_ptr<Expression> pE(pEO->optimize());
+	intrusive_ptr<Expression> pE(pEO->optimize());
 	pEO = dynamic_pointer_cast<ExpressionObject>(pE);
     }
 
@@ -151,7 +151,7 @@ namespace mongo {
     }
 
     void DocumentSourceProject::addField(
-        const string &fieldName, const shared_ptr<Expression> &pExpression,
+        const string &fieldName, const intrusive_ptr<Expression> &pExpression,
 	bool unwindArray) {
         assert(pExpression); // CW TODO must be a non-null expression
 
@@ -259,7 +259,7 @@ IncludeExclude:
             case Object: {
                 bool hasUnwound = objectCtx.unwindUsed();
 
-                shared_ptr<Expression> pDocument(
+                intrusive_ptr<Expression> pDocument(
                     Expression::parseObject(&outFieldElement, &objectCtx));
 
                 /*

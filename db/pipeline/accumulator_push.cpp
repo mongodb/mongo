@@ -60,9 +60,9 @@ namespace mongo {
         pCtx(pTheCtx) {
     }
 
-    shared_ptr<Accumulator> AccumulatorPush::create(
+    intrusive_ptr<Accumulator> AccumulatorPush::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	shared_ptr<AccumulatorPush> pAccumulator(
+	intrusive_ptr<AccumulatorPush> pAccumulator(
 	    new AccumulatorPush(pCtx));
         return pAccumulator;
     }

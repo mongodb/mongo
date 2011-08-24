@@ -74,9 +74,9 @@ namespace mongo {
         return Value::getZero();
     }
 
-    shared_ptr<Accumulator> AccumulatorAvg::create(
+    intrusive_ptr<Accumulator> AccumulatorAvg::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	shared_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
+	intrusive_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
         return pA;
     }
 

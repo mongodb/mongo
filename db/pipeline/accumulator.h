@@ -30,7 +30,7 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-	virtual void addOperand(const shared_ptr<Expression> &pExpression);
+	virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
 	virtual void addToBsonArray(
@@ -76,7 +76,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create(
+        static intrusive_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
@@ -102,9 +102,9 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> createMin(
+        static intrusive_ptr<Accumulator> createMin(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
-        static shared_ptr<Accumulator> createMax(
+        static intrusive_ptr<Accumulator> createMax(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
@@ -131,7 +131,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create(
+        static intrusive_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
@@ -157,7 +157,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create(
+        static intrusive_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     protected: /* reused by AccumulatorAvg */
@@ -185,7 +185,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create(
+        static intrusive_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:

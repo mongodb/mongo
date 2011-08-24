@@ -98,7 +98,7 @@ namespace mongo {
     }
 
     void DocumentSourceSort::addKey(const string &fieldPath, bool ascending) {
-	shared_ptr<ExpressionFieldPath> pE(
+	intrusive_ptr<ExpressionFieldPath> pE(
 	    ExpressionFieldPath::create(fieldPath));
 	vSortKey.push_back(pE);
 	vAscending.push_back(ascending);

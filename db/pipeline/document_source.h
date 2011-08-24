@@ -22,6 +22,7 @@
 #include "client/parallel.h"
 #include "db/jsobj.h"
 #include "db/pipeline/document.h"
+#include "db/pipeline/expression.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -334,7 +335,7 @@ namespace mongo {
           @returns the filter
          */
         static shared_ptr<DocumentSourceFilter> create(
-            const shared_ptr<Expression> &pFilter);
+            const intrusive_ptr<Expression> &pFilter);
 
 	/*
 	  Create a BSONObj suitable for Matcher construction.
@@ -359,9 +360,9 @@ namespace mongo {
 	virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
 
     private:
-        DocumentSourceFilter(const shared_ptr<Expression> &pFilter);
+        DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter);
 
-        shared_ptr<Expression> pFilter;
+        intrusive_ptr<Expression> pFilter;
     };
 
 
@@ -392,7 +393,7 @@ namespace mongo {
 
           @param pExpression the group key
          */
-        void setIdExpression(const shared_ptr<Expression> &pExpression);
+        void setIdExpression(const intrusive_ptr<Expression> &pExpression);
 
         /*
           Add an accumulator.
@@ -407,9 +408,9 @@ namespace mongo {
                 group field
          */
         void addAccumulator(string fieldName,
-			    shared_ptr<Accumulator> (*pAccumulatorFactory)(
+			    intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
 			    const intrusive_ptr<ExpressionContext> &),
-                            const shared_ptr<Expression> &pExpression);
+                            const intrusive_ptr<Expression> &pExpression);
 
 	/*
 	  Create a grouping DocumentSource from BSON.
@@ -453,10 +454,10 @@ namespace mongo {
         void populate();
         bool populated;
 
-        shared_ptr<Expression> pIdExpression;
+        intrusive_ptr<Expression> pIdExpression;
 
 	typedef boost::unordered_map<intrusive_ptr<const Value>,
-	    vector<shared_ptr<Accumulator> >, Value::Hash> GroupsType;
+	    vector<intrusive_ptr<Accumulator> >, Value::Hash> GroupsType;
         GroupsType groups;
 
         /*
@@ -472,9 +473,9 @@ namespace mongo {
           These three vectors parallel each other.
         */
         vector<string> vFieldName;
-        vector<shared_ptr<Accumulator> (*)(
+        vector<intrusive_ptr<Accumulator> (*)(
 	    const intrusive_ptr<ExpressionContext> &)> vpAccumulatorFactory;
-        vector<shared_ptr<Expression> > vpExpression;
+        vector<intrusive_ptr<Expression> > vpExpression;
 
 
         intrusive_ptr<Document> makeDocument(
@@ -610,7 +611,7 @@ namespace mongo {
 	      per projection.
         */
         void addField(const string &fieldName,
-		      const shared_ptr<Expression> &pExpression,
+		      const intrusive_ptr<Expression> &pExpression,
 		      bool unwindArray);
 
 	/*
@@ -637,7 +638,7 @@ namespace mongo {
 
         // configuration state
 	bool excludeId;
-	shared_ptr<ExpressionObject> pEO;
+	intrusive_ptr<ExpressionObject> pEO;
 	string unwindName; // name of the field to unwind, if any
         size_t unwindWhich; // if unwinding, current Document's index
 
@@ -718,7 +719,7 @@ namespace mongo {
         long long count;
 
 	/* these two parallel each other */
-	vector<shared_ptr<ExpressionFieldPath> > vSortKey;
+	vector<intrusive_ptr<ExpressionFieldPath> > vSortKey;
 	vector<bool> vAscending;
 
 	class Carrier {
@@ -765,7 +766,7 @@ namespace mongo {
 namespace mongo {
 
     inline void DocumentSourceGroup::setIdExpression(
-        const shared_ptr<Expression> &pExpression) {
+        const intrusive_ptr<Expression> &pExpression) {
         pIdExpression = pExpression;
     }
 

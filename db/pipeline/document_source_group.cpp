@@ -70,7 +70,7 @@ namespace mongo {
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pCtx));
+	    intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pCtx));
 	    pA->addOperand(vpExpression[i]);
 	    pA->addToBsonObj(&insides, vFieldName[i], 0);
 	}
@@ -98,9 +98,9 @@ namespace mongo {
 
     void DocumentSourceGroup::addAccumulator(
         string fieldName,
-        shared_ptr<Accumulator> (*pAccumulatorFactory)(
+        intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
 	    const intrusive_ptr<ExpressionContext> &),
-        const shared_ptr<Expression> &pExpression) {
+        const intrusive_ptr<Expression> &pExpression) {
         vFieldName.push_back(fieldName);
         vpAccumulatorFactory.push_back(pAccumulatorFactory);
         vpExpression.push_back(pExpression);
@@ -109,7 +109,7 @@ namespace mongo {
 
     struct GroupOpDesc {
         const char *pName;
-        shared_ptr<Accumulator> (*pFactory)(
+        intrusive_ptr<Accumulator> (*pFactory)(
 	    const intrusive_ptr<ExpressionContext> &);
     };
 
@@ -157,7 +157,7 @@ namespace mongo {
                   group-by key.
                  */
 		Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                shared_ptr<Expression> pId(
+                intrusive_ptr<Expression> pId(
                     Expression::parseObject(&groupField, &oCtx));
 
                 pGroup->setIdExpression(pId);
@@ -189,7 +189,7 @@ namespace mongo {
 
                     assert(pOp); // CW TODO error: operator not found
 
-                    shared_ptr<Expression> pGroupExpr;
+                    intrusive_ptr<Expression> pGroupExpr;
 
                     BSONType elementType = subElement.type();
                     if (elementType == Object) {
@@ -231,7 +231,7 @@ namespace mongo {
               Look for the _id value in the map; if it's not there, add a
 	      new entry with a blank accumulator.
             */
-            vector<shared_ptr<Accumulator> > *pGroup;
+            vector<intrusive_ptr<Accumulator> > *pGroup;
             GroupsType::iterator it(groups.find(pId));
             if (it != groups.end()) {
                 /* point at the existing accumulators */
@@ -241,8 +241,8 @@ namespace mongo {
                 /* insert a new group into the map */
                 groups.insert(it,
                               pair<intrusive_ptr<const Value>,
-                              vector<shared_ptr<Accumulator> > >(
-                                  pId, vector<shared_ptr<Accumulator> >()));
+                              vector<intrusive_ptr<Accumulator> > >(
+                                  pId, vector<intrusive_ptr<Accumulator> >()));
 
                 /* find the accumulator vector (the map value) */
                 it = groups.find(pId);
@@ -252,7 +252,7 @@ namespace mongo {
                 const size_t n = vpAccumulatorFactory.size();
                 pGroup->reserve(n);
                 for(size_t i = 0; i < n; ++i) {
-                    shared_ptr<Accumulator> pAccumulator(
+                    intrusive_ptr<Accumulator> pAccumulator(
                         (*vpAccumulatorFactory[i])(pCtx));
                     pAccumulator->addOperand(vpExpression[i]);
                     pGroup->push_back(pAccumulator);
@@ -277,7 +277,7 @@ namespace mongo {
 
     intrusive_ptr<Document> DocumentSourceGroup::makeDocument(
         const GroupsType::iterator &rIter) {
-        vector<shared_ptr<Accumulator> > *pGroup = &rIter->second;
+        vector<intrusive_ptr<Accumulator> > *pGroup = &rIter->second;
         const size_t n = vFieldName.size();
         intrusive_ptr<Document> pResult(Document::create(1 + n));
 
