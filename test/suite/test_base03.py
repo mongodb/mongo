@@ -12,6 +12,7 @@
 import unittest
 import wiredtiger
 import wttest
+import wtscenario
 
 class test_base03(wttest.WiredTigerTestCase):
     """
@@ -23,16 +24,24 @@ class test_base03(wttest.WiredTigerTestCase):
     table_name4 = 'test_base03d'
     nentries = 10
 
-    def create_table(self, tablename):
-        extra_params = ',intl_node_min=512,intl_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
-        self.pr('create_table')
-        self.session.create(tablename, 'key_format=S,value_format=S' + extra_params)
+    scenarios = wtscenario.wtscenario.session_create_scenario()
+
+    def session_create(self, name, args):
+        """
+        session.create, but report errors more completely
+        """
+        try:
+            self.session.create(name, args)
+        except:
+            print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
+            raise
 
     def test_table_ss(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        self.session.create("table:" + self.table_name1, 'key_format=S,value_format=S')
+        create_args = 'key_format=S,value_format=S' + self.session_create_scenario.configString()
+        self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
@@ -53,7 +62,8 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=int
         """
-        self.session.create("table:" + self.table_name2, 'key_format=S,value_format=i')
+        create_args = 'key_format=S,value_format=i' + self.session_create_scenario.configString()
+        self.session_create("table:" + self.table_name2, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name2, None, None)
         for i in range(0, self.nentries):
@@ -77,7 +87,8 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=string
         """
-        self.session.create("table:" + self.table_name3, 'key_format=i,value_format=S')
+        create_args = 'key_format=i,value_format=S' + self.session_create_scenario.configString()
+        self.session_create("table:" + self.table_name3, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name3, None, None)
         for i in range(0, self.nentries):
@@ -99,7 +110,8 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=int
         """
-        self.session.create("table:" + self.table_name4, 'key_format=i,value_format=i')
+        create_args = 'key_format=i,value_format=i' + self.session_create_scenario.configString()
+        self.session_create("table:" + self.table_name4, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name4, None, None)
         self.pr('stepping')

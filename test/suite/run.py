@@ -69,7 +69,7 @@ if len(sys.argv) < 2:
 	# Use the backport of Python 2.7+ unittest discover module.
 	# (Under a BSD license, so we include a copy in our tree for simplicity.)
 	from discover import defaultTestLoader as loader
-	tests.addTests(loader.discover(suitedir))
+	tests.addTests(generate_scenarios(loader.discover(suitedir)))
 
 # Otherwise, turn numbers and ranges into test module names
 preserve = False
