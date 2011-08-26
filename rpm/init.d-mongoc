@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# mongod - Startup script for mongod
+
+# chkconfig: 35 85 15
+# description: Mongo Sharding Config Server
+# processname: mongod
+# config: /etc/mongoc.conf
+# pidfile: /var/run/mongo/mongoc.pid
+
+. /etc/rc.d/init.d/functions
+
+# mongod will read mongoc.conf for configuration settings
+
+# Add variable to support multiple instances of mongoc
+# The instance name is by default the name of this init script
+# In this way another instance can be created by just copying this init script
+# and creating a config file with the same name and a .conf extension
+# For Example:
+#   /etc/init.d/mongoc2
+#   /etc/mongoc2.conf
+# Optionally also create a sysconfig file to override env variables below
+#   /etc/sysconfig/mongoc2
+INSTANCE=`basename $0`
+
+# By default OPTIONS just points to the /etc/mongoc.conf config file
+# This can be overriden in /etc/sysconfig/mongoc
+OPTIONS=" -f /etc/${INSTANCE}.conf"
+
+PID_PATH=/var/run/mongo
+PID_FILE=${PID_PATH}/${INSTANCE}.pid
+MONGO_BIN=/usr/bin/mongod
+MONGO_USER=mongod
+MONGO_GROUP=mongod
+MONGO_ULIMIT=12000
+MONGO_LOCK_FILE=/var/lock/subsys/${INSTANCE}
+
+# Source sysconfig options so that above values can be overriden
+SYSCONFIG="/etc/sysconfig/${INSTANCE}"
+if [ -f "$SYSCONFIG" ]; then
+  . "$SYSCONFIG" || true
+fi
+
+# Create mongo pids path if it does not exist
+if [ ! -d "${PID_PATH}" ]; then
+  mkdir -p "${PID_PATH}"
+  chown "${MONGO_USER}:${MONGO_GROUP}" "${PID_PATH}"
+fi
+
+start()
+{
+  echo -n $"Starting ${INSTANCE}: "
+  daemon --user "$MONGO_USER" --pidfile $PID_FILE $MONGO_BIN $OPTIONS --pidfilepath=$PID_FILE
+  RETVAL=$?
+  echo
+  [ $RETVAL -eq 0 ] && touch $MONGO_LOCK_FILE
+  return $RETVAL
+}
+
+stop()
+{
+  echo -n $"Stopping ${INSTANCE}: "
+  killproc -p $PID_FILE -t30 -TERM $MONGO_BIN
+  RETVAL=$?
+  echo
+  [ $RETVAL -eq 0 ] && rm -f $MONGO_LOCK_FILE
+  [ $RETVAL -eq 0 ] && rm -f $PID_FILE
+  return $RETVAL
+}
+
+restart () {
+  stop
+  start
+}
+
+ulimit -n $MONGO_ULIMIT
+RETVAL=0
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload|force-reload)
+    restart
+    ;;
+  condrestart)
+    [ -f $MONGO_LOCK_FILE ] && restart || :
+    ;;
+  status)
+    status -p $PID_FILE $MONGO_BIN
+    RETVAL=$?
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart|reload|force-reload|condrestart}"
+    RETVAL=1
+esac
+
+exit $RETVAL
