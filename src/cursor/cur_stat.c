@@ -273,7 +273,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	} else {
 		__wt_conn_stat_init(session);
 		stats_first = (WT_STATS *)S2C(session)->stats;
-		clear_func = __wt_stat_clear_conn_stats;
+		clear_func = __wt_stat_clear_connection_stats;
 	}
 
 	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));

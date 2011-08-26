@@ -150,9 +150,9 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 }
 
 int
-__wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
+__wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS **statsp)
 {
-	WT_CONN_STATS *stats;
+	WT_CONNECTION_STATS *stats;
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
@@ -202,11 +202,11 @@ __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session, WT_CONN_STATS **statsp)
 }
 
 void
-__wt_stat_clear_conn_stats(WT_STATS *stats_arg)
+__wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 {
-	WT_CONN_STATS *stats;
+	WT_CONNECTION_STATS *stats;
 
-	stats = (WT_CONN_STATS *)stats_arg;
+	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_evict_hazard.v = 0;

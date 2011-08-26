@@ -27,7 +27,7 @@ __wt_connection_config(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 
 	/* Statistics. */
-	WT_RET(__wt_stat_alloc_conn_stats(session, &conn->stats));
+	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
 	/* Diagnostic output separator. */
 	conn->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";

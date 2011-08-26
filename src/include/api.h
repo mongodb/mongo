@@ -150,7 +150,7 @@ struct __wt_connection_impl {
 	WT_CACHE  *cache;		/* Page cache */
 	int64_t	   cache_size;
 
-	WT_CONN_STATS *stats;		/* Database statistics */
+	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */

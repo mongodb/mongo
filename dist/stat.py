@@ -6,7 +6,7 @@ from dist import compare_srcfile
 from dist import source_paths_list
 
 # Read the source files.
-from stat_data import btree_stats, conn_stats
+from stat_data import btree_stats, connection_stats
 
 # print_def --
 #	Print the structures for the stat.h file.
@@ -38,7 +38,7 @@ for line in open('../src/include/stat.h', 'r'):
 		f.write('\n')
 		skip = 1
 		print_struct('BTREE', 'btree', btree_stats)
-		print_struct('CONNECTION', 'conn', conn_stats)
+		print_struct('CONNECTION', 'connection', connection_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
 
@@ -89,7 +89,7 @@ f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
 print_func('btree', btree_stats)
-print_func('conn', conn_stats)
+print_func('connection', connection_stats)
 
 f.close()
 

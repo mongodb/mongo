@@ -605,6 +605,6 @@ extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,
     WT_BTREE_STATS **statsp);
 extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
-extern int __wt_stat_alloc_conn_stats(WT_SESSION_IMPL *session,
-    WT_CONN_STATS **statsp);
-extern void __wt_stat_clear_conn_stats(WT_STATS *stats_arg);
+extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
+    WT_CONNECTION_STATS **statsp);
+extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);

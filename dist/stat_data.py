@@ -17,7 +17,7 @@ class Stat:
 ##########################################
 # CONNECTION statistics
 ##########################################
-conn_stats = [
+connection_stats = [
 	Stat('block_read', 'blocks read from a file'),
 	Stat('block_write', 'blocks written to a file'),
 	Stat('cache_bytes_inuse', 'cache: bytes currently held in the cache', 'perm'),
