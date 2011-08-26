@@ -71,6 +71,7 @@ AM_TYPES
 AC_PROG_INSTALL
 
 AC_CHECK_LIB(pthread, pthread_create)
+AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([fcntl pthread_yieldNO])
 
