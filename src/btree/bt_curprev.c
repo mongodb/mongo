@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __btcur_prev_fix --
+ * __prev_fix --
  *	Move to the previous, fixed-length column-store item.
  */
 static inline int
-__btcur_prev_fix(
+__prev_fix(
     WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
 {
 	WT_BTREE *btree;
@@ -74,11 +74,11 @@ __btcur_prev_fix(
 }
 
 /*
- * __btcur_prev_var --
+ * __prev_var --
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__btcur_prev_var(WT_CURSOR_BTREE *cbt,
+__prev_var(WT_CURSOR_BTREE *cbt,
     int newpage, uint64_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
@@ -179,75 +179,75 @@ __btcur_prev_var(WT_CURSOR_BTREE *cbt,
 }
 
 /*
- * __btcur_prev_row --
+ * __prev_row --
  *	Move to the previous row-store item.
  */
 static inline int
-__btcur_prev_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
+__prev_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value, int skip)
 {
 	WT_CELL *cell;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
+	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
-	int found;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/* Initialize for each new page. */
-	if (newpage) {
-		cbt->rip = cbt->page->u.row_leaf.d + (cbt->page->entries - 1);
-		cbt->nslots = cbt->page->entries;
-		cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
-	}
-
-	/* This loop moves through a page, including after reading a record. */
-	for (found = 0; !found;
-	    cbt->ins_head = WT_ROW_INSERT(cbt->page, cbt->rip),
-	    --cbt->rip, --cbt->nslots) {
+	/*
+	 * Return the entry referenced by the cursor, and then move to the
+	 * previous entry.
+	 */
+	for (;; skip = 0) {
 		/*
 		 * Continue traversing any insert list.  Insert lists are in
 		 * forward sorted order; in a last-to-first walk we have walk
 		 * the list from the end to the beginning.
 		 */
-		if (cbt->ins_head != NULL) {
-			/* Count the number of items on the insert list. */
-			if (cbt->ins_prev_cnt == 0)
-				WT_SKIP_FOREACH(ins, cbt->ins_head)
-					++cbt->ins_prev_cnt;
-
-			/* Return them in reverse order. */
-			for (i = cbt->ins_prev_cnt,
+		if (cbt->ins_head != NULL && cbt->ins_entry_cnt != 0) {
+			for (i = --cbt->ins_entry_cnt,
 			    ins = WT_SKIP_FIRST(cbt->ins_head); i > 0; --i)
 				ins = WT_SKIP_NEXT(ins);
-			if (--cbt->ins_prev_cnt == 0)
-				cbt->ins_head = NULL;
 
 			upd = ins->upd;
-			if (!WT_UPDATE_DELETED_ISSET(upd)) {
-				key->data = WT_INSERT_KEY(ins);
-				key->size = WT_INSERT_KEY_SIZE(ins);
-				value->data = WT_UPDATE_DATA(upd);
-				value->size = upd->size;
-				return (0);
-			}
+			if (skip || WT_UPDATE_DELETED_ISSET(upd))
+				continue;
+			key->data = WT_INSERT_KEY(ins);
+			key->size = WT_INSERT_KEY_SIZE(ins);
+			value->data = WT_UPDATE_DATA(upd);
+			value->size = upd->size;
+			return (0);
 		}
 
-		/* Check to see if we've completed the page. */
-		if (cbt->nslots == 0)
+		/* Check to see if we've finished with this page. */
+		if (cbt->slot == cbt->page->entries)
 			return (WT_NOTFOUND);
 
+		/*
+		 * Set up for this slot, and any insert list that precedes this
+		 * slot.
+		 */
+		rip = &cbt->page->u.row_leaf.d[cbt->slot];
+		if (cbt->slot == 0) {
+			cbt->slot = cbt->page->entries;
+			cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
+		} else {
+			--cbt->slot;
+			cbt->ins_head =
+			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot);
+		}
+		cbt->ins_entry_cnt = 0;
+		WT_SKIP_FOREACH(ins, cbt->ins_head)
+			++cbt->ins_entry_cnt;
+
 		/* If the slot has been deleted, we don't have a record. */
-		upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
-		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+		upd = WT_ROW_UPDATE(cbt->page, rip);
+		if (skip || (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)))
 			continue;
 
-		/* We have a record. */
-		found = 1;
-
 		/*
-		 * Set the key.
+		 * Return the slot's K/V pair.
 		 *
 		 * XXX
 		 * If we have the last key, we can easily build the next prefix
@@ -256,12 +256,12 @@ __btcur_prev_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 		 * need to check the cell type, at the least, before taking the
 		 * fast path.
 		 */
-		if (__wt_off_page(cbt->page, cbt->rip->key)) {
-			ikey = cbt->rip->key;
+		if (__wt_off_page(cbt->page, rip->key)) {
+			ikey = rip->key;
 			key->data = WT_IKEY_DATA(ikey);
 			key->size = ikey->size;
 		} else
-			WT_RET(__wt_row_key(session, cbt->page, cbt->rip, key));
+			WT_RET(__wt_row_key(session, cbt->page, rip, key));
 
 		/*
 		 * If the item was ever modified, use the data from the
@@ -272,14 +272,14 @@ __btcur_prev_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 			value->data = WT_UPDATE_DATA(upd);
 			value->size = upd->size;
 		} else if ((cell =
-		    __wt_row_value(cbt->page, cbt->rip)) == NULL) {
+		    __wt_row_value(cbt->page, rip)) == NULL) {
 			value->data = "";
 			value->size = 0;
 		} else
 			WT_RET(__wt_cell_copy(session, cell, value));
+		return (0);
 	}
-
-	return (0);
+	/* NOTREACHED */
 }
 
 /*
@@ -289,11 +289,10 @@ __btcur_prev_row(WT_CURSOR_BTREE *cbt, int newpage, WT_BUF *key, WT_BUF *value)
 int
 __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 {
-	WT_SESSION_IMPL *session;
+	__wt_cursor_hazard_clear(cbt);
 
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	cbt->iter_state = WT_CBT_NOTHING;
 
-	WT_RET(__wt_walk_last(session, NULL, &cbt->walk, 0));
 	return (__wt_btcur_prev(cbt));
 }
 
@@ -304,37 +303,55 @@ __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 int
 __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 {
-	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int newpage, ret;
-
-	if (cbt->walk.tree == NULL)		/* If "first" not yet called. */
-		return (__wt_btcur_last(cbt));
+	WT_SESSION_IMPL *session;
+	WT_INSERT *ins;
+	int newpage, ret, skip;
 
 	cursor = &cbt->iface;
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	session = (WT_SESSION_IMPL *)cursor->session;
+	WT_BSTAT_INCR(session, file_readprev);
 
-	WT_BSTAT_INCR(session, file_reads);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	switch (cbt->iter_state) {
+	case WT_CBT_NOTHING:
+		WT_RET(__wt_walk_last(session, &cbt->walk, 0));
+		break;
+	case WT_CBT_SEARCH:
+		WT_RET(__wt_btcur_search_setup(cbt, 0));
+
+		/*
+		 * The iteration functions return the record referenced by the
+		 * cursor, and then move the cursor: setting up a search means
+		 * referencing a record we've already returned (or deleted, or
+		 * whatever), skip that record and move to the next record.
+		 */
+		skip = 1;
+		break;
+	case WT_CBT_ITERATING:
+		break;
+	}
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	for (newpage = 0;; newpage = 1) {
+	for (newpage = 0;; newpage = 1, skip = 0) {
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
-				ret = __btcur_prev_fix(cbt, newpage,
+				ret = __prev_fix(cbt, newpage,
 				   &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __btcur_prev_var(cbt, newpage,
+				ret = __prev_var(cbt, newpage,
 				    &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __btcur_prev_row(cbt, newpage,
-				    &cursor->key, &cursor->value);
+				ret = __prev_row(
+				    cbt, &cursor->key, &cursor->value, skip);
 				break;
 			WT_ILLEGAL_FORMAT_ERR(session);
 			}
@@ -348,13 +365,24 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
 		    cbt->page->type == WT_PAGE_ROW_INT);
+
+		switch (cbt->page->type) {
+		case WT_PAGE_ROW_LEAF:
+			cbt->ins_head = WT_ROW_INSERT_SLOT(
+			    cbt->page, cbt->page->entries - 1);
+			cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+			cbt->ins_entry_cnt = 0;
+			WT_SKIP_FOREACH(ins, cbt->ins_head)
+				++cbt->ins_entry_cnt;
+			cbt->slot = cbt->page->entries - 1;
+			break;
+		}
 	}
 
-err:	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_POSITIONED |
-		    WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else
-		F_CLR(cursor, WT_CURSTD_POSITIONED |
-		    WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	return (ret);
+err:	if (ret != 0)
+		return (ret);
+
+	F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	cbt->iter_state = WT_CBT_ITERATING;
+	return (0);
 }

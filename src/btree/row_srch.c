@@ -8,12 +8,31 @@
 #include "wt_internal.h"
 
 /*
- * __wt_row_ins_search --
+ * __search_reset --
+ *	Reset the cursor's state.
+ */
+static inline void
+__search_reset(WT_CURSOR_BTREE *cbt)
+{
+	cbt->page = NULL;
+	cbt->cip = NULL;
+	cbt->rip = NULL;
+	cbt->slot = UINT32_MAX;			/* Fail big. */
+
+	cbt->ins_head = NULL;
+	cbt->ins = NULL;
+
+	cbt->match = 0;
+	cbt->write_gen = 0;
+}
+
+/*
+ * __search_insert --
  *	Search the slot's insert list.
  */
-static inline int
-__insert_search(
-    WT_SESSION_IMPL *session, WT_INSERT_HEAD *inshead, WT_ITEM *key)
+static inline WT_INSERT *
+__search_insert(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *key)
 {
 	WT_BTREE *btree;
 	WT_INSERT **ins;
@@ -22,15 +41,14 @@ __insert_search(
 
 	/* If there's no insert chain to search, we're done. */
 	if (inshead == NULL)
-		return (1);
+		return (NULL);
 
 	btree = session->btree;
 	compare = btree->btree_compare;
 
 	/*
-	 * The insert list is a skip list: start at the highest skip level,
-	 * then go as far as possible at each level before stepping down to the
-	 * next one.
+	 * The insert list is a skip list: start at the highest skip level, then
+	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
 		if (*ins == NULL)
@@ -40,21 +58,15 @@ __insert_search(
 			insert_key.size = WT_INSERT_KEY_SIZE(*ins);
 			cmp = compare(btree, key, &insert_key);
 		}
-		if (cmp == 0) {
-			/* Clear the ins array, we're not going to insert. */
-			memset(session->srch.ins, 0, sizeof(session->srch.ins));
-			session->srch.vupdate = (*ins)->upd;
-			session->srch.upd = &(*ins)->upd;
-			return (0);
-		} else if (cmp > 0)
-			/* Keep going on this level. */
+		if (cmp == 0)			/* Exact match: return */
+			return (*ins);
+		else if (cmp > 0)		/* Keep going at this level */
 			ins = &(*ins)->next[i];
-		else
-			/* Go down a level in the skiplist. */
-			session->srch.ins[i--] = ins--;
+		else				/* Drop down a level */
+			cbt->ins_stack[i--] = ins--;
 	}
 
-	return (1);
+	return (NULL);
 }
 
 /*
@@ -62,31 +74,30 @@ __insert_search(
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, int is_write)
+__wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
-	WT_INSERT_HEAD *inshead;
-	WT_ITEM *item, _item;
+	WT_ITEM *key, *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
-	uint32_t base, indx, limit, slot, write_gen;
+	uint32_t base, indx, limit;
 	int cmp, ret;
 	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	/* Return values. */
-	WT_CLEAR(session->srch);
-	session->srch.slot = UINT32_MAX;
+	key = (WT_ITEM *)&cbt->iface.key;
+
+	__search_reset(cbt);
 
 	btree = session->btree;
-	item = &_item;
 	rip = NULL;
 	compare = btree->btree_compare;
 
 	cmp = -1;				/* Assume we don't match. */
 
-	/* Search the tree. */
+	/* Search the internal pages of the tree. */
+	item = &_item;
 	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
 		/* Binary search of internal pages. */
 		for (base = 0, rref = NULL,
@@ -136,34 +147,17 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, int is_write)
 	}
 
 	/*
-	 * Copy the page's write generation value before reading anything on
-	 * the page.
+	 * Copy the leaf page's write generation value before reading the page.
+	 * Use a memory barrier to ensure we read the value before we read any
+	 * of the page's contents.
 	 */
-	write_gen = page->write_gen;
+	if (is_modify) {
+		cbt->write_gen = page->write_gen;
+		WT_MEMORY_FLUSH;
+	}
+	cbt->page = page;
 
-	/*
-	 * There are 4 pieces of information regarding updates and inserts
-	 * that are set in the next few lines of code.
-	 *
-	 * For an update, we set session->srch.upd and session->srch.slot.
-	 * For an insert, we set session->srch.ins and session->srch.slot.
-	 * For an exact match, we set session->srch.vupdate.
-	 *
-	 * The session->srch.slot only serves a single purpose, indicating the
-	 * slot in the WT_ROW array where a new update/insert entry goes when
-	 * entering the first such item for the page (that is, the slot to use
-	 * when allocating the update/insert array itself).
-	 *
-	 * In other words, we would like to pass back to our caller a pointer
-	 * to a pointer to an update/insert structure, in front of which our
-	 * caller will insert a new update or insert structure.  The problem is
-	 * if the update/insert arrays don't yet exist, in which case we have
-	 * to return the WT_ROW array slot information so our caller can first
-	 * allocate the update/insert array, and then figure out which slot to
-	 * use.
-	 *
-	 * Do a binary search of the leaf page.
-	 */
+	/* Do a binary search of the leaf page. */
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row_leaf.d + indx;
@@ -191,21 +185,25 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, int is_write)
 	}
 
 	/*
-	 * If we found a match in the page on-disk information, set the return
-	 * information, we're done.
+	 * We now have a WT_ROW reference that's our best match on this search.
+	 * The best case is finding an exact match in the page's WT_ROW slot
+	 * array, which is likely for any read-mostly workload.
+	 *
+	 * In that case, we're not doing any kind of insert, all we can do is
+	 * update an existing entry.  Check that case and get out fast.
 	 */
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
-		session->srch.slot = slot = WT_ROW_SLOT(page, rip);
-		if (page->u.row_leaf.upd != NULL) {
-			session->srch.upd = &page->u.row_leaf.upd[slot];
-			session->srch.vupdate = page->u.row_leaf.upd[slot];
-		}
-		goto done;
+
+		cbt->rip = rip;
+		cbt->slot = WT_ROW_SLOT(page, rip);
+		cbt->match = 1;
+		F_SET(cbt, WT_CBT_PAGE_RELEASE);
+		return (0);
 	}
 
 	/*
-	 * No match found.
+	 * We didn't find an exact match in the WT_ROW array.
 	 *
 	 * Base is the smallest index greater than key and may be the 0th index
 	 * or the (last + 1) index.  Set the WT_ROW reference to be the largest
@@ -216,61 +214,37 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *key, int is_write)
 	rip = page->u.row_leaf.d;
 	if (base != 0)
 		rip += base - 1;
+	cbt->rip = rip;
 
 	/*
-	 * Figure out which insert chain to search, and do initial setup of the
-	 * return information for the insert chain (we'll correct it as needed
-	 * depending on what we find.)
+	 * It's still possible there is an exact match, but it's on an insert
+	 * list.  Figure out which insert chain to search, and do the initial
+	 * setup of the return information for the insert chain (we'll correct
+	 * it as needed depending on what we find.)
 	 *
-	 * If inserting a key smaller than any from-disk key found on the page,
-	 * use the extra slot of the insert array, otherwise use the usual
-	 * one-to-one mapping.
+	 * If inserting a key smaller than any key found in the WT_ROW array,
+	 * use the extra slot of the insert array, otherwise insert lists map
+	 * one-to-one to the WT_ROW array.
 	 */
 	if (base == 0) {
-		inshead = WT_ROW_INSERT_SMALLEST(page);
-		session->srch.slot = page->entries;
+		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
+		cbt->slot = page->entries;		/* extra slot */
 	} else {
-		inshead = WT_ROW_INSERT(page, rip);
-		session->srch.slot = WT_ROW_SLOT(page, rip);
+		cbt->ins_head = WT_ROW_INSERT(page, rip);
+		cbt->slot = WT_ROW_SLOT(page, rip);
 	}
-	if (page->u.row_leaf.ins != NULL)
-		session->srch.inshead =
-		    &page->u.row_leaf.ins[session->srch.slot];
 
 	/*
-	 * Search the insert tree for a match -- if we don't find a match, we
+	 * Search the insert list for a match: if we don't find a match, we
 	 * fail, unless we're inserting new data.
 	 *
-	 * No matter how things turn out, __wt_row_ins_search resets
-	 * session->srch appropriately, there's no more work to be done.
+	 * No matter how things turn out, __wt_row_ins_search sets the return
+	 * insert information appropriately, there's no more work to be done.
 	 */
-	if ((cmp = __insert_search(session, inshead, key)) != 0) {
-		/*
-		 * No match found.
-		 * If not doing an insert, we've failed.
-		 */
-		if (!is_write)
-			goto notfound;
-	}
-
-done:	/*
-	 * If we found a match and it's not an insert operation, review any
-	 * updates to the key's value: a deleted object returns not-found.
-	 */
-	if (!is_write &&
-	    session->srch.upd != NULL &&
-	    *session->srch.upd != NULL &&
-	    WT_UPDATE_DELETED_ISSET(*session->srch.upd))
-		goto notfound;
-
-	session->srch.page = page;
-	session->srch.write_gen = write_gen;
-	session->srch.match = (cmp == 0);
-	session->srch.ip = rip;
+	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
+	cbt->match = cbt->ins == NULL ? 0 : 1;
+	F_SET(cbt, WT_CBT_PAGE_RELEASE);
 	return (0);
-
-notfound:
-	ret = WT_NOTFOUND;
 
 err:	__wt_page_release(session, page);
 	return (ret);

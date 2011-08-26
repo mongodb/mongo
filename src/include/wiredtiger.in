@@ -373,7 +373,7 @@ struct wt_cursor {
 
 #define	WT_CURSTD_KEY_RAW	0x01
 #define	WT_CURSTD_KEY_SET	0x02
-#define	WT_CURSTD_POSITIONED	0x04
+#define	WT_CURSTD_OVERWRITE	0x04
 #define	WT_CURSTD_PRINT		0x08
 #define	WT_CURSTD_PUBLIC	0x10
 #define	WT_CURSTD_RAW		0x20

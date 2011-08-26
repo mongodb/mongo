@@ -21,8 +21,6 @@
  * the eviction thread and cursors must be able to pause and then restart the
  * traversal at any point).
  */
-static int __wt_walk_init(
-	WT_SESSION_IMPL *, WT_PAGE *, WT_WALK *, int, uint32_t);
 
 /*
  * __wt_tree_walk --
@@ -86,13 +84,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
  *	Initialize structures for a tree walk.
  */
 static int
-__wt_walk_init(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_WALK *walk, int last, uint32_t flags)
+__wt_walk_init(WT_SESSION_IMPL *session, WT_WALK *walk, uint32_t flags)
 {
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
 	/*
 	 * If the caller is restarting a walk, the structure may be allocated
 	 * (and worse, our caller may be holding hazard references); clean up.
@@ -105,14 +98,6 @@ __wt_walk_init(WT_SESSION_IMPL *session,
 		    &walk->tree_len, 20 * sizeof(WT_WALK_ENTRY), &walk->tree));
 	walk->flags = flags;
 	walk->tree_slot = 0;
-
-	/* A NULL page starts at the top of the tree -- it's a convenience. */
-	if (page == NULL && (page = btree->root_page.page) == NULL)
-		return (WT_ERROR);
-	walk->tree[0].page = page;
-	walk->tree[0].indx = last ? page->entries - 1 : 0;
-	walk->tree[0].child = walk->tree[0].visited = 0;
-
 	return (0);
 }
 
@@ -121,10 +106,21 @@ __wt_walk_init(WT_SESSION_IMPL *session,
  *	Start a tree walk, from start to finish.
  */
 int
-__wt_walk_first(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
+__wt_walk_first(WT_SESSION_IMPL *session, WT_WALK *walk, uint32_t flags)
 {
-	return (__wt_walk_init(session, page, walk, 0, flags));
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = session->btree;
+
+	WT_RET(__wt_walk_init(session, walk, flags));
+
+	if ((page = btree->root_page.page) == NULL)
+		return (WT_ERROR);
+	walk->tree[0].page = page;
+	walk->tree[0].indx = 0;
+	walk->tree[0].child = walk->tree[0].visited = 0;
+	return (0);
 }
 
 /*
@@ -132,14 +128,23 @@ __wt_walk_first(
  *	Start a tree walk, from finish to start.
  */
 int
-__wt_walk_last(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
+__wt_walk_last(WT_SESSION_IMPL *session, WT_WALK *walk, uint32_t flags)
 {
-	WT_WALK_ENTRY *e;
+	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_REF *ref;
+	WT_WALK_ENTRY *e;
 	u_int elem;
 
-	WT_RET(__wt_walk_init(session, page, walk, 1, flags));
+	btree = session->btree;
+
+	WT_RET(__wt_walk_init(session, walk, flags));
+
+	if ((page = btree->root_page.page) == NULL)
+		return (WT_ERROR);
+	walk->tree[0].page = page;
+	walk->tree[0].indx = page->entries - 1;
+	walk->tree[0].child = walk->tree[0].visited = 0;
 
 	/* Move to the last entry on the last page in the tree. */
 	for (e = &walk->tree[0];;) {
@@ -179,6 +184,90 @@ __wt_walk_last(
 		e->child = e->visited = 0;
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __wt_walk_set --
+ *	Start a tree walk, from an existing location.
+ */
+int
+__wt_walk_set(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
+{
+	WT_PAGE *t;
+	WT_REF *ref;
+	WT_ROW_REF *rref;
+	WT_WALK_ENTRY *e;
+	uint32_t elem, i, levels;
+
+	/*
+	 * Figure out how deep we are in the tree, and allocate sufficient
+	 * slots in the walk structure.
+	 */
+	for (t = page->parent, levels = 1; t != NULL; t = t->parent, ++levels)
+		;
+	elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
+	if (levels > elem)
+		WT_RET(__wt_realloc(session, &walk->tree_len,
+		    (levels + 10) * sizeof(WT_WALK_ENTRY), &walk->tree));
+	walk->flags = flags;
+
+	/*
+	 * Walk back up the tree, acquiring hazard references and filling in
+	 * slots as we go.  Set the number of slots immediately, that way we
+	 * can simply return on error, and "ending" the walk will clean up.
+	 *
+	 * We only need an entry for each internal tree level, correct for a
+	 * leaf page, and for 0-based references.
+	 */
+	walk->tree_slot = levels - 2;
+	e = &walk->tree[walk->tree_slot];
+
+	/*
+	 * The hazard entry at each slot is the NEXT page, that is, it's the
+	 * hazard reference for the page in the next slot, and, at the leaf
+	 * level, the leaf page being returned.
+	 */
+	e->hazard = page;
+
+	/* Walk the tree, filling in slots. */
+	for (t = page->parent, ref = page->parent_ref;;
+	    ref = t->parent_ref, t = t->parent) {
+		/*
+		 * Acquire a hazard reference on every page but the root (pages
+		 * can't be discarded as long as they have children, but if the
+		 * leaf page is discarded, and nobody has a hazard reference on
+		 * its internal parent page, it could theoretically be discarded
+		 * while still in use by a cursor).  However, we do not want a
+		 * hazard reference on the root page, the root page is pinned.
+		 */
+		if (t->parent != NULL)
+			WT_RET(__wt_page_in(session, t, ref, 0));
+		e->page = t;
+		e->child = e->visited = 0;
+
+		switch (t->type) {
+		case WT_PAGE_COL_INT:
+			break;
+		case WT_PAGE_ROW_INT:
+			WT_ROW_REF_FOREACH(t, rref, i)
+				if (&rref->ref == ref) {
+					e->indx = WT_ROW_REF_SLOT(t, rref) + 1;
+					if (e->indx == t->entries)
+						e->child = 1;
+					break;
+				}
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
+
+		if (t->parent == NULL)
+			break;
+		--e;
+		e->hazard = t;
+	}
+
+	return (0);
 }
 
 /*

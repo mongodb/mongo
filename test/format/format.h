@@ -41,6 +41,7 @@ typedef struct {
 	char *progname;				/* Program name */
 
 	void *bdb;				/* BDB comparison handle */
+	void *dbc;				/* BDB cursor handle */
 
 	void *wts_conn;				/* WT_CONNECTION handle */
 	void *wts_cursor;			/* WT_CURSOR handle */
@@ -89,6 +90,7 @@ extern GLOBAL g;
 
 int	 bdb_del(uint64_t, int *);
 void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
+int	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
 int	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
 int	 bdb_read(uint64_t, void *, uint32_t *, int *);
 void	 bdb_startup(void);

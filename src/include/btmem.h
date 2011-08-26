@@ -268,6 +268,13 @@ struct __wt_row_ref {
 	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
 
 /*
+ * WT_ROW_REF_SLOT --
+ *	Return the 0-based array offset based on a WT_ROW_REF reference.
+ */
+#define	WT_ROW_REF_SLOT(page, rref)					\
+	((uint32_t)(((WT_ROW_REF *)rref) - (page)->u.row_int.t))
+
+/*
  * WT_COL_REF --
  * Column-store internal page subtree entries.
  */
@@ -497,9 +504,11 @@ struct __wt_insert_head {
  * requires an extra slot to hold keys that sort before any key found on the
  * original page.
  */
-#define	WT_ROW_INSERT(page, ip)						\
+#define	WT_ROW_INSERT_SLOT(page, slot)					\
 	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[WT_ROW_SLOT(page, ip)])
+	    NULL : (page)->u.row_leaf.ins[slot])
+#define	WT_ROW_INSERT(page, ip)						\
+	WT_ROW_INSERT_SLOT(page, WT_ROW_SLOT(page, ip))
 #define	WT_ROW_INSERT_SMALLEST(page)					\
 	((page)->u.row_leaf.ins == NULL ?				\
 	    NULL : (page)->u.row_leaf.ins[(page)->entries])

@@ -62,6 +62,8 @@ btree_stats = [
 	Stat('file_major', 'major version number'),
 	Stat('file_minor', 'minor version number'),
 	Stat('file_overflow', 'overflow pages'),
+	Stat('file_readnext', 'read-next'),
+	Stat('file_readprev', 'read-prev'),
 	Stat('file_reads', 'reads'),
 	Stat('file_removes', 'removes'),
 	Stat('file_row_internal', 'row-store internal pages'),

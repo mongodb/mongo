@@ -11,41 +11,59 @@ struct __wt_cursor_btree {
 	WT_BTREE *btree;		/* Enclosing btree */
 
 	/*
-	 * WT_WALK is the stack of pages to the current cursor location, a
-	 * page.
+	 * A cursor is in one of three states with respect to iteration through
+	 * the tree: it's currently iterating, that is, it has a position in the
+	 * tree and the information necessary to iterate has been filled in; it
+	 * is not currently iterating, but the information necessary to iterate
+	 * has been initialized by a search function, that is, the cursor has a
+	 * position in the tree and iterating from the position is possible; it
+	 * is not currently iterating, and there's no useful search information.
 	 */
-	WT_WALK	  walk;			/* Current walk */
-	WT_PAGE	 *page;			/* Current page */
+	enum {
+		WT_CBT_NOTHING=0,	/* Not iterating, no position */
+		WT_CBT_SEARCH=1,	/* Not iterating, but has a position */
+		WT_CBT_ITERATING=2	/* Iterating */
+	} iter_state;
 
 	/*
-	 * The following fields give us a cursor location within a single page
-	 * for traversal.  Our primary location is the WT_COL/WT_ROW slot, and
-	 * we also track the number of slots to return remaining on this page.
+	 * The following fields are set by the search functions as a precursor
+	 * to page modification: we have a page, a WT_COL/WT_ROW slot on the
+	 * page, an insert head and list and a skiplist stack (the stack of
+	 * skiplist entries leading to the insert point).  The search functions
+	 * also return if an exact match was found and a write-generation for
+	 * the leaf page.
 	 */
+	WT_PAGE	  *page;		/* Current page */
 	WT_COL	  *cip;			/* Col-store page slot */
 	WT_ROW	  *rip;			/* Row-store page slot */
-	uint32_t   nslots;		/* slots to return remaining */
+	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
 
-	/*
-	 * Insert lists override the slot: If the insert list is set for a row-
-	 * store page, we're either walking an insert list of elements appearing
-	 * before all the slots on the page, or between two slots on the page.
-	 * If the insert list is set for a column-store page, it's replacement
-	 * items for variable-length, RLE encoded entries, checked before we
-	 * return an element.
-	 *
-	 * Further, we can't walk an insert list in reverse order.  Count the
-	 * insert list entries, then repeatedly walk the list in the forward
-	 * direction, each time returning one entry earlier in the list.
-	 */
 	WT_INSERT_HEAD  *ins_head;	/* Insert chain head */
-	WT_INSERT	*ins;		/* Insert chain */
-	uint32_t	 ins_prev_cnt;	/* Insert chain counting back */
+	WT_INSERT	*ins;		/* Insert list, skiplist stack */
+	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
+
+	int	 match;			/* If search found an exact match */
+	uint32_t write_gen;		/* Saved leaf page's write generation */
 
 	/*
-	 * The following fields are cached information used for cursors as they
-	 * return items from the page.
-	 *
+	 * If an application is doing a cursor walk, the following fields are
+	 * additional information as to the cursor's location in the tree or
+	 * are cached information used for cursors as they return items from
+	 * the page.  These fields are not set by the search functions -- when
+	 * the first cursor next/prev function is called, they are filled in,
+	 * using the initial information returned by the search function.
+	 */
+	WT_WALK	 walk;			/* Current tree stack */
+	uint32_t nslots;		/* remaining page slots to return */
+
+	/*
+	 * We can't walk an insert list in reverse order, so we have to maintain
+	 * a count of the current entry we're on.  For each iteration, we return
+	  one entry earlier in the list.
+	 */
+	uint32_t ins_entry_cnt;		/* Insert list entry count */
+
+	/*
 	 * The record number is calculated from the initial record number on the
 	 * page, and offset for the slot at which we start.   Don't repeat that
 	 * calculation, set it once and increment/decrement during traversal.
@@ -64,6 +82,14 @@ struct __wt_cursor_btree {
 	 */
 	uint64_t rle_return_cnt;	/* RLE count */
 	WT_BUF  value;			/* Cursor value copy */
+
+	/*
+	 * Finally, we need to know if we're holding hazard references, so we
+	 * can release them on error or close.
+	 */
+#define	WT_CBT_PAGE_RELEASE	0x01	/* Release the page */
+#define	WT_CBT_WALK_RELEASE	0x02	/* Release the walk */
+	uint32_t flags;
 };
 
 struct __wt_cursor_bulk {

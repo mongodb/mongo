@@ -53,6 +53,10 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_minor.desc = "minor version number";
 	stats->file_overflow.name = "file_overflow";
 	stats->file_overflow.desc = "overflow pages";
+	stats->file_readnext.name = "file_readnext";
+	stats->file_readnext.desc = "read-next";
+	stats->file_readprev.name = "file_readprev";
+	stats->file_readprev.desc = "read-prev";
 	stats->file_reads.name = "file_reads";
 	stats->file_reads.desc = "reads";
 	stats->file_removes.name = "file_removes";
@@ -123,6 +127,8 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_major.v = 0;
 	stats->file_minor.v = 0;
 	stats->file_overflow.v = 0;
+	stats->file_readnext.v = 0;
+	stats->file_readprev.v = 0;
 	stats->file_reads.v = 0;
 	stats->file_removes.v = 0;
 	stats->file_row_internal.v = 0;

@@ -99,9 +99,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
 		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->key_format, ap)) == 0)
-			F_SET(cursor, WT_CURSTD_KEY_SET);
-		else {
+		    cursor->key_format, ap)) != 0) {
 			cursor->saved_err = ret;
 			F_CLR(cursor, WT_CURSTD_KEY_SET);
 			return;
@@ -109,6 +107,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	}
 	WT_ASSERT(session, sz <= UINT32_MAX);
 	cursor->key.size = (uint32_t)sz;
+	F_SET(cursor, WT_CURSTD_KEY_SET);
 	va_end(ap);
 
 	API_END(session);
@@ -149,9 +148,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) == 0 &&
 		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap)) == 0)
-			F_SET(cursor, WT_CURSTD_VALUE_SET);
-		else {
+		    cursor->value_format, ap)) != 0) {
 			cursor->saved_err = ret;
 			F_CLR(cursor, WT_CURSTD_VALUE_SET);
 			return;
@@ -160,6 +157,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	}
 	WT_ASSERT(session, sz <= UINT32_MAX);
 	cursor->value.size = (uint32_t)sz;
+	F_SET(cursor, WT_CURSTD_VALUE_SET);
 	va_end(ap);
 
 	API_END(session);

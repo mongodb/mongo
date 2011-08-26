@@ -10,17 +10,6 @@
 static int __curstat_next(WT_CURSOR *cursor);
 
 /*
- * __cursor_notsup --
- *	WT_CURSOR->XXX methods for unsupported statistics cursor actions.
- */
-static int
-__cursor_notsup(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-	return (ENOTSUP);
-}
-
-/*
  * __curstat_print_value --
  *	Convert statistics cursor value to printable format.
  */
@@ -245,14 +234,14 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		__curstat_first,
-		__cursor_notsup,
+		__wt_cursor_notsup,
 		__curstat_next,
-		__cursor_notsup,
+		__wt_cursor_notsup,
 		NULL,
 		__curstat_search_near,
-		__cursor_notsup,
-		__cursor_notsup,
-		__cursor_notsup,
+		__wt_cursor_notsup,
+		__wt_cursor_notsup,
+		__wt_cursor_notsup,
 		__curstat_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */

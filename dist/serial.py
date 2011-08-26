@@ -38,6 +38,17 @@ Serial('evict_file', 'WT_WORKQ_EVICT', 0, [
 		SerialArg('int', 'close_method'),
 	]),
 
+Serial('xxxinsert', 'WT_WORKQ_FUNC', 1, [
+		SerialArg('WT_PAGE *', 'page'),
+		SerialArg('uint32_t', 'write_gen'),
+		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('WT_INSERT ***', 'ins_stack'),
+		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
+		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
+		SerialArg('WT_INSERT *', 'ins', 1),
+		SerialArg('uint32_t', 'depth'),
+	]),
+
 Serial('insert', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('WT_SEARCH *', 'srch'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
@@ -50,6 +61,14 @@ Serial('row_key', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
+	]),
+
+Serial('xxxupdate', 'WT_WORKQ_FUNC', 1, [
+		SerialArg('WT_PAGE *', 'page'),
+		SerialArg('uint32_t', 'write_gen'),
+		SerialArg('WT_UPDATE **', 'srch_upd'),
+		SerialArg('WT_UPDATE **', 'new_upd', 1),
+		SerialArg('WT_UPDATE *', 'upd', 1),
 	]),
 
 Serial('update', 'WT_WORKQ_FUNC', 1, [

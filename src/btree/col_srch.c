@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_col_ins_search --
+ * __search_insert --
  *	Search the slot's insert list.
  */
 static inline int
-__wt_col_ins_search(
+__search_insert(
     WT_SESSION_IMPL *session, WT_INSERT_HEAD *inshead, uint64_t recno)
 {
 	WT_INSERT **ins;
@@ -67,7 +67,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 	WT_COL_RLE *repeat;
 	WT_PAGE *page;
 	uint64_t start_recno;
-	uint32_t base, indx, limit, match, start_indx, write_gen;
+	uint32_t base, indx, limit, match, start_indx;
 	int ret;
 
 	unpack = &_unpack;
@@ -124,10 +124,14 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 	}
 
 	/*
-	 * Copy the page's write generation value before reading anything on
-	 * the page.
+	 * Copy the leaf page's write generation value before reading the page.
+	 * Use a memory barrier to ensure we read the value before we read any
+	 * of the page's contents.
 	 */
-	write_gen = page->write_gen;
+	if (is_write) {
+		session->srch.write_gen = page->write_gen;
+		WT_MEMORY_FLUSH;
+	}
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a
@@ -150,7 +154,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 			match = 0;
 		else {
 			session->srch.inshead = page->u.col_leaf.ins;
-			match = (__wt_col_ins_search(session,
+			match = (__search_insert(session,
 			    *session->srch.inshead, recno) == 0);
 		}
 
@@ -240,7 +244,7 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 		else {
 			session->srch.inshead =
 			    &page->u.col_leaf.ins[session->srch.slot];
-			match = (__wt_col_ins_search(session,
+			match = (__search_insert(session,
 			    *session->srch.inshead, recno) == 0);
 		}
 
@@ -268,7 +272,6 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 append:		session->srch.match = 0;
 	}
 	session->srch.page = page;
-	session->srch.write_gen = write_gen;
 	session->srch.ip = cip;
 	return (0);
 
