@@ -21,7 +21,7 @@ This package provides the mongo shell, import/export tools, and other
 client utilities.
 
 %package server
-Summary: mongo server, sharding server, and support scripts
+Summary: mongo server (mongod) and support scripts
 Group: Applications/Databases
 Requires: mongo
 
@@ -29,10 +29,32 @@ Requires: mongo
 Mongo (from "huMONGOus") is a schema-free document-oriented database.
 
 This package provides the mongo server software, mongo sharding server
-softwware, default configuration files, and init.d scripts.
+software, default configuration files, and init.d scripts.
+
+%package router
+Summary: mongo sharding router (mongos), and support scripts
+Group: Applications/Databases
+Requires: mongo
+
+%description router
+Mongo (from "huMONGOus") is a schema-free document-oriented database.
+
+This package provides the mongos sharding router (mongos)
+software, default configuration files, and init.d scripts.
+
+%package config
+Summary: mongo sharding configuration server (mongod) and support scripts
+Group: Applications/Databases
+Requires: mongo
+
+%description config
+Mongo (from "huMONGOus") is a schema-free document-oriented database.
+
+This package provides the mongo sharding configuration server software
+software, default configuration files, and init.d scripts.
 
 %package devel
-Summary: Headers and libraries for mongo development. 
+Summary: Headers and libraries for mongo development.
 Group: Applications/Databases
 
 %description devel
@@ -94,6 +116,62 @@ then
   /sbin/service mongod condrestart >/dev/null 2>&1 || :
 fi
 
+# router
+%pre router
+if ! /usr/bin/id -g mongod &>/dev/null; then
+    /usr/sbin/groupadd -r mongod
+fi
+if ! /usr/bin/id mongod &>/dev/null; then
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false \
+	-c mongod mongod > /dev/null 2>&1
+fi
+
+%post router
+if test $1 = 1
+then
+  /sbin/chkconfig --add mongos
+fi
+
+%preun router
+if test $1 = 0
+then
+  /sbin/chkconfig --del mongos
+fi
+
+%postun router
+if test $1 -ge 1
+then
+  /sbin/service mongos condrestart >/dev/null 2>&1 || :
+fi
+
+# config
+%pre config
+if ! /usr/bin/id -g mongod &>/dev/null; then
+    /usr/sbin/groupadd -r mongod
+fi
+if ! /usr/bin/id mongod &>/dev/null; then
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false \
+	-c mongod mongod > /dev/null 2>&1
+fi
+
+%post config
+if test $1 = 1
+then
+  /sbin/chkconfig --add mongoc
+fi
+
+%preun config
+if test $1 = 0
+then
+  /sbin/chkconfig --del mongoc
+fi
+
+%postun config
+if test $1 -ge 1
+then
+  /sbin/service mongoc condrestart >/dev/null 2>&1 || :
+fi
+
 %files
 %defattr(-,root,root,-)
 %doc README GNU-AGPL-3.0.txt
@@ -107,9 +185,12 @@ fi
 %{_bindir}/mongostat
 %{_bindir}/bsondump
 %{_bindir}/mongotop
+%{_bindir}/mongod
+%{_bindir}/mongos
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
+%{_mandir}/man1/mongos.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
@@ -122,20 +203,41 @@ fi
 %files server
 %defattr(-,root,root,-)
 %config(noreplace) /etc/mongod.conf
-%{_bindir}/mongod
-%{_bindir}/mongos
-#%{_mandir}/man1/mongod.1*
-%{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
 /etc/sysconfig/mongod
-#/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
+%files router
+%defattr(-,root,root,-)
+%config(noreplace) /etc/mongos.conf
+/etc/rc.d/init.d/mongos
+/etc/sysconfig/mongos
+%attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongos.log
+
+%files config
+%defattr(-,root,root,-)
+%config(noreplace) /etc/mongoc.conf
+/etc/rc.d/init.d/mongoc
+/etc/sysconfig/mongoc
+%attr(0755,mongod,mongod) %dir /var/lib/mongo
+%attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongoc.log
+
 %changelog
+* Fri Aug 26 2011 Reid Morrison <reidmo@gmail.com>
+- Break apart into multiple RPM's to support Sharding
+- By including mongod and mongos in the common package it allows
+  end users to create their own init.d scripts etc, yet still use the official
+  software distribution package.
+
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
 
-* Sat Oct 24 2009 Joe Miklojcik <jmiklojcik@shopwiki.com> - 
+* Sat Oct 24 2009 Joe Miklojcik <jmiklojcik@shopwiki.com> -
 - Wrote mongo.spec.
