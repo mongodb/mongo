@@ -37,7 +37,7 @@ PY_SETUP_DEBUG = -g
 endif
 all-local: _wiredtiger.so
 $(PYSRC)/wiredtiger_wrap.c: wiredtiger.h $(PYSRC)/wiredtiger.i
-	@(cd $(PYSRC) && swig -python -I../../build_posix wiredtiger.i)
+	@(cd $(PYSRC) && $(SWIG) -python -I../../build_posix wiredtiger.i)
 
 _wiredtiger.so: $(wt_LTLIBRARIES) $(PYSRC)/wiredtiger_wrap.c
 	@env CFLAGS="$(PYTHON_CFLAGS)" LDFLAGS="$(PYTHON_LDFLAGS)" \
