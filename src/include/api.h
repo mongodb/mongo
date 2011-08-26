@@ -172,7 +172,7 @@ struct __wt_connection_impl {
 	uint32_t   session_size;
 
 	WT_CACHE  *cache;		/* Page cache */
-	uint64_t   cache_size;
+	int64_t	   cache_size;
 
 	WT_CONN_STATS *stats;		/* Database statistics */
 
