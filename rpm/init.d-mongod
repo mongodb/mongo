@@ -6,54 +6,74 @@
 # description: Mongo is a scalable, document-oriented database.
 # processname: mongod
 # config: /etc/mongod.conf
-# pidfile: /var/run/mongo/mongo.pid
+# pidfile: /var/run/mongo/mongod.pid
 
 . /etc/rc.d/init.d/functions
 
-# things from mongod.conf get there by mongod reading it
+# mongod will read mongod.conf for configuration settings
 
+# Add variable to support multiple instances of mongod
+# The instance name is by default the name of this init script
+# In this way another instance can be created by just copying this init script
+# and creating a config file with the same name and a .conf extension
+# For Example:
+#   /etc/init.d/mongo4
+#   /etc/mongo4.conf
+# Optionally also create a sysconfig file to override env variables below
+#   /etc/sysconfig/mongo4
+INSTANCE=`basename $0`
 
-# NOTE: if you change any OPTIONS here, you get what you pay for:
-# this script assumes all options are in the config file.
-CONFIGFILE="/etc/mongod.conf"
-OPTIONS=" -f $CONFIGFILE"
-SYSCONFIG="/etc/sysconfig/mongod"
+# By default OPTIONS just points to the /etc/mongod.conf config file
+# This can be overriden in /etc/sysconfig/mongod
+OPTIONS=" -f /etc/${INSTANCE}.conf"
 
-# FIXME: 1.9.x has a --shutdown flag that parses the config file and
-# shuts down the correct running pid, but that's unavailable in 1.8
-# for now.  This can go away when this script stops supporting 1.8.
-DBPATH=`awk -F= '/^dbpath=/{print $2}' "$CONFIGFILE"`
-mongod=${MONGOD-/usr/bin/mongod}
-
+PID_PATH=/var/run/mongo
+PID_FILE=${PID_PATH}/${INSTANCE}.pid
+MONGO_BIN=/usr/bin/mongod
 MONGO_USER=mongod
 MONGO_GROUP=mongod
+MONGO_ULIMIT=12000
+MONGO_LOCK_FILE=/var/lock/subsys/${INSTANCE}
 
-. "$SYSCONFIG" || true
+# Source sysconfig options so that above values can be overriden
+SYSCONFIG="/etc/sysconfig/${INSTANCE}"
+if [ -f "$SYSCONFIG" ]; then
+  . "$SYSCONFIG" || true
+fi
+
+# Create mongo pids path if it does not exist
+if [ ! -d "${PID_PATH}" ]; then
+  mkdir -p "${PID_PATH}"
+  chown "${MONGO_USER}:${MONGO_GROUP}" "${PID_PATH}"
+fi
 
 start()
 {
-  echo -n $"Starting mongod: "
-  daemon --user "$MONGO_USER" $mongod $OPTIONS
+  echo -n $"Starting ${INSTANCE}: "
+  daemon --user "$MONGO_USER" --pidfile $PID_FILE $MONGO_BIN $OPTIONS --pidfilepath=$PID_FILE
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
+  [ $RETVAL -eq 0 ] && touch $MONGO_LOCK_FILE
+  return $RETVAL
 }
 
 stop()
 {
-  echo -n $"Stopping mongod: "
-  killproc -p "$DBPATH"/mongod.lock -t30 -TERM /usr/bin/mongod
+  echo -n $"Stopping ${INSTANCE}: "
+  killproc -p $PID_FILE -t30 -TERM $MONGO_BIN
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
+  [ $RETVAL -eq 0 ] && rm -f $MONGO_LOCK_FILE
+  [ $RETVAL -eq 0 ] && rm -f $PID_FILE
+  return $RETVAL
 }
 
 restart () {
-	stop
-	start
+  stop
+  start
 }
 
-ulimit -n 12000
+ulimit -n $MONGO_ULIMIT
 RETVAL=0
 
 case "$1" in
@@ -67,10 +87,10 @@ case "$1" in
     restart
     ;;
   condrestart)
-    [ -f /var/lock/subsys/mongod ] && restart || :
+    [ -f $MONGO_LOCK_FILE ] && restart || :
     ;;
   status)
-    status $mongod
+    status -p $PID_FILE $MONGO_BIN
     RETVAL=$?
     ;;
   *)
