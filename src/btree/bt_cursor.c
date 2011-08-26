@@ -32,16 +32,12 @@ __wt_cursor_hazard_clear(WT_CURSOR_BTREE *cbt)
  * __cursor_flags_begin --
  *	Cursor function initial flags handling.
  */
-static inline int
-__cursor_flags_begin(WT_CURSOR_BTREE *cbt, const char *method)
+static inline void
+__cursor_flags_begin(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
-	int keyset;
 
 	cursor = &cbt->iface;
-
-	/* The key must be set, otherwise the operation will fail. */
-	keyset = F_ISSET(cursor, WT_CURSTD_KEY_SET) ? 1 : 0;
 
 	/* Release any hazard references we're holding. */
 	__wt_cursor_hazard_clear(cbt);
@@ -49,8 +45,6 @@ __cursor_flags_begin(WT_CURSOR_BTREE *cbt, const char *method)
 	/* Reset the iteration state. */
 	cbt->iter_state = WT_CBT_NOTHING;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-
-	return (keyset ? 0 : __wt_cursor_key_not_set(cursor, method));
 }
 
 /*
@@ -120,7 +114,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_reads);
 
-	WT_RET(__cursor_flags_begin(cbt, "search-near"));
+	__cursor_flags_begin(cbt);
 
 	*exact = 0;
 	switch (btree->type) {
@@ -169,7 +163,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_inserts);
 
-	WT_RET(__cursor_flags_begin(cbt, "insert"));
+	__cursor_flags_begin(cbt);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -223,7 +217,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_removes);
 
-	WT_RET(__cursor_flags_begin(cbt, "remove"));
+	__cursor_flags_begin(cbt);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -273,7 +267,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_updates);
 
-	WT_RET(__cursor_flags_begin(cbt, "update"));
+	__cursor_flags_begin(cbt);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
