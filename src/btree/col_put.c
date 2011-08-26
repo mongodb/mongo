@@ -14,7 +14,7 @@ static int __col_next_recno(WT_SESSION_IMPL *, WT_PAGE *, uint64_t *);
 
 /*
  * __wt_col_modify --
- *	Column-store delete and update.
+ *	Column-store delete insert, and update.
  */
 int
 __wt_col_modify(
