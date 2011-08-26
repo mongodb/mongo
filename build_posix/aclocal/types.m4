@@ -1,4 +1,4 @@
-# Copyright (c) 2008-2011 WiredTiger Software.
+# Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 
 # AM_SIGNED_TYPES, AM_UNSIGNED_TYPES --
