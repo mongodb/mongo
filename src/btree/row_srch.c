@@ -141,8 +141,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
-		if (page != btree->root_page.page)
-			__wt_hazard_clear(session, page);
+		__wt_page_release(session, page);
 		page = WT_ROW_REF_PAGE(rref);
 	}
 
