@@ -3,6 +3,7 @@
 //
 
 var coll = db.getCollection( 'jstests_geo_poly_edge' )
+coll.drop();
 
 coll.ensureIndex({ loc : "2d" })
 
