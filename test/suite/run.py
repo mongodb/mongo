@@ -28,7 +28,7 @@ import wttest
 from testscenarios.scenarios import generate_scenarios
 
 # These may be needed on some systems
-#os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = wt_builddir
+#os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = os.path.join(wt_builddir, '.libs')
 
 #export ARCH="x86_64"  # may be needed on OS/X
 

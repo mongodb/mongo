@@ -43,14 +43,7 @@ cp ../README README
 # Build Makefile.am
 sh ./makemake
 
-# Build aclocal.m4.
-aclocal -I aclocal
-
-# Create header file config.in.
-autoheader
-
-# Configure.
-autoconf
+autoreconf --install
 
 # Edit version information we couldn't pre-compute.
 . ../dist/RELEASE
@@ -61,9 +54,6 @@ sed -e "s/__EDIT_WIREDTIGER_VERSION_MAJOR__/$WIREDTIGER_VERSION_MAJOR/g" \
     -e "s/__EDIT_WIREDTIGER_VERSION_UNIQUE_NAME__/$WIREDTIGER_VERSION_UNIQUE_NAME/g" \
     -e "s/__EDIT_WIREDTIGER_VERSION__/$WIREDTIGER_VERSION/g" configure > $t
 cp $t configure
-
-# Build make files.
-automake --add-missing --copy
 
 # Make sure any missing files are writable
 chmod 755 gnu-support/*
