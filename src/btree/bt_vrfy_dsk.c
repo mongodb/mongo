@@ -240,8 +240,8 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_OFF:
 		case WT_CELL_VALUE_OVFL:
-			if (WT_ADDR_TO_OFF(btree,
-			    unpack->off.addr) + unpack->off.size > file_size)
+			if (WT_ADDR_TO_OFF(btree, unpack->off.addr) +
+			    (off_t)unpack->off.size > file_size)
 				goto eof;
 			break;
 		}
@@ -475,8 +475,8 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 		/* Check if any referenced item is entirely in the file.
 		 */
 		if (cell_type == WT_CELL_VALUE_OVFL) {
-			if (WT_ADDR_TO_OFF(btree,
-			    unpack->off.addr) + unpack->off.size > file_size)
+			if (WT_ADDR_TO_OFF(btree, unpack->off.addr) +
+			    (off_t)unpack->off.size > file_size)
 				return (__err_eof(
 				    session, cell_num, addr, quiet));
 		}

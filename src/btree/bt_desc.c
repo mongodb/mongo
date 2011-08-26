@@ -57,13 +57,13 @@ __wt_desc_read(WT_SESSION_IMPL *session)
 	}
 	if (desc->root_addr != WT_ADDR_INVALID &&
 	    WT_ADDR_TO_OFF(btree, desc->root_addr) +
-	    desc->root_size > btree->fh->file_size)
+	    (off_t)desc->root_size > btree->fh->file_size)
 		goto eof;
 	btree->root_page.addr = desc->root_addr;
 	btree->root_page.size = desc->root_size;
 	if (desc->free_addr != WT_ADDR_INVALID &&
 	    WT_ADDR_TO_OFF(btree, desc->free_addr) +
-	    desc->free_size > btree->fh->file_size) {
+	    (off_t)desc->free_size > btree->fh->file_size) {
 eof:		__wt_errx(session,
 		    "root or free addresses reference non-existent pages");
 		return (WT_ERROR);

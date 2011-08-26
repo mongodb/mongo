@@ -547,7 +547,7 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		if (WT_ADDR_TO_OFF(btree, fe->addr) +
-		    fe->size > btree->fh->file_size) {
+		    (off_t)fe->size > btree->fh->file_size) {
 			__wt_errx(session,
 			    "free-list entry addr %" PRIu32 "references "
 			    "non-existent file pages",
