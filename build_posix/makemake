@@ -4,13 +4,11 @@
 #	All rights reserved.
 
 # Build Makefile.am
-. ../dist/RELEASE
-
 filelist=../dist/filelist
 set_sources()
 {
 	echo
-	echo "libwiredtiger_la_LDFLAGS = -release ${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}"
+	echo "libwiredtiger_la_LDFLAGS = -release @VERSION@"
 	echo "libwiredtiger_la_SOURCES=\\"
 	sed -e '/^[a-z]/! d' \
 	    -e 's/.*/	..\/& \\/' \
@@ -28,8 +26,4 @@ set_vpath()
 	echo "../src/utilities"
 }
 
-(
-  sed -e "s/@WIREDTIGER_VERSION_MAJOR@/$WIREDTIGER_VERSION_MAJOR/" \
-      -e "s/@WIREDTIGER_VERSION_MINOR@/$WIREDTIGER_VERSION_MINOR/" \
-      -e "s/@WIREDTIGER_VERSION_PATCH@/$WIREDTIGER_VERSION_PATCH/" \
-      Make.base; set_vpath; set_sources) > Makefile.am
+(cat Make.base; set_vpath; set_sources) > Makefile.am

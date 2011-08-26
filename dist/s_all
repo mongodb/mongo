@@ -40,6 +40,8 @@ while :
 	esac
 done
 
+run "sh ./s_version" "Updating files that include the package version"
+
 test "$reconf" -eq 0 || {
 	(cd ../build_posix &&
 	run "sh ./reconf" "Rebuilding GNU tools library support")

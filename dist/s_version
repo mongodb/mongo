@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Propagate version changes to the necessary files.
+. ./RELEASE
+
+cat <<EOF > ../build_posix/aclocal/version.m4
+dnl WiredTiger product version for AC_INIT.  Maintained by dist/s_version
+${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.${WIREDTIGER_VERSION_PATCH}
+EOF
+
+cat <<EOF > ../build_posix/aclocal/version-set.m4
+dnl build by dist/s_version
+
+VERSION_MAJOR=${WIREDTIGER_VERSION_MAJOR}
+VERSION_MINOR=${WIREDTIGER_VERSION_MINOR}
+VERSION_PATCH=${WIREDTIGER_VERSION_PATCH}
+VERSION_STRING='"${WIREDTIGER_VERSION_STRING}"'
+
+AC_SUBST(VERSION_MAJOR)
+AC_SUBST(VERSION_MINOR)
+AC_SUBST(VERSION_PATCH)
+AC_SUBST(VERSION_STRING)
+
+VERSION_NOPATCH=${VERSION_MAJOR}.${VERSION_MINOR}
+AC_SUBST(VERSION_NOPATCH)
+EOF

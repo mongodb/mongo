@@ -15,10 +15,10 @@ extern "C" {
 /*******************************************
  * Version information
  *******************************************/
-#define	WIREDTIGER_VERSION_MAJOR	@WIREDTIGER_VERSION_MAJOR@
-#define	WIREDTIGER_VERSION_MINOR	@WIREDTIGER_VERSION_MINOR@
-#define	WIREDTIGER_VERSION_PATCH	@WIREDTIGER_VERSION_PATCH@
-#define	WIREDTIGER_VERSION_STRING	@WIREDTIGER_VERSION_STRING@
+#define	WIREDTIGER_VERSION_MAJOR	@VERSION_MAJOR@
+#define	WIREDTIGER_VERSION_MINOR	@VERSION_MINOR@
+#define	WIREDTIGER_VERSION_PATCH	@VERSION_PATCH@
+#define	WIREDTIGER_VERSION_STRING	@VERSION_STRING@
 
 /*******************************************
  * Required includes

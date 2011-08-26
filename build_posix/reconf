@@ -45,16 +45,6 @@ sh ./makemake
 
 autoreconf --install
 
-# Edit version information we couldn't pre-compute.
-. ../dist/RELEASE
-sed -e "s/__EDIT_WIREDTIGER_VERSION_MAJOR__/$WIREDTIGER_VERSION_MAJOR/g" \
-    -e "s/__EDIT_WIREDTIGER_VERSION_MINOR__/$WIREDTIGER_VERSION_MINOR/g" \
-    -e "s/__EDIT_WIREDTIGER_VERSION_PATCH__/$WIREDTIGER_VERSION_PATCH/g" \
-    -e "s/__EDIT_WIREDTIGER_VERSION_STRING__/$WIREDTIGER_VERSION_STRING/g" \
-    -e "s/__EDIT_WIREDTIGER_VERSION_UNIQUE_NAME__/$WIREDTIGER_VERSION_UNIQUE_NAME/g" \
-    -e "s/__EDIT_WIREDTIGER_VERSION__/$WIREDTIGER_VERSION/g" configure > $t
-cp $t configure
-
 # Make sure any missing files are writable
 chmod 755 gnu-support/*
 

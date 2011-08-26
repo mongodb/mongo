@@ -2,32 +2,22 @@
 #	All rights reserved.
 
 PACKAGE=wiredtiger
-AC_INIT(WiredTiger, [__EDIT_WIREDTIGER_VERSION__],
-	[support@wiredtiger.com],
-	wt-__EDIT_WIREDTIGER_VERSION__)
+AC_INIT(WiredTiger, m4_normalize(m4_include([aclocal/version.m4])),
+	[support@wiredtiger.com])
+
+m4_include([aclocal/version-set.m4])
 
 AC_CONFIG_AUX_DIR([gnu-support])
 AC_CONFIG_MACRO_DIR([aclocal])
 AC_CONFIG_SRCDIR([../dist/RELEASE])
 
-AC_CONFIG_HEADERS([wiredtiger_config.h:config.hin])
-
-AC_SUBST(WIREDTIGER_VERSION_MAJOR)
-WIREDTIGER_VERSION_MAJOR="__EDIT_WIREDTIGER_VERSION_MAJOR__"
-AC_SUBST(WIREDTIGER_VERSION_MINOR)
-WIREDTIGER_VERSION_MINOR="__EDIT_WIREDTIGER_VERSION_MINOR__"
-AC_SUBST(WIREDTIGER_VERSION_PATCH)
-WIREDTIGER_VERSION_PATCH="__EDIT_WIREDTIGER_VERSION_PATCH__"
-AC_SUBST(WIREDTIGER_VERSION_STRING)
-WIREDTIGER_VERSION_STRING='"__EDIT_WIREDTIGER_VERSION_STRING__"'
-AC_SUBST(WIREDTIGER_VERSION_UNIQUE_NAME)
-
 LT_INIT([dlopen])
 AC_SUBST([LIBTOOL_DEPS])
 
 AM_INIT_AUTOMAKE
-
 AM_OPTIONS
+
+AC_CONFIG_HEADERS([wiredtiger_config.h:config.hin])
 
 AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)
@@ -82,7 +72,7 @@ AC_PROG_INSTALL
 
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(rt, sched_yield)
-AC_CHECK_FUNCS(fcntl pthread_yield)
+AC_CHECK_FUNCS([fcntl pthread_yieldNO])
 
 AC_C_BIGENDIAN
 
@@ -90,6 +80,6 @@ AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:../src/include/wiredtiger.in
 	wt_internal.h:../src/include/wt_internal.in
-	wiredtiger-${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.pc:wiredtiger.pc.in
+	wiredtiger-${VERSION}.pc:wiredtiger.pc.in
 	])
 AC_OUTPUT

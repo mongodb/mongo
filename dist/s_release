@@ -4,7 +4,7 @@
 set -e
 RELEASE_DIR=../releases
 
-. RELEASE || exit 1
+. ./RELEASE || exit 1
 
 pkgver="$1"
 if test -z "$pkgver" ; then
