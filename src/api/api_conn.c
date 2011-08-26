@@ -446,10 +446,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
 		WT_ERR(__wt_buf_sprintf(session, &expath,
 		    "%.*s", (int)skey.len, skey.str));
-		if (sval.len > 0) {
+		if (sval.len > 0)
 			WT_ERR(__wt_buf_sprintf(session, &exconfig,
 			    "entry=%.*s\n", (int)sval.len, sval.str));
-		}
 		WT_ERR(conn->iface.load_extension(&conn->iface,
 		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
 	}
