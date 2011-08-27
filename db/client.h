@@ -29,6 +29,7 @@
 #include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
+#include "../util/concurrency/threadlocal.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
 
-    extern boost::thread_specific_ptr<Client> currentClient;
+    extern TSP<Client> currentClient;
 
     typedef long long ConnectionId;
 
