@@ -250,13 +250,13 @@ struct __wt_ikey {
  * Row-store internal page subtree entries.
  */
 struct __wt_row_ref {
-	void	*key;			/* On-page cell or off-page WT_IKEY */
-
 	WT_REF	 ref;			/* Subtree page */
 #define	WT_ROW_REF_ADDR(rref)	((rref)->ref.addr)
 #define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
 #define	WT_ROW_REF_SIZE(rref)	((rref)->ref.size)
 #define	WT_ROW_REF_STATE(rref)	((rref)->ref.state)
+
+	void	*key;			/* On-page cell or off-page WT_IKEY */
 };
 
 /*
@@ -279,13 +279,13 @@ struct __wt_row_ref {
  * Column-store internal page subtree entries.
  */
 struct __wt_col_ref {
-	uint64_t recno;			/* Starting record number */
-
 	WT_REF	 ref;			/* Subtree page */
 #define	WT_COL_REF_ADDR(cref)	((cref)->ref.addr)
 #define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
 #define	WT_COL_REF_SIZE(cref)	((cref)->ref.size)
 #define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
+
+	uint64_t recno;			/* Starting record number */
 };
 
 /*
