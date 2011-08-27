@@ -581,9 +581,21 @@ namespace PerfTests {
     };
 
     // test thread local speed
+    __declspec( thread ) int x;
+    class TLS2 : public B {
+    public:
+        virtual int howLongMillis() { return 3000; } 
+        string name() { return "thread-local-storage2"; }
+        void timed() {
+            if( x )
+                dontOptimizeOutHopefully++;
+        }
+        virtual bool showDurStats() { return false; }
+    };
+
+    // test thread local speed
     class TLS : public B {
     public:
-        TLS() { }
         virtual int howLongMillis() { return 3000; } 
         string name() { return "thread-local-storage"; }
         void timed() {
@@ -595,7 +607,6 @@ namespace PerfTests {
 
     class Malloc : public B {
     public:
-        Malloc() { }
         virtual int howLongMillis() { return 4000; } 
         string name() { return "malloc"; }
         void timed() {
@@ -870,6 +881,7 @@ namespace PerfTests {
                 add< ChecksumTest >();
                 add< Compress >();
                 add< TLS >();
+                add< TLS2 >();
                 add< Malloc >();
                 add< Timer >();
                 add< Sleep0Ms >();
