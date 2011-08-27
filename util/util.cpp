@@ -27,7 +27,7 @@
 namespace mongo {
 
 #if defined(_WIN32)
-    long long Timer::countsPerSecond;
+    unsigned long long Timer::countsPerSecond;
     struct AtStartup {
         AtStartup() {
             LARGE_INTEGER x;
