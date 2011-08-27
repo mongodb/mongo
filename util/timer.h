@@ -67,7 +67,9 @@ namespace mongo {
         Timer() { reset(); }
 
         int seconds() const { 
-            return now() / countsPerSecond;
+            int s = (now() - old) / countsPerSecond;
+            assert( s < 100 );
+            return s;
         }
 
         int millis() const { 
@@ -97,7 +99,7 @@ namespace mongo {
                     ((now() - old) * 1000000.0 / countsPerSecond);
         }
 
-        static long long countsPerSecond;
+        static unsigned long long countsPerSecond;
 
     private:
         unsigned long long now() const {
