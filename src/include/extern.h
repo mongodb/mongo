@@ -164,9 +164,10 @@ extern int __wt_btree_lex_compare( WT_BTREE *btree,
 extern int __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
+extern int __wt_xxx_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
 extern int __wt_btcur_last(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
-extern void __wt_cursor_hazard_clear(WT_CURSOR_BTREE *cbt);
+extern void __wt_cursor_clear(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);

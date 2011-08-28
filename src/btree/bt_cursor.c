@@ -8,24 +8,23 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cursor_hazard_clear --
- *	Clear any hazard references the cursor holds.
+ * __wt_cursor_clear --
+ *	Reset the cursor.
  */
 void
-__wt_cursor_hazard_clear(WT_CURSOR_BTREE *cbt)
+__wt_cursor_clear(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	if (F_ISSET(cbt, WT_CBT_PAGE_RELEASE)) {
+	if (cbt->page != NULL) {
 		__wt_page_release(session, cbt->page);
-		F_CLR(cbt, WT_CBT_PAGE_RELEASE);
+		cbt->page = NULL;
 	}
-	if (F_ISSET(cbt, WT_CBT_WALK_RELEASE)) {
-		__wt_walk_end(session, &cbt->walk, 0);
-		F_CLR(cbt, WT_CBT_WALK_RELEASE);
-	}
+
+	/* Reset the cursor iteration state. */
+	F_CLR(cbt, WT_CBT_SEARCH_SET);
 }
 
 /*
@@ -39,11 +38,10 @@ __cursor_flags_begin(WT_CURSOR_BTREE *cbt)
 
 	cursor = &cbt->iface;
 
-	/* Release any hazard references we're holding. */
-	__wt_cursor_hazard_clear(cbt);
+	/* Release any page references we're holding. */
+	__wt_cursor_clear(cbt);
 
-	/* Reset the iteration state. */
-	cbt->iter_state = WT_CBT_NOTHING;
+	/* Reset the key/value state. */
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 }
 
@@ -59,14 +57,14 @@ __cursor_flags_end(WT_CURSOR_BTREE *cbt, int ret)
 	cursor = &cbt->iface;
 
 	/*
-	 * On success, we're returning a key/value pair.
-	 * On error, release any hazard references.
+	 * On success, we're returning a key/value pair, and can iterate.
+	 * On error, release any page references we're holding.
 	 */
 	if (ret == 0) {
-		cbt->iter_state = WT_CBT_SEARCH;
+		F_SET(cbt, WT_CBT_SEARCH_SET);
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	} else
-		__wt_cursor_hazard_clear(cbt);
+		__wt_cursor_clear(cbt);
 }
 
 /*
@@ -314,9 +312,8 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
 	WT_UNUSED(config);
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	__wt_cursor_hazard_clear(cbt);
+	__wt_cursor_clear(cbt);
 
-	__wt_walk_end(session, &cbt->walk, 1);
 	__wt_buf_free(session, &cbt->value);
 
 	return (0);

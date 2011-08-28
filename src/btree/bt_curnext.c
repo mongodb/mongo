@@ -160,7 +160,7 @@ __next_var(WT_CURSOR_BTREE *cbt,
  *	Move to the next row-store item.
  */
 static inline int
-__next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value, int skip)
+__next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value, int newpage)
 {
 	WT_CELL *cell;
 	WT_IKEY *ikey;
@@ -171,42 +171,64 @@ __next_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value, int skip)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/*
-	 * Return the entry referenced by the cursor, and then move to the
-	 * next entry.
-	 */
-	for (;; skip = 0) {
-		/* Continue traversing any insert list. */
-		if ((ins = cbt->ins) != NULL) {
-			++cbt->ins_entry_cnt;
-			cbt->ins = WT_SKIP_NEXT(ins);
+	/* New page configuration. */
+	if (newpage) {
+		cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
+		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+		cbt->slot = 0;
+		F_SET(cbt, WT_CBT_RET_SLOT | WT_CBT_RET_INSERT);
+	}
 
-			upd = ins->upd;
-			if (skip || WT_UPDATE_DELETED_ISSET(upd))
-				continue;
-			key->data = WT_INSERT_KEY(ins);
-			key->size = WT_INSERT_KEY_SIZE(ins);
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = upd->size;
-			return (0);
+	/* Move to the next entry and return the item. */
+	for (;; newpage = 0) {
+		/* Continue traversing any insert list. */
+		if (cbt->ins != NULL) {
+			/*
+			 * If it's not the first entry on the page, move to the
+			 * next entry in the insert list.
+			 */
+			if (F_ISSET(cbt, WT_CBT_RET_INSERT))
+				F_CLR(cbt, WT_CBT_RET_INSERT);
+			else
+				cbt->ins = WT_SKIP_NEXT(cbt->ins);
+			++cbt->ins_entry_cnt;
+			if ((ins = cbt->ins) != NULL) {
+				upd = ins->upd;
+				if (WT_UPDATE_DELETED_ISSET(upd))
+					continue;
+				key->data = WT_INSERT_KEY(ins);
+				key->size = WT_INSERT_KEY_SIZE(ins);
+				value->data = WT_UPDATE_DATA(upd);
+				value->size = upd->size;
+				return (0);
+			}
 		}
 
-		/* Check to see if we've finished with this page. */
-		if (cbt->slot == cbt->page->entries)
-			return (WT_NOTFOUND);
+		/*
+		 * If we've returned the current slot, move to the next slot
+		 * (first checking to see if we're done with this page).
+		 */
+		if (F_ISSET(cbt, WT_CBT_RET_SLOT))
+			F_CLR(cbt, WT_CBT_RET_SLOT);
+		else {
+			if (cbt->slot == cbt->page->entries - 1)
+				return (WT_NOTFOUND);
+			++cbt->slot;
+		}
 
 		/*
 		 * Set up for this slot, and any insert list that follows this
 		 * slot.
 		 */
-		rip = &cbt->page->u.row_leaf.d[cbt->slot++];
+		rip = &cbt->page->u.row_leaf.d[cbt->slot];
 		cbt->ins_head = WT_ROW_INSERT(cbt->page, rip);
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		cbt->ins_entry_cnt = 0;
+		F_SET(cbt, WT_CBT_RET_INSERT);
 
 		/* If the slot has been deleted, we don't have a record. */
 		upd = WT_ROW_UPDATE(cbt->page, rip);
-		if (skip || (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)))
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
 		/*
@@ -252,37 +274,60 @@ int
 __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt, int next)
 {
 	WT_INSERT *ins;
-	WT_SESSION_IMPL *session;
 
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	/*
-	 * A cursor that was positioned using a search function is now being
-	 * used for iteration.  We don't want the search function to be slow,
-	 * so we put off doing expensive tasks until we know the application
-	 * is going to iterate with the cursor.
-	 *
-	 * First, build a stack of pages in the tree.
-	 */
-	WT_RET(__wt_walk_set(session, cbt->page, &cbt->walk, 0));
+	cbt->flags = 0;
 
 	/*
 	 * If we're in an insert list and moving forward through the tree, and
 	 * it's the "smaller than any page key" insert list, reset the slot to
-	 * 0, that's our traversal slot going forward.  If not the "smallest"
-	 * insert list, increment the page slot because we've logically already
-	 * returned the current slot, it appears before any insert list.
+	 * 0, that's our traversal slot, and make sure we return the items on
+	 * it.
 	 */
-	if (cbt->ins_head != NULL && next) {
+	if (next && cbt->ins_head != NULL &&
+	    cbt->ins_head == WT_ROW_INSERT_SMALLEST(cbt->page)) {
+		F_SET(cbt, WT_CBT_RET_SLOT);
+		cbt->slot = 0;
+	}
+
+	/*
+	 * If we're not in an insert list and moving forward through the tree,
+	 * set up the insert list that follows our current slot, it's the next
+	 * thing we return.
+	 */
+	if (next && cbt->ins_head == NULL) {
+		cbt->ins_head = WT_ROW_INSERT_SLOT(cbt->page, cbt->slot);
+		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+		F_SET(cbt, WT_CBT_RET_INSERT);
+	}
+
+	/*
+	 * If we're in an insert list and moving backward through the tree, and
+	 * it's the "smaller than any page key" insert list, reset the slot to
+	 * 0, that's our traversal slot.   If it's any other insert list, make
+	 * sure we return the items on it.
+	 */
+	if (!next && cbt->ins_head != NULL) {
 		if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(cbt->page))
 			cbt->slot = 0;
 		else
-			++cbt->slot;
+			F_SET(cbt, WT_CBT_RET_SLOT);
+	}
+
+	/*
+	 * If we're not in an insert list and moving backward through the tree,
+	 * set up the insert list that precedes our current slot, it's the next
+	 * thing we return.
+	 */
+	if (!next && cbt->ins_head == NULL) {
+		cbt->ins_head = cbt->slot == 0 ?
+		    WT_ROW_INSERT_SMALLEST(cbt->page) :
+		    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot - 1);
+		F_SET(cbt, WT_CBT_RET_INSERT);
 	}
 
 	/*
 	 * If we're in an insert list, figure out how far in, we have to track
-	 * our current slot in case we reverse direction.
+	 * our current slot for previous traversals.
 	 */
 	cbt->ins_entry_cnt = 0;
 	if (cbt->ins_head != NULL)
@@ -291,10 +336,6 @@ __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt, int next)
 			if (ins == cbt->ins)
 				break;
 		}
-
-	/* Our page hazard reference is now a tree hazard reference. */
-	F_CLR(cbt, WT_CBT_PAGE_RELEASE);
-	F_SET(cbt, WT_CBT_WALK_RELEASE);
 
 	return (0);
 }
@@ -306,9 +347,7 @@ __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt, int next)
 int
 __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 {
-	__wt_cursor_hazard_clear(cbt);
-
-	cbt->iter_state = WT_CBT_NOTHING;
+	__wt_cursor_clear(cbt);
 
 	return (__wt_btcur_next(cbt));
 }
@@ -322,9 +361,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
-	int newpage, ret, skip;
-
-	skip = 0;
+	int newpage, ret;
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
@@ -332,31 +369,16 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	switch (cbt->iter_state) {
-	case WT_CBT_NOTHING:
-		WT_RET(__wt_walk_first(session, &cbt->walk, 0));
-		break;
-	case WT_CBT_SEARCH:
+	/* If iterating from a search position, there's some setup to do. */
+	if (F_ISSET(cbt, WT_CBT_SEARCH_SET))
 		WT_RET(__wt_btcur_search_setup(cbt, 1));
-
-		/*
-		 * The iteration functions return the record referenced by the
-		 * cursor, and then move the cursor: setting up a search means
-		 * referencing a record we've already returned (or deleted, or
-		 * whatever), skip that record and move to the next record.
-		 */
-		skip = 1;
-		break;
-	case WT_CBT_ITERATING:
-		break;
-	}
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	for (newpage = 0;; newpage = 1, skip = 0) {
+	for (newpage = 0;; newpage = 1) {
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
@@ -369,7 +391,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 				break;
 			case WT_PAGE_ROW_LEAF:
 				ret = __next_row(
-				    cbt, &cursor->key, &cursor->value, skip);
+				    cbt, &cursor->key, &cursor->value, newpage);
 				break;
 			WT_ILLEGAL_FORMAT_ERR(session);
 			}
@@ -378,25 +400,108 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		}
 
 		do {
-			WT_ERR(__wt_walk_next(session, &cbt->walk, &cbt->page));
+			WT_ERR(__wt_xxx_np(session, &cbt->page, 1));
 			WT_ERR_TEST(cbt->page == NULL, WT_NOTFOUND);
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
 		    cbt->page->type == WT_PAGE_ROW_INT);
-
-		switch (cbt->page->type) {
-		case WT_PAGE_ROW_LEAF:
-			cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
-			cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-			cbt->slot = 0;
-			break;
-		}
 	}
 
 err:	if (ret != 0)
 		return (ret);
 
 	F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	cbt->iter_state = WT_CBT_ITERATING;
+	return (0);
+}
+
+/*
+ * __wt_xxx_np --
+ *	Move to the next/previous page in the tree.
+ */
+int
+__wt_xxx_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page, *t;
+	WT_ROW_REF *rref;
+	uint32_t slot;
+
+	btree = session->btree;
+
+	/*
+	 * Take a copy of any returned page; we have a hazard reference on the
+	 * page, by definition.
+	 */
+	page = *pagep;
+	*pagep = NULL;
+
+	/* If no page is active, begin a walk from the start of the tree. */
+	if (page == NULL) {
+		if ((page = btree->root_page.page) == NULL)
+			return (WT_ERROR);
+		slot = 0;
+		goto descend;
+	}
+
+	/* If the active page was the root, we've reached the walk's end. */
+	if (WT_PAGE_IS_ROOT(page))
+		return (0);
+
+	/*
+	 * Swap our hazard reference for the hazard reference of our parent.
+	 *
+	 * We're hazard-reference coupling up the tree and that's OK: first,
+	 * hazard references can't deadlock, so there's none of the usual
+	 * problems found when logically locking up a Btree; second, we don't
+	 * release our current hazard reference until we have our parent's
+	 * hazard reference.  If the eviction thread tries to evict the active
+	 * page, that fails because of our hazard reference.  If eviction tries
+	 * to evict our parent, that fails because the parent has a child page
+	 * that can't be discarded.
+	 *
+	 * Get the page if it's not the root page; we could access it directly
+	 * because we know it's in memory, but we need a hazard reference.
+	 */
+	t = page->parent;
+	if (!WT_PAGE_IS_ROOT(t))
+		WT_RET(__wt_page_in(session, t, t->parent_ref, 0));
+
+	/* Figure out the currently slot. */
+	slot = WT_ROW_REF_SLOT(t, page->parent_ref);
+
+	/* Release our previous hazard reference. */
+	__wt_page_release(session, page);
+	page = t;
+
+	/*
+	 * If we're at the last/first slot on the page, return this page in
+	 * post-order traversal.  Otherwise we move to the next/prev slot
+	 * and left/right-most element in its subtree.
+	 */
+	if ((next && slot == page->entries - 1) || (!next && slot == 0)) {
+		*pagep = page;
+		return (0);
+	}
+	if (next)
+		++slot;
+	else
+		--slot;
+
+descend:
+	/*
+	 * We're starting a new subtree on page/slot, descend to the left-most
+	 * item in the subtree, swapping hazard references at each level.
+	 */
+	for (;;) {
+		rref = &page->u.row_int.t[slot];
+		WT_RET(__wt_page_in(session, page, &rref->ref, 0));
+		__wt_page_release(session, page);
+
+		page = WT_ROW_REF_PAGE(rref);
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+		slot = next ? 0 : page->entries - 1;
+	}
+	*pagep = page;
 	return (0);
 }

@@ -11,21 +11,6 @@ struct __wt_cursor_btree {
 	WT_BTREE *btree;		/* Enclosing btree */
 
 	/*
-	 * A cursor is in one of three states with respect to iteration through
-	 * the tree: it's currently iterating, that is, it has a position in the
-	 * tree and the information necessary to iterate has been filled in; it
-	 * is not currently iterating, but the information necessary to iterate
-	 * has been initialized by a search function, that is, the cursor has a
-	 * position in the tree and iterating from the position is possible; it
-	 * is not currently iterating, and there's no useful search information.
-	 */
-	enum {
-		WT_CBT_NOTHING=0,	/* Not iterating, no position */
-		WT_CBT_SEARCH=1,	/* Not iterating, but has a position */
-		WT_CBT_ITERATING=2	/* Iterating */
-	} iter_state;
-
-	/*
 	 * The following fields are set by the search functions as a precursor
 	 * to page modification: we have a page, a WT_COL/WT_ROW slot on the
 	 * page, an insert head and list and a skiplist stack (the stack of
@@ -53,7 +38,6 @@ struct __wt_cursor_btree {
 	 * the first cursor next/prev function is called, they are filled in,
 	 * using the initial information returned by the search function.
 	 */
-	WT_WALK	 walk;			/* Current tree stack */
 	uint32_t nslots;		/* remaining page slots to return */
 
 	/*
@@ -61,7 +45,7 @@ struct __wt_cursor_btree {
 	 * a count of the current entry we're on.  For each iteration, we return
 	  one entry earlier in the list.
 	 */
-	uint32_t ins_entry_cnt;		/* Insert list entry count */
+	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
 
 	/*
 	 * The record number is calculated from the initial record number on the
@@ -83,12 +67,9 @@ struct __wt_cursor_btree {
 	uint64_t rle_return_cnt;	/* RLE count */
 	WT_BUF  value;			/* Cursor value copy */
 
-	/*
-	 * Finally, we need to know if we're holding hazard references, so we
-	 * can release them on error or close.
-	 */
-#define	WT_CBT_PAGE_RELEASE	0x01	/* Release the page */
-#define	WT_CBT_WALK_RELEASE	0x02	/* Release the walk */
+#define	WT_CBT_RET_INSERT	0x01	/* Return the current insert list */
+#define	WT_CBT_RET_SLOT		0x02	/* Return the current slot */
+#define	WT_CBT_SEARCH_SET	0x04	/* Search has set a page */
 	uint32_t flags;
 };
 

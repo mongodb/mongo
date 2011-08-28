@@ -481,10 +481,11 @@ wts_ops(void)
 {
 	uint64_t cnt, keyno;
 	uint32_t op;
-	int notfound;
+	int notfound, np;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		keyno = MMRAND(1, g.c_rows);
+		np = MMRAND(1, 2);
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -503,7 +504,7 @@ wts_ops(void)
 				 */
 				if (wts_row_del(keyno, &notfound))
 					return (1);
-				if (!notfound && wts_np(1))
+				if (!notfound && wts_np(np))
 					return (1);
 				break;
 			case FIX:
@@ -517,7 +518,7 @@ wts_ops(void)
 			case ROW:
 				if (wts_row_put(keyno, 1))
 					return (1);
-				if (wts_np(1))
+				if (wts_np(np))
 					return (1);
 				break;
 			case FIX:
@@ -534,7 +535,7 @@ wts_ops(void)
 			case ROW:
 				if (wts_row_put(keyno, 0))
 					return (1);
-				if (wts_np(1))
+				if (wts_np(np))
 					return (1);
 				break;
 			case FIX:

@@ -197,7 +197,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->rip = rip;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		cbt->match = 1;
-		F_SET(cbt, WT_CBT_PAGE_RELEASE);
 		return (0);
 	}
 
@@ -242,7 +241,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
 	cbt->match = cbt->ins == NULL ? 0 : 1;
-	F_SET(cbt, WT_CBT_PAGE_RELEASE);
 	return (0);
 
 err:	__wt_page_release(session, page);
