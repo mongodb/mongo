@@ -297,6 +297,13 @@ struct __wt_col_ref {
 	    (cref) = (page)->u.col_int.t; (i) > 0; ++(cref), --(i))
 
 /*
+ * WT_COL_REF_SLOT --
+ *	Return the 0-based array offset based on a WT_COL_REF reference.
+ */
+#define	WT_COL_REF_SLOT(page, cref)					\
+	((uint32_t)(((WT_COL_REF *)cref) - (page)->u.col_int.t))
+
+/*
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
  * this is created from on-page data when a page is read from the file.  It's
