@@ -561,3 +561,95 @@ __wt_walk_prev(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
 	}
 	/* NOTREACHED */
 }
+
+/*
+ * __wt_tree_np --
+ *	Move to the next/previous page in the tree.
+ */
+int
+__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page, *t;
+	WT_ROW_REF *rref;
+	uint32_t slot;
+
+	btree = session->btree;
+
+	/*
+	 * Take a copy of any returned page; we have a hazard reference on the
+	 * page, by definition.
+	 */
+	page = *pagep;
+	*pagep = NULL;
+
+	/* If no page is active, begin a walk from the start of the tree. */
+	if (page == NULL) {
+		if ((page = btree->root_page.page) == NULL)
+			return (WT_ERROR);
+		slot = 0;
+		goto descend;
+	}
+
+	/* If the active page was the root, we've reached the walk's end. */
+	if (WT_PAGE_IS_ROOT(page))
+		return (0);
+
+	/*
+	 * Swap our hazard reference for the hazard reference of our parent.
+	 *
+	 * We're hazard-reference coupling up the tree and that's OK: first,
+	 * hazard references can't deadlock, so there's none of the usual
+	 * problems found when logically locking up a Btree; second, we don't
+	 * release our current hazard reference until we have our parent's
+	 * hazard reference.  If the eviction thread tries to evict the active
+	 * page, that fails because of our hazard reference.  If eviction tries
+	 * to evict our parent, that fails because the parent has a child page
+	 * that can't be discarded.
+	 *
+	 * Get the page if it's not the root page; we could access it directly
+	 * because we know it's in memory, but we need a hazard reference.
+	 */
+	t = page->parent;
+	if (!WT_PAGE_IS_ROOT(t))
+		WT_RET(__wt_page_in(session, t, t->parent_ref, 0));
+
+	/* Figure out the currently slot. */
+	slot = WT_ROW_REF_SLOT(t, page->parent_ref);
+
+	/* Release our previous hazard reference. */
+	__wt_page_release(session, page);
+	page = t;
+
+	/*
+	 * If we're at the last/first slot on the page, return this page in
+	 * post-order traversal.  Otherwise we move to the next/prev slot
+	 * and left/right-most element in its subtree.
+	 */
+	if ((next && slot == page->entries - 1) || (!next && slot == 0)) {
+		*pagep = page;
+		return (0);
+	}
+	if (next)
+		++slot;
+	else
+		--slot;
+
+descend:
+	/*
+	 * We're starting a new subtree on page/slot, descend to the left-most
+	 * item in the subtree, swapping hazard references at each level.
+	 */
+	for (;;) {
+		rref = &page->u.row_int.t[slot];
+		WT_RET(__wt_page_in(session, page, &rref->ref, 0));
+		__wt_page_release(session, page);
+
+		page = WT_ROW_REF_PAGE(rref);
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+		slot = next ? 0 : page->entries - 1;
+	}
+	*pagep = page;
+	return (0);
+}

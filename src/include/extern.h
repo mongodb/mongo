@@ -164,7 +164,6 @@ extern int __wt_btree_lex_compare( WT_BTREE *btree,
 extern int __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
-extern int __wt_xxx_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
 extern int __wt_btcur_last(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
 extern void __wt_cursor_clear(WT_CURSOR_BTREE *cbt);
@@ -254,22 +253,13 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session,
 extern int __wt_walk_first(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     uint32_t flags);
-extern int __wt_walk_last(WT_SESSION_IMPL *session,
-    WT_WALK *walk,
-    uint32_t flags);
-extern int __wt_walk_set( WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_WALK *walk,
-    uint32_t flags);
 extern void __wt_walk_end(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     int discard_walk);
 extern int __wt_walk_next(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);
-extern int __wt_walk_prev(WT_SESSION_IMPL *session,
-    WT_WALK *walk,
-    WT_PAGE **pagep);
+extern int __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
 extern int __wt_col_modify( WT_SESSION_IMPL *session,
     uint64_t recno,
     WT_ITEM *value,

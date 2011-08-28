@@ -360,7 +360,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		}
 
 		do {
-			WT_ERR(__wt_xxx_np(session, &cbt->page, 0));
+			WT_ERR(__wt_tree_np(session, &cbt->page, 0));
 			WT_ERR_TEST(cbt->page == NULL, WT_NOTFOUND);
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
