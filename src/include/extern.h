@@ -253,10 +253,20 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session,
 extern int __wt_walk_first(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     uint32_t flags);
+extern int __wt_walk_last(WT_SESSION_IMPL *session,
+    WT_WALK *walk,
+    uint32_t flags);
+extern int __wt_walk_set( WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_WALK *walk,
+    uint32_t flags);
 extern void __wt_walk_end(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     int discard_walk);
 extern int __wt_walk_next(WT_SESSION_IMPL *session,
+    WT_WALK *walk,
+    WT_PAGE **pagep);
+extern int __wt_walk_prev(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);
 extern int __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
