@@ -1602,7 +1602,6 @@
     class SignedZeroDuplication : public Base {
     public:
         void run() {
-            if ( 0 ) { // SERVER-3682
             ASSERT_EQUALS( 0.0, -0.0 );
             DBDirectClient c;
             c.ensureIndex( ns(), BSON( "b" << 1 ), true );
@@ -1610,7 +1609,6 @@
             c.insert( ns(), BSON( "b" << 1.0 ) );
             c.update( ns(), BSON( "b" << 1.0 ), BSON( "b" << -0.0 ) );
             ASSERT_EQUALS( 1U, c.count( ns(), BSON( "b" << 0.0 ) ) );
-            }
         }
     };
 
