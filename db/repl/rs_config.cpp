@@ -37,7 +37,7 @@ namespace mongo {
         while( i.more() ) {
             BSONElement e = i.next();
             if( !fields.count( e.fieldName() ) ) {
-                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "'in object");
+                uasserted(13434, str::stream() << "unexpected field '" << e.fieldName() << "' in object");
             }
         }
     }

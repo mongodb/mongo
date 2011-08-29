@@ -717,11 +717,12 @@ namespace mongo {
                     // but is likely also less spiky on our cpu usage, which is good.
 
                     // commit sooner if one or more getLastError j:true is pending
+                    sleepmillis(oneThird);
                     for( unsigned i = 1; i <= 2; i++ ) {
-                        sleepmillis(oneThird);
                         if( commitJob._notify.nWaiting() )
                             break;
                         commitJob.wi()._deferred.invoke();
+                        sleepmillis(oneThird);
                     }
 
                     go();

@@ -295,8 +295,14 @@ namespace mongo {
                     if ( x == 0 && inShutdown() ) {
                         return;   // socket closed
                     }
-                    if( !inShutdown() )
+                    if( !inShutdown() ) {
                         log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
+                        if (x == EMFILE || x == ENFILE) {
+                            // Connection still in listen queue but we can't accept it yet
+                            error() << "Out of file descriptors. Waiting one second before trying to accept more connections." << warnings;
+                            sleepsecs(1);
+                        }
+                    }
                     continue;
                 }
                 if (from.getType() != AF_UNIX)

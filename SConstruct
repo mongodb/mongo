@@ -36,6 +36,8 @@ def findSettingsSetup():
 
 options = {}
 
+options_topass = {}
+
 def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 
     if dest is None:
@@ -56,7 +58,7 @@ def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
 def get_option( name ):
     return GetOption( name )
 
-def has_option( name ):
+def _has_option( name ):
     x = get_option( name )
     if x is None:
         return False
@@ -68,6 +70,12 @@ def has_option( name ):
         return False
 
     return True
+
+def has_option( name ):
+    x = _has_option(name)
+    options_topass[name] = x
+    return x
+
 
 def get_variant_dir():
     
@@ -113,6 +121,7 @@ add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
 add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 
 add_option( "cxx", "compiler to use" , 1 , True )
+add_option( "cc", "compiler to use for c" , 1 , True )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , True )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , True )
@@ -218,6 +227,9 @@ elif has_option("clang"):
     env["CC"] = 'clang'
     env["CXX"] = 'clang++'
 
+if has_option( "cc" ):
+    env["CC"] = get_option( "cc" )
+
 env["LIBPATH"] = []
 
 if has_option( "libpath" ):
@@ -252,6 +264,7 @@ else:
 
 if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
+    options_topass["usesm"] = True
 
 distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 
@@ -367,8 +380,6 @@ serverOnlyFiles += Glob( "db/commands/*.cpp" )
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
-snappyFiles = ["third_party/snappy/snappy.cc", "third_party/snappy/snappy-sinksource.cc"]
-
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
 if usesm:
@@ -377,8 +388,6 @@ elif usev8:
     scriptingFiles += [ Glob( "scripting/*v8*.cpp" ) ]
 else:
     scriptingFiles += [ "scripting/engine_none.cpp" ]
-
-coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp", "s/mr_shard.cpp", "s/security.cpp" ]
@@ -561,12 +570,6 @@ elif "win32" == os.sys.platform:
 
     boostLibs = []
 
-    env.Append(CPPPATH=[ "js/src/" ])
-    env.Append(CPPPATH=["../js/src/"])
-    env.Append(LIBPATH=["../js/src"])
-    env.Append(LIBPATH=["../js/"])
-
-    env.Append( CPPDEFINES=[ "OLDJS" ] )
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
@@ -574,7 +577,7 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
+    env.Append( CPPPATH=[ boostDir , winSDKHome + "/Include" ] )
 
     # consider adding /MP build with multiple processes option.
 
@@ -586,9 +589,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
     # PSAPI_VERSION relates to process api dll Psapi.dll.
-    # HAVE_CONFIG_H for pcre
-    # SUPPORT_UTF8 and SUPPORT_UCP are for pcre.  not sure if SUPPORT_UCP is needed - that is for unicode.
-    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","SUPPORT_UCP","SUPPORT_UTF8","PSAPI_VERSION=1" ] )
+    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","PSAPI_VERSION=1" ] )
 
     # this would be for pre-compiled headers, could play with it later  
     #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
@@ -598,7 +599,8 @@ elif "win32" == os.sys.platform:
     # /Gm is minimal rebuild, but may not work in parallel mode.
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /MT /Gy /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS= " /O2 /Gy " )
+        env.Append( CPPFLAGS= " /MT /Zi /TP /errorReport:none " )
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
@@ -636,26 +638,6 @@ elif "win32" == os.sys.platform:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
-
-    def pcreFilter(x):
-        name = x.name
-        if x.name.endswith( "dftables.c" ):
-            return False
-        if x.name.endswith( "pcredemo.c" ):
-            return False
-        if x.name.endswith( "pcretest.c" ):
-            return False
-        if x.name.endswith( "unittest.cc" ):
-            return False
-        if x.name.endswith( "pcregrep.c" ):
-            return False
-        return True
-
-    pcreFiles = []
-    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
-    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
-    commonFiles += pcreFiles
-    allClientFiles += pcreFiles
 
     winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
 
@@ -773,6 +755,24 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+for x in os.listdir( "third_party" ):
+    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+        continue
+         
+    shortName = x.rpartition( "." )[0]
+    path = "third_party/%s" % x
+
+
+    myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles }
+    
+    options_topass["windows"] = windows
+    options_topass["nix"] = nix
+    
+    myModule.configure( env , fileLists , options_topass )
+
+coreServerFiles += scriptingFiles
+
 # --- check system ---
 
 def getSysInfo():
@@ -819,7 +819,7 @@ def bigLibString( myenv ):
     return s
 
 
-def doConfigure( myenv , needPcre=True , shell=False ):
+def doConfigure( myenv , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
@@ -872,10 +872,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
         return False
 
-    if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
-        print( "can't find pcre" )
-        Exit(1)
-
     if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
         print( "can't find boost headers" )
         if shell:
@@ -902,10 +898,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
 
-    if nix and needPcre:
-        myCheckLib( "pcrecpp" , True )
-        myCheckLib( "pcre" , True )
-
     myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
     removeIfInList( myenv["LIBS"] , "wpcap" )
@@ -916,46 +908,8 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         else:
             m.configure( conf , myenv )
 
-    # XP_* is for spidermonkey.
-    # this is outside of usesm block so don't have to rebuild for java
-    if windows:
-        myenv.Append( CPPDEFINES=[ "XP_WIN" ] )
-    else:
-        myenv.Append( CPPDEFINES=[ "XP_UNIX" ] )
-
     if solaris:
         conf.CheckLib( "nsl" )
-
-    if usesm:
-
-        # see http://www.mongodb.org/pages/viewpageattachments.action?pageId=12157032
-        J = [ "mozjs" , "js", "js_static" ]
-        if windows:
-            if msarch == "amd64":
-                if release:
-                    J = [ "js64r", "js", "mozjs" , "js_static" ]
-                else:
-                    J = "js64d"
-                    print( "looking for js64d.lib for spidermonkey. (available at mongodb.org prebuilt)" );
-            else:
-                if not force32:
-                    print( "Assuming a 32 bit build is desired" )
-                if release:
-                    J = [ "js32r", "js", "mozjs" , "js_static" ]
-                else:
-                    J = [ "js32d", "js", "mozjs" , "js_static" ]
-                
-        myCheckLib( J , True )
-        mozHeader = "js"
-        if bigLibString(myenv).find( "mozjs" ) >= 0:
-            mozHeader = "mozjs"
-
-        if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
-            if conf.CheckHeader( "jsapi.h" ):
-                myenv.Append( CPPDEFINES=[ "OLDJS" ] )
-            else:
-                print( "no spider monkey headers!" )
-                Exit(1)
 
     if usev8:
         if debugBuild:
@@ -1093,8 +1047,6 @@ clientEnv.Prepend( LIBS=[ "mongoclient"] )
 clientEnv.Prepend( LIBPATH=["."] )
 clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
 l = clientEnv[ "LIBS" ]
-removeIfInList( l , "pcre" )
-removeIfInList( l , "pcrecpp" )
 
 # profile guided
 #if windows:
@@ -1117,12 +1069,6 @@ def checkErrorCodes():
         Exit(-1)
 
 checkErrorCodes()
-
-snappyEnv = env.Clone()
-if not windows:
-    snappyEnv.Append(CPPFLAGS=" -Wno-sign-compare -Wno-unused-function ") #snappy doesn't compile cleanly
-serverOnlyFiles += [snappyEnv.Object(f) for f in snappyFiles]
-
 
 # main db target
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
@@ -1206,9 +1152,6 @@ if noshell:
 elif not onlyServer:
     l = shellEnv["LIBS"]
 
-    removeIfInList( l , "pcre" )
-    removeIfInList( l , "pcrecpp" )
-
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
@@ -1218,7 +1161,7 @@ elif not onlyServer:
 
     shellEnv.Prepend( LIBPATH=[ "." ] )
         
-    shellEnv = doConfigure( shellEnv , needPcre=False , shell=True )
+    shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
     mongo = shellEnv.Program( "mongo" , coreShellFiles )

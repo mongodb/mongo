@@ -190,6 +190,9 @@ namespace mongo {
             char * end = data + netLength();
             for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
+
+                break; // TODO: remove this, pending SERVER-3711
+                
                 if ( ! entireRecrd )
                     break;
             }

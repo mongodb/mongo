@@ -275,6 +275,13 @@ namespace mongo {
             b.append("hidden", true);
         if( !myConfig().buildIndexes )
             b.append("buildIndexes", false);
+        if( !myConfig().tags.empty() ) {
+            BSONObjBuilder a;
+            for( map<string,string>::const_iterator i = myConfig().tags.begin(); i != myConfig().tags.end(); i++ )
+                a.append((*i).first, (*i).second);
+            b.append("tags", a.done());
+        }
+        b.append("me", myConfig().h.toString());
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
@@ -578,7 +585,6 @@ namespace mongo {
                 }
                 catch(DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
-                    throw;
                 }
                 for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ ) {
                     try {

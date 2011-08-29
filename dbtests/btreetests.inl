@@ -17,7 +17,8 @@
                 false, BTVERSION);
         }
         ~Ensure() {
-            _c.dropIndexes( ns() );
+            _c.dropCollection( ns() );
+            //_c.dropIndexes( ns() );
         }
     private:
         DBDirectClient _c;
@@ -1599,6 +1600,19 @@
         }
     };
 
+    class SignedZeroDuplication : public Base {
+    public:
+        void run() {
+            ASSERT_EQUALS( 0.0, -0.0 );
+            DBDirectClient c;
+            c.ensureIndex( ns(), BSON( "b" << 1 ), true );
+            c.insert( ns(), BSON( "b" << 0.0 ) );
+            c.insert( ns(), BSON( "b" << 1.0 ) );
+            c.update( ns(), BSON( "b" << 1.0 ), BSON( "b" << -0.0 ) );
+            ASSERT_EQUALS( 1U, c.count( ns(), BSON( "b" << 0.0 ) ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( testName ) {
@@ -1683,5 +1697,6 @@
             add< DelInternalReplacementNextNonNull >();
             add< DelInternalSplitPromoteLeft >();
             add< DelInternalSplitPromoteRight >();
+            add< SignedZeroDuplication >();
         }
     } myall;

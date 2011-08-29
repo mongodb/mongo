@@ -339,6 +339,7 @@ namespace mongo {
     }
 
     BSONObj KeyV1::toBson() const { 
+        assert( _keyData != 0 );
         if( !isCompactFormat() )
             return bson();
 
@@ -601,8 +602,12 @@ namespace mongo {
                     return false;
                 l += 4; r += 4;
             case cdate:
-            case cdouble:
                 if( *((unsigned long long *) l) != *((unsigned long long *) r) )
+                    return false;
+                l += 8; r += 8;
+                break;
+            case cdouble:
+                if( *((double *) l) != *((double *) r) )
                     return false;
                 l += 8; r += 8;
                 break;

@@ -522,6 +522,13 @@ namespace mongo {
                           ( _min._y + _max._y ) / 2 );
         }
 
+        void truncate( const Geo2dType* g ) {
+            if( _min._x < g->_min ) _min._x = g->_min;
+            if( _min._y < g->_min ) _min._y = g->_min;
+            if( _max._x > g->_max ) _max._x = g->_max;
+            if( _max._y > g->_max ) _max._y = g->_max;
+        }
+
         bool onBoundary( Point p, double fudge = 0 ) {
             return onBoundary( _min._x, p._x, fudge ) ||
                    onBoundary( _max._x, p._x, fudge ) ||
@@ -650,8 +657,17 @@ namespace mongo {
 
                 }
                 else if( fudge == 0 ){
-                    if( p._y == p1._y && p._x == p1._x ) return true;
-                    else if( p._y == p2._y && p._x == p2._x ) return true;
+
+                    // If this is an exact vertex, we won't intersect, so check this
+                    if( p._y == p1._y && p._x == p1._x ) return 1;
+                    else if( p._y == p2._y && p._x == p2._x ) return 1;
+
+                    // If this is a horizontal line we won't intersect, so check this
+                    if( p1._y == p2._y && p._y == p1._y ){
+                        // Check that the x-coord lies in the line
+                        if( p._x >= std::min( p1._x, p2._x ) && p._x <= std::max( p1._x, p2._x ) ) return 1;
+                    }
+
                 }
 
                 // Normal intersection test.
@@ -661,7 +677,20 @@ namespace mongo {
                         if ( p._x <= std::max( p1._x, p2._x ) ) {
                             if ( p1._y != p2._y ) {
                                 double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
-                                if ( p1._x == p2._x || p._x <= xinters ) {
+                                // Special case of point on vertical line
+                                if ( p1._x == p2._x && p._x == p1._x ){
+
+                                    // Need special case for the vertical edges, for example:
+                                    // 1) \e   pe/----->
+                                    // vs.
+                                    // 2) \ep---e/----->
+                                    //
+                                    // if we count exact as intersection, then 1 is in but 2 is out
+                                    // if we count exact as no-int then 1 is out but 2 is in.
+
+                                    return 1;
+                                }
+                                else if( p1._x == p2._x || p._x <= xinters ) {
                                     counter++;
                                 }
                             }
@@ -2363,6 +2392,8 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
+            _bounds.truncate( g );
+
             _maxDim = _g->_error + _bounds.maxDim() / 2;
 
             ok();
@@ -2370,7 +2401,7 @@ namespace mongo {
 
         // The initial geo hash box for our first expansion
         virtual GeoHash expandStartHash() {
-            return _g->hash( _poly.centroid() );
+            return _g->hash( _bounds.center() );
         }
 
         // Whether the current box width is big enough for our search area
