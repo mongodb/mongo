@@ -1002,7 +1002,12 @@ namespace mongo {
             
             {
                 // we need to re-find in case something changed
-                
+                d = nsdetails( ns );
+                if ( ! d ) {
+                    // dropped 
+                    return UpdateResult(0, 0, 0);
+                }
+                nsdt = &NamespaceDetailsTransient::get_w(ns);
                 IndexDetails& i = d->idx(idIdxNo);
                 BSONObj key = i.getKeyFromQuery( patternOrig );            
                 loc = i.idxInterface().findSingle(i, i.head, key);
