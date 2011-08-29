@@ -11,7 +11,7 @@ static int  bulk(WT_ITEM **, WT_ITEM **);
 static int  wts_close(WT_CONNECTION *);
 static int  wts_col_del(uint64_t);
 static int  wts_col_put(uint64_t, int);
-static int  wts_np(int);
+static int  wts_np(int, int *);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
 static int  wts_open(WT_CONNECTION **, WT_SESSION **session);
 static int  wts_read(uint64_t);
@@ -481,11 +481,15 @@ wts_ops(void)
 {
 	uint64_t cnt, keyno;
 	uint32_t op;
-	int notfound, np;
+	u_int np;
+	int notfound;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
+		if (cnt % 10 == 0)
+			track("read/write ops", cnt);
+
+		notfound = 0;
 		keyno = MMRAND(1, g.c_rows);
-		np = MMRAND(1, 2);
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -504,8 +508,6 @@ wts_ops(void)
 				 */
 				if (wts_row_del(keyno, &notfound))
 					return (1);
-				if (!notfound && wts_np(np))
-					return (1);
 				break;
 			case FIX:
 			case VAR:
@@ -517,8 +519,6 @@ wts_ops(void)
 			switch (g.c_file_type) {
 			case ROW:
 				if (wts_row_put(keyno, 1))
-					return (1);
-				if (wts_np(np))
 					return (1);
 				break;
 			case FIX:
@@ -535,8 +535,6 @@ wts_ops(void)
 			case ROW:
 				if (wts_row_put(keyno, 0))
 					return (1);
-				if (wts_np(np))
-					return (1);
 				break;
 			case FIX:
 			case VAR:
@@ -544,14 +542,27 @@ wts_ops(void)
 					return (1);
 				break;
 			}
+		} else {
+			if (wts_read(keyno))
+				return (1);
+			continue;
 		}
 
-		/* Read the value and check that it worked. */
+		/*
+		 * If we did any operation, we've set the cursor, do a small
+		 * number of next/prev cursor operations.
+		 */
+		if (g.c_file_type == ROW)
+			for (np = 0; np < MMRAND(1, 4); ++np) {
+				if (notfound)
+					break;
+				if (wts_np(MMRAND(0, 1), &notfound))
+					return (1);
+			}
+
+		/* Then read the value we modified to confirm it worked. */
 		if (wts_read(keyno))
 			return (1);
-
-		if (cnt % 10 == 0)
-			track("read/write ops", cnt);
 	}
 	return (0);
 }
@@ -674,7 +685,7 @@ wts_read(uint64_t keyno)
  *	Read and verify the next/prev element in a row- or column-store file.
  */
 static int
-wts_np(int next)
+wts_np(int next, int *notfoundp)
 {
 	static WT_ITEM key, value, bdb_key, bdb_value;
 	WT_CURSOR *cursor;
@@ -696,6 +707,7 @@ wts_np(int next)
 	if (bdb_np(next, &bdb_key.data, &bdb_key.size,
 	    &bdb_value.data, &bdb_value.size, &notfound))
 		return (1);
+	*notfoundp = notfound;
 
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);

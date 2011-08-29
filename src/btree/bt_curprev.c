@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __prev_fix --
+ * __cursor_fix_prev --
  *	Move to the previous, fixed-length column-store item.
  */
 static inline int
-__prev_fix(
+__cursor_fix_prev(
     WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
 {
 	WT_BTREE *btree;
@@ -74,11 +74,11 @@ __prev_fix(
 }
 
 /*
- * __prev_var --
+ * __cursor_var_prev --
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__prev_var(WT_CURSOR_BTREE *cbt,
+__cursor_var_prev(WT_CURSOR_BTREE *cbt,
     int newpage, uint64_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
@@ -179,123 +179,97 @@ __prev_var(WT_CURSOR_BTREE *cbt,
 }
 
 /*
- * __prev_row --
+ * __cursor_row_prev --
  *	Move to the previous row-store item.
  */
 static inline int
-__prev_row(WT_CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value, int newpage)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_CELL *cell;
-	WT_IKEY *ikey;
+	WT_BUF *key, *val;
 	WT_INSERT *ins;
 	WT_ROW *rip;
-	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	key = &cbt->iface.key;
+	val = &cbt->iface.value;
 
-	/* New page configuration. */
+	/*
+	 * For row-store pages, we need a single item that tells us the part
+	 * of the page we're walking (otherwise switching from next to prev
+	 * and vice-versa is just too complicated), so we map the WT_ROW and
+	 * WT_INSERT_HEAD array slots into a single name space: slot 1 is the
+	 * "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
+	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
+	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
+	 *
+	 * New page configuration.
+	 */
 	if (newpage) {
 		cbt->ins_head =
 		    WT_ROW_INSERT_SLOT(cbt->page, cbt->page->entries - 1);
-		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		cbt->ins_entry_cnt = 0;
 		WT_SKIP_FOREACH(ins, cbt->ins_head)
 			++cbt->ins_entry_cnt;
-		cbt->slot = cbt->page->entries - 1;
-		F_SET(cbt, WT_CBT_RET_SLOT | WT_CBT_RET_INSERT);
+		cbt->slot = cbt->page->entries * 2 + 1;
+		goto new_insert;
 	}
 
 	/* Move to the previous entry and return the item. */
-	for (;; newpage = 0) {
+	for (;;) {
 		/*
 		 * Continue traversing any insert list.  Insert lists are in
 		 * forward sorted order; in a last-to-first walk we have walk
-		 * the list from the end to the beginning.
+		 * the list from the end to the beginning.  Maintain the
+		 * reference to the current insert element in case we switch
+		 * to a cursor next movement.
 		 */
-		if (cbt->ins_head != NULL && cbt->ins_entry_cnt != 0) {
-			if (F_ISSET(cbt, WT_CBT_RET_INSERT))
-				F_CLR(cbt, WT_CBT_RET_INSERT);
-			else
-				if (--cbt->ins_entry_cnt == 0)
-					continue;
+		if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0)
+			--cbt->ins_entry_cnt;
+
+new_insert:	if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0) {
 			for (i = cbt->ins_entry_cnt,
 			    ins = WT_SKIP_FIRST(cbt->ins_head); i > 1; --i)
 				ins = WT_SKIP_NEXT(ins);
+			cbt->ins = ins;
 
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = upd->size;
+			val->data = WT_UPDATE_DATA(upd);
+			val->size = upd->size;
 			return (0);
 		}
 
+		/* Check for the beginning of the page. */
+		if (cbt->slot == 1)
+			return (WT_NOTFOUND);
+		--cbt->slot;
+
 		/*
-		 * If we've returned the current slot, move to the previous slot
-		 * (first checking to see if we're done with this page).
+		 * Odd-numbered slots configure as WT_INSERT_HEAD entries,
+		 * even-numbered slots configure as WT_ROW entries.
 		 */
-		if (F_ISSET(cbt, WT_CBT_RET_SLOT))
-			F_CLR(cbt, WT_CBT_RET_SLOT);
-		else {
-			if (cbt->slot == 0)
-				return (WT_NOTFOUND);
-			--cbt->slot;
+		if (cbt->slot & 0x01) {
+			cbt->ins_head = cbt->slot == 1 ?
+			    WT_ROW_INSERT_SMALLEST(cbt->page) :
+			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot / 2 - 1);
+			cbt->ins_entry_cnt = 0;
+			WT_SKIP_FOREACH(ins, cbt->ins_head)
+				++cbt->ins_entry_cnt;
+			goto new_insert;
 		}
+		cbt->ins_head = NULL;
+		cbt->ins = NULL;
 
-		/*
-		 * Set up for this slot, and the insert list that precedes this
-		 * slot.
-		 */
-		rip = &cbt->page->u.row_leaf.d[cbt->slot];
-		cbt->ins_head = cbt->slot == 0 ?
-		    WT_ROW_INSERT_SMALLEST(cbt->page) :
-		    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot - 1);
-		cbt->ins_entry_cnt = 0;
-		WT_SKIP_FOREACH(ins, cbt->ins_head)
-			++cbt->ins_entry_cnt;
-		F_SET(cbt, WT_CBT_RET_INSERT);
-
-		/* If the slot has been deleted, we don't have a record. */
+		rip = &cbt->page->u.row_leaf.d[cbt->slot / 2 - 1];
 		upd = WT_ROW_UPDATE(cbt->page, rip);
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
-		/*
-		 * Return the slot's K/V pair.
-		 *
-		 * XXX
-		 * If we have the last key, we can easily build the next prefix
-		 * compressed key without calling __wt_row_key() -- obviously,
-		 * that won't work for overflow or Huffman-encoded keys, so we
-		 * need to check the cell type, at the least, before taking the
-		 * fast path.
-		 */
-		if (__wt_off_page(cbt->page, rip->key)) {
-			ikey = rip->key;
-			key->data = WT_IKEY_DATA(ikey);
-			key->size = ikey->size;
-		} else
-			WT_RET(__wt_row_key(session, cbt->page, rip, key));
-
-		/*
-		 * If the item was ever modified, use the data from the
-		 * WT_UPDATE entry. Then check for empty data.  Finally, use
-		 * the value from the disk image.
-		 */
-		if (upd != NULL) {
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = upd->size;
-		} else if ((cell =
-		    __wt_row_value(cbt->page, rip)) == NULL) {
-			value->data = "";
-			value->size = 0;
-		} else
-			WT_RET(__wt_cell_copy(session, cell, value));
-		return (0);
+		return (__cursor_row_slot_return(cbt, rip));
 	}
 	/* NOTREACHED */
 }
@@ -331,7 +305,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 
 	/* If iterating from a search position, there's some setup to do. */
 	if (F_ISSET(cbt, WT_CBT_SEARCH_SET))
-		WT_RET(__wt_btcur_search_setup(cbt, 0));
+		WT_RET(__wt_btcur_search_setup(cbt));
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
@@ -342,16 +316,15 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
-				ret = __prev_fix(cbt, newpage,
+				ret = __cursor_fix_prev(cbt, newpage,
 				   &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __prev_var(cbt, newpage,
+				ret = __cursor_var_prev(cbt, newpage,
 				    &cursor->recno, &cursor->value);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __prev_row(
-				    cbt, &cursor->key, &cursor->value, newpage);
+				ret = __cursor_row_prev(cbt, newpage);
 				break;
 			WT_ILLEGAL_FORMAT_ERR(session);
 			}
