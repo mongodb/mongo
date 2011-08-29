@@ -172,19 +172,29 @@ SELFHELPER(struct wt_cursor)
 
         PyObject *_get_key() {
                 WT_ITEM k;
-                $self->get_key($self, &k);
+                int ret = $self->get_key($self, &k);
+                if (ret != 0) {
+                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
+                        return (NULL);
+                }
                 return SWIG_FromCharPtrAndSize(k.data, k.size);
         }
 
         uint64_t _get_recno() {
-                uint64_t r;
-                $self->get_key($self, &r);
+                uint64_t r = 0;
+                int ret = $self->get_key($self, &r);
+                if (ret != 0)
+                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
                 return r;
         }
 
         PyObject *_get_value() {
                 WT_ITEM v;
-                $self->get_value($self, &v);
+                int ret = $self->get_value($self, &v);
+                if (ret != 0) {
+                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
+                        return (NULL);
+                }
                 return SWIG_FromCharPtrAndSize(v.data, v.size);
         }
 
