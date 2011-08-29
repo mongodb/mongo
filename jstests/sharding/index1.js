@@ -61,8 +61,8 @@ for ( var i = 0; i < 10; i++ ) {
 		}
 		catch( e ){
 			print(e)
-            assert( !passed, "Should not shard collection with no unique index.")
 		}
+        assert( !passed, "Should not shard collection with no unique index.")
         }
 	}
 	if ( i == 3 ) {
