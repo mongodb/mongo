@@ -17,7 +17,8 @@
                 false, BTVERSION);
         }
         ~Ensure() {
-            _c.dropIndexes( ns() );
+            _c.dropCollection( ns() );
+            //_c.dropIndexes( ns() );
         }
     private:
         DBDirectClient _c;
