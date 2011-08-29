@@ -51,11 +51,14 @@ namespace mongo {
                 userObj = conn->findOne(systemUsers, query);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                    conn.done(); // return to pool
                     return false;
                 }
             }
 
             pwd = userObj.getStringField("pwd");
+
+            conn.done(); // return to pool
         }
         return true;
     }
