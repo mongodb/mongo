@@ -22,12 +22,14 @@ for ( var i = 0; i < 10; i++ ) {
 		coll.ensureIndex( { num : 1 }, { unique : true } )
 		coll.ensureIndex( { x : 1 } )
 
+		passed = false
 		try {
 			s.adminCommand( { shardcollection : "" + coll, key : { x : 1 } } )
-			assert( false, "Should not shard collection when another unique index exists!" )
+			passed = true
 		} catch (e) {
 			print( e )
 		}
+		assert( !passed, "Should not shard collection when another unique index exists!")
 
 	}
 	if ( i == 1 ) {
@@ -46,18 +48,22 @@ for ( var i = 0; i < 10; i++ ) {
 		
 	}
 	if ( i == 2 ) {
-
-		// Unique index exists as prefix, also index exists
+        if (false) { // SERVER-3718
+		// Non-unique index exists as prefix, also index exists.  No unique index.
 		coll.ensureIndex( { x : 1 } )
 		coll.ensureIndex( { x : 1, num : 1 } )
 
+        passed = false;
 		try{
 			s.adminCommand({ shardcollection : "" + coll, key : { x : 1 } })
-			assert( false, "Should not shard collection with non-unique prefix index.")
+            passed = true;
+
 		}
 		catch( e ){
 			print(e)
+            assert( !passed, "Should not shard collection with no unique index.")
 		}
+        }
 	}
 	if ( i == 3 ) {
 
