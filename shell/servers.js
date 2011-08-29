@@ -182,13 +182,15 @@ myPort = function() {
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
     
     // Check if testName is an object, if so, pull params from there
+    var keyFile = undefined
     if( testName && ! testName.charAt ){
         var params = testName
         testName = params.name || "test"
         numShards = params.shards || 2
         verboseLevel = params.verbose || 0
         numMongos = params.mongos || 1
-        otherParams = params.other || {} 
+        otherParams = params.other || {}
+        keyFile = params.keyFile || otherParams.keyFile
     }
     
     this._testName = testName;
@@ -221,7 +223,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var numReplicas = rsDefaults.nodes || otherParams.numReplicas || 3
             delete rsDefaults.nodes 
             
-            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ) } );
+            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), keyFile : keyFile } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
             
@@ -237,8 +239,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         }
         
         this._configServers = []
-        for ( var i=0; i<3; i++ ){
-            var conn = startMongodTest( 30000 + i , testName + "-config" + i, false, otherParams.extraOptions );
+        for ( var i=0; i<3; i++ ){            
+            var options = otherParams.extraOptions
+            if( keyFile ) options["keyFile"] = keyFile
+            var conn = startMongodTest( 30000 + i , testName + "-config" + i, false, options );
             this._alldbpaths.push( testName + "-config" + i )
             this._configServers.push( conn );
         }
@@ -251,7 +255,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     else {
         for ( var i=0; i<numShards; i++){
-            var conn = startMongodTest( 30000 + i , testName + i, 0, {useHostname : otherParams.useHostname} );
+            var options = { useHostname : otherParams.useHostname }
+            if( keyFile ) options["keyFile"] = keyFile
+            var conn = startMongodTest( 30000 + i , testName + i, 0, options );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
         }
@@ -273,6 +279,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         var myPort =  startMongosPort - i;
         print("ShardingTest config: "+this._configDB);
         var opts = { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB };
+        if( keyFile ) opts["keyFile"] = keyFile
         for (var j in otherParams.extraOptions) {
             opts[j] = otherParams.extraOptions[j];
         }
@@ -1080,6 +1087,7 @@ ReplSetTest = function( opts ){
     this.useSeedList = opts.useSeedList || false;
     this.bridged = opts.bridged || false;
     this.ports = [];
+    this.keyFile = opts.keyFile
 
     this.startPort = opts.startPort || 31000;
 
@@ -1259,6 +1267,11 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
     a.push( "--dbpath" );
     a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
+    
+    if( this.keyFile ){
+        a.push( "--keyFile" )
+        a.push( keyFile )
+    }        
     
     if( jsTestOptions().noJournal ) a.push( "--nojournal" )
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
