@@ -89,9 +89,15 @@ namespace mongo {
                 _warned = true;
                 log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
             }
+
+            // Must return conn to pool
+            // TODO: Check for errors during findOne(), or just let the conn die?
+            conn.done();
             return true;
         }
 
+        // Must return conn to pool
+        conn.done();
         return false;
     }
 
