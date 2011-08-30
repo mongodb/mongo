@@ -729,30 +729,23 @@ wts_np(int next, int *notfoundp)
 		return (1);
 	}
 
-	/*
-	 * Check for not-found status.
-	 *
-	 * In fixed length stores, zero values at the end of the key space
-	 * are treated as not found.  Treat this the same as a zero value
-	 * in the key space, to match BDB's behavior.
-	 */
-	if (g.c_file_type == FIX && ret == WT_NOTFOUND) {
-		bitfield = 0;
-		ret = 0;
-	}
-
 	NTF_CHK(wts_notfound_chk(
 	    next ? "wts_np(next)" : "wts_np(prev)", ret, notfound, keyno));
 
 	/* Compare the two. */
-	if (key.size != bdb_key.size ||
-	    memcmp(key.data, bdb_key.data, key.size) != 0 ||
-	    value.size != bdb_value.size ||
+	if (g.c_file_type == ROW) {
+		if (key.size != bdb_key.size ||
+		    memcmp(key.data, bdb_key.data, key.size) != 0) {
+			fprintf(stderr, "wts_np: %s key mismatch:\n", which);
+			wts_stream_item("bdb-key", &bdb_key);
+			wts_stream_item(" wt-key", &key);
+			return (1);
+		}
+	}
+	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
-		fprintf(stderr, "wts_np: %s row key/value mismatch:\n", which);
-		wts_stream_item("bdb-key", &bdb_key);
+		fprintf(stderr, "wts_np: %s value mismatch:\n", which);
 		wts_stream_item("bdb-value", &bdb_value);
-		wts_stream_item(" wt-key", &key);
 		wts_stream_item(" wt-value", &value);
 		return (1);
 	}
