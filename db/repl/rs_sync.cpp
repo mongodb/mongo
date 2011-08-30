@@ -553,7 +553,7 @@ namespace mongo {
         rwlock lk( _lock , false );
         MAP::iterator i = _ghostCache.find( rid );
         if ( i == _ghostCache.end() ) {
-            OCCASIONALLY log() << "couldn't update slave " << rid << " no entry" << rsLog;
+            OCCASIONALLY warning() << "couldn't update slave " << rid << " no entry" << rsLog;
             return;
         }
         
