@@ -67,6 +67,10 @@ for (iter = 0; iter < 5; iter++) {
     print("checking result field");
     assert.eq(res.result.collection, outCollStr, "Wrong collection " + res.result.collection);
     assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db);
+
+    // make sure final collection has index on _id
+    assert(outDb.system.indexes.count({ns: outDbStr + "." + outCollStr, key: {_id: 1}}) > 0, "No index on _id")
+    assert( gotAGoodOne , "no good for out db" )
 }
 
 assert( gotAGoodOne , "no good for out db" )
