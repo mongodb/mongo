@@ -90,14 +90,14 @@ value_gen(void *valuep, uint32_t *sizep)
 	if (g.c_file_type == FIX) {
 		snprintf((char *)buf, blen, "%010u", ++r);
 		switch (g.c_bitcnt) {
-		case 8: buf[0] = MMRAND(0, 0xff); break;
-		case 7: buf[0] = MMRAND(0, 0x7f); break;
-		case 6: buf[0] = MMRAND(0, 0x3f); break;
-		case 5: buf[0] = MMRAND(0, 0x1f); break;
-		case 4: buf[0] = MMRAND(0, 0x0f); break;
-		case 3: buf[0] = MMRAND(0, 0x07); break;
-		case 2: buf[0] = MMRAND(0, 0x03); break;
-		case 1: buf[0] = MMRAND(0, 0x01); break;
+		case 8: buf[0] = MMRAND(1, 0xff); break;
+		case 7: buf[0] = MMRAND(1, 0x7f); break;
+		case 6: buf[0] = MMRAND(1, 0x3f); break;
+		case 5: buf[0] = MMRAND(1, 0x1f); break;
+		case 4: buf[0] = MMRAND(1, 0x0f); break;
+		case 3: buf[0] = MMRAND(1, 0x07); break;
+		case 2: buf[0] = MMRAND(1, 0x03); break;
+		case 1: buf[0] = 1; break;
 		}
 		*(void **)valuep = buf;
 		*sizep = 1;
