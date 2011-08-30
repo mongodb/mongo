@@ -2,7 +2,7 @@
 // Tests for polygon querying with varying levels of accuracy
 //
 
-var numTests = 30;
+var numTests = 31;
 
 for( var n = 0; n < numTests; n++ ){
 	
