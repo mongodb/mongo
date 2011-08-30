@@ -305,7 +305,7 @@ namespace mongo {
                 {
                     long long n = e._numberLong();
                     double d = (double) n;
-                    if( d != n ) { 
+                    if( ((long long)d) != n ) { 
                         traditional(obj);
                         return;
                     }
