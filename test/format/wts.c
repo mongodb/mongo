@@ -832,9 +832,9 @@ wts_col_put(uint64_t keyno, int insert)
 	if (g.logging) {
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
-			    "%-10s%" PRIu64 " {0x%02x}",
+			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    insert ? "insert" : "put",
-			    keyno, ((char *)value.data)[0]);
+			    keyno, ((uint8_t *)value.data)[0]);
 		else
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {%.*s}",
