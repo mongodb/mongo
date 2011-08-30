@@ -25,10 +25,9 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
 	UNUSED(handler);
 
-	if (g.logfp != NULL) {
+	if (g.logfp != NULL)
 		fprintf(g.logfp, "%s\n", message);
-		fflush(g.logfp);
-	} else
+	else
 		printf("%s\n", message);
 	return (0);
 }
@@ -432,7 +431,7 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	}
 
 	key_gen(&key.data, &key.size, (uint64_t)g.key_cnt, 0);
-	value_gen(&value.data, &value.size);
+	value_gen(&value.data, &value.size, (uint64_t)g.key_cnt);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -552,13 +551,17 @@ wts_ops(void)
 		 * If we did any operation, we've set the cursor, do a small
 		 * number of next/prev cursor operations.
 		 */
-		if (g.c_file_type == ROW)
+		if (g.c_file_type == ROW || g.c_file_type == FIX)
+			if (wts_np(1, &notfound))
+				return (1);
+#if 0
 			for (np = 0; np < MMRAND(1, 4); ++np) {
 				if (notfound)
 					break;
 				if (wts_np(MMRAND(0, 1), &notfound))
 					return (1);
 			}
+#endif
 
 		/* Then read the value we modified to confirm it worked. */
 		if (wts_read(keyno))
@@ -768,7 +771,7 @@ wts_row_put(uint64_t keyno, int insert)
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, insert);
-	value_gen(&value.data, &value.size);
+	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
 	if (g.logging)
@@ -812,7 +815,7 @@ wts_col_put(uint64_t keyno, int insert)
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, 0);
-	value_gen(&value.data, &value.size);
+	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
 	if (g.logging) {

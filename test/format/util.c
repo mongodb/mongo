@@ -56,10 +56,9 @@ key_gen_setup(void)
 }
 
 void
-value_gen(void *valuep, uint32_t *sizep)
+value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
 {
 	static size_t blen = 0;
-	static u_int r = 0;
 	static const char *dup_data = "duplicate data item";
 	static u_char *buf = NULL;
 	size_t i;
@@ -88,7 +87,6 @@ value_gen(void *valuep, uint32_t *sizep)
 	 * the record number.
 	 */
 	if (g.c_file_type == FIX) {
-		snprintf((char *)buf, blen, "%010u", ++r);
 		switch (g.c_bitcnt) {
 		case 8: buf[0] = MMRAND(1, 0xff); break;
 		case 7: buf[0] = MMRAND(1, 0x7f); break;
@@ -108,7 +106,7 @@ value_gen(void *valuep, uint32_t *sizep)
 	 * WiredTiger doesn't store zero-length data items in row-store files,
 	 * test that by inserting a zero-length data item every so often.
 	 */
-	if (++r % 63 == 0) {
+	if (++keyno % 63 == 0) {
 		*(void **)valuep = buf;
 		*sizep = 0;
 		return;
@@ -130,7 +128,7 @@ value_gen(void *valuep, uint32_t *sizep)
 		return;
 	}
 
-	snprintf((char *)buf, blen, "%010u", r);
+	snprintf((char *)buf, blen, "%010" PRIu64, keyno);
 	buf[10] = '/';
 	*(void **)valuep = buf;
 	*sizep = MMRAND(g.c_value_min, g.c_value_max);
@@ -185,8 +183,10 @@ wts_rand(void)
 		if ((g.rand_log =
 		    fopen("__rand", g.replay ? "r" : "w")) == NULL)
 			die("__rand", errno);
-		if (!g.replay)
+		if (!g.replay) {
+			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
+		}
 	}
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {

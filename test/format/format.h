@@ -106,7 +106,7 @@ void	 die(const char *,  int);
 void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
 void	 track(const char *, uint64_t);
-void	 value_gen(void *, uint32_t *);
+void	 value_gen(void *, uint32_t *, uint64_t);
 int	 wts_bulk_load(void);
 int	 wts_dump(const char *, int);
 int	 wts_ops(void);

@@ -10,7 +10,6 @@
 GLOBAL g;
 
 static void onint(int);
-static void shutdown(int);
 static void startup(void);
 static void usage(void);
 
@@ -74,7 +73,6 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
-		shutdown(0);			/* Clean up previous runs */
 		startup();			/* Start a run */
 
 		config_setup();			/* Run configuration */
@@ -144,11 +142,10 @@ main(int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
-
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
+	if (g.rand_log != NULL)
+		(void)fclose(g.rand_log);
 
 	config_print(ret);
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
@@ -161,28 +158,27 @@ err:		ret = 1;
 static void
 startup(void)
 {
-	/* Seed the random number generator. */
-	if (!g.replay)
-		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+	/* Close the logging file. */
+	if (g.logfp != NULL) {
+		(void)fclose(g.logfp);
+		g.logfp = NULL;
+	}
+
+	/* Close the random number file. */
+	if (g.rand_log != NULL) {
+		(void)fclose(g.rand_log);
+		g.rand_log = NULL;
+	}
+
+	/* Remove the run's files except for __rand. */
+	(void)system("rm -f __[a-qs-z]* __run");
 
 	/* Open/truncate the logging file. */
-	if (g.logging && (g.logfp = fopen("__log", "w")) == NULL)
-		die("__log", errno);
-}
-
-/*
- * shutdown --
- *	Clean up from previous runs.
- */
-static void
-shutdown(int force)
-{
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-
-	(void)system("rm -f __bdb* __run __schema.wt __stats __wt*");
-	if (force)					/* __rand, too */
-		(void)system("rm -f __*");
+	if (g.logging) {
+		if ((g.logfp = fopen("__log", "w")) == NULL)
+			die("__log", errno);
+		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
+	}
 }
 
 /*
@@ -194,7 +190,8 @@ onint(int signo)
 {
 	UNUSED(signo);
 
-	shutdown(1);
+	/* Remove the run's files except for __rand. */
+	(void)system("rm -f __[a-qs-z]* __run");
 
 	fprintf(stderr, "\n");
 	exit (EXIT_FAILURE);
