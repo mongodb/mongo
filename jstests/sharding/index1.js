@@ -124,7 +124,55 @@ for ( var i = 0; i < 10; i++ ) {
 		}
 		
 	}
+    if ( i == 7 ) {
+        if (false) { // SERVER-3718
+		coll.remove()
 
+		// No index exists
+
+        passed = false
+		try{
+			s.adminCommand({ shardcollection : "" + coll, key : { num : 1 } })
+            passed = true
+		}
+		catch( e ){
+			print(e)
+		}
+        assert( !passed, "Should not shard collection with no index on shard key.")
+        }
+	}
+    if ( i == 8 ) {
+        if (false) { // SERVER-3718
+		coll.remove()
+
+		// No index exists
+
+        passed = false
+		try{
+			s.adminCommand({ shardcollection : "" + coll, key : { num : 1 }, unique : true })
+            passed = true
+		}
+		catch( e ){
+			print(e)
+		}
+        assert( !passed, "Should not shard collection with no index on shard key.")
+        }
+	}
+    if ( i == 9 ) {
+
+		// Unique index exists on a different field as well
+		coll.ensureIndex( { num : 1 }, { unique : true } )
+		coll.ensureIndex( { x : 1 }, { unique : true} )
+
+        passed = false
+		try {
+			s.adminCommand( { shardcollection : "" + coll, key : { x : 1 } } )
+            passed = true
+		} catch (e) {
+			print( e )
+		}
+        assert( !passed, "Should not shard collection when another unique index exists!" )
+	}
 }
 
 s.stop();
