@@ -961,13 +961,13 @@ wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 			return (2);
 
 		fprintf(stderr, "%s: %s: row %" PRIu64
-                    ": deleted in Berkeley DB, found in WiredTiger\n",
+                    ": not found in Berkeley DB, found in WiredTiger\n",
 		    g.progname, f, keyno);
 		return (1);
 	}
 	if (wt_ret == WT_NOTFOUND) {
 		fprintf(stderr, "%s: %s: row %" PRIu64
-		    ": found in Berkeley DB, deleted in WiredTiger\n",
+		    ": found in Berkeley DB, not found in WiredTiger\n",
 		    g.progname, f, keyno);
 		return (1);
 	}
