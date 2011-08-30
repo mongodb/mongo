@@ -110,12 +110,6 @@ then
   /sbin/chkconfig --del mongod
 fi
 
-%postun server
-if test $1 -ge 1
-then
-  /sbin/service mongod condrestart >/dev/null 2>&1 || :
-fi
-
 # router
 %pre router
 if ! /usr/bin/id -g mongod &>/dev/null; then
@@ -136,12 +130,6 @@ fi
 if test $1 = 0
 then
   /sbin/chkconfig --del mongos
-fi
-
-%postun router
-if test $1 -ge 1
-then
-  /sbin/service mongos condrestart >/dev/null 2>&1 || :
 fi
 
 # config
@@ -166,39 +154,33 @@ then
   /sbin/chkconfig --del mongoc
 fi
 
-%postun config
-if test $1 -ge 1
-then
-  /sbin/service mongoc condrestart >/dev/null 2>&1 || :
-fi
-
 %files
 %defattr(-,root,root,-)
 %doc README GNU-AGPL-3.0.txt
 
 %{_bindir}/mongo
+%{_bindir}/mongod
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
-%{_bindir}/mongostat
-%{_bindir}/bsondump
-%{_bindir}/mongotop
-%{_bindir}/mongod
 %{_bindir}/mongos
+%{_bindir}/mongostat
+%{_bindir}/mongotop
+%{_bindir}/bsondump
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
-%{_mandir}/man1/mongos.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
+%{_mandir}/man1/mongos.1*
 %{_mandir}/man1/mongosniff.1*
 %{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
-%{_mandir}/man1/bsondum.1*
+%{_mandir}/man1/bsondump.1*
 
 %files server
 %defattr(-,root,root,-)
@@ -224,7 +206,7 @@ fi
 %config(noreplace) /etc/mongoc.conf
 /etc/rc.d/init.d/mongoc
 /etc/sysconfig/mongoc
-%attr(0755,mongod,mongod) %dir /var/lib/mongo
+%attr(0755,mongod,mongod) %dir /var/lib/mongoc
 %attr(0755,mongod,mongod) %dir /var/log/mongo
 %attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongoc.log
