@@ -305,12 +305,14 @@ __curindex_remove(WT_CURSOR *cursor)
 static int
 __curindex_close(WT_CURSOR *cursor, const char *config)
 {
+	WT_BTREE *btree;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR **cp;
 	WT_SESSION_IMPL *session;
 	int i, ret;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
+	btree = cindex->cbt.btree;
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
 	WT_UNUSED(cfg);
 
@@ -322,6 +324,13 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 			*cp = NULL;
 		}
 
+	__wt_free(session, cindex->cg_cursors);
+	if (cindex->key_plan != btree->key_plan)
+		__wt_free(session, cindex->key_plan);
+	if (cindex->value_plan != btree->value_plan)
+		__wt_free(session, cindex->value_plan);
+
+	WT_TRET(__wt_btcur_close(&cindex->cbt, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END(session);
 

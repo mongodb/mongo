@@ -466,7 +466,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config)
 
 	if (!ctable->table->idx_complete)
 		WT_RET(__wt_schema_open_index(session, table, NULL, 0));
-	if (table->nindices == 0)
+	if (table->nindices == 0 || ctable->idx_cursors != NULL)
 		return (0);
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {

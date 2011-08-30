@@ -72,9 +72,11 @@ __wt_schema_remove_table(
 	TAILQ_REMOVE(&session->tables, table, q);
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);
+	__wt_free(session, table->plan);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
-	__wt_free(session, table->plan);
+	__wt_free(session, table->colgroup);
+	__wt_free(session, table->index);
 	__wt_free(session, table);
 
 	return (0);

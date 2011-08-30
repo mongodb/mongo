@@ -2717,6 +2717,7 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_PAGE_IS_ROOT(page)) {
 			if (!r->salvage)
 				WT_RET(__rec_discard_add_page(session, page));
+			session->btree->root_page.page = NULL;
 
 			/* Discard everything we've queued for discard. */
 			WT_RET(__rec_discard_evict(session));

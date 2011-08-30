@@ -235,11 +235,10 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	 * that remain in the cache.  If there is still a root page in memory,
 	 * it must be an empty page that was not reconciled, so free it.
 	 */
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		WT_TRET(__wt_evict_file_serial(session, 1));
-		if (btree->root_page.page != NULL)
-			__wt_page_out(session, btree->root_page.page, 0);
-	}
+	if (btree->root_page.page != NULL)
+		__wt_page_out(session, btree->root_page.page, 0);
 
 	/*
 	 * Write out the free list.
@@ -255,7 +254,9 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->filename);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->key_format);
+	__wt_free(session, btree->key_plan);
 	__wt_free(session, btree->value_format);
+	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);
 	__wt_buf_free(session, &btree->key_srch);
 	__wt_walk_end(session, &btree->evict_walk, 1);
