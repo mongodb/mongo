@@ -50,6 +50,7 @@ fi
 start()
 {
   echo -n $"Starting ${INSTANCE}: "
+  ulimit -n $MONGO_ULIMIT
   daemon --user "$MONGO_USER" --pidfile $PID_FILE $MONGO_BIN $OPTIONS --pidfilepath=$PID_FILE
   RETVAL=$?
   echo
@@ -70,10 +71,10 @@ stop()
 
 restart () {
   stop
+  # TODO need to wait for process to stop before continuing
   start
 }
 
-ulimit -n $MONGO_ULIMIT
 RETVAL=0
 
 case "$1" in
