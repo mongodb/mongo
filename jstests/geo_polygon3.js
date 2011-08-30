@@ -4,7 +4,7 @@
 
 var numTests = 30;
 
-for( var t = 0; t < numTests; t++ ){
+for( var n = 0; n < numTests; n++ ){
 	
 	t = db.geo_polygon1;
 	t.drop();
@@ -17,7 +17,7 @@ for( var t = 0; t < numTests; t++ ){
 	    }
 	}
 	
-	t.ensureIndex( { loc : "2d" }, { bits : 2 + t } );
+	t.ensureIndex( { loc : "2d" }, { bits : 2 + n } );
 	
 	triangle = [[0,0], [1,1], [0,2]];
 	
@@ -51,5 +51,4 @@ for( var t = 0; t < numTests; t++ ){
 	t.save({ loc : [3,-1] })  // Add a point below the center of the bottom
 	
 	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman double point" );
-
 }
