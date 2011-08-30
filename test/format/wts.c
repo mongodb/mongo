@@ -509,6 +509,17 @@ wts_ops(void)
 					return (1);
 				break;
 			case FIX:
+				/*
+				 * We don't delete records in fixed-length
+				 * column-store files: a "delete" is the same
+				 * as a store of 0x00, which means we're not
+				 * really testing anything interesting, and,
+				 * if we reconcile the page, the engine code
+				 * discards trailing, deleted records, which
+				 * can give us test failures because we don't
+				 * match the contents of the BDB database.
+				 */
+				break;
 			case VAR:
 				if (wts_col_del(keyno))
 					return (1);
