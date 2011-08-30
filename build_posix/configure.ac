@@ -14,13 +14,13 @@ AC_CONFIG_SRCDIR([../dist/RELEASE])
 LT_INIT([dlopen])
 AC_SUBST([LIBTOOL_DEPS])
 
+AC_PROG_CC(cc gcc)
+AC_PROG_CXX(c++ g++)
+
 AM_INIT_AUTOMAKE
 AM_OPTIONS
 
 AC_CONFIG_HEADERS([wiredtiger_config.h:config.hin])
-
-AC_PROG_CC(cc gcc)
-AC_PROG_CXX(c++ g++)
 
 if test "$GCC" = "yes"; then
 	# Automake configures gcc's CFLAGS to be -g -O2.
@@ -83,10 +83,21 @@ AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN
 
+# Set up files for automake -- we maintain Makefile.am with the sources but
+# build under the main build directory.
+AC_CONFIG_FILES([
+	bench/tcbench/Makefile
+	ext/compressors/bzip2_compress/Makefile
+	test/format/Makefile
+	test/insert/Makefile
+	test/salvage/Makefile
+	test/thread/Makefile
+])
+
 AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:../src/include/wiredtiger.in
 	wt_internal.h:../src/include/wt_internal.in
-	wiredtiger-${VERSION}.pc:wiredtiger.pc.in
-	])
+	wiredtiger.pc:wiredtiger.pc.in
+])
 AC_OUTPUT

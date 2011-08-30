@@ -27,6 +27,8 @@ int showprgr;                            /* whether to show progression */
 /* function prototypes */
 int main(int argc, char **argv);
 void usage(void);
+int setup(char *name, const char *tconfig, const char *cconfig, WT_CURSOR **cursor);
+int teardown(void);
 int runwrite(int argc, char **argv);
 int runread(int argc, char **argv);
 int runvlcswrite(int argc, char **argv);
@@ -289,7 +291,7 @@ int runflcsread(int argc, char **argv){
 /* pseudo random number generator */
 int myrand(void){
   static int cnt = 0;
-  return (lrand48() + cnt++) & 0x7FFFFFFF;
+  return (int)((lrand48() + cnt++) & 0x7FFFFFFF);
 }
 
 WT_CONNECTION *conn;

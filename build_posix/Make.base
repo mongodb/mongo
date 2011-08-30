@@ -1,6 +1,8 @@
+SUBDIRS = . bench/tcbench ext/compressors/bzip2_compress test/format test/insert test/salvage test/thread
+
 wtdir = $(prefix)/wt
 wt_LTLIBRARIES = libwiredtiger.la
-LDADD = $(wt_LTLIBRARIES) -lpthread
+LDADD = $(wt_LTLIBRARIES)
 
 wt_PROGRAMS = wt
 wt_SOURCES = util_create.c util_dump.c util_dumpfile.c util_getopt.c \
@@ -23,7 +25,7 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = wiredtiger-@VERSION@.pc
+pkgconfig_DATA = wiredtiger.pc
 
 ../src/include/extern.h: prototype.chk
 
