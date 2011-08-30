@@ -11,21 +11,20 @@
  * __search_insert --
  *	Search the slot's insert list.
  */
-static inline int
-__search_insert(
-    WT_SESSION_IMPL *session, WT_INSERT_HEAD *inshead, uint64_t recno)
+static inline WT_INSERT *
+__search_insert(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, uint64_t recno)
 {
 	WT_INSERT **ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
+	/* If there's no insert chain to search, we're done. */
 	if (inshead == NULL)
-		return (1);
+		return (NULL);
 
 	/*
-	 * The insert list is a skip list: start at the highest skip level,
-	 * then go as far as possible at each level before stepping down to the
-	 * next one.
+	 * The insert list is a skip list: start at the highest skip level, then
+	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
 		if (*ins == NULL)
@@ -35,21 +34,15 @@ __search_insert(
 			cmp = (recno == ins_recno) ? 0 :
 			    (recno < ins_recno) ? -1 : 1;
 		}
-		if (cmp == 0) {
-			/* Clear the ins array, we're not going to insert. */
-			memset(session->srch.ins, 0, sizeof(session->srch.ins));
-			session->srch.vupdate = (*ins)->upd;
-			session->srch.upd = &(*ins)->upd;
-			return (0);
-		} else if (cmp > 0)
-			/* Keep going on this level. */
+		if (cmp == 0)			/* Exact match: return */
+			return (*ins);
+		else if (cmp > 0)		/* Keep going at this level */
 			ins = &(*ins)->next[i];
-		else
-			/* Go down a level in the skiplist. */
-			session->srch.ins[i--] = ins--;
+		else				/* Drop down a level */
+			cbt->ins_stack[i--] = ins--;
 	}
 
-	return (1);
+	return (NULL);
 }
 
 /*
@@ -57,31 +50,27 @@ __search_insert(
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
+__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_COL_RLE *repeat;
 	WT_PAGE *page;
-	uint64_t start_recno;
-	uint32_t base, indx, limit, match, start_indx;
+	uint64_t recno, start_recno;
+	uint32_t base, indx, limit, start_indx;
 	int ret;
 
-	unpack = &_unpack;
+	__cursor_search_reset(cbt);
+
+	cbt->recno = recno = cbt->iface.recno;
+
+	btree = session->btree;
 	cip = NULL;
 	cref = NULL;
 	start_recno = 0;
 
-	/* Return values. */
-	WT_CLEAR(session->srch);
-	session->srch.slot = UINT32_MAX;
-
-	btree = session->btree;
-
-	/* Search the tree. */
+	/* Search the internal pages of the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
 		/* Binary search of internal pages. */
 		for (base = 0,
@@ -127,10 +116,11 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 	 * Use a memory barrier to ensure we read the value before we read any
 	 * of the page's contents.
 	 */
-	if (is_write) {
-		session->srch.write_gen = page->write_gen;
+	if (is_modify) {
+		cbt->write_gen = page->write_gen;
 		WT_MEMORY_FLUSH;
 	}
+	cbt->page = page;
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a
@@ -140,31 +130,11 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		if (recno >= page->u.col_leaf.recno + page->entries) {
-			if (is_write)
-				goto append;
-			goto notfound;
+			cbt->match = 0;
+			return (0);
 		}
-
-		/*
-		 * Search the WT_COL's insert list for the record's WT_INSERT
-		 * slot.
-		 */
-		if (page->u.col_leaf.ins == NULL)
-			match = 0;
-		else {
-			session->srch.inshead = page->u.col_leaf.ins;
-			match = (__search_insert(session,
-			    *session->srch.inshead, recno) == 0);
-		}
-
-		/*
-		 * Fixed-length column store entries are never deleted, bits are
-		 * just set to 0.  If we didn't find an update structure, return
-		 * the original value.
-		 */
-		if (!match)
-			session->srch.v =
-			    __bit_getv_recno(page, recno, btree->bitcnt);
+		cbt->ins_head =
+		    page->u.col_leaf.ins == NULL ? NULL : *page->u.col_leaf.ins;
 		break;
 	case WT_PAGE_COL_VAR:
 		/*
@@ -209,73 +179,31 @@ __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, int is_write)
 				start_recno = repeat->recno + repeat->rle;
 			}
 
-			if (recno >= start_recno +
-			    (page->entries - start_indx)) {
-				if (is_write)
-					goto append;
-				goto notfound;
+			if (recno >=
+			    start_recno + (page->entries - start_indx)) {
+				cbt->match = 0;
+				break;
 			}
 
 			WT_ASSERT(session, recno >= start_recno);
 			cip = page->u.col_leaf.d + start_indx +
 			    (uint32_t)(recno - start_recno);
 		}
-
-		/* Now we have a slot, look up the cell and unpack. */
-		if ((cell = WT_COL_PTR(page, cip)) != NULL)
-			__wt_cell_unpack(cell, unpack);
-
-		/*
-		 * We have the right WT_COL slot: if it's a write, set up the
-		 * return information in session->{srch.upd,slot}.  If it's a
-		 * read, set up the return information in session->srch.vupdate.
-		 *
-		 * Search the WT_COL's insert list for the record's WT_INSERT
-		 * slot.  The insert list is a sorted, forward-linked list: on
-		 * average, we have to search half of it.
-		 *
-		 * Do an initial setup of the return information (we'll correct
-		 * it as needed depending on what we find).
-		 */
-		session->srch.slot = WT_COL_SLOT(page, cip);
-		if (page->u.col_leaf.ins == NULL)
-			match = 0;
-		else {
-			session->srch.inshead =
-			    &page->u.col_leaf.ins[session->srch.slot];
-			match = (__search_insert(session,
-			    *session->srch.inshead, recno) == 0);
-		}
-
-		/*
-		 * If we're not updating an existing data item, check to see if
-		 * the item has been deleted.  If we found a match, use the
-		 * WT_INSERT's WT_UPDATE value.  If we didn't find a match, use
-		 * use the original data.
-		 */
-		if (is_write)
-			break;
-
-		if (match) {
-			if (WT_UPDATE_DELETED_ISSET(session->srch.vupdate))
-				goto notfound;
-		} else
-			if (cell != NULL && unpack->type == WT_CELL_DEL)
-				goto notfound;
+		cbt->cip = cip;
+		cbt->slot = WT_COL_SLOT(page, cip);
+		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	session->srch.match = 1;
-	if (0) {
-append:		session->srch.match = 0;
-	}
-	session->srch.page = page;
-	session->srch.ip = cip;
-	return (0);
+	/*
+	 * Search the insert list for a match; __search_insert sets the return
+	 * insert information appropriately.
+	 */
+	cbt->ins = __search_insert(cbt, cbt->ins_head, recno);
+	cbt->match = 1;
 
-notfound:
-	ret = WT_NOTFOUND;
+	return (0);
 
 err:	__wt_page_release(session, page);
 	return (ret);

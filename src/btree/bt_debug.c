@@ -25,7 +25,7 @@ typedef struct {
 static void __debug_byte_string(WT_DBG *, const uint8_t *, uint32_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
-static void __debug_col_insert(WT_DBG *, WT_INSERT_HEAD *);
+static void __debug_col_insert(WT_DBG *, WT_INSERT_HEAD *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
@@ -40,7 +40,7 @@ static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __debug_page_work(WT_DBG *, WT_PAGE *, uint32_t);
 static void __debug_ref(WT_DBG *, WT_REF *);
 static void __debug_row_insert(WT_DBG *, WT_INSERT_HEAD *);
-static void __debug_update(WT_DBG *, WT_UPDATE *);
+static void __debug_update(WT_DBG *, WT_UPDATE *, int);
 static void __dmsg(WT_DBG *, const char *, ...);
 static void __dmsg_wrapup(WT_DBG *);
 
@@ -432,7 +432,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	if (dsk != NULL) {
 		ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
 		WT_FIX_FOREACH(btree, dsk, v, i) {
-			__dmsg(ds, "\t{");
+			__dmsg(ds, "\t%" PRIu64 "\t{", recno);
 			__debug_hex_byte(ds, v);
 			__dmsg(ds, "}\n");
 
@@ -441,21 +441,14 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 				__dmsg(ds,
 				    "\tinsert %" PRIu64 "\n",
 				    WT_INSERT_RECNO(ins));
-				__debug_update(ds, ins->upd);
+				__debug_update(ds, ins->upd, 1);
 				ins = WT_SKIP_NEXT(ins);
 			}
 			++recno;
 		}
 	}
 	__dmsg(ds, "%s\n", conn->sep);
-	for (ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
-	    ins != NULL;
-	    ins = WT_SKIP_NEXT(ins)) {
-		__dmsg(ds,
-		    "\tinsert %" PRIu64 "\n",
-		    WT_INSERT_RECNO(ins));
-		__debug_update(ds, ins->upd);
-	}
+	__debug_col_insert(ds, WT_COL_INSERT_SINGLE(page), 1);
 }
 
 /*
@@ -513,7 +506,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		WT_RET(__debug_cell_data(ds, tag, unpack));
 
 		if ((inshead = WT_COL_INSERT(page, cip)) != NULL)
-			__debug_col_insert(ds, inshead);
+			__debug_col_insert(ds, inshead, 0);
 	}
 	return (0);
 }
@@ -584,7 +577,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		}
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
-			__debug_update(ds, upd);
+			__debug_update(ds, upd, 0);
 
 		if ((inshead = WT_ROW_INSERT(page, rip)) != NULL)
 			__debug_row_insert(ds, inshead);
@@ -598,14 +591,14 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
  *	Dump a column-store insert array.
  */
 static void
-__debug_col_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
+__debug_col_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead, int hexbyte)
 {
 	WT_INSERT *ins;
 
 	WT_SKIP_FOREACH(ins, inshead) {
 		__dmsg(ds,
 		    "\tinsert %" PRIu64 "\n", WT_INSERT_RECNO(ins));
-		__debug_update(ds, ins->upd);
+		__debug_update(ds, ins->upd, hexbyte);
 	}
 }
 
@@ -621,7 +614,7 @@ __debug_row_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
 	WT_SKIP_FOREACH(ins, inshead) {
 		__debug_item(ds,
 		    "insert", WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins));
-		__debug_update(ds, ins->upd);
+		__debug_update(ds, ins->upd, 0);
 	}
 }
 
@@ -630,12 +623,17 @@ __debug_row_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
  *	Dump an update array.
  */
 static void
-__debug_update(WT_DBG *ds, WT_UPDATE *upd)
+__debug_update(WT_DBG *ds, WT_UPDATE *upd, int hexbyte)
 {
 	for (; upd != NULL; upd = upd->next)
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			__dmsg(ds, "\tupdate: {deleted}\n");
-		else
+		else if (hexbyte) {
+			__dmsg(ds, "\t{");
+			__debug_hex_byte(ds,
+			    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+			__dmsg(ds, "}\n");
+		} else
 			__debug_item(ds,
 			    "update", WT_UPDATE_DATA(upd), upd->size);
 }

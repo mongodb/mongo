@@ -5,6 +5,10 @@
  *	All rights reserved.
  */
 
+/*
+ * __cursor_row_slot_return --
+ *	Return a WT_ROW slot's K/V pair.
+ */
 static inline int
 __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 {
@@ -52,3 +56,23 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 
 	return (0);
 }
+
+/*
+ * __cursor_search_reset --
+ *	Reset the cursor's state for a search.
+ */
+static inline void
+__cursor_search_reset(WT_CURSOR_BTREE *cbt)
+{
+	cbt->page = NULL;
+	cbt->cip = NULL;
+	cbt->rip = NULL;
+	cbt->slot = UINT32_MAX;			/* Fail big. */
+
+	cbt->ins_head = NULL;
+	cbt->ins = NULL;
+
+	cbt->match = 0;
+	cbt->write_gen = 0;
+}
+

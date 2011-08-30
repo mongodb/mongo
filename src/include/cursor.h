@@ -27,6 +27,7 @@ struct __wt_cursor_btree {
 	WT_INSERT	*ins;		/* Insert list, skiplist stack */
 	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
 
+	uint64_t recno;			/* Record number */
 	int	 match;			/* If search found an exact match */
 	uint32_t write_gen;		/* Saved leaf page's write generation */
 
@@ -46,13 +47,6 @@ struct __wt_cursor_btree {
 	  one entry earlier in the list.
 	 */
 	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
-
-	/*
-	 * The record number is calculated from the initial record number on the
-	 * page, and offset for the slot at which we start.   Don't repeat that
-	 * calculation, set it once and increment/decrement during traversal.
-	 */
-	uint64_t recno;			/* Cursor record number */
 
 	/*
 	 * Variable length column-store items are run-length encoded; the

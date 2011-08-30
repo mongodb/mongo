@@ -571,7 +571,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page, *t;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t slot;
 
 	btree = session->btree;
@@ -615,7 +615,9 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 		WT_RET(__wt_page_in(session, t, t->parent_ref, 0));
 
 	/* Figure out the currently slot. */
-	slot = WT_ROW_REF_SLOT(t, page->parent_ref);
+	slot = page->type == WT_PAGE_ROW_INT ?
+	    WT_ROW_REF_SLOT(t, page->parent_ref) :
+	    WT_COL_REF_SLOT(t, page->parent_ref);
 
 	/* Release our previous hazard reference. */
 	__wt_page_release(session, page);
@@ -641,13 +643,16 @@ descend:
 	 * item in the subtree, swapping hazard references at each level.
 	 */
 	for (;;) {
-		rref = &page->u.row_int.t[slot];
-		WT_RET(__wt_page_in(session, page, &rref->ref, 0));
-		__wt_page_release(session, page);
-
-		page = WT_ROW_REF_PAGE(rref);
-		if (page->type != WT_PAGE_ROW_INT)
+		if (page->type == WT_PAGE_ROW_INT)
+			ref = &page->u.row_int.t[slot].ref;
+		else if (page->type == WT_PAGE_COL_INT)
+			ref = &page->u.col_int.t[slot].ref;
+		else
 			break;
+
+		WT_RET(__wt_page_in(session, page, ref, 0));
+		__wt_page_release(session, page);
+		page = ref->page;
 		slot = next ? 0 : page->entries - 1;
 	}
 	*pagep = page;

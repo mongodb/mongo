@@ -8,69 +8,105 @@
 #include "wt_internal.h"
 
 /*
+ * __search_insert --
+ *	Search an insert list.
+ */
+static inline WT_INSERT *
+__search_insert(WT_INSERT_HEAD *inshead, uint64_t recno)
+{
+	WT_INSERT **ins;
+	uint64_t ins_recno;
+	int cmp, i;
+
+	/* If there's no insert chain to search, we're done. */
+	if (inshead == NULL)
+		return (NULL);
+
+	/*
+	 * The insert list is a skip list: start at the highest skip level, then
+	 * go as far as possible at each level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
+		if (*ins == NULL)
+			cmp = -1;
+		else {
+			ins_recno = WT_INSERT_RECNO(*ins);
+			cmp = (recno == ins_recno) ? 0 :
+			    (recno < ins_recno) ? -1 : 1;
+		}
+		if (cmp == 0)			/* Exact match: return */
+			return (*ins);
+		else if (cmp > 0)		/* Keep going at this level */
+			ins = &(*ins)->next[i];
+		else {				/* Drop down a level */
+			--i;
+			--ins;
+		}
+	}
+
+	return (NULL);
+}
+
+/*
  * __cursor_fix_prev --
  *	Move to the previous, fixed-length column-store item.
  */
 static inline int
-__cursor_fix_prev(
-    WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
+__cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
+	WT_BUF *val;
 	WT_INSERT *ins;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
-	enum { DELETED, FOUND, NOTFOUND } state;
+	uint64_t *recnop;
 	uint8_t v;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
 
+	recnop = &cbt->iface.recno;
+	val = &cbt->iface.value;
+
+	/*
+	 * Reset the insert list reference so any subsequent cursor next
+	 * works correctly.
+	 */
+	cbt->ins = NULL;
+
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->ins_head = WT_COL_INSERT_SINGLE(cbt->page);
-		cbt->nslots = cbt->page->entries;
 		cbt->recno =
 		    cbt->page->u.col_leaf.recno + (cbt->page->entries - 1);
+		goto new_page;
 	}
 
-	/* This loop moves through a page, including after reading a record. */
-	for (state = NOTFOUND; state != FOUND; --cbt->recno, --cbt->nslots) {
-		if (cbt->nslots == 0)
+	/* Move to the previous entry and return the item. */
+	for (;;) {
+		if (cbt->recno == cbt->page->u.col_leaf.recno)
 			return (WT_NOTFOUND);
-
-		*recnop = cbt->recno;
+		--cbt->recno;
+new_page:	*recnop = cbt->recno;
 
 		/*
 		 * Check any insert list for a matching record.  Insert lists
-		 * are in forward sorted order; in a last-to-first walk we have
-		 * to search the entire list.
+		 * are in forward sorted order, in a last-to-first walk we have
+		 * to search the entire list.  We use the skiplist structure,
+		 * rather than doing it linearly.
 		 */
-		state = NOTFOUND;
-		if (cbt->ins_head != NULL)
-			WT_SKIP_FOREACH(ins, cbt->ins_head) {
-				if (cbt->recno != WT_INSERT_RECNO(ins))
-					continue;
-				upd = cbt->ins->upd;
-				if (WT_UPDATE_DELETED_ISSET(upd))
-					state = DELETED;
-				else {
-					value->data =
-					    WT_UPDATE_DATA(upd);
-					value->size = 1;
-					state = FOUND;
-				}
-			}
-		if (state == NOTFOUND) {
-			v = __bit_getv_recno(
-			    cbt->page, cbt->recno, btree->bitcnt);
-			WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
-			value->data = cbt->value.data;
-			value->size = 1;
-			state = FOUND;
+		if ((ins = __search_insert(
+		    WT_COL_INSERT_SINGLE(cbt->page), cbt->recno)) != NULL) {
+			val->data = WT_UPDATE_DATA(ins->upd);
+			val->size = 1;
+			return (0);
 		}
-	}
 
-	return (0);
+		v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+		WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
+		val->data = cbt->value.data;
+		val->size = 1;
+		return (0);
+	}
+	/* NOTREACHED */
 }
 
 /*
@@ -316,8 +352,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
-				ret = __cursor_fix_prev(cbt, newpage,
-				   &cursor->recno, &cursor->value);
+				ret = __cursor_fix_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
 				ret = __cursor_var_prev(cbt, newpage,

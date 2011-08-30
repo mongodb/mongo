@@ -92,14 +92,12 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_INSERT *ins;
-
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the insert array. */
-	if ((ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page))) != NULL)
-		__free_insert_list(session, ins);
+	if (page->u.col_leaf.ins != NULL)
+		__free_insert(session, page->u.col_leaf.ins, 1);
 }
 
 /*

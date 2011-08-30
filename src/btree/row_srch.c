@@ -8,25 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __search_reset --
- *	Reset the cursor's state.
- */
-static inline void
-__search_reset(WT_CURSOR_BTREE *cbt)
-{
-	cbt->page = NULL;
-	cbt->cip = NULL;
-	cbt->rip = NULL;
-	cbt->slot = UINT32_MAX;			/* Fail big. */
-
-	cbt->ins_head = NULL;
-	cbt->ins = NULL;
-
-	cbt->match = 0;
-	cbt->write_gen = 0;
-}
-
-/*
  * __search_insert --
  *	Search the slot's insert list.
  */
@@ -86,9 +67,9 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	int cmp, ret;
 	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	key = (WT_ITEM *)&cbt->iface.key;
+	__cursor_search_reset(cbt);
 
-	__search_reset(cbt);
+	key = (WT_ITEM *)&cbt->iface.key;
 
 	btree = session->btree;
 	rip = NULL;
@@ -225,19 +206,16 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * one-to-one to the WT_ROW array.
 	 */
 	if (base == 0) {
-		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 		cbt->slot = page->entries;		/* extra slot */
+		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 	} else {
-		cbt->ins_head = WT_ROW_INSERT(page, rip);
 		cbt->slot = WT_ROW_SLOT(page, rip);
+		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
 
 	/*
-	 * Search the insert list for a match: if we don't find a match, we
-	 * fail, unless we're inserting new data.
-	 *
-	 * No matter how things turn out, __wt_row_ins_search sets the return
-	 * insert information appropriately, there's no more work to be done.
+	 * Search the insert list for a match; __search_insert sets the return
+	 * insert information appropriately.
 	 */
 	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
 	cbt->match = cbt->ins == NULL ? 0 : 1;

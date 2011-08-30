@@ -12,56 +12,79 @@
  *	Move to the next, fixed-length column-store item.
  */
 static inline int
-__cursor_fix_next(
-    WT_CURSOR_BTREE *cbt, int newpage, uint64_t *recnop, WT_BUF *value)
+__cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
+	WT_BUF *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int found;
+	uint64_t *recnop;
 	uint8_t v;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
 
+	recnop = &cbt->iface.recno;
+	val = &cbt->iface.value;
+
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
-		cbt->nslots = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
+		goto new_page;
 	}
 
-	/* This loop moves through a page, including after reading a record. */
-	for (found = 0; !found; ++cbt->recno, --cbt->nslots) {
-		if (cbt->nslots == 0)
-			return (WT_NOTFOUND);
+	/*
+	 * The cursor prev function may have cleared our insert list reference,
+	 * so we have to check in on every call.
+	 */
+	if (cbt->ins == NULL)
+		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
 
-		*recnop = cbt->recno;
+	/* Move to the next entry and return the item. */
+	for (;;) {
+		if (cbt->recno >=
+		    cbt->page->u.col_leaf.recno + (cbt->page->entries - 1))
+			return (WT_NOTFOUND);
+		++cbt->recno;
+new_page:	*recnop = cbt->recno;
+
 		/*
-		 * Check any insert list for a matching record (insert
-		 * lists are in sorted order, we check the next entry).
+		 * Check any insert list for a matching record.  Insert lists
+		 * are in forward sorted order, move forward until we reach a
+		 * value equal to or larger than the target record number, then
+		 * check for equality.
+		 *
+		 * If doing a next after a previous cursor next, the insert list
+		 * reference should be pointing to the record we want; if we're
+		 * doing a next after a search, the insert list reference may be
+		 * pointing to the beginning of the list; if we're doing a next
+		 * after a previous cursor prev, the insert list reference will
+		 * be the beginning of the list (the cursor prev code clears the
+		 * insert list reference, and we set it to the beginning of the
+		 * list at the start of this function).   In all cases we can
+		 * move forward to the entry we want, and leave the insert list
+		 * reference set for a future cursor-next operation.
 		 */
+		while (cbt->ins != NULL &&
+		    WT_INSERT_RECNO(cbt->ins) < cbt->recno)
+			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 		if (cbt->ins != NULL &&
 		    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
 			upd = cbt->ins->upd;
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
-
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				continue;
-			value->data = WT_UPDATE_DATA(upd);
-			value->size = 1;
-			found = 1;
-		} else {
-			v = __bit_getv_recno(
-			    cbt->page, cbt->recno, btree->bitcnt);
-			WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
-			value->data = cbt->value.data;
-			value->size = 1;
-			found = 1;
+			val->data = WT_UPDATE_DATA(upd);
+			val->size = 1;
+			return (0);
 		}
-	}
 
-	return (0);
+		v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+		WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
+		val->data = cbt->value.data;
+		val->size = 1;
+		return (0);
+	}
+	/* NOTREACHED */
 }
 
 /*
@@ -249,6 +272,9 @@ __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt)
 {
 	WT_INSERT *ins;
 
+	if (cbt->page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
 	/*
 	 * For row-store pages, we need a single item that tells us the part
 	 * of the page we're walking (otherwise switching from next to prev
@@ -324,8 +350,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
-				ret = __cursor_fix_next(cbt, newpage,
-				   &cursor->recno, &cursor->value);
+				ret = __cursor_fix_next(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
 				ret = __cursor_var_next(cbt, newpage,

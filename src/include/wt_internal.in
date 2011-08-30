@@ -123,8 +123,6 @@ struct __wt_row_ref;
     typedef struct __wt_row_ref WT_ROW_REF;
 struct __wt_salvage_cookie;
     typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
-struct __wt_search;
-    typedef struct __wt_search WT_SEARCH;
 struct __wt_session_buffer;
     typedef struct __wt_session_buffer WT_SESSION_BUFFER;
 struct __wt_session_impl;

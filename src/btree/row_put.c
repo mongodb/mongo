@@ -67,12 +67,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Allocate room for the new value from per-thread memory. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
-		/* workQ: to insert the WT_UPDATE structure. */
-		ret = __wt_xxxupdate_serial(session, page, cbt->write_gen,
+		/* workQ: insert the WT_UPDATE structure. */
+		ret = __wt_update_serial(session, page, cbt->write_gen,
 		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
 	} else {
 		/*
-		 * Allocate insert array necessary (we allocate an additional
+		 * Allocate insert array if necessary (allocate an additional
 		 * slot for insert keys sorting less than any original key on
 		 * the page).
 		 *
@@ -96,10 +96,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * well, search couldn't have.
 		 */
 		if (*inshead == NULL) {
+			new_inshead_size = WT_SIZEOF32(WT_INSERT_HEAD);
 			WT_ERR(__wt_sb_alloc(session,
 			    sizeof(WT_INSERT_HEAD), &new_inshead, &sb));
 			new_inshead->sb = sb;
-			new_inshead_size = WT_SIZEOF32(WT_INSERT_HEAD);
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
 			cbt->ins_head = new_inshead;
@@ -120,7 +120,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/* workQ: insert the WT_INSERT structure. */
-		ret = __wt_xxxinsert_serial(session,
+		ret = __wt_insert_serial(session,
 		    page, cbt->write_gen,
 		    inshead, cbt->ins_stack,
 		    &new_inslist, new_inslist_size,
@@ -176,11 +176,11 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_xxxinsert_serial_func --
+ * __wt_insert_serial_func --
  *	Server function to add an WT_INSERT entry to the page tree.
  */
 int
-__wt_xxxinsert_serial_func(WT_SESSION_IMPL *session)
+__wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
 	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
@@ -190,7 +190,7 @@ __wt_xxxinsert_serial_func(WT_SESSION_IMPL *session)
 
 	ret = 0;
 
-	__wt_xxxinsert_unpack(session, &page, &write_gen, &inshead,
+	__wt_insert_unpack(session, &page, &write_gen, &inshead,
 	    &ins_stack, &new_inslist, &new_inshead, &ins, &skipdepth);
 
 	/* Check the page's write-generation. */
@@ -203,12 +203,12 @@ __wt_xxxinsert_serial_func(WT_SESSION_IMPL *session)
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row_leaf.ins == NULL) {
 			page->u.row_leaf.ins = new_inslist;
-			__wt_xxxinsert_new_inslist_taken(session, page);
+			__wt_insert_new_inslist_taken(session, page);
 		}
 	} else
 		if (page->u.col_leaf.ins == NULL) {
 			page->u.col_leaf.ins = new_inslist;
-			__wt_xxxinsert_new_inslist_taken(session, page);
+			__wt_insert_new_inslist_taken(session, page);
 		}
 
 	/*
@@ -217,7 +217,7 @@ __wt_xxxinsert_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (*inshead == NULL) {
 		*inshead = new_inshead;
-		__wt_xxxinsert_new_inshead_taken(session, page);
+		__wt_insert_new_inshead_taken(session, page);
 	}
 
 	/*
@@ -231,70 +231,7 @@ __wt_xxxinsert_serial_func(WT_SESSION_IMPL *session)
 	WT_MEMORY_FLUSH;
 	for (i = 0; i < skipdepth; i++)
 		*ins_stack[i] = ins;
-	__wt_xxxinsert_ins_taken(session, page);
-
-err:	__wt_session_serialize_wrapup(session, page, 0);
-	return (ret);
-}
-
-/*
- * __wt_insert_serial_func --
- *	Server function to add an WT_INSERT entry to the page tree.
- */
-int
-__wt_insert_serial_func(WT_SESSION_IMPL *session)
-{
-	WT_PAGE *page;
-	WT_INSERT_HEAD **new_inslist, *new_inshead;
-	WT_INSERT *ins;
-	WT_SEARCH *srch;
-	uint32_t i, skipdepth;
-	int ret;
-
-	ret = 0;
-
-	__wt_insert_unpack(session,
-	    &srch, &new_inslist, &new_inshead, &ins, &skipdepth);
-	page = srch->page;
-
-	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, srch->write_gen));
-
-	/*
-	 * If the page does not yet have an insert array, our caller passed
-	 * us one of the correct size.	 (It's the caller's responsibility to
-	 * detect and free the passed-in expansion array if we don't use it.)
-	 */
-	switch (page->type) {
-	case WT_PAGE_ROW_LEAF:
-		if (page->u.row_leaf.ins == NULL) {
-			page->u.row_leaf.ins = new_inslist;
-			__wt_insert_new_inslist_taken(session, page);
-		}
-		break;
-	default:
-		if (page->u.col_leaf.ins == NULL) {
-			page->u.col_leaf.ins = new_inslist;
-			__wt_insert_new_inslist_taken(session, page);
-		}
-		break;
-	}
-
-	if (*srch->inshead == NULL) {
-		*srch->inshead = new_inshead;
-		__wt_insert_new_inshead_taken(session, page);
-	}
-
-	/*
-	 * Insert the new WT_INSERT item into the linked list and flush memory
-	 * to ensure the list is never broken.
-	 */
 	__wt_insert_ins_taken(session, page);
-	for (i = 0; i < skipdepth; i++)
-		ins->next[i] = *srch->ins[i];
-	WT_MEMORY_FLUSH;
-	for (i = 0; i < skipdepth; i++)
-		*srch->ins[i] = ins;
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);
@@ -341,18 +278,17 @@ int
 __wt_update_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
-	WT_SEARCH *srch;
-	WT_UPDATE **new_upd, *upd;
+	WT_UPDATE **new_upd, *upd, **upd_entry;
+	uint32_t write_gen;
 	int ret;
 
 	ret = 0;
 
 	__wt_update_unpack(
-	    session, &srch, &new_upd, &upd);
-	page = srch->page;
+	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, srch->write_gen));
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
@@ -369,54 +305,10 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * Insert the new WT_UPDATE item into the linked list and flush memory
 	 * to ensure the list is never broken.
 	 */
-	__wt_update_upd_taken(session, page);
-	upd->next = *srch->upd;
-	WT_MEMORY_FLUSH;
-	*srch->upd = upd;
-
-err:	__wt_session_serialize_wrapup(session, page, 0);
-	return (ret);
-}
-
-/*
- * __wt_xxxupdate_serial_func --
- *	Server function to add an WT_UPDATE entry in the page array.
- */
-int
-__wt_xxxupdate_serial_func(WT_SESSION_IMPL *session)
-{
-	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd, **upd_entry;
-	uint32_t write_gen;
-	int ret;
-
-	ret = 0;
-
-	__wt_xxxupdate_unpack(
-	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);
-
-	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
-
-	/*
-	 * If the page needs an update array (column-store pages and inserts on
-	 * row-store pages do not use the update array), our caller passed us
-	 * one of the correct size.   Check the page still needs one (the write
-	 * generation test should have caught that, though).
-	 */
-	if (new_upd != NULL && page->u.row_leaf.upd == NULL) {
-		page->u.row_leaf.upd = new_upd;
-		__wt_xxxupdate_new_upd_taken(session, page);
-	}
-
-	/*
-	 * Insert the new WT_UPDATE item into the linked list and flush memory
-	 * to ensure the list is never broken.
-	 */
 	upd->next = *upd_entry;
 	WT_MEMORY_FLUSH;
 	*upd_entry = upd;
-	__wt_xxxupdate_upd_taken(session, page);
+	__wt_update_upd_taken(session, page);
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);

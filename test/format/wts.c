@@ -574,16 +574,12 @@ wts_ops(void)
 		 * number of next/prev cursor operations.
 		 */
 		if (g.c_file_type == ROW || g.c_file_type == FIX)
-			if (wts_np(1, &notfound))
-				return (1);
-#if 0
 			for (np = 0; np < MMRAND(1, 4); ++np) {
 				if (notfound)
 					break;
 				if (wts_np(MMRAND(0, 1), &notfound))
 					return (1);
 			}
-#endif
 
 		/* Then read the value we modified to confirm it worked. */
 		if (wts_read(keyno))

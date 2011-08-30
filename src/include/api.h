@@ -44,27 +44,6 @@ typedef	enum {
 	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
-/*
- * WT_SEARCH --
- *	Search return values.
- */
-struct __wt_search {
-	WT_PAGE		*page;		/* page */
-	uint32_t	 write_gen;	/* leaf page's write-generation */
-	int		 match;		/* an exact match */
-	void		*ip;		/* WT_{COL,ROW} reference */
-	uint32_t	 slot;		/* WT_{COL,ROW} slot */
-
-	WT_UPDATE      **upd;		/* WT_UPDATE base insert node */
-	WT_UPDATE	*vupdate;	/* WT_UPDATE value node */
-
-	WT_INSERT_HEAD **inshead;	/* WT_INSERT_HEAD node */
-					/* Previous inserts */
-	WT_INSERT      **ins[WT_SKIP_MAXDEPTH];
-
-	uint8_t		 v;		/* Bitfield search value */
-};
-
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 /*
@@ -98,8 +77,6 @@ struct __wt_session_impl {
 
 	WT_SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
-
-	WT_SEARCH srch;                 /* Search results */
 
 	WT_EVENT_HANDLER *event_handler;
 

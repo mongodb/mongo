@@ -74,24 +74,24 @@ __cursor_flags_end(WT_CURSOR_BTREE *cbt, int ret)
 static inline int
 __cursor_deleted(WT_CURSOR_BTREE *cbt)
 {
+	WT_BTREE *btree;
 	WT_INSERT *ins;
 	WT_PAGE *page;
 
+	btree = cbt->btree;
 	ins = cbt->ins;
 	page = cbt->page;
 
-	/*
-	 * If we found an item on an insert list, check there, otherwise check
-	 * an update in the page slots.
-	 */
-	if (ins != NULL) {
-		if (ins->upd != NULL && WT_UPDATE_DELETED_ISSET(ins->upd))
-			return (WT_NOTFOUND);
-	} else
-		if (page->u.row_leaf.upd != NULL &&
-		    page->u.row_leaf.upd[cbt->slot] != NULL &&
-		    WT_UPDATE_DELETED_ISSET(page->u.row_leaf.upd[cbt->slot]))
-			return (WT_NOTFOUND);
+	/* If we found an item on an insert list, check there. */
+	if (ins != NULL)
+		return (WT_UPDATE_DELETED_ISSET(ins->upd) ? WT_NOTFOUND : 0);
+
+	/* Otherwise, check for an update in the page's slots. */
+	if (btree->type == BTREE_ROW &&
+	    page->u.row_leaf.upd != NULL &&
+	    page->u.row_leaf.upd[cbt->slot] != NULL &&
+	    WT_UPDATE_DELETED_ISSET(page->u.row_leaf.upd[cbt->slot]))
+		return (WT_NOTFOUND);
 	return (0);
 }
 
@@ -118,25 +118,21 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		while ((ret = __wt_col_search(
-		    session, cursor->recno, 0)) == WT_RESTART)
+		while ((ret = __wt_col_search(session, cbt, 0)) == WT_RESTART)
 			;
-		if (ret == 0) {
-			ret = __wt_return_value(session, cursor);
-			__wt_page_release(session, session->srch.page);
-		}
 		break;
 	case BTREE_ROW:
 		while ((ret = __wt_row_search(session, cbt, 0)) == WT_RESTART)
 			;
-		if (ret == 0) {
-			if (cbt->match == 0)
-				ret = WT_NOTFOUND;
-			else if ((ret = __cursor_deleted(cbt)) == 0)
-				ret = __wt_xxxreturn_value(session, cbt);
-		}
 		break;
 	WT_ILLEGAL_FORMAT(session);
+	}
+
+	if (ret == 0) {
+		if (cbt->match == 0)
+			ret = WT_NOTFOUND;
+		else if ((ret = __cursor_deleted(cbt)) == 0)
+			ret = __wt_return_value(session, cbt);
 	}
 
 	__cursor_flags_end(cbt, ret);
@@ -161,7 +157,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_inserts);
 
-	__cursor_flags_begin(cbt);
+xxx:	__cursor_flags_begin(cbt);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -174,9 +170,12 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
-		while ((ret = __wt_col_modify(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+		while ((ret = __wt_col_search(session, cbt, 1)) == WT_RESTART)
 			;
+		if (ret != 0)
+			break;
+		if ((ret = __wt_col_modify(session, cbt, 0)) == WT_RESTART)
+			goto xxx;
 		break;
 	case BTREE_ROW:
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
@@ -206,7 +205,6 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
-	WT_ITEM zero;
 	WT_SESSION_IMPL *session;
 	int ret;
 
@@ -219,16 +217,15 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		zero.data = "";		/* A zero-byte means delete. */
-		zero.size = 1;
-		while ((ret = __wt_col_modify(
-		    session, cursor->recno, &zero, 0)) == WT_RESTART)
-			;
-		break;
 	case BTREE_COL_VAR:
-		while ((ret = __wt_col_modify(
-		    session, cursor->recno, NULL, 0)) == WT_RESTART)
+		while ((ret = __wt_col_search(session, cbt, 1)) == WT_RESTART)
 			;
+		if (ret == 0) {
+			if (cbt->match == 0)
+				ret = WT_NOTFOUND;
+			else if ((ret = __cursor_deleted(cbt)) == 0)
+				ret  = __wt_col_modify(session, cbt, 1);
+		}
 		break;
 	case BTREE_ROW:
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
@@ -265,7 +262,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_updates);
 
-	__cursor_flags_begin(cbt);
+xxx:	__cursor_flags_begin(cbt);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -278,9 +275,12 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
-		while ((ret = __wt_col_modify(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value, 1)) == WT_RESTART)
+		while ((ret = __wt_col_search(session, cbt, 1)) == WT_RESTART)
 			;
+		if (ret != 0)
+			break;
+		if ((ret  = __wt_col_modify(session, cbt, 0)) == WT_RESTART)
+			goto xxx;
 		break;
 	case BTREE_ROW:
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
