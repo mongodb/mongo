@@ -505,31 +505,34 @@ struct __wt_insert_head {
  * pointers to structures, and may not exist.  The following macros return an
  * array entry if the array of pointers and the specific structure exist, else
  * NULL.
- *
- * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
- * the "one per WT_ROW slot" insert array.  That's because the insert array
- * requires an extra slot to hold keys that sort before any key found on the
- * original page.
  */
 #define	WT_ROW_INSERT_SLOT(page, slot)					\
 	((page)->u.row_leaf.ins == NULL ?				\
 	    NULL : (page)->u.row_leaf.ins[slot])
 #define	WT_ROW_INSERT(page, ip)						\
 	WT_ROW_INSERT_SLOT(page, WT_ROW_SLOT(page, ip))
-#define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[(page)->entries])
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
 	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
+/*
+ * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
+ * the "one per WT_ROW slot" insert array.  That's because the insert array
+ * requires an extra slot to hold keys that sort before any key found on the
+ * original page.
+ */
+#define	WT_ROW_INSERT_SMALLEST(page)					\
+	((page)->u.row_leaf.ins == NULL ?				\
+	    NULL : (page)->u.row_leaf.ins[(page)->entries])
 
+#define	WT_COL_INSERT_SLOT(page, slot)					\
+	((page)->u.col_leaf.ins == NULL ?				\
+	    NULL : (page)->u.col_leaf.ins[slot])
+#define	WT_COL_INSERT(page, ip)						\
+	WT_COL_INSERT_SLOT(page, WT_COL_SLOT(page, ip))
 /*
  * WT_COL_INSERT_SINGLE references a single WT_INSERT list, which is used for
  * fixed-length column-store updates.
  */
-#define	WT_COL_INSERT(page, ip)						\
-	((page)->u.col_leaf.ins == NULL ?				\
-	    NULL : (page)->u.col_leaf.ins[WT_COL_SLOT(page, ip)])
 #define	WT_COL_INSERT_SINGLE(page)					\
 	((page)->u.col_leaf.ins == NULL ? NULL : (page)->u.col_leaf.ins[0])
 
