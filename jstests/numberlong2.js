@@ -1,6 +1,6 @@
 // Test precision of NumberLong values with v1 index code SERVER-3717
 
-if ( 0 ) { // SERVER-3717
+if ( 1 ) { // SERVER-3717
 
 t = db.jstests_numberlong2;
 t.drop();
