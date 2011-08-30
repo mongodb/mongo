@@ -532,6 +532,17 @@ wts_ops(void)
 					return (1);
 				break;
 			case FIX:
+				/*
+				 * We don't insert records in fixed-length
+				 * column-store files: an insert extends the
+				 * file by creating a large number of "deleted"
+				 * records: since a deleted record is a store
+				 * of 0x00, we can't distinguish between a
+				 * legitimate value and a deleted record, and
+				 * so we don't match the contents of the BDB
+				 * database.
+				 */
+				 break;
 			case VAR:
 				/* Column-store tables only support append. */
 				keyno = ++g.c_rows;
