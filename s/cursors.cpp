@@ -275,6 +275,7 @@ namespace mongo {
             }
             log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make log(1)
             _cursors.erase( i );
+            i = _cursors.begin(); // possible 2nd entry will get skipped, will get on next pass
         }
     }
 
