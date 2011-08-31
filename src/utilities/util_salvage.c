@@ -17,14 +17,14 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 	char *name;
 
 	name = NULL;
-	while ((ch = getopt(argc, argv, "")) != EOF)
+	while ((ch = util_getopt(argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/* The remaining argument is the file name. */
 	if (argc != 1)

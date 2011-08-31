@@ -61,12 +61,12 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 
 	name = NULL;
 	printable = reverse = 0;
-	while ((ch = getopt(argc, argv, "f:pr")) != EOF)
+	while ((ch = util_getopt(argc, argv, "f:pr")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
-			if (freopen(optarg, "w", stdout) == NULL) {
+			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, optarg, strerror(errno));
+				    progname, util_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
@@ -80,8 +80,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/* The remaining argument is the table name. */
 	if (argc != 1)

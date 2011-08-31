@@ -18,18 +18,18 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 
 	config = NULL;
 
-	while ((ch = getopt(argc, argv, "c:")) != EOF)
+	while ((ch = util_getopt(argc, argv, "c:")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line configuration */
-			config = optarg;
+			config = util_optarg;
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
 
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/* The remaining argument is the URI to create. */
 	if (argc != 1)

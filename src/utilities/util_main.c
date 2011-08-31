@@ -49,15 +49,15 @@ main(int argc, char *argv[])
 
 	/* Check for standard options. */
 	config = NULL;
-	while ((ch = getopt(argc, argv, "C:h:Vv")) != EOF)
+	while ((ch = util_getopt(argc, argv, "C:h:Vv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
-			config = optarg;
+			config = util_optarg;
 			break;
 		case 'h':			/* home directory */
-			if (chdir(optarg) != 0) {
+			if (chdir(util_optarg) != 0) {
 				fprintf(stderr, "%s: chdir %s: %s\n",
-				    progname, optarg, strerror(errno));
+				    progname, util_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
@@ -71,8 +71,8 @@ main(int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/* The next argument is the command name. */
 	if (argc < 1)
@@ -80,8 +80,8 @@ main(int argc, char *argv[])
 	command = argv[0];
 
 	/* Reset getopt. */
-	optreset = 1;
-	optind = 1;
+	util_optreset = 1;
+	util_optind = 1;
 
 	if ((ret = wiredtiger_open(".",
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0)

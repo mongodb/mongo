@@ -17,12 +17,12 @@ util_dumpfile(WT_SESSION *session, int argc, char *argv[])
 	char *name;
 
 	name = NULL;
-	while ((ch = getopt(argc, argv, "f:")) != EOF)
+	while ((ch = util_getopt(argc, argv, "f:")) != EOF)
 		switch (ch) {
 		case 'f':				/* output file */
-			if (freopen(optarg, "w", stdout) == NULL) {
+			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: %s\n",
-				    progname, optarg, strerror(errno));
+				    progname, util_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
@@ -30,8 +30,8 @@ util_dumpfile(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/* The remaining argument is the file name. */
 	if (argc != 1)

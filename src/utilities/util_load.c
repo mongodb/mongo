@@ -35,18 +35,18 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	name = NULL;
 	debug = printable = 0;
 
-	while ((ch = getopt(argc, argv, "c:df:T")) != EOF)
+	while ((ch = util_getopt(argc, argv, "c:df:T")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
-			table_config = optarg;
+			table_config = util_optarg;
 			break;
 		case 'd':			/* command-line option */
 			debug = 1;
 			break;
 		case 'f':			/* input file */
-			if (freopen(optarg, "r", stdin) == NULL) {
+			if (freopen(util_optarg, "r", stdin) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, optarg, strerror(errno));
+				    progname, util_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
@@ -57,8 +57,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= util_optind;
+	argv += util_optind;
 
 	/*
 	 * Right now, we only support text input -- require the T option to

@@ -1,3 +1,30 @@
+/*-
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 /*	$NetBSD: getopt.c,v 1.26 2003/08/07 16:43:40 agc Exp $	*/
 
 /*
@@ -29,26 +56,14 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)getopt.c	8.3 (Berkeley) 4/27/95";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/lib/libc/stdlib/getopt.c,v 1.8.14.1 2010/12/21 17:10:29 kensmith Exp $");
+#include <wiredtiger.h>
+#include "util.h"
 
-#include "namespace.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include "un-namespace.h"
-
-#include "libc_private.h"
-
-int	opterr = 1,		/* if error message should be printed */
-	optind = 1,		/* index into parent argv vector */
-	optopt,			/* character checked for validity */
-	optreset;		/* reset getopt */
-char	*optarg;		/* argument associated with option */
+int	util_opterr = 1,	/* if error message should be printed */
+	util_optind = 1,	/* index into parent argv vector */
+	util_optopt,		/* character checked for validity */
+	util_optreset;		/* reset getopt */
+char	*util_optarg;		/* argument associated with option */
 
 #define	BADCH	(int)'?'
 #define	BADARG	(int)':'
@@ -59,77 +74,74 @@ char	*optarg;		/* argument associated with option */
  *	Parse argc/argv argument vector.
  */
 int
-getopt(nargc, nargv, ostr)
-	int nargc;
-	char * const nargv[];
-	const char *ostr;
+util_getopt(int nargc, char * const *nargv, const char *ostr)
 {
-	static char *place = EMSG;		/* option letter processing */
-	char *oli;				/* option letter list index */
+	static const char *place = EMSG;	/* option letter processing */
+	const char *oli;			/* option letter list index */
 
-	if (optreset || *place == 0) {		/* update scanning pointer */
-		optreset = 0;
-		place = nargv[optind];
-		if (optind >= nargc || *place++ != '-') {
+	if (util_optreset || *place == 0) {	/* update scanning pointer */
+		util_optreset = 0;
+		place = nargv[util_optind];
+		if (util_optind >= nargc || *place++ != '-') {
 			/* Argument is absent or is not an option */
 			place = EMSG;
 			return (-1);
 		}
-		optopt = *place++;
-		if (optopt == '-' && *place == 0) {
+		util_optopt = *place++;
+		if (util_optopt == '-' && *place == 0) {
 			/* "--" => end of options */
-			++optind;
+			++util_optind;
 			place = EMSG;
 			return (-1);
 		}
-		if (optopt == 0) {
+		if (util_optopt == 0) {
 			/* Solitary '-', treat as a '-' option
 			   if the program (eg su) is looking for it. */
 			place = EMSG;
 			if (strchr(ostr, '-') == NULL)
 				return (-1);
-			optopt = '-';
+			util_optopt = '-';
 		}
 	} else
-		optopt = *place++;
+		util_optopt = *place++;
 
 	/* See if option letter is one the caller wanted... */
-	if (optopt == ':' || (oli = strchr(ostr, optopt)) == NULL) {
+	if (util_optopt == ':' || (oli = strchr(ostr, util_optopt)) == NULL) {
 		if (*place == 0)
-			++optind;
-		if (opterr && *ostr != ':')
+			++util_optind;
+		if (util_opterr && *ostr != ':')
 			(void)fprintf(stderr,
-			    "%s: illegal option -- %c\n", _getprogname(),
-			    optopt);
+			    "%s: illegal option -- %c\n", progname,
+			    util_optopt);
 		return (BADCH);
 	}
 
 	/* Does this option need an argument? */
 	if (oli[1] != ':') {
 		/* don't need argument */
-		optarg = NULL;
+		util_optarg = NULL;
 		if (*place == 0)
-			++optind;
+			++util_optind;
 	} else {
 		/* Option-argument is either the rest of this argument or the
 		   entire next argument. */
 		if (*place)
-			optarg = place;
-		else if (nargc > ++optind)
-			optarg = nargv[optind];
+			util_optarg = (char *)place;
+		else if (nargc > ++util_optind)
+			util_optarg = nargv[util_optind];
 		else {
 			/* option-argument absent */
 			place = EMSG;
 			if (*ostr == ':')
 				return (BADARG);
-			if (opterr)
+			if (util_opterr)
 				(void)fprintf(stderr,
 				    "%s: option requires an argument -- %c\n",
-				    _getprogname(), optopt);
+				    progname, util_optopt);
 			return (BADCH);
 		}
 		place = EMSG;
-		++optind;
+		++util_optind;
 	}
-	return (optopt);			/* return option letter */
+	return (util_optopt);			/* return option letter */
 }

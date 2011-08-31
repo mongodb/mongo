@@ -1,0 +1,6 @@
+#! /bin/sh
+
+# Complain if someone breaks getopt usage in the wt utility.
+egrep -w 'opterr|optind|optopt|optreset|optarg' ../src/utilities/*.c
+
+exit 0
