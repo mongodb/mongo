@@ -304,13 +304,13 @@ namespace mongo {
             case NumberLong:
                 {
                     long long n = e._numberLong();
-                    double d = (double) n;
-                    if( ((long long)d) != n ) { 
+                    if( abs(n) >= 10000000000000LL ) {
+                        // can't represent exactly as a double
                         traditional(obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
-                    b.appendNum(d);
+                    b.appendNum((double) n);
                     break;
                 }
             case NumberDouble:
