@@ -271,6 +271,7 @@ inuse
 io
 ispo
 keyname
+kv
 leafmax
 leafmin
 len
@@ -308,6 +309,7 @@ newname
 nl
 nlpo
 notsup
+np
 nset
 nul
 numSymbols
@@ -329,6 +331,8 @@ qSS
 qdown
 qsort
 qup
+readnext
+readprev
 readserver
 realloc
 recno
@@ -417,6 +421,7 @@ vanishingly
 versa
 vpack
 vsize
+vslot
 vunpack
 vupdate
 wiredtiger
