@@ -604,7 +604,7 @@ namespace mongo {
             }
             if( !d.moreJSObjs() )
                 break;
-            js = d.nextJsObj();
+            js = d.nextJsObj(); // TODO: refactor to do objcheck outside of writelock
         }
     }
 
@@ -612,6 +612,12 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
+
+        if( !d.moreJSObjs() ) {
+            // strange.  should we complain?
+            return;
+        }
+        BSONObj js = d.nextJsObj();
 
         writelock lk(ns);
 
@@ -623,11 +629,6 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        if( !d.moreJSObjs() ) { 
-            // strange.  should we complain?
-            return;
-        }
-        BSONObj js = d.nextJsObj();
         if( d.moreJSObjs() ) { 
             insertMulti(d, ns, js);
             return;
