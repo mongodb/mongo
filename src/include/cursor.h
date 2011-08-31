@@ -13,18 +13,16 @@ struct __wt_cursor_btree {
 	/*
 	 * The following fields are set by the search functions as a precursor
 	 * to page modification: we have a page, a WT_COL/WT_ROW slot on the
-	 * page, an insert head and list and a skiplist stack (the stack of
+	 * page, an insert head, insert list and a skiplist stack (the stack of
 	 * skiplist entries leading to the insert point).  The search functions
 	 * also return if an exact match was found and a write-generation for
 	 * the leaf page.
 	 */
 	WT_PAGE	  *page;		/* Current page */
-	WT_COL	  *cip;			/* Col-store page slot */
-	WT_ROW	  *rip;			/* Row-store page slot */
 	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
 
-	WT_INSERT_HEAD  *ins_head;	/* Insert chain head */
-	WT_INSERT	*ins;		/* Insert list, skiplist stack */
+	WT_INSERT_HEAD   *ins_head;	/* Insert chain head */
+	WT_INSERT	 *ins;		/* Insert list, skiplist stack */
 	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
 
 	uint64_t recno;			/* Record number */
@@ -32,37 +30,27 @@ struct __wt_cursor_btree {
 	uint32_t write_gen;		/* Saved leaf page's write generation */
 
 	/*
-	 * If an application is doing a cursor walk, the following fields are
-	 * additional information as to the cursor's location in the tree or
-	 * are cached information used for cursors as they return items from
-	 * the page.  These fields are not set by the search functions -- when
-	 * the first cursor next/prev function is called, they are filled in,
-	 * using the initial information returned by the search function.
-	 */
-	uint32_t nslots;		/* remaining page slots to return */
-
-	/*
-	 * We can't walk an insert list in reverse order, so we have to maintain
-	 * a count of the current entry we're on.  For each iteration, we return
-	  one entry earlier in the list.
+	 * The following fields are maintained by cursor iteration functions.
+	 *
+	 * We can't walk an insert list in reverse order, it's only linked in a
+	 * forward, sorted order.   We don't care for column-store files, the
+	 * record number gives us a "key" for lookup; for row-store files, we
+	 * maintain a count of the current entry we're on.  For each iteration,
+	 * we return one entry earlier in the list.
 	 */
 	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
 
 	/*
-	 * Variable length column-store items are run-length encoded; the
-	 * rel_return_count field is the item return count, set to the cell's
-	 * initial unpacked value then decremented to 0.
-	 *
-	 * Variable length column-store items are optionally Huffman encoded;
-	 * the value field is a buffer containing a copy of the item we're
-	 * returning, so we don't repeatedly decode it if the RLE count is
-	 * non-zero.
+	 * Variable length column-store items are run-length encoded, and
+	 * optionally Huffman encoded.   To avoid repeatedly decompressing the
+	 * item, we decompress it once into the value buffer.  The vslot field
+	 * is used to determine if we're returning information from the same
+	 * slot as the last iteration on the cursor.
 	 */
-	uint64_t rle_return_cnt;	/* RLE count */
 	WT_BUF	 value;			/* Variable-length value */
 	uint32_t vslot;			/* Variable-length value slot */
 
-#define	WT_CBT_SEARCH_SET	0x04	/* Search has set a page */
+#define	WT_CBT_SEARCH_SET	0x01	/* Search has set a page */
 	uint32_t flags;
 };
 

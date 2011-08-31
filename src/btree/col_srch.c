@@ -53,6 +53,7 @@ int
 __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
+	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	uint64_t recno, start_recno;
@@ -135,11 +136,11 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->match = 1;
 		break;
 	case WT_PAGE_COL_VAR:
-		if ((cbt->cip = __cursor_col_rle_search(page, recno)) == NULL)
+		if ((cip = __cursor_col_rle_search(page, recno)) == NULL)
 			cbt->match = 0;
 		else {
 			cbt->match = 1;
-			cbt->slot = WT_COL_SLOT(page, cbt->cip);
+			cbt->slot = WT_COL_SLOT(page, cip);
 			cbt->ins_head = WT_COL_INSERT_SLOT(page, cbt->slot);
 		}
 		break;

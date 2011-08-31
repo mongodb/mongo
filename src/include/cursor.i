@@ -13,12 +13,11 @@ static inline void
 __cursor_search_reset(WT_CURSOR_BTREE *cbt)
 {
 	cbt->page = NULL;
-	cbt->cip = NULL;
-	cbt->rip = NULL;
 	cbt->slot = UINT32_MAX;			/* Fail big. */
 
 	cbt->ins_head = NULL;
 	cbt->ins = NULL;
+	/* We don't bother clearing the insert stack, that's more expensive. */
 
 	cbt->match = 0;
 	cbt->write_gen = 0;

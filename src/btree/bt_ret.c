@@ -19,6 +19,7 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CURSOR *cursor;
 	WT_PAGE *page;
+	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint8_t v;
 
@@ -51,15 +52,16 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			return (__wt_buf_set(session,
 			    &cursor->value, WT_UPDATE_DATA(upd), upd->size));
 		}
-		cell = WT_COL_PTR(page, cbt->cip);
+		cell = WT_COL_PTR(page, &page->u.col_leaf.d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
 		 * If the cursor references a WT_INSERT item, or if the original
 		 * item was updated, take the related WT_UPDATE item.
 		 */
+		rip = &page->u.row_leaf.d[cbt->slot];
 		if (cbt->ins == NULL)
-			upd = WT_ROW_UPDATE(page, cbt->rip);
+			upd = WT_ROW_UPDATE(page, rip);
 		else
 			upd = cbt->ins->upd;
 		if (upd != NULL)
@@ -67,7 +69,7 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			    &cursor->value, WT_UPDATE_DATA(upd), upd->size));
 
 		/* Otherwise, take the original cell (which may be empty). */
-		if ((cell = __wt_row_value(page, cbt->rip)) == NULL) {
+		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			cursor->value.size = 0;
 			return (0);
 		}

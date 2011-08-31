@@ -174,8 +174,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
-
-		cbt->rip = rip;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		cbt->match = 1;
 		return (0);
@@ -193,7 +191,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	rip = page->u.row_leaf.d;
 	if (base != 0)
 		rip += base - 1;
-	cbt->rip = rip;
 
 	/*
 	 * It's still possible there is an exact match, but it's on an insert
