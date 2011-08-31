@@ -305,9 +305,9 @@ namespace mongo {
                 {
                     long long n = e._numberLong();
                     long long m = 2LL << 52;
-                    {
+                    DEV {
                         long long d = m-1;
-                        dassert( ((long long) ((double) -d)) == -d );
+                        assert( ((long long) ((double) -d)) == -d );
                     }
                     if( n >= m || n <= -m ) {
                         // can't represent exactly as a double
