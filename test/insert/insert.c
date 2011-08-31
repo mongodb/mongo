@@ -244,9 +244,12 @@ run(void)
 		fprintf(stderr, "timer: %.2lf\n",
 		    (stop - start) / (double)CLOCKS_PER_SEC);
 	}
+	assert(cursor->close(cursor, 0) == 0);
 
 	assert(session->sync(session, "file:" FILENAME, NULL) == 0);
 
+	assert(session->open_cursor(
+	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
 	if (flags & PRINT) {
 		while ((ret = cursor->next(cursor)) == 0) {
 			switch (file_type) {
