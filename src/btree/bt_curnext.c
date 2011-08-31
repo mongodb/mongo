@@ -17,7 +17,6 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_BTREE *btree;
 	WT_BUF *val;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
 	uint64_t *recnop;
 	uint8_t v;
 
@@ -71,9 +70,7 @@ new_page:	*recnop = cbt->recno;
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 		if (cbt->ins != NULL &&
 		    WT_INSERT_RECNO(cbt->ins) == cbt->recno) {
-			upd = cbt->ins->upd;
-			cbt->ins = WT_SKIP_NEXT(cbt->ins);
-			val->data = WT_UPDATE_DATA(upd);
+			val->data = WT_UPDATE_DATA(cbt->ins->upd);
 			val->size = 1;
 			return (0);
 		}
