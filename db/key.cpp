@@ -304,7 +304,7 @@ namespace mongo {
             case NumberLong:
                 {
                     long long n = e._numberLong();
-                    if( abs(n) >= 10000000000000LL ) {
+                    if( n >= 10000000000000LL || n >= -10000000000000LL ) {
                         // can't represent exactly as a double
                         traditional(obj);
                         return;
