@@ -1,5 +1,34 @@
 {
-   <BDB uninitialized write>
+   <FreeBSD 8.2 dlopen #1>
+   Memcheck:Addr8
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   fun:dlopen
+   fun:__wt_dlopen
+   fun:__conn_load_extension
+   fun:wiredtiger_open
+   fun:wts_open
+   fun:wts_startup
+   fun:main
+}
+{
+   <FreeBSD 8.2 dlopen #2>
+   Memcheck:Addr8
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   fun:dlopen
+   fun:__wt_dlopen
+   fun:__conn_load_extension
+   fun:wiredtiger_open
+   fun:wts_open
+   fun:wts_startup
+   fun:main
+}
+{
+   <Berkeley DB uninitialized write>
    Memcheck:Param
    write(buf)
    obj:/lib/libc.so.7
