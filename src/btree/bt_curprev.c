@@ -177,10 +177,20 @@ new_page:	*recnop = cbt->recno;
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			if (unpack.type == WT_CELL_DEL)
+			switch (unpack.type) {
+			case WT_CELL_DEL:
 				continue;
-			WT_RET(__wt_cell_unpack_copy(
-			    session, &unpack, &cbt->value));
+			case WT_CELL_VALUE:
+				if (session->btree->huffman_value == NULL) {
+					cbt->value.data = unpack.data;
+					cbt->value.size = unpack.size;
+					break;
+				}
+				/* FALLTHROUGH */
+			default:
+				WT_RET(__wt_cell_unpack_copy(
+				    session, &unpack, &cbt->value));
+			}
 			cbt->vslot = slot;
 		}
 		val->data = cbt->value.data;
