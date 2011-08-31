@@ -34,6 +34,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 {
 	WT_BUF *key, *val;
 	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
 	WT_IKEY *ikey;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -64,15 +65,21 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	 * Else, check for empty data.
 	 * Else, use the value from the original disk image.
 	 */
-	upd = WT_ROW_UPDATE(cbt->page, rip);
-	if (upd != NULL) {
+	if ((upd = WT_ROW_UPDATE(cbt->page, rip)) != NULL) {
 		val->data = WT_UPDATE_DATA(upd);
 		val->size = upd->size;
 	} else if ((cell = __wt_row_value(cbt->page, rip)) == NULL) {
 		val->data = "";
 		val->size = 0;
-	} else
-		WT_RET(__wt_cell_copy(session, cell, val));
+	} else {
+		__wt_cell_unpack(cell, &unpack);
+		if (unpack.type == WT_CELL_VALUE &&
+		    session->btree->huffman_value == NULL) {
+			val->data = unpack.data;
+			val->size = unpack.size;
+		} else
+			WT_RET(__wt_cell_unpack_copy(session, &unpack, val));
+	}
 
 	return (0);
 }
