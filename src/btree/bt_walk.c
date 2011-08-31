@@ -615,7 +615,8 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 		WT_RET(__wt_page_in(session, t, t->parent_ref, 0));
 
 	/* Figure out the currently slot. */
-	slot = page->type == WT_PAGE_ROW_INT ?
+	slot =
+	    page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF ?
 	    WT_ROW_REF_SLOT(t, page->parent_ref) :
 	    WT_COL_REF_SLOT(t, page->parent_ref);
 

@@ -114,104 +114,82 @@ new_page:	*recnop = cbt->recno;
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt,
-    int newpage, uint64_t *recnop, WT_BUF *value)
+__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
+	WT_BUF *val;
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_CELL_UNPACK unpack;
+	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
-	enum { DELETED, FOUND, NOTFOUND } state;
-	int newcell;
+	uint64_t *recnop;
+	uint32_t slot;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	unpack = &_unpack;
-	cell = NULL;
+	recnop = &cbt->iface.recno;
+	val = &cbt->iface.value;
+
+	/*
+	 * Reset the insert list reference so any subsequent cursor next
+	 * works correctly.
+	 */
+	cbt->ins = NULL;
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->cip = cbt->page->u.col_leaf.d + (cbt->page->entries - 1);
-		cbt->nslots = cbt->page->entries;
-		cbt->recno =
-		    cbt->page->u.col_leaf.recno + (cbt->page->entries - 1);
-		newcell = 1;
-	} else
-		newcell = 0;
-
-	/* This loop moves through a page. */
-	for (; cbt->rle_return_cnt > 0 || cbt->nslots > 0;
-	    --cbt->cip, --cbt->nslots, newcell = 1) {
-		/* Unpack each cell, find out how many times it's repeated. */
-		if (newcell) {
-			if ((cell = WT_COL_PTR(cbt->page, cbt->cip)) != NULL) {
-				__wt_cell_unpack(cell, unpack);
-				cbt->rle_return_cnt = unpack->rle;
-			} else
-				cbt->rle_return_cnt = 1;
-
-			cbt->ins_head = WT_COL_INSERT(cbt->page, cbt->cip);
-
-			/*
-			 * Skip deleted records, there might be a large number
-			 * of them.
-			 */
-			if (cbt->ins_head == NULL &&
-			    unpack->type == WT_CELL_DEL) {
-				cbt->recno -= cbt->rle_return_cnt;
-				cbt->rle_return_cnt = 0;
-				continue;
-			}
-
-			/*
-			 * Get a copy of the item we're returning: it might be
-			 * encoded, and we don't want to repeatedly decode it.
-			 */
-			if (cell == NULL) {
-				cbt->value.data = NULL;
-				cbt->value.size = 0;
-			} else
-				WT_RET(__wt_cell_unpack_copy(
-				    session, unpack, &cbt->value));
-		}
-
-		/* Return the data RLE-count number of times. */
-		state = NOTFOUND;
-		while (cbt->rle_return_cnt > 0) {
-			--cbt->rle_return_cnt;
-			*recnop = cbt->recno--;
-
-			/*
-			 * Check any insert list for a matching record.  Insert
-			 * lists are in forward sorted order; in a last-to-first
-			 * walk we have to search the entire list.
-			 */
-			if (cbt->ins_head != NULL)
-				WT_SKIP_FOREACH(ins, cbt->ins_head) {
-					if (cbt->recno !=
-					    WT_INSERT_RECNO(cbt->ins))
-						continue;
-					upd = cbt->ins->upd;
-					if (WT_UPDATE_DELETED_ISSET(upd))
-						state = DELETED;
-					else {
-						value->data =
-						    WT_UPDATE_DATA(upd);
-						value->size = upd->size;
-						state = FOUND;
-					}
-					break;
-				}
-			if (state == NOTFOUND) {
-				value->data = cbt->value.data;
-				value->size = cbt->value.size;
-				state = FOUND;
-			}
-			if (state == FOUND)
-				return (0);
-		}
+		cbt->recno = __cursor_col_rle_last(cbt->page);
+		cbt->vslot = UINT32_MAX;
+		goto new_page;
 	}
-	return (WT_NOTFOUND);
+
+	/* Move to the previous entry and return the item. */
+	for (;;) {
+		if (cbt->recno == cbt->page->u.col_leaf.recno)
+			return (WT_NOTFOUND);
+		--cbt->recno;
+new_page:	*recnop = cbt->recno;
+
+		/* Find the matching WT_COL slot. */
+		if ((cip =
+		    __cursor_col_rle_search(cbt->page, cbt->recno)) == NULL)
+			return (WT_NOTFOUND);
+		slot = WT_COL_SLOT(cbt->page, cip);
+
+		/*
+		 * Check any insert list for a matching record.  Insert lists
+		 * are in forward sorted order, in a last-to-first walk we have
+		 * to search the entire list.  We use the skiplist structure,
+		 * rather than doing it linearly.
+		 */
+		if ((ins = __search_insert(
+		    WT_COL_INSERT(cbt->page, cip), cbt->recno)) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(ins->upd))
+				continue;
+			val->data = WT_UPDATE_DATA(ins->upd);
+			val->size = ins->upd->size;
+			return (0);
+		}
+
+		/*
+		 * If we're at the same slot as the last reference and there's
+		 * no matching insert list item, re-use the return information.
+		 * Otherwise, unpack the cell and build the return information.
+		 */
+		if (slot != cbt->vslot) {
+			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
+				continue;
+			__wt_cell_unpack(cell, &unpack);
+			if (unpack.type == WT_CELL_DEL)
+				continue;
+			WT_RET(__wt_cell_unpack_copy(
+			    session, &unpack, &cbt->value));
+			cbt->vslot = slot;
+		}
+		val->data = cbt->value.data;
+		val->size = cbt->value.size;
+		return (0);
+	}
+	/* NOTREACHED */
 }
 
 /*
@@ -355,8 +333,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 				ret = __cursor_fix_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_prev(cbt, newpage,
-				    &cursor->recno, &cursor->value);
+				ret = __cursor_var_prev(cbt, newpage);
 				break;
 			case WT_PAGE_ROW_LEAF:
 				ret = __cursor_row_prev(cbt, newpage);

@@ -75,6 +75,9 @@ static inline int
 __cursor_deleted(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
+	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_PAGE *page;
 
@@ -87,11 +90,24 @@ __cursor_deleted(WT_CURSOR_BTREE *cbt)
 		return (WT_UPDATE_DELETED_ISSET(ins->upd) ? WT_NOTFOUND : 0);
 
 	/* Otherwise, check for an update in the page's slots. */
-	if (btree->type == BTREE_ROW &&
-	    page->u.row_leaf.upd != NULL &&
-	    page->u.row_leaf.upd[cbt->slot] != NULL &&
-	    WT_UPDATE_DELETED_ISSET(page->u.row_leaf.upd[cbt->slot]))
-		return (WT_NOTFOUND);
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		break;
+	case BTREE_COL_VAR:
+		cip = &page->u.col_leaf.d[cbt->slot];
+		if ((cell = WT_COL_PTR(page, cip)) == NULL)
+			return (WT_NOTFOUND);
+		__wt_cell_unpack(cell, &unpack);
+		if (unpack.type == WT_CELL_DEL)
+			return (WT_NOTFOUND);
+		break;
+	case BTREE_ROW:
+		if (page->u.row_leaf.upd != NULL &&
+		    page->u.row_leaf.upd[cbt->slot] != NULL &&
+		    WT_UPDATE_DELETED_ISSET(page->u.row_leaf.upd[cbt->slot]))
+			return (WT_NOTFOUND);
+		break;
+	}
 	return (0);
 }
 

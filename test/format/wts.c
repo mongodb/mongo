@@ -9,7 +9,7 @@
 
 static int  bulk(WT_ITEM **, WT_ITEM **);
 static int  wts_close(WT_CONNECTION *);
-static int  wts_col_del(uint64_t);
+static int  wts_col_del(uint64_t, int *);
 static int  wts_col_put(uint64_t, int);
 static int  wts_np(int, int *);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
@@ -521,7 +521,7 @@ wts_ops(void)
 				 */
 				break;
 			case VAR:
-				if (wts_col_del(keyno))
+				if (wts_col_del(keyno, &notfound))
 					return (1);
 				break;
 			}
@@ -573,13 +573,12 @@ wts_ops(void)
 		 * If we did any operation, we've set the cursor, do a small
 		 * number of next/prev cursor operations.
 		 */
-		if (g.c_file_type == ROW || g.c_file_type == FIX)
-			for (np = 0; np < MMRAND(1, 4); ++np) {
-				if (notfound)
-					break;
-				if (wts_np(MMRAND(0, 1), &notfound))
-					return (1);
-			}
+		for (np = 0; np < MMRAND(1, 4); ++np) {
+			if (notfound)
+				break;
+			if (wts_np(MMRAND(0, 1), &notfound))
+				return (1);
+		}
 
 		/* Then read the value we modified to confirm it worked. */
 		if (wts_read(keyno))
@@ -915,7 +914,7 @@ wts_row_del(uint64_t keyno, int *notfoundp)
  *	Delete an element from a column-store file.
  */
 static int
-wts_col_del(uint64_t keyno)
+wts_col_del(uint64_t keyno, int *notfoundp)
 {
 	static WT_ITEM key;
 	WT_CURSOR *cursor;
@@ -938,9 +937,11 @@ wts_col_del(uint64_t keyno)
 		key_gen(&key.data, &key.size, keyno, 0);
 		if (bdb_put(key.data, key.size, "\0", 1, &notfound))
 			return (1);
-	} else
+	} else {
 		if (bdb_del(keyno, &notfound))
 			return (1);
+		*notfoundp = notfound;
+	}
 
 	cursor->set_key(cursor, keyno);
 	ret = cursor->remove(cursor);
@@ -967,15 +968,19 @@ wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 		if (wt_ret == WT_NOTFOUND)
 			return (2);
 
-		fprintf(stderr, "%s: %s: row %" PRIu64
-                    ": not found in Berkeley DB, found in WiredTiger\n",
-		    g.progname, f, keyno);
+		fprintf(stderr, "%s: %s:", g.progname, f);
+		if (keyno != 0)
+			fprintf(stderr, " row %" PRIu64 ":", keyno);
+		fprintf(stderr,
+		    " not found in Berkeley DB, found in WiredTiger\n");
 		return (1);
 	}
 	if (wt_ret == WT_NOTFOUND) {
-		fprintf(stderr, "%s: %s: row %" PRIu64
-		    ": found in Berkeley DB, not found in WiredTiger\n",
-		    g.progname, f, keyno);
+		fprintf(stderr, "%s: %s:", g.progname, f);
+		if (keyno != 0)
+			fprintf(stderr, " row %" PRIu64 ":", keyno);
+		fprintf(stderr,
+		    " found in Berkeley DB, not found in WiredTiger\n");
 		return (1);
 	}
 	return (0);

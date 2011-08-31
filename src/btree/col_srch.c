@@ -53,12 +53,10 @@ int
 __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
-	WT_COL *cip;
 	WT_COL_REF *cref;
-	WT_COL_RLE *repeat;
 	WT_PAGE *page;
 	uint64_t recno, start_recno;
-	uint32_t base, indx, limit, start_indx;
+	uint32_t base, indx, limit;
 	int ret;
 
 	__cursor_search_reset(cbt);
@@ -66,7 +64,6 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	cbt->recno = recno = cbt->iface.recno;
 
 	btree = session->btree;
-	cip = NULL;
 	cref = NULL;
 	start_recno = 0;
 
@@ -135,63 +132,16 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		}
 		cbt->ins_head =
 		    page->u.col_leaf.ins == NULL ? NULL : *page->u.col_leaf.ins;
+		cbt->match = 1;
 		break;
 	case WT_PAGE_COL_VAR:
-		/*
-		 * Find the matching slot.
-		 *
-		 * This is done in two stages: first, we do a binary search
-		 * among any repeating records to find largest repeating
-		 * less than the search key.  Once there, we can do a simple
-		 * offset calculation to find the correct slot for this record
-		 * number, because we know any intervening records will have
-		 * repeat counts of 1.
-		 */
-		cip = NULL;
-		for (base = 0, limit = page->u.col_leaf.nrepeats;
-		    limit != 0;
-		    limit >>= 1) {
-			indx = base + (limit >> 1);
-
-			repeat = page->u.col_leaf.repeats + indx;
-			if (recno >= repeat->recno &&
-			    recno < repeat->recno + repeat->rle) {
-				cip = page->u.col_leaf.d + repeat->indx;
-				break;
-			}
-			if (recno < repeat->recno)
-				continue;
-			base = indx + 1;
-			--limit;
+		if ((cbt->cip = __cursor_col_rle_search(page, recno)) == NULL)
+			cbt->match = 0;
+		else {
+			cbt->match = 1;
+			cbt->slot = WT_COL_SLOT(page, cbt->cip);
+			cbt->ins_head = WT_COL_INSERT_SLOT(page, cbt->slot);
 		}
-
-		/*
-		 * If we didn't find an exact match, take the largest repeat
-		 * less than the search key.
-		 */
-		if (cip == NULL) {
-			if (base == 0) {
-				start_indx = 0;
-				start_recno = page->u.col_leaf.recno;
-			} else {
-				repeat = page->u.col_leaf.repeats + (base - 1);
-				start_indx = repeat->indx + 1;
-				start_recno = repeat->recno + repeat->rle;
-			}
-
-			if (recno >=
-			    start_recno + (page->entries - start_indx)) {
-				cbt->match = 0;
-				break;
-			}
-
-			WT_ASSERT(session, recno >= start_recno);
-			cip = page->u.col_leaf.d + start_indx +
-			    (uint32_t)(recno - start_recno);
-		}
-		cbt->cip = cip;
-		cbt->slot = WT_COL_SLOT(page, cip);
-		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -201,7 +151,6 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * insert information appropriately.
 	 */
 	cbt->ins = __search_insert(cbt, cbt->ins_head, recno);
-	cbt->match = 1;
 
 	return (0);
 

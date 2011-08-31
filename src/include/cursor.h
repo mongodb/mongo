@@ -59,7 +59,8 @@ struct __wt_cursor_btree {
 	 * non-zero.
 	 */
 	uint64_t rle_return_cnt;	/* RLE count */
-	WT_BUF  value;			/* Cursor value copy */
+	WT_BUF	 value;			/* Variable-length value */
+	uint32_t vslot;			/* Variable-length value slot */
 
 #define	WT_CBT_SEARCH_SET	0x04	/* Search has set a page */
 	uint32_t flags;
