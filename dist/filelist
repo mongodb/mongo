@@ -40,10 +40,10 @@ src/btree/bt_sync.c
 src/btree/bt_vrfy.c
 src/btree/bt_vrfy_dsk.c
 src/btree/bt_walk.c
-src/btree/col_put.c
+src/btree/col_modify.c
 src/btree/col_srch.c
 src/btree/row_key.c
-src/btree/row_put.c
+src/btree/row_modify.c
 src/btree/row_srch.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
