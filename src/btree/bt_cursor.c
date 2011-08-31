@@ -186,6 +186,13 @@ xxx:	__cursor_flags_begin(cbt);
 		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
+		/*
+		 * Insert in column stores allocates a new key (ignoring the
+		 * application's key), and creates a new record.
+		 *
+		 * XXX
+		 * This semantic not yet implemented.
+		 */
 		while ((ret = __wt_col_search(session, cbt, 1)) == WT_RESTART)
 			;
 		if (ret != 0)
@@ -194,10 +201,15 @@ xxx:	__cursor_flags_begin(cbt);
 			goto xxx;
 		break;
 	case BTREE_ROW:
+		/*
+		 * Insert in row stores fails if the key exists (and the
+		 * configuration "overwrite" not set), otherwise creates
+		 * a new record.
+		 */
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
 			;
 		if (ret == 0) {
-			if (cbt->match == 1 &&
+			if (cbt->match == 1 && !__cursor_deleted(cbt) &&
 			    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
 				ret = EINVAL;		/* XXX: WRONG ERROR? */
 			else
@@ -291,6 +303,7 @@ xxx:	__cursor_flags_begin(cbt);
 		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
+		/* Update in column stores is an unconditional overwrite. */
 		while ((ret = __wt_col_search(session, cbt, 1)) == WT_RESTART)
 			;
 		if (ret != 0)
@@ -299,6 +312,10 @@ xxx:	__cursor_flags_begin(cbt);
 			goto xxx;
 		break;
 	case BTREE_ROW:
+		/*
+		 * Update in row stores fails if the key doesn't exist, else
+		 * overwrites the value.
+		 */
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
 			;
 		if (ret == 0) {
