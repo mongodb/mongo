@@ -1,4 +1,0 @@
-#!/bin/sh
-
-# Top-level configure script for folks who don't want to read documentation.
-cd build_posix && exec ./configure "$@"

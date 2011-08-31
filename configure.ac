@@ -2,14 +2,14 @@
 #	All rights reserved.
 
 PACKAGE=wiredtiger
-AC_INIT(WiredTiger, m4_normalize(m4_include([aclocal/version.m4])),
+AC_INIT(WiredTiger, m4_normalize(m4_include([build_posix/aclocal/version.m4])),
 	[support@wiredtiger.com])
 
-m4_include([aclocal/version-set.m4])
+m4_include([build_posix/aclocal/version-set.m4])
 
-AC_CONFIG_AUX_DIR([gnu-support])
-AC_CONFIG_MACRO_DIR([aclocal])
-AC_CONFIG_SRCDIR([../dist/RELEASE])
+AC_CONFIG_AUX_DIR([build_posix/gnu-support])
+AC_CONFIG_MACRO_DIR([build_posix/aclocal])
+AC_CONFIG_SRCDIR([dist/RELEASE])
 
 LT_INIT([dlopen])
 AC_SUBST([LIBTOOL_DEPS])
@@ -20,7 +20,7 @@ AC_PROG_CXX(c++ g++)
 AM_INIT_AUTOMAKE
 AM_OPTIONS
 
-AC_CONFIG_HEADERS([wiredtiger_config.h:config.hin])
+AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
 if test "$GCC" = "yes"; then
 	# Automake configures gcc's CFLAGS to be -g -O2.
@@ -96,8 +96,8 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_FILES([
 	Makefile
-	wiredtiger.h:../src/include/wiredtiger.in
-	wt_internal.h:../src/include/wt_internal.in
-	wiredtiger.pc:wiredtiger.pc.in
+	wiredtiger.h:$srcdir/src/include/wiredtiger.in
+	wt_internal.h:$srcdir/src/include/wt_internal.in
+	wiredtiger.pc:$srcdir/build_posix/wiredtiger.pc.in
 ])
 AC_OUTPUT

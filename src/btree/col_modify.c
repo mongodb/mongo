@@ -103,8 +103,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			case WT_PAGE_COL_FIX:
 				new_inslist_size = 1 *
 				    sizeof(WT_INSERT_HEAD *);
-				WT_ERR(__wt_calloc(session,
-				    new_inslist_size, 1, &new_inslist));
+				WT_ERR(__wt_calloc_def(session,
+				    1, &new_inslist));
+				inshead = &new_inslist[0];
 				break;
 			case WT_PAGE_COL_VAR:
 				new_inslist_size = page->entries *

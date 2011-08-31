@@ -1,21 +1,20 @@
-WiredTiger 0.7.0: (August 11, 2011)
+WiredTiger 0.7.0: (September  1, 2011)
 
 This is version 0.7.0 of WiredTiger.
 
 See the file LICENSE for redistribution information.
 
-To view release and installation documentation, load the distribution
-file docs/index.html into your web browser.
+To view release and installation documentation, open docs/index.html
+in your web browser.
 
 To build in a POSIX environment (for example, Linux or other UNIX-like
-system), change directory to build_posix and enter:
+system), run:
 
-	./configure
-	make
+	./configure && make
 
 To install in the standard POSIX environment locations, enter:
 
 	make install
 
-For more information on installation locations, see the WiredTiger
-documentation.
+For more information on build and installation options, see the
+WiredTiger documentation.

@@ -1,3 +1,5 @@
+ACLOCAL_AMFLAGS = -I build_posix/aclocal
+
 SUBDIRS = . bench/tcbench ext/compressors/bzip2_compress test/format test/insert test/salvage test/thread
 
 wtdir = $(prefix)/wt
@@ -14,12 +16,10 @@ noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
 	ex_stat ex_thread ex_tpcb ex_transaction
 
 include_HEADERS= wiredtiger.h
-INCLUDES= -I../src/include
+INCLUDES= -I$(srcdir)/src/include
 
-ACLOCAL_AMFLAGS = -I aclocal
-
-Makefile.am: Make.base makemake ../dist/filelist
-	@sh makemake
+$(srcdir)/build_posix/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/makemake $(srcdir)/dist/filelist
+	@cd $(srcdir)/build_posix && sh makemake
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
@@ -27,19 +27,19 @@ libtool: $(LIBTOOL_DEPS)
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = wiredtiger.pc
 
-../src/include/extern.h: prototype.chk
+$(srcdir)/src/include/extern.h: prototype.chk
 
 prototype.chk: $(libwiredtiger_la_SOURCES)
-	@(cd ../dist && sh s_prototypes) && touch $@
+	@(cd $(srcdir)/dist && sh s_prototypes) && touch $@
 
 if PYTHON
-PYSRC = ../lang/python
+PYSRC = $(srcdir)/lang/python
 if DEBUG
 PY_SETUP_DEBUG = -g
 endif
 all-local: _wiredtiger.so
 $(PYSRC)/wiredtiger_wrap.c: wiredtiger.h $(PYSRC)/wiredtiger.i
-	@(cd $(PYSRC) && $(SWIG) -python -I../../build_posix wiredtiger.i)
+	@(cd $(PYSRC) && $(SWIG) -python -I$(abs_top_builddir) wiredtiger.i)
 
 _wiredtiger.so: $(wt_LTLIBRARIES) $(PYSRC)/wiredtiger_wrap.c
 	@env CFLAGS="$(PYTHON_CFLAGS)" LDFLAGS="$(PYTHON_LDFLAGS)" \

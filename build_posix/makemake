@@ -11,19 +11,13 @@ set_sources()
 	echo "libwiredtiger_la_LDFLAGS = -release @VERSION@"
 	echo "libwiredtiger_la_SOURCES=\\"
 	sed -e '/^[a-z]/! d' \
-	    -e 's/.*/	..\/& \\/' \
+	    -e 's/.*/	& \\/' \
 	    -e '$s/ \\$//' < $filelist
 }
 
 set_vpath()
 {
-	echo
-	printf "VPATH = ../examples/c:"
-	sed -e '/^[a-z]/! d' \
-	    -e 's/\(.*\)\/.*/\1/' < $filelist |
-	sort -u |
-	while read d ; do printf "../%s:" $d ; done
-	echo "../src/utilities"
+	echo 'VPATH = $(srcdir):$(srcdir)/src/utilities'
 }
 
-(cat Make.base; set_vpath; set_sources) > Makefile.am
+(cat Make.base; set_vpath; set_sources) > ../Makefile.am

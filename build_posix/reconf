@@ -10,10 +10,9 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 clean()
 {
 	test -f Makefile && make distclean > /dev/null
-	rm -rf \
-	    ChangeLog COPYING INSTALL Makefile.am Makefile.in NEWS \
-	    README aclocal.m4 autom4te.cache config.hin config.hin~ \
-	    configure flexlint.out mklog
+	rm -rf ../Makefile.am ../Makefile.in \
+	    ../aclocal.m4 ../autom4te.cache ../config.hin ../config.hin~ \
+	    ../configure flexlint.out mklog
 }
 
 while :
@@ -27,28 +26,25 @@ while :
 	esac
 done
 
+# Build Makefile.am
+sh ./makemake
+
+cd ..
+autoreconf --install
+
+# Make sure any missing files are writable
+chmod 755 build_posix/gnu-support/*
+
+# Cleanup
+rm -rf ../autom4te.cache
+
 # Initialize standard automake files.
-cp ../LICENSE COPYING
-cat << END > ChangeLog
-To view release and installation documentation, load the distribution
-file docs/index.html into your web browser.
-END
-cp ../README INSTALL
+cp LICENSE COPYING
 cat << END > NEWS
 To view release and installation documentation, load the distribution
 file docs/index.html into your web browser.
 END
-cp ../README README
-
-# Build Makefile.am
-sh ./makemake
-
-autoreconf --install
-
-# Make sure any missing files are writable
-chmod 755 gnu-support/*
-
-# Cleanup
-rm -rf autom4te.cache config.hin~
+cp NEWS ChangeLog
+cp NEWS INSTALL
 
 exit 0
