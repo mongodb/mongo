@@ -41,17 +41,23 @@ struct __wt_cursor_btree {
 	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
 
 	/*
-	 * Variable length column-store items are run-length encoded, and
+	 * Variable-length column-store items are run-length encoded, and
 	 * optionally Huffman encoded.   To avoid repeatedly decompressing the
 	 * item, we decompress it once into the value buffer.  The vslot field
 	 * is used to determine if we're returning information from the same
 	 * slot as the last iteration on the cursor.
 	 */
-	WT_BUF	 value;			/* Variable-length value */
+	WT_BUF	 value;			/* Variable-length return value */
 	uint32_t vslot;			/* Variable-length value slot */
 
+	/*
+	 * Fixed-length column-store items are a single byte, and it's simpler
+	 * and cheaper to allocate the space for it now.
+	 */
+	uint8_t v;			/* Fixed-length return value */
+
 #define	WT_CBT_SEARCH_SET	0x01	/* Search has set a page */
-	uint32_t flags;
+	uint8_t flags;
 };
 
 struct __wt_cursor_bulk {

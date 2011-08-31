@@ -18,7 +18,6 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_BUF *val;
 	WT_SESSION_IMPL *session;
 	uint64_t *recnop;
-	uint8_t v;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
@@ -75,9 +74,8 @@ new_page:	*recnop = cbt->recno;
 			return (0);
 		}
 
-		v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
-		WT_RET(__wt_buf_set(session, &cbt->value, &v, 1));
-		val->data = cbt->value.data;
+		cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+		val->data = &cbt->v;
 		val->size = 1;
 		return (0);
 	}
