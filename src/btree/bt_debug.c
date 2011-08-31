@@ -487,26 +487,27 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT_HEAD *inshead;
+	uint64_t recno, rle;
 	uint32_t i;
 	char tag[64];
 
 	unpack = &_unpack;
+	recno = page->u.col_leaf.recno;
 
 	WT_COL_FOREACH(page, cip, i) {
-		tag[0] = 'V';
-		tag[1] = '\0';
-		if ((cell = WT_COL_PTR(page, cip)) == NULL)
+		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
 			unpack = NULL;
-		else {
+			rle = 1;
+		} else {
 			__wt_cell_unpack(cell, unpack);
-			if (unpack->rle > 1)
-				snprintf(tag,
-				    sizeof(tag), "V %" PRIu64, unpack->rle);
+			rle = unpack->rle;
 		}
+		snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle);
 		WT_RET(__debug_cell_data(ds, tag, unpack));
 
 		if ((inshead = WT_COL_INSERT(page, cip)) != NULL)
 			__debug_col_insert(ds, inshead, 0);
+		recno += rle;
 	}
 	return (0);
 }
