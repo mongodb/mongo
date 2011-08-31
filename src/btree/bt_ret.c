@@ -37,8 +37,9 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 */
 		if (cbt->ins != NULL) {
 			upd = cbt->ins->upd;
-			return (__wt_buf_set(session,
-			    &cursor->value, WT_UPDATE_DATA(upd), upd->size));
+			cursor->value.data = WT_UPDATE_DATA(upd);
+			cursor->value.size = upd->size;
+			return (0);
 		}
 		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
@@ -49,8 +50,9 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 */
 		if (cbt->ins != NULL) {
 			upd = cbt->ins->upd;
-			return (__wt_buf_set(session,
-			    &cursor->value, WT_UPDATE_DATA(upd), upd->size));
+			cursor->value.data = WT_UPDATE_DATA(upd);
+			cursor->value.size = upd->size;
+			return (0);
 		}
 		cell = WT_COL_PTR(page, &page->u.col_leaf.d[cbt->slot]);
 		break;
@@ -64,9 +66,11 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			upd = WT_ROW_UPDATE(page, rip);
 		else
 			upd = cbt->ins->upd;
-		if (upd != NULL)
-			return (__wt_buf_set(session,
-			    &cursor->value, WT_UPDATE_DATA(upd), upd->size));
+		if (upd != NULL) {
+			cursor->value.data = WT_UPDATE_DATA(upd);
+			cursor->value.size = upd->size;
+			return (0);
+		}
 
 		/* Otherwise, take the original cell (which may be empty). */
 		if ((cell = __wt_row_value(page, rip)) == NULL) {
@@ -79,9 +83,10 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* It's a cell, unpack and expand it as necessary. */
 	__wt_cell_unpack(cell, unpack);
-	if (btree->huffman_value == NULL && unpack->type == WT_CELL_VALUE)
-		return (__wt_buf_set(
-		    session, &cursor->value, unpack->data, unpack->size));
-	else
+	if (btree->huffman_value == NULL && unpack->type == WT_CELL_VALUE) {
+		cursor->value.data = unpack->data;
+		cursor->value.size = unpack->size;
+		return (0);
+	} else
 		return (__wt_cell_unpack_copy(session, unpack, &cursor->value));
 }
