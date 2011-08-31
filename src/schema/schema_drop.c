@@ -17,8 +17,9 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 	WT_CLEAR(keybuf);
 
 	/* If open, close the btree handle. */
-	if ((ret = __wt_session_find_btree(session,
-	    filename, strlen(filename), &btree_session)) == 0) {
+	switch ((ret = __wt_session_find_btree(
+	    session, filename, strlen(filename), &btree_session))) {
+	case 0:
 		/*
 		 * XXX fail gracefully if other threads have the tree open.
 		 * It only matters that they don't have cursors open, we need
@@ -29,18 +30,22 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 
 		F_SET(btree_session->btree, WT_BTREE_NO_EVICTION);
 		WT_TRET(__wt_session_remove_btree(session, btree_session));
-	} else if (ret != WT_NOTFOUND)
+		break;
+	case WT_NOTFOUND:
+		ret = 0;
+		break;
+	default:
 		return (ret);
+	}
 
-	WT_TRET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
-	if (ret == 0)
-		ret = __wt_schema_table_remove(session, keybuf.data);
+	WT_RET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
+	WT_ERR(__wt_schema_table_remove(session, keybuf.data));
 
 	/* TODO: use the connection home directory. */
 	if (__wt_exist(filename))
-		WT_TRET(__wt_remove(session, filename));
+		ret = __wt_remove(session, filename);
 
-	__wt_buf_free(session, &keybuf);
+err:	__wt_buf_free(session, &keybuf);
 	return (ret);
 }
 
