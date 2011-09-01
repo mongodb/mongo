@@ -1,5 +1,6 @@
 // Test uniqueDocs option for $within and geoNear queries SERVER-3139
 
+collName = 'geo_uniqueDocs_test'
 t = db.geo_uniqueDocs_test
 t.drop()
 
@@ -9,14 +10,14 @@ t.save( { locs : [ [6,8], [10,10] ] } )
 t.ensureIndex( { locs : '2d' } )
 
 // geoNear tests
-assert.eq(4, db.runCommand({geoNear:'geo', near:[0,0]}).results.length)
-assert.eq(4, db.runCommand({geoNear:'geo', near:[0,0], uniqueDocs:false}).results.length)
-assert.eq(2, db.runCommand({geoNear:'geo', near:[0,0], uniqueDocs:true}).results.length)
-results = db.runCommand({geoNear:'geo', near:[0,0], num:2}).results
+assert.eq(4, db.runCommand({geoNear:collName, near:[0,0]}).results.length)
+assert.eq(4, db.runCommand({geoNear:collName, near:[0,0], uniqueDocs:false}).results.length)
+assert.eq(2, db.runCommand({geoNear:collName, near:[0,0], uniqueDocs:true}).results.length)
+results = db.runCommand({geoNear:collName, near:[0,0], num:2}).results
 assert.eq(2, results.length)
 assert.eq(2, results[0].dis)
 assert.eq(5, results[1].dis)
-results = db.runCommand({geoNear:'geo', near:[0,0], num:2, uniqueDocs:true}).results
+results = db.runCommand({geoNear:collName, near:[0,0], num:2, uniqueDocs:true}).results
 assert.eq(2, results.length)
 assert.eq(2, results[0].dis)
 assert.eq(10, results[1].dis)
