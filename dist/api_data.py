@@ -2,6 +2,7 @@
 
 errors = [
 	('WT_DEADLOCK', 'conflict with concurrent operation'),
+	('WT_DUPLICATE_KEY', 'attempt to insert an existing key'),
 	('WT_ERROR', 'non-specific WiredTiger error'),
 	('WT_NOTFOUND', 'item not found'),
 	('WT_RESTART', 'restart the operation (internal)'),

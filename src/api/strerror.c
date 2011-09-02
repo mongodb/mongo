@@ -18,6 +18,8 @@ wiredtiger_strerror(int error)
 	switch (error) {
 	case WT_DEADLOCK:
 		return ("WT_DEADLOCK: conflict with concurrent operation");
+	case WT_DUPLICATE_KEY:
+		return ("WT_DUPLICATE_KEY: attempt to insert an existing key");
 	case WT_ERROR:
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:

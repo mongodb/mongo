@@ -211,7 +211,7 @@ xxx:	__cursor_flags_begin(cbt);
 		if (ret == 0) {
 			if (cbt->match == 1 && !__cursor_deleted(cbt) &&
 			    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
-				ret = EINVAL;		/* XXX: WRONG ERROR? */
+				ret = WT_DUPLICATE_KEY;
 			else
 				ret = __wt_row_modify(session, cbt, 0);
 		}

@@ -1137,12 +1137,14 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 /*! Conflict with concurrent operation. */
 #define	WT_DEADLOCK	-31800
+/*! Attempt to insert an existing key. */
+#define	WT_DUPLICATE_KEY	-31801
 /*! Non-specific WiredTiger error. */
-#define	WT_ERROR	-31801
+#define	WT_ERROR	-31802
 /*! Item not found. */
-#define	WT_NOTFOUND	-31802
+#define	WT_NOTFOUND	-31803
 /*! Restart the operation (internal). */
-#define	WT_RESTART	-31803
+#define	WT_RESTART	-31804
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
