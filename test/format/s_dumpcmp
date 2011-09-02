@@ -2,8 +2,8 @@
 
 trap 'rm -f __*; exit 1' 1 2
 
-wt=../../build_posix
-bdb=db/build_unix
+build_top=../..
+bdb=$build_top/db/build_unix
 
 colflag=0
 dump_bdb=0
@@ -58,7 +58,7 @@ if test $dump_bdb -eq 1; then
 	fi
 fi
 
-bzext="../../ext/compressors/bzip2_compress/bzip2_compress.so"
+bzext="../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so"
 if test -e $bzext ; then
 	config='extensions=["'$bzext'"]'
 else
@@ -66,9 +66,9 @@ else
 fi
 
 if test $colflag -eq 0; then
-	$wt/wt -C "$config" dump -p file:__wt > __wt_dump
+	$build_top/wt -C "$config" dump -p file:__wt > __wt_dump
 else
-	$wt/wt -C "$config" dump -p file:__wt | strip_zeros > __wt_dump
+	$build_top/wt -C "$config" dump -p file:__wt | strip_zeros > __wt_dump
 fi
 cmp __wt_dump __bdb_dump > /dev/null || exit 1
 

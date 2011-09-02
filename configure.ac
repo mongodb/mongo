@@ -87,6 +87,10 @@ AC_C_BIGENDIAN
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
+AC_CONFIG_LINKS([
+	test/format/s_dumpcmp:test/format/s_dumpcmp
+])
+
 AC_CONFIG_FILES([
 	bench/tcbench/Makefile
 	examples/c/Makefile
