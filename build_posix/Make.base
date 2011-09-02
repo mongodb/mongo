@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I build_posix/aclocal
 
-if HAVE_BZIP2
+if BZIP2
   BZBUILD = ext/compressors/bzip2_compress
 endif
 if PYTHON
