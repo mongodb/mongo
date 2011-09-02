@@ -79,7 +79,7 @@ AC_PROG_INSTALL
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
-AC_CHECK_FUNCS([fcntl pthread_yieldNO])
+AC_CHECK_FUNCS([fcntl pthread_yield])
 AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN
