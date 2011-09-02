@@ -235,6 +235,11 @@ SELFHELPER(struct wt_cursor)
                 if self._next() == WT_NOTFOUND:
                         raise StopIteration
                 return self.get_keys() + self.get_values()
+
+        # De-position the cursor so the next iteration starts from the beginning
+        def reset(self):
+                self.last()
+                self._next()
 %}
 };
 

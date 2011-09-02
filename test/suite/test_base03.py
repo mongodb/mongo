@@ -50,6 +50,7 @@ class test_base03(wttest.WiredTigerTestCase):
             cursor.insert()
 
         i = 0
+        cursor.reset()
         for key, value in cursor:
             self.assertEqual(key, ('key' + str(i)))
             self.assertEqual(value, ('value' + str(i)))
@@ -72,6 +73,7 @@ class test_base03(wttest.WiredTigerTestCase):
             cursor.insert()
 
         i = 0
+        cursor.reset()
         for key, value in cursor:
             self.pr('got: ' + str(key) + ': ' + str(value))
             self.assertEqual(key, 'key' + str(i))
@@ -97,6 +99,7 @@ class test_base03(wttest.WiredTigerTestCase):
             cursor.insert()
 
         i = 0
+        cursor.reset()
         for key, value in cursor:
             self.pr('got: ' + str(key) + ': ' + str(value))
             self.assertEqual(key, i)
@@ -122,6 +125,7 @@ class test_base03(wttest.WiredTigerTestCase):
             cursor.insert()
 
         i = 0
+        cursor.reset()
         for key, value in cursor:
             self.pr('got %d -> %d' % (key, value))
             self.assertEqual(key, i)
@@ -132,5 +136,5 @@ class test_base03(wttest.WiredTigerTestCase):
         cursor.close(None)
 
 
-if __name__ == '__main__':
+if __namreset == '__main__':
     wttest.run()
