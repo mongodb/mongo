@@ -962,9 +962,8 @@ namespace mongo {
                 if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
-                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                             << "recommend removing file and running --repair\n"
-                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                             << "Unclean shutdown detected.\n"
+                             << "Please visit http://dochub.mongodb.org/core/repair for recovery instructions.\n"
                              << "*************";
                 }
             }
