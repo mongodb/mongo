@@ -29,6 +29,7 @@ static int __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config);
 		WT_RET(__wt_schema_project_merge(session,		\
 		    ctable->cg_cursors,					\
 		    btree->key_plan, btree->key_format, &(*__cp)->key));\
+		F_SET(*__cp, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
 		WT_RET((*__cp)->f(*__cp));				\
 	}								\
 } while (0)
@@ -75,7 +76,7 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 	int ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(ctable->cg_cursors[0], WT_CURSTD_VALUE_SET)) {
 		__wt_errx(session, "Value not set");
@@ -172,11 +173,12 @@ err:	API_END(session);
 static void
 __curtable_set_value(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR **cp;
 	WT_CURSOR_TABLE *ctable;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
+	int i, ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
@@ -194,14 +196,15 @@ __curtable_set_value(WT_CURSOR *cursor, ...)
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
-	if (ret == 0)
-		F_SET(ctable->cg_cursors[0], WT_CURSTD_VALUE_SET);
-	else {
-		cursor->saved_err = ret;
-		F_CLR(ctable->cg_cursors[0], WT_CURSTD_VALUE_SET);
-		return;
-	}
+	for (i = 0, cp = ctable->cg_cursors;
+	     i < WT_COLGROUPS(ctable->table);
+	     i++, cp++)
+		if (ret == 0)
+			F_SET(*cp, WT_CURSTD_VALUE_SET);
+		else
+			F_CLR(*cp, WT_CURSTD_VALUE_SET);
 
+	cursor->saved_err = ret;
 	API_END(session);
 }
 

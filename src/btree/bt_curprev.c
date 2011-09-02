@@ -228,8 +228,8 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * New page configuration.
 	 */
 	if (newpage) {
-		cbt->ins_head =
-		    WT_ROW_INSERT_SLOT(cbt->page, cbt->page->entries - 1);
+		cbt->ins_head = WT_ROW_INSERT_SLOT(cbt->page,
+		    (cbt->page->entries > 0) ? cbt->page->entries - 1 : 0);
 		cbt->ins_entry_cnt = 0;
 		WT_SKIP_FOREACH(ins, cbt->ins_head)
 			++cbt->ins_entry_cnt;
