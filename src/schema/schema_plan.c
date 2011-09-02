@@ -24,9 +24,9 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 			continue;
 		/*
 		 * If there is only one column group, we just scan through all
-		 * of the columns.  For multi-column-group tables, we look at
-		 * the key columns once, then go through the value columns for
-		 * each group.
+		 * of the columns.  For tables with multiple column groups, we
+		 * look at the key columns once, then go through the value
+		 * columns for each group.
 		 */
 		if (cg == 0) {
 			cval = table->colconf;

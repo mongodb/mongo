@@ -339,7 +339,8 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 }
 
 static int
-__curindex_open_colgroups(WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *config)
+__curindex_open_colgroups(
+    WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *config)
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
