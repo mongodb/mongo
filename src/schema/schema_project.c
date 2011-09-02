@@ -258,9 +258,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 							    (const uint8_t **)
 							    &p,
 							    (size_t)(end - p)));
-						break;
 					}
 				}
+				if (*proj == WT_PROJ_SKIP)
+					break;
 				WT_RET(__pack_next(&vpack, &vpv));
 				WT_RET(__unpack_read(session, &vpv,
 				    &vp, (size_t)(vend - vp)));
