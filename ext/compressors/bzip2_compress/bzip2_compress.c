@@ -33,11 +33,6 @@ static int bz_workfactor = 0;
 /* if nonzero, decompress using less memory, but slower (decompression only) */
 static int bz_small = 0;
 
-/* For OS X */
-__attribute__((destructor))
-static void _fini(void) {
-}
-
 int
 wiredtiger_extension_init(
     WT_SESSION *session, WT_EXTENSION_API *api, const char *config)

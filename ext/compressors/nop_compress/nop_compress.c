@@ -15,11 +15,6 @@ static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress };
 
 #define	__UNUSED(v)	((void)(v))
 
-/* For OS X */
-__attribute__((destructor))
-static void _fini(void) {
-}
-
 int
 wiredtiger_extension_init(
     WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
