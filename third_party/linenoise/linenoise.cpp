@@ -273,9 +273,9 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
         if (pos < len) {
             /* this scans for a brace matching buf[pos] to highlight */
             int scanDirection = 0;
-            if (memchr("}])", buf[pos], len))
+            if (strchr("}])", buf[pos]))
                 scanDirection = -1; /* backwards */
-            else if (memchr("{[(", buf[pos], len))
+            else if (strchr("{[(", buf[pos]))
                 scanDirection = 1; /* forwards */
 
             if (scanDirection) {
@@ -283,9 +283,9 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
                 int i;
                 for(i = pos + scanDirection; i >= 0 && buf[i]; i += scanDirection){
                     /* TODO: the right thing when inside a string */
-                    if (memchr("}])", buf[i], len))
+                    if (strchr("}])", buf[i]))
                         unmatched--;
-                    else if (memchr("{[(", buf[i], len))
+                    else if (strchr("{[(", buf[i]))
                         unmatched++;
 
                     if (unmatched == 0) {
