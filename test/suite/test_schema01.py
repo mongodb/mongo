@@ -50,15 +50,15 @@ class test_schema01(wttest.WiredTigerTestCase):
 		self.pr('drop table')
 		self.session.drop(self.tablename)
 
-	def cursor(self):
+	def cursor(self, config=None):
 		self.pr('open cursor')
-		return self.session.open_cursor(self.tablename, None)
+		return self.session.open_cursor(self.tablename, None, config)
 
 	def test_populate(self):
 		'''Populate a table'''
 		for reopen in (False, True):
 			self.create_table()
-			c = self.cursor()
+			c = self.cursor('overwrite')
 			try:
 				for record in pop_data:
 					c.set_key(record[0])
