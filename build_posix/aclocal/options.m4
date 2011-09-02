@@ -16,6 +16,17 @@ no)	db_cv_enable_attach=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_attach)
 
+AC_MSG_CHECKING(if --enable-bzip2 option specified)
+AC_ARG_ENABLE(debug,
+	[AC_HELP_STRING([--enable-bzip2],
+	    [Build the bzip2 compressor extention.])], r=$enableval, r=no)
+case "$r" in
+no)	db_cv_enable_bzip2=no;;
+*)	db_cv_enable_bzip2=yes;;
+esac
+AC_MSG_RESULT($db_cv_enable_bzip2)
+AM_CONDITIONAL(HAVE_BZIP2, test x$db_cv_enable_bzip2 = xyes)
+
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
 	[AC_HELP_STRING([--enable-debug],

@@ -11,7 +11,7 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([dist/RELEASE])
 
-LT_INIT([dlopen])
+LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
 AC_PROG_CC(cc gcc)
@@ -63,7 +63,7 @@ AM_CONDITIONAL(DEBUG, test "$db_cv_enable_debug" = "yes")
 
 # Python API
 if test "$db_cv_enable_python" = "yes"; then
-	AM_PATH_PYTHON([2.5])
+	AM_PATH_PYTHON([2.6])
         AC_PATH_PROG([SWIG], [swig])
 	if test -z "$SWIG" ; then
                 AC_MSG_ERROR(
@@ -87,7 +87,10 @@ AC_C_BIGENDIAN
 # build under the main build directory.
 AC_CONFIG_FILES([
 	bench/tcbench/Makefile
+	examples/c/Makefile
 	ext/compressors/bzip2_compress/Makefile
+	ext/compressors/nop_compress/Makefile
+	lang/python/Makefile
 	test/format/Makefile
 	test/insert/Makefile
 	test/salvage/Makefile

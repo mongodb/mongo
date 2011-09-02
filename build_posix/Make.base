@@ -1,6 +1,16 @@
 ACLOCAL_AMFLAGS = -I build_posix/aclocal
 
-SUBDIRS = . bench/tcbench ext/compressors/bzip2_compress test/format test/insert test/salvage test/thread
+if HAVE_BZIP2
+  BZBUILD = ext/compressors/bzip2_compress
+endif
+if PYTHON
+  PYBUILD = lang/python
+endif
+SUBDIRS = . \
+	bench/tcbench examples/c \
+	ext/compressors/nop_compress \
+	test/format test/insert test/salvage test/thread \
+	$(BZBUILD) $(PYBUILD)
 
 wtdir = $(prefix)/wt
 wt_LTLIBRARIES = libwiredtiger.la
@@ -10,10 +20,6 @@ wt_PROGRAMS = wt
 wt_SOURCES = util_create.c util_dump.c util_dumpfile.c util_getopt.c \
 	util_load.c util_main.c util_printlog.c util_salvage.c util_stat.c \
 	util_verify.c util_verbose.c
-
-noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
-	ex_extending ex_hello ex_pack ex_process ex_schema ex_sequence \
-	ex_stat ex_thread ex_tpcb ex_transaction
 
 include_HEADERS= wiredtiger.h
 INCLUDES= -I$(srcdir)/src/include
@@ -31,17 +37,3 @@ $(srcdir)/src/include/extern.h: prototype.chk
 
 prototype.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes) && touch $@
-
-if PYTHON
-PYSRC = $(srcdir)/lang/python
-if DEBUG
-PY_SETUP_DEBUG = -g
-endif
-all-local: _wiredtiger.so
-$(PYSRC)/wiredtiger_wrap.c: wiredtiger.h $(PYSRC)/wiredtiger.i
-	@(cd $(PYSRC) && $(SWIG) -python -I$(abs_top_builddir) wiredtiger.i)
-
-_wiredtiger.so: $(wt_LTLIBRARIES) $(PYSRC)/wiredtiger_wrap.c
-	@env CFLAGS="$(PYTHON_CFLAGS)" LDFLAGS="$(PYTHON_LDFLAGS)" \
-	    $(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
-endif
