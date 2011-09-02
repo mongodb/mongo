@@ -20,17 +20,12 @@ wt_disttop = os.path.dirname(os.path.dirname(suitedir))
 wt_builddir = os.path.join(wt_disttop, 'build_posix')
 
 # Cannot import wiredtiger and supporting utils until we set up paths
-sys.path.append(wt_builddir)
+sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
 sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
 sys.path.append(os.path.join(wt_disttop, 'test', 'suiteutil'))
 
 import wttest
 from testscenarios.scenarios import generate_scenarios
-
-# These may be needed on some systems
-#os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = os.path.join(wt_builddir, '.libs')
-
-#export ARCH="x86_64"  # may be needed on OS/X
 
 def addScenarioTests(tests, loader, testname):
 	loaded = loader.loadTestsFromName(testname)
@@ -61,33 +56,31 @@ def testsFromArg(tests, loader, arg):
 	for t in xrange(start, end+1):
 		addScenarioTests(tests, loader, 'test%03d' % t)
 
+if __name__ == '__main__':
+	tests = unittest.TestSuite()
 
-tests = unittest.TestSuite()
+	# Without arguments, do discovery
+	if len(sys.argv) < 2:
+		from discover import defaultTestLoader as loader
+		tests.addTests(generate_scenarios(loader.discover(suitedir)))
 
-# Without arguments, do discovery
-if len(sys.argv) < 2:
-	# Use the backport of Python 2.7+ unittest discover module.
-	# (Under a BSD license, so we include a copy in our tree for simplicity.)
-	from discover import defaultTestLoader as loader
-	tests.addTests(generate_scenarios(loader.discover(suitedir)))
+	# Otherwise, turn numbers and ranges into test module names
+	preserve = timestamp = False
+	for arg in sys.argv[1:]:
+		from unittest import defaultTestLoader as loader
 
-# Otherwise, turn numbers and ranges into test module names
-preserve = timestamp = False
-for arg in sys.argv[1:]:
-	from unittest import defaultTestLoader as loader
+		# Command line options
+		if arg[0] == '-':
+			option = arg[1:]
+			if option == 'preserve' or option == 'p':
+				preserve = True
+				continue
+			if option == 'timestamp' or option == 't':
+				timestamp = True
+				continue
 
-        # Command line options
-        if arg[0] == '-':
-                option = arg[1:]
-                if option == 'preserve' or option == 'p':
-                        preserve = True
-                        continue
-                if option == 'timestamp' or option == 't':
-                        timestamp = True
-                        continue
+		testsFromArg(tests, loader, arg)
 
-        testsFromArg(tests, loader, arg)
-
-wttest.WiredTigerTestCase.globalSetup(preserve, timestamp)
-result = wttest.runsuite(tests)
-sys.exit(not result.wasSuccessful())
+	wttest.WiredTigerTestCase.globalSetup(preserve, timestamp)
+	result = wttest.runsuite(tests)
+	sys.exit(not result.wasSuccessful())

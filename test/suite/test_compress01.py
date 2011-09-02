@@ -3,10 +3,10 @@
 # See the file LICENSE for redistribution information.
 #
 # Copyright (c) 2008-2011 WiredTiger, Inc.
-#	All rights reserved.
+#   All rights reserved.
 #
 # test001.py
-# 	Basic operations
+#   Basic operations
 #
 
 import unittest
@@ -92,10 +92,11 @@ class test_compress01_base(wttest.WiredTigerTestCase):
     def extensionArg(self, name):
         if name != None:
             testdir = os.path.dirname(__file__)
-            extdir = os.path.join(testdir, '../../ext/compressors')
-            extfile = os.path.join(extdir, name, name + '.so')
+            import run
+            extdir = os.path.join(run.wt_builddir, 'ext/compressors')
+            extfile = os.path.join(extdir, name, '.libs', name + '.so')
             if not os.path.exists(extfile):
-                self.skipTest('Extension "' + name + '.so" not built')
+                self.skipTest('Extension "' + extfile + '" not built')
             return 'extensions=["' + extfile + '"]'
         else:
             return ''

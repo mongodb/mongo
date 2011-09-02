@@ -127,7 +127,7 @@ def runsuite(suite):
         return unittest.TextTestRunner(verbosity=2).run(suite)
     except BaseException as e:
         # This should not happen for regular test errors, unittest should catch everything
-        print('ERROR: running test: ' + repr(name) + ': ', e)
+        print('ERROR: running test: ', e)
         raise e
 
 def run(name='__main__'):
