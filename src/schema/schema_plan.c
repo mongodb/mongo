@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 static int
-__find_next_col(WT_SESSION_IMPL *session,
-    WT_TABLE *table, WT_CONFIG_ITEM *colname, int *cgnump, int *colnump)
+__find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
+    WT_CONFIG_ITEM *colname, int *cgnump, int *colnump, char *coltype)
 {
 	WT_BTREE *cgtree;
 	WT_CONFIG conf;
@@ -22,15 +22,22 @@ __find_next_col(WT_SESSION_IMPL *session,
 	for (cg = 0; cg < WT_COLGROUPS(table); cg++) {
 		if ((cgtree = table->colgroup[cg]) == NULL)
 			continue;
-		if (table->ncolgroups == 0)
+		/*
+		 * If there is only one column group, we just scan through all
+		 * of the columns.  For multi-column-group tables, we look at
+		 * the key columns once, then go through the value columns for
+		 * each group.
+		 */
+		if (cg == 0) {
 			cval = table->colconf;
-		else
-			WT_RET(__wt_config_getones(session,
+			col = 0;
+		} else {
+cgcols:			WT_RET(__wt_config_getones(session,
 			    cgtree->config, "columns", &cval));
+			col = table->nkey_columns;
+		}
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
-		for (col = 0;
-		    __wt_config_next(&conf, &k, &v) == 0;
-		    col++) {
+		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
 			if (cg == *cgnump && col == *colnump)
 				getnext = 1;
 			if (getnext && k.len == colname->len &&
@@ -39,6 +46,9 @@ __find_next_col(WT_SESSION_IMPL *session,
 				foundcol = col;
 				getnext = 0;
 			}
+			if (cg == 0 && table->ncolgroups > 0 &&
+			    col == table->nkey_columns - 1)
+				goto cgcols;
 		}
 	}
 
@@ -46,7 +56,13 @@ __find_next_col(WT_SESSION_IMPL *session,
 		return (WT_NOTFOUND);
 
 	*cgnump = foundcg;
-	*colnump = foundcol;
+	if (foundcol < table->nkey_columns) {
+		*coltype = WT_PROJ_KEY;
+		*colnump = foundcol;
+	} else {
+		*coltype = WT_PROJ_VALUE;
+		*colnump = foundcol - table->nkey_columns;
+	}
 	return (0);
 }
 
@@ -62,6 +78,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	int cg, col, i, ret;
+	char coltype;
 
 	if (table->is_simple)
 		return (0);
@@ -81,13 +98,19 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_RET(__wt_config_next(&conf, &k, &v));
 	cg = col = 0;
 	while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
-		if (__find_next_col(session, table, &k, &cg, &col) == 0)
-			continue;
+		if (__find_next_col(session, table,
+		    &k, &cg, &col, &coltype) != 0) {
+			__wt_errx(session, "Column '%.*s' in table '%s' "
+			    "does not appear in a column group",
+			    (int)k.len, k.str, table->name);
+			return (EINVAL);
+		}
+		/*
+		 * Column groups can't store key columns in their value:
+		 * __wt_struct_reformat should have already detected this case.
+		 */
+		WT_ASSERT(session, coltype == WT_PROJ_VALUE);
 
-		__wt_errx(session, "Column '%.*s' in table '%s' "
-		    "does not appear in a column group",
-		    (int)k.len, k.str, table->name);
-		return (EINVAL);
 	}
 	if (ret != WT_NOTFOUND)
 		return (ret);
@@ -109,6 +132,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CONFIG_ITEM k, v;
 	int cg, col, current_cg, current_col, start_cg, start_col;
 	int i, have_it;
+	char coltype, current_coltype;
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_RET(__wt_config_initn(session, &conf, columns, len));
@@ -122,7 +146,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	while (__wt_config_next(&conf, &k, &v) == 0) {
 		have_it = 0;
 
-		while (__find_next_col(session, table, &k, &cg, &col) == 0 &&
+		while (__find_next_col(session, table,
+		    &k, &cg, &col, &coltype) == 0 &&
 		    (!have_it || cg != start_cg || col != start_col)) {
 			/*
 			 * First we move to the column.  If that is in a
@@ -132,22 +157,19 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			 * we need to switch column groups or rewind.
 			 */
 			if (current_cg != cg || current_col > col ||
-			    (current_col < table->nkey_columns &&
-			    col >= table->nkey_columns)) {
+			    current_coltype != coltype) {
 				WT_ASSERT(session, !value_only ||
-				    col >= table->nkey_columns);
+				    coltype == WT_PROJ_VALUE);
 				WT_RET(__wt_buf_sprintf(session,
-				    plan, "%d%c", cg,
-				    (col < table->nkey_columns) ?
-				    WT_PROJ_KEY : WT_PROJ_VALUE));
+				    plan, "%d%c", cg, coltype));
 
 				/*
 				 * Set the current column group and column
 				 * within the table.
 				 */
 				current_cg = cg;
-				current_col = (col < table->nkey_columns) ? 0 :
-				    table->nkey_columns;
+				current_col = 0;
+				current_coltype = coltype;
 			}
 			/* Now move to the column we want. */
 			if (current_col < col) {
