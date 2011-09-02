@@ -13,15 +13,21 @@ import unittest
 import sys
 import os
 import wiredtiger
-import subprocess
 import traceback
 import time
+
+def removeAll(top):
+	for root, dirs, files in os.walk(top, topdown=False):
+		for name in files:
+			os.remove(os.path.join(root, name))
+		for name in dirs:
+			os.rmdir(os.path.join(root, name))
 
 class WiredTigerTestCase(unittest.TestCase):
     _timeStamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
     _parentTestdir = 'WT_TEST.' + _timeStamp
-    subprocess.call(["rm", "-rf", _parentTestdir])
-    subprocess.call(["mkdir", "-p", _parentTestdir])
+    removeAll(_parentTestdir)
+    os.makedirs(_parentTestdir)
     _resultfile = open(_parentTestdir + os.sep + 'results.txt', "w", 0)  # unbuffered
     _preserveFiles = False
 
@@ -46,10 +52,10 @@ class WiredTigerTestCase(unittest.TestCase):
         self.testdir = WiredTigerTestCase._parentTestdir + os.sep + self.className() + '.' + str(self.__class__.wt_ntests)
         self.prhead('started in ' + self.testdir, True)
         self.origcwd = os.getcwd()
-        subprocess.call(["rm", "-rf", self.testdir])
+        removeAll(self.testdir)
         if os.path.exists(self.testdir):
             raise Exception(self.testdir + ": cannot remove directory");
-        subprocess.call(["mkdir", "-p", self.testdir])
+        os.makedirs(self.testdir)
         os.chdir(self.testdir)
 
         self.conn = self.setUpConnectionOpen(".")
@@ -65,7 +71,7 @@ class WiredTigerTestCase(unittest.TestCase):
         excinfo = sys.exc_info()
         if excinfo == (None, None, None):
             if not WiredTigerTestCase._preserveFiles:
-                subprocess.call(["rm", "-rf", self.testdir])
+                removeAll(self.testdir)
             else:
                 self.pr('preserving directory ' + self.testdir)
         else:
