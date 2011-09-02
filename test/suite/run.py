@@ -72,7 +72,7 @@ if len(sys.argv) < 2:
 	tests.addTests(generate_scenarios(loader.discover(suitedir)))
 
 # Otherwise, turn numbers and ranges into test module names
-preserve = False
+preserve = timestamp = False
 for arg in sys.argv[1:]:
 	from unittest import defaultTestLoader as loader
 
@@ -82,9 +82,12 @@ for arg in sys.argv[1:]:
                 if option == 'preserve' or option == 'p':
                         preserve = True
                         continue
+                if option == 'timestamp' or option == 't':
+                        timestamp = True
+                        continue
 
         testsFromArg(tests, loader, arg)
 
-wttest.WiredTigerTestCase.globallyPreserveFiles(preserve)
+wttest.WiredTigerTestCase.globalSetup(preserve, timestamp)
 result = wttest.runsuite(tests)
 sys.exit(not result.wasSuccessful())

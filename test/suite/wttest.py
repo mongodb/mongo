@@ -3,10 +3,10 @@
 # See the file LICENSE for redistribution information.
 #
 # Copyright (c) 2008-2011 WiredTiger, Inc.
-#	All rights reserved.
+#   All rights reserved.
 #
 # WiredTigerTestCase
-# 	parent class for all test cases
+#   parent class for all test cases
 #
 
 import unittest
@@ -17,23 +17,35 @@ import traceback
 import time
 
 def removeAll(top):
-	for root, dirs, files in os.walk(top, topdown=False):
-		for name in files:
-			os.remove(os.path.join(root, name))
-		for name in dirs:
-			os.rmdir(os.path.join(root, name))
+    if not os.path.isdir(top):
+        return
+    for root, dirs, files in os.walk(top, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            os.rmdir(os.path.join(root, name))
+    os.rmdir(top)
 
 class WiredTigerTestCase(unittest.TestCase):
-    _timeStamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
-    _parentTestdir = 'WT_TEST.' + _timeStamp
-    removeAll(_parentTestdir)
-    os.makedirs(_parentTestdir)
-    _resultfile = open(_parentTestdir + os.sep + 'results.txt', "w", 0)  # unbuffered
-    _preserveFiles = False
+    _globalSetup = False
 
     @staticmethod
-    def globallyPreserveFiles(val):
-        WiredTigerTestCase._preserveFiles = val
+    def globalSetup(preserveFiles = False, useTimestamp = False):
+        WiredTigerTestCase._preserveFiles = preserveFiles
+        if useTimestamp:
+            d = 'WT_TEST.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
+        else:
+            d = 'WT_TEST'
+        removeAll(d)
+        os.makedirs(d)
+        WiredTigerTestCase._parentTestdir = d
+        WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
+        WiredTigerTestCase._globalSetup = True
+    
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self, *args, **kwargs)
+        if not self._globalSetup:
+            WiredTigerTestCase.globalSetup()
 
     # Can be overridden
     def setUpConnectionOpen(self, dir):
@@ -49,7 +61,7 @@ class WiredTigerTestCase(unittest.TestCase):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
         self.__class__.wt_ntests += 1
-        self.testdir = WiredTigerTestCase._parentTestdir + os.sep + self.className() + '.' + str(self.__class__.wt_ntests)
+        self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.className() + '.' + str(self.__class__.wt_ntests))
         self.prhead('started in ' + self.testdir, True)
         self.origcwd = os.getcwd()
         removeAll(self.testdir)
