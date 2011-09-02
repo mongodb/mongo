@@ -120,26 +120,22 @@ for ( var i = 0; i < 10; i++ ) {
 		}
 		catch( e ){
 			print(e)
-			assert( false, "Should be able to shard collection with no index.")
+			assert( false, "Should be able to shard collection with no unique index but with a unique prefix index.")
 		}
 		
 	}
     if ( i == 7 ) {
-        if (false) { // SERVER-3718
 		coll.remove()
 
 		// No index exists
 
-        passed = false
 		try{
 			s.adminCommand({ shardcollection : "" + coll, key : { num : 1 } })
-            passed = true
 		}
 		catch( e ){
 			print(e)
+            assert( !passed, "Should be able to shard collection with no index on shard key.")
 		}
-        assert( !passed, "Should not shard collection with no index on shard key.")
-        }
 	}
     if ( i == 8 ) {
         if (false) { // SERVER-3718
@@ -155,7 +151,7 @@ for ( var i = 0; i < 10; i++ ) {
 		catch( e ){
 			print(e)
 		}
-        assert( !passed, "Should not shard collection with no index on shard key.")
+        assert( !passed, "Should not shard collection with unique flag but with no unique index on shard key.")
         }
 	}
     if ( i == 9 ) {
