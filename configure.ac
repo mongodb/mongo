@@ -11,16 +11,16 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([dist/RELEASE])
 
+AM_INIT_AUTOMAKE
+AM_OPTIONS
+
+define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
+define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
 AC_PROG_CC(cc gcc)
-AC_PROG_CXX(c++ g++)
-
-AM_INIT_AUTOMAKE
-AM_OPTIONS
-
-AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
+# AC_PROG_CXX(c++ g++)
 
 if test "$GCC" = "yes"; then
 	# Automake configures gcc's CFLAGS to be -g -O2.
@@ -59,7 +59,8 @@ if test "$db_cv_enable_debug" = "yes"; then
 	CFLAGS=`echo "$CFLAGS" | sed 's/-g//g'`
 	CFLAGS="$CFLAGS -g"
 fi
-AM_CONDITIONAL(DEBUG, test "$db_cv_enable_debug" = "yes")
+
+AM_CONDITIONAL([DEBUG], [test "$db_cv_enable_debug" = "yes"])
 
 # Python API
 if test "$db_cv_enable_python" = "yes"; then
@@ -83,8 +84,9 @@ AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN
 
-# Set up files for automake -- we maintain Makefile.am with the sources but
-# build under the main build directory.
+# Output files
+AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
+
 AC_CONFIG_FILES([
 	bench/tcbench/Makefile
 	examples/c/Makefile
@@ -92,15 +94,14 @@ AC_CONFIG_FILES([
 	ext/compressors/nop_compress/Makefile
 	lang/python/Makefile
 	test/format/Makefile
-	test/insert/Makefile
 	test/salvage/Makefile
 	test/thread/Makefile
 ])
 
 AC_CONFIG_FILES([
 	Makefile
-	wiredtiger.h:$srcdir/src/include/wiredtiger.in
-	wt_internal.h:$srcdir/src/include/wt_internal.in
-	wiredtiger.pc:$srcdir/build_posix/wiredtiger.pc.in
+	wiredtiger.h:src/include/wiredtiger.in
+	wt_internal.h:src/include/wt_internal.in
+	wiredtiger.pc:build_posix/wiredtiger.pc.in
 ])
 AC_OUTPUT

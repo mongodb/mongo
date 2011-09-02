@@ -29,14 +29,8 @@ done
 # Build Makefile.am
 sh ./makemake
 
+# From here on, work in the top of the tree
 cd ..
-autoreconf --install
-
-# Make sure any missing files are writable
-chmod 755 build_posix/gnu-support/*
-
-# Cleanup
-rm -rf ../autom4te.cache
 
 # Initialize standard automake files.
 cp LICENSE COPYING
@@ -46,5 +40,13 @@ file docs/index.html into your web browser.
 END
 cp NEWS ChangeLog
 cp NEWS INSTALL
+
+autoreconf --install
+
+# Make sure any missing files are writable
+chmod 755 build_posix/gnu-support/*
+
+# Cleanup
+rm -rf autom4te.cache
 
 exit 0

@@ -9,7 +9,7 @@ endif
 SUBDIRS = . \
 	bench/tcbench examples/c \
 	ext/compressors/nop_compress \
-	test/format test/insert test/salvage test/thread \
+	test/format test/salvage test/thread \
 	$(BZBUILD) $(PYBUILD)
 
 wtdir = $(prefix)/wt
@@ -24,7 +24,7 @@ wt_SOURCES = util_create.c util_dump.c util_dumpfile.c util_getopt.c \
 include_HEADERS= wiredtiger.h
 INCLUDES= -I$(srcdir)/src/include
 
-$(srcdir)/build_posix/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/makemake $(srcdir)/dist/filelist
+$(srcdir)/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/makemake $(srcdir)/dist/filelist
 	@cd $(srcdir)/build_posix && sh makemake
 
 libtool: $(LIBTOOL_DEPS)
@@ -37,3 +37,10 @@ $(srcdir)/src/include/extern.h: prototype.chk
 
 prototype.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes) && touch $@
+
+# test/insert is stripped from the release, so we don't want it in SUBDIRS
+test/insert/Makefile: $(srcdir)/test/insert/Makefile.am
+	@./config.status --file=test/insert/Makefile
+
+test-insert: test/insert/Makefile
+	@(cd test/insert && $(MAKE))
