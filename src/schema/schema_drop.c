@@ -28,7 +28,6 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 		 */
 		WT_ASSERT(session, btree_session->btree->refcnt == 1);
 
-		F_SET(btree_session->btree, WT_BTREE_NO_EVICTION);
 		WT_TRET(__wt_session_remove_btree(session, btree_session));
 		break;
 	case WT_NOTFOUND:

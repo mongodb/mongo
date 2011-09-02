@@ -136,5 +136,5 @@ class test_base03(wttest.WiredTigerTestCase):
         cursor.close(None)
 
 
-if __namreset == '__main__':
+if __name__ == '__main__':
     wttest.run()
