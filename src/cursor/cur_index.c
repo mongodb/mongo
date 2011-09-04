@@ -348,7 +348,7 @@ __curindex_open_colgroups(
 	uint32_t arg;
 
 	table = cindex->table;
-	WT_RET(__wt_calloc_def(session, (size_t)WT_COLGROUPS(table), &cp));
+	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
 	cindex->cg_cursors = cp;
 
 	/* Work out which column groups we need. */

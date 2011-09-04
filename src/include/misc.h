@@ -82,7 +82,8 @@
  * __wt_calloc_def --
  *	Simple calls don't need separate sizeof arguments.
  */
-#define	__wt_calloc_def(a, b, c)	__wt_calloc(a, b, sizeof(**(c)), c)
+#define	__wt_calloc_def(a, b, c)					\
+	__wt_calloc(a, (size_t)(b), sizeof(**(c)), c)
 /*
  * Our internal free function clears the underlying address atomically so there
  * is a smaller chance of racing threads seeing intermediate results while a
