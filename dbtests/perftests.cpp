@@ -119,7 +119,7 @@ namespace PerfTests {
 
         // optional 2nd test phase to be timed separately
         // return name of it
-        virtual string timed2() { return ""; }
+        virtual string timed2(DBClientBase&) { return ""; }
 
         virtual void post() { }
 
@@ -273,6 +273,11 @@ namespace PerfTests {
                 }
             }
         }
+
+        virtual bool testThreaded() { return false; }
+
+        unsigned long long n;
+
         void run() {
             _ns = string("perftest.") + name();
             client().dropCollection(ns());
@@ -288,7 +293,7 @@ namespace PerfTests {
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
             mongo::Timer t;
-            unsigned long long n = 0;
+            n = 0;
             const unsigned Batch = batchSize();
 
             if( hlm == 0 ) { 
@@ -311,8 +316,8 @@ namespace PerfTests {
 
             post();
 
+            string test2name = timed2(client());
             {
-                string test2name = timed2();
                 if( test2name.size() != 0 ) {
                     dur::stats.curr->reset();
                     mongo::Timer t;
@@ -320,7 +325,7 @@ namespace PerfTests {
                     while( 1 ) {
                         unsigned i;
                         for( i = 0; i < Batch; i++ )
-                            timed2();
+                            timed2(client());
                         n += i;
                         if( t.millis() > hlm )
                             break;
@@ -329,6 +334,33 @@ namespace PerfTests {
                     say(n, ms, test2name);
                 }
             }
+
+            if( testThreaded() ) {
+                cout << "testThreaded" << endl;
+                mongo::Timer t;
+                launchThreads(8);
+                //cout << "threaded done " << t.millis() << "ms" << endl;
+                //cout << n * 1000 / t.millis() << " per second" << endl;
+                say(n, t.millis(), test2name+"-threaded");
+
+            }
+        }
+
+        void thread() { 
+            DBClientType c;
+            Client::initThreadIfNotAlready("perftestthr");
+            for( unsigned long long i = 0; i < n/8; i++ ) { 
+                timed2(c);
+            }
+            cc().shutdown();
+        }
+
+        void launchThreads(int remaining) {
+            if (!remaining) 
+                return;
+            boost::thread athread(boost::bind(&B::thread, this));
+            launchThreads(remaining - 1);
+            athread.join();
         }
     };
 
@@ -605,12 +637,24 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
     };
 
-    class Malloc : public B {
+    class New128 : public B {
     public:
-        virtual int howLongMillis() { return 4000; } 
-        string name() { return "malloc"; }
+        virtual int howLongMillis() { return 14000; } 
+        string name() { return "new128"; }
         void timed() {
             char *p = new char[128];
+            if( dontOptimizeOutHopefully++ > 0 )
+                delete p;
+        }
+        virtual bool showDurStats() { return false; }
+    };
+
+    class New8 : public B {
+    public:
+        virtual int howLongMillis() { return 14000; } 
+        string name() { return "new8"; }
+        void timed() {
+            char *p = new char[8];
             if( dontOptimizeOutHopefully++ > 0 )
                 delete p;
         }
@@ -735,16 +779,25 @@ namespace PerfTests {
         OID oid;
         BSONObj query;
     public:
+        virtual int howLongMillis() { return 30000; } 
         Insert1() : x( BSON("x" << 99) ) { 
+            char *x = new char[4];
             oid.init();
             query = BSON("_id" << oid);
+            i = 0;
         }
         string name() { return "insert-simple"; }
+        unsigned i;
         void timed() {
-            client().insert( ns(), x );
+            BSONObj o = BSON( "_id" << i++ << "x" << 99 );
+            client().insert( ns(), o );
+            //client().insert( ns(), x );
         }
-        string timed2() {
-            client().findOne(ns(), query);
+        virtual bool testThreaded() { return true; }
+        string timed2(DBClientBase& c) {
+            Query q = QUERY( "_id" << (unsigned) Security::getNonce() % i );
+            c.findOne(ns(), q);
+            //client().findOne(ns(), query);
             return "findOne_by_id";
         }
         void post() {
@@ -810,14 +863,14 @@ namespace PerfTests {
             client().update(ns(), q, y, /*upsert*/true);
         }
 
-        virtual string timed2() {
+        virtual string timed2(DBClientBase& c) {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
 
             // test some $inc's
 
             int x = rand();
             BSONObj q = BSON("x" << x);
-            client().update(ns(), q, I);
+            c.update(ns(), q, I);
 
             return name()+"-inc";
         }
@@ -872,9 +925,8 @@ namespace PerfTests {
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
             if( profiling ) { 
-                add< Sleep0Ms >();
-                add< InsertRandom >();
-                add< MoreIndexes<InsertRandom> >();
+                add< New8 >();
+                add< New128 >();
             }
             else {
                 add< Dummy >();
@@ -882,7 +934,8 @@ namespace PerfTests {
                 add< Compress >();
                 add< TLS >();
                 add< TLS2 >();
-                add< Malloc >();
+                add< New8 >();
+                add< New128 >();
                 add< Timer >();
                 add< Sleep0Ms >();
                 add< rlock >();
