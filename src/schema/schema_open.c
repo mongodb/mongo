@@ -80,16 +80,16 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session, const char *objname, size_t len)
 	if (ret != 0)
 		goto err;
 
-	WT_ERR(__wt_session_get_btree(session, uri, filename, NULL));
+	ret = __wt_session_get_btree(session, uri, filename, NULL);
+	if (ret == ENOENT)
+		__wt_errx(session,
+		    "%s created but '%s' is missing", objname, uri);
 
 err:	__wt_buf_free(session, &uribuf);
 	if (name != objname)
 		__wt_free(session, name);
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor, NULL));
-	if (ret == ENOENT)
-		__wt_errx(session, "%s created but '%s' is missing",
-		    objname, uri);
 	return (ret);
 }
 
