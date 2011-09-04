@@ -68,7 +68,6 @@ namespace mongo {
 
         int seconds() const { 
             int s = (now() - old) / countsPerSecond;
-            assert( s < 100 );
             return s;
         }
 
