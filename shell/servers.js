@@ -1706,6 +1706,11 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     return this.start( n , options , true, wait );
 }
 
+ReplSetTest.prototype.stopMaster = function( signal , wait ) {
+    var master = this.getMaster();
+    var master_id = this.getNodeId( master );
+    return this.stop( master_id , signal , wait );
+}
 
 // Stops a particular node or nodes, specified by conn or id
 ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
