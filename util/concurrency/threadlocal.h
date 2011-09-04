@@ -16,13 +16,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/thread/tss.hpp>
+
 namespace mongo { 
 
 #if defined(_WIN32) || defined(__GNUC__)
         
     template< class T >
     struct TSP {
-        thread_specific_ptr<T> tsp;
+        boost::thread_specific_ptr<T> tsp;
     public:
         T* get() const;
         void reset(T* v);

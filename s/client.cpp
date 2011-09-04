@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    DECL_TSP(Client, currentClient);
+
     ClientInfo::ClientInfo() {
         _cur = &_a;
         _prev = &_b;
