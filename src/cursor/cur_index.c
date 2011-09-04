@@ -23,7 +23,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	if (!F_SET(cursor, WT_CURSTD_VALUE_SET)) {
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET)) {
 		__wt_errx(session, "Value not set");
 		return (EINVAL);
 	}
