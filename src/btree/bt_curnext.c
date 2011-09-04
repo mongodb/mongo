@@ -292,6 +292,13 @@ __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt)
 	 * "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
 	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
 	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
+	 *
+	 * !!!
+	 * I'm re-using WT_CURSOR_BTREE->slot for this purpose, which means that
+	 * WT_CURSOR_BTREE->slot is now useless outside of cursor next/prev.  If
+	 * that turns out to be a bad idea because we need the original value of
+	 * WT_CURSOR_BTREE->slot after a next/prev call, switch to another field
+	 * to hold the iteration slot.
 	 */
 	cbt->slot = (cbt->slot + 1) * 2;
 	if (cbt->ins_head != NULL) {
