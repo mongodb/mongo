@@ -72,6 +72,6 @@ run "sh ./s_typedef -c" "checking for unused typedefs"
 run "sh ./s_types" "checking for old-style types"
 run "sh ./s_whitespace" "checking whitespace"
 
-run "sh ./s_docs" "Generating documentation"
+run "sh ./s_docs" "generating documentation"
 
 echo 'dist/s_all run finished'
