@@ -176,7 +176,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
 	    (int)cval.len, cval.str));
 	filename = fileuri = uribuf.data;
-	WT_PREFIX_SKIP(filename, "file:");
+	(void)WT_PREFIX_SKIP(filename, "file:");
 
 	ret = __wt_session_get_btree(session, fileuri, filename, NULL);
 	if (ret == ENOENT)
@@ -252,12 +252,12 @@ __wt_schema_open_index(
     WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len)
 {
 	WT_CURSOR *cursor;
-	const char *idxconf, *fileconf, *uri;
 	int i, match, ret, skipped;
+	const char *idxconf, *uri;
 
 	cursor = NULL;
-	idxconf = fileconf = NULL;
 	skipped = 0;
+	idxconf = NULL;
 
 	if (len == 0 && table->idx_complete)
 		return (0);
@@ -270,7 +270,7 @@ __wt_schema_open_index(
 
 	/* Open each column group. */
 	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
-		cursor->get_key(cursor, &uri);
+		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_SKIP(uri, "index:") ||
 		    !WT_PREFIX_SKIP(uri, table->name) ||
 		    !WT_PREFIX_SKIP(uri, ":"))
