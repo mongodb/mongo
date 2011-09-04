@@ -12,7 +12,7 @@ type python > /dev/null 2>&1 || {
 
 run()
 {
-	printf "$2..."
+	printf "WiredTiger: $2..."
 	$1 > $t
 
 	if `grep 'skipped' $t > /dev/null 2>&1`; then
@@ -47,30 +47,30 @@ test "$reconf" -eq 0 || {
 	run "sh ./reconf" "Rebuilding GNU tools library support")
 }
 
-run "python api_err.py" "Building error return API"
-run "python api_flags.py" "Building API flags"
-run "python config.py" "Building configuration code"
-run "python log.py" "Building logging layer"
-run "python stat.py" "Building statistics support"
-run "python serial.py" "Building serial function support"
+run "python api_err.py" "building error return API"
+run "python api_flags.py" "building API flags"
+run "python config.py" "building configuration code"
+run "python log.py" "building logging layer"
+run "python stat.py" "building statistics support"
+run "python serial.py" "building serial function support"
 
-run "sh ./s_typedef -b" "Building standard typedefs"
-run "sh ./s_prototypes" "Building function prototypes"
-run "sh ./s_readme" "Building README file"
-run "sh ./s_tags" "Building tags files"
+run "sh ./s_typedef -b" "building standard typedefs"
+run "sh ./s_prototypes" "building function prototypes"
+run "sh ./s_readme" "building README file"
+run "sh ./s_tags" "building tags files"
 
-run "sh ./s_copyright" "Checking copyright notices"
-run "sh ./s_define" "Checking for unused #defines"
-run "sh ./s_funcs" "Checking for unused functions"
-run "sh ./s_getopt" "Checking for incorrect getopt usage"
-run "sh ./s_longlines" "Checking for long lines"
-run "sh ./s_printf" "Checking for non-portable printf/scanf"
-run "sh ./s_string" "Checking string spelling"
-run "sh ./s_style" "Checking style"
-run "sh ./s_symbols" "Checking external symbol names"
-run "sh ./s_typedef -c" "Checking for unused typedefs"
-run "sh ./s_types" "Checking for old-style types"
-run "sh ./s_whitespace" "Checking whitespace"
+run "sh ./s_copyright" "checking copyright notices"
+run "sh ./s_define" "checking for unused #defines"
+run "sh ./s_funcs" "checking for unused functions"
+run "sh ./s_getopt" "checking for incorrect getopt usage"
+run "sh ./s_longlines" "checking for long lines"
+run "sh ./s_printf" "checking for non-portable printf/scanf"
+run "sh ./s_string" "checking string spelling"
+run "sh ./s_style" "checking style"
+run "sh ./s_symbols" "checking external symbol names"
+run "sh ./s_typedef -c" "checking for unused typedefs"
+run "sh ./s_types" "checking for old-style types"
+run "sh ./s_whitespace" "checking whitespace"
 
 run "sh ./s_docs" "Generating documentation"
 
