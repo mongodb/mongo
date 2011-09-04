@@ -48,19 +48,19 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 int
 __wt_schema_get_btree(WT_SESSION_IMPL *session, const char *objname, size_t len)
 {
+	WT_BUF uribuf;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
-	WT_BUF uribuf;
 	const char *filename, *name, *objconf, *uri;
 	int ret;
 
+	cursor = NULL;
 	WT_CLEAR(uribuf);
 
 	name = objname;
 	if (len != strlen(objname))
 		WT_ERR(__wt_strndup(session, objname, len, &name));
 
-	cursor = NULL;
 	WT_ERR(__wt_schema_table_cursor(session, &cursor));
 	cursor->set_key(cursor, name);
 	WT_ERR(cursor->search(cursor));
