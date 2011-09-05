@@ -25,7 +25,6 @@ __search_insert(WT_SESSION_IMPL *session,
 		return (NULL);
 
 	btree = session->btree;
-	ret_ins = NULL;
 	compare = btree->btree_compare;
 
 	/*
