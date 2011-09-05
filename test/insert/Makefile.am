@@ -1,9 +1,9 @@
-BDB = $(top_builddir)/db
-INCLUDES = -I$(top_builddir) -I$(BDB)
-LDADD = -L$(top_builddir) -lwiredtiger -L$(BDB)/build_unix -ldb
+INCLUDES = -I$(top_builddir)
 
 noinst_PROGRAMS = t
 t_SOURCES = insert.c
+t_LDADD = $(top_builddir)/libwiredtiger.la
+t_LDFLAGS = -static
 
 clean-local:
 	rm -rf xx __schema.wt

@@ -14,17 +14,19 @@ SUBDIRS = . \
 	ext/compressors/nop_compress \
 	$(BZBUILD) $(PYBUILD) $(TEST_SUBDIRS)
 
-wtdir = $(prefix)/wt
-wt_LTLIBRARIES = libwiredtiger.la
-LDADD = $(wt_LTLIBRARIES)
+lib_LTLIBRARIES = libwiredtiger.la
+LDADD = $(lib_LTLIBRARIES)
 
-wt_PROGRAMS = wt
+bin_PROGRAMS = wt
 wt_SOURCES = util_create.c util_dump.c util_dumpfile.c util_getopt.c \
 	util_load.c util_main.c util_printlog.c util_salvage.c util_stat.c \
 	util_verify.c util_verbose.c
 
 include_HEADERS= wiredtiger.h
-INCLUDES= -I$(srcdir)/src/include
+INCLUDES = -I$(srcdir)/src/include
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = wiredtiger.pc
 
 $(srcdir)/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/makemake $(srcdir)/dist/filelist
 	@cd $(srcdir)/build_posix && sh makemake
@@ -32,17 +34,7 @@ $(srcdir)/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/mak
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
 
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = wiredtiger.pc
-
 $(srcdir)/src/include/extern.h: prototype.chk
 
 prototype.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes) && touch $@
-
-# test/insert is stripped from the release, so we don't want it in SUBDIRS
-test/insert/Makefile: $(srcdir)/test/insert/Makefile.am
-	@./config.status --file=test/insert/Makefile
-
-test-insert: test/insert/Makefile
-	@(cd test/insert && $(MAKE))
