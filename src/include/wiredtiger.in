@@ -614,7 +614,10 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the uri of the table to salvage
-	 * @configempty{session.salvage, see dist/api_data.py}
+	 * @configstart{session.salvage, see dist/api_data.py}
+	 * @config{force, force salvage even of files that do not appear to be
+	 * WiredTiger files. The value must be a boolean flag.,\c false}
+	 * @configend
 	 * @errors
 	 */
 	int __F(salvage)(WT_SESSION *session,

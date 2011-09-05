@@ -14,11 +14,16 @@ int
 util_salvage(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch, ret;
+	const char *force;
 	char *name;
 
+	force = NULL;
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	while ((ch = util_getopt(argc, argv, "F")) != EOF)
 		switch (ch) {
+		case 'F':
+			force = "force";
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -32,7 +37,7 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 	if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
-	if ((ret = session->salvage(session, name, NULL)) != 0) {
+	if ((ret = session->salvage(session, name, force)) != 0) {
 		fprintf(stderr, "%s: salvage(%s): %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
@@ -55,7 +60,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "salvage file\n",
+	    "salvage [-F] file\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

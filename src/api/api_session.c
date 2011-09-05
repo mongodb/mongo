@@ -206,8 +206,8 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 * corrupted.
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(session,
-	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
+	WT_ERR(__wt_btree_open(session, name, filename,
+	    treeconf, config, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
 
 	WT_TRET(__wt_salvage(session, config));
 
@@ -305,7 +305,7 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
 	WT_ERR(__wt_btree_open(
-	    session, name, filename, treeconf, WT_BTREE_VERIFY));
+	    session, name, filename, treeconf, config, WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
@@ -351,8 +351,8 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
 	WT_RET(__wt_schema_table_read(session, name, &treeconf));
-	WT_RET(__wt_btree_open(session,
-	    name, filename, treeconf, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_RET(__wt_btree_open(session, name, filename,
+	    treeconf, config, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_dumpfile(session, config));
 

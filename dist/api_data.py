@@ -199,7 +199,12 @@ methods = {
 ]),
 
 'session.rename' : Method([]),
-'session.salvage' : Method([]),
+'session.salvage' : Method([
+	Config('force', 'false', r'''
+		force salvage even of files that do not appear to be WiredTiger
+		files''',
+		type='boolean'),
+]),
 'session.sync' : Method([]),
 'session.truncate' : Method([]),
 'session.verify' : Method([]),

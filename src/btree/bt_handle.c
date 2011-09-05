@@ -7,8 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *);
-static int __btree_init(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_conf(WT_SESSION_IMPL *, const char *, const char *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_type(WT_SESSION_IMPL *);
 
@@ -84,20 +83,25 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 /*
  * __wt_btree_open --
  *	Open a Btree.
- *
- *	Note that the config string must point to allocated memory: it will
- *	be stored in the returned btree handle and freed when the handle is
- *	closed.
  */
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config, uint32_t flags)
+    const char *name, const char *filename,
+    const char *treeconfig, const char *opconfig, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	int matched, ret;
+	const char *cfg[] = { __wt_confdfl_session_salvage, opconfig, NULL };
 
 	conn = S2C(session);
+
+	/*
+	 * The file configuration string must point to allocated memory: it
+	 * is stored in the returned btree handle and freed when the handle
+	 * is closed.
+	 */
 
 	/* Increment the reference count if we already have the btree open. */
 	matched = 0;
@@ -112,8 +116,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 	__wt_unlock(session, conn->mtx);
 	if (matched) {
-		/* The config string will not be needed: free it now. */
-		__wt_free(session, config);
+		/* The treeconfig string will not be needed: free it now. */
+		__wt_free(session, treeconfig);
 		return (0);
 	}
 
@@ -123,22 +127,26 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	session->btree = btree;
 
 	/* Use the config string: it will be freed when the btree handle. */
-	btree->config = config;
+	btree->config = treeconfig;
 
-	/* Initialize the WT_BTREE structure. */
-	WT_ERR(__btree_init(session, name, filename));
+	/* Initialize and configure the WT_BTREE structure. */
+	WT_ERR(__btree_conf(session, name, filename));
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0666, 1, &btree->fh));
 
 	/*
-	 * Read the file's metadata and configure the WT_BTREE structure based
-	 * on the configuration string.
+	 * Read the file's metadata (unless it's a salvage operation and the
+	 * force flag is set, in which case we don't care what the file looks
+	 * like).
 	 */
-	WT_ERR(__wt_desc_read(session));
-	WT_ERR(__btree_conf(session));
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		WT_RET(__wt_config_gets(session, cfg, "force", &cval));
+	if (!LF_ISSET(WT_BTREE_SALVAGE) || cval.val == 0)
+		WT_ERR(__wt_desc_read(
+		    session, LF_ISSET(WT_BTREE_SALVAGE) ? 1 : 0));
 
-	/* If an open for a salvage operation, that's all we do. */
+	/* If this is an open for a salvage operation, that's all we do. */
 	if (LF_ISSET(WT_BTREE_SALVAGE))
 		goto done;
 
@@ -177,15 +185,19 @@ err:	if (btree->fh != NULL)
 }
 
 /*
- * __btree_init --
+ * __btree_conf --
  *	Initialize the WT_BTREE structure, after an zero-filled allocation.
  */
 static int
-__btree_init(WT_SESSION_IMPL *session, const char *name, const char *filename)
+__btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
 {
 	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COMPRESSOR *ncomp;
 
 	btree = session->btree;
+	conn = S2C(session);
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
 	WT_RET(__wt_strdup(session, filename, &btree->filename));
@@ -200,6 +212,36 @@ __btree_init(WT_SESSION_IMPL *session, const char *name, const char *filename)
 	btree->btree_compare = __wt_btree_lex_compare;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
+
+	/* File type. */
+	WT_RET(__btree_type(session));
+
+	/* Page sizes. */
+	WT_RET(__btree_page_sizes(session));
+
+	/* Huffman encoding configuration. */
+	WT_RET(__wt_btree_huffman_open(session));
+
+	/* Set the key gap for prefix compression. */
+	WT_RET(__wt_config_getones(session, btree->config, "key_gap", &cval));
+	btree->key_gap = (uint32_t)cval.val;
+
+	/* Page compressor configuration. */
+	WT_RET(__wt_config_getones(session,
+	    btree->config, "block_compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
+			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
+				btree->compressor = ncomp->compressor;
+				break;
+			}
+		}
+		if (btree->compressor == NULL) {
+			__wt_errx(session, "unknown block_compressor '%.*s'",
+			    (int)cval.len, cval.str);
+			return (EINVAL);
+		}
+	}
 
 	return (0);
 }
@@ -268,54 +310,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	WT_STAT_DECR(conn->stats, file_open);
 
 	return (ret);
-}
-
-/*
- * __btree_conf --
- *	Configure the btree and verify the configuration relationships.
- */
-static int
-__btree_conf(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
-	WT_NAMED_COMPRESSOR *ncomp;
-	WT_CONNECTION_IMPL *conn;
-
-	btree = session->btree;
-	conn = S2C(session);
-
-	/* File type. */
-	WT_RET(__btree_type(session));
-
-	/* Page sizes. */
-	WT_RET(__btree_page_sizes(session));
-
-	/* Huffman encoding configuration. */
-	WT_RET(__wt_btree_huffman_open(session));
-
-	/* Set the key gap for prefix compression. */
-	WT_RET(__wt_config_getones(session, btree->config, "key_gap", &cval));
-	btree->key_gap = (uint32_t)cval.val;
-
-	/* Page compressor configuration. */
-	WT_RET(__wt_config_getones(session,
-	    btree->config, "block_compressor", &cval));
-	if (cval.len > 0) {
-		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
-			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
-				btree->compressor = ncomp->compressor;
-				break;
-			}
-		}
-		if (btree->compressor == NULL) {
-			__wt_errx(session, "unknown block_compressor '%.*s'",
-			    (int)cval.len, cval.str);
-			return (EINVAL);
-		}
-	}
-
-	return (0);
 }
 
 /*

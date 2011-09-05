@@ -42,7 +42,7 @@ __create_file(WT_SESSION_IMPL *session,
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_ERR(__wt_btree_open(session, name, filename, treeconf, 0));
+	WT_ERR(__wt_btree_open(session, name, filename, treeconf, config, 0));
 	treeconf = NULL;
 	WT_ERR(__wt_session_add_btree(session, NULL));
 err:    __wt_buf_free(session, &keybuf);

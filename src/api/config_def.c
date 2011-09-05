@@ -221,11 +221,11 @@ __wt_confchk_session_rollback_transaction =
 
 const char *
 __wt_confdfl_session_salvage =
-    "";
+    "force=false";
 
 const char *
 __wt_confchk_session_salvage =
-    "";
+    "force=(type=boolean)";
 
 const char *
 __wt_confdfl_session_sync =

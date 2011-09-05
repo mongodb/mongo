@@ -76,9 +76,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		if (tconfig != NULL)
 			WT_RET(__wt_strdup(session, tconfig, &treeconf));
 		else
-			WT_RET(__wt_schema_table_read(session,
-			    name, &treeconf));
-		WT_RET(__wt_btree_open(session, name, filename, treeconf, 0));
+			WT_RET(
+			    __wt_schema_table_read(session, name, &treeconf));
+		WT_RET(__wt_btree_open(
+		    session, name, filename, treeconf, NULL, 0));
 		WT_RET(__wt_session_add_btree(session, &btree_session));
 		ret = 0;
 	}

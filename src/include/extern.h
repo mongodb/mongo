@@ -182,7 +182,7 @@ extern int __wt_debug_tree(WT_SESSION_IMPL *session,
 extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
-extern int __wt_desc_read(WT_SESSION_IMPL *session);
+extern int __wt_desc_read(WT_SESSION_IMPL *session, int salvage);
 extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
@@ -197,7 +197,8 @@ extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
-    const char *config,
+    const char *treeconfig,
+    const char *opconfig,
     uint32_t flags);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
