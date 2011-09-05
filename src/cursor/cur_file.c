@@ -103,6 +103,28 @@ __curfile_prev(WT_CURSOR *cursor)
 }
 
 /*
+ * __curfile_search --
+ *	WT_CURSOR->search method for the btree cursor type.
+ */
+static int
+__curfile_search(WT_CURSOR *cursor)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	cbt = (WT_CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, search, cbt->btree);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
+		ret = __cur_kv_not_set(session, cursor, "search", 1);
+	else
+		ret = __wt_btcur_search(cbt);
+	API_END(session);
+
+	return (ret);
+}
+
+/*
  * __curfile_search_near --
  *	WT_CURSOR->search_near method for the btree cursor type.
  */
@@ -236,7 +258,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		__curfile_last,
 		__curfile_next,
 		__curfile_prev,
-		NULL,
+		__curfile_search,
 		__curfile_search_near,
 		__curfile_insert,
 		__curfile_update,

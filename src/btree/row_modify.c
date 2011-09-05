@@ -22,7 +22,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	size_t ins_size, new_inshead_size, new_inslist_size;
 	size_t new_upd_size, upd_size;
-	uint32_t skipdepth;
+	uint32_t ins_slot, skipdepth;
 	int i, ret;
 
 	key = (WT_ITEM *)&cbt->iface.key;
@@ -46,7 +46,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	 * and WT_UPDATE structure pair in per-thread memory, and schedule
 	 * the workQ to insert the WT_INSERT structure.
 	 */
-	if (cbt->match == 1) {
+	if (cbt->compare == 0) {
 		new_upd_size = 0;
 		if (cbt->ins == NULL) {
 			/*
@@ -73,21 +73,29 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
 	} else {
 		/*
-		 * Allocate insert array if necessary (allocate an additional
-		 * slot for insert keys sorting less than any original key on
-		 * the page).
+		 * Allocate insert array if necessary, and set the WT_INSERT
+		 * array reference.
 		 *
-		 * Set the WT_INSERT array reference.
+		 * We allocate an additional insert array slot for insert keys
+		 * sorting less than any key on the page.  The test to select
+		 * that slot is baroque: if the search returned the first page
+		 * slot, we didn't end up processing an insert list, and the
+		 * comparison value indicates the search key was smaller than
+		 * the returned slot, then we're using the smallest-key insert
+		 * slot.  That's hard, so we set a flag.
 		 */
+		ins_slot = F_ISSET(
+		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
+
 		new_inshead_size = new_inslist_size = 0;
 		if (page->u.row_leaf.ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &new_inslist));
 			new_inslist_size =
 			    (page->entries + 1) * sizeof(WT_INSERT_HEAD *);
-			inshead = &new_inslist[cbt->slot];
+			inshead = &new_inslist[ins_slot];
 		} else
-			inshead = &page->u.row_leaf.ins[cbt->slot];
+			inshead = &page->u.row_leaf.ins[ins_slot];
 
 		/*
 		 * Allocate a new insert list head as necessary.

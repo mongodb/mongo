@@ -75,9 +75,10 @@ struct __wt_btree_stats {
 	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
+	WT_STATS file_read;
+	WT_STATS file_readnear;
 	WT_STATS file_readnext;
 	WT_STATS file_readprev;
-	WT_STATS file_reads;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;

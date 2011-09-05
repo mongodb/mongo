@@ -161,6 +161,7 @@ extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_last(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
 extern void __wt_cursor_clear(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
@@ -226,7 +227,9 @@ extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
-extern int __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
+extern int __wt_kv_return(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt,
+    int key_ret);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session);

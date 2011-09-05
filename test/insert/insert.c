@@ -138,7 +138,7 @@ run(void)
 	WT_SESSION *session;
 	const char *key, *value;
 	char config[256], kbuf[64], vbuf[64];
-	int cnt, ikey, ret;
+	int cnt, exact, ikey, ret;
 	uint8_t bitf;
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
@@ -246,7 +246,7 @@ run(void)
 	}
 	assert(cursor->close(cursor, 0) == 0);
 
-	assert(session->sync(session, "file:" FILENAME, NULL) == 0);
+	//assert(session->sync(session, "file:" FILENAME, NULL) == 0);
 
 	assert(session->open_cursor(
 	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
@@ -281,6 +281,27 @@ run(void)
 			    progname, wiredtiger_strerror(ret));
 			exit (EXIT_FAILURE);
 		}
+	}
+
+	for (;;) {
+		fprintf(stderr, "search-near string >>> ");
+		fflush(stdout);
+		if (fgets(config, sizeof(config), stdin) == NULL)
+			break;
+		cursor->set_key(cursor, config);
+		if ((ret = cursor->search_near(cursor, &exact)) != 0) {
+			fprintf(stderr,
+			    "cursor->search_near: %s\n",
+			    wiredtiger_strerror(ret));
+			exit (EXIT_FAILURE);
+		}
+		if ((ret = cursor->get_key(cursor, &key)) != 0) {
+			fprintf(stderr,
+			    "cursor->get_key: %s\n",
+			    wiredtiger_strerror(ret));
+			exit (EXIT_FAILURE);
+		}
+		fprintf(stderr, "%d: %s\n", exact, key);
 	}
 
 	assert(conn->close(conn, 0) == 0);

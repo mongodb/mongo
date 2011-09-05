@@ -51,7 +51,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	 * immutable).  If we don't have an exact match, it's an append and we
 	 * need to extend the file.
 	 */
-	if (!cbt->match) {
+	if (cbt->compare != 0) {
 		/*
 		 * We may have, and need to hold, a hazard reference on a page,
 		 * but we're possibly doing some page shuffling of the root,

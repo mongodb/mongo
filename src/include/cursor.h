@@ -15,8 +15,8 @@ struct __wt_cursor_btree {
 	 * to page modification: we have a page, a WT_COL/WT_ROW slot on the
 	 * page, an insert head, insert list and a skiplist stack (the stack of
 	 * skiplist entries leading to the insert point).  The search functions
-	 * also return if an exact match was found and a write-generation for
-	 * the leaf page.
+	 * also return the relationship of the search key to the found key and
+	 * a write-generation for the leaf page.
 	 */
 	WT_PAGE	  *page;		/* Current page */
 	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
@@ -26,8 +26,15 @@ struct __wt_cursor_btree {
 	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
 
 	uint64_t recno;			/* Record number */
-	int	 match;			/* If search found an exact match */
 	uint32_t write_gen;		/* Saved leaf page's write generation */
+
+	/*
+	 * The search function sets compare to:
+	 *	-1 if the found key is less than the specified key
+	 *	 0 if the found key matches the specified key
+	 *	+1 if the found key is larger than the specified key
+	 */
+	int	compare;
 
 	/*
 	 * The following fields are maintained by cursor iteration functions.
@@ -45,9 +52,11 @@ struct __wt_cursor_btree {
 	 * optionally Huffman encoded.   To avoid repeatedly decompressing the
 	 * item, we decompress it once into the value buffer.  The vslot field
 	 * is used to determine if we're returning information from the same
-	 * slot as the last iteration on the cursor.
+	 * slot as the last iteration on the cursor; we're never going to have
+	 * UINT32_MAX slots on a page, so use that as our out-of-band value.
 	 */
 	WT_BUF	 value;			/* Variable-length return value */
+#define	WT_CBT_VSLOT_OOB	UINT32_MAX
 	uint32_t vslot;			/* Variable-length value slot */
 
 	/*
@@ -57,6 +66,7 @@ struct __wt_cursor_btree {
 	uint8_t v;			/* Fixed-length return value */
 
 #define	WT_CBT_SEARCH_SET	0x01	/* Search has set a page */
+#define	WT_CBT_SEARCH_SMALLEST	0x02	/* Smallest-key insert list */
 	uint8_t flags;
 };
 

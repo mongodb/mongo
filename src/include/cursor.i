@@ -12,17 +12,21 @@
 static inline void
 __cursor_search_reset(WT_CURSOR_BTREE *cbt)
 {
+	/* Our caller should have released any page held by this cursor. */
 	cbt->page = NULL;
-	cbt->slot = UINT32_MAX;			/* Fail big. */
+	cbt->slot = UINT32_MAX;			/* Fail big */
 
 	cbt->ins_head = NULL;
 	cbt->ins = NULL;
 	/* We don't bother clearing the insert stack, that's more expensive. */
 
-	cbt->match = 0;
 	cbt->write_gen = 0;
 
-	cbt->vslot = UINT32_MAX;
+	cbt->compare = 2;			/* Illegal value */
+
+	cbt->vslot = WT_CBT_VSLOT_OOB;
+
+	cbt->flags = 0;
 }
 
 /*

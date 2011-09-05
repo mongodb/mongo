@@ -27,13 +27,14 @@ __search_insert(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL)
-			cmp = -1;
-		else {
-			ins_recno = WT_INSERT_RECNO(*ins);
-			cmp = (recno == ins_recno) ? 0 :
-			    (recno < ins_recno) ? -1 : 1;
+		if (*ins == NULL) {
+			cbt->ins_stack[i--] = ins--;
+			continue;
 		}
+
+		ins_recno = WT_INSERT_RECNO(*ins);
+		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
+
 		if (cmp == 0)			/* Exact match: return */
 			return (*ins);
 		else if (cmp > 0)		/* Keep going at this level */
@@ -41,7 +42,6 @@ __search_insert(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, uint64_t recno)
 		else				/* Drop down a level */
 			cbt->ins_stack[i--] = ins--;
 	}
-
 	return (NULL);
 }
 
@@ -133,18 +133,19 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		if (recno >= page->u.col_leaf.recno + page->entries) {
-			cbt->match = 0;
+			cbt->compare = 1;
+			F_SET(cbt, WT_CBT_SEARCH_SET);
 			return (0);
 		}
 		cbt->ins_head =
 		    page->u.col_leaf.ins == NULL ? NULL : *page->u.col_leaf.ins;
-		cbt->match = 1;
+		cbt->compare = 0;
 		break;
 	case WT_PAGE_COL_VAR:
 		if ((cip = __cursor_col_rle_search(page, recno)) == NULL)
-			cbt->match = 0;
+			cbt->compare = 1;
 		else {
-			cbt->match = 1;
+			cbt->compare = 0;
 			cbt->slot = WT_COL_SLOT(page, cip);
 			cbt->ins_head = WT_COL_INSERT_SLOT(page, cbt->slot);
 		}
@@ -158,6 +159,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	cbt->ins = __search_insert(cbt, cbt->ins_head, recno);
 
+	F_SET(cbt, WT_CBT_SEARCH_SET);
 	return (0);
 
 err:	__wt_page_release(session, page);

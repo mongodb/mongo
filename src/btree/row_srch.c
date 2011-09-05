@@ -16,7 +16,7 @@ __search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *key)
 {
 	WT_BTREE *btree;
-	WT_INSERT **ins;
+	WT_INSERT **ins, *ret_ins;
 	WT_ITEM insert_key;
 	int cmp, i, (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
@@ -25,6 +25,7 @@ __search_insert(WT_SESSION_IMPL *session,
 		return (NULL);
 
 	btree = session->btree;
+	ret_ins = NULL;
 	compare = btree->btree_compare;
 
 	/*
@@ -32,22 +33,31 @@ __search_insert(WT_SESSION_IMPL *session,
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL)
-			cmp = -1;
-		else {
-			insert_key.data = WT_INSERT_KEY(*ins);
-			insert_key.size = WT_INSERT_KEY_SIZE(*ins);
-			cmp = compare(btree, key, &insert_key);
+		if (*ins == NULL) {
+			cbt->ins_stack[i--] = ins--;
+			continue;
 		}
+
+		ret_ins = *ins;
+		insert_key.data = WT_INSERT_KEY(*ins);
+		insert_key.size = WT_INSERT_KEY_SIZE(*ins);
+		cmp = compare(btree, key, &insert_key);
+
 		if (cmp == 0)			/* Exact match: return */
-			return (*ins);
+			break;
 		else if (cmp > 0)		/* Keep going at this level */
 			ins = &(*ins)->next[i];
 		else				/* Drop down a level */
 			cbt->ins_stack[i--] = ins--;
 	}
 
-	return (NULL);
+	/*
+	 * For every insert element we review, we're getting closer to a better
+	 * choice; update the compare field to its new value.
+	 */
+	cbt->compare = cmp == 0 ? 0 : (cmp < 0 ? 1 : -1);
+
+	return (ret_ins);
 }
 
 /*
@@ -165,17 +175,17 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	}
 
 	/*
-	 * We now have a WT_ROW reference that's our best match on this search.
 	 * The best case is finding an exact match in the page's WT_ROW slot
-	 * array, which is likely for any read-mostly workload.
-	 *
-	 * In that case, we're not doing any kind of insert, all we can do is
-	 * update an existing entry.  Check that case and get out fast.
+	 * array, which is probable for any read-mostly workload.  In that
+	 * case, we're not doing any kind of insert, all we can do is update
+	 * an existing entry.  Check that case and get out fast.
 	 */
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
+		cbt->compare = 0;
 		cbt->slot = WT_ROW_SLOT(page, rip);
-		cbt->match = 1;
+
+		F_SET(cbt, WT_CBT_SEARCH_SET);
 		return (0);
 	}
 
@@ -189,8 +199,12 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * the page).
 	 */
 	rip = page->u.row_leaf.d;
-	if (base != 0)
+	if (base == 0)
+		cbt->compare = 1;
+	else {
 		rip += base - 1;
+		cbt->compare = -1;
+	}
 
 	/*
 	 * It's still possible there is an exact match, but it's on an insert
@@ -202,20 +216,20 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * use the extra slot of the insert array, otherwise insert lists map
 	 * one-to-one to the WT_ROW array.
 	 */
+	cbt->slot = WT_ROW_SLOT(page, rip);
 	if (base == 0) {
-		cbt->slot = page->entries;		/* extra slot */
+		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
-	} else {
-		cbt->slot = WT_ROW_SLOT(page, rip);
+	} else
 		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
-	}
 
 	/*
 	 * Search the insert list for a match; __search_insert sets the return
 	 * insert information appropriately.
 	 */
 	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
-	cbt->match = cbt->ins == NULL ? 0 : 1;
+
+	F_SET(cbt, WT_CBT_SEARCH_SET);
 	return (0);
 
 err:	__wt_page_release(session, page);

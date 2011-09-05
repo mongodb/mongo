@@ -8,16 +8,17 @@
 #include "wt_internal.h"
 
 /*
- * __wt_return_value --
- *	Return a page referenced value item to the application.
+ * __wt_kv_return --
+ *	Return a page referenced key/value pair to the application.
  */
 int
-__wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CURSOR *cursor;
+	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -31,6 +32,9 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
+		if (key_ret)
+			cursor->recno = cbt->recno;
+
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
@@ -44,6 +48,9 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
 	case WT_PAGE_COL_VAR:
+		if (key_ret)
+			cursor->recno = cbt->recno;
+
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
@@ -57,22 +64,39 @@ __wt_return_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		cell = WT_COL_PTR(page, &page->u.col_leaf.d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		/*
-		 * If the cursor references a WT_INSERT item, or if the original
-		 * item was updated, take the related WT_UPDATE item.
-		 */
 		rip = &page->u.row_leaf.d[cbt->slot];
-		if (cbt->ins == NULL)
+
+		/*
+		 * If the cursor references a WT_INSERT item, take the key and
+		 * related WT_UPDATE item.   Otherwise, take the key from the
+		 * original page, and the value from any related WT_UPDATE item,
+		 * or the page if the key was never updated.
+		 */
+		if (cbt->ins == NULL) {
+			if (key_ret) {
+				if (__wt_off_page(page, rip->key)) {
+					ikey = rip->key;
+					cursor->key.data = WT_IKEY_DATA(ikey);
+					cursor->key.size = ikey->size;
+				} else
+					WT_RET(__wt_row_key(
+					    session, page, rip, &cursor->key));
+			}
 			upd = WT_ROW_UPDATE(page, rip);
-		else
+		} else {
+			if (key_ret) {
+				cursor->key.data = WT_INSERT_KEY(cbt->ins);
+				cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+			}
 			upd = cbt->ins->upd;
+		}
 		if (upd != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
 		}
 
-		/* Otherwise, take the original cell (which may be empty). */
+		/* Take the original cell (which may be empty). */
 		if ((cell = __wt_row_value(page, rip)) == NULL) {
 			cursor->value.size = 0;
 			return (0);
