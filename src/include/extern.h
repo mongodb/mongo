@@ -259,10 +259,13 @@ extern int __wt_walk_prev(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);
 extern int __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
+extern int __wt_col_extend(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    uint64_t recno);
+extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
-extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
