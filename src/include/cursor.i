@@ -6,11 +6,11 @@
  */
 
 /*
- * __cursor_search_reset --
+ * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */
 static inline void
-__cursor_search_reset(WT_CURSOR_BTREE *cbt)
+__cursor_search_clear(WT_CURSOR_BTREE *cbt)
 {
 	/* Our caller should have released any page held by this cursor. */
 	cbt->page = NULL;
@@ -26,7 +26,59 @@ __cursor_search_reset(WT_CURSOR_BTREE *cbt)
 
 	cbt->vslot = WT_CBT_VSLOT_OOB;
 
-	cbt->flags = 0;
+	F_CLR(cbt, WT_CBT_SEARCH_SET | WT_CBT_SEARCH_SMALLEST);
+}
+
+/*
+ * __cursor_func_clear --
+ *	Reset the cursor's state for a new call.
+ */
+static inline void
+__cursor_func_clear(WT_CURSOR_BTREE *cbt, int page_release)
+{
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	/* Optionally release any page references we're holding. */
+	if (page_release && cbt->page != NULL) {
+		__wt_page_release(session, cbt->page);
+		cbt->page = NULL;
+	}
+
+	/* Reset the returned key/value state. */
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+}
+
+/*
+ * __cursor_func_set --
+ *	Resolve the cursor's state for return.
+ */
+static inline void
+__cursor_func_set(WT_CURSOR_BTREE *cbt, int ret)
+{
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	/*
+	 * On success, we're returning a key/value pair, and can iterate.
+	 * On error, we're not returning anything, we can't iterate, and
+	 * we should release any page references we're holding.
+	 */
+	if (ret == 0)
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else {
+		if (cbt->page != NULL) {
+			__wt_page_release(session, cbt->page);
+			cbt->page = NULL;
+		}
+		F_CLR(cbt, WT_CBT_SEARCH_SET | WT_CBT_SEARCH_SMALLEST);
+	}
 }
 
 /*

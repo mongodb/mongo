@@ -77,7 +77,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	int cmp, ret;
 	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	__cursor_search_reset(cbt);
+	__cursor_search_clear(cbt);
 
 	key = (WT_ITEM *)&cbt->iface.key;
 

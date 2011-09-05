@@ -160,7 +160,6 @@ extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_last(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
-extern void __wt_cursor_clear(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);

@@ -303,7 +303,8 @@ new_insert:	if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0) {
 int
 __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 {
-	__wt_cursor_clear(cbt);
+	__cursor_func_clear(cbt, 1);
+	F_CLR(cbt, WT_CBT_SEARCH_SET);
 
 	return (__wt_btcur_prev(cbt));
 }
@@ -323,7 +324,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_readprev);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	__cursor_func_clear(cbt, 0);
 
 	/* If iterating from a search position, there's some setup to do. */
 	if (F_ISSET(cbt, WT_CBT_SEARCH_SET))
@@ -360,9 +361,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		    cbt->page->type == WT_PAGE_ROW_INT);
 	}
 
-err:	if (ret != 0)
-		return (ret);
-
-	F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	return (0);
+err:	__cursor_func_set(cbt, ret);
+	return (ret);
 }

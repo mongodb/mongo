@@ -60,7 +60,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	uint32_t base, indx, limit;
 	int ret;
 
-	__cursor_search_reset(cbt);
+	__cursor_search_clear(cbt);
 
 	cbt->recno = recno = cbt->iface.recno;
 

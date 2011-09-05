@@ -8,65 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cursor_clear --
- *	Reset the cursor.
- */
-void
-__wt_cursor_clear(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	if (cbt->page != NULL) {
-		__wt_page_release(session, cbt->page);
-		cbt->page = NULL;
-	}
-
-	/* Reset the cursor iteration state. */
-	F_CLR(cbt, WT_CBT_SEARCH_SET);
-}
-
-/*
- * __cursor_flags_begin --
- *	Cursor function initial flags handling.
- */
-static inline void
-__cursor_flags_begin(WT_CURSOR_BTREE *cbt)
-{
-	WT_CURSOR *cursor;
-
-	cursor = &cbt->iface;
-
-	/* Release any page references we're holding. */
-	__wt_cursor_clear(cbt);
-
-	/* Reset the key/value state. */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-}
-
-/*
- * __cursor_flags_end --
- *	Cursor function final flags handling.
- */
-static inline void
-__cursor_flags_end(WT_CURSOR_BTREE *cbt, int ret)
-{
-	WT_CURSOR *cursor;
-
-	cursor = &cbt->iface;
-
-	/*
-	 * On success, we're returning a key/value pair, and can iterate.
-	 * On error, release any page references we're holding.
-	 */
-	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else
-		__wt_cursor_clear(cbt);
-}
-
-/*
  * __cursor_deleted --
  *	Return if the item is currently deleted.
  */
@@ -128,7 +69,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 
 	WT_BSTAT_INCR(session, file_read);
 
-	__cursor_flags_begin(cbt);
+	__cursor_func_clear(cbt, 1);
 
 	ret = btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) : __wt_col_search(session, cbt, 0);
@@ -139,7 +80,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 			ret = __wt_kv_return(session, cbt, 0);
 	}
 
-	__cursor_flags_end(cbt, ret);
+	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
@@ -172,7 +113,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * If we find an exact match, or the search key is smaller than the tree
 	 * key, and the tree key has not been deleted, return the tree key.
 	 */
-	__cursor_flags_begin(cbt);
+	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
 	if (cbt->compare == 0 || cbt->compare == 1)
 		if (!__cursor_deleted(cbt)) {
@@ -197,7 +138,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * a subsequent record.  If we don't find a previous record, there's no
 	 * record to return, quit.
 	 */
-	__cursor_flags_begin(cbt);
+	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
 	if (!__cursor_deleted(cbt)) {
 		*exact = cbt->compare;
@@ -209,7 +150,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	ret = __wt_btcur_prev(cbt);
 
 err:
-done:	__cursor_flags_end(cbt, ret);
+done:	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
@@ -231,7 +172,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_inserts);
 
-retry:	__cursor_flags_begin(cbt);
+retry:	__cursor_func_clear(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -276,7 +217,7 @@ retry:	__cursor_flags_begin(cbt);
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-err:	__cursor_flags_end(cbt, ret);
+err:	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
@@ -298,7 +239,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_removes);
 
-retry:	__cursor_flags_begin(cbt);
+retry:	__cursor_func_clear(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -319,7 +260,7 @@ retry:	__cursor_flags_begin(cbt);
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-err:	__cursor_flags_end(cbt, ret);
+err:	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
@@ -341,7 +282,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, file_updates);
 
-retry:	__cursor_flags_begin(cbt);
+retry:	__cursor_func_clear(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -373,7 +314,7 @@ retry:	__cursor_flags_begin(cbt);
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-err:	__cursor_flags_end(cbt, ret);
+err:	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
@@ -390,7 +331,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
 	WT_UNUSED(config);
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	__wt_cursor_clear(cbt);
+	__cursor_func_clear(cbt, 1);
 
 	__wt_buf_free(session, &cbt->value);
 
