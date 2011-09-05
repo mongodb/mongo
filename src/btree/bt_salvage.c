@@ -91,7 +91,7 @@ struct __wt_track {
 #define	WT_TRK_FREE_OVFL	0x02		/* Free any overflow pages */
 
 static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_col_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_col_build_leaf(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_COL_REF *);
 static int  __slvg_col_merge_ovfl(
@@ -108,7 +108,7 @@ static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_row_build_internal(WT_SESSION_IMPL *, WT_STUFF *);
+static int  __slvg_row_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_row_build_leaf(WT_SESSION_IMPL *,
 		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *);
 static int  __slvg_row_merge_ovfl(
@@ -128,6 +128,19 @@ static int  __slvg_trk_ovfl(
 		WT_SESSION_IMPL *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 
 /*
+ * __slvg_empty --
+ *	Standard didn't find anything message.
+ */
+static int
+__slvg_empty(WT_SESSION_IMPL *session)
+{
+	__wt_errx(session,
+	    "the file contains no recoverable leaf pages and cannot be "
+	    "salvaged");
+	return (WT_ERROR);
+}
+
+/*
  * __wt_salvage --
  *	Salvage a Btree.
  */
@@ -137,7 +150,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	off_t len;
-	uint32_t allocsize;
+	uint32_t allocsize, i, leaf_cnt;
 	int ret;
 
 	WT_UNUSED(config);
@@ -171,11 +184,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	}
 
 	/* If the file has no data pages, we're done. */
-	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
-		__wt_errx(session,
-		    "the file contains no data pages and cannot be salvaged");
-		goto err;
-	}
+	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR)
+		WT_ERR(__slvg_empty(session));
 
 	/*
 	 * Step 1:
@@ -184,11 +194,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 * or overflow pages are added to the free list.
 	 */
 	WT_ERR(__slvg_read(session, ss));
-	if (ss->pages_next == 0) {
-		__wt_errx(session,
-		    "file has no valid pages and cannot be salvaged");
-		goto err;
-	}
+	if (ss->pages_next == 0)
+		WT_ERR(__slvg_empty(session));
 
 	/*
 	 * Step 2:
@@ -266,6 +273,16 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	}
 
 	/*
+	 * Count how many leaf pages we have (we could track this during the
+	 * array shuffling/splitting, but that's a lot harder).
+	 */
+	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
+		if (ss->pages[i] != NULL)
+			++leaf_cnt;
+	if (leaf_cnt == 0)
+		WT_ERR(__slvg_empty(session));
+
+	/*
 	 * Step 6:
 	 * Build an internal page that references all of the leaf pages, and
 	 * write it, as well as any merged pages, to the file.
@@ -273,10 +290,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	switch (ss->page_type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__slvg_col_build_internal(session, ss));
+		WT_ERR(__slvg_col_build_internal(session, leaf_cnt, ss));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__slvg_row_build_internal(session, ss));
+		WT_ERR(__slvg_row_build_internal(session, leaf_cnt, ss));
 		break;
 	}
 
@@ -1052,24 +1069,17 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
  *	pages we've found.
  */
 static int
-__slvg_col_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
+__slvg_col_build_internal(
+    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_REF *root_page;
 	WT_TRACK *trk;
-	uint32_t i, leaf_cnt;
+	uint32_t i;
 	int ret;
 
 	root_page = &session->btree->root_page;
-
-	/*
-	 * Count how many internal page slots we need (we could track this
-	 * during the array shuffling/splitting, but that's a lot harder).
-	 */
-	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
-		if ((trk = ss->pages[i]) != NULL)
-			++leaf_cnt;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1624,24 +1634,17 @@ err:	__wt_scr_free(&dsk);
  *	pages we've found.
  */
 static int
-__slvg_row_build_internal(WT_SESSION_IMPL *session, WT_STUFF *ss)
+__slvg_row_build_internal(
+    WT_SESSION_IMPL *session, uint32_t leaf_cnt,  WT_STUFF *ss)
 {
 	WT_PAGE *page;
 	WT_REF *root_page;
 	WT_ROW_REF *rref;
 	WT_TRACK *trk;
-	uint32_t i, leaf_cnt;
+	uint32_t i;
 	int ret;
 
 	root_page = &session->btree->root_page;
-
-	/*
-	 * Count how many internal page slots we need (we could track this
-	 * during the array shuffling/splitting, but that's a lot harder).
-	 */
-	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
-		if (ss->pages[i] != NULL)
-			++leaf_cnt;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
