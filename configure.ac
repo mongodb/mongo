@@ -44,7 +44,7 @@ else
 	# Automake configures non-gcc compiler CFLAGS to be -g.
 	#
 	# If not using gcc, use -O (which is specifically correct for Solaris,
-	# the -O flag configures the compiler to use the "default" optimization).
+	# the -O flag configures the compiler to use "default" optimization).
 	CFLAGS=`echo "$CFLAGS" | sed 's/-g/-O/g'`
 
 	# The Solaris native compiler gets the additional -mt flag.
