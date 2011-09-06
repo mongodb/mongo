@@ -569,6 +569,40 @@ namespace JsobjTests {
                 }
 
                 {
+                    // check (non)equality
+                    BSONObj a = BSONObjBuilder().appendBinData("", 8, (BinDataType) 1, "abcdefgh").obj();
+                    BSONObj b = BSONObjBuilder().appendBinData("", 8, (BinDataType) 1, "abcdefgj").obj();
+                    ASSERT( !a.equal(b) );
+                    int res_ab = a.woCompare(b);
+                    ASSERT( res_ab != 0 );
+                    keyTest( a, true );
+                    keyTest( b, true );
+
+                    // check subtypes do not equal
+                    BSONObj c = BSONObjBuilder().appendBinData("", 8, (BinDataType) 4, "abcdefgh").obj();
+                    BSONObj d = BSONObjBuilder().appendBinData("", 8, (BinDataType) 0x81, "abcdefgh").obj();
+                    ASSERT( !a.equal(c) );
+                    int res_ac = a.woCompare(c);
+                    ASSERT( res_ac != 0 );
+                    keyTest( c, true );
+                    ASSERT( !a.equal(d) );
+                    int res_ad = a.woCompare(d);
+                    ASSERT( res_ad != 0 );
+                    keyTest( d, true );
+
+                    KeyV1Owned A(a);
+                    KeyV1Owned B(b);
+                    KeyV1Owned C(c);
+                    KeyV1Owned D(d);
+                    ASSERT( !A.woEqual(B) );
+                    ASSERT( A.woCompare(B, Ordering::make(BSONObj())) == res_ab );
+                    ASSERT( !A.woEqual(C) );
+                    ASSERT( A.woCompare(C, Ordering::make(BSONObj())) < 0 && res_ac < 0 );
+                    ASSERT( !A.woEqual(D) );
+                    ASSERT( A.woCompare(D, Ordering::make(BSONObj())) < 0 && res_ad < 0 );
+                }
+
+                {
                     BSONObjBuilder b;
                     b.appendBinData("f", 33, (BinDataType) 1, "123456789012345678901234567890123");
                     BSONObj o = b.obj();
