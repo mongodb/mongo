@@ -900,7 +900,7 @@ namespace mongo {
             }
         }
     }
-
+//zzz
     /* unindex all keys in all indexes for this record. */
     static void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         BSONObj obj(todelete);
@@ -1152,10 +1152,31 @@ namespace mongo {
         extern unsigned notesThisLock;
     }
 
+    void upgradeToWritable(bool shouldBeUnlocked) {
+        // todo upgrade!
+        DEV {
+            // verify we haven't written yet (usually)
+
+            // test binary does special things so this would assert there so don't check there
+            if( shouldBeUnlocked && !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
+                static unsigned long long zeroes;
+                static unsigned long long tot;
+                tot++;
+                if( dur::notesThisLock == 0 )
+                    zeroes++;
+                else 
+                    log() << "lockd " << endl;
+                if( tot > 1000 ) {
+                    assert( zeroes > tot / 2 );
+                }
+            }
+        }
+    }
+
     /** add index keys for a newly inserted record 
         done in two steps/phases to defer write lock portion
-     */
-    static void indexRecordUsingTwoSteps(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
+    */
+    static void indexRecordUsingTwoSteps(NamespaceDetails *d, BSONObj obj, DiskLoc loc, bool shouldBeUnlocked) {
         vector<int> multi;
         vector<BSONObjSet> multiKeys;
 
@@ -1183,22 +1204,8 @@ namespace mongo {
         }
 
         // update lock to writable here.  TODO
-
-        DEV {
-            // verify we haven't written yet (usually)
-
-            // test binary does special things so this would assert there so don't check there
-            if( !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
-                static unsigned long long zeroes;
-                static unsigned long long tot;
-                tot++;
-                if( dur::notesThisLock == 0 )
-                    zeroes++;
-                if( tot > 1000 ) {
-                    assert( zeroes > tot / 2 );
-                }
-            }
-        }
+        
+        upgradeToWritable(shouldBeUnlocked);
 
         IndexInterface::phasedFinish(); // step 2
 
@@ -1586,7 +1593,7 @@ namespace mongo {
     }
 
     /* add keys to indexes for a new record */
-    static void oldIndexRecord(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
+    static void oldIndexRecord__notused(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
         int n = d->nIndexesBeingBuilt();
         for ( int i = 0; i < n; i++ ) {
             try {
@@ -1943,7 +1950,7 @@ namespace mongo {
                 assert( obuf );
                 BSONObj obj((const char *) obuf);
                 try {
-                    indexRecordUsingTwoSteps(d, obj, loc);
+                    indexRecordUsingTwoSteps(d, obj, loc, true);
                 }
                 catch( AssertionException& ) {
                     // should be a dup key error on _id index
@@ -1997,7 +2004,7 @@ namespace mongo {
                 // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
                 // but twosteps handles dup key errors more efficiently.
                 //oldIndexRecord(d, obj, loc);
-                indexRecordUsingTwoSteps(d, obj, loc);
+                indexRecordUsingTwoSteps(d, obj, loc, false);
 
             }
             catch( AssertionException& e ) {
