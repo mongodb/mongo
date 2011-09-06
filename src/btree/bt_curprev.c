@@ -303,6 +303,12 @@ new_insert:	if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0) {
 int
 __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 {
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	WT_BSTAT_INCR(session, cursor_last);
+
 	__cursor_func_clear(cbt, 1);
 	F_CLR(cbt, WT_CBT_SEARCH_SET);
 
@@ -322,7 +328,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, file_readprev);
+	WT_BSTAT_INCR(session, cursor_read_prev);
 
 	__cursor_func_clear(cbt, 0);
 

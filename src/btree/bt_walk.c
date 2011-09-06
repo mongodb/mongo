@@ -8,76 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * There are two tree-walk implementations: a textbook, depth-first recursive
- * tree walk in __wt_tree_walk(), and a non-recursive, forward and backward,
- * depth-first tree walk in __wt_walk_{first,last,end,next,prev}().
- *
- * The simple recursive walk is sufficient in most cases: a hazard reference
- * is obtained on each page in turn, a worker function is called on the page,
- * then the hazard reference is released.
- *
- * The complicated tree walk routine was added to support complex walks of the
- * tree (for example, cursors need to walk the tree in reverse order, and both
- * the eviction thread and cursors must be able to pause and then restart the
- * traversal at any point).
+ * The tree-walk implementation is a non-recursive, forward and backward,
+ * depth-first tree walk in __wt_walk_{first,last,end,next,prev}().  These
+ * walk routines were added to support complex walks of the tree (for example,
+ * the eviction thread must be able to pause and then restart the traversal
+ * at any point).
  */
-
-/*
- * __wt_tree_walk --
- *	Depth-first recursive walk of a btree, calling a worker function on
- *	each page.
- */
-int
-__wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_PAGE *page, int (*work)(WT_SESSION_IMPL *, WT_PAGE *, void *), void *arg)
-{
-	WT_BTREE *btree;
-	WT_COL_REF *cref;
-	WT_ROW_REF *rref;
-	uint32_t i;
-	int ret;
-
-	btree = session->btree;
-
-	/* A NULL page starts at the top of the tree -- it's a convenience. */
-	if (page == NULL && (page = btree->root_page.page) == NULL)
-		return (WT_ERROR);
-
-	/*
-	 * WT_TREE_WALK_DESCEND --
-	 *	The code to descend the tree is identical for both row- and
-	 * column-store pages, except for finding the WT_REF structure.
-	 */
-#define	WT_TREE_WALK_DESCEND(session, page, ref, work, arg) do {	\
-	WT_RET(__wt_page_in(session, page, ref, 0));			\
-	ret = __wt_tree_walk(session, (ref)->page, work, arg);		\
-	__wt_hazard_clear(session, (ref)->page);			\
-	if (ret != 0)							\
-		return (ret);						\
-} while (0)
-
-	/* Walk internal pages, descending through any off-page references. */
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(page, cref, i)
-			WT_TREE_WALK_DESCEND(
-			    session, page, &cref->ref, work, arg);
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(page, rref, i)
-			WT_TREE_WALK_DESCEND(
-			    session, page, &rref->ref, work, arg);
-		break;
-	}
-
-	/*
-	 * Call the worker function for a page after all of its children have
-	 * been visited; nothing depends on this semantic, but if some future
-	 * operation wants to operate on a parent/child combination, this is
-	 * the right approach.
-	 */
-	return (work(session, page, arg));
-}
 
 /*
  * __wt_walk_init --
@@ -426,6 +362,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
+	int ret;
 
 	btree = session->btree;
 
@@ -448,8 +385,18 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	if (WT_PAGE_IS_ROOT(page))
 		return (0);
 
+	/* Figure out the current slot in the parent page. */
+	t = page->parent;
+	slot =
+	    page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF ?
+	    WT_ROW_REF_SLOT(t, page->parent_ref) :
+	    WT_COL_REF_SLOT(t, page->parent_ref);
+
 	/*
-	 * Swap our hazard reference for the hazard reference of our parent.
+	 * Swap our hazard reference for the hazard reference of our parent,
+	 * if it's not the root page (we could access it directly because we
+	 * know it's in memory, but we need a hazard reference).  Don't leave
+	 * a hazard reference dangling on error.
 	 *
 	 * We're hazard-reference coupling up the tree and that's OK: first,
 	 * hazard references can't deadlock, so there's none of the usual
@@ -459,22 +406,11 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	 * page, that fails because of our hazard reference.  If eviction tries
 	 * to evict our parent, that fails because the parent has a child page
 	 * that can't be discarded.
-	 *
-	 * Get the page if it's not the root page; we could access it directly
-	 * because we know it's in memory, but we need a hazard reference.
 	 */
-	t = page->parent;
-	if (!WT_PAGE_IS_ROOT(t))
-		WT_RET(__wt_page_in(session, t, t->parent_ref, 0));
-
-	/* Figure out the currently slot. */
-	slot =
-	    page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF ?
-	    WT_ROW_REF_SLOT(t, page->parent_ref) :
-	    WT_COL_REF_SLOT(t, page->parent_ref);
-
-	/* Release our previous hazard reference. */
+	ret = WT_PAGE_IS_ROOT(t) ?
+	    0 : __wt_page_in(session, t, t->parent_ref, 0);
 	__wt_page_release(session, page);
+	WT_RET(ret);
 	page = t;
 
 	/*
@@ -494,7 +430,8 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 descend:
 	/*
 	 * We're starting a new subtree on page/slot, descend to the left-most
-	 * item in the subtree, swapping hazard references at each level.
+	 * item in the subtree, swapping hazard references at each level (but
+	 * don't leave a hazard reference dangling on error).
 	 */
 	for (;;) {
 		if (page->type == WT_PAGE_ROW_INT)
@@ -504,8 +441,9 @@ descend:
 		else
 			break;
 
-		WT_RET(__wt_page_in(session, page, ref, 0));
+		ret = __wt_page_in(session, page, ref, 0);
 		__wt_page_release(session, page);
+		WT_RET(ret);
 		page = ref->page;
 		slot = next ? 0 : page->entries - 1;
 	}

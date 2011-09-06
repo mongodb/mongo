@@ -108,7 +108,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	WT_BSTAT_INCR(session, items_inserted);
+	WT_BSTAT_INCR(session, file_bulk_loaded);
 	return (0);
 }
 

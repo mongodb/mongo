@@ -72,7 +72,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_BSTAT_INCR(session, file_read);
+	WT_BSTAT_INCR(session, cursor_read);
 
 	__cursor_func_clear(cbt, 1);
 
@@ -107,7 +107,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	srch = btree->type == BTREE_ROW ? __wt_row_search : __wt_col_search;
 
-	WT_BSTAT_INCR(session, file_readnear);
+	WT_BSTAT_INCR(session, cursor_read_near);
 
 	/*
 	 * We assume "range-prefix" semantics are more likely, so where we don't
@@ -174,7 +174,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, file_inserts);
+	WT_BSTAT_INCR(session, cursor_inserts);
 
 retry:	__cursor_func_clear(cbt, 1);
 
@@ -241,7 +241,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, file_removes);
+	WT_BSTAT_INCR(session, cursor_removes);
 
 retry:	__cursor_func_clear(cbt, 1);
 
@@ -284,7 +284,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, file_updates);
+	WT_BSTAT_INCR(session, cursor_updates);
 
 retry:	__cursor_func_clear(cbt, 1);
 

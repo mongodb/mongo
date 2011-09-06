@@ -240,12 +240,6 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
     int quiet);
-extern int __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    int (*work)(WT_SESSION_IMPL *,
-    WT_PAGE *,
-    void *),
-    void *arg);
 extern int __wt_walk_first(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     uint32_t flags);

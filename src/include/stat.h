@@ -50,20 +50,28 @@ struct __wt_stats {
  * Statistics entries for BTREE handle.
  */
 struct __wt_btree_stats {
-	WT_STATS file_item_col_deleted;
-	WT_STATS file_col_fix;
-	WT_STATS file_col_internal;
-	WT_STATS file_col_variable;
+	WT_STATS file_bulk_loaded;
+	WT_STATS file_col_deleted;
+	WT_STATS file_col_fix_pages;
+	WT_STATS file_col_int_pages;
+	WT_STATS file_col_var_pages;
+	WT_STATS cursor_first;
+	WT_STATS cursor_inserts;
+	WT_STATS cursor_last;
+	WT_STATS cursor_read;
+	WT_STATS cursor_read_near;
+	WT_STATS cursor_read_next;
+	WT_STATS cursor_read_prev;
+	WT_STATS cursor_removes;
+	WT_STATS cursor_updates;
 	WT_STATS alloc;
 	WT_STATS extend;
 	WT_STATS free;
-	WT_STATS items_inserted;
 	WT_STATS overflow_read;
 	WT_STATS page_read;
 	WT_STATS page_write;
 	WT_STATS file_size;
 	WT_STATS file_fixed_len;
-	WT_STATS file_inserts;
 	WT_STATS file_magic;
 	WT_STATS file_major;
 	WT_STATS file_intlmax;
@@ -75,10 +83,6 @@ struct __wt_btree_stats {
 	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
-	WT_STATS file_read;
-	WT_STATS file_readnear;
-	WT_STATS file_readnext;
-	WT_STATS file_readprev;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
@@ -86,12 +90,9 @@ struct __wt_btree_stats {
 	WT_STATS rec_ovfl_value;
 	WT_STATS rec_page_delete;
 	WT_STATS rec_hazard;
-	WT_STATS file_removes;
-	WT_STATS file_row_internal;
-	WT_STATS file_row_leaf;
-	WT_STATS file_item_total_key;
-	WT_STATS file_item_total_value;
-	WT_STATS file_updates;
+	WT_STATS file_row_int_pages;
+	WT_STATS file_row_leaf_pages;
+	WT_STATS file_entries;
 	WT_STATS __end;
 };
 
