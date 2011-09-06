@@ -45,6 +45,7 @@ _ disallow system* manipulations from the database.
 #include "compact.h"
 #include "ops/delete.h"
 #include "instance.h"
+#include "replutil.h"
 
 namespace mongo {
 
@@ -1296,7 +1297,7 @@ namespace mongo {
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
         for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
-            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true , true );
+            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false /* cappedOk */ , true /* noWarn */ , isMaster( ns ) /* logOp */ );
             getDur().commitIfNeeded();
         }
 
