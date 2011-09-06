@@ -24,7 +24,12 @@ class test_base03(wttest.WiredTigerTestCase):
     table_name4 = 'test_base03d'
     nentries = 10
 
-    scenarios = wtscenario.wtscenario.session_create_scenario()
+    def config_string(self):
+        """
+        Return any additional configuration.
+        This method may be overridden.
+        """
+        return ''
 
     def session_create(self, name, args):
         """
@@ -40,7 +45,7 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        create_args = 'key_format=S,value_format=S' + self.session_create_scenario.configString()
+        create_args = 'key_format=S,value_format=S' + self.config_string()
         self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
@@ -63,7 +68,7 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=int
         """
-        create_args = 'key_format=S,value_format=i' + self.session_create_scenario.configString()
+        create_args = 'key_format=S,value_format=i' + self.config_string()
         self.session_create("table:" + self.table_name2, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name2, None, None)
@@ -89,7 +94,7 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=string
         """
-        create_args = 'key_format=i,value_format=S' + self.session_create_scenario.configString()
+        create_args = 'key_format=i,value_format=S' + self.config_string()
         self.session_create("table:" + self.table_name3, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name3, None, None)
@@ -113,7 +118,7 @@ class test_base03(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=int
         """
-        create_args = 'key_format=i,value_format=i' + self.session_create_scenario.configString()
+        create_args = 'key_format=i,value_format=i' + self.config_string()
         self.session_create("table:" + self.table_name4, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name4, None, None)
