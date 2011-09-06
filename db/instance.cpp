@@ -912,7 +912,7 @@ namespace mongo {
                 (LPSTR)&msg, 0, NULL);
             string m = msg;
             str::stripTrailing(m, "\r\n");
-            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?" );
+            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << ". Is a mongod instance already running?" );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
@@ -923,7 +923,7 @@ namespace mongo {
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
             lockFile = 0;
-            uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
+            uassert( 10310 ,  "Unable to lock file: " + name + ". Is a mongod instance already running?",  0 );
         }
 #endif
 
