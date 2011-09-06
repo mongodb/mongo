@@ -76,16 +76,15 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 
 	__cursor_func_clear(cbt, 1);
 
-	ret = btree->type == BTREE_ROW ?
-	    __wt_row_search(session, cbt, 0) : __wt_col_search(session, cbt, 0);
-	if (ret == 0) {
-		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
-		else
-			ret = __wt_kv_return(session, cbt, 0);
-	}
+	WT_ERR(btree->type == BTREE_ROW ?
+	    __wt_row_search(session, cbt, 0) :
+	    __wt_col_search(session, cbt, 0));
+	if (cbt->compare != 0 || __cursor_invalid(cbt))
+		ret = WT_NOTFOUND;
+	else
+		ret = __wt_kv_return(session, cbt, 0);
 
-	__cursor_func_set(cbt, ret);
+err:	__cursor_func_set(cbt, ret);
 
 	return (ret);
 }
