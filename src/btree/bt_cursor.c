@@ -8,11 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __cursor_deleted --
- *	Return if the item is currently deleted.
+ * __cursor_invalid --
+ *	Return if the cursor references an invalid K/V pair (either the pair
+ * doesn't exist at all because the tree is empty, or the pair was deleted).
  */
 static inline int
-__cursor_deleted(WT_CURSOR_BTREE *cbt)
+__cursor_invalid(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -28,6 +29,10 @@ __cursor_deleted(WT_CURSOR_BTREE *cbt)
 	/* If we found an item on an insert list, check there. */
 	if (ins != NULL)
 		return (WT_UPDATE_DELETED_ISSET(ins->upd) ? 1 : 0);
+
+	/* The page may be empty, the search routine doesn't check. */
+	if (page->entries == 0)
+		return (1);
 
 	/* Otherwise, check for an update in the page's slots. */
 	switch (btree->type) {
@@ -74,7 +79,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	ret = btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) : __wt_col_search(session, cbt, 0);
 	if (ret == 0) {
-		if (cbt->compare != 0 || __cursor_deleted(cbt))
+		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			ret = WT_NOTFOUND;
 		else
 			ret = __wt_kv_return(session, cbt, 0);
@@ -116,8 +121,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
 	if (cbt->compare == 0 || cbt->compare == 1)
-		if (!__cursor_deleted(cbt) &&
-		    (cbt->page->entries > 0 || cbt->ins != NULL)) {
+		if (!__cursor_invalid(cbt)) {
 			*exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt, 1);
 			goto done;
@@ -141,8 +145,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 */
 	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
-	if (!__cursor_deleted(cbt) &&
-	    (cbt->page->entries > 0 || cbt->ins != NULL)) {
+	if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, 1);
 		goto done;
@@ -207,7 +210,7 @@ retry:	__cursor_func_clear(cbt, 1);
 		while ((ret = __wt_row_search(session, cbt, 1)) == WT_RESTART)
 			;
 		if (ret == 0) {
-			if (cbt->compare == 0 && !__cursor_deleted(cbt) &&
+			if (cbt->compare == 0 && !__cursor_invalid(cbt) &&
 			    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
 				ret = WT_DUPLICATE_KEY;
 			else
@@ -247,14 +250,14 @@ retry:	__cursor_func_clear(cbt, 1);
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
 		WT_ERR(__wt_col_search(session, cbt, 1));
-		if (cbt->compare != 0 || __cursor_deleted(cbt))
+		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			ret = WT_NOTFOUND;
 		else if ((ret = __wt_col_modify(session, cbt, 1)) == WT_RESTART)
 			goto retry;
 		break;
 	case BTREE_ROW:
 		WT_ERR(__wt_row_search(session, cbt, 1));
-		if (cbt->compare != 0 || __cursor_deleted(cbt))
+		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			ret = WT_NOTFOUND;
 		else if ((ret = __wt_row_modify(session, cbt, 1)) == WT_RESTART)
 			goto retry;
@@ -308,7 +311,7 @@ retry:	__cursor_func_clear(cbt, 1);
 		 * overwrites the value.
 		 */
 		WT_ERR(__wt_row_search(session, cbt, 1));
-		if (cbt->compare != 0 || __cursor_deleted(cbt))
+		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			ret = WT_NOTFOUND;
 		else if ((ret = __wt_row_modify(session, cbt, 0)) == WT_RESTART)
 			goto retry;
