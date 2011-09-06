@@ -575,7 +575,13 @@ namespace mongo {
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
-        void init();
+    private:
+        void _init();
+    public:
+        void init() {
+            if( !ht ) 
+                _init();
+        }
 
         void add_ns(const char *ns, DiskLoc& loc, bool capped) {
             NamespaceDetails details( loc, capped );

@@ -150,9 +150,9 @@ namespace mongo {
 
     bool checkNsFilesOnLoad = true;
 
-    void NamespaceIndex::init() {
-        if ( ht )
-            return;
+    NOINLINE_DECL void NamespaceIndex::_init() {
+        assert( !ht );
+
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
            local.*.
