@@ -1527,10 +1527,11 @@ namespace mongo {
 
     template< class V >
     bool BtreeBucket<V>::customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) {
+        const BtreeBucket<V> * bucket = BTREE(thisLoc);
         while( 1 ) {
             if ( l + 1 == h ) {
                 keyOfs = ( direction > 0 ) ? h : l;
-                DiskLoc next = BTREE(thisLoc)->k( h ).prevChildBucket;
+                DiskLoc next = bucket->k( h ).prevChildBucket;
                 if ( !next.isNull() ) {
                     bestParent = make_pair( thisLoc, keyOfs );
                     thisLoc = next;
@@ -1541,7 +1542,7 @@ namespace mongo {
                 }
             }
             int m = l + ( h - l ) / 2;
-            int cmp = customBSONCmp( BTREE(thisLoc)->keyNode( m ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction );
+            int cmp = customBSONCmp( bucket->keyNode( m ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction );
             if ( cmp < 0 ) {
                 l = m;
             }
@@ -1607,36 +1608,40 @@ namespace mongo {
     /** @param thisLoc in/out param. perhaps thisLoc isn't the best name given that.
     */
     template< class V >
-    void BtreeBucket<V>::customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) {
-      if ( BTREE(thisLoc)->n == 0 ) {
+    void BtreeBucket<V>::customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, 
+                                      const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, 
+                                      const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) {
+        const BtreeBucket<V> *bucket = BTREE(thisLoc);
+        if ( bucket->n == 0 ) {
             thisLoc = DiskLoc();
             return;
         }
         // go down until find smallest/biggest >=/<= target
         while( 1 ) {
             int l = 0;
-            int h = BTREE(thisLoc)->n - 1;
+            int h = bucket->n - 1;
             // leftmost/rightmost key may possibly be >=/<= search key
             bool firstCheck;
             if ( direction > 0 ) {
-	      firstCheck = ( customBSONCmp( BTREE(thisLoc)->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 );
+                firstCheck = ( customBSONCmp( bucket->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 );
             }
             else {
-	      firstCheck = ( customBSONCmp( BTREE(thisLoc)->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 );
+                firstCheck = ( customBSONCmp( bucket->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 );
             }
             if ( firstCheck ) {
                 DiskLoc next;
                 if ( direction > 0 ) {
-		    next = BTREE(thisLoc)->k( 0 ).prevChildBucket;
+                    next = bucket->k( 0 ).prevChildBucket;
                     keyOfs = 0;
                 }
                 else {
-                    next = BTREE(thisLoc)->nextChild;
+                    next = bucket->nextChild;
                     keyOfs = h;
                 }
                 if ( !next.isNull() ) {
                     bestParent = pair< DiskLoc, int >( thisLoc, keyOfs );
                     thisLoc = next;
+                    bucket = BTREE(thisLoc);
                     continue;
                 }
                 else {
@@ -1645,18 +1650,18 @@ namespace mongo {
             }
             bool secondCheck;
             if ( direction > 0 ) {
-                secondCheck = ( customBSONCmp( BTREE(thisLoc)->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) < 0 );
+                secondCheck = ( customBSONCmp( bucket->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) < 0 );
             }
             else {
-                secondCheck = ( customBSONCmp( BTREE(thisLoc)->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) > 0 );
+                secondCheck = ( customBSONCmp( bucket->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) > 0 );
             }
             if ( secondCheck ) {
                 DiskLoc next;
                 if ( direction > 0 ) {
-                    next = BTREE(thisLoc)->nextChild;
+                    next = bucket->nextChild;
                 }
                 else {
-                    next = BTREE(thisLoc)->k( 0 ).prevChildBucket;
+                    next = bucket->k( 0 ).prevChildBucket;
                 }
                 if ( next.isNull() ) {
                     // if bestParent is this->null, we've hit the end and thisLoc gets set to DiskLoc()
@@ -1672,6 +1677,7 @@ namespace mongo {
             if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, thisLoc, keyOfs, bestParent ) ) {
                 return;
             }
+            bucket = BTREE(thisLoc);
         }
     }
 
