@@ -102,6 +102,20 @@ static PyObject *wtError;
 
 %pythoncode %{
 WiredTigerError = _wiredtiger.WiredTigerError
+
+# Implements the iterable contract
+class IterableCursor:
+        def __init__(self, cursor):
+                self.cursor = cursor
+
+        def __iter__(self):
+                return self
+
+        def next(self):
+                if self.cursor.next() == WT_NOTFOUND:
+                        raise StopIteration
+                return self.cursor.get_keys() + self.cursor.get_values()
+
 %}
 
 %typemap(out) int {
@@ -227,26 +241,17 @@ SELFHELPER(struct wt_cursor)
                 self._value = pack(self.value_format, *args)
                 self._set_value(self._value)
 
-        # Implement the iterable contract for wt_cursor
         def __iter__(self):
-                return self
-
-        def next(self):
-                if self._next() == WT_NOTFOUND:
-                        raise StopIteration
-                return self.get_keys() + self.get_values()
+                if not hasattr(self, '_iterable'):
+                        self._iterable = IterableCursor(self)
+                return self._iterable
 
         # De-position the cursor so the next iteration starts from the beginning
         def reset(self):
                 self.last()
-                self._next()
+                self.next()
 %}
 };
-
-/*
- * We want our own 'next' function for wt_cursor to implement iterable.
- */
-%rename(_next) next(WT_CURSOR *);
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable wt_cursor::session;
