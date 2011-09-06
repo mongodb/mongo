@@ -6,7 +6,7 @@ var numTests = 31;
 
 for( var n = 0; n < numTests; n++ ){
 	
-	t = db.geo_polygon1;
+	t = db.geo_polygon3;
 	t.drop();
 	
 	num = 0;
