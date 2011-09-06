@@ -1611,6 +1611,7 @@ namespace mongo {
     void BtreeBucket<V>::customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, 
                                       const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, 
                                       const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) {
+        dassert( direction == 1 || direction == -1 );
         const BtreeBucket<V> *bucket = BTREE(thisLoc);
         if ( bucket->n == 0 ) {
             thisLoc = DiskLoc();
@@ -1620,23 +1621,23 @@ namespace mongo {
         while( 1 ) {
             int l = 0;
             int h = bucket->n - 1;
+
+            // +direction: 0, -direction: h
+            int z = (1-direction)/2*h;
+
             // leftmost/rightmost key may possibly be >=/<= search key
-            bool firstCheck;
-            if ( direction > 0 ) {
-                firstCheck = ( customBSONCmp( bucket->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 );
-            }
-            else {
-                firstCheck = ( customBSONCmp( bucket->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 );
-            }
+            int res = customBSONCmp( bucket->keyNode( z ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction );
+            bool firstCheck = direction*res >= 0;
+
             if ( firstCheck ) {
                 DiskLoc next;
+                keyOfs = z;
                 if ( direction > 0 ) {
+                    dassert( z == 0 );
                     next = bucket->k( 0 ).prevChildBucket;
-                    keyOfs = 0;
                 }
                 else {
                     next = bucket->nextChild;
-                    keyOfs = h;
                 }
                 if ( !next.isNull() ) {
                     bestParent = pair< DiskLoc, int >( thisLoc, keyOfs );
@@ -1648,13 +1649,10 @@ namespace mongo {
                     return;
                 }
             }
-            bool secondCheck;
-            if ( direction > 0 ) {
-                secondCheck = ( customBSONCmp( bucket->keyNode( h ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) < 0 );
-            }
-            else {
-                secondCheck = ( customBSONCmp( bucket->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) > 0 );
-            }
+
+            res = customBSONCmp( bucket->keyNode( h-z ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction );
+            bool secondCheck = direction*res < 0;
+
             if ( secondCheck ) {
                 DiskLoc next;
                 if ( direction > 0 ) {
@@ -1671,9 +1669,11 @@ namespace mongo {
                 }
                 else {
                     thisLoc = next;
+                    bucket = BTREE(thisLoc);
                     continue;
                 }
             }
+
             if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, thisLoc, keyOfs, bestParent ) ) {
                 return;
             }
