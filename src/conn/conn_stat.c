@@ -9,7 +9,7 @@
 
 /*
  * __wt_conn_stat_init --
- *	Initialize the Btree statistics.
+ *	Initialize the per-connection statistics.
  */
 void
 __wt_conn_stat_init(WT_SESSION_IMPL *session)
