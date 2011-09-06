@@ -244,7 +244,7 @@ new_insert:	if (cbt->ins != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->slot == cbt->page->entries * 2 + 1)
+		if (cbt->slot >= cbt->page->entries * 2 + 1)
 			return (WT_NOTFOUND);
 		++cbt->slot;
 

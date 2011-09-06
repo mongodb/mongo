@@ -116,7 +116,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
 	if (cbt->compare == 0 || cbt->compare == 1)
-		if (!__cursor_deleted(cbt)) {
+		if (!__cursor_deleted(cbt) &&
+		    (cbt->page->entries > 0 || cbt->ins != NULL)) {
 			*exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt, 1);
 			goto done;
@@ -140,7 +141,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 */
 	__cursor_func_clear(cbt, 1);
 	WT_ERR(srch(session, cbt, 0));
-	if (!__cursor_deleted(cbt)) {
+	if (!__cursor_deleted(cbt) &&
+	    (cbt->page->entries > 0 || cbt->ins != NULL)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, 1);
 		goto done;
