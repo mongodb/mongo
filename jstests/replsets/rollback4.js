@@ -1,4 +1,5 @@
-if (1) { // SERVER-3650
+//Test for SERVER-3650 (rollback from slave)
+if (0) { // enable for SERVER-3772
 
 var num = 7;
 var host = getHostName();
