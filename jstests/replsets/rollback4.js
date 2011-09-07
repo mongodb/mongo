@@ -1,4 +1,4 @@
-if (0) { // disabled due to SERVER-3650
+if (1) { // SERVER-3650
 
 var num = 7;
 var host = getHostName();
@@ -45,25 +45,26 @@ replTest.partition(2,5)
 replTest.partition(2,6)
 printjson({endPartition: new Date()});
 
-var gotOneThrough = false
+var gotThrough = 0
 try {
     while (true){
         mColl.insert({})
-        out = master.adminCommand({getLastError:1});
+        out = master.adminCommand({getLastError:1, w:3});
         if (out.err)
             break;
 
-        gotOneThrough = true;
+        gotThrough++;
     }
 }
 catch (e) {
     print("caught exception");
 }
 
+printjson({gotThrough: gotThrough});
 printjson({cantWriteOldPrimary: new Date()});
 printjson(master.adminCommand("replSetGetStatus"));
 
-assert(gotOneThrough, "gotOneThrough");
+assert(gotThrough > 0, "gotOneThrough");
 
 sleep(5*1000); // make sure new seconds field in opTime
 
@@ -77,6 +78,8 @@ var sentinel = {_id: 'sentinel'} // used to detect which master's data is used
 m2Coll.insert(sentinel);
 printjson(master2.adminCommand({getLastError:1, w:4, wtimeout:30*1000}));
 printjson(master2.adminCommand("replSetGetStatus"));
+
+m2Coll.insert({}); // this shouldn't be necessary but the next GLE doesn't work without it
 
 printjson({startUnPartition: new Date()});
 replTest.unPartition(0,3)
@@ -93,9 +96,13 @@ replTest.unPartition(2,5)
 replTest.unPartition(2,6)
 printjson({endUnPartition: new Date()});
 
-m2Coll.insert({}); // this shouldn't be necessary but the next line doesn't work without it
 printjson(master2.adminCommand({getLastError:1, w:7, wtimeout:30*1000}));
 printjson(master2.adminCommand("replSetGetStatus"));
+
+assert.soon(function() {return master.adminCommand('isMaster').ismaster},
+            "Node 0 back to primary",
+            60*1000/*needs to be longer than LeaseTime*/);
+printjson(master.adminCommand("replSetGetStatus"));
 
 // make sure old master rolled back to new master
 assert.eq(m2Coll.count(sentinel), 1, "check sentinal on node 6");
