@@ -43,44 +43,6 @@ __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 }
 
 /*
- * __wt_btree_root_init --
- *      Create an in-memory page but don't mark it dirty, if it's never
- *      written, that's OK.
- */
-int
-__wt_btree_root_init(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_PAGE *page;
-
-	btree = session->btree;
-
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-		page->u.col_leaf.recno = 1;
-		page->type = WT_PAGE_COL_FIX;
-		break;
-	case BTREE_COL_VAR:
-		page->u.col_leaf.recno = 1;
-		page->type = WT_PAGE_COL_VAR;
-		break;
-	case BTREE_ROW:
-		page->type = WT_PAGE_ROW_LEAF;
-		break;
-	}
-	page->parent = NULL;
-	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
-
-	btree->root_page.state = WT_REF_MEM;
-	btree->root_page.addr = WT_ADDR_INVALID;
-	btree->root_page.size = 0;
-	btree->root_page.page = page;
-	return (0);
-}
-
-/*
  * __wt_btree_open --
  *	Open a Btree.
  */
@@ -242,6 +204,44 @@ __btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
 		}
 	}
 
+	return (0);
+}
+
+/*
+ * __wt_btree_root_init --
+ *      Create an in-memory page but don't mark it dirty, if it's never
+ *      written, that's OK.
+ */
+int
+__wt_btree_root_init(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = session->btree;
+
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		page->u.col_leaf.recno = 1;
+		page->type = WT_PAGE_COL_FIX;
+		break;
+	case BTREE_COL_VAR:
+		page->u.col_leaf.recno = 1;
+		page->type = WT_PAGE_COL_VAR;
+		break;
+	case BTREE_ROW:
+		page->type = WT_PAGE_ROW_LEAF;
+		break;
+	}
+	page->parent = NULL;
+	page->parent_ref = &btree->root_page;
+	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
+
+	btree->root_page.state = WT_REF_MEM;
+	btree->root_page.addr = WT_ADDR_INVALID;
+	btree->root_page.size = 0;
+	btree->root_page.page = page;
 	return (0);
 }
 
