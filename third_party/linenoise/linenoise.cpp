@@ -281,7 +281,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
             if (scanDirection) {
                 int unmatched = scanDirection;
                 int i;
-                for(i = pos + scanDirection; i >= 0 && i <= (int)len; i += scanDirection){
+                for(i = pos + scanDirection; i >= 0 && i < (int)len; i += scanDirection){
                     /* TODO: the right thing when inside a string */
                     if (strchr("}])", buf[i]))
                         unmatched--;
