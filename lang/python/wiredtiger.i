@@ -66,17 +66,6 @@ DESTRUCTOR(wt_session, close)
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
 
-/*
- * Release the Global Interpreter Lock so that WT calls will be
- * multi-threaded.  Using %exception to wrap every call seems to be a
- * commonly used trick for this.
- */
-%exception {
-        Py_BEGIN_ALLOW_THREADS
-        $action
-        Py_END_ALLOW_THREADS
-}
-
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
  * Use our own exception type, in future tailored to the kind
@@ -121,7 +110,7 @@ class IterableCursor:
 %typemap(out) int {
         if ($1 != 0 && $1 != WT_NOTFOUND) {
                 /* We could use PyErr_SetObject for more complex reporting. */
-                PyErr_SetString(wtError, wiredtiger_strerror($1));
+                SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror($1));
                 SWIG_fail;
         }
         $result = SWIG_From_int((int)($1));
@@ -188,7 +177,8 @@ SELFHELPER(struct wt_cursor)
                 WT_ITEM k;
                 int ret = $self->get_key($self, &k);
                 if (ret != 0) {
-                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
+                        SWIG_Python_SetErrorMsg(wtError,
+                            wiredtiger_strerror(ret));
                         return (NULL);
                 }
                 return SWIG_FromCharPtrAndSize(k.data, k.size);
@@ -198,7 +188,8 @@ SELFHELPER(struct wt_cursor)
                 uint64_t r = 0;
                 int ret = $self->get_key($self, &r);
                 if (ret != 0)
-                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
+                        SWIG_Python_SetErrorMsg(wtError,
+                            wiredtiger_strerror(ret));
                 return r;
         }
 
@@ -206,7 +197,8 @@ SELFHELPER(struct wt_cursor)
                 WT_ITEM v;
                 int ret = $self->get_value($self, &v);
                 if (ret != 0) {
-                        PyErr_SetString(wtError, wiredtiger_strerror(ret));
+                        SWIG_Python_SetErrorMsg(wtError,
+                            wiredtiger_strerror(ret));
                         return (NULL);
                 }
                 return SWIG_FromCharPtrAndSize(v.data, v.size);
