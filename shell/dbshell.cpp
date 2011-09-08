@@ -31,6 +31,7 @@
 #include "../util/password.h"
 #include "../util/version.h"
 #include "../util/goodies.h"
+#include "../util/file.h"
 #include "../db/repl/rs_member.h"
 
 using namespace std;
@@ -88,6 +89,73 @@ void completionHook(const char* text , linenoiseCompletions* lc ) {
 
     for ( unsigned i=0; i<all.size(); i++ )
         linenoiseAddCompletion( lc , (char*)all[i].c_str() );
+
+}
+#endif
+
+#ifndef _WIN32
+static void edit(const string& var){
+    static const char * editor = getenv("EDITOR");
+    if (!editor) {
+        cout << "please define the EDITOR environment variable" << endl;
+        return;
+    }
+
+    for (const char* p=var.data(); *p ; p++){
+        if (! (isalnum(*p) || *p == '_' || *p == '.')){
+            cout << "can only edit variable or property" << endl;
+            return;
+        }
+    }
+
+    if (!shellMainScope->exec("__jsout__ = tojson("+var+")", "tojs", false, false, false))
+        return; // Error already printed
+
+    const string js = shellMainScope->getString("__jsout__");
+
+    if (strstr(js.c_str(), "[native code]")) {
+        cout << "Can't edit native functions" << endl;
+        return;
+    }
+
+    char filename[] = "/tmp/mongo_editXXXXXX.js";
+    int fd = mkstemps(filename, /*suffix len*/3);
+    if (fd == -1){
+        cout << "couldn't open temp file: " << errnoWithDescription() << endl;
+        return;
+    }
+
+    // just to make sure this gets closed no matter what
+    File holder;
+    holder.fd = fd;
+
+    if (write(fd, js.data(), js.size()) != (int)js.size()){
+        cout << "failed to write to temp file: " << errnoWithDescription() << endl;
+        return;
+    }
+
+    StringBuilder sb;
+    sb << editor << " " << filename;
+    ::system(sb.str().c_str());
+
+    lseek(fd, 0, SEEK_SET);
+
+    sb.reset();
+    sb << var << " = ";
+    int bytes;
+    do {
+        char buf[1024];
+        bytes = read(fd, buf, sizeof(buf));
+        if (bytes < 0) {
+            cout << "failed to read temp file: " << errnoWithDescription() << endl;
+            return;
+        }
+        sb.append( StringData(buf, bytes) );
+    }while (bytes);
+
+    const string code = sb.str();
+    if (!shellMainScope->exec(code, "tojs", false, false, false))
+        return; // Error already printed
 
 }
 #endif
@@ -743,8 +811,23 @@ int _main(int argc, char* argv[]) {
             if ( code == "exit" || code == "exit;" ) {
                 break;
             }
+
             if ( code.size() == 0 )
                 continue;
+
+#ifndef _WIN32
+            if (startsWith(line, "edit ")){
+                shellHistoryAdd( line );
+
+                const char* s = line + 5; // skip "edit "
+                while(*s && isspace(*s))
+                    s++;
+
+
+                edit(s);
+                continue;
+            }
+#endif
 
             code = finishCode( code );
             if ( gotInterrupted ) {
