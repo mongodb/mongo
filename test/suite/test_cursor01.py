@@ -78,7 +78,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(key, ('key' + str(i)))
             self.assertEqual(value, ('value' + str(i)))
             i += 1
-            nextret = cursor._next()
+            nextret = cursor.next()
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
@@ -96,7 +96,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_key(), 'key9')
         self.assertEqual(cursor.get_value(), 'value9')
             
-        nextret = cursor._next()
+        nextret = cursor.next()
         i = 0
         while nextret == 0:
             key = cursor.get_key()
@@ -104,7 +104,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(key, ('key' + str(i)))
             self.assertEqual(value, ('value' + str(i)))
             i += 1
-            nextret = cursor._next()
+            nextret = cursor.next()
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
