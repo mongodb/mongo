@@ -38,8 +38,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_out(session,
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
-
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -52,6 +51,7 @@ static void
 __curindex_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	cursor->saved_err = ENOTSUP;
@@ -214,7 +214,7 @@ __curindex_search(WT_CURSOR *cursor)
 	 * XXX we can avoid this with a cursor flag indicating when the
 	 * application owns the data.
 	 */
-	WT_RET(__wt_scr_alloc(session, cursor->key.size, &oldkeyp));
+	WT_ERR(__wt_scr_alloc(session, cursor->key.size, &oldkeyp));
 	memcpy(oldkeyp->mem, cursor->key.data, cursor->key.size);
 	oldkeyp->size = cursor->key.size;
 
@@ -233,7 +233,6 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_ERR(__curindex_move(cindex));
 
 err:	__wt_scr_free(&oldkeyp);
-
 	API_END(session);
 
 	return (ret);
@@ -310,10 +309,10 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	btree = cindex->cbt.btree;
+
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
 	WT_UNUSED(cfg);
 
-	ret = 0;
 	for (i = 0, cp = (cindex)->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)
 		if (*cp != NULL) {
@@ -329,7 +328,7 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 
 	WT_TRET(__wt_btcur_close(&cindex->cbt, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }

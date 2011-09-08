@@ -57,8 +57,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 		*va_arg(ap, const char **) = s->name;
 	va_end(ap);
 
-	API_END(session);
-	return (0);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -98,7 +98,6 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		*va_arg(ap, const char **) = cst->stats->desc;
 	}
 err:	va_end(ap);
-
 	API_END(session);
 	return (ret);
 }
@@ -169,11 +168,11 @@ __curstat_next(WT_CURSOR *cursor)
 		ret = WT_NOTFOUND;
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	} else {
-		WT_RET(__curstat_print_value(session, s->v, &cst->pvalue));
+		WT_ERR(__curstat_print_value(session, s->v, &cst->pvalue));
 		ret = 0;
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -199,8 +198,6 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	ret = 0;
-
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
 	WT_TRET(__wt_config_gets(session, cfg, "clear", &cval));
@@ -208,7 +205,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 		cst->clear_func(cst->stats_first);
 	__wt_buf_free(session, &cst->pvalue);
 	WT_TRET(__wt_cursor_close(cursor, config));
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }

@@ -91,16 +91,18 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	WT_UNUSED(prefix);
 	WT_UNUSED(ctype);
+	ret = ENOTSUP;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_cursor_type, config, cfg);
 	WT_UNUSED(cfg);
-	API_END(session);
+err:	API_END(session);
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 /*
@@ -113,16 +115,18 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	WT_UNUSED(name);
 	WT_UNUSED(collator);
+	ret = ENOTSUP;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
-	API_END(session);
+err:	API_END(session);
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 /*
@@ -145,18 +149,16 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_RET(__wt_calloc_def(session, 1, &ncomp));
+	WT_ERR(__wt_calloc_def(session, 1, &ncomp));
 	WT_ERR(__wt_strdup(session, name, &ncomp->name));
 	ncomp->compressor = compressor;
 
 	__wt_lock(session, conn->mtx);
 	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
 	__wt_unlock(session, conn->mtx);
-	API_END(session);
-
-	return (0);
-
-err:	__wt_free(session, ncomp);
+	ncomp = NULL;
+err:	API_END(session);
+	__wt_free(session, ncomp);
 	return (ret);
 }
 
@@ -208,16 +210,18 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
+	ret = ENOTSUP;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
-	API_END(session);
+err:	API_END(session);
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 static const char *
@@ -245,11 +249,11 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
-	int ret;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *s, *session, **tp;
 	WT_SESSION *wt_session;
 	WT_NAMED_COMPRESSOR *ncomp;
+	int ret;
 
 	ret = 0;
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
@@ -279,7 +283,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_TRET(__wt_connection_close(conn));
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -299,17 +303,18 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
+	ret = 0;
+
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	ret = 0;
 	__wt_lock(session, conn->mtx);
 	WT_TRET(__wt_open_session(conn, event_handler, config, &session_ret));
 	__wt_unlock(session, conn->mtx);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_sessionp = &session_ret->iface;
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }

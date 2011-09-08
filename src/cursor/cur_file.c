@@ -200,10 +200,9 @@ __curfile_close(WT_CURSOR *cursor, const char *config)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config, cfg);
 	WT_UNUSED(cfg);
-	ret = 0;
 	WT_TRET(__wt_btcur_close((WT_CURSOR_BTREE *)cursor, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
-	API_END(session);
+err:	API_END(session);
 
 	return (ret);
 }

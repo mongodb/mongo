@@ -70,9 +70,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	session = &conn->default_session;
 	__wt_unlock(session, conn->mtx);
-	API_END(session);
+err:	API_END(session);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -110,7 +110,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		ret = EINVAL;
 	}
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -128,8 +128,8 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 	SESSION_API_CALL(session, create, config, cfg);
 	WT_UNUSED(cfg);
-	WT_TRET(__wt_schema_create(session, name, config));
-	API_END(session);
+	WT_ERR(__wt_schema_create(session, name, config));
+err:	API_END(session);
 	return (ret);
 }
 
@@ -165,11 +165,11 @@ __session_drop(
 
 	SESSION_API_CALL(session, drop, config, cfg);
 
-	WT_RET(__wt_config_gets(session, cfg, "force", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
 	ret = __wt_schema_drop(session, name, config);
-	API_END(session);
+err:	API_END(session);
 
 	return (force ? 0 : ret);
 }
@@ -194,7 +194,8 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 
 	/*
@@ -238,23 +239,21 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 
 	ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), &btree_session);
 
 	/* If the tree isn't open, there's nothing to do. */
-	if (ret == WT_NOTFOUND)
-		return (0);
-	else if (ret != 0)
-		return (ret);
+	if (ret == 0) {
+		session->btree = btree_session->btree;
+		ret = __wt_btree_sync(session);
+	}
+err:	API_END(session);
 
-	session->btree = btree_session->btree;
-	ret = __wt_btree_sync(session);
-	API_END(session);
-
-	return (0);
+	return (ret);
 }
 
 /*
@@ -294,7 +293,8 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 
 	/*
@@ -331,12 +331,13 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, dumpfile, config, cfg);
-	(void)cfg;
+	WT_UNUSED(cfg);
 
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 
 	/*
@@ -350,16 +351,17 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_RET(__wt_schema_table_read(session, name, &treeconf));
-	WT_RET(__wt_btree_open(session, name, filename,
+	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
+	WT_ERR(__wt_btree_open(session, name, filename,
 	    treeconf, config, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
-	WT_TRET(__wt_dumpfile(session, config));
+	WT_ERR(__wt_dumpfile(session, config));
+
+err:	API_END(session);
 
 	/* Close the file and discard the WT_BTREE structure. */
-	WT_TRET(__wt_btree_close(session));
-	API_END(session);
-
+	if (session->btree != NULL)
+		WT_TRET(__wt_btree_close(session));
 	return (ret);
 }
 

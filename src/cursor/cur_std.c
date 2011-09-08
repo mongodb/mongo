@@ -31,7 +31,7 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 		    cursor->key.data, cursor->key.size, fmt, ap);
 	va_end(ap);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -56,7 +56,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -102,14 +102,14 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 		    cursor->key_format, ap)) != 0) {
 			cursor->saved_err = ret;
 			F_CLR(cursor, WT_CURSTD_KEY_SET);
-			return;
+			goto err;
 		}
 	}
 	cursor->key.size = WT_STORE_SIZE(sz);
 	F_SET(cursor, WT_CURSTD_KEY_SET);
 	va_end(ap);
 
-	API_END(session);
+err:	API_END(session);
 }
 
 /*
@@ -150,7 +150,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 		    cursor->value_format, ap)) != 0) {
 			cursor->saved_err = ret;
 			F_CLR(cursor, WT_CURSTD_VALUE_SET);
-			return;
+			goto err;
 		}
 		cursor->value.data = buf->mem;
 	}
@@ -158,7 +158,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	cursor->value.size = WT_STORE_SIZE(sz);
 	va_end(ap);
 
-	API_END(session);
+err:	API_END(session);
 }
 
 /*
@@ -184,8 +184,6 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	ret = 0;
-
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
 	WT_UNUSED(cfg);
 
@@ -196,7 +194,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 	__wt_free(session, cursor);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

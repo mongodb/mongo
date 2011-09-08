@@ -176,13 +176,15 @@ struct __wt_connection_impl {
 	(s)->name = #h "." #n;						\
 
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
-	API_SESSION_INIT(s, h, n, cur, bt)
+	API_SESSION_INIT(s, h, n, cur, bt);				\
+	ret = 0
 
+/* Standard entry point to the API.  Sets ret to 0 on success. */
 #define	API_CALL(s, h, n, cur, bt, cfg, cfgvar)	do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
-	if (cfg != NULL)						\
-		WT_RET(__wt_config_check((s), __wt_confchk_##h##_##n, (cfg)))
+	WT_ERR((cfg != NULL) ?						\
+	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL)						\

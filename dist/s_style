@@ -18,6 +18,13 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 		echo "$f: (unsigned) cast is wrong"
 	fi
 
+	# Early exits from critical loops
+	sed -n -e '/API_CALL/,/API_END/{=;p;}' \
+	       -e '/va_start/,/va_end/{=;p;}' $f | \
+		sed 'N;s/\n/:/' | \
+		egrep 'return|WT_RET' | \
+		sed -e "s,^,$f:," -e 's/$/ [Early exit]/'
+
 	# Bad code we can't easily fix
 	grep -Hn 'bzero|exit[ ]*\(1\)|^[	 ]+[|&=+-]' $f
 
