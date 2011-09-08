@@ -14,9 +14,5 @@
 void
 __wt_yield(void)
 {
-#ifdef HAVE_PTHREAD_YIELD
-	pthread_yield();
-#else
 	sched_yield();
-#endif
 }
