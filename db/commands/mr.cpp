@@ -508,7 +508,7 @@ namespace mongo {
 
             _scope->injectNative( "emit" , fast_emit );
 
-            if ( _onDisk ) {
+            if ( _onDisk && _config.incLong != _config.tempLong ) {
                 // clear temp collections
                 _db.dropCollection( _config.tempLong );
                 _db.dropCollection( _config.incLong );

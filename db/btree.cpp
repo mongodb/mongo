@@ -1642,6 +1642,7 @@ namespace mongo {
     }
 
     DiskLoc BtreeBucket::findSingle( const IndexDetails& indexdetails , const DiskLoc& thisLoc, const BSONObj& key ) const {
+        indexdetails.checkVersion();
         int pos;
         bool found;
         // TODO: is it really ok here that the order is a default?

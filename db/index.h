@@ -145,6 +145,13 @@ namespace mongo {
 
         const IndexSpec& getSpec() const;
 
+        void checkVersion() const {
+            // TODO: cache?
+            massert( 13658 , 
+                     str::stream() << "using a newer index version: " << info.obj() << " v: " << info.obj().getIntField("v" ) , 
+                     info.obj().getIntField("v") <= 0 );
+        }
+
         string toString() const {
             return info.obj().toString();
         }
