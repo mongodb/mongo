@@ -51,11 +51,15 @@ __wt_walk_first(WT_SESSION_IMPL *session, WT_WALK *walk, uint32_t flags)
 
 	WT_RET(__wt_walk_init(session, walk, flags));
 
-	if ((page = btree->root_page.page) == NULL)
-		return (WT_ERROR);
-	walk->tree[0].page = page;
+	walk->tree[0].child = 0;
 	walk->tree[0].indx = 0;
-	walk->tree[0].child = walk->tree[0].visited = 0;
+
+	/*
+	 * If there is no root page, the first call to __wt_walk_next/prev
+	 * will return a NULL page.
+	 */
+	walk->tree[0].visited = ((page = btree->root_page.page) == NULL);
+	walk->tree[0].page = page;
 	return (0);
 }
 
@@ -376,7 +380,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (page == NULL) {
 		if ((page = btree->root_page.page) == NULL)
-			return (WT_ERROR);
+			return (0);
 		slot = 0;
 		goto descend;
 	}
