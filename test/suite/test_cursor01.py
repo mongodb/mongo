@@ -11,6 +11,7 @@
 
 import unittest
 import wiredtiger
+from wiredtiger import WiredTigerError
 import wttest
 
 class test_cursor01(wttest.WiredTigerTestCase):
@@ -37,15 +38,6 @@ class test_cursor01(wttest.WiredTigerTestCase):
             print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
             raise
 
-    # Similar to assertRaises in unittest 2.7
-    def expect_exception(self, excl, arg, f):
-        try:
-            f(arg)
-        except BaseException as e:
-            self.assertIsInstance(e, excl, 'Exception is not of expected type')
-            return
-        self.fail('did not get expected exception')
-
     def test_forward_iter(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
@@ -54,11 +46,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
-        # TODO: do we expect an exception, or merely None?
-        self.expect_exception(BaseException, cursor,
-                              lambda cursor: cursor.get_key())
-        self.expect_exception(BaseException, cursor,
-                              lambda cursor: cursor.get_value())
+        self.assertRaises(WiredTigerError, cursor.get_key)
+        self.assertRaises(WiredTigerError, cursor.get_value)
 
         for i in range(0, self.nentries):
             cursor.set_key('key' + str(i))
@@ -83,18 +72,15 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
 
-        # we are still positioned at the last entry
-        # TODO: do we expect to see this?
-        self.assertEqual(cursor.get_key(), 'key9')
-        self.assertEqual(cursor.get_value(), 'value9')
+        # After an error, we can no longer access the key or value
+        self.assertRaises(WiredTigerError, cursor.get_key)
+        self.assertRaises(WiredTigerError, cursor.get_value)
 
         # 2. Setting reset() should place us just before first pair.
         cursor.reset()
 
-        # but leaves the contents of the cursor the same.
-        # TODO: do we expect to see this?
-        self.assertEqual(cursor.get_key(), 'key9')
-        self.assertEqual(cursor.get_value(), 'value9')
+        self.assertRaises(WiredTigerError, cursor.get_key)
+        self.assertRaises(WiredTigerError, cursor.get_value)
             
         nextret = cursor.next()
         i = 0

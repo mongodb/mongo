@@ -48,9 +48,10 @@ __curtable_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	primary = *ctable->cg_cursors;
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	WT_CURSOR_NEEDKEY(primary);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -58,7 +59,7 @@ __curtable_get_key(WT_CURSOR *cursor, ...)
 	    primary->key.data, primary->key.size, fmt, ap);
 	va_end(ap);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -69,6 +70,7 @@ __curtable_get_key(WT_CURSOR *cursor, ...)
 static int
 __curtable_get_value(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
@@ -76,8 +78,9 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 	int ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
+	primary = *ctable->cg_cursors;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -93,7 +96,6 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_out(session,
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
-
 err:	API_END(session);
 
 	return (ret);
