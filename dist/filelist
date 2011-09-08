@@ -53,7 +53,6 @@ src/conn/workq.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
 src/cursor/cur_dump.c
-src/cursor/cur_err.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
 src/cursor/cur_stat.c

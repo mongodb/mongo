@@ -19,9 +19,8 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	ret = 0;
-
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	WT_CURSOR_NEEDKEY(cursor);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -49,6 +48,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
@@ -238,3 +238,32 @@ __wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *config)
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 	}
 }
+
+/*
+ * __wt_cursor_notsup --
+ *	WT_CURSOR->XXX method for unsupported cursor actions.
+ */
+int
+__wt_cursor_notsup(WT_CURSOR *cursor)
+{
+	WT_UNUSED(cursor);
+	return (ENOTSUP);
+}
+
+/*
+ * __wt_cursor_kv_not_set --
+ *	Standard error message for key/values not set.
+ */
+int
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	if (cursor->saved_err != 0)
+		return (cursor->saved_err);
+
+	__wt_errx(session, "requires %s be set", key ? "key" : "value");
+	return (EINVAL);
+}
+

@@ -41,12 +41,11 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 	WT_STATS *s;
 	va_list ap;
+	int ret;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
+	WT_CURSOR_NEEDKEY(cursor);
 
 	s = cst->stats;
 	va_start(ap, cursor);
@@ -79,12 +78,9 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	s = cst->stats;
-	ret = 0;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-
-	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
-		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {

@@ -7,25 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __cur_kv_not_set(WT_SESSION_IMPL *, WT_CURSOR *, const char *, int);
-
-/*
- * __cur_kv_not_set --
- *	Standard error message for key/values not set.
- */
-static int
-__cur_kv_not_set(WT_SESSION_IMPL *session,
-    WT_CURSOR *cursor, const char *method, int key)
-{
-	if (cursor->saved_err != 0)
-		return (cursor->saved_err);
-
-	__wt_errx(session,
-	    "cursor %s method requires %s be set",
-	    method, key ? "key" : "value");
-	return (EINVAL);
-}
-
 /*
  * __curfile_first --
  *	WT_CURSOR->first method for the btree cursor type.
@@ -115,11 +96,9 @@ __curfile_search(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		ret = __cur_kv_not_set(session, cursor, "search", 1);
-	else
-		ret = __wt_btcur_search(cbt);
-	API_END(session);
+	WT_CURSOR_NEEDKEY(cursor);
+	ret = __wt_btcur_search(cbt);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -137,11 +116,9 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		ret = __cur_kv_not_set(session, cursor, "search-near", 1);
-	else
-		ret = __wt_btcur_search_near(cbt, exact);
-	API_END(session);
+	WT_CURSOR_NEEDKEY(cursor);
+	ret = __wt_btcur_search_near(cbt, exact);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -159,13 +136,11 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		ret = __cur_kv_not_set(session, cursor, "insert", 1);
-	else if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
-		ret = __cur_kv_not_set(session, cursor, "insert", 0);
-	else
-		ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
-	API_END(session);
+	if (cbt->btree->type == BTREE_ROW)
+		WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
+	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -183,13 +158,10 @@ __curfile_update(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, update, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		ret = __cur_kv_not_set(session, cursor, "update", 1);
-	else if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
-		ret = __cur_kv_not_set(session, cursor, "update", 0);
-	else
-		ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
-	API_END(session);
+	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
+	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -207,11 +179,9 @@ __curfile_remove(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, remove, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
-		ret = __cur_kv_not_set(session, cursor, "remove", 1);
-	else
-		ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
-	API_END(session);
+	WT_CURSOR_NEEDKEY(cursor);
+	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
+err:	API_END(session);
 
 	return (ret);
 }

@@ -77,11 +77,7 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-
-	if (!F_ISSET(ctable->cg_cursors[0], WT_CURSTD_VALUE_SET)) {
-		__wt_errx(session, "Value not set");
-		return (EINVAL);
-	}
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {

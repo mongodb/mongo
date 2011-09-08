@@ -17,34 +17,18 @@ __curbulk_insert(WT_CURSOR *cursor)
 	WT_BTREE *btree;
 	WT_CURSOR_BULK *cbulk;
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 	CURSOR_API_CALL(cursor, session, insert, btree);
+	if (btree->type == BTREE_ROW)
+		WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(__wt_bulk_insert(cbulk));
+err:	API_END(session);
 
-	/* TODO: check the state of the key/value pair. */
-#if 0
-	These are errors set in the original bulk-load code that need
-	to be reported somewhere.
-
-	/* if key value specified to a column-store */
-	__wt_errx(session,
-	    "column-store keys are implied and should not be returned by "
-	    "the bulk load input routine"
-
-	/* if 0-length key to row-store */
-	__wt_errx(session, "zero-length keys are not supported");
-
-	/* the high-bit is set on fixed-length keys to signify deletion. */
-	__wt_errx(session,
-	    "the first bit may not be stored in fixed-length column-store "
-	    "file items");
-#endif
-
-	WT_RET(__wt_bulk_insert(cbulk));
-	API_END(session);
-
-	return (0);
+	return (ret);
 }
 
 /*
@@ -84,7 +68,5 @@ __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 	c->insert = __curbulk_insert;
 	c->close = __curbulk_close;
 
-	WT_RET(__wt_bulk_init(cbulk));
-
-	return (0);
+	return (__wt_bulk_init(cbulk));
 }
