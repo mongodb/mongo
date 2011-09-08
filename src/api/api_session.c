@@ -189,7 +189,6 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
-	WT_UNUSED(cfg);
 
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
@@ -208,7 +207,7 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
 	WT_ERR(__wt_btree_open(session, name, filename,
-	    treeconf, config, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
+	    treeconf, cfg, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
 
 	WT_TRET(__wt_salvage(session, config));
 
@@ -288,8 +287,6 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, verify, config, cfg);
-	WT_UNUSED(cfg);
-
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -305,7 +302,7 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
 	WT_ERR(__wt_btree_open(
-	    session, name, filename, treeconf, config, WT_BTREE_VERIFY));
+	    session, name, filename, treeconf, cfg, WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
@@ -331,8 +328,6 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	ret = 0;
 
 	SESSION_API_CALL(session, dumpfile, config, cfg);
-	WT_UNUSED(cfg);
-
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -353,7 +348,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	 */
 	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
 	WT_ERR(__wt_btree_open(session, name, filename,
-	    treeconf, config, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	    treeconf, cfg, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
 	WT_ERR(__wt_dumpfile(session, config));
 

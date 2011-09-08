@@ -198,7 +198,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
     const char *treeconfig,
-    const char *opconfig,
+    const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);

@@ -12,7 +12,8 @@ __create_file(WT_SESSION_IMPL *session,
     const char *name, const char *filename, const char *config)
 {
 	WT_BUF keybuf;
-	const char *cfg[] = API_CONF_DEFAULTS(file, meta, config);
+	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *treeconf;
 	int is_schema, ret;
 
@@ -36,13 +37,13 @@ __create_file(WT_SESSION_IMPL *session,
 	else {
 		WT_RET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
 
-		WT_ERR(__wt_config_collapse(session, cfg, &treeconf));
+		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
 		WT_ERR(__wt_schema_table_insert(session,
 		    keybuf.data, treeconf));
 	}
 
 	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_ERR(__wt_btree_open(session, name, filename, treeconf, config, 0));
+	WT_ERR(__wt_btree_open(session, name, filename, treeconf, cfg, 0));
 	treeconf = NULL;
 	WT_ERR(__wt_session_add_btree(session, NULL));
 err:    __wt_buf_free(session, &keybuf);

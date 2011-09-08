@@ -87,13 +87,12 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name, const char *filename,
-    const char *treeconfig, const char *opconfig, uint32_t flags)
+    const char *treeconfig, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	int matched, ret;
-	const char *cfg[] = { __wt_confdfl_session_salvage, opconfig, NULL };
 
 	conn = S2C(session);
 
