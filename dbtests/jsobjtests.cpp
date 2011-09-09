@@ -595,7 +595,7 @@ namespace JsobjTests {
                     KeyV1Owned C(c);
                     KeyV1Owned D(d);
                     ASSERT( !A.woEqual(B) );
-                    ASSERT( A.woCompare(B, Ordering::make(BSONObj())) == res_ab );
+                    ASSERT( A.woCompare(B, Ordering::make(BSONObj())) < 0 && res_ab < 0 );
                     ASSERT( !A.woEqual(C) );
                     ASSERT( A.woCompare(C, Ordering::make(BSONObj())) < 0 && res_ac < 0 );
                     ASSERT( !A.woEqual(D) );
