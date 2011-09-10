@@ -416,7 +416,7 @@ namespace mongo {
         if ( _conn->auth( "admin" , _username , _password , errmsg ) )
             return;
 
-        throw UserException( 9997 , (string)"auth failed: " + errmsg );
+        throw UserException( 9997 , (string)"authentication failed: " + errmsg );
     }
 
     BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )
@@ -451,7 +451,7 @@ namespace mongo {
 
         FILE* file = fopen( _fileName.c_str() , "rb" );
         if ( ! file ) {
-            log() << "error opening file: " << _fileName << endl;
+            log() << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
             return 0;
         }
 
