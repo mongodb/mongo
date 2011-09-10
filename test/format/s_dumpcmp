@@ -70,6 +70,5 @@ if test $colflag -eq 0; then
 else
 	$build_top/wt -C "$config" dump -p file:__wt | strip_zeros > __wt_dump
 fi
-cmp __wt_dump __bdb_dump > /dev/null || exit 1
-
-exit 0
+cmp __wt_dump __bdb_dump > /dev/null
+exit $?
