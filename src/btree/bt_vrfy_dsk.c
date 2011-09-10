@@ -532,7 +532,7 @@ match_err:			ret = WT_ERROR;
  */
 static int
 __verify_dsk_chunk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
-    uint32_t addr, uint32_t data_len, uint32_t size, int quiet)
+    uint32_t addr, uint32_t datalen, uint32_t size, int quiet)
 {
 	uint8_t *p, *end;
 
@@ -542,7 +542,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
 	 * Fixed-length column-store, overflow and freelist pages are simple
 	 * chunks of data.
 	 */
-	if (data_len == 0) {
+	if (datalen == 0) {
 		WT_VRFY_ERR(session, quiet,
 		    "%s page at addr %" PRIu32 " has no data",
 		    __wt_page_type_string(dsk->type), addr);
@@ -551,7 +551,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
 
 	/* Verify the data doesn't overflow the end of the page. */
 	p = (uint8_t *)WT_PAGE_DISK_BYTE(dsk);
-	if (p + data_len > end) {
+	if (p + datalen > end) {
 		WT_VRFY_ERR(session, quiet,
 		    "data on page at addr %" PRIu32 " extends past the "
 		    "end of the page", addr);
@@ -559,7 +559,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk,
 	}
 
 	/* Any bytes after the data chunk should be nul bytes. */
-	for (p += data_len; p < end; ++p)
+	for (p += datalen; p < end; ++p)
 		if (*p != '\0') {
 			WT_VRFY_ERR(session, quiet,
 			    "%s page at addr %"
