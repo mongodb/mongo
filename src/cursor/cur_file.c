@@ -138,7 +138,8 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
-	if (cbt->btree->type == BTREE_ROW)
+	if (cbt->btree->type == BTREE_ROW ||
+	    F_ISSET(cursor, WT_CURSTD_OVERWRITE))
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
