@@ -335,7 +335,8 @@ wts_sync(void)
 
 	track("sync", 0ULL);
 
-	if ((ret = session->sync(session, WT_TABLENAME, NULL)) != 0) {
+	if ((ret = session->sync(
+	    session, WT_TABLENAME, NULL)) != 0 && ret != EBUSY) {
 		fprintf(stderr, "%s: sync: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
