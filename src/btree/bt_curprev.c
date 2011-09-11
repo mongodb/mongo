@@ -390,8 +390,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		 * it's only that one page and it's in a simple format.
 		 */
 		if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-		    (cbt->ins =
-		    WT_SKIP_FIRST(WT_COL_APPEND(cbt->page))) != NULL)
+		    (cbt->ins_head = WT_COL_APPEND(cbt->page)) != NULL)
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 

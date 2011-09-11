@@ -20,6 +20,7 @@ __cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	if (newpage) {
 		cbt->ins_entry_cnt = 1;
+		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		goto new_page;
 	}
 
@@ -460,8 +461,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			 * it's only that one page and it's in a simple format.
 			 */
 			if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-			    (cbt->ins =
-			    WT_SKIP_FIRST(WT_COL_APPEND(cbt->page))) != NULL) {
+			    (cbt->ins_head =
+			    WT_COL_APPEND(cbt->page)) != NULL) {
 				F_SET(cbt, WT_CBT_ITERATE_APPEND);
 				continue;
 			}
