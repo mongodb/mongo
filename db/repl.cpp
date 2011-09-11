@@ -490,7 +490,7 @@ namespace mongo {
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
                     resyncDrop( db.c_str(), "internal" );

@@ -70,7 +70,7 @@ namespace mongo {
             log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
             cursor.reset( _conn->query( ns, query, 0, 0, fields,
                                         QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
-                                        /* TODO: slaveok maybe shouldn't use? */
+                                        /* TODO: slaveOk maybe shouldn't use? */
                                         QueryOption_AwaitData
                                         ).release() );
         }
