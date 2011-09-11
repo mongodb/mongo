@@ -381,7 +381,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	if (page == NULL) {
 		if ((page = btree->root_page.page) == NULL)
 			return (0);
-		slot = 0;
+		slot = next ? 0 : page->entries - 1;
 		goto descend;
 	}
 
