@@ -1225,7 +1225,7 @@ err:	/* Reset the page. */
 	page->entries = save_entries;
 
 	/* Discard our hazard reference and the page. */
-	__wt_hazard_clear(session, page);
+	__wt_page_release(session, page);
 	__wt_page_out(session, page, 0);
 
 	return (ret);
@@ -1891,7 +1891,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	}
 
 	/* Discard our hazard reference and the page. */
-err:	__wt_hazard_clear(session, page);
+err:	__wt_page_release(session, page);
 	__wt_page_out(session, page, 0);
 
 	__wt_scr_free(&key);
