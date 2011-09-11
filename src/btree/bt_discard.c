@@ -96,8 +96,8 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the insert array. */
-	if (page->u.col_leaf.ins != NULL)
-		__free_insert(session, page->u.col_leaf.ins, 1);
+	if (page->u.col_leaf.update != NULL)
+		__free_insert(session, page->u.col_leaf.update, 1);
 }
 
 /*
@@ -125,8 +125,8 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, page->u.col_leaf.repeats);
 
 	/* Free the insert array. */
-	if (page->u.col_leaf.ins != NULL)
-		__free_insert(session, page->u.col_leaf.ins, page->entries);
+	if (page->u.col_leaf.update != NULL)
+		__free_insert(session, page->u.col_leaf.update, page->entries);
 }
 
 /*

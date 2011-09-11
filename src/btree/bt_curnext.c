@@ -63,7 +63,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
+		cbt->ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(cbt->page));
 		cbt->recno = cbt->page->u.col_leaf.recno;
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		goto new_page;
@@ -74,7 +74,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * so we have to check in on every call.
 	 */
 	if (cbt->ins == NULL)
-		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
+		cbt->ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(cbt->page));
 
 	/* Move to the next entry and return the item. */
 	for (;;) {
@@ -162,7 +162,7 @@ new_page:	*recnop = cbt->recno;
 		 * to a new insert list as well.
 		 */
 		if (cbt->ins == NULL || slot != cbt->vslot)
-			cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT(cbt->page, cip));
+			cbt->ins = WT_SKIP_FIRST(WT_COL_UPDATE(cbt->page, cip));
 
 		/*
 		 * Check any insert list for a matching record.  Insert lists
@@ -368,7 +368,7 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 
 		/* If we're traversing the append list, set the reference. */
 		if (cbt->ins_head != NULL &&
-		    cbt->ins_head == WT_COL_INSERT_APPEND(page))
+		    cbt->ins_head == WT_COL_APPEND(page))
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 
@@ -460,8 +460,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			 * it's only that one page and it's in a simple format.
 			 */
 			if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-			    (cbt->ins = WT_SKIP_FIRST(
-			    WT_COL_INSERT_APPEND(cbt->page))) != NULL) {
+			    (cbt->ins =
+			    WT_SKIP_FIRST(WT_COL_APPEND(cbt->page))) != NULL) {
 				F_SET(cbt, WT_CBT_ITERATE_APPEND);
 				continue;
 			}

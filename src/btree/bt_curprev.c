@@ -98,7 +98,7 @@ new_page:	*recnop = cbt->recno;
 		 * rather than doing it linearly.
 		 */
 		if ((ins = __col_insert_search(
-		    WT_COL_INSERT_SINGLE(cbt->page), cbt->recno)) != NULL) {
+		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
 			val->data = WT_UPDATE_DATA(ins->upd);
 			val->size = 1;
 			return (0);
@@ -164,7 +164,7 @@ new_page:	*recnop = cbt->recno;
 		 * rather than doing it linearly.
 		 */
 		if ((ins = __col_insert_search(
-		    WT_COL_INSERT(cbt->page, cip), cbt->recno)) != NULL) {
+		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				continue;
 			val->data = WT_UPDATE_DATA(ins->upd);
@@ -388,8 +388,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		 * it's only that one page and it's in a simple format.
 		 */
 		if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-		    (cbt->ins = WT_SKIP_FIRST(
-		    WT_COL_INSERT_APPEND(cbt->page))) != NULL)
+		    (cbt->ins =
+		    WT_SKIP_FIRST(WT_COL_APPEND(cbt->page))) != NULL)
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 

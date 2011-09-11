@@ -207,8 +207,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 			__wt_insert_new_inslist_taken(session, page);
 		}
 	} else
-		if (page->u.col_leaf.ins == NULL) {
-			page->u.col_leaf.ins = new_inslist;
+		if (page->u.col_leaf.update == NULL) {
+			page->u.col_leaf.update = new_inslist;
 			__wt_insert_new_inslist_taken(session, page);
 		}
 

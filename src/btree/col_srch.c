@@ -97,16 +97,16 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno >= page->u.col_leaf.recno + page->entries) {
 			cbt->compare = -1;
-			cbt->ins_head = WT_COL_INSERT_APPEND(page);
+			cbt->ins_head = WT_COL_APPEND(page);
 		} else
-			cbt->ins_head = WT_COL_INSERT_SINGLE(page);
+			cbt->ins_head = WT_COL_UPDATE_SINGLE(page);
 	} else {
 		if ((cip = __col_var_search(page, recno)) == NULL) {
 			cbt->compare = -1;
-			cbt->ins_head = WT_COL_INSERT_APPEND(page);
+			cbt->ins_head = WT_COL_APPEND(page);
 		} else {
 			cbt->slot = WT_COL_SLOT(page, cip);
-			cbt->ins_head = WT_COL_INSERT_SLOT(page, cbt->slot);
+			cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		}
 	}
 

@@ -428,7 +428,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	recno = page->u.col_leaf.recno;
 
 	if (dsk != NULL) {
-		ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(page));
+		ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(page));
 		WT_FIX_FOREACH(btree, dsk, v, i) {
 			__dmsg(ds, "\t%" PRIu64 "\t{", recno);
 			__debug_hex_byte(ds, v);
@@ -446,13 +446,13 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 		}
 	}
 
-	if (WT_COL_INSERT_SINGLE(page) != NULL) {
+	if (WT_COL_UPDATE_SINGLE(page) != NULL) {
 		__dmsg(ds, "%s\n", S2C(session)->sep);
-		__debug_col_list(ds, WT_COL_INSERT_SINGLE(page), "insert", 1);
+		__debug_col_list(ds, WT_COL_UPDATE_SINGLE(page), "update", 1);
 	}
-	if (WT_COL_INSERT_APPEND(page) != NULL) {
+	if (WT_COL_APPEND(page) != NULL) {
 		__dmsg(ds, "%s\n", S2C(session)->sep);
-		__debug_col_list(ds, WT_COL_INSERT_APPEND(page), "append", 1);
+		__debug_col_list(ds, WT_COL_APPEND(page), "append", 1);
 	}
 }
 
@@ -512,14 +512,14 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle);
 		WT_RET(__debug_cell_data(ds, tag, unpack));
 
-		if ((inshead = WT_COL_INSERT(page, cip)) != NULL)
+		if ((inshead = WT_COL_UPDATE(page, cip)) != NULL)
 			__debug_col_list(ds, inshead, "update", 0);
 		recno += rle;
 	}
 
-	if (WT_COL_INSERT_APPEND(page) != NULL) {
+	if (WT_COL_APPEND(page) != NULL) {
 		__dmsg(ds, "%s\n", S2C(session)->sep);
-		__debug_col_list(ds, WT_COL_INSERT_APPEND(page), "append", 0);
+		__debug_col_list(ds, WT_COL_APPEND(page), "append", 0);
 	}
 
 	return (0);

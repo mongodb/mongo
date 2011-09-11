@@ -122,7 +122,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Walk the insert list, checking for changes.  For each insert
 		 * we find, correct the original count based on its state.
 		 */
-		WT_SKIP_FOREACH(ins, WT_COL_INSERT(page, cip)) {
+		WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip)) {
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (orig_deleted)

@@ -77,23 +77,23 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 				inshead = &page->u.col_leaf.append[0];
 			cbt->ins_head = *inshead;
 		} else if (page->type == WT_PAGE_COL_FIX) {
-			if (page->u.col_leaf.ins == NULL) {
+			if (page->u.col_leaf.update == NULL) {
 				new_inslist_size = 1 *
 				    sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
 			} else
-				inshead = &page->u.col_leaf.ins[0];
+				inshead = &page->u.col_leaf.update[0];
 		} else {
-			if (page->u.col_leaf.ins == NULL) {
+			if (page->u.col_leaf.update == NULL) {
 				new_inslist_size = page->entries *
 				    sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_inslist));
 				inshead = &new_inslist[cbt->slot];
 			} else
-				inshead = &page->u.col_leaf.ins[cbt->slot];
+				inshead = &page->u.col_leaf.update[cbt->slot];
 		}
 
 		/* There may be no WT_INSERT list, allocate as necessary. */

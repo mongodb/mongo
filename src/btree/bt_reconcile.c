@@ -1614,7 +1614,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 
 	/* Update any changes to the original on-page data items. */
-	WT_SKIP_FOREACH(ins, WT_COL_INSERT_SINGLE(page))
+	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
 		__bit_setv_recno(
 		    page, WT_INSERT_RECNO(ins), btree->bitcnt,
 		    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
@@ -1633,7 +1633,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_INSERT_APPEND(page))
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
@@ -1916,7 +1916,7 @@ __rec_col_var(
 		 * insert list.
 		 */
 		cell = WT_COL_PTR(page, cip);
-		ins = WT_SKIP_FIRST(WT_COL_INSERT(page, cip));
+		ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
 		if (cell == NULL) {
 			nrepeat = 1;
 			orig_deleted = 1;
@@ -2053,7 +2053,7 @@ __rec_col_var(
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_INSERT_APPEND(page))
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left

@@ -62,7 +62,7 @@ struct __wt_page {
 			 * very large number of bits on a single page, and the
 			 * cost of the WT_UPDATE array would be huge.
 			 */
-			WT_INSERT_HEAD **ins;	/* Updated items */
+			WT_INSERT_HEAD **update;/* Updated items */
 
 			/*
 			 * Variable-length column-store files maintain a list of
@@ -523,10 +523,9 @@ struct __wt_insert_head {
 };
 
 /*
- * The row- and column-store leaf page insert and update arrays are arrays of
- * pointers to structures, and may not exist.  The following macros return an
- * array entry if the array of pointers and the specific structure exist, else
- * NULL.
+ * The row-store leaf page insert lists are arrays of pointers to structures,
+ * and may not exist.  The following macros return an array entry if the array
+ * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_ROW_INSERT_SLOT(page, slot)					\
 	((page)->u.row_leaf.ins == NULL ?				\
@@ -546,22 +545,31 @@ struct __wt_insert_head {
 	((page)->u.row_leaf.ins == NULL ?				\
 	    NULL : (page)->u.row_leaf.ins[(page)->entries])
 
-#define	WT_COL_INSERT_SLOT(page, slot)					\
-	((page)->u.col_leaf.ins == NULL ?				\
-	    NULL : (page)->u.col_leaf.ins[slot])
-#define	WT_COL_INSERT(page, ip)						\
-	WT_COL_INSERT_SLOT(page, WT_COL_SLOT(page, ip))
 /*
- * WT_COL_INSERT_{APPEND,SINGLE} reference a single WT_INSERT list, which are
- * used for fixed-length column-store updates, and variable- and fixed-length
- * column-store appends.
+ * The column-store leaf page update lists are arrays of pointers to structures,
+ * and may not exist.  The following macros return an array entry if the array
+ * of pointers and the specific structure exist, else NULL.
  */
-#define	WT_COL_INSERT_APPEND(page)					\
+#define	WT_COL_UPDATE_SLOT(page, slot)					\
+	((page)->u.col_leaf.update == NULL ?				\
+	    NULL : (page)->u.col_leaf.update[slot])
+#define	WT_COL_UPDATE(page, ip)						\
+	WT_COL_UPDATE_SLOT(page, WT_COL_SLOT(page, ip))
+
+/*
+ * WT_COL_UPDATE_SINGLE is a single WT_INSERT list, used for any fixed-length
+ * column-store updates for a page.
+ */
+#define	WT_COL_UPDATE_SINGLE(page)					\
+	WT_COL_UPDATE_SLOT(page, 0)
+
+/*
+ * WT_COL_APPEND is a single WT_INSERT list, used for fixed- and variable-length
+ * appends.
+ */
+#define	WT_COL_APPEND(page)						\
 	((page)->u.col_leaf.append == NULL ?				\
 	    NULL : (page)->u.col_leaf.append[0])
-#define	WT_COL_INSERT_SINGLE(page)					\
-	((page)->u.col_leaf.ins == NULL ?				\
-	    NULL : (page)->u.col_leaf.ins[0])
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\
