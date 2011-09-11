@@ -10,4 +10,4 @@ backup:
 	rm -rf BACKUP && mkdir BACKUP && cp __* BACKUP/
 
 clean-local:
-	rm -rf BACKUP __*
+	rm -rf BACKUP __* vgout.*
