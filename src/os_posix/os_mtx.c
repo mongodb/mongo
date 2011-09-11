@@ -30,11 +30,6 @@ __wt_mtx_alloc(WT_SESSION_IMPL *session,
 	 */
 	if (pthread_mutexattr_init(&mutexattr) != 0)
 		goto err;
-#if 0
-	if (pthread_mutexattr_setpshared(
-	    &mutexattr, PTHREAD_PROCESS_SHARED) != 0)
-		goto err;
-#endif
 	if (pthread_mutex_init(&mtx->mtx, &mutexattr) != 0)
 		goto err;
 	(void)pthread_mutexattr_destroy(&mutexattr);
@@ -42,11 +37,6 @@ __wt_mtx_alloc(WT_SESSION_IMPL *session,
 	/* Initialize the condition variable (mutexes are self-blocking). */
 	if (pthread_condattr_init(&condattr) != 0)
 		goto err;
-#if 0
-	if (pthread_condattr_setpshared(
-	    &condattr, PTHREAD_PROCESS_SHARED) != 0)
-		goto err;
-#endif
 	if (pthread_cond_init(&mtx->cond, &condattr) != 0)
 		goto err;
 	(void)pthread_condattr_destroy(&condattr);
@@ -143,4 +133,105 @@ __wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx)
 	__wt_free(session, mtx);
 
 	return ((ret == 0) ? 0 : WT_ERROR);
+
+}
+
+/*
+ * __wt_rwlock_alloc --
+ *	Allocate and initialize a read/write lock.
+ */
+int
+__wt_rwlock_alloc(
+    WT_SESSION_IMPL *session, const char *name, WT_RWLOCK **rwlockp)
+{
+	WT_RWLOCK *rwlock;
+	int ret;
+
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
+	ret = 0;
+	WT_ERR_TEST(pthread_rwlock_init(&rwlock->rwlock, NULL), WT_ERROR);
+
+	rwlock->name = name;
+	*rwlockp = rwlock;
+	if (0) {
+err:		__wt_free(session, rwlock);
+	}
+	return (ret);
+}
+
+/*
+ * __wt_readlock
+ *	Get a shared lock.
+ */
+void
+__wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	int ret;
+
+	WT_VERBOSE(session, MUTEX,
+	    "readlock %s rwlock (%p)",  rwlock->name, rwlock);
+
+	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
+	WT_CSTAT_INCR(session, rwlock_rdlock);
+	return;
+
+err:	__wt_err(session, ret, "rwlock readlock failed");
+	__wt_abort(session);
+}
+
+/*
+ * __wt_writelock
+ *	Get an exclusive lock.
+ */
+void
+__wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	int ret;
+
+	WT_VERBOSE(session, MUTEX,
+	    "writelock %s rwlock (%p)",  rwlock->name, rwlock);
+
+	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
+	WT_CSTAT_INCR(session, rwlock_rdlock);
+	return;
+
+err:	__wt_err(session, ret, "rwlock writelock failed");
+	__wt_abort(session);
+}
+
+/*
+ * __wt_rwunlock --
+ *	Release a read/write lock.
+ */
+void
+__wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	int ret;
+
+	WT_VERBOSE(session, MUTEX,
+	    "unlock %s rwlock (%p)",  rwlock->name, rwlock);
+
+	WT_ERR(pthread_rwlock_unlock(&rwlock->rwlock));
+	return;
+
+err:	__wt_err(session, ret, "rwlock unlock failed");
+	__wt_abort(session);
+}
+
+/*
+ * __wt_rwlock_destroy --
+ *	Destroy a mutex.
+ */
+int
+__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	int ret;
+
+	ret = pthread_rwlock_destroy(&rwlock->rwlock);
+	if (ret == EBUSY)
+		ret = 0;
+	WT_ASSERT(session, ret == 0);
+	__wt_free(session, rwlock);
+
+	return (ret);
 }

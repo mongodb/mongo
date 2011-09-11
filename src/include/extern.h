@@ -370,6 +370,13 @@ extern int __wt_mtx_alloc(WT_SESSION_IMPL *session,
 extern void __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx);
 extern void __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx);
 extern int __wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx);
+extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
+    const char *name,
+    WT_RWLOCK **rwlockp);
+extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern void __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
     mode_t mode,

@@ -111,6 +111,8 @@ struct __wt_connection_stats {
 	WT_STATS cache_evict_unmodified;
 	WT_STATS file_open;
 	WT_STATS mtx_lock;
+	WT_STATS rwlock_rdlock;
+	WT_STATS rwlock_wrlock;
 	WT_STATS memalloc;
 	WT_STATS memfree;
 	WT_STATS total_read_io;

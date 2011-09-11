@@ -93,3 +93,15 @@ struct __wt_mtx {
 
 	int locked;			/* Mutex is locked */
 };
+
+/*
+ * Read/write locks:
+ *
+ * WiredTiger uses standard pthread rwlocks to get shared and exclusive access
+ * to resources.
+ */
+struct __wt_rwlock {
+	const char *name;		/* Lock name for debugging */
+
+	pthread_rwlock_t rwlock;	/* Read/write lock */
+};

@@ -194,6 +194,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->memfree.desc = "total memory frees";
 	stats->mtx_lock.name = "mtx_lock";
 	stats->mtx_lock.desc = "mutex lock calls";
+	stats->rwlock_rdlock.name = "rwlock_rdlock";
+	stats->rwlock_rdlock.desc = "rwlock readlock calls";
+	stats->rwlock_wrlock.name = "rwlock_wrlock";
+	stats->rwlock_wrlock.desc = "rwlock writelock calls";
 	stats->total_read_io.name = "total_read_io";
 	stats->total_read_io.desc = "total read I/Os";
 	stats->total_write_io.name = "total_write_io";
@@ -223,6 +227,8 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->memalloc.v = 0;
 	stats->memfree.v = 0;
 	stats->mtx_lock.v = 0;
+	stats->rwlock_rdlock.v = 0;
+	stats->rwlock_wrlock.v = 0;
 	stats->total_read_io.v = 0;
 	stats->total_write_io.v = 0;
 	stats->workq_passes.v = 0;

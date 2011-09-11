@@ -121,6 +121,8 @@ struct __wt_row;
     typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;
     typedef struct __wt_row_ref WT_ROW_REF;
+struct __wt_rwlock;
+    typedef struct __wt_rwlock WT_RWLOCK;
 struct __wt_salvage_cookie;
     typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
 struct __wt_session_buffer;

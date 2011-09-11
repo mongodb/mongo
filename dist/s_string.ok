@@ -335,6 +335,8 @@ qSS
 qdown
 qsort
 qup
+rdlock
+readlock
 readnear
 readnext
 readprev
@@ -349,6 +351,9 @@ rle
 rpc
 rref
 runlength
+rwlock
+rwlocks
+rwunlock
 savepoints
 sb
 schemas
@@ -436,6 +441,8 @@ workQ
 workq
 wq
 wrapup
+writelock
+wrlock
 wti
 xff
 xxxx

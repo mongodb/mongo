@@ -31,6 +31,8 @@ connection_stats = [
 	Stat('memalloc', 'total memory allocations'),
 	Stat('memfree', 'total memory frees'),
 	Stat('mtx_lock', 'mutex lock calls'),
+	Stat('rwlock_rdlock', 'rwlock readlock calls'),
+	Stat('rwlock_wrlock', 'rwlock writelock calls'),
 	Stat('total_read_io', 'total read I/Os'),
 	Stat('total_write_io', 'total write I/Os'),
 	Stat('workq_passes', 'workQ queue passes'),
