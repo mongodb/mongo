@@ -80,7 +80,8 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno = __col_last_recno(cbt->page);
+		cbt->recno =
+		    cbt->last_standard_recno = __col_last_recno(cbt->page);
 		goto new_page;
 	}
 
@@ -140,7 +141,8 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno = __col_last_recno(cbt->page);
+		cbt->recno =
+		    cbt->last_standard_recno = __col_last_recno(cbt->page);
 		cbt->vslot = UINT32_MAX;
 		goto new_page;
 	}
