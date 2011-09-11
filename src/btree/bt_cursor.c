@@ -194,7 +194,7 @@ retry:	__cursor_func_init(cbt, 1);
 		 * the application's record number), return the record number.
 		 *
 		 * If WT_CURSTD_OVERWRITE set, insert/update the application
-		 * specified record
+		 * specified record.
 		 */
 		if (F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 			WT_ERR(__wt_col_search(session, cbt, 1));
