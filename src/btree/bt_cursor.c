@@ -193,8 +193,8 @@ retry:	__cursor_func_init(cbt, 1);
 		 * If WT_CURSTD_OVERWRITE not set, insert a new record (ignoring
 		 * the application's record number), return the record number.
 		 *
-		 * If WT_CURSTD_OVERWRITE set, insert/update the application
-		 * specified record.
+		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair,
+		 * (where the key must be specified by the application).
 		 */
 		if (F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 			WT_ERR(__wt_col_search(session, cbt, 1));
