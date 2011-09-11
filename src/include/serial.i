@@ -11,16 +11,16 @@ typedef struct {
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
 	u_int skipdepth;
-} __wt_append_args;
+} __wt_col_append_args;
 
 static inline int
-__wt_append_serial(
+__wt_col_append_serial(
 	WT_SESSION_IMPL *session, WT_INSERT_HEAD **inshead, WT_INSERT
 	***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
 	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
 	*new_ins, u_int skipdepth)
 {
-	__wt_append_args _args, *args = &_args;
+	__wt_col_append_args _args, *args = &_args;
 	int ret;
 
 	args->inshead = inshead;
@@ -50,7 +50,7 @@ __wt_append_serial(
 	args->skipdepth = skipdepth;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_FUNC, 1, __wt_append_serial_func, args);
+	    WT_WORKQ_FUNC, 1, __wt_col_append_serial_func, args);
 
 	if (!args->new_inslist_taken)
 		__wt_free(session, args->new_inslist);
@@ -60,13 +60,13 @@ __wt_append_serial(
 }
 
 static inline void
-__wt_append_unpack(
+__wt_col_append_unpack(
 	WT_SESSION_IMPL *session, WT_INSERT_HEAD ***insheadp, WT_INSERT
 	****ins_stackp, WT_INSERT_HEAD ***new_inslistp, WT_INSERT_HEAD
 	**new_insheadp, WT_INSERT **new_insp, u_int *skipdepthp)
 {
-	__wt_append_args *args =
-	    (__wt_append_args *)session->wq_args;
+	__wt_col_append_args *args =
+	    (__wt_col_append_args *)session->wq_args;
 
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
@@ -77,10 +77,10 @@ __wt_append_unpack(
 }
 
 static inline void
-__wt_append_new_inslist_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_col_append_new_inslist_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_append_args *args =
-	    (__wt_append_args *)session->wq_args;
+	__wt_col_append_args *args =
+	    (__wt_col_append_args *)session->wq_args;
 
 	args->new_inslist_taken = 1;
 
@@ -89,10 +89,10 @@ __wt_append_new_inslist_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 static inline void
-__wt_append_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_col_append_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_append_args *args =
-	    (__wt_append_args *)session->wq_args;
+	__wt_col_append_args *args =
+	    (__wt_col_append_args *)session->wq_args;
 
 	args->new_inshead_taken = 1;
 

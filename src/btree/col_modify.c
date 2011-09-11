@@ -121,7 +121,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		 * workQ: insert or append the WT_INSERT structure.
 		 */
 		if (op == 1) {
-			WT_ERR(__wt_append_serial(session,
+			WT_ERR(__wt_col_append_serial(session,
 			    inshead, cbt->ins_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size, ins, skipdepth));
@@ -189,11 +189,11 @@ __col_insert_alloc(
 }
 
 /*
- * __wt_append_serial_func --
+ * __wt_col_append_serial_func --
  *	Server function to append an WT_INSERT entry to the tree.
  */
 int
-__wt_append_serial_func(WT_SESSION_IMPL *session)
+__wt_col_append_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -205,7 +205,7 @@ __wt_append_serial_func(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	page = btree->last_page;
 
-	__wt_append_unpack(session, &inshead, &ins_stack,
+	__wt_col_append_unpack(session, &inshead, &ins_stack,
 	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/*
@@ -214,7 +214,7 @@ __wt_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (page->u.col_leaf.append == NULL) {
 		page->u.col_leaf.append = new_inslist;
-		__wt_append_new_inslist_taken(session, page);
+		__wt_col_append_new_inslist_taken(session, page);
 	}
 
 	/*
@@ -223,7 +223,7 @@ __wt_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (*inshead == NULL) {
 		*inshead = new_inshead;
-		__wt_append_new_inshead_taken(session, page);
+		__wt_col_append_new_inshead_taken(session, page);
 	}
 
 	/*

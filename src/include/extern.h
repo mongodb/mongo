@@ -256,7 +256,7 @@ extern int __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int op);
-extern int __wt_append_serial_func(WT_SESSION_IMPL *session);
+extern int __wt_col_append_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);

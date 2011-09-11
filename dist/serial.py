@@ -17,7 +17,7 @@ class Serial:
 		self.args = args
 
 msgtypes = [
-Serial('append', 'WT_WORKQ_FUNC', 1, [
+Serial('col_append', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
