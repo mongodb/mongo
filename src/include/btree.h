@@ -125,7 +125,10 @@ struct __wt_btree {
 	uint32_t leafmin;		/* Min/max leaf page size */
 	uint32_t leafmax;
 
-	WT_WALK evict_walk;		/* Eviction thread's walk state */
+	WT_WALK  evict_walk;		/* Eviction thread's walk state */
+
+	WT_PAGE *last_page;		/* Col-store append, last page */
+	uint64_t last_recno;		/* Col-store append, last recno */
 
 	void	*reconcile;		/* Reconciliation structure */
 

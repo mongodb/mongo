@@ -26,6 +26,7 @@ struct __wt_evict_req {
 	uint32_t  retry_next;			/* Next retry slot */
 	uint32_t  retry_entries;		/* Total retry slots */
 	size_t    retry_allocated;		/* Bytes allocated */
+	int	  retry_cnt;			/* We only try a few times. */
 
 	int	  close_method;			/* Discard pages */
 };
@@ -92,7 +93,6 @@ struct __wt_cache {
 	uint64_t bytes_read;		/* Bytes/pages read by read server */
 	uint64_t pages_read;
 	uint64_t bytes_workq;		/* Bytes/pages created by workQ */
-	uint64_t pages_workq;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 };

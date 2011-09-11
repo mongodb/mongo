@@ -45,6 +45,7 @@ typedef struct {
 
 	void *wts_conn;				/* WT_CONNECTION handle */
 	void *wts_cursor;			/* WT_CURSOR handle */
+	void *wts_cursor_insert;		/* WT_CURSOR insert handle */
 	void *wts_session;			/* WT_SESSION handle */
 
 	FILE *rand_log;				/* Random number log */

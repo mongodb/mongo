@@ -40,7 +40,6 @@ src/btree/bt_sync.c
 src/btree/bt_vrfy.c
 src/btree/bt_vrfy_dsk.c
 src/btree/bt_walk.c
-src/btree/col_extend.c
 src/btree/col_modify.c
 src/btree/col_srch.c
 src/btree/row_key.c

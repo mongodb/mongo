@@ -43,11 +43,34 @@ struct __wt_page {
 		/* Column-store leaf page. */
 		struct {
 			uint64_t    recno;	/* Starting recno */
-			uint8_t	   *bitf;	/* COL_FIX bits */
-			WT_COL	   *d;		/* COL_VAR objects */
-			WT_INSERT_HEAD **ins;	/* Inserts (RLE) */
+
+			uint8_t	   *bitf;	/* COL_FIX items */
+			WT_COL	   *d;		/* COL_VAR items */
+
+			/*
+			 * The last page of both fix- and variable-length column
+			 * stores includes a skiplist of appended entries.
+			 */
+			WT_INSERT_HEAD **append;/* Appended items */
+
+			/*
+			 * Updated items in column-stores: variable-length RLE
+			 * entries can expand to multiple entries which requires
+			 * some kind of list we can expand on demand.  Updated
+			 * items in fixed-length files could be done based on an
+			 * WT_UPDATE array as in row-stores, but there can be a
+			 * very large number of bits on a single page, and the
+			 * cost of the WT_UPDATE array would be huge.
+			 */
+			WT_INSERT_HEAD **ins;	/* Updated items */
+
+			/*
+			 * Variable-length column-store files maintain a list of
+			 * RLE entries on the page so it's unnecessary to walk
+			 * the page counting records to find a specific entry.
+			 */
 			WT_COL_RLE *repeats;	/* RLE array for lookups */
-			uint32_t    nrepeats;	/* Number of repeats. */
+			uint32_t    nrepeats;	/* Number of repeat slots. */
 		} col_leaf;
 
 		/* Bulk-loaded linked list. */
@@ -496,7 +519,6 @@ struct __wt_insert {
  * 	The head of a skip list of WT_INSERT items.
  */
 struct __wt_insert_head {
-	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
 	WT_INSERT *head[WT_SKIP_MAXDEPTH];	/* first item on skiplists */
 };
 
@@ -530,11 +552,16 @@ struct __wt_insert_head {
 #define	WT_COL_INSERT(page, ip)						\
 	WT_COL_INSERT_SLOT(page, WT_COL_SLOT(page, ip))
 /*
- * WT_COL_INSERT_SINGLE references a single WT_INSERT list, which is used for
- * fixed-length column-store updates.
+ * WT_COL_INSERT_{APPEND,SINGLE} reference a single WT_INSERT list, which are
+ * used for fixed-length column-store updates, and variable- and fixed-length
+ * column-store appends.
  */
+#define	WT_COL_INSERT_APPEND(page)					\
+	((page)->u.col_leaf.append == NULL ?				\
+	    NULL : (page)->u.col_leaf.append[0])
 #define	WT_COL_INSERT_SINGLE(page)					\
-	((page)->u.col_leaf.ins == NULL ? NULL : (page)->u.col_leaf.ins[0])
+	((page)->u.col_leaf.ins == NULL ?				\
+	    NULL : (page)->u.col_leaf.ins[0])
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\

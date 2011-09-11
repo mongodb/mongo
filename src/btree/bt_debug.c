@@ -25,7 +25,7 @@ typedef struct {
 static void __debug_byte_string(WT_DBG *, const uint8_t *, size_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
-static void __debug_col_insert(WT_DBG *, WT_INSERT_HEAD *, int);
+static void __debug_col_list(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
@@ -39,7 +39,7 @@ static int  __debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __debug_page_work(WT_DBG *, WT_PAGE *, uint32_t);
 static void __debug_ref(WT_DBG *, WT_REF *);
-static void __debug_row_insert(WT_DBG *, WT_INSERT_HEAD *);
+static void __debug_row_list(WT_DBG *, WT_INSERT_HEAD *);
 static void __debug_update(WT_DBG *, WT_UPDATE *, int);
 static void __dmsg(WT_DBG *, const char *, ...)
 	WT_GCC_ATTRIBUTE((format (printf, 2, 3)));
@@ -415,7 +415,6 @@ static void
 __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_INSERT *ins;
 	WT_PAGE_DISK *dsk;
 	WT_SESSION_IMPL *session;
@@ -425,7 +424,6 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 
 	session = ds->session;
 	btree = session->btree;
-	conn = S2C(session);
 	dsk = page->dsk;
 	recno = page->u.col_leaf.recno;
 
@@ -447,8 +445,15 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 			++recno;
 		}
 	}
-	__dmsg(ds, "%s\n", conn->sep);
-	__debug_col_insert(ds, WT_COL_INSERT_SINGLE(page), 1);
+
+	if (WT_COL_INSERT_SINGLE(page) != NULL) {
+		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__debug_col_list(ds, WT_COL_INSERT_SINGLE(page), "insert", 1);
+	}
+	if (WT_COL_INSERT_APPEND(page) != NULL) {
+		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__debug_col_list(ds, WT_COL_INSERT_APPEND(page), "append", 1);
+	}
 }
 
 /*
@@ -487,10 +492,12 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT_HEAD *inshead;
+	WT_SESSION_IMPL *session;
 	uint64_t recno, rle;
 	uint32_t i;
 	char tag[64];
 
+	session = ds->session;
 	unpack = &_unpack;
 	recno = page->u.col_leaf.recno;
 
@@ -506,9 +513,15 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		WT_RET(__debug_cell_data(ds, tag, unpack));
 
 		if ((inshead = WT_COL_INSERT(page, cip)) != NULL)
-			__debug_col_insert(ds, inshead, 0);
+			__debug_col_list(ds, inshead, "update", 0);
 		recno += rle;
 	}
+
+	if (WT_COL_INSERT_APPEND(page) != NULL) {
+		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__debug_col_list(ds, WT_COL_INSERT_APPEND(page), "append", 0);
+	}
+
 	return (0);
 }
 
@@ -559,7 +572,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	 * key on the page.
 	 */
 	if ((inshead = WT_ROW_INSERT_SMALLEST(page)) != NULL)
-		__debug_row_insert(ds, inshead);
+		__debug_row_list(ds, inshead);
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -581,34 +594,35 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			__debug_update(ds, upd, 0);
 
 		if ((inshead = WT_ROW_INSERT(page, rip)) != NULL)
-			__debug_row_insert(ds, inshead);
+			__debug_row_list(ds, inshead);
 	}
 
 	return (0);
 }
 
 /*
- * __debug_col_insert --
- *	Dump a column-store insert array.
+ * __debug_col_list --
+ *	Dump a column-store skiplist.
  */
 static void
-__debug_col_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead, int hexbyte)
+__debug_col_list(
+    WT_DBG *ds, WT_INSERT_HEAD *inshead, const char *tag, int hexbyte)
 {
 	WT_INSERT *ins;
 
 	WT_SKIP_FOREACH(ins, inshead) {
 		__dmsg(ds,
-		    "\tinsert %" PRIu64 "\n", WT_INSERT_RECNO(ins));
+		    "\t%s %" PRIu64 "\n", tag, WT_INSERT_RECNO(ins));
 		__debug_update(ds, ins->upd, hexbyte);
 	}
 }
 
 /*
- * __debug_row_insert --
+ * __debug_row_list --
  *	Dump an insert array.
  */
 static void
-__debug_row_insert(WT_DBG *ds, WT_INSERT_HEAD *inshead)
+__debug_row_list(WT_DBG *ds, WT_INSERT_HEAD *inshead)
 {
 	WT_INSERT *ins;
 

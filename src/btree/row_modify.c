@@ -18,11 +18,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
-	WT_SESSION_BUFFER *sb;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
-	size_t ins_size, new_inshead_size, new_inslist_size;
-	size_t new_upd_size, upd_size;
-	uint32_t ins_slot, skipdepth;
+	size_t new_inshead_size, new_inslist_size, new_upd_size;
+	uint32_t ins_slot;
+	u_int skipdepth;
 	int i, ret;
 
 	key = (WT_ITEM *)&cbt->iface.key;
@@ -66,11 +65,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(session, value, &upd));
 
 		/* workQ: insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page, cbt->write_gen,
-		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
+		ret = __wt_update_serial(session, page,
+		    cbt->write_gen, upd_entry, &new_upd, new_upd_size, upd);
 	} else {
 		/*
 		 * Allocate insert array if necessary, and set the WT_INSERT
@@ -106,9 +105,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		if (*inshead == NULL) {
 			new_inshead_size = sizeof(WT_INSERT_HEAD);
-			WT_ERR(__wt_sb_alloc(session,
-			    sizeof(WT_INSERT_HEAD), &new_inshead, &sb));
-			new_inshead->sb = sb;
+			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
 			cbt->ins_head = new_inshead;
@@ -121,20 +118,16 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * Allocate a WT_INSERT/WT_UPDATE pair, and update the cursor
 		 * to reference it.
 		 */
-		WT_ERR(__wt_row_insert_alloc(
-		    session, key, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_row_insert_alloc(session, key, skipdepth, &ins));
+		WT_ERR(__wt_update_alloc(session, value, &upd));
 		ins->upd = upd;
-		ins_size += upd_size;
 		cbt->ins = ins;
 
 		/* workQ: insert the WT_INSERT structure. */
-		ret = __wt_insert_serial(session,
-		    page, cbt->write_gen,
+		ret = __wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack,
 		    &new_inslist, new_inslist_size,
-		    &new_inshead, new_inshead_size,
-		    &ins, ins_size, skipdepth);
+		    &new_inshead, new_inshead_size, ins, skipdepth);
 	}
 
 	if (ret != 0) {
@@ -145,8 +138,8 @@ err:		if (ins != NULL)
 	}
 
 	/* Free any insert, update arrays. */
-	__wt_free(session, new_inshead);
 	__wt_free(session, new_inslist);
+	__wt_free(session, new_inshead);
 	__wt_free(session, new_upd);
 
 	return (ret);
@@ -158,8 +151,8 @@ err:		if (ins != NULL)
  *	buffer and fill it in.
  */
 int
-__wt_row_insert_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *key, uint32_t skipdepth, WT_INSERT **insp, size_t *ins_sizep)
+__wt_row_insert_alloc(
+    WT_SESSION_IMPL *session, WT_ITEM *key, u_int skipdepth, WT_INSERT **insp)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -179,29 +172,27 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 	memcpy(WT_INSERT_KEY(ins), key->data, key->size);
 
 	*insp = ins;
-	if (ins_sizep != NULL)
-		*ins_sizep = ins_size;
-
 	return (0);
 }
 
 /*
  * __wt_insert_serial_func --
- *	Server function to add an WT_INSERT entry to the page tree.
+ *	Server function to add an WT_INSERT entry to the page.
  */
 int
 __wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_PAGE *page;
 	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
-	WT_INSERT *ins, ***ins_stack;
-	uint32_t i, skipdepth, write_gen;
-	int ret;
+	WT_INSERT *new_ins, ***ins_stack;
+	uint32_t write_gen;
+	u_int i, skipdepth;
+	int  ret;
 
 	ret = 0;
 
 	__wt_insert_unpack(session, &page, &write_gen, &inshead,
-	    &ins_stack, &new_inslist, &new_inshead, &ins, &skipdepth);
+	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -222,8 +213,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 		}
 
 	/*
-	 * If the slot does not yet have an insert list, our caller passed us
-	 * one.
+	 * If the insert head does not yet have an insert list, our caller
+	 * passed us one.
 	 */
 	if (*inshead == NULL) {
 		*inshead = new_inshead;
@@ -237,11 +228,10 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 * the list is never inconsistent.
 	 */
 	for (i = 0; i < skipdepth; i++)
-		ins->next[i] = *ins_stack[i];
+		new_ins->next[i] = *ins_stack[i];
 	WT_MEMORY_FLUSH;
 	for (i = 0; i < skipdepth; i++)
-		*ins_stack[i] = ins;
-	__wt_insert_ins_taken(session, page);
+		*ins_stack[i] = new_ins;
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);
@@ -253,8 +243,7 @@ err:	__wt_session_serialize_wrapup(session, page, 0);
  *	buffer and fill it in.
  */
 int
-__wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, size_t *upd_sizep)
+__wt_update_alloc(WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
@@ -274,10 +263,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	if (upd_sizep != NULL)
-		*upd_sizep = size + sizeof(WT_UPDATE);
 	*updp = upd;
-
 	return (0);
 }
 
@@ -319,7 +305,6 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	upd->next = *upd_entry;
 	WT_MEMORY_FLUSH;
 	*upd_entry = upd;
-	__wt_update_upd_taken(session, page);
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);

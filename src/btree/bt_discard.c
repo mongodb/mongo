@@ -208,9 +208,8 @@ __free_insert(
 	 */
 	for (insheadp = insert_head; entries > 0; --entries, ++insheadp)
 		if (*insheadp != NULL) {
-			__free_insert_list(session,
-			    WT_SKIP_FIRST(*insheadp));
-			__wt_sb_free(session, (*insheadp)->sb);
+			__free_insert_list(session, WT_SKIP_FIRST(*insheadp));
+			__wt_free(session, *insheadp);
 		}
 
 	/* Free the page's array of inserts. */

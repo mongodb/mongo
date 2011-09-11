@@ -8,44 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __search_insert --
- *	Search the slot's insert list.
- */
-static inline WT_INSERT *
-__search_insert(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, uint64_t recno)
-{
-	WT_INSERT **ins;
-	uint64_t ins_recno;
-	int cmp, i;
-
-	/* If there's no insert chain to search, we're done. */
-	if (inshead == NULL)
-		return (NULL);
-
-	/*
-	 * The insert list is a skip list: start at the highest skip level, then
-	 * go as far as possible at each level before stepping down to the next.
-	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL) {
-			cbt->ins_stack[i--] = ins--;
-			continue;
-		}
-
-		ins_recno = WT_INSERT_RECNO(*ins);
-		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
-
-		if (cmp == 0)			/* Exact match: return */
-			return (*ins);
-		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(*ins)->next[i];
-		else				/* Drop down a level */
-			cbt->ins_stack[i--] = ins--;
-	}
-	return (NULL);
-}
-
-/*
  * __wt_col_search --
  *	Search a column-store tree for a specific record-based key.
  */
@@ -125,42 +87,39 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_MEMORY_FLUSH;
 	}
 	cbt->page = page;
+	cbt->compare = 0;
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a
 	 * record greater than the maximum record in the tree; in that case,
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
+	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno >= page->u.col_leaf.recno + page->entries) {
-			cbt->compare = 1;
-			F_SET(cbt, WT_CBT_SEARCH_SET);
-			return (0);
-		}
-		cbt->ins_head =
-		    page->u.col_leaf.ins == NULL ? NULL : *page->u.col_leaf.ins;
-		cbt->compare = 0;
-		break;
-	case WT_PAGE_COL_VAR:
-		if ((cip = __cursor_col_rle_search(page, recno)) == NULL)
-			cbt->compare = 1;
-		else {
-			cbt->compare = 0;
+			cbt->compare = -1;
+			cbt->ins_head = WT_COL_INSERT_APPEND(page);
+		} else
+			cbt->ins_head = WT_COL_INSERT_SINGLE(page);
+	} else {
+		if ((cip = __col_var_search(page, recno)) == NULL) {
+			cbt->compare = -1;
+			cbt->ins_head = WT_COL_INSERT_APPEND(page);
+		} else {
 			cbt->slot = WT_COL_SLOT(page, cip);
 			cbt->ins_head = WT_COL_INSERT_SLOT(page, cbt->slot);
 		}
-		break;
-	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*
-	 * Search the insert list for a match; __search_insert sets the return
-	 * insert information appropriately.
+	 * Search the insert or append list for a match; __search_insert sets
+	 * the return insert information appropriately.
 	 */
-	cbt->ins = __search_insert(cbt, cbt->ins_head, recno);
-
-	F_SET(cbt, WT_CBT_SEARCH_SET);
+	if (cbt->ins_head == NULL)
+		cbt->ins = NULL;
+	else
+		if ((cbt->ins = __col_insert_search_stack(
+		    cbt->ins_head, cbt->ins_stack, recno)) != NULL)
+			cbt->compare = 0;
 	return (0);
 
 err:	__wt_page_release(session, page);

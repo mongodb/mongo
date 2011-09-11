@@ -49,7 +49,8 @@ __wt_page_in_func(
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (__wt_hazard_set(session, ref
+			if (F_ISSET(ref->page, WT_PAGE_PINNED) ||
+			    __wt_hazard_set(session, ref
 #ifdef HAVE_DIAGNOSTIC
 			    , file, line
 #endif

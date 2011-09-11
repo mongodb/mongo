@@ -61,11 +61,10 @@ __evict_clr(WT_EVICT_LIST *e)
 static inline void
 __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 {
+					/* Should be empty */
+	WT_ASSERT(session, r->session == NULL);
+
 	r->close_method = close_method;
-	WT_ASSERT(session, r->retry == NULL);
-	WT_ASSERT(session, r->retry_next == 0);
-	WT_ASSERT(session, r->retry_entries == 0);
-	WT_ASSERT(session, r->retry_allocated == 0);
 	WT_MEMORY_FLUSH;		/* Flush before turning entry on */
 
 	r->session = session;
@@ -74,16 +73,15 @@ __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 
 /*
  * __evict_req_clr --
- *	Set an entry in the eviction request list.
+ *	Clear an entry in the eviction request list.
  */
 static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	__wt_free(session, r->retry);
-	r->retry_next = r->retry_entries = 0;
-	r->retry_allocated = 0;
 
-	r->session = NULL;
+	memset(r, 0, sizeof(WT_EVICT_REQ));
+
 	WT_MEMORY_FLUSH;		/* Turn entry off */
 }
 
@@ -413,7 +411,8 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 */
 		if (!er->close_method && !WT_PAGE_IS_MODIFIED(page))
 			continue;
-		if (__wt_page_reconcile(session, page, flags) == 0)
+		if (!F_ISSET(page, WT_PAGE_PINNED) &&
+		    __wt_page_reconcile(session, page, flags) == 0)
 			continue;
 
 		/*
@@ -449,9 +448,10 @@ err:	/* End the walk cleanly. */
 static int
 __evict_request_retry(WT_SESSION_IMPL *session)
 {
-	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	WT_PAGE *page;
+	WT_SESSION_IMPL *request_session;
 	uint32_t i, flags;
 	int pending_retry;
 
@@ -490,10 +490,10 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 
 		/* Walk the list of retry requests. */
 		for (pending_retry = 0, i = 0; i < er->retry_entries; ++i) {
-			if (er->retry[i] == NULL)
+			if ((page = er->retry[i]) == NULL)
 				continue;
-			if (__wt_page_reconcile(
-			    session, er->retry[i], flags) == 0)
+			if (!F_ISSET(page, WT_PAGE_PINNED) &&
+			    __wt_page_reconcile(session, page, flags) == 0)
 				er->retry[i] = NULL;
 			else
 				pending_retry = 1;
@@ -503,10 +503,11 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 		 * If we finished, clean up and resolve the request, otherwise
 		 * there's still work to do.
 		 */
-		if (pending_retry)
+		if (pending_retry && ++er->retry_cnt < 5)
 			cache->pending_retry = 1;
 		else {
-			__wt_session_serialize_wrapup(request_session, NULL, 0);
+			__wt_session_serialize_wrapup(
+			    request_session, NULL, pending_retry ? EBUSY : 0);
 			__evict_req_clr(session, er);
 		}
 

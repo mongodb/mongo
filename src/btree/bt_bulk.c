@@ -36,6 +36,8 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	if (F_ISSET(btree->root_page.page, WT_PAGE_INITIAL_EMPTY)) {
 		btree->root_page.state = WT_REF_DISK;
 		__wt_free(session, btree->root_page.page);
+
+		btree->last_page = NULL;
 	} else {
 		__wt_errx(
 		    session, "bulk-load is only possible for empty trees");
@@ -158,8 +160,7 @@ __bulk_col_var(WT_CURSOR_BULK *cbulk)
 	 * Allocate an WT_UPDATE item and append the V object onto the page's
 	 * update list.
 	 */
-	WT_RET(__wt_update_alloc(
-	    session, (WT_ITEM *)&cursor->value, &upd, NULL));
+	WT_RET(__wt_update_alloc(session, (WT_ITEM *)&cursor->value, &upd));
 	(*cbulk->updp) = upd;
 	cbulk->updp = &upd->next;
 
@@ -196,10 +197,10 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
 	 * page's insert list.
 	 */
-	WT_RET(__wt_row_insert_alloc(
-	    session, (WT_ITEM *)&cursor->key, 1, &ins, NULL));
-	WT_ERR(__wt_update_alloc(
-	    session, (WT_ITEM *)&cursor->value, &ins->upd, NULL));
+	WT_RET(
+	    __wt_row_insert_alloc(session, (WT_ITEM *)&cursor->key, 1, &ins));
+	WT_ERR(
+	    __wt_update_alloc(session, (WT_ITEM *)&cursor->value, &ins->upd));
 	*cbulk->insp = ins;
 	cbulk->insp = &WT_SKIP_NEXT(ins);
 

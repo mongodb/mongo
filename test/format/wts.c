@@ -10,9 +10,10 @@
 static int  bulk(WT_ITEM **, WT_ITEM **);
 static int  wts_close(WT_CONNECTION *);
 static int  wts_col_del(uint64_t, int *);
-static int  wts_col_put(uint64_t, int);
-static int  wts_np(int, int *);
+static int  wts_col_insert(uint64_t *);
+static int  wts_col_put(uint64_t);
 static int  wts_notfound_chk(const char *, int, int, uint64_t);
+static int  wts_np(int, int, int *);
 static int  wts_open(WT_CONNECTION **, WT_SESSION **session);
 static int  wts_read(uint64_t);
 static int  wts_row_del(uint64_t, int *);
@@ -116,7 +117,7 @@ wts_startup(void)
 {
 	time_t now;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	int ret;
 	char config[512], *end, *p;
@@ -162,6 +163,21 @@ wts_startup(void)
 		return (1);
 	}
 
+	/*
+	 * We open 2 cursors, one configured for overwriting, one not configured
+	 * for overwriting.  The reason is that for row-store and column-store
+	 * files where we're testing with existing records, we don't track if a
+	 * record was deleted or not, which means we need to use cursor->insert
+	 * with overwriting configured.  But, in column-store files where we're
+	 * testing with new, appended records, we don't want to have to specify 
+	 * the record number, which means we can't configure with overwriting.
+	 */
+	if ((ret = session->open_cursor(
+	    session, WT_TABLENAME, NULL, NULL, &cursor_insert)) != 0) {
+		fprintf(stderr, "%s: open_cursor: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
 	if ((ret = session->open_cursor(
 	    session, WT_TABLENAME, NULL, "overwrite", &cursor)) != 0) {
 		fprintf(stderr, "%s: open_cursor: %s\n",
@@ -179,6 +195,8 @@ wts_startup(void)
 	g.wts_conn = conn;
 	g.wts_session = session;
 	g.wts_cursor = cursor;
+	g.wts_cursor_insert = cursor_insert;
+
 	return (0);
 }
 
@@ -481,13 +499,13 @@ wts_ops(void)
 	uint64_t cnt, keyno;
 	uint32_t op;
 	u_int np;
-	int notfound;
+	int insert, notfound;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		if (cnt % 10 == 0)
 			track("read/write ops", cnt);
 
-		notfound = 0;
+		insert = notfound = 0;
 		keyno = MMRAND(1, g.c_rows);
 
 		/*
@@ -509,17 +527,6 @@ wts_ops(void)
 					return (1);
 				break;
 			case FIX:
-				/*
-				 * We don't delete records in fixed-length
-				 * column-store files: a "delete" is the same
-				 * as a store of 0x00, which means we're not
-				 * really testing anything interesting, and,
-				 * if we reconcile the page, the engine code
-				 * discards trailing, deleted records, which
-				 * can give us test failures because we don't
-				 * match the contents of the BDB database.
-				 */
-				break;
 			case VAR:
 				if (wts_col_del(keyno, &notfound))
 					return (1);
@@ -532,22 +539,10 @@ wts_ops(void)
 					return (1);
 				break;
 			case FIX:
-				/*
-				 * We don't insert records in fixed-length
-				 * column-store files: an insert extends the
-				 * file by creating a large number of "deleted"
-				 * records: since a deleted record is a store
-				 * of 0x00, we can't distinguish between a
-				 * legitimate value and a deleted record, and
-				 * so we don't match the contents of the BDB
-				 * database.
-				 */
-				 break;
 			case VAR:
-				/* Column-store tables only support append. */
-				keyno = ++g.c_rows;
-				if (wts_col_put(keyno, 1))
+				if (wts_col_insert(&keyno))
 					return (1);
+				insert = 1;
 				break;
 			}
 		} else if (
@@ -559,7 +554,7 @@ wts_ops(void)
 				break;
 			case FIX:
 			case VAR:
-				if (wts_col_put(keyno, 0))
+				if (wts_col_put(keyno))
 					return (1);
 				break;
 			}
@@ -576,7 +571,7 @@ wts_ops(void)
 		for (np = 0; np < MMRAND(1, 4); ++np) {
 			if (notfound)
 				break;
-			if (wts_np(MMRAND(0, 1), &notfound))
+			if (wts_np(MMRAND(0, 1), insert, &notfound))
 				return (1);
 		}
 
@@ -705,7 +700,7 @@ wts_read(uint64_t keyno)
  *	Read and verify the next/prev element in a row- or column-store file.
  */
 static int
-wts_np(int next, int *notfoundp)
+wts_np(int next, int insert, int *notfoundp)
 {
 	static WT_ITEM key, value, bdb_key, bdb_value;
 	WT_CURSOR *cursor;
@@ -715,7 +710,7 @@ wts_np(int next, int *notfoundp)
 	uint8_t bitfield;
 	const char *which;
 
-	cursor = g.wts_cursor;
+	cursor = insert ? g.wts_cursor_insert : g.wts_cursor;
 	session = g.wts_session;
 	which = next ? "next" : "prev";
 
@@ -774,7 +769,7 @@ wts_np(int next, int *notfoundp)
 
 /*
  * wts_row_put --
- *	Replace an element in a row-store file.
+ *	Update an element in a row-store file.
  */
 static int
 wts_row_put(uint64_t keyno, int insert)
@@ -818,10 +813,10 @@ wts_row_put(uint64_t keyno, int insert)
 
 /*
  * wts_col_put --
- *	Replace an element in a column-store file.
+ *	Update an element in a column-store file.
  */
 static int
-wts_col_put(uint64_t keyno, int insert)
+wts_col_put(uint64_t keyno)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -835,38 +830,93 @@ wts_col_put(uint64_t keyno, int insert)
 	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
-	if (g.logging) {
+	if (g.logging)
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
-			    insert ? "insert" : "put",
-			    keyno, ((uint8_t *)value.data)[0]);
+			    "put", keyno,
+			    ((uint8_t *)value.data)[0]);
 		else
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {%.*s}",
-			    insert ? "insert" : "put",
-			    keyno, (int)value.size, (char *)value.data);
-	}
+			    "put", keyno,
+			    (int)value.size, (char *)value.data);
 
-	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
-		return (1);
-	
 	cursor->set_key(cursor, keyno);
 	if (g.c_file_type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value.data);
 	else
 		cursor->set_value(cursor, &value);
-	ret = cursor->insert(cursor);
+	ret = cursor->update(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_col_put: %s col %" PRIu64 " by key: %s\n",
-		    g.progname,
-		    insert ? "insert" : "put", keyno, wiredtiger_strerror(ret));
+                    "%s: wts_col_put: %" PRIu64 " : %s\n",
+		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
+	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
+		return (1);
+
 	NTF_CHK(wts_notfound_chk("wts_col_put", ret, notfound, keyno));
 	return (0);
+}
+
+/*
+ * wts_col_insert --
+ *	Insert an element in a column-store file.
+ */
+static int
+wts_col_insert(uint64_t *keynop)
+{
+	static WT_ITEM key, value;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	uint64_t keyno;
+	int notfound, ret;
+
+	cursor = g.wts_cursor_insert;
+	session = g.wts_session;
+
+	value_gen(&value.data, &value.size, 0);
+
+	if (g.c_file_type == FIX)
+		cursor->set_value(cursor, *(uint8_t *)value.data);
+	else
+		cursor->set_value(cursor, &value);
+	ret = cursor->insert(cursor);
+	if (ret != 0) {
+		fprintf(stderr, "%s: wts_col_insert: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	if ((ret = cursor->get_key(cursor, &keyno)) != 0) {
+		fprintf(stderr, "%s: cursor->get_key: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	if (keyno <= g.c_rows) {
+		fprintf(stderr,
+		    "%s: inserted key did not create new row\n", g.progname);
+		return (1);
+	}
+	g.c_rows = *keynop = (uint32_t)keyno;
+
+	if (g.logging)
+		if (g.c_file_type == FIX)
+			(void)session->msg_printf(session,
+			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
+			    "insert", keyno,
+			    ((uint8_t *)value.data)[0]);
+		else
+			(void)session->msg_printf(session,
+			    "%-10s%" PRIu64 " {%.*s}",
+			    "insert", keyno,
+			    (int)value.size, (char *)value.data);
+
+	key_gen(&key.data, &key.size, keyno, 0);
+	return (bdb_put(
+	    key.data, key.size, value.data, value.size, &notfound) ? 1 : 0);
 }
 
 /*

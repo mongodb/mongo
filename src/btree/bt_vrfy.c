@@ -311,7 +311,7 @@ recno_chk:	if (parent_recno != recno) {
 			ref = &cref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __verify_tree(session, ref, cref->recno, vs);
-			__wt_hazard_clear(session, ref->page);
+			__wt_page_release(session, ref->page);
 			WT_RET_TEST(ret, ret);
 		}
 		break;
@@ -336,7 +336,7 @@ recno_chk:	if (parent_recno != recno) {
 			ref = &rref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __verify_tree(session, ref, (uint64_t)0, vs);
-			__wt_hazard_clear(session, ref->page);
+			__wt_page_release(session, ref->page);
 			WT_RET_TEST(ret, ret);
 		}
 		break;

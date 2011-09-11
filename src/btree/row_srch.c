@@ -183,8 +183,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
 		cbt->slot = WT_ROW_SLOT(page, rip);
-
-		F_SET(cbt, WT_CBT_SEARCH_SET);
 		return (0);
 	}
 
@@ -227,8 +225,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * insert information appropriately.
 	 */
 	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
-
-	F_SET(cbt, WT_CBT_SEARCH_SET);
 	return (0);
 
 err:	__wt_page_release(session, page);

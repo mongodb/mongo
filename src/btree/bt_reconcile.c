@@ -588,9 +588,9 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 		r->key_pfx_compress_conf = (cval.val != 0);
 	}
 
-	r->evict = LF_ISSET(WT_REC_EVICT);
-	r->locked = LF_ISSET(WT_REC_LOCKED);
-	r->salvage = LF_ISSET(WT_REC_SALVAGE);
+	r->evict = LF_ISSET(WT_REC_EVICT) ? 1 : 0;
+	r->locked = LF_ISSET(WT_REC_LOCKED) ? 1 : 0;
+	r->salvage = LF_ISSET(WT_REC_SALVAGE) ? 1 : 0;
 
 	/*
 	 * During internal page reconciliation we track referenced objects that
@@ -1636,10 +1636,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_SKIP_FOREACH(ins, WT_COL_INSERT_APPEND(page))
 		for (;;) {
 			/*
-			 * The application may have inserted records, leaving
-			 * gaps in the name space, fill in any gaps.
+			 * The application may have inserted records which left
+			 * gaps in the name space.
 			 */
-			for (recno = WT_INSERT_RECNO(ins) - 1;
+			for (recno = WT_INSERT_RECNO(ins);
 			    nrecs > 0 && r->recno < recno;
 			    --nrecs, ++entry, ++r->recno)
 				__bit_setv(
@@ -1648,10 +1648,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
 				    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+				--nrecs;
 				++entry;
 				++r->recno;
-				if (--nrecs > 0 || WT_SKIP_NEXT(ins) == NULL)
-					break;
+				break;
 			}
 
 			/*
@@ -1670,7 +1670,6 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 	/* Update the counters. */
-	r->recno += entry;
 	__rec_incrv(session, r, entry, __bitstr_size(entry * btree->bitcnt));
 
 	/* Write the remnant page. */
@@ -1724,7 +1723,7 @@ __rec_col_fix_slvg(
 		    --nrecs, --page_take, ++page_start, ++entry)
 			__bit_setv(r->first_free, entry, btree->bitcnt,
 			    __bit_getv(page->u.col_leaf.bitf,
-			        (uint32_t)page_start, btree->bitcnt));
+				(uint32_t)page_start, btree->bitcnt));
 
 		r->recno += entry;
 		__rec_incrv(
@@ -2043,15 +2042,60 @@ __rec_col_var(
 			}
 
 			/* Swap the current/last state. */
-			last_deleted = deleted;
-			if (!last_deleted)
+			if (!deleted)
 				WT_RET(__wt_buf_set(session, last, data, size));
+			last_deleted = deleted;
 
 			/* Reset RLE counter and turn on comparisons. */
 			rle = repeat_count;
 			can_compare = 1;
 		}
 	}
+
+	/* Walk any append list. */
+	WT_SKIP_FOREACH(ins, WT_COL_INSERT_APPEND(page))
+		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
+			/*
+			 * The application may have inserted records which left
+			 * gaps in the name space.
+			 */
+			if (src_recno < n)
+				deleted = 1;
+			else {
+				upd = ins->upd;
+				deleted = WT_UPDATE_DELETED_ISSET(upd);
+				if (!deleted) {
+					data = WT_UPDATE_DATA(upd);
+					size = upd->size;
+				}
+			}
+
+			/*
+			 * Handle RLE accounting and comparisons -- see comment
+			 * above, this code fragment does the same thing.
+			 */
+			if (can_compare) {
+				if ((deleted && last_deleted) ||
+				    (!last_deleted && !deleted &&
+				    last->size == size &&
+				    memcmp(last->data, data, size) == 0)) {
+					++rle;
+					continue;
+				}
+
+				WT_RET(__rec_col_var_helper(session,
+				    salvage, last, last_deleted, 0, rle));
+			}
+
+			/* Swap the current/last state. */
+			if (!deleted)
+				WT_RET(__wt_buf_set(session, last, data, size));
+			last_deleted = deleted;
+
+			/* Reset RLE counter and turn on comparisons. */
+			rle = 1;
+			can_compare = 1;
+		}
 
 	/* If we were tracking a record, write it. */
 	if (can_compare)

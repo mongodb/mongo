@@ -37,15 +37,19 @@ struct __wt_cursor_btree {
 	int	compare;
 
 	/*
-	 * The following fields are maintained by cursor iteration functions.
-	 *
 	 * We can't walk an insert list in reverse order, it's only linked in a
-	 * forward, sorted order.   We don't care for column-store files, the
-	 * record number gives us a "key" for lookup; for row-store files, we
-	 * maintain a count of the current entry we're on.  For each iteration,
-	 * we return one entry earlier in the list.
+	 * forward, sorted order.  Maintain a count of the current entry we're
+	 * on.  For each iteration, we return one entry earlier in the list.
 	 */
 	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
+
+	/*
+	 * It's relatively expensive to calculate the last record on a variable-
+	 * length column-store page because of the repeat values.  Calculate it
+	 * once per page and cache it.  This value doesn't include the skiplist
+	 * of appended entries on the last page.
+	 */
+	uint64_t last_standard_recno;
 
 	/*
 	 * Variable-length column-store items are run-length encoded, and
@@ -61,12 +65,15 @@ struct __wt_cursor_btree {
 
 	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
-	 * and cheaper to allocate the space for it now.
+	 * and cheaper to allocate the space for it now than keep checking to
+	 * see if we need to grow the buffer.
 	 */
 	uint8_t v;			/* Fixed-length return value */
 
-#define	WT_CBT_SEARCH_SET	0x01	/* Search has set a page */
-#define	WT_CBT_SEARCH_SMALLEST	0x02	/* Smallest-key insert list */
+#define	WT_CBT_ITERATE_APPEND	0x01	/* Col-store: iterating append list */
+#define	WT_CBT_ITERATE_NEXT	0x02	/* Next iteration configuration */
+#define	WT_CBT_ITERATE_PREV	0x04	/* Prev iteration configuration */
+#define	WT_CBT_SEARCH_SMALLEST	0x08	/* Row-store: small-key insert list */
 	uint8_t flags;
 };
 

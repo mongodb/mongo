@@ -8,6 +8,42 @@
 #include "wt_internal.h"
 
 /*
+ * __cursor_col_append_next --
+ *	Return the next entry on the append list.
+ */
+static inline int
+__cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+{
+	WT_BUF *val;
+
+	val = &cbt->iface.value;
+
+	if (newpage) {
+		cbt->ins_entry_cnt = 1;
+		goto new_page;
+	}
+
+	for (;;) {
+		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
+			return (WT_NOTFOUND);
+		++cbt->ins_entry_cnt;
+
+new_page:	if (cbt->page->type == WT_PAGE_COL_FIX) {
+			val->data = WT_UPDATE_DATA(cbt->ins->upd);
+			val->size = 1;
+			break;
+		} else {
+			if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+				continue;
+			val->data = WT_UPDATE_DATA(cbt->ins->upd);
+			val->size = cbt->ins->upd->size;
+			break;
+		}
+	}
+	return (0);
+}
+
+/*
  * __cursor_fix_next --
  *	Move to the next, fixed-length column-store item.
  */
@@ -29,6 +65,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(WT_COL_INSERT_SINGLE(cbt->page));
 		cbt->recno = cbt->page->u.col_leaf.recno;
+		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		goto new_page;
 	}
 
@@ -41,8 +78,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Move to the next entry and return the item. */
 	for (;;) {
-		if (cbt->recno >=
-		    cbt->page->u.col_leaf.recno + (cbt->page->entries - 1))
+		if (cbt->recno >= cbt->last_standard_recno)
 			return (WT_NOTFOUND);
 		++cbt->recno;
 new_page:	*recnop = cbt->recno;
@@ -104,18 +140,20 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->recno = cbt->page->u.col_leaf.recno;
+		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		cbt->vslot = UINT32_MAX;
 		goto new_page;
 	}
 
 	/* Move to the next entry and return the item. */
 	for (;;) {
+		if (cbt->recno >= cbt->last_standard_recno)
+			return (WT_NOTFOUND);
 		++cbt->recno;
 new_page:	*recnop = cbt->recno;
 
 		/* Find the matching WT_COL slot. */
-		if ((cip =
-		    __cursor_col_rle_search(cbt->page, cbt->recno)) == NULL)
+		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
 		slot = WT_COL_SLOT(cbt->page, cip);
 
@@ -273,44 +311,71 @@ new_insert:	if (cbt->ins != NULL) {
 }
 
 /*
- * __wt_btcur_search_setup --
- *	Initialize a cursor for iteration based on a search.
+ * __wt_btcur_iterate_setup --
+ *	Initialize a cursor for iteration, usually based on a search.
  */
-int
-__wt_btcur_search_setup(WT_CURSOR_BTREE *cbt)
+void
+__wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 {
 	WT_INSERT *ins;
+	WT_PAGE *page;
 
-	if (cbt->page->type != WT_PAGE_ROW_LEAF)
-		return (0);
+	WT_UNUSED(next);
 
 	/*
-	 * For row-store pages, we need a single item that tells us the part
-	 * of the page we're walking (otherwise switching from next to prev
-	 * and vice-versa is just too complicated), so we map the WT_ROW and
-	 * WT_INSERT_HEAD array slots into a single name space: slot 1 is the
-	 * "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
-	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
-	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
-	 *
-	 * !!!
-	 * I'm re-using WT_CURSOR_BTREE->slot for this purpose, which means that
-	 * WT_CURSOR_BTREE->slot is now useless outside of cursor next/prev.  If
-	 * that turns out to be a bad idea because we need the original value of
-	 * WT_CURSOR_BTREE->slot after a next/prev call, switch to another field
-	 * to hold the iteration slot.
+	 * We don't currently have to do any setup when we switch between next
+	 * and prev calls, but I'm sure we will someday -- I'm leaving support
+	 * here for both flags for that reason.
 	 */
-	cbt->slot = (cbt->slot + 1) * 2;
-	if (cbt->ins_head != NULL) {
-		if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(cbt->page))
-			cbt->slot = 1;
-		else
-			cbt->slot += 1;
+	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
+
+	/* If we don't have a search page, then we're done. */
+	if ((page = cbt->page) == NULL)
+		return;
+
+	if (page->type == WT_PAGE_ROW_LEAF) {
+		/*
+		 * For row-store pages, we need a single item that tells us the
+		 * part of the page we're walking (otherwise switching from next
+		 * to prev and vice-versa is just too complicated), so we map
+		 * the WT_ROW and WT_INSERT_HEAD array slots into a single name
+		 * space: slot 1 is the "smallest key insert list", slot 2 is
+		 * WT_ROW[0], slot 3 is WT_INSERT_HEAD[0], and so on.  This
+		 * means WT_INSERT lists are odd-numbered slots, and WT_ROW
+		 * array slots are even-numbered slots.
+		 *
+		 * !!!
+		 * I'm re-using WT_CURSOR_BTREE->slot for this purpose, which
+		 * means that WT_CURSOR_BTREE->slot is now useless outside of
+		 * cursor next/prev.  If that turns out to be a bad idea because
+		 * we need the original value of WT_CURSOR_BTREE->slot after a
+		 * next/prev call, switch to another field to hold the iteration
+		 * slot.
+		 */
+		cbt->slot = (cbt->slot + 1) * 2;
+		if (cbt->ins_head != NULL) {
+			if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(page))
+				cbt->slot = 1;
+			else
+				cbt->slot += 1;
+		}
+	} else {
+		/*
+		 * For column-store pages, calculate the largest record on the
+		 * page.
+		 */
+		cbt->last_standard_recno = __col_last_recno(page);
+
+		/* If we're traversing the append list, set the reference. */
+		if (cbt->ins_head != NULL &&
+		    cbt->ins_head == WT_COL_INSERT_APPEND(page))
+			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 
 	/*
-	 * If we're in an insert list, figure out how far in, we have to track
-	 * our current slot for previous traversals.
+	 * If we're in a row-store insert list or a column-store append list,
+	 * figure out how far in, we have to track the current slot for prev
+	 * traversals.
 	 */
 	cbt->ins_entry_cnt = 0;
 	if (cbt->ins_head != NULL)
@@ -319,9 +384,6 @@ __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt)
 			if (ins == cbt->ins)
 				break;
 		}
-
-	F_CLR(cbt, WT_CBT_SEARCH_SET);
-	return (0);
 }
 
 /*
@@ -334,11 +396,10 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
 	WT_BSTAT_INCR(session, cursor_first);
 
-	__cursor_func_clear(cbt, 1);
-	F_CLR(cbt, WT_CBT_SEARCH_SET);
+	__cursor_func_init(cbt, 1);
+	F_SET(cbt, WT_CBT_ITERATE_NEXT);
 
 	return (__wt_btcur_next(cbt));
 }
@@ -350,19 +411,20 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 int
 __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
-	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 	int newpage, ret;
 
-	cursor = &cbt->iface;
-	session = (WT_SESSION_IMPL *)cursor->session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	__cursor_func_clear(cbt, 0);
+	__cursor_func_init(cbt, 0);
 
-	/* If iterating from a search position, there's some setup to do. */
-	if (F_ISSET(cbt, WT_CBT_SEARCH_SET))
-		WT_RET(__wt_btcur_search_setup(cbt));
+	/*
+	 * If we aren't already iterating in the right direction, there's
+	 * some setup to do.
+	 */
+	if (!F_ISSET(cbt, WT_CBT_ITERATE_NEXT))
+		__wt_btcur_iterate_setup(cbt, 1);
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
@@ -370,7 +432,13 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	 * file.
 	 */
 	for (newpage = 0;; newpage = 1) {
-		if (cbt->page != NULL) {
+		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
+			if ((ret = __cursor_col_append_next(cbt, newpage)) == 0)
+				break;
+			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
+			if (ret != WT_NOTFOUND)
+				break;
+		} else if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_next(cbt, newpage);
@@ -385,6 +453,18 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			}
 			if (ret != WT_NOTFOUND)
 				break;
+
+			/*
+			 * The last page in a column-store has appended entries.
+			 * We handle it separately from the usual cursor code:
+			 * it's only that one page and it's in a simple format.
+			 */
+			if (cbt->page->type != WT_PAGE_ROW_LEAF &&
+			    (cbt->ins = WT_SKIP_FIRST(
+			    WT_COL_INSERT_APPEND(cbt->page))) != NULL) {
+				F_SET(cbt, WT_CBT_ITERATE_APPEND);
+				continue;
+			}
 		}
 
 		do {
@@ -395,6 +475,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		    cbt->page->type == WT_PAGE_ROW_INT);
 	}
 
-err:	__cursor_func_set(cbt, ret);
+err:	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }

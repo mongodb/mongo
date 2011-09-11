@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __btree_conf(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_type(WT_SESSION_IMPL *);
 
@@ -125,8 +126,13 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_page_in(session, NULL,
 		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
+
+		WT_MEMORY_FLUSH;		/* flush pin before release */
 		__wt_hazard_clear(session, btree->root_page.page);
 	}
+
+	/* Get the last page of the file. */
+	WT_ERR(__btree_last(session));
 
 done:	/* Add to the connection list. */
 	__wt_lock(session, conn->mtx);
@@ -246,6 +252,40 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __btree_last --
+ *      Read and pin the last page of the file.
+ */
+static int
+__btree_last(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = session->btree;
+
+	page = NULL;
+	WT_RET(__wt_tree_np(session, &page, 0));
+	if (page == NULL)
+		return (WT_NOTFOUND);
+
+	btree->last_page = page;
+	if (page->type != WT_PAGE_ROW_LEAF)
+		btree->last_recno = __col_last_recno(page);
+
+	/*
+	 * If the page is already pinned (that is, the last page is the root
+	 * page), we're done, otherwise, pin the last page into memory.
+	 */
+	if (!F_ISSET(page, WT_PAGE_PINNED)) {
+		F_SET(page, WT_PAGE_PINNED);
+
+		WT_MEMORY_FLUSH;		/* flush pin before release */
+		__wt_hazard_clear(session, page);
+	}
+	return (0);
+}
+
+/*
  * __wt_btree_close --
  *	Close a Btree.
  */
@@ -270,6 +310,12 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_unlock(session, conn->mtx);
 	if (inuse)
 		return (0);
+
+	/* Unpin any pages we have locked down. */
+	if (btree->last_page != NULL)
+		F_CLR(btree->last_page, WT_PAGE_PINNED);
+	if (btree->root_page.page != NULL)
+		F_CLR(btree->root_page.page, WT_PAGE_PINNED);
 
 	/*
 	 * If it's a normal tree, ask the eviction thread to flush any pages

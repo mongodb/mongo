@@ -155,7 +155,7 @@ extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
 extern int __wt_btree_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
-extern int __wt_btcur_search_setup(WT_CURSOR_BTREE *cbt);
+extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_last(WT_CURSOR_BTREE *cbt);
@@ -193,13 +193,13 @@ extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
 extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
     const char *treeconfig,
     const char *cfg[],
     uint32_t flags);
+extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
@@ -253,13 +253,10 @@ extern int __wt_walk_prev(WT_SESSION_IMPL *session,
     WT_WALK *walk,
     WT_PAGE **pagep);
 extern int __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next);
-extern int __wt_col_extend(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    uint64_t recno);
-extern int __wt_col_extend_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
-    int is_remove);
+    int op);
+extern int __wt_append_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
@@ -277,16 +274,14 @@ extern int __wt_row_key_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
-extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
+extern int __wt_row_insert_alloc( WT_SESSION_IMPL *session,
     WT_ITEM *key,
-    uint32_t skipdepth,
-    WT_INSERT **insp,
-    size_t *ins_sizep);
+    u_int skipdepth,
+    WT_INSERT **insp);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
-    WT_UPDATE **updp,
-    size_t *upd_sizep);
+    WT_UPDATE **updp);
 extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,

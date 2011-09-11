@@ -8,43 +8,49 @@
 #include "wt_internal.h"
 
 /*
- * __search_insert --
- *	Search an insert list.
+ * __cursor_col_append_prev --
+ *	Return the previous entry on the append list.
  */
-static inline WT_INSERT *
-__search_insert(WT_INSERT_HEAD *inshead, uint64_t recno)
+static inline int
+__cursor_col_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_INSERT **ins;
-	uint64_t ins_recno;
-	int cmp, i;
+	WT_BUF *val;
+	WT_INSERT *ins;
+	uint32_t i;
 
-	/* If there's no insert chain to search, we're done. */
-	if (inshead == NULL)
-		return (NULL);
+	val = &cbt->iface.value;
 
-	/*
-	 * The insert list is a skip list: start at the highest skip level, then
-	 * go as far as possible at each level before stepping down to the next.
-	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL)
-			cmp = -1;
-		else {
-			ins_recno = WT_INSERT_RECNO(*ins);
-			cmp = (recno == ins_recno) ? 0 :
-			    (recno < ins_recno) ? -1 : 1;
-		}
-		if (cmp == 0)			/* Exact match: return */
-			return (*ins);
-		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(*ins)->next[i];
-		else {				/* Drop down a level */
-			--i;
-			--ins;
-		}
+	if (newpage) {
+		cbt->ins_entry_cnt = 0;
+		WT_SKIP_FOREACH(ins, cbt->ins_head)
+			++cbt->ins_entry_cnt;
+		goto new_page;
 	}
 
-	return (NULL);
+	for (;;) {
+		if (--cbt->ins_entry_cnt == 0) {
+			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
+			return (WT_NOTFOUND);
+		}
+
+new_page:	for (i = cbt->ins_entry_cnt,
+		    ins = WT_SKIP_FIRST(cbt->ins_head); i > 1; --i)
+			ins = WT_SKIP_NEXT(ins);
+		cbt->ins = ins;
+
+		if (cbt->page->type == WT_PAGE_COL_FIX) {
+			val->data = WT_UPDATE_DATA(cbt->ins->upd);
+			val->size = 1;
+			break;
+		} else {
+			if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+				continue;
+			val->data = WT_UPDATE_DATA(cbt->ins->upd);
+			val->size = cbt->ins->upd->size;
+			break;
+		}
+	}
+	return (0);
 }
 
 /*
@@ -74,8 +80,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno =
-		    cbt->page->u.col_leaf.recno + (cbt->page->entries - 1);
+		cbt->recno = __col_last_recno(cbt->page);
 		goto new_page;
 	}
 
@@ -92,7 +97,7 @@ new_page:	*recnop = cbt->recno;
 		 * to search the entire list.  We use the skiplist structure,
 		 * rather than doing it linearly.
 		 */
-		if ((ins = __search_insert(
+		if ((ins = __col_insert_search(
 		    WT_COL_INSERT_SINGLE(cbt->page), cbt->recno)) != NULL) {
 			val->data = WT_UPDATE_DATA(ins->upd);
 			val->size = 1;
@@ -135,7 +140,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno = __cursor_col_rle_last(cbt->page);
+		cbt->recno = __col_last_recno(cbt->page);
 		cbt->vslot = UINT32_MAX;
 		goto new_page;
 	}
@@ -148,8 +153,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	*recnop = cbt->recno;
 
 		/* Find the matching WT_COL slot. */
-		if ((cip =
-		    __cursor_col_rle_search(cbt->page, cbt->recno)) == NULL)
+		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
 		slot = WT_COL_SLOT(cbt->page, cip);
 
@@ -159,7 +163,7 @@ new_page:	*recnop = cbt->recno;
 		 * to search the entire list.  We use the skiplist structure,
 		 * rather than doing it linearly.
 		 */
-		if ((ins = __search_insert(
+		if ((ins = __col_insert_search(
 		    WT_COL_INSERT(cbt->page, cip), cbt->recno)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				continue;
@@ -228,8 +232,11 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * New page configuration.
 	 */
 	if (newpage) {
-		cbt->ins_head = WT_ROW_INSERT_SLOT(cbt->page,
-		    (cbt->page->entries > 0) ? cbt->page->entries - 1 : 0);
+		if (cbt->page->entries == 0)
+			cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
+		else
+			cbt->ins_head = WT_ROW_INSERT_SLOT(
+			    cbt->page, cbt->page->entries - 1);
 		cbt->ins_entry_cnt = 0;
 		WT_SKIP_FOREACH(ins, cbt->ins_head)
 			++cbt->ins_entry_cnt;
@@ -309,8 +316,8 @@ __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 
 	WT_BSTAT_INCR(session, cursor_last);
 
-	__cursor_func_clear(cbt, 1);
-	F_CLR(cbt, WT_CBT_SEARCH_SET);
+	__cursor_func_init(cbt, 1);
+	F_SET(cbt, WT_CBT_ITERATE_PREV);
 
 	return (__wt_btcur_prev(cbt));
 }
@@ -322,19 +329,20 @@ __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 int
 __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 {
-	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 	int newpage, ret;
 
-	cursor = &cbt->iface;
-	session = (WT_SESSION_IMPL *)cursor->session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_prev);
 
-	__cursor_func_clear(cbt, 0);
+	__cursor_func_init(cbt, 0);
 
-	/* If iterating from a search position, there's some setup to do. */
-	if (F_ISSET(cbt, WT_CBT_SEARCH_SET))
-		WT_RET(__wt_btcur_search_setup(cbt));
+	/*
+	 * If we aren't already iterating in the right direction, there's
+	 * some setup to do.
+	 */
+	if (!F_ISSET(cbt, WT_CBT_ITERATE_PREV))
+		__wt_btcur_iterate_setup(cbt, 0);
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
@@ -342,6 +350,14 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 	 * of the file.
 	 */
 	for (newpage = 0;; newpage = 1) {
+		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
+			if ((ret = __cursor_col_append_prev(cbt, newpage)) == 0)
+				break;
+			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
+			if (ret != WT_NOTFOUND)
+				break;
+			newpage = 1;
+		}
 		if (cbt->page != NULL) {
 			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
@@ -365,8 +381,18 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		} while (
 		    cbt->page->type == WT_PAGE_COL_INT ||
 		    cbt->page->type == WT_PAGE_ROW_INT);
+
+		/*
+		 * The last page in a column-store has appended entries.
+		 * We handle it separately from the usual cursor code:
+		 * it's only that one page and it's in a simple format.
+		 */
+		if (cbt->page->type != WT_PAGE_ROW_LEAF &&
+		    (cbt->ins = WT_SKIP_FIRST(
+		    WT_COL_INSERT_APPEND(cbt->page))) != NULL)
+			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 
-err:	__cursor_func_set(cbt, ret);
+err:	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }

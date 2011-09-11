@@ -17,22 +17,20 @@ class Serial:
 		self.args = args
 
 msgtypes = [
+Serial('append', 'WT_WORKQ_FUNC', 1, [
+		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('WT_INSERT ***', 'ins_stack'),
+		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
+		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
+		SerialArg('WT_INSERT *', 'new_ins', 0),
+		SerialArg('u_int', 'skipdepth'),
+	]),
+
 Serial('cache_read', 'WT_WORKQ_READ', 0, [
 		SerialArg('WT_PAGE *', 'parent'),
 		SerialArg('WT_REF *', 'parent_ref'),
 		SerialArg('int', 'dsk_verify'),
 	 ]),
-
-Serial('col_extend', 'WT_WORKQ_FUNC', 1, [
-		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('WT_PAGE *', 'new_intl', 1),
-		SerialArg('WT_COL_REF *', 't', 1),
-		SerialArg('uint32_t', 'internal_extend'),
-		SerialArg('WT_PAGE *', 'new_leaf', 1),
-		SerialArg('void *', 'entries', 1),
-		SerialArg('uint32_t', 'leaf_extend'),
-		SerialArg('uint64_t', 'recno'),
-	]),
 
 Serial('evict_file', 'WT_WORKQ_EVICT', 0, [
 		SerialArg('int', 'close_method'),
@@ -45,8 +43,8 @@ Serial('insert', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
 		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
-		SerialArg('WT_INSERT *', 'ins', 1),
-		SerialArg('uint32_t', 'depth'),
+		SerialArg('WT_INSERT *', 'new_ins', 0),
+		SerialArg('u_int', 'skipdepth'),
 	]),
 
 Serial('row_key', 'WT_WORKQ_FUNC', 1, [
@@ -60,7 +58,7 @@ Serial('update', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE **', 'new_upd', 1),
-		SerialArg('WT_UPDATE *', 'upd', 1),
+		SerialArg('WT_UPDATE *', 'upd', 0),
 	]),
 ]
 

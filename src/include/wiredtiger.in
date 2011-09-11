@@ -509,12 +509,6 @@ struct wt_session {
 	 * must appear in at least one column group.  Each column group must be
 	 * created with a separate call to WT_SESSION::create. The value must be
 	 * a string.,}
-	 * @config{column_internal_extend, configure the number of records a
-	 * column-store internal page is extended by when records are appended.
-	 * The value must be an integer between 500 and 10M.,\c 10000}
-	 * @config{column_leaf_extend, configure the number of records a
-	 * column-store leaf page is extended by when records are appended. The
-	 * value must be an integer between 500 and 10M.,\c 10000}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  For tables\, the number of
 	 * entries must match the total number of values in \c key_format and \c

@@ -171,6 +171,7 @@ struct __wt_walk_entry;
 #include "bitstring.i"
 #include "btree.i"
 #include "cell.i"
+#include "column.i"
 #include "cursor.i"
 #include "log.i"
 #include "packing.i"

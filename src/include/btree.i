@@ -6,20 +6,6 @@
  */
 
 /*
- * __wt_cache_page_workq --
- *	Create pages into the cache.
- */
-static inline void
-__wt_cache_page_workq(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	++cache->pages_workq;
-}
-
-/*
  * __wt_cache_page_workq_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -95,7 +81,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	pages_in = cache->pages_read + cache->pages_workq;
+	pages_in = cache->pages_read;
 	pages_out = cache->pages_evict;
 	return (pages_in > pages_out ? pages_in - pages_out : 0);
 }
@@ -167,13 +153,13 @@ __wt_page_reconcile(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 /*
  * __wt_page_release --
- *	Release a reference to a page, unless it's the root page, which remains
- * pinned for the life of the table handle.
+ *	Release a reference to a page, unless it's pinned into memory, in which
+ * case we never acquired a hazard reference.
  */
 static inline void
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page != NULL && !WT_PAGE_IS_ROOT(page))
+	if (page != NULL && !F_ISSET(page, WT_PAGE_PINNED))
 		__wt_hazard_clear(session, page);
 }
 
@@ -181,10 +167,11 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_skip_choose_depth --
  *      Randomly choose a depth for a skiplist insert.
  */
-static inline uint32_t
+static inline u_int
 __wt_skip_choose_depth(void)
 {
-	uint32_t d;
+	u_int d;
+
 	for (d = 1; d < WT_SKIP_MAXDEPTH &&
 	    __wt_random() < WT_SKIP_PROBABILITY; d++)
 		;
