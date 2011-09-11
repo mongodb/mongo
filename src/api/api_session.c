@@ -161,6 +161,8 @@ __session_drop(
 	WT_CONFIG_ITEM cval;
 	int force, ret;
 
+	force = 0;
+
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, drop, config, cfg);
