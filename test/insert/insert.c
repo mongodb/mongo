@@ -36,15 +36,14 @@
 	} while (0)
 
 const char *progname;
-u_int	flags = PRINT;
+u_int	flags =  0;
 int	bitcnt = 3;
 int	nrecs = 10;
-int	nrecs2 = 0;
 
 #define	FIX	1
 #define	ROW	2
 #define	VAR	3
-int	file_type = ROW;
+int	file_type;
 
 void run(void);
 int  usage(void);
@@ -62,16 +61,18 @@ main(int argc, char *argv[])
 	else
 		++progname;
 
-	while ((ch = getopt(argc, argv, "b:dN:n:pt:")) != EOF)
+	file_type = ROW;		/* Row-store by default */
+#if 0
+	flags = PRINT;			/* Don't print table by default */
+#endif
+
+	while ((ch = getopt(argc, argv, "b:dn:pt:")) != EOF)
 		switch (ch) {
 		case 'b':
 			bitcnt = atoi(optarg);
 			break;
 		case 'd':
 			flags |= DUPS;
-			break;
-		case 'N':
-			nrecs2 = atoi(optarg);
 			break;
 		case 'n':
 			nrecs = atoi(optarg);
@@ -103,12 +104,6 @@ main(int argc, char *argv[])
 		fprintf(stderr,
 		    "%s: -d requires row-store or variable-length "
 		    "column-store file type\n", progname);
-		return (EXIT_FAILURE);
-	}
-	if (nrecs2 != 0 && file_type != ROW) {
-		fprintf(stderr,
-		    "%s: -N requires row-store file type\n",
-		    progname);
 		return (EXIT_FAILURE);
 	}
 
@@ -176,12 +171,13 @@ run(void)
 	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
 
 	/* Create the initial key/value pairs. */
-	ikey = 100;
+	start = clock();
+	ikey = 1;
 	for (cnt = 0; cnt < nrecs; ++cnt, ++ikey) {
 		switch (file_type) {			/* Build the key. */
 		case FIX:
 		case VAR:
-			cursor->set_key(cursor, (uint64_t)cnt + 1);
+			cursor->set_key(cursor, (uint64_t)ikey);
 			break;
 		case ROW:
 			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
@@ -221,66 +217,48 @@ run(void)
 			exit (EXIT_FAILURE);
 		}
 	}
+	stop = clock();
+	fprintf(stderr, "timer: %.2lf\n",
+	    (stop - start) / (double)CLOCKS_PER_SEC);
+	if (!(flags & PRINT))
+		goto done;
+	fprintf(stderr, "\n");
 
-	/* Insert key/value pairs into the set. */
-	if (nrecs2 != 0) {
-		start = clock();
-
-		for (cnt = 0; cnt < nrecs2; ++cnt) {
-			snprintf(kbuf, sizeof(kbuf),
-			    "%010d KEY APPEND %010d", 105, cnt);
-			cursor->set_key(cursor, kbuf);
-			snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", cnt);
-			cursor->set_value(cursor, vbuf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				fprintf(stderr,
-				    "cursor->insert: %s\n",
-				    wiredtiger_strerror(ret));
-				exit (EXIT_FAILURE);
-			}
-		}
-
-		stop = clock();
-		fprintf(stderr, "timer: %.2lf\n",
-		    (stop - start) / (double)CLOCKS_PER_SEC);
-	}
 	assert(cursor->close(cursor, 0) == 0);
 
-	//assert(session->sync(session, "file:" FILENAME, NULL) == 0);
+	assert(session->sync(session, "file:" FILENAME, NULL) == 0);
 
 	assert(session->open_cursor(
 	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
-	if (flags & PRINT) {
-		while ((ret = cursor->next(cursor)) == 0) {
-			switch (file_type) {
-			case FIX:
-				if ((ret =
-				    cursor->get_value(cursor, &bitf)) != 0)
-					break;
-				printf("0x%02x\n", bitf);
+	while ((ret = cursor->next(cursor)) == 0) {
+		switch (file_type) {
+		case FIX:
+			if ((ret =
+			    cursor->get_value(cursor, &bitf)) != 0)
 				break;
-			case ROW:
-				if ((ret = cursor->get_key(cursor, &key)) != 0)
-					break;
-				if (printf("%s\n", key) < 0) {
-					ret = errno;
-					break;
-				}
-				/* FALLTHROUGH */
-			case VAR:
-				if ((ret =
-				    cursor->get_value(cursor, &value)) != 0)
-					break;
-				if (printf("%s\n", value) < 0)
-					ret = errno;
+			printf("0x%02x\n", bitf);
+			break;
+		case ROW:
+			if ((ret = cursor->get_key(cursor, &key)) != 0)
+				break;
+			if (printf("%s\n", key) < 0) {
+				ret = errno;
 				break;
 			}
+			/* FALLTHROUGH */
+		case VAR:
+			if ((ret =
+			    cursor->get_value(cursor, &value)) != 0)
+				break;
+			if (printf("%s\n", value) < 0)
+				ret = errno;
+			break;
 		}
-		if (ret != WT_NOTFOUND) {
-			fprintf(stderr, "%s: cursor get failed: %s\n",
-			    progname, wiredtiger_strerror(ret));
-			exit (EXIT_FAILURE);
-		}
+	}
+	if (ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: cursor get failed: %s\n",
+		    progname, wiredtiger_strerror(ret));
+		exit (EXIT_FAILURE);
 	}
 
 	for (;;) {
@@ -304,5 +282,5 @@ run(void)
 		fprintf(stderr, "%d: %s\n", exact, key);
 	}
 
-	assert(conn->close(conn, 0) == 0);
+done:	assert(conn->close(conn, 0) == 0);
 }
