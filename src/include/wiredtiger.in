@@ -223,7 +223,7 @@ struct wt_cursor {
 	/*! @name Cursor positioning
 	 * @{
 	 */
-	/*! Move to the first record.
+	/*! Return the first record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->first
@@ -233,7 +233,7 @@ struct wt_cursor {
 	 */
 	int __F(first)(WT_CURSOR *cursor);
 
-	/*! Move to the last record.
+	/*! Return the last record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->last
@@ -243,7 +243,7 @@ struct wt_cursor {
 	 */
 	int __F(last)(WT_CURSOR *cursor);
 
-	/*! Move to the next record.
+	/*! Return the next record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->next
@@ -253,7 +253,7 @@ struct wt_cursor {
 	 */
 	int __F(next)(WT_CURSOR *cursor);
 
-	/*! Move to the previous record.
+	/*! Return the previous record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->prev
@@ -263,7 +263,7 @@ struct wt_cursor {
 	 */
 	int __F(prev)(WT_CURSOR *cursor);
 
-	/*! Search for a record.
+	/*! Return a record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->prev
@@ -275,7 +275,7 @@ struct wt_cursor {
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
-	/*! Search for a record.
+	/*! Return a record, or a nearby record.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->search
@@ -294,24 +294,36 @@ struct wt_cursor {
 	 * @{
 	 */
 	/*! Insert a record.
+	 * In a row-store, if the cursor was not configured with "overwrite",
+	 * both the key and value must be set, the record must not already
+	 * exist, and the key/value pair will be inserted.
+	 *
+	 * In a row-store, if the cursor was configured with "overwrite",
+	 * both the key and value must be set; if the record already exists, the
+	 * key's value will be updated, otherwise, the key/value pair will be
+	 * inserted.
+	 *
+	 * In a column-store, if the cursor was not configured with "overwrite",
+	 * the value must be set; a new record will be appended to the table
+	 * and the new record's number returned as the key value.
+	 *
+	 * In a column-store, if the cursor was configured with "overwrite",
+	 * both the key and value must be set; if the record already exists, the
+	 * key's value will be updated, otherwise, the key/value pair will be
+	 * inserted.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->search_near
 	 * @skip ->set_key
 	 * @until ->insert
 	 *
-	 * @todo describe append
-	 * @todo describe how to unconditionally overwrite
-	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(insert)(WT_CURSOR *cursor);
 
-	/*! Update the current record.  The cursor must be positioned on a
-	 * record and the value of the record will be updated.  If the record
-	 * is part of a sorted duplicate set, its position must not change as
-	 * a result of the update.
+	/*! Update a record.  Both key and value must be set, the key must
+	 * exist, and the value of the key's record will be updated.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->insert
@@ -323,7 +335,8 @@ struct wt_cursor {
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
-	/*! Remove the current record.
+	/*! Remove a record.  Both key and value must be set, and the key's
+	 * record will be removed.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->remove
