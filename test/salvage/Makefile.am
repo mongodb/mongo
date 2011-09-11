@@ -4,3 +4,6 @@ noinst_PROGRAMS = t
 t_SOURCES = salvage.c
 t_LDADD = $(top_builddir)/libwiredtiger.la
 t_LDFLAGS = -static
+
+clean-local:
+	rm -rf __slvg.* __schema.wt
