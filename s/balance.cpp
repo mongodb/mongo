@@ -244,9 +244,8 @@ namespace mongo {
             return true;
 
         }
-        catch ( std::exception& ) {
-
-            log( LL_WARNING ) << "could not initialize balancer, please check that all shards and config servers are up" << endl;
+        catch ( std::exception& e ) {
+            warning() << "could not initialize balancer, please check that all shards and config servers are up: " << e.what() << endl;
             return false;
 
         }

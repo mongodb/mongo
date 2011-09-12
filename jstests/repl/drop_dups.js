@@ -17,7 +17,12 @@ function run( createInBackground ) {
     
     am[collName].drop();
     am.blah.insert( { x : 1 } )
-    block();
+    assert.soon( function(){
+        block();
+        return as.blah.findOne();
+    }
+               );
+        
     
     for ( i=0; i<10; i++ ) {
         am[collName].insert( { _id : i , x : Math.floor( i / 2 ) } )

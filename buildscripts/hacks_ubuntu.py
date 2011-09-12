@@ -2,11 +2,13 @@
 import os
 
 def insert( env , options ):
-    
-    if not foundxulrunner( env , options ):
-        if os.path.exists( "usr/include/mozjs/" ):
-            env.Append( CPPDEFINES=[ "MOZJS" ] )
 
+    # now that sm is in the source tree, don't need this
+    # if not foundxulrunner( env , options ):
+    #     if os.path.exists( "usr/include/mozjs/" ):
+    #         env.Append( CPPDEFINES=[ "MOZJS" ] )
+
+    return
 
 def foundxulrunner( env , options ):
     best = None

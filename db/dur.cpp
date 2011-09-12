@@ -123,7 +123,7 @@ namespace mongo {
             return ss.str();
         }
 
-        int getAgeOutJournalFiles();
+        //int getAgeOutJournalFiles();
         BSONObj Stats::S::_asObj() {
             BSONObjBuilder b;
             b << 
@@ -140,11 +140,11 @@ namespace mongo {
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
                            );
-            int r = getAgeOutJournalFiles();
+            /*int r = getAgeOutJournalFiles();
             if( r == -1 )
                 b << "ageOutJournalFiles" << "mutex timeout";
             if( r == 0 )
-                b << "ageOutJournalFiles" << false;
+                b << "ageOutJournalFiles" << false;*/
             if( cmdLine.journalCommitInterval != 0 )
                 b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
@@ -714,11 +714,12 @@ namespace mongo {
                     // but is likely also less spiky on our cpu usage, which is good.
 
                     // commit sooner if one or more getLastError j:true is pending
+                    sleepmillis(oneThird);
                     for( unsigned i = 1; i <= 2; i++ ) {
-                        sleepmillis(oneThird);
                         if( commitJob._notify.nWaiting() )
                             break;
                         commitJob.wi()._deferred.invoke();
+                        sleepmillis(oneThird);
                     }
 
                     go();

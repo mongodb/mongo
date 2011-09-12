@@ -1,10 +1,10 @@
 // to run: 
 //   ./mongo jstests/<this-file>
 
-Array.prototype.contains = function(obj) {
-    var i = this.length;
+contains = function(arr,obj) {
+    var i = arr.length;
     while (i--) {
-        if (this[i] === obj) {
+        if (arr[i] === obj) {
             return true;
         }
     }
@@ -15,8 +15,8 @@ var resp = db.adminCommand({getLog:"*"})
 assert( resp.ok == 1, "error executing getLog command" );
 assert( resp.names, "no names field" );
 assert( resp.names.length > 0, "names array is empty" );
-assert( resp.names.contains("global") , "missing global category" );
-assert( !resp.names.contains("butty") , "missing butty category" );
+assert( contains(resp.names,"global") , "missing global category" );
+assert( !contains(resp.names,"butty") , "missing butty category" );
 
 resp = db.adminCommand({getLog:"global"})
 assert( resp.ok == 1, "error executing getLog command" );

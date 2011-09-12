@@ -604,7 +604,7 @@ namespace mongo {
             }
             if( !d.moreJSObjs() )
                 break;
-            js = d.nextJsObj();
+            js = d.nextJsObj(); // TODO: refactor to do objcheck outside of writelock
         }
     }
 
@@ -612,6 +612,12 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
+
+        if( !d.moreJSObjs() ) {
+            // strange.  should we complain?
+            return;
+        }
+        BSONObj js = d.nextJsObj();
 
         writelock lk(ns);
 
@@ -623,11 +629,6 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        if( !d.moreJSObjs() ) { 
-            // strange.  should we complain?
-            return;
-        }
-        BSONObj js = d.nextJsObj();
         if( d.moreJSObjs() ) { 
             insertMulti(d, ns, js);
             return;
@@ -961,9 +962,8 @@ namespace mongo {
                 if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
-                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                             << "recommend removing file and running --repair\n"
-                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                             << "Unclean shutdown detected.\n"
+                             << "Please visit http://dochub.mongodb.org/core/repair for recovery instructions.\n"
                              << "*************";
                 }
             }

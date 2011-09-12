@@ -38,3 +38,19 @@ t.save( {a:[]} );
 t.update( {}, {$set:{"a.f":1}} );
 assert( db.getLastError() );
 assert.eq( [], t.findOne().a );
+
+// SERVER-3750
+t.drop();
+t.save( {a:[]} );
+t.update( {}, {$set:{"a.1500000":1}} ); // current limit
+assert( db.getLastError() == null );
+
+t.drop();
+t.save( {a:[]} );
+t.update( {}, {$set:{"a.1500001":1}} ); // 1 over limit
+assert.eq(15891 , db.getLastErrorObj().code );
+
+t.drop();
+t.save( {a:[]} );
+t.update( {}, {$set:{"a.1000000000":1}} ); // way over limit
+assert.eq(15891 , db.getLastErrorObj().code );

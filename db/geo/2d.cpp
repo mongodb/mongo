@@ -522,6 +522,20 @@ namespace mongo {
                           ( _min._y + _max._y ) / 2 );
         }
 
+        void truncate( const Geo2dType* g ) {
+            if( _min._x < g->_min ) _min._x = g->_min;
+            if( _min._y < g->_min ) _min._y = g->_min;
+            if( _max._x > g->_max ) _max._x = g->_max;
+            if( _max._y > g->_max ) _max._y = g->_max;
+        }
+
+        void fudge( const Geo2dType* g ) {
+            _min._x -= g->_error;
+            _min._y -= g->_error;
+            _max._x += g->_error;
+            _max._y += g->_error;
+        }
+
         bool onBoundary( Point p, double fudge = 0 ) {
             return onBoundary( _min._x, p._x, fudge ) ||
                    onBoundary( _max._x, p._x, fudge ) ||
@@ -650,8 +664,17 @@ namespace mongo {
 
                 }
                 else if( fudge == 0 ){
-                    if( p._y == p1._y && p._x == p1._x ) return true;
-                    else if( p._y == p2._y && p._x == p2._x ) return true;
+
+                    // If this is an exact vertex, we won't intersect, so check this
+                    if( p._y == p1._y && p._x == p1._x ) return 1;
+                    else if( p._y == p2._y && p._x == p2._x ) return 1;
+
+                    // If this is a horizontal line we won't intersect, so check this
+                    if( p1._y == p2._y && p._y == p1._y ){
+                        // Check that the x-coord lies in the line
+                        if( p._x >= std::min( p1._x, p2._x ) && p._x <= std::max( p1._x, p2._x ) ) return 1;
+                    }
+
                 }
 
                 // Normal intersection test.
@@ -661,7 +684,20 @@ namespace mongo {
                         if ( p._x <= std::max( p1._x, p2._x ) ) {
                             if ( p1._y != p2._y ) {
                                 double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
-                                if ( p1._x == p2._x || p._x <= xinters ) {
+                                // Special case of point on vertical line
+                                if ( p1._x == p2._x && p._x == p1._x ){
+
+                                    // Need special case for the vertical edges, for example:
+                                    // 1) \e   pe/----->
+                                    // vs.
+                                    // 2) \ep---e/----->
+                                    //
+                                    // if we count exact as intersection, then 1 is in but 2 is out
+                                    // if we count exact as no-int then 1 is out but 2 is in.
+
+                                    return 1;
+                                }
+                                else if( p1._x == p2._x || p._x <= xinters ) {
                                     counter++;
                                 }
                             }
@@ -2276,6 +2312,9 @@ namespace mongo {
             _want._min = Point( i.next() );
             _want._max = Point( i.next() );
 
+            _wantRegion = _want;
+            _wantRegion.fudge( g ); // Need to make sure we're checking regions within error bounds of where we want
+            fixBox( g, _wantRegion );
             fixBox( g, _want );
 
             uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
@@ -2294,18 +2333,18 @@ namespace mongo {
         }
 
         void fixBox( const Geo2dType* g, Box& box ) {
-            if( _want._min._x > _want._max._x )
-                swap( _want._min._x, _want._max._x );
-            if( _want._min._y > _want._max._y )
-                swap( _want._min._y, _want._max._y );
+            if( box._min._x > box._max._x )
+                swap( box._min._x, box._max._x );
+            if( box._min._y > box._max._y )
+                swap( box._min._y, box._max._y );
 
             double gMin = g->_min;
             double gMax = g->_max;
 
-            if( _want._min._x < gMin ) _want._min._x = gMin;
-            if( _want._min._y < gMin ) _want._min._y = gMin;
-            if( _want._max._x > gMax) _want._max._x = gMax;
-            if( _want._max._y > gMax ) _want._max._y = gMax;
+            if( box._min._x < gMin ) box._min._x = gMin;
+            if( box._min._y < gMin ) box._min._y = gMin;
+            if( box._max._x > gMax) box._max._x = gMax;
+            if( box._max._y > gMax ) box._max._y = gMax;
         }
 
         void swap( double& a, double& b ) {
@@ -2323,7 +2362,7 @@ namespace mongo {
         }
 
         virtual double intersectsBox( Box& cur ) {
-            return cur.intersects( _want );
+            return cur.intersects( _wantRegion );
         }
 
         virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
@@ -2337,6 +2376,7 @@ namespace mongo {
         }
 
         Box _want;
+        Box _wantRegion;
         double _wantLen;
         double _fudge;
 
@@ -2363,6 +2403,9 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
+            _bounds.fudge( g ); // We need to check regions within the error bounds of these bounds
+            _bounds.truncate( g ); // We don't need to look anywhere outside the space
+
             _maxDim = _g->_error + _bounds.maxDim() / 2;
 
             ok();
@@ -2370,7 +2413,7 @@ namespace mongo {
 
         // The initial geo hash box for our first expansion
         virtual GeoHash expandStartHash() {
-            return _g->hash( _poly.centroid() );
+            return _g->hash( _bounds.center() );
         }
 
         // Whether the current box width is big enough for our search area

@@ -1817,6 +1817,15 @@ namespace mongo {
 
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+
+            if ( c->requiresAuth() ) {
+                // test that the user at least as read permissions
+                if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
+                    result.append( "errmsg" , "need to login" );
+                    return false;
+                }
+            }
+
             client.curop()->ensureStarted();
             string errmsg;
             int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );

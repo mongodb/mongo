@@ -1,4 +1,4 @@
-if (db.serverStatus().dur) {
+if (false && db.serverStatus().dur) {
 
     assert(db.serverStatus().dur.ageOutJournalFiles != false);
 

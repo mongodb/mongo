@@ -901,7 +901,10 @@ namespace mongo {
 
     class UpdateOp : public MultiCursor::CursorOp {
     public:
-        UpdateOp( bool hasPositionalField ) : _nscanned(), _hasPositionalField( hasPositionalField ) {}
+        UpdateOp( bool hasPositionalField, int orClauseIndex = -1 ) :
+        _nscanned(),
+        _hasPositionalField( hasPositionalField ),
+        _orClauseIndex( orClauseIndex ) {}
         virtual void _init() {
             _c = qp().newCursor();
             if ( ! _c->ok() ) {
@@ -909,6 +912,9 @@ namespace mongo {
             }
         }
         virtual bool prepareToYield() {
+            if ( _orClauseIndex > 0 ) {
+                return false;
+            }
             if ( ! _cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
             }
@@ -930,6 +936,10 @@ namespace mongo {
                 return;
             }
             _nscanned = _c->nscanned();
+            if ( _orClauseIndex > 0 && _nscanned >= 100 ) {
+                setComplete();
+                return;
+            }
             if ( matcher( _c )->matchesCurrent(_c.get(), &_details ) ) {
                 setComplete();
                 return;
@@ -939,7 +949,7 @@ namespace mongo {
 
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *_createChild() const {
-            return new UpdateOp( _hasPositionalField );
+            return new UpdateOp( _hasPositionalField, _orClauseIndex + 1 );
         }
         // already scanned to the first match, so return _c
         virtual shared_ptr< Cursor > newCursor() const { return _c; }
@@ -951,6 +961,8 @@ namespace mongo {
         MatchDetails _details;
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
+        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.  SERVER-3555
+        int _orClauseIndex;
     };
 
     static void checkTooLarge(const BSONObj& newObj) {
@@ -990,7 +1002,12 @@ namespace mongo {
             
             {
                 // we need to re-find in case something changed
-                
+                d = nsdetails( ns );
+                if ( ! d ) {
+                    // dropped 
+                    return UpdateResult(0, 0, 0);
+                }
+                nsdt = &NamespaceDetailsTransient::get_w(ns);
                 IndexDetails& i = d->idx(idIdxNo);
                 BSONObj key = i.getKeyFromQuery( patternOrig );            
                 loc = i.idxInterface().findSingle(i, i.head, key);

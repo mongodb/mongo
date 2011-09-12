@@ -1,0 +1,388 @@
+# -*- Mode: makefile -*-
+#
+# ***** BEGIN LICENSE BLOCK *****
+# Version: MPL 1.1/GPL 2.0/LGPL 2.1
+#
+# The contents of this file are subject to the Mozilla Public License Version
+# 1.1 (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+# http://www.mozilla.org/MPL/
+#
+# Software distributed under the License is distributed on an "AS IS" basis,
+# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+# for the specific language governing rights and limitations under the
+# License.
+#
+# The Original Code is Mozilla Communicator client code, released
+# March 31, 1998.
+#
+# The Initial Developer of the Original Code is
+# Netscape Communications Corporation.
+# Portions created by the Initial Developer are Copyright (C) 1998
+# the Initial Developer. All Rights Reserved.
+#
+# Contributor(s):
+#
+# Alternatively, the contents of this file may be used under the terms of
+# either of the GNU General Public License Version 2 or later (the "GPL"),
+# or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+# in which case the provisions of the GPL or the LGPL are applicable instead
+# of those above. If you wish to allow use of your version of this file only
+# under the terms of either the GPL or the LGPL, and not to allow others to
+# use your version of this file under the terms of the MPL, indicate your
+# decision by deleting the provisions above and replace them with the notice
+# and other provisions required by the GPL or the LGPL. If you do not delete
+# the provisions above, a recipient may use your version of this file under
+# the terms of any one of the MPL, the GPL or the LGPL.
+#
+# ***** END LICENSE BLOCK *****
+
+DEPTH		= ../..
+topsrcdir	= @top_srcdir@
+srcdir		= @srcdir@
+VPATH		= @srcdir@
+
+include $(DEPTH)/config/autoconf.mk
+
+MODULE		= js
+LIBRARY_NAME	= mozjs
+LIB_IS_C_ONLY	= 1
+GRE_MODULE	= 1
+
+ifeq (,$(filter-out WINNT WINCE,$(OS_ARCH)))
+LIBRARY_NAME	= js$(MOZ_BITS)$(VERSION_NUMBER)
+RESFILE		= js$(MOZ_BITS)40.res
+endif
+
+PACKAGE_FILE = js.pkg
+
+# JavaScript must be built shared, even for static builds, as it is used by
+# other modules which are always built shared. Failure to do so results in
+# the js code getting copied into xpinstall and jsd as well as mozilla-bin,
+# and then the static data cells used for locking no longer work.
+
+ifndef JS_STATIC_BUILD
+FORCE_SHARED_LIB = 1
+endif
+
+CSRCS		= \
+		jsapi.c \
+		jsarena.c \
+		jsarray.c \
+		jsatom.c \
+		jsbool.c \
+		jscntxt.c \
+		jsdate.c \
+		jsdbgapi.c \
+		jsdhash.c \
+		jsdtoa.c \
+		jsemit.c \
+		jsexn.c \
+		jsfun.c \
+		jsgc.c \
+		jshash.c \
+		jsinterp.c \
+		jsiter.c \
+		jslock.c \
+		jslog2.c \
+		jslong.c \
+		jsmath.c \
+		jsnum.c \
+		jsobj.c \
+		jsopcode.c \
+		jsparse.c \
+		jsprf.c \
+		jsregexp.c \
+		jsscan.c \
+		jsscope.c \
+		jsscript.c \
+		jsstr.c \
+		jsutil.c \
+		jsxdrapi.c \
+		jsxml.c \
+		prmjtime.c \
+		$(NULL)
+
+EXPORTS		= \
+		jsautocfg.h \
+		jsautokw.h \
+		js.msg \
+		jsapi.h \
+		jsarray.h \
+		jsarena.h \
+		jsatom.h \
+		jsbit.h \
+		jsbool.h \
+		jsclist.h \
+		jscntxt.h \
+		jscompat.h \
+		jsconfig.h \
+		jsdate.h \
+		jsdbgapi.h \
+		jsdhash.h \
+		jsemit.h \
+		jsfun.h \
+		jsgc.h \
+		jshash.h \
+		jsinterp.h \
+		jsiter.h \
+		jslock.h \
+		jslong.h \
+		jsmath.h \
+		jsnum.h \
+		jsobj.h \
+		jsopcode.tbl \
+		jsopcode.h \
+		jsosdep.h \
+		jsotypes.h \
+		jsparse.h \
+		jsprf.h \
+		jsproto.tbl \
+		jsprvtd.h \
+		jspubtd.h \
+		jsregexp.h \
+		jsscan.h \
+		jsscope.h \
+		jsscript.h \
+		jsstddef.h \
+		jsstr.h \
+		jstypes.h \
+		jsutil.h \
+		jsxdrapi.h \
+		jsxml.h \
+		$(NULL)
+
+ifeq (,$(filter-out WINNT WINCE,$(OS_ARCH)))
+EXPORTS		+= jscpucfg.h
+endif
+
+JS_SAFE_ARENA	= 1
+
+DASH_R		= -r
+
+include $(topsrcdir)/config/config.mk
+
+EXTRA_DSO_LDOPTS += $(NSPR_LIBS)
+
+# When using gcc the assembly is inlined in the C-file (see jslock.c)
+ifeq ($(OS_ARCH),SunOS)
+ifneq ($(OS_TEST),i86pc)
+ifndef GNU_CC
+ASFILES		= lock_$(OS_ARCH).s
+endif
+endif
+endif
+
+ifndef BUILD_OPT
+MOCHAFILE	= 1
+endif
+
+ifndef NSBUILDROOT
+JSJAVA_STUBHEADERS = \
+		-I$(topsrcdir)/sun-java/include/_gen \
+		-I$(topsrcdir)/sun-java/netscape/javascript/_jri \
+		-I$(topsrcdir)/sun-java/netscape/security/_jri
+else
+JSJAVA_STUBHEADERS = -I$(JRI_GEN_DIR) -I$(JDK_GEN_DIR)
+endif
+
+JSJAVA_CFLAGS	= \
+		-I$(topsrcdir)/sun-java/md-include \
+		-I$(topsrcdir)/sun-java/include \
+		$(JSJAVA_STUBHEADERS)
+
+# Define keyword generator before rules.mk, see bug 323979 comment 50
+
+HOST_SIMPLE_PROGRAMS += host_jskwgen$(HOST_BIN_SUFFIX)
+GARBAGE += jsautokw.h host_jskwgen$(HOST_BIN_SUFFIX)
+
+include $(topsrcdir)/config/rules.mk
+
+DEFINES		+= -DEXPORT_JS_API 
+
+INCLUDES	+= -I$(srcdir)
+
+# MSVC '-Gy' cc flag and '/OPT:REF' linker flag cause JS_GetArgument and
+# JS_GetLocalVariable to be folded to the same address by the linker, 
+# leading to a crash on startup. See bug 151066. So, in optimized builds,
+# add the /OPT:NOICF flag, which turns off 'identical COMDAT folding'.
+#
+# N.B.: 'identical COMDAT folding' that folds functions whose addresses
+# are taken violates the ISO C and C++ standards.
+ifndef MOZ_DEBUG
+ifeq (_WINNT,$(GNU_CC)_$(OS_ARCH))
+LDFLAGS         += -OPT:NOICF
+endif
+endif
+
+GARBAGE		+= jscpucfg.o jsautocfg.h jsautocfg.tmp jscpucfg
+
+ifneq (,$(CROSS_COMPILE)$(filter-out WINNT,$(OS_ARCH)))
+TARGETS		+= jscpucfg$(HOST_BIN_SUFFIX)
+endif
+
+ifdef JS_SAFE_ARENA
+DEFINES		+= -DJS_USE_SAFE_ARENA
+endif
+
+ifdef JS_THREADSAFE
+DEFINES		+= -DJS_THREADSAFE
+endif
+
+ifdef JS_NO_THIN_LOCKS
+DEFINES		+= -DJS_USE_ONLY_NSPR_LOCKS
+endif
+
+ifdef JS_VERSION
+DEFINES		+= -DJS_VERSION=$(JS_VERSION)
+endif
+
+ifneq ($(findstring -L,$(NSPR_LIBS)),)
+NSPR_STATIC_PATH = $(subst -L,,$(findstring -L,$(NSPR_LIBS)))
+else
+NSPR_STATIC_PATH = $(DIST)/lib
+endif
+
+LDFLAGS		+= $(pathsubst -l%,$(NSPR_STATIC_PATH)/%.a,$(NSPR_LIBS))
+
+# BeOS and HP-UX do not require the extra linking of "-lm"
+ifeq (,$(filter BeOS HP-UX WINNT WINCE OpenVMS,$(OS_ARCH)))
+LDFLAGS		+= -lm
+endif
+
+# Prevent floating point errors caused by VC++ optimizations
+ifeq ($(OS_ARCH)_$(GNU_CC),WINNT_)
+ifeq (,$(filter-out 1200 1300 1310,$(_MSC_VER)))
+CFLAGS += -Op
+else
+CFLAGS += -fp:precise
+endif
+endif # WINNT
+
+ifeq ($(OS_ARCH),FreeBSD)
+LDFLAGS		+= -pthread
+endif
+ifeq ($(OS_ARCH),IRIX)
+ifdef USE_N32
+DASH_R		+= -n32
+endif
+endif
+ifeq ($(OS_ARCH),Linux)
+LDFLAGS		+= -ldl
+endif
+ifeq ($(OS_ARCH),OSF1)
+LDFLAGS		+= -lc_r
+endif
+ifeq ($(OS_ARCH),SunOS)
+ifeq ($(TARGET_CPU),sparc)
+
+ifdef JS_ULTRASPARC_OPTS
+DEFINES += -DULTRA_SPARC
+ifdef GNU_CC
+CFLAGS   += -Wa,-xarch=v8plus,-DULTRA_SPARC,-P,-L,-D_ASM,-D__STDC__=0
+CXXFLAGS += -Wa,-xarch=v8plus,-DULTRA_SPARC,-P,-L,-D_ASM,-D__STDC__=0,-K,PIC
+else
+ASFLAGS  += -xarch=v8plus -DULTRA_SPARC -P -L -D_ASM -D__STDC__=0 -K PIC
+endif # GNU_CC
+endif # JS_ULTRASPARC_OPTS
+
+endif
+ifeq ($(OS_RELEASE),4.1)
+LDFLAGS		+= -ldl -lnsl
+else
+LDFLAGS		+= -lposix4 -ldl -lnsl -lsocket
+endif
+endif
+
+ifeq ($(OS_ARCH),IRIX)
+ifndef GNU_CC
+_COMPILE_CFLAGS  = $(patsubst -O%,-O1,$(COMPILE_CFLAGS))
+jsapi.o jsarena.o jsarray.o jsatom.o jsemit.o jsfun.o jsinterp.o jsregexp.o jsparse.o jsopcode.o jsscript.o: %.o: %.c Makefile.in
+	$(REPORT_BUILD)
+	@$(MAKE_DEPS_AUTO)
+	$(CC) -o $@ -c $(_COMPILE_CFLAGS) $<
+endif
+endif
+
+# An AIX Optimization bug causes PR_dtoa() & JS_dtoa to produce wrong result.
+# This suppresses optimization for this single compilation unit.
+ifeq ($(OS_ARCH),AIX)
+jsatom.o: jsatom.c Makefile.in
+	$(REPORT_BUILD)
+	@$(MAKE_DEPS_AUTO)
+	$(CC) -o $@ -c $(filter-out $(MOZ_OPTIMIZE_FLAGS), $(COMPILE_CFLAGS)) $<
+jsdtoa.o: jsdtoa.c Makefile.in
+	$(REPORT_BUILD)
+	@$(MAKE_DEPS_AUTO)
+	$(CC) -o $@ -c $(filter-out $(MOZ_OPTIMIZE_FLAGS), $(COMPILE_CFLAGS)) $<
+endif
+
+jsopcode.h jsopcode.c: jsopcode.tbl
+
+ifeq (,$(CROSS_COMPILE)$(filter-out WINNT,$(OS_ARCH)))
+jsautocfg.h:
+	touch $@
+else
+ifeq ($(OS_ARCH),WINCE)
+jsautocfg.h:
+	touch $@
+else
+jsautocfg.h: jscpucfg$(HOST_BIN_SUFFIX)
+	@rm -f $@ jsautocfg.tmp
+	./jscpucfg > jsautocfg.tmp
+	mv jsautocfg.tmp $@
+endif
+endif
+
+# jscpucfg is a strange target
+# Needs to be built with the host compiler but needs to include
+# the mdcpucfg for the target so it needs the appropriate target defines
+ifdef HOST_NSPR_MDCPUCFG
+HOST_CC := $(HOST_CC) -DMDCPUCFG=$(TARGET_NSPR_MDCPUCFG)
+HOST_CFLAGS := $(patsubst -DXP_%,,$(HOST_CFLAGS))
+endif
+
+ifdef CROSS_COMPILE
+# jscpucfg needs to know when it's supposed to produce a config for the target
+JSCPUCFG_DEFINES = $(ACDEFINES)
+
+# This is incredibly hacky.  Darwin NSPR uses the same MDCPUCFG for multiple
+# processors, and determines which processor to configure for based on
+# #ifdef i386.  This macro is among the NSPR defines, but is also automatically
+# defined by the compiler when building for i386.  It therefore needs to be
+# defined here if targeting i386, and explicitly undefined otherwise.
+ifeq ($(OS_ARCH),Darwin)
+ifeq ($(TARGET_CPU),powerpc)
+JSCPUCFG_DEFINES += -Ui386
+else
+JSCPUCFG_DEFINES += -Di386=1
+endif
+endif
+endif
+
+ifeq ($(OS_ARCH),QNX)
+ifneq ($(OS_TARGET),NTO)
+# QNX's compiler apparently can't build a binary directly from a source file.
+jscpucfg.o: jscpucfg.c Makefile.in
+	$(HOST_CC) $(HOST_CFLAGS) -c $(JSCPUCFG_DEFINES) $(DEFINES) $(NSPR_CFLAGS) -o $@ $<
+
+jscpucfg: jscpucfg.o
+	$(HOST_CC) $(HOST_CFLAGS) $(JSCPUCFG_DEFINES) $(DEFINES) -o $@ $<
+endif
+else
+ifeq ($(OS_ARCH),WINCE)
+jscpucfg$(HOST_BIN_SUFFIX):
+	echo no need to build jscpucfg $<
+else
+jscpucfg$(HOST_BIN_SUFFIX): jscpucfg.c Makefile.in
+	$(HOST_CC) $(HOST_CFLAGS) $(JSCPUCFG_DEFINES) $(DEFINES) $(NSPR_CFLAGS) $(OUTOPTION)$@ $<
+endif
+endif
+
+# Extra dependancies and rules for keyword switch code
+jsscan.$(OBJ_SUFFIX): jsautokw.h jskeyword.tbl
+
+host_jskwgen.$(OBJ_SUFFIX): jsconfig.h jskeyword.tbl
+
+jsautokw.h: host_jskwgen$(HOST_BIN_SUFFIX)
+	./host_jskwgen$(HOST_BIN_SUFFIX) $@

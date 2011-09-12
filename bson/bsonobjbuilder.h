@@ -24,6 +24,7 @@
 
 #include <limits>
 #include <cmath>
+#include <boost/static_assert.hpp>
 #include "bsonelement.h"
 #include "bsonobj.h"
 #include "bsonmisc.h"
@@ -764,6 +765,11 @@ namespace mongo {
         }
 
         void fill (int upTo){
+            // if this is changed make sure to update error message and jstests/set7.js
+            const int maxElems = 1500000;
+            BOOST_STATIC_ASSERT(maxElems < (BSONObjMaxUserSize/10));
+            uassert(15891, "can't backfill array to larger than 1,500,000 elements", upTo <= maxElems);
+
             while( _i < upTo )
                 append( nullElt() );
         }

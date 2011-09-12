@@ -107,6 +107,8 @@ namespace mongo {
         bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
+        bool keyFile;
+
 #ifdef MONGO_SSL
         bool sslOnNormalPorts;      // --sslOnNormalPorts
         string sslPEMKeyFile;       // --sslPEMKeyFile

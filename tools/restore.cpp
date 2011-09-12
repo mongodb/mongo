@@ -39,6 +39,7 @@ class Restore : public BSONTool {
 public:
 
     bool _drop;
+    bool _keepIndexVersion;
     string _curns;
     string _curdb;
     set<string> _users; // For restoring users with --drop
@@ -47,6 +48,7 @@ public:
         add_options()
         ("drop" , "drop each collection before import" )
         ("oplogReplay" , "replay oplog for point-in-time restore")
+        ("keepIndexVersion" , "don't upgrade indexes to newest version")
         ;
         add_hidden_options()
         ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
@@ -69,6 +71,7 @@ public:
         }
 
         _drop = hasParam( "drop" );
+        _keepIndexVersion = hasParam("keepIndexVersion");
 
         bool doOplog = hasParam( "oplogReplay" );
         if (doOplog) {
@@ -265,7 +268,7 @@ public:
                     string s = _curdb + "." + n.coll;
                     bo.append("ns", s);
                 }
-                else {
+                else if (strcmp(e.fieldName(), "v") != 0 || _keepIndexVersion) { // Remove index version number
                     bo.append(e);
                 }
             }

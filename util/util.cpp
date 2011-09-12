@@ -21,6 +21,7 @@
 #include "file_allocator.h"
 #include "optime.h"
 #include "time_support.h"
+#include "mongoutils/str.h"
 
 namespace mongo {
 
@@ -46,6 +47,13 @@ namespace mongo {
         static unsigned N = 0;
 
         if ( strcmp( name , "conn" ) == 0 ) {
+            string* x = _threadName.get();
+            if ( x && mongoutils::str::startsWith( *x , "conn" ) ) {
+                int n = atoi( x->c_str() + 4 );
+                if ( n > 0 )
+                    return n;
+                warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
+            }
             unsigned n = ++N;
             stringstream ss;
             ss << name << n;

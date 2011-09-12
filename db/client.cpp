@@ -418,6 +418,8 @@ namespace mongo {
             b.append( "desc" , _client->desc() );
             if ( _client->_threadId.size() ) 
                 b.append( "threadId" , _client->_threadId );
+            if ( _client->_connectionId )
+                b.appendNumber( "connectionId" , _client->_connectionId );
         }
         
         if ( ! _message.empty() ) {

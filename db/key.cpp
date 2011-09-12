@@ -304,13 +304,18 @@ namespace mongo {
             case NumberLong:
                 {
                     long long n = e._numberLong();
-                    double d = (double) n;
-                    if( d != n ) { 
+                    long long m = 2LL << 52;
+                    DEV {
+                        long long d = m-1;
+                        assert( ((long long) ((double) -d)) == -d );
+                    }
+                    if( n >= m || n <= -m ) {
+                        // can't represent exactly as a double
                         traditional(obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
-                    b.appendNum(d);
+                    b.appendNum((double) n);
                     break;
                 }
             case NumberDouble:
@@ -339,6 +344,7 @@ namespace mongo {
     }
 
     BSONObj KeyV1::toBson() const { 
+        assert( _keyData != 0 );
         if( !isCompactFormat() )
             return bson();
 
@@ -452,16 +458,21 @@ namespace mongo {
             {
                 int L = *l;
                 int R = *r;
+                int llen = binDataCodeToLength(L);
                 int diff = L-R; // checks length and subtype simultaneously
-                if( diff )
+                if( diff ) {
+                    // unfortunately nibbles are backwards to do subtype and len in one check (could bit swap...)
+                    int rlen = binDataCodeToLength(R);
+                    if( llen != rlen ) 
+                        return llen - rlen;
                     return diff;
+                }
                 // same length, same type
                 l++; r++;
-                int len = binDataCodeToLength(L);
-                int res = memcmp(l, r, len);
+                int res = memcmp(l, r, llen);
                 if( res ) 
                     return res;
-                l += len; r += len;
+                l += llen; r += llen;
                 break;
             }
         case cdate:
@@ -601,21 +612,29 @@ namespace mongo {
                     return false;
                 l += 4; r += 4;
             case cdate:
-            case cdouble:
                 if( *((unsigned long long *) l) != *((unsigned long long *) r) )
+                    return false;
+                l += 8; r += 8;
+                break;
+            case cdouble:
+                if( *((double *) l) != *((double *) r) )
                     return false;
                 l += 8; r += 8;
                 break;
             case cstring:
                 {
+                    if( *l != *r ) 
+                        return false; // not same length
                     unsigned sz = ((unsigned) *l) + 1;
-                    if( memcmp(l, r, sz) ) // first byte checked is the length byte
+                    if( memcmp(l, r, sz) )
                         return false;
                     l += sz; r += sz;
                     break;
                 }
             case cbindata:
                 {
+                    if( *l != *r )
+                        return false; // len or subtype mismatch
                     int len = binDataCodeToLength(*l) + 1;
                     if( memcmp(l, r, len) ) 
                         return false;
