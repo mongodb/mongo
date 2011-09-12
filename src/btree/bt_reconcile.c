@@ -1955,8 +1955,8 @@ __rec_col_var(
 				last->data = cell;
 				last->size = unpack->len;
 				WT_RET(__rec_col_var_helper(
-				    session, salvage, last, 0, 1, (uint64_t)1));
-				src_recno += 1;
+				    session, salvage, last, 0, 1, unpack->rle));
+				src_recno += unpack->rle;
 				continue;
 			}
 
