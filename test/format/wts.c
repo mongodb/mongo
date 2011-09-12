@@ -831,7 +831,7 @@ wts_col_put(uint64_t keyno)
 	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
-	if (g.logging)
+	if (g.logging) {
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
@@ -842,6 +842,7 @@ wts_col_put(uint64_t keyno)
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "put", keyno,
 			    (int)value.size, (char *)value.data);
+	}
 
 	cursor->set_key(cursor, keyno);
 	if (g.c_file_type == FIX)
@@ -901,9 +902,9 @@ wts_col_insert(uint64_t *keynop)
 		    "%s: inserted key did not create new row\n", g.progname);
 		return (1);
 	}
-	g.c_rows = *keynop = (uint32_t)keyno;
+	*keynop = g.c_rows = (uint32_t)keyno;
 
-	if (g.logging)
+	if (g.logging) {
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
@@ -914,6 +915,7 @@ wts_col_insert(uint64_t *keynop)
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "insert", keyno,
 			    (int)value.size, (char *)value.data);
+	}
 
 	key_gen(&key.data, &key.size, keyno, 0);
 	return (bdb_put(
