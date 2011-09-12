@@ -14,8 +14,8 @@ To run the test standalone, first build WiredTiger in the top-level
 "build_posix" directory, then do the following in this directory:
 
   $ make
-  $ ./wttest write table:cabinet.wt 1000000
-  $ ./wttest read table:cabinet.wt 1000000
+  $ ./wttest write file:casket.wt 1000000
+  $ ./wttest read file:casket.wt 1000000
 
 To compare the results from WiredTiger with various other stores,
 start with a Tokyo Cabinet tree, and apply tokyocabinet-test.patch.
