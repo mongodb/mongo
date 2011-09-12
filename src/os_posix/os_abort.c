@@ -16,7 +16,9 @@ __wt_abort(WT_SESSION_IMPL *session)
 {
 	__wt_errx(session, "aborting WiredTiger library");
 
+#if HAVE_DIAGNOSTIC
 	__wt_attach(session);
+#endif
 
 	abort();
 	/* NOTREACHED */
