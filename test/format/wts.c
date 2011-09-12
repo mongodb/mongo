@@ -880,7 +880,7 @@ wts_col_insert(uint64_t *keynop)
 	cursor = g.wts_cursor_insert;
 	session = g.wts_session;
 
-	value_gen(&value.data, &value.size, 0);
+	value_gen(&value.data, &value.size, g.c_rows + 1);
 
 	if (g.c_file_type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value.data);
