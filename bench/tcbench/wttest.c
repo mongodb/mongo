@@ -299,22 +299,19 @@ WT_CONNECTION *conn;
 int setup(char *name, const char *tconfig, const char *cconfig, WT_CURSOR **cursor){
   WT_SESSION *session;
   int creating, ret;
-  char cmd[100];
 
   creating = (tconfig != NULL);
-
-  if (creating) {
-    snprintf(cmd, sizeof cmd, "rm -rf %s", name + strlen("file:"));
-    system(cmd);
-  }
 
   if((ret = wiredtiger_open(NULL, NULL, NULL, &conn) != 0) ||
      (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
     return ret;
 
   /* If we get a configuration, create the table. */
-  if(creating && (ret = session->create(session, name, tconfig)) != 0)
-    return ret;
+  if(creating) {
+    (void)session->drop(session, name, "force");
+    if ((ret = session->create(session, name, tconfig)) != 0)
+      return ret;
+  }
 
   return session->open_cursor(session, name, NULL, cconfig, cursor);
 }
@@ -351,9 +348,8 @@ int dowrite(char *name, int rnum, int bulk, int rnd){
     len = sprintf(buf, "%08d", rnd ? myrand() % rnum + 1 : i);
     c->set_key(c, &key);
     c->set_value(c, &value);
-    if(c->insert(c) != 0) {
+    if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {
       fprintf(stderr, "insert failed\n");
-      err = TRUE;
       break;
     }
     /* print progression */
@@ -448,9 +444,8 @@ int dovlcswrite(char *name, int rnum, int bulk, int rnd){
     len = sprintf(buf, "%08d", i);
     c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     c->set_value(c, &value);
-    if(c->insert(c) != 0) {
+    if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {
       fprintf(stderr, "insert failed\n");
-      err = TRUE;
       break;
     }
     /* print progression */
@@ -540,9 +535,8 @@ int doflcswrite(char *name, int rnum, int bulk, int rnd){
     len = sprintf(buf, "%08d", i);
     c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     c->set_value(c, value);
-    if(c->insert(c) != 0) {
+    if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {
       fprintf(stderr, "insert failed\n");
-      err = TRUE;
       break;
     }
     /* print progression */
