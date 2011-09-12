@@ -1089,11 +1089,9 @@ namespace mongo {
         printStackTrace( oss );
         rawOut( oss.str() );
 
-        if( cmdLine.dur ) { 
-            ::exit(EXIT_ABRUPT);
-        }
+        // Don't go through normal shutdown procedure. It may make things worse.
+        ::exit(EXIT_ABRUPT);
 
-        dbexit( EXIT_ABRUPT );
     }
 
     void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
