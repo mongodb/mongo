@@ -1001,7 +1001,7 @@ db/repl_block.cpp
 db/replutil.h
 ----
 * 10107 [code](http://github.com/mongodb/mongo/blob/master/db/replutil.h#L76) not master
-* 13435 [code](http://github.com/mongodb/mongo/blob/master/db/replutil.h#L84) not master and slaveok=false
+* 13435 [code](http://github.com/mongodb/mongo/blob/master/db/replutil.h#L84) not master and slaveOk=false
 * 13436 [code](http://github.com/mongodb/mongo/blob/master/db/replutil.h#L85) not master or secondary, can't read
 
 
