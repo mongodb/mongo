@@ -606,6 +606,8 @@ namespace mongo {
                 break;
             js = d.nextJsObj(); // TODO: refactor to do objcheck outside of writelock
         }
+
+        globalOpCounters.incInsertInWriteLock(n);
     }
 
     void receivedInsert(Message& m, CurOp& op) {
