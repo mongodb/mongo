@@ -362,14 +362,16 @@ namespace mongo {
         const Member *_self = this->_self;
         assert( _self );
 
+        MemberState myState = box.getState();
+
         // add self
         {
             BSONObjBuilder bb;
             bb.append("_id", (int) _self->id());
             bb.append("name", _self->fullName());
             bb.append("health", 1.0);
-            bb.append("state", (int) box.getState().s);
-            bb.append("stateStr", box.getState().toString());
+            bb.append("state", (int)myState.s);
+            bb.append("stateStr", myState.toString());
             bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
             bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
             string s = _self->lhb();
@@ -408,9 +410,9 @@ namespace mongo {
         sort(v.begin(), v.end());
         b.append("set", name());
         b.appendTimeT("date", time(0));
-        b.append("myState", box.getState().s);
+        b.append("myState", myState.s);
         const Member *syncTarget = _currentSyncTarget;
-        if (syncTarget) {
+        if (syncTarget && myState != MemberState::RS_PRIMARY) {
             b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);
