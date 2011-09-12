@@ -230,8 +230,12 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
 	WT_MEMORY_FLUSH;
-	for (i = 0; i < skipdepth; i++)
+	for (i = 0; i < skipdepth; i++) {
+		if ((*inshead)->tail[i] == NULL ||
+		    ins_stack[i] == &(*inshead)->tail[i]->next[i])
+			(*inshead)->tail[i] = new_ins;
 		*ins_stack[i] = new_ins;
+	}
 
 err:	__wt_session_serialize_wrapup(session, page, 0);
 	return (ret);

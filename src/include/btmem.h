@@ -520,6 +520,7 @@ struct __wt_insert {
  */
 struct __wt_insert_head {
 	WT_INSERT *head[WT_SKIP_MAXDEPTH];	/* first item on skiplists */
+	WT_INSERT *tail[WT_SKIP_MAXDEPTH];	/* last item on skiplists */
 };
 
 /*

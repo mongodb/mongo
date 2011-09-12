@@ -20,6 +20,11 @@ __col_insert_search(WT_INSERT_HEAD *inshead, uint64_t recno)
 	if (inshead == NULL)
 		return (NULL);
 
+	/* Fast path the check for values at the end of the skiplist. */
+	ins = &inshead->tail[0];
+	if (*ins != NULL && recno > WT_INSERT_RECNO(*ins))
+		return (NULL);
+
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
@@ -58,6 +63,16 @@ __col_insert_search_stack(
 	WT_INSERT **ins;
 	uint64_t ins_recno;
 	int cmp, i;
+
+	/* Fast path appends. */
+	ins = &inshead->tail[0];
+	if (*ins != NULL && recno > WT_INSERT_RECNO(*ins)) {
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
+			ins_stack[i] = (inshead->tail[i] != NULL) ?
+				    &inshead->tail[i]->next[i] :
+				    &inshead->head[i];
+		return (NULL);
+	}
 
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
