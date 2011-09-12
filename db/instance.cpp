@@ -586,28 +586,22 @@ namespace mongo {
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
-        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-        int n = 0;
-        BSONObj js(_js);
-        while( 1 ) {
+    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
+        size_t i;
+        for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(ns, js);
-                ++n;
+                checkAndInsert(ns, objs[i]);
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
-                if (!keepGoing || !d.moreJSObjs()){
-                    globalOpCounters.incInsertInWriteLock(n);
+                if (!keepGoing || i == objs.size()-1){
+                    globalOpCounters.incInsertInWriteLock(i);
                     throw;
                 }
                 // otherwise ignore and keep going
             }
-            if( !d.moreJSObjs() )
-                break;
-            js = d.nextJsObj(); // TODO: refactor to do objcheck outside of writelock
         }
 
-        globalOpCounters.incInsertInWriteLock(n);
+        globalOpCounters.incInsertInWriteLock(i);
     }
 
     void receivedInsert(Message& m, CurOp& op) {
@@ -619,7 +613,14 @@ namespace mongo {
             // strange.  should we complain?
             return;
         }
-        BSONObj js = d.nextJsObj();
+        BSONObj first = d.nextJsObj();
+
+        vector<BSONObj> multi;
+        while (d.moreJSObjs()){
+            if (multi.empty()) // first pass
+                multi.push_back(first);
+            multi.push_back( d.nextJsObj() );
+        }
 
         writelock lk(ns);
 
@@ -631,12 +632,13 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        if( d.moreJSObjs() ) { 
-            insertMulti(d, ns, js);
+        if( !multi.empty() ) {
+            const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+            insertMulti(keepGoing, ns, multi);
             return;
         }
 
-        checkAndInsert(ns, js);
+        checkAndInsert(ns, first);
         globalOpCounters.incInsertInWriteLock(1);
     }
 
