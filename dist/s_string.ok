@@ -28,6 +28,7 @@ COL's
 CONCAT
 CONFIG
 CURSORs
+CURSTD
 Checksum
 Config
 DATAITEMs
@@ -236,6 +237,8 @@ fsync
 fsyncs
 ftruncate
 func
+gcc
+gdb
 getone
 getoneraw
 getones
@@ -393,12 +396,14 @@ tinsert
 toffpage
 transactional
 trecno
+treeconfig
 trepeat
 trk
 trk's
 tstate
 tt
 tupdate
+tvalue
 tworkq
 txn
 typedef
