@@ -307,8 +307,11 @@ namespace mongo {
                 }
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
-                if ( _logConnect && ! cmdLine.quiet )
-                    log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+                if ( _logConnect && ! cmdLine.quiet ){
+                    int conns = connTicketHolder.used()+1;
+                    const char* word = (conns == 1 ? " connection" : " connections");
+                    log() << "connection accepted from " << from.toString() << " #" << ++connNumber << " (" << conns << word << " now open)" << endl;
+                }
                 
                 Socket newSock = Socket(s, from);
 #ifdef MONGO_SSL
