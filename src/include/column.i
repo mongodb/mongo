@@ -111,7 +111,7 @@ __col_last_recno(WT_PAGE *page)
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
 	 *
-	 * WT_PAGE_COL_FIX pages have no nrepeat values, so this works for
+	 * WT_PAGE_COL_FIX pages don't have a repeat array, so this works for
 	 * fixed-length column-stores without any further check.
 	 */
 	if (page->u.col_leaf.nrepeats == 0)
