@@ -576,7 +576,7 @@ Description: An object/document-oriented database
 """
     s=re.sub("@@PACKAGE_BASENAME@@", "mongodb%s" % spec.suffix(), s)
     conflict_suffixes=["", "-stable", "-unstable", "-nightly", "-10gen", "-10gen-unstable"]
-    conflict_suffixes.remove(spec.suffix())
+    conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
     s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongodb"+suffix for suffix in conflict_suffixes]), s)
     f=open(path, 'w')
     try:
@@ -952,9 +952,9 @@ fi
     s=re.sub("@@PACKAGE_REVISION@@", str(int(spec.param("revision"))+1) if spec.param("revision") else "1", s)
     s=re.sub("@@BINARYDIR@@", BINARYDIR, s)
     conflict_suffixes=["", "-10gen", "-10gen-unstable"]
-    conflict_suffixes.remove(suffix)
+    conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
     s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongo"+_ for _ in conflict_suffixes]), s)
-    if suffix == "-10gen":
+    if suffix.endswith("-10gen"):
         s=re.sub("@@PACKAGE_PROVIDES@@", "mongo-stable", s)
         s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-stable", s)
     elif suffix == "-10gen-unstable":
