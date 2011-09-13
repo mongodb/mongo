@@ -119,9 +119,20 @@ namespace mongo {
 
         BSONObj asBson() const;
 
+        /**
+         * Getter and setter for _majority. This is almost always
+         * members.size()/2+1, but can be the number of non-arbiter members if
+         * there are more arbiters than non-arbiters (writing to 3 out of 7
+         * servers is safe if 4 of the servers are arbiters).
+         */
+        void setMajority();
+        int getMajority() const;
+
         bool _constructed;
     private:
         bool _ok;
+        int _majority;
+
         void from(BSONObj);
         void clear();
 

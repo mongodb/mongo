@@ -296,6 +296,26 @@ namespace mongo {
         _ok = false;
     }
 
+    void ReplSetConfig::setMajority() {
+        int total = members.size();
+        int nonArbiters = total;
+        int strictMajority = total/2+1;
+
+        for (vector<MemberCfg>::iterator it = members.begin(); it < members.end(); it++) {
+            if ((*it).arbiterOnly) {
+                nonArbiters--;
+            }
+        }
+
+        // majority should be all "normal" members if we have something like 4
+        // arbiters & 3 normal members
+        _majority = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
+    }
+
+    int ReplSetConfig::getMajority() const {
+        return _majority;
+    }
+
     void ReplSetConfig::checkRsConfig() const {
         uassert(13132,
                 "nonmatching repl set name in _id field; check --replSet command line",
@@ -533,6 +553,9 @@ namespace mongo {
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
         }
+
+        // figure out the majority for this config
+        setMajority();
     }
 
     static inline void configAssert(bool expr) {
