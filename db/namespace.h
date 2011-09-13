@@ -380,7 +380,7 @@ namespace mongo {
         /* predetermine location of the next alloc without actually doing it. 
            if cannot predetermine returns null (so still call alloc() then)
         */
-        DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc);
+        DiskLoc allocWillBeAt(const char *ns, int lenToAlloc);
 
         /* allocate a new record.  lenToAlloc includes headers. */
         DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);

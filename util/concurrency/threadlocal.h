@@ -20,7 +20,9 @@
 
 namespace mongo { 
 
-#if defined(_WIN32) || defined(__GNUC__)
+  // TEMP
+  //#if defined(_WIN32) || defined(__GNUC__)
+#if defined(_WIN32)
         
     template< class T >
     struct TSP {

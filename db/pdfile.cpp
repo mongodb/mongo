@@ -1193,14 +1193,9 @@ namespace mongo {
                     multi.push_back(i);
                     multiKeys.push_back(BSONObjSet());
                     multiKeys[multiKeys.size()-1].swap(keys);
-                    BSONObjSet& q = multiKeys[0];
                 }
                 keys.clear();
             }
-        }
-
-        if( multiKeys.size() ) {
-            BSONObjSet& q = multiKeys[0];
         }
 
         // update lock to writable here.  TODO
@@ -1221,7 +1216,7 @@ namespace mongo {
                 try {
                     ii.bt_insert(idx.head, loc, *k, ordering, !idx.unique(), idx);
                 } catch (AssertionException& e) {
-                    if( e.getCode() == 10287 && i == d->nIndexes ) {
+                    if( e.getCode() == 10287 && (int) i == d->nIndexes ) {
                         DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
                     }
                     else {
@@ -1593,6 +1588,7 @@ namespace mongo {
     }
 
     /* add keys to indexes for a new record */
+#if 0
     static void oldIndexRecord__notused(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
         int n = d->nIndexesBeingBuilt();
         for ( int i = 0; i < n; i++ ) {
@@ -1617,6 +1613,7 @@ namespace mongo {
             }
         }
     }
+#endif
 
     extern BSONObj id_obj; // { _id : 1 }
 

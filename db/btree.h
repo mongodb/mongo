@@ -1148,7 +1148,7 @@ namespace mongo {
             if( op == Nothing )
                 return;
             else if( op == SetUsed ) {
-                const V::_KeyNode& kn = b->k(pos);
+                const typename V::_KeyNode& kn = b->k(pos);
                 kn.writing().setUsed();
             }
             else {

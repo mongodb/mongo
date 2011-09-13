@@ -31,10 +31,10 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
-        typedef typename Continuation<V> Continuation;
+        typedef Continuation<V> Cont;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
 
-        Continuation *c[NamespaceDetails::NIndexesMax];
+        Cont *c[NamespaceDetails::NIndexesMax];
         int n;
 
     public:
@@ -56,7 +56,7 @@ namespace mongo {
         { 
             if( idxNo >= n )
                 n = idxNo + 1;
-            Continuation *C = c[idxNo] = new Continuation(thisLoc, _recordLoc, _key, _order, _idx);
+            Cont *C = c[idxNo] = new Cont(thisLoc, _recordLoc, _key, _order, _idx);
             thisLoc.btree<V>()->twoStepInsert(thisLoc, *C, dupsAllowed);
         }
         void _phasedFinish() {
