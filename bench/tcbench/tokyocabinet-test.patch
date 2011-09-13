@@ -1,45 +1,51 @@
---- bros/Makefile	2009-01-26 13:44:10.000000000 +1100
-+++ bros/Makefile	2011-09-12 14:40:51.012340635 +1000
-@@ -11,8 +11,8 @@
- SHELL = /bin/sh
- 
- # Targets
--MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest bdbtest \
--  maptest sqltest cmpsqltctest
-+MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest \
-+  bdbtest wttest maptest sqltest cmpsqltctest
- 
- 
- 
-@@ -64,7 +64,7 @@
- qdbmtest : qdbmtest.c
- 	gcc -I.. -I/usr/local/include -D_GNU_SOURCE=1 \
- 	  -Wall -ansi -pedantic -O3 -o $@ qdbmtest.c \
--	  -static -L.. -L/usr/local/lib -lqdbm -lz -lc
-+	  -static -L.. -L/usr/local/lib -lqdbm -liconv -lz -lc
- 
- 
- ndbmtest : ndbmtest.c
-@@ -98,9 +98,15 @@
- 
- 
- bdbtest : bdbtest.c
--	gcc -I/usr/local/bdb/include -D_GNU_SOURCE=1 \
-+	gcc -I/usr/local/include/db5 -D_GNU_SOURCE=1 \
- 	  -Wall -O3 -o $@ bdbtest.c \
--	  -static -L/usr/local/bdb/lib -ldb -lpthread -lc
-+	  -static -L/usr/local/lib/db5 -ldb -lpthread -lc
-+
-+WT_HOME=/home/mjc/wt/src/wiredtiger
-+wttest : wttest.c
-+	gcc -I$(WT_HOME)/build_posix -D_GNU_SOURCE=1 \
-+	  -Wall -O3 -o $@ wttest.c \
-+	  $(WT_HOME)/build_posix/.libs/libwiredtiger.a -lpthread -lc
- 
- 
- maptest : maptest.cc
---- bros/reporter	2008-07-27 22:30:39.000000000 +1000
-+++ bros/reporter	2011-08-05 17:20:26.500784436 +1000
+*** Makefile.orig	Mon Jan 26 02:44:10 2009
+--- Makefile	Tue Sep 13 15:17:04 2011
+***************
+*** 12,18 ****
+  
+  # Targets
+  MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest bdbtest \
+!   maptest sqltest cmpsqltctest
+  
+  
+  
+--- 12,18 ----
+  
+  # Targets
+  MYBINS = tctest qdbmtest ndbmtest sdbmtest gdbmtest tdbtest cdbtest bdbtest \
+!   maptest sqltest cmpsqltctest wttest
+  
+  
+  
+***************
+*** 98,106 ****
+  
+  
+  bdbtest : bdbtest.c
+! 	gcc -I/usr/local/bdb/include -D_GNU_SOURCE=1 \
+  	  -Wall -O3 -o $@ bdbtest.c \
+! 	  -static -L/usr/local/bdb/lib -ldb -lpthread -lc
+  
+  
+  maptest : maptest.cc
+--- 98,112 ----
+  
+  
+  bdbtest : bdbtest.c
+! 	gcc -I$(BDB_HOME)/build_unix -D_GNU_SOURCE=1 \
+  	  -Wall -O3 -o $@ bdbtest.c \
+! 	  -static $(BDB_HOME)/build_unix/libdb.a -lpthread -lc
+! 
+! 
+! wttest : $(WT_HOME)/bench/tcbench/wttest.c
+! 	gcc -I$(WT_HOME)/build_posix -D_GNU_SOURCE=1 \
+! 	  -Wall -O3 -o $@ $(WT_HOME)/bench/tcbench/wttest.c \
+! 	  -static $(WT_HOME)/build_posix/.libs/libwiredtiger.a -lpthread -lc
+  
+  
+  maptest : maptest.cc
+--- reporter.orig	2008-07-27 22:30:39.000000000 +1000
++++ reporter	2011-08-05 17:20:26.500784436 +1000
 @@ -11,9 +11,9 @@
  
  use constant {
@@ -145,3 +151,43 @@
 +printf("%s,%.5f,%.5f,%d\n", "WT-FIX-RND", $table[46][1], $table[47][1], $sizes[23]);
  
  # END OF FILE
+--- reporter.orig	2011-08-05 17:20:26.500784436 +1000
++++ reporter	2011-09-14 06:19:44.702015434 +1000
+@@ -33,16 +33,16 @@
+                 './cdbtest read casket.cdbh ' . RECNUM,
+                 './bdbtest write casket.bdbh ' . RECNUM,
+                 './bdbtest read casket.bdbh ' . RECNUM,
+-                './tctest btwrite casket.tcb ' . RECNUM,
+-                './tctest btread casket.tcb ' . RECNUM,
++                './tctest btwrite casket.tcb_a ' . RECNUM,
++                './tctest btread casket.tcb_a ' . RECNUM,
+                 './tctest btwrite -rnd casket.tcb_r ' . RECNUM,
+                 './tctest btread -rnd casket.tcb_r ' . RECNUM,
+-                './qdbmtest btwrite casket.qdbb ' . RECNUM,
+-                './qdbmtest btread casket.qdbb ' . RECNUM,
++                './qdbmtest btwrite casket.qdbb_a ' . RECNUM,
++                './qdbmtest btread casket.qdbb_a ' . RECNUM,
+                 './qdbmtest btwrite -rnd casket.qdbb_r ' . RECNUM,
+                 './qdbmtest btread -rnd casket.qdbb_r ' . RECNUM,
+-                './bdbtest btwrite casket.bdbb ' . RECNUM,
+-                './bdbtest btread casket.bdbb ' . RECNUM,
++                './bdbtest btwrite casket.bdbb_a ' . RECNUM,
++                './bdbtest btread casket.bdbb_a ' . RECNUM,
+                 './bdbtest btwrite -rnd casket.bdbb_r ' . RECNUM,
+                 './bdbtest btread -rnd casket.bdbb_r ' . RECNUM,
+                 './tctest flwrite casket.tcf ' . RECNUM,
+@@ -79,11 +79,11 @@
+              'casket.tdbh',
+              'casket.cdbh',
+              'casket.bdbh',
+-             'casket.tcb',
++             'casket.tcb_a',
+              'casket.tcb_r',
+-             'casket.qdbb',
++             'casket.qdbb_a',
+              'casket.qdbb_r',
+-             'casket.bdbb',
++             'casket.bdbb_a',
+              'casket.bdbb_r',
+              'casket.tcf',
+              'casket.wt_b',
