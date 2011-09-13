@@ -175,7 +175,7 @@ namespace mongo {
             if (wStr == "majority") {
                 // use the entire set, including arbiters, to prevent writing
                 // to a majority of the set but not a majority of voters
-                return replicatedToNum(op, theReplSet->config().members.size()/2+1);
+                return replicatedToNum(op, theReplSet->config().getMajority());
             }
 
             map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
