@@ -1923,8 +1923,8 @@ namespace mongo {
     template class BucketBasics<V1>;
     template class BtreeBucket<V0>;
     template class BtreeBucket<V1>;
-    template class __KeyNode<DiskLoc>;
-    template class __KeyNode<DiskLoc56Bit>;
+    template struct __KeyNode<DiskLoc>;
+    template struct __KeyNode<DiskLoc56Bit>;
 
     struct BTUnitTest : public UnitTest {
         void run() {
