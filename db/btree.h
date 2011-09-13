@@ -203,7 +203,7 @@ namespace mongo {
         BtreeBucket<V> * btreemod() const { 
             return DiskLoc(*this).btreemod<V>();
         }
-        operator DiskLoc() const { 
+        operator const DiskLoc() const { 
             // endian
             if( isNull() ) return DiskLoc();
             unsigned a = *((unsigned *) (_a-1));

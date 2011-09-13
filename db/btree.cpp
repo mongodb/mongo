@@ -87,7 +87,7 @@ namespace mongo {
         ss << "  Bucket info:" << endl;
         ss << "    n: " << this->n << endl;
         ss << "    parent: " << this->parent.toString() << endl;
-        ss << "    nextChild: " << this->parent.toString() << endl;
+        ss << "    nextChild: " << this->nextChild.toString() << endl;
         ss << "    flags:" << this->flags << endl;
         ss << "    emptySize: " << this->emptySize << " topSize: " << this->topSize << endl;
         return ss.str();
@@ -929,9 +929,6 @@ namespace mongo {
             ll.btree<V>()->childForPos( indexInParent( thisLoc ) ).writing() = this->nextChild;
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
-
-        BTREE(this->nextChild)->parent.writing() = this->parent;
-        //(static_cast<DiskLoc>(this->nextChild).btree<V>())->parent.writing() = this->parent;
         ClientCursor::informAboutToDeleteBucket( thisLoc );
         deallocBucket( thisLoc, id );
     }
@@ -1103,7 +1100,7 @@ namespace mongo {
             KeyNode kn = l->keyNode( split );
             l->nextChild = kn.prevChildBucket;
             // Because lchild is a descendant of thisLoc, updating thisLoc will
-            // not not affect packing or keys of lchild and kn will be stable
+            // not affect packing or keys of lchild and kn will be stable
             // during the following setInternalKey()            
             setInternalKey( thisLoc, leftIndex, kn.recordLoc, kn.key, order, lchild, rchild, id );
         }
@@ -1355,7 +1352,7 @@ namespace mongo {
         DiskLoc rLoc = addBucket(idx);
         BtreeBucket *r = rLoc.btreemod<V>();
         if ( split_debug )
-            out() << "     split:" << split << ' ' << keyNode(split).key.toString() << " this->n:" << this->n << endl;
+            out() << "     split:" << split << ' ' << keyNode(split).key.toString() << " n:" << this->n << endl;
         for ( int i = split+1; i < this->n; i++ ) {
             KeyNode kn = keyNode(i);
             r->pushBack(kn.recordLoc, kn.key, order, kn.prevChildBucket);
@@ -1364,7 +1361,7 @@ namespace mongo {
         r->assertValid( order );
 
         if ( split_debug )
-            out() << "     this->new rLoc:" << rLoc.toString() << endl;
+            out() << "     new rLoc:" << rLoc.toString() << endl;
         r = 0;
         rLoc.btree<V>()->fixParentPtrs(rLoc);
 
@@ -1381,7 +1378,7 @@ namespace mongo {
             
             // promote splitkey to a parent this->node
             if ( this->parent.isNull() ) {
-                // make a this->new this->parent if we were the root
+                // make a new parent if we were the root
                 DiskLoc L = addBucket(idx);
                 BtreeBucket *p = L.btreemod<V>();
                 p->pushBack(splitkey.recordLoc, splitkey.key, order, thisLoc);
@@ -1389,7 +1386,7 @@ namespace mongo {
                 p->assertValid( order );
                 this->parent = idx.head.writing() = L;
                 if ( split_debug )
-                    out() << "    we were root, making this->new root:" << hex << this->parent.getOfs() << dec << endl;
+                    out() << "    we were root, making new root:" << hex << this->parent.getOfs() << dec << endl;
                 rLoc.btree<V>()->parent.writing() = this->parent;
             }
             else {
@@ -1409,7 +1406,7 @@ namespace mongo {
         {
             if ( keypos <= split ) {
                 if ( split_debug )
-                    out() << "  keypos<split, insertHere() the this->new key" << endl;
+                    out() << "  keypos<split, insertHere() the new key" << endl;
                 insertHere(thisLoc, newpos, recordLoc, key, order, lchild, rchild, idx);
             }
             else {
@@ -1423,7 +1420,7 @@ namespace mongo {
             out() << "     split end " << hex << thisLoc.getOfs() << dec << endl;
     }
 
-    /** start a this->new index off, empty */
+    /** start a new index off, empty */
     template< class V >
     DiskLoc BtreeBucket<V>::addBucket(const IndexDetails& id) {
         string ns = id.indexNamespace();
@@ -1450,7 +1447,7 @@ namespace mongo {
         if ( keyOfs < 0 || keyOfs >= this->n ) {
             out() << "ASSERT failure BtreeBucket<V>::advance, caller: " << caller << endl;
             out() << "  thisLoc: " << thisLoc.toString() << endl;
-            out() << "  keyOfs: " << keyOfs << " this->n:" << this->n << " direction: " << direction << endl;
+            out() << "  keyOfs: " << keyOfs << " n:" << this->n << " direction: " << direction << endl;
             out() << bucketSummary() << endl;
             assert(false);
         }
@@ -1487,7 +1484,7 @@ namespace mongo {
                 }
             }
             assert( direction<0 || an->nextChild == childLoc );
-            // this->parent exhausted also, keep going up
+            // parent exhausted also, keep going up
             childLoc = ancestor;
             ancestor = an->parent;
         }
@@ -1587,7 +1584,7 @@ namespace mongo {
             }
         }
         else {
-            // go up this->parents until rightmost/leftmost node is >=/<= target or at top
+            // go up parents until rightmost/leftmost node is >=/<= target or at top
 	    while( !BTREE(thisLoc)->parent.isNull() ) {
 	        thisLoc = BTREE(thisLoc)->parent;
                 if ( direction > 0 ) {
@@ -1662,7 +1659,7 @@ namespace mongo {
                     next = bucket->k( 0 ).prevChildBucket;
                 }
                 if ( next.isNull() ) {
-                    // if bestParent is this->null, we've hit the end and thisLoc gets set to DiskLoc()
+                    // if bestParent is null, we've hit the end and thisLoc gets set to DiskLoc()
                     thisLoc = bestParent.first;
                     keyOfs = bestParent.second;
                     return;
@@ -1744,15 +1741,15 @@ namespace mongo {
             out() << "  " << thisLoc.toString() << '.' << "_insert " <<
                   key.toString() << '/' << recordLoc.toString() <<
                   " l:" << lChild.toString() << " r:" << rChild.toString() << endl;
-            out() << "    found:" << found << " pos:" << pos << " this->n:" << this->n << endl;
+            out() << "    found:" << found << " pos:" << pos << " n:" << this->n << endl;
         }
 
         if ( found ) {
             const _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
                 log(4) << "btree _insert: reusing unused key" << endl;
-                massert( 10285 , "_insert: reuse key but lchild is not this->null", lChild.isNull());
-                massert( 10286 , "_insert: reuse key but rchild is not this->null", rChild.isNull());
+                massert( 10285 , "_insert: reuse key but lchild is not null", lChild.isNull());
+                massert( 10286 , "_insert: reuse key but rchild is not null", rChild.isNull());
                 kn.writing().setUsed();
                 return 0;
             }
@@ -1763,7 +1760,7 @@ namespace mongo {
                 log() << "  " << key.toString() << '\n';
                 log() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
                 log() << "  old l r: " << this->childForPos(pos).toString() << ' ' << this->childForPos(pos+1).toString() << endl;
-                log() << "  this->new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
+                log() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
             }
             alreadyInIndex();
         }
@@ -1773,11 +1770,11 @@ namespace mongo {
         DiskLoc child = ch;
         if ( insert_debug )
             out() << "    getChild(" << pos << "): " << child.toString() << endl;
-        // In current usage, rChild isNull() for a this->new key and false when we are
+        // In current usage, rChild isNull() for a new key and false when we are
         // promoting a split key.  These are the only two cases where _insert()
         // is called currently.
         if ( child.isNull() || !rChild.isNull() ) {
-            // A this->new key will be inserted at the same tree height as an adjacent existing key.
+            // A new key will be inserted at the same tree height as an adjacent existing key.
             insertHere(thisLoc, pos, recordLoc, key, order, lChild, rChild, idx);
             return 0;
         }
@@ -1850,7 +1847,7 @@ namespace mongo {
         int pos;
         bool found;
         // TODO: is it really ok here that the order is a default?  
-        // for findById() use, yes.  for checkNoIndexConflicts, this->no?
+        // for findById() use, yes.  for checkNoIndexConflicts, no?
         Ordering o = Ordering::make(BSONObj());
         DiskLoc bucket = locate( indexdetails , indexdetails.head , key , o , pos , found , minDiskLoc );
         if ( bucket.isNull() )
@@ -1872,7 +1869,7 @@ namespace mongo {
         return kn.recordLoc;
     }
 
-} // this->namespace mongo
+} // namespace mongo
 
 #include "db.h"
 #include "dbhelpers.h"
