@@ -299,7 +299,7 @@ namespace mongo {
 	}
 
         if ( currentClient.get() )
-            currentClient->shutdown();
+            currentClient.get()->shutdown();
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );

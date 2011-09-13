@@ -306,7 +306,7 @@ namespace PerfTests {
                     for( i = 0; i < Batch; i++ )
                         timed();
                     n += i;
-                } while( t.micros() < hlm * 1000 );
+                } while( t.micros() < (unsigned) hlm * 1000 );
             }
 
             client().getLastError(); // block until all ops are finished
@@ -613,6 +613,7 @@ namespace PerfTests {
     };
 
     // test thread local speed
+#if defined(_WIN32)
     __declspec( thread ) int x;
     class TLS2 : public B {
     public:
@@ -624,6 +625,7 @@ namespace PerfTests {
         }
         virtual bool showDurStats() { return false; }
     };
+#endif
 
     // test thread local speed
     class TLS : public B {
@@ -781,7 +783,6 @@ namespace PerfTests {
     public:
         virtual int howLongMillis() { return 30000; } 
         Insert1() : x( BSON("x" << 99) ) { 
-            char *x = new char[4];
             oid.init();
             query = BSON("_id" << oid);
             i = 0;
@@ -933,7 +934,9 @@ namespace PerfTests {
                 add< ChecksumTest >();
                 add< Compress >();
                 add< TLS >();
+#if defined(_WIN32)
                 add< TLS2 >();
+#endif
                 add< New8 >();
                 add< New128 >();
                 add< Timer >();
