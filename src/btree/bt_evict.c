@@ -245,6 +245,9 @@ err:		__wt_err(session, ret, "cache eviction server error");
 	if (session != &conn->default_session)
 		(void)wt_session->close(wt_session, NULL);
 
+	/* Flag that we are done to the closing thread. */
+	cache->evict_sleeping = 1;
+
 	return (NULL);
 }
 

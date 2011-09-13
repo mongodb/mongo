@@ -233,6 +233,9 @@ __wt_cache_read_server(void *arg)
 	WT_VERBOSE(session, READSERVER, "read server exiting");
 	(void)wt_session->close(wt_session, NULL);
 
+	/* Flag that we are done to the closing thread. */
+	cache->read_sleeping = 1;
+
 	return (NULL);
 }
 
