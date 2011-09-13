@@ -27,15 +27,13 @@ done
 # Generate a tags file for the build directory
 (cd ../build_posix
 rm -f tags
-ctags $flags ../src/include/*.in ../src/*/*.[chi] 2>/dev/null
-chmod 444 tags)
+ctags $flags ../src/include/*.in ../src/*/*.[chi] 2>/dev/null)
 
 # Put the shared tags file in the include directory, it's at the same level in
 # the tree as the other source files.
 (cd ../src/include
 rm -f tags
-ctags $flags ../include/*.in ../*/*.[chi] 2>/dev/null
-chmod 444 tags)
+ctags $flags ../include/*.in ../*/*.[chi] 2>/dev/null)
 
 # Link to the tags file from standard build and source directories.
 dirs="`python -c 'from dist import directory_files; directory_files();'`"
