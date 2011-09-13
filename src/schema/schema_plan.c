@@ -143,6 +143,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
+	current_coltype = coltype = WT_PROJ_KEY; /* Keep lint quiet. */
 	while (__wt_config_next(&conf, &k, &v) == 0) {
 		have_it = 0;
 

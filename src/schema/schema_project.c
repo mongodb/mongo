@@ -79,7 +79,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 						WT_RET(__unpack_read(session,
 						    &pv, (const uint8_t **)&p,
 						    (size_t)(end - p)));
-						break;
+					break;
 				}
 				WT_PACK_GET(session, pv, ap);
 				/* FALLTHROUGH */
