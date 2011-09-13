@@ -681,7 +681,7 @@ doneCheckOrder:
         if ( _plans._bestGuessOnly ) {
             shared_ptr<QueryOp> op( _op.createChild() );
             shared_ptr<QueryPlan> plan = _plans.getBestGuess();
-            massert( 15870, "no index matches QueryPlanSet's sort with _bestGuessOnly", plan.get() );
+            massert( 15894, "no index matches QueryPlanSet's sort with _bestGuessOnly", plan.get() );
             op->setQueryPlan( plan.get() );
             _ops.push_back( op );
         }
