@@ -19,6 +19,29 @@
 
 namespace mongo {
 
+    QueryPattern::QueryPattern( const FieldRangeSet &frs, const BSONObj &sort ) {
+        for( map<string,FieldRange>::const_iterator i = frs.ranges().begin(); i != frs.ranges().end(); ++i ) {
+            if ( i->second.equality() ) {
+                _fieldTypes[ i->first ] = QueryPattern::Equality;
+            }
+            else if ( i->second.empty() ) {
+                // This case generally results from an upper and lower bound that are inconsistent for a single key index.
+                _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
+            }
+            else if ( i->second.nontrivial() ) {
+                bool upper = i->second.max().type() != MaxKey;
+                bool lower = i->second.min().type() != MinKey;
+                if ( upper && lower )
+                    _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
+                else if ( upper )
+                    _fieldTypes[ i->first ] = QueryPattern::UpperBound;
+                else if ( lower )
+                    _fieldTypes[ i->first ] = QueryPattern::LowerBound;
+            }
+        }
+        setSort( sort );
+    }
+
     /** for testing only - speed unimportant */
     bool QueryPattern::operator==( const QueryPattern &other ) const {
         bool less = operator<( other );
@@ -30,6 +53,28 @@ namespace mongo {
     /** for testing only - speed unimportant */
     bool QueryPattern::operator!=( const QueryPattern &other ) const {
         return !operator==( other );
+    }
+    
+    string typeToString( enum QueryPattern::Type t ) {
+        switch (t) {
+            case QueryPattern::Equality:
+                return "Equality";
+            case QueryPattern::LowerBound:
+                return "LowerBound";
+            case QueryPattern::UpperBound:
+                return "UpperBound";
+            case QueryPattern::UpperAndLowerBound:
+                return "UpperAndLowerBound";
+        }
+        return "";
+    }
+    
+    string QueryPattern::toString() const {
+        BSONObjBuilder b;
+        for( map<string,Type>::const_iterator i = _fieldTypes.begin(); i != _fieldTypes.end(); ++i ) {
+            b << i->first << typeToString( i->second );
+        }
+        return BSON( "query" << b.done() << "sort" << _sort ).toString();
     }
     
     void QueryPattern::setSort( const BSONObj sort ) {

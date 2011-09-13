@@ -266,11 +266,14 @@ doneCheckOrder:
     }
 
     void QueryPlan::registerSelf( long long nScanned ) const {
-        // FIXME SERVER-2864 Otherwise no query pattern can be generated.
-        if ( _frs.matchPossible() ) {
-            SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-            NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
+        // Impossible query constraints can be detected before scanning, and we
+        // don't have a reserved pattern enum value for impossible constraints.
+        if ( _impossible ) {
+            return;
         }
+
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
     }
     
     /**
