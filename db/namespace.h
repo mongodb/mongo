@@ -485,6 +485,7 @@ namespace mongo {
          * This is a work in progress.  Partial list of features not yet implemented:
          * - modification of scanned documents
          * - covered indexes
+         * - in memory sorting
          */
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
                                      
