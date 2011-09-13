@@ -33,7 +33,7 @@ namespace mongo {
             /** send a message to the port */
             void send(lam);
 
-            Server(string name) : _name(name), rq(false) { }
+            Server(string name) : m("server"), _name(name), rq(false) { }
             virtual ~Server() { }
 
             /** send message but block until function completes */
@@ -50,7 +50,7 @@ namespace mongo {
             virtual string name() const { return _name; }
             void doWork();
             deque<lam> d;
-            boost::mutex m;
+            mongo::mutex m;
             boost::condition c;
             string _name;
             bool rq;
