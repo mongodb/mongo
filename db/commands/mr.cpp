@@ -265,7 +265,7 @@ namespace mongo {
                 if (o.hasElement("nonAtomic")) {
                     outNonAtomic = o["nonAtomic"].Bool();
                     if (outNonAtomic)
-                        uassert( 15889 , "nonAtomic option cannot be used with this output type", (outType == REDUCE || outType == MERGE) );
+                        uassert( 15895 , "nonAtomic option cannot be used with this output type", (outType == REDUCE || outType == MERGE) );
                 }
             }
             else {
