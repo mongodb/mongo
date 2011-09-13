@@ -15,9 +15,4 @@ set_sources()
 	    -e '$s/ \\$//' < $filelist
 }
 
-set_vpath()
-{
-	echo 'VPATH = $(srcdir):$(srcdir)/src/utilities'
-}
-
-(cat Make.base; set_vpath; set_sources) > ../Makefile.am
+(cat Make.base; set_sources) > ../Makefile.am
