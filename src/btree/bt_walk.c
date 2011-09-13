@@ -244,123 +244,11 @@ eop:		e->child = e->visited = 1;
 }
 
 /*
- * __wt_walk_prev --
- *	Return the previous WT_PAGE in the tree, in a non-recursive way.
- */
-int
-__wt_walk_prev(WT_SESSION_IMPL *session, WT_WALK *walk, WT_PAGE **pagep)
-{
-	WT_PAGE *page;
-	WT_REF *ref;
-	WT_WALK_ENTRY *e;
-	size_t elem;
-
-	e = &walk->tree[walk->tree_slot];
-	page = e->page;
-
-	/* Release the hazard reference on the last page returned. */
-	if (e->hazard != NULL) {
-		__wt_hazard_clear(session, e->hazard);
-		e->hazard = NULL;
-	}
-
-	/*
-	 * Coming into this function we should have a tree internal page and
-	 * we're walking the array of children.  If the status of the page is
-	 * not in-memory, the tree is empty, there's nothing to do.
-	 *
-	 * If we've reached the start of this page, and haven't yet returned
-	 * it, do that now.
-	 *
-	 * If the page has been returned, traversal is finished: release our
-	 * hazard reference at this level, pop the stack and call ourselves
-	 * recursively (unless the entire tree has been traversed, in which
-	 * case, return NULL).
-	 */
-	if (e->visited) {
-		if (walk->tree_slot == 0) {
-			*pagep = NULL;
-			return (0);
-		}
-
-		--walk->tree_slot;
-		return (__wt_walk_prev(session, walk, pagep));
-	}
-
-	/*
-	 * If we have a non-internal page at this point, we're walking a tree
-	 * with a single leaf page.  Sure, make it work.
-	 */
-	if (e->child ||
-	    (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_ROW_INT)) {
-		e->child = e->visited = 1;
-		*pagep = e->page;
-		return (0);
-	}
-
-	/*
-	 * Walk (or continue to walk) the internal page, returning leaf child
-	 * pages, and traversing internal child pages.
-	 */
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-		ref = &page->u.col_int.t[e->indx].ref;
-		break;
-	case WT_PAGE_ROW_INT:
-		ref = &page->u.row_int.t[e->indx].ref;
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
-	/* We just picked up a hazard reference -- save it. */
-	WT_RET(__wt_page_in(session, page, ref, 0));
-	e->hazard = ref->page;
-
-	/* Move past this page. */
-	if (e->indx == 0)
-		e->child = 1;
-	else
-		--e->indx;
-
-	switch (ref->page->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		/*
-		 * Check to see if we grew past the end of our stack, then push
-		 * the child onto the stack and recursively descend the tree.
-		 */
-		elem = walk->tree_len / sizeof(WT_WALK_ENTRY);
-		if (walk->tree_slot + 1 >= elem)
-			WT_RET(__wt_realloc(session, &walk->tree_len,
-			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));
-		/*
-		 * Don't increment our slot until we have the memory: if the
-		 * allocation fails and our caller doesn't handle the error
-		 * reasonably, we don't want to be pointing off into space.
-		 */
-		e = &walk->tree[++walk->tree_slot];
-		e->page = ref->page;
-		e->hazard = NULL;
-		e->indx = ref->page->entries - 1;
-		e->child = e->visited = 0;
-		return (__wt_walk_next(session, walk, pagep));
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		/* Return the page, it doesn't require further traversal. */
-		*pagep = ref->page;
-		return (0);
-	WT_ILLEGAL_FORMAT(session);
-	}
-	/* NOTREACHED */
-}
-
-/*
  * __wt_tree_np --
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
+__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page, *t;
@@ -422,35 +310,42 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int next)
 	 * post-order traversal.  Otherwise we move to the next/prev slot
 	 * and left/right-most element in its subtree.
 	 */
-	if ((next && slot == page->entries - 1) || (!next && slot == 0)) {
-		*pagep = page;
-		return (0);
-	}
-	if (next)
-		++slot;
-	else
-		--slot;
-
-descend:
-	/*
-	 * We're starting a new subtree on page/slot, descend to the left-most
-	 * item in the subtree, swapping hazard references at each level (but
-	 * don't leave a hazard reference dangling on error).
-	 */
 	for (;;) {
-		if (page->type == WT_PAGE_ROW_INT)
-			ref = &page->u.row_int.t[slot].ref;
-		else if (page->type == WT_PAGE_COL_INT)
-			ref = &page->u.col_int.t[slot].ref;
+		if ((!next && slot == 0) ||
+		    (next && slot == page->entries - 1)) {
+			*pagep = page;
+			return (0);
+		}
+		if (next)
+			++slot;
 		else
-			break;
+			--slot;
 
-		ret = __wt_page_in(session, page, ref, 0);
-		__wt_page_release(session, page);
-		WT_RET(ret);
-		page = ref->page;
-		slot = next ? 0 : page->entries - 1;
+descend:	for (;;) {
+			if (page->type == WT_PAGE_ROW_INT)
+				ref = &page->u.row_int.t[slot].ref;
+			else if (page->type == WT_PAGE_COL_INT)
+				ref = &page->u.col_int.t[slot].ref;
+			else {
+				*pagep = page;
+				return (0);
+			}
+
+			/* We may only care about in-memory pages. */
+			if (cacheonly && ref->state != WT_REF_MEM)
+				break;
+
+			/*
+			 * Swap hazard references at each level (but don't
+			 * leave a hazard reference dangling on error).
+			 */
+			ret = __wt_page_in(session, page, ref, 0);
+			__wt_page_release(session, page);
+			WT_RET(ret);
+
+			page = ref->page;
+			slot = next ? 0 : page->entries - 1;
+		}
 	}
-	*pagep = page;
-	return (0);
+	/* NOTREACHED */
 }

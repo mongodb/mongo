@@ -264,7 +264,7 @@ __btree_last(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	page = NULL;
-	WT_RET(__wt_tree_np(session, &page, 0));
+	WT_RET(__wt_tree_np(session, &page, 0, 0));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
@@ -310,12 +310,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_unlock(session, conn->mtx);
 	if (inuse)
 		return (0);
-
-	/* Unpin any pages we have locked down. */
-	if (btree->last_page != NULL)
-		F_CLR(btree->last_page, WT_PAGE_PINNED);
-	if (btree->root_page.page != NULL)
-		F_CLR(btree->root_page.page, WT_PAGE_PINNED);
 
 	/*
 	 * If it's a normal tree, ask the eviction thread to flush any pages

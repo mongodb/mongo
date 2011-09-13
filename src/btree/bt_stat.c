@@ -38,7 +38,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 	WT_BSTAT_SET(session, file_size, btree->fh->file_size);
 
 	page = NULL;
-	while ((ret = __wt_tree_np(session, &page, 1)) == 0 && page != NULL)
+	while ((ret = __wt_tree_np(session, &page, 0, 1)) == 0 && page != NULL)
 		WT_RET(__stat_page(session, page));
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }

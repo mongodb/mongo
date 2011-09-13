@@ -384,38 +384,46 @@ static int
 __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
+	WT_PAGE *next_page, *page;
 	uint32_t flags;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 	flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 	WT_VERBOSE(session, EVICTSERVER,
 	    "eviction: %s file request: %s",
 	    btree->name, er->close_method ? "close" : "sync");
 
-	/*
-	 * Walk the tree.  It doesn't matter if we are already walking the tree,
-	 * __wt_walk_first restarts the process.
-	 */
-	WT_RET(__wt_walk_first(session, &btree->evict_walk, WT_WALK_CACHE));
+	/* Release any page we're holding -- we want to re-start the walk. */
+	if (btree->evict_page != NULL) {
+		__wt_page_release(session, btree->evict_page);
+		btree->evict_page = NULL;
+	}
 
+	/*
+	 * We can't release the page just returned to us, it marks our place in
+	 * the tree.  So, always stay one page ahead of the page being returned.
+	 */
+	next_page = NULL;
+	WT_RET(__wt_tree_np(session, &next_page, 1, 1));
 	for (;;) {
-		WT_ERR(__wt_walk_next(session, &btree->evict_walk, &page));
-		if (page == NULL)
+		if ((page = next_page) == NULL)
 			break;
+		WT_RET(__wt_tree_np(session, &next_page, 1, 1));
 
 		/*
-		 * Sync: only dirty pages need be reconciled.
+		 * Sync: only dirty pages need reconciliation, and we ignore
+		 * pinned pages because we can't assure total access to them
+		 * (hazard references don't apply).
+		 *
 		 * Close: discarding all of the file's pages from the cache,
 		 * and reconciliation is how we do that.
 		 */
-		if (!er->close_method && !WT_PAGE_IS_MODIFIED(page))
+		if (!er->close_method &&
+		    (!WT_PAGE_IS_MODIFIED(page) ||
+		    F_ISSET(page, WT_PAGE_PINNED)))
 			continue;
-		if (!F_ISSET(page, WT_PAGE_PINNED) &&
-		    __wt_page_reconcile(session, page, flags) == 0)
+		if (__wt_page_reconcile(session, page, flags) == 0)
 			continue;
 
 		/*
@@ -430,7 +438,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 * Add this page to the list of pages we'll have to retry.
 		 */
 		if (er->retry_next == er->retry_entries) {
-			WT_ERR(__wt_realloc(session, &er->retry_allocated,
+			WT_RET(__wt_realloc(session, &er->retry_allocated,
 			    (er->retry_entries + 100) *
 			    sizeof(*er->retry), &er->retry));
 			er->retry_entries += 100;
@@ -438,10 +446,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		er->retry[er->retry_next++] = page;
 	}
 
-err:	/* End the walk cleanly. */
-	__wt_walk_end(session, &btree->evict_walk, 1);
-
-	return (ret);
+	return (0);
 }
 
 /*
@@ -495,8 +500,7 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 		for (pending_retry = 0, i = 0; i < er->retry_entries; ++i) {
 			if ((page = er->retry[i]) == NULL)
 				continue;
-			if (!F_ISSET(page, WT_PAGE_PINNED) &&
-			    __wt_page_reconcile(session, page, flags) == 0)
+			if (__wt_page_reconcile(session, page, flags) == 0)
 				er->retry[i] = NULL;
 			else
 				pending_retry = 1;

@@ -126,6 +126,7 @@ struct __wt_btree {
 	uint32_t leafmax;
 
 	WT_WALK  evict_walk;		/* Eviction thread's walk state */
+	WT_PAGE *evict_page;		/* Eviction thread's page */
 
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */

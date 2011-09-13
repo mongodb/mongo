@@ -632,7 +632,10 @@ struct wt_session {
 
 	/*! Sync a table.
 	 *
-	 * @todo describe sync
+	 * Flush dirty pages from a table to stable storage.  Note that not
+	 * all pages are necessarily flushed (pages pinned in memory, or in
+	 * use by other threads of control may not be written until all open
+	 * session handles for the table are closed).
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->sync

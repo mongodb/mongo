@@ -516,20 +516,19 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * when said parent is reconciled.  Newly split root pages can't be
 	 * merged (as they have no parent), the new root page must be written.
 	 *
-	 * We detect root splits when the root page is flagged as a split.  We
-	 * do the check at the top level because I'd rather the reconciliation
-	 * code not handle two pages at once, and we've just finished with the
-	 * original page.
+	 * We detect root splits when the root page is flagged as needing to be
+	 * merged into its parent, that is, it's the result of a split.  We do
+	 * the check here because I'd rather the reconciliation code code not
+	 * handle two pages at once, and we've just finished with the original
+	 * page.
 	 *
-	 * Reconcile the new root page explicitly rather than waiting for a
-	 * natural reconcile, because root splits result from walking the tree
-	 * during a sync or close call, and the new root page is the one page
-	 * that won't be visited as part of that walk.
+	 * Reconcile the new root page explicitly because root splits result
+	 * from walking the tree during a close call, and the new root page
+	 * won't be visited as part of that walk.
 	 */
 	if (btree->root_page.state == WT_REF_MEM &&
 	    F_ISSET(btree->root_page.page, WT_PAGE_MERGE)) {
 		F_CLR(btree->root_page.page, WT_PAGE_MERGE);
-		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret =
 		    __wt_page_reconcile(session, btree->root_page.page, flags);
