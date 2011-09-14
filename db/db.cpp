@@ -1132,6 +1132,13 @@ namespace mongo {
         ::abort();
     }
 
+    // this gets called when new fails to allocate memory
+    void my_new_handler() {
+        rawOut( "out of memory, printing stack and exiting:" );
+        printStackTrace();
+        ::exit(EXIT_ABRUPT);
+    }
+
     void setupSignals_ignoreHelper( int signal ) {}
 
     void setupSignals( bool inFork ) {
@@ -1165,6 +1172,7 @@ namespace mongo {
         boost::thread it( interruptThread );
 
         set_terminate( myterminate );
+        set_new_handler( my_new_handler );
     }
 
 #else
