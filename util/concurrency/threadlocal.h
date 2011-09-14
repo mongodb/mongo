@@ -20,9 +20,7 @@
 
 namespace mongo { 
 
-  // TEMP
-  //#if defined(_WIN32) || defined(__GNUC__)
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__GNUC__)
         
     template< class T >
     struct TSP {
@@ -33,23 +31,30 @@ namespace mongo {
     };
 
 # if defined(_WIN32)
-#  define DECL_TSP(T,p) __declspec( thread ) T* _ ## p; \
+
+#  define TSP_DECLARE(T,p) extern TSP<T> p;
+
+#  define TSP_DEFINE(T,p) __declspec( thread ) T* _ ## p; \
     TSP<T> p; \
-    template<> T* TSP<T>::get() const \
-    { return _ ## p; } \
+    template<> T* TSP<T>::get() const { return _ ## p; } \
     void TSP<T>::reset(T* v) { \
         tsp.reset(v); \
         _ ## p = v; \
     } 
 # else
-#  define DECL_TSP(T,p) __thread T* _ ## p; \
-    TSP<T> p; \
-    template<> T* TSP<T>::get() const \
-    { return _ ## p; } \
-    void TSP<T>::reset(T* v) { \
+
+#  define TSP_DECLARE(T,p) \
+    extern __thread T* _ ## p; \
+    template<> inline T* TSP<T>::get() const { return _ ## p; }	\
+    extern TSP<T> p;
+
+#  define TSP_DEFINE(T,p) \
+    __thread T* _ ## p; \
+    template<> void TSP<T>::reset(T* v) { \
         tsp.reset(v); \
         _ ## p = v; \
-    } 
+    } \
+    TSP<T> p;
 # endif
 
 #else
@@ -62,8 +67,9 @@ namespace mongo {
         void reset(T* v) { tsp.reset(v); }
     };
 
-# define DECL_TSP(T,p) \
-    TSP<T> p; 
+#  define TSP_DECLARE(T,p) extern TSP<T> p;
+
+# define TSP_DEFINE(T,p) TSP<T> p; 
 
 #endif
 

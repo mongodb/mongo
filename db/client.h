@@ -41,7 +41,7 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
 
-    extern TSP<Client> currentClient;
+    TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
 
