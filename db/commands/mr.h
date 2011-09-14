@@ -194,6 +194,9 @@ namespace mongo {
                    INMEMORY // only store in memory, limited in size
                  } outType;
 
+            // if true, no lock during output operation
+            bool outNonAtomic;
+
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
 
@@ -252,6 +255,7 @@ namespace mongo {
                @return number objects in collection
              */
             long long postProcessCollection();
+            long long postProcessCollectionNonAtomic();
 
             /**
              * if INMEMORY will append

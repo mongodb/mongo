@@ -820,6 +820,18 @@ namespace mongo {
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
+                if (conn->count("config.shards", BSON("_id" << NE << s.getName() << ShardFields::draining(true)))){
+                    conn.done();
+                    errmsg = "Can't have more than one draining shard at a time";
+                    return false;
+                }
+
+                if (conn->count("config.shards", BSON("_id" << NE << s.getName())) == 0){
+                    conn.done();
+                    errmsg = "Can't remove last shard";
+                    return false;
+                }
+
                 // If the server is not yet draining chunks, put it in draining mode.
                 BSONObj searchDoc = BSON( "_id" << s.getName() );
                 BSONObj drainingDoc = BSON( "_id" << s.getName() << ShardFields::draining(true) );

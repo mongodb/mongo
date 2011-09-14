@@ -47,5 +47,14 @@ expected["6"] = 1
 
 assert.eq( tos( expected ) , tos( res.convertToSingleObject() ) , "C" );
 
+// test that the nonAtomic output gives valid result
+t.insert( { a : [ 6 , 7 ] } )
+out.insert( { _id : 20 , value : "10" } )
+res = t.mapReduce( m , r , { out : { merge : outName, nonAtomic: true } } )
 
+expected["6"]++;
+expected["20"] = 10
+expected["7"] = 1
+
+assert.eq( tos( expected ) , tos( res.convertToSingleObject() ) , "D" );
 

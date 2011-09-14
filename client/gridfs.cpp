@@ -169,29 +169,29 @@ namespace mongo {
         }
     }
 
-    GridFile::GridFile( GridFS * grid , BSONObj obj ) {
+    GridFile::GridFile(const GridFS * grid , BSONObj obj ) {
         _grid = grid;
         _obj = obj;
     }
 
-    GridFile GridFS::findFile( const string& fileName ) {
+    GridFile GridFS::findFile( const string& fileName ) const {
         return findFile( BSON( "filename" << fileName ) );
     };
 
-    GridFile GridFS::findFile( BSONObj query ) {
+    GridFile GridFS::findFile( BSONObj query ) const {
         query = BSON("query" << query << "orderby" << BSON("uploadDate" << -1));
         return GridFile( this , _client.findOne( _filesNS.c_str() , query ) );
     }
 
-    auto_ptr<DBClientCursor> GridFS::list() {
+    auto_ptr<DBClientCursor> GridFS::list() const {
         return _client.query( _filesNS.c_str() , BSONObj() );
     }
 
-    auto_ptr<DBClientCursor> GridFS::list( BSONObj o ) {
+    auto_ptr<DBClientCursor> GridFS::list( BSONObj o ) const {
         return _client.query( _filesNS.c_str() , o );
     }
 
-    BSONObj GridFile::getMetadata() {
+    BSONObj GridFile::getMetadata() const {
         BSONElement meta_element = _obj["metadata"];
         if( meta_element.eoo() ) {
             return BSONObj();
@@ -200,7 +200,7 @@ namespace mongo {
         return meta_element.embeddedObject();
     }
 
-    GridFSChunk GridFile::getChunk( int n ) {
+    GridFSChunk GridFile::getChunk( int n ) const {
         _exists();
         BSONObjBuilder b;
         b.appendAs( _obj["_id"] , "files_id" );
@@ -211,7 +211,7 @@ namespace mongo {
         return GridFSChunk(o);
     }
 
-    gridfs_offset GridFile::write( ostream & out ) {
+    gridfs_offset GridFile::write( ostream & out ) const {
         _exists();
 
         const int num = getNumChunks();
@@ -227,7 +227,7 @@ namespace mongo {
         return getContentLength();
     }
 
-    gridfs_offset GridFile::write( const string& where ) {
+    gridfs_offset GridFile::write( const string& where ) const {
         if (where == "-") {
             return write( cout );
         }
@@ -238,7 +238,7 @@ namespace mongo {
         }
     }
 
-    void GridFile::_exists() {
+    void GridFile::_exists() const {
         uassert( 10015 ,  "doesn't exists" , exists() );
     }
 

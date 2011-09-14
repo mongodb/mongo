@@ -701,7 +701,7 @@ namespace mongo {
         if (recv != 0)
             v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
         else
-            v8recv = _emptyObj;
+            v8recv = _global;
 
         enableV8Interrupt(); // because of v8 locker we can check interrupted, then enable
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( v8recv , nargs , nargs ? args.get() : 0 );
@@ -967,7 +967,7 @@ namespace mongo {
                 break;
 
             case CodeWScope:
-                if ( f.codeWScopeObject().isEmpty() )
+                if ( !f.codeWScopeObject().isEmpty() )
                     log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
                 o->Set( name, newFunction( f.codeWScopeCode() ) );
                 break;
@@ -1174,7 +1174,7 @@ namespace mongo {
             return newFunction( f.valuestr() );
 
         case CodeWScope:
-            if ( f.codeWScopeObject().isEmpty() )
+            if ( !f.codeWScopeObject().isEmpty() )
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction( f.codeWScopeCode() );
 

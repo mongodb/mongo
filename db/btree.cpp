@@ -1603,15 +1603,24 @@ namespace mongo {
     }
 
     /** @param thisLoc in/out param. perhaps thisLoc isn't the best name given that.
+        Ut is used by advanceTo, which skips
+        from one key to another key without necessarily checking all the keys
+        between them in the btree (it can skip to different btree buckets).
+        The advanceTo function can get called a lot, and for different targets
+        we want to advance to, don't want to create a bson obj in a new
+        buffer each time we call that function.  The
+        customLocate function necessary for advanceTo, and does the same thing
+        as normal locate function but takes basically the same arguments
+        as advanceTo.
     */
     template< class V >
-    void BtreeBucket<V>::customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, 
+    void BtreeBucket<V>::customLocate(DiskLoc &locInOut, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, 
                                       const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, 
                                       const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) {
         dassert( direction == 1 || direction == -1 );
-        const BtreeBucket<V> *bucket = BTREE(thisLoc);
+        const BtreeBucket<V> *bucket = BTREE(locInOut);
         if ( bucket->n == 0 ) {
-            thisLoc = DiskLoc();
+            locInOut = DiskLoc();
             return;
         }
         // go down until find smallest/biggest >=/<= target
@@ -1637,9 +1646,9 @@ namespace mongo {
                     next = bucket->nextChild;
                 }
                 if ( !next.isNull() ) {
-                    bestParent = pair< DiskLoc, int >( thisLoc, keyOfs );
-                    thisLoc = next;
-                    bucket = BTREE(thisLoc);
+                    bestParent = pair< DiskLoc, int >( locInOut, keyOfs );
+                    locInOut = next;
+                    bucket = BTREE(locInOut);
                     continue;
                 }
                 else {
@@ -1659,22 +1668,22 @@ namespace mongo {
                     next = bucket->k( 0 ).prevChildBucket;
                 }
                 if ( next.isNull() ) {
-                    // if bestParent is null, we've hit the end and thisLoc gets set to DiskLoc()
-                    thisLoc = bestParent.first;
+                    // if bestParent is null, we've hit the end and locInOut gets set to DiskLoc()
+                    locInOut = bestParent.first;
                     keyOfs = bestParent.second;
                     return;
                 }
                 else {
-                    thisLoc = next;
-                    bucket = BTREE(thisLoc);
+                    locInOut = next;
+                    bucket = BTREE(locInOut);
                     continue;
                 }
             }
 
-            if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, thisLoc, keyOfs, bestParent ) ) {
+            if ( !customFind( l, h, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction, locInOut, keyOfs, bestParent ) ) {
                 return;
             }
-            bucket = BTREE(thisLoc);
+            bucket = BTREE(locInOut);
         }
     }
 
