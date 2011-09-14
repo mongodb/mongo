@@ -1,5 +1,5 @@
 Name: mongo
-Version: 2.0.0-rc0
+Version: 2.0.0.rc0
 Release: mongodb_1%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0
@@ -76,14 +76,24 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+cp rpm/init.d-mongoc $RPM_BUILD_ROOT/etc/rc.d/init.d/mongoc
+cp rpm/init.d-mongos $RPM_BUILD_ROOT/etc/rc.d/init.d/mongos
 chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+cp rpm/mongoc.conf $RPM_BUILD_ROOT/etc/mongoc.conf
+cp rpm/mongos.conf $RPM_BUILD_ROOT/etc/mongos.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
+cp rpm/mongoc.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongoc
+cp rpm/mongos.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongos
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
+mkdir -p $RPM_BUILD_ROOT/var/lib/mongoc
 mkdir -p $RPM_BUILD_ROOT/var/log/mongo
 touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
+touch $RPM_BUILD_ROOT/var/log/mongo/mongoc.log
+touch $RPM_BUILD_ROOT/var/log/mongo/mongos.log
+mkdir -p $RPM_BUILD_ROOT/var/run/mongo
 
 %clean
 scons -c
