@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    DECL_TSP(Client, currentClient);
+    /* todo: rename this file clientinfo.cpp would be more intuitive? */
 
     ClientInfo::ClientInfo() {
         _cur = &_a;
