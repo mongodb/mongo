@@ -19,20 +19,20 @@ __search_insert(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_INSERT **ins, *ret_ins;
 	WT_ITEM insert_key;
-	int cmp, i, (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
 	if (inshead == NULL)
 		return (NULL);
 
 	btree = session->btree;
-	compare = btree->btree_compare;
 
 	/* Fast-path appends. */
 	if (inshead->tail[0] != NULL) {
 		insert_key.data = WT_INSERT_KEY(inshead->tail[0]);
 		insert_key.size = WT_INSERT_KEY_SIZE(inshead->tail[0]);
-		if ((cmp = compare(btree, key, &insert_key)) > 0) {
+		(void)WT_BTREE_CMP(session, btree, key, &insert_key, cmp);
+		if (cmp > 0) {
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
 				    &inshead->tail[i]->next[i] :
@@ -61,7 +61,8 @@ __search_insert(WT_SESSION_IMPL *session,
 			ret_ins = *ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-			cmp = compare(btree, key, &insert_key);
+			(void)WT_BTREE_CMP(session, btree,
+			    key, &insert_key, cmp);
 		}
 
 		if (cmp == 0)			/* Exact match: return */
@@ -95,7 +96,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ROW_REF *rref;
 	uint32_t base, indx, limit;
 	int cmp, ret;
-	int (*compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	__cursor_search_clear(cbt);
 
@@ -103,7 +103,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	btree = session->btree;
 	rip = NULL;
-	compare = btree->btree_compare;
 
 	cmp = -1;				/* Assume we don't match. */
 
@@ -128,7 +127,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
-				cmp = compare(btree, key, item);
+				WT_RET(WT_BTREE_CMP(session, btree,
+				    key, item, cmp));
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -183,7 +183,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			item = (WT_ITEM *)&cbt->tmp;
 		}
 
-		cmp = compare(btree, key, item);
+		WT_RET(WT_BTREE_CMP(session, btree, key, item, cmp));
 		if (cmp == 0)
 			break;
 		if (cmp < 0)

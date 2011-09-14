@@ -2,6 +2,7 @@
 __bit_ffs
 __bit_nclr
 __wt_block_dump
+__wt_btree_lex_compare
 __wt_config_getone
 __wt_debug_addr
 __wt_debug_tree

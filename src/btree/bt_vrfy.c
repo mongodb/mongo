@@ -356,10 +356,9 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
 	WT_ITEM item;
-	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp;
 
 	btree = session->btree;
-	func = btree->btree_compare;
 
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr != WT_ADDR_INVALID);
@@ -370,7 +369,9 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	item.size = ikey->size;
 
 	/* Compare the key against the largest key we've seen so far. */
-	if (func(btree, &item, (WT_ITEM *)vs->max_key) <= 0) {
+	WT_RET(
+	    WT_BTREE_CMP(session, btree, &item, (WT_ITEM *)vs->max_key, cmp));
+	if (cmp <= 0) {
 		__wt_errx(session,
 		    "the internal key in entry %" PRIu32
 		    " on the page at addr %" PRIu32
@@ -397,11 +398,10 @@ __verify_row_leaf_key_order(
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
-	int ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, ret;
 
 	btree = session->btree;
 	key = NULL;
-	func = btree->btree_compare;
 	ret = 0;
 
 	/*
@@ -423,7 +423,9 @@ __verify_row_leaf_key_order(
 		 * we've seen was a key from a previous leaf page, and it's not
 		 * OK to compare equally in that case.
 		 */
-		if (func(btree, (WT_ITEM *)key, (WT_ITEM *)vs->max_key) < 0) {
+		WT_RET(WT_BTREE_CMP(session, btree,
+		    (WT_ITEM *)key, (WT_ITEM *)vs->max_key, cmp));
+		if (cmp < 0) {
 			__wt_errx(session,
 			    "the first key on the page at addr %" PRIu32
 			    " sorts equal or less than a key"

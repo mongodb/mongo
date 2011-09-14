@@ -156,13 +156,10 @@ __btree_conf(WT_SESSION_IMPL *session,
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		btree->btree_compare = __wt_btree_lex_compare;
-
 		WT_RET(__wt_config_getones(
 		    session, btree->config, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
 	}
-
 	/* Check for fixed-size data. */
 	if (btree->type == BTREE_COL_VAR) {
 		WT_RET(__wt_struct_check(

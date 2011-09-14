@@ -132,11 +132,9 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 	void *huffman;
 	uint32_t cell_num, cell_type, i, prefix;
 	uint8_t *end;
-	int ret;
-	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, ret;
 
 	btree = session->btree;
-	func = btree->btree_compare;
 	huffman = btree->huffman_key;
 	unpack = &_unpack;
 	ret = 0;
@@ -332,13 +330,17 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 		}
 
 key_compare:	/* Compare the current key against the last key. */
-		if (last->size != 0 &&
-		     func(btree, (WT_ITEM *)last, (WT_ITEM *)current) >= 0) {
-			WT_VRFY_ERR(session, quiet,
-			    "the %" PRIu32 " and %" PRIu32 " keys on page at "
-			    "addr %" PRIu32 " are incorrectly sorted",
-			    cell_num - 2, cell_num, addr);
-			goto err;
+		if (last->size != 0) {
+			WT_ERR(WT_BTREE_CMP(session, btree,
+			    (WT_ITEM *)last, (WT_ITEM *)current, cmp));
+			if (cmp >= 0) {
+				WT_VRFY_ERR(session, quiet,
+				    "the %" PRIu32 " and %" PRIu32
+				    " keys on page at addr %" PRIu32
+				    " are incorrectly sorted",
+				    cell_num - 2, cell_num, addr);
+				goto err;
+			}
 		}
 
 		/*

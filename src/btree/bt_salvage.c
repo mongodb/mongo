@@ -15,6 +15,7 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  * to make the code prettier.
  */
 struct __wt_stuff {
+	WT_SESSION_IMPL *session;		/* Salvage session */
 	WT_BTREE  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
@@ -160,6 +161,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
+	ss->session = session;
 	ss->btree = btree;
 	ss->page_type = WT_PAGE_INVALID;
 
@@ -1282,10 +1284,9 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	uint32_t i, j;
-	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp;
 
 	btree = session->btree;
-	func = btree->btree_compare;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1311,9 +1312,10 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * We're done if this page starts after our stop, no
 			 * subsequent pages can overlap our page.
 			 */
-			if (func(btree,
+			WT_RET(WT_BTREE_CMP(session, btree,
 			    (WT_ITEM *)&ss->pages[j]->row_start,
-			    (WT_ITEM *)&ss->pages[i]->row_stop) > 0)
+			    (WT_ITEM *)&ss->pages[i]->row_stop, cmp));
+			if (cmp > 0)
 				break;
 
 			/* There's an overlap, fix it up. */
@@ -1333,7 +1335,7 @@ __slvg_row_range_overlap(
 {
 	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
-	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1341,7 +1343,6 @@ __slvg_row_range_overlap(
 	 * BEING HANDLED.
 	 */
 	btree = session->btree;
-	func = btree->btree_compare;
 
 	a_trk = ss->pages[a_slot];
 	b_trk = ss->pages[b_slot];
@@ -1392,7 +1393,8 @@ __slvg_row_range_overlap(
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
-	if (func(btree, A_TRK_START, B_TRK_START) == 0) {
+	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_START, B_TRK_START, cmp));
+	if (cmp == 0) {
 		/*
 		 * Case #1, #4 and #9.
 		 *
@@ -1403,7 +1405,9 @@ __slvg_row_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		if (func(btree, A_TRK_STOP, B_TRK_STOP) >= 0)
+		WT_RET(
+		    WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+		if (cmp >= 0)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
@@ -1421,7 +1425,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	if (func(btree, A_TRK_STOP, B_TRK_STOP) == 0) {
+	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+	if (cmp == 0) {
 		/* Case #6. */
 		if (a_trk->lsn > b_trk->lsn)
 			/*
@@ -1440,7 +1445,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	if  (func(btree, A_TRK_STOP, B_TRK_STOP) < 0) {
+	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+	if (cmp < 0) {
 		/* Case #3/8. */
 		if (a_trk->lsn > b_trk->lsn) {
 			/*
@@ -1545,12 +1551,11 @@ __slvg_row_trk_update_start(
 	WT_ROW *rip;
 	WT_TRACK *trk;
 	uint32_t i;
-	int found, ret, (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	int cmp, found, ret;
 
 	btree = session->btree;
 	key = dsk = NULL;
 	page = NULL;
-	func = btree->btree_compare;
 	found = ret = 0;
 
 	trk = ss->pages[slot];
@@ -1594,7 +1599,8 @@ __slvg_row_trk_update_start(
 			WT_ERR(__wt_row_key(session, page, rip, key));
 			item = (WT_ITEM *)key;
 		}
-		if  (func(btree, item, stop) > 0) {
+		WT_ERR(WT_BTREE_CMP(session, btree, item, stop, cmp));
+		if (cmp > 0) {
 			found = 1;
 			break;
 		}
@@ -1618,7 +1624,9 @@ __slvg_row_trk_update_start(
 	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		if  (func(btree, SLOT_START(i), (WT_ITEM *)&trk->row_stop) > 0)
+		WT_ERR(WT_BTREE_CMP(session, btree,
+		    SLOT_START(i), (WT_ITEM *)&trk->row_stop, cmp));
+		if (cmp > 0)
 			break;
 	}
 	i -= slot;
@@ -1724,12 +1732,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
-	int (*func)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 	uint32_t i, skip_start, skip_stop;
+	int cmp, ret;
 
 	btree = session->btree;
 	page = NULL;
-	func = btree->btree_compare;
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
@@ -1772,8 +1779,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			/*
 			 * >= is correct: see the comment above.
 			 */
-			if  (func(btree,
-			    item, (WT_ITEM *)&trk->row_start) >= 0)
+			WT_ERR(WT_BTREE_CMP(session, btree,
+			    item, (WT_ITEM *)&trk->row_start, cmp));
+			if (cmp >= 0)
 				break;
 			if (ss->verbose) {
 				WT_ERR(__slvg_load_byte_string(session,
@@ -1801,8 +1809,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			/*
 			 * < is correct: see the comment above.
 			 */
-			if  (func(btree,
-			    item, (WT_ITEM *)&trk->row_stop) < 0)
+			WT_ERR(WT_BTREE_CMP(session, btree,
+			    item, (WT_ITEM *)&trk->row_stop, cmp));
+			if (cmp < 0)
 				break;
 			if (ss->verbose) {
 				WT_ERR(__slvg_load_byte_string(session,
@@ -2064,9 +2073,10 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
-		if ((cmp = btree->btree_compare(btree,
+		(void)WT_BTREE_CMP(a_trk->ss->session, btree,
 		    (WT_ITEM *)&a_trk->row_start,
-		    (WT_ITEM *)&b_trk->row_start)) != 0)
+		    (WT_ITEM *)&b_trk->row_start, cmp);
+		if (cmp != 0)
 			return (cmp);
 		break;
 	}

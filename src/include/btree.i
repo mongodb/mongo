@@ -177,3 +177,41 @@ __wt_skip_choose_depth(void)
 		;
 	return (d);
 }
+
+/*
+ * __wt_btree_lex_compare --
+ *	Lexicographic comparison routine.
+ *
+ * Returns:
+ *	< 0 if user_item is lexicographically < tree_item
+ *	= 0 if user_item is lexicographically = tree_item
+ *	> 0 if user_item is lexicographically > tree_item
+ *
+ * We use the names "user" and "tree" so it's clear which the application is
+ * looking at when we call its comparison func.
+ */
+static inline int
+__wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
+{
+	const uint8_t *userp, *treep;
+	uint32_t len, usz, tsz;
+
+	usz = user_item->size;
+	tsz = tree_item->size;
+	len = WT_MIN(usz, tsz);
+
+	for (userp = user_item->data, treep = tree_item->data;
+	    len > 0;
+	    --len, ++userp, ++treep)
+		if (*userp != *treep)
+			return (*userp < *treep ? -1 : 1);
+
+	/* Contents are equal up to the smallest length. */
+	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
+}
+
+#define	WT_BTREE_CMP(s, bt, k1, k2, __cmp)				\
+	(((bt)->collator == NULL) ?					\
+	(__cmp = __wt_btree_lex_compare((k1), (k2)), 0) :		\
+	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
+	    (k1), (k2), &__cmp, NULL))

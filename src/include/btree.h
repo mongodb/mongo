@@ -99,7 +99,7 @@ struct __wt_btree {
 	const char *value_plan;		/* Value projection plan for indices */
 
 					/* Row-store comparison function */
-	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
+	WT_COLLATOR *collator;          /* Comparison function */
 
 	uint32_t key_gap;		/* Row-store prefix key gap */
 
