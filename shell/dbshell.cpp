@@ -151,9 +151,11 @@ static void edit(const string& var){
     StringBuilder sb;
     sb << editor << " " << filename;
     int ret = ::system(sb.str().c_str());
+    int systemErrno = errno;
+    remove(filename.c_str()); // file already open, deleted on close
     if (ret){
         if (ret == -1) {
-            cout << "failed to launch $EDITOR (" << editor << "): " << errnoWithDescription() << endl;
+            cout << "failed to launch $EDITOR (" << editor << "): " << errnoWithDescription(systemErrno) << endl;
             return;
         }
 
