@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __btree_conf(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_type(WT_SESSION_IMPL *);
@@ -53,7 +54,6 @@ __wt_btree_open(WT_SESSION_IMPL *session,
     const char *treeconfig, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	int matched, ret;
 
@@ -85,7 +85,6 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 
 	/* Create the WT_BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
-	btree->flags = flags;
 	session->btree = btree;
 
 	/* Use the config string: it will be freed when the btree handle. */
@@ -97,44 +96,10 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0666, 1, &btree->fh));
 
-	/*
-	 * Read the file's metadata (unless it's a salvage operation and the
-	 * force flag is set, in which case we don't care what the file looks
-	 * like).
-	 */
-	if (LF_ISSET(WT_BTREE_SALVAGE))
-		WT_RET(__wt_config_gets(session, cfg, "force", &cval));
-	if (!LF_ISSET(WT_BTREE_SALVAGE) || cval.val == 0)
-		WT_ERR(__wt_desc_read(
-		    session, LF_ISSET(WT_BTREE_SALVAGE) ? 1 : 0));
+	/* Read in the root page. */
+	WT_ERR(__btree_read_meta(session, cfg, flags));
 
-	/* If this is an open for a salvage operation, that's all we do. */
-	if (LF_ISSET(WT_BTREE_SALVAGE))
-		goto done;
-
-	/* Read in the free list. */
-	WT_ERR(__wt_block_freelist_read(session));
-
-	/*
-	 * Get a root page.  If there's a root page in the file, read it in and
-	 * pin it.  If there's no root page, create an empty in-memory page.
-	 */
-	if (btree->root_page.addr == WT_ADDR_INVALID)
-		WT_ERR(__wt_btree_root_init(session));
-	else  {
-		/* If an open for a verify operation, check the disk image. */
-		WT_ERR(__wt_page_in(session, NULL,
-		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
-		F_SET(btree->root_page.page, WT_PAGE_PINNED);
-
-		WT_MEMORY_FLUSH;		/* flush pin before release */
-		__wt_hazard_clear(session, btree->root_page.page);
-	}
-
-	/* Get the last page of the file. */
-	WT_ERR(__btree_last(session));
-
-done:	/* Add to the connection list. */
+	/* Add to the connection list. */
 	__wt_lock(session, conn->mtx);
 	btree->refcnt = 1;
 	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
@@ -153,7 +118,7 @@ err:	if (btree->fh != NULL)
 
 /*
  * __btree_conf --
- *	Initialize the WT_BTREE structure, after an zero-filled allocation.
+ *	Initialize the WT_BTREE structure, after a zero-filled allocation.
  */
 static int
 __btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
@@ -165,6 +130,8 @@ __btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
 
 	btree = session->btree;
 	conn = S2C(session);
+
+	WT_RET(__wt_rwlock_alloc(session, "btree handle", &btree->rwlock));
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
 	WT_RET(__wt_strdup(session, filename, &btree->filename));
@@ -286,6 +253,94 @@ __btree_last(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __btree_close_cache --
+ *	Close a the in-memory cache of a btree.
+ */
+static int
+__btree_close_cache(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	int ret;
+
+	btree = session->btree;
+	ret = 0;
+
+	/*
+	 * If it's a normal tree, ask the eviction thread to flush any pages
+	 * that remain in the cache.  If there is still a root page in memory,
+	 * it must be an empty page that was not reconciled, so free it.
+	 */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		WT_TRET(__wt_evict_file_serial(session, 1));
+	if (btree->root_page.page != NULL)
+		__wt_page_out(session, btree->root_page.page, 0);
+
+	/*
+	 * Write out the free list.
+	 * Update the file's description.
+	 * Close the underlying file handle.
+	 */
+	WT_TRET(__wt_block_freelist_write(session));
+	WT_TRET(__wt_desc_update(session));
+
+	return (ret);
+}
+
+/*
+ * __btree_read_meta --
+ *	Read the metadata for a tree.
+ */
+static int
+__btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+{
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+
+	btree = session->btree;
+
+	btree->flags = flags;
+
+	/*
+	 * Read the file's metadata (unless it's a salvage operation and the
+	 * force flag is set, in which case we don't care what the file looks
+	 * like).
+	 */
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		WT_RET(__wt_config_gets(session, cfg, "force", &cval));
+	if (!LF_ISSET(WT_BTREE_SALVAGE) || cval.val == 0)
+		WT_RET(__wt_desc_read(
+		    session, LF_ISSET(WT_BTREE_SALVAGE) ? 1 : 0));
+
+	/* If this is an open for a salvage operation, that's all we do. */
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		return (0);
+
+	/* Read in the free list. */
+	WT_RET(__wt_block_freelist_read(session));
+
+	/*
+	 * Get a root page.  If there's a root page in the file, read it in and
+	 * pin it.  If there's no root page, create an empty in-memory page.
+	 */
+	if (btree->root_page.addr == WT_ADDR_INVALID)
+		WT_RET(__wt_btree_root_init(session));
+	else  {
+		/* If an open for a verify operation, check the disk image. */
+		WT_RET(__wt_page_in(session, NULL,
+		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
+		F_SET(btree->root_page.page, WT_PAGE_PINNED);
+
+		WT_MEMORY_FLUSH;		/* flush pin before release */
+		__wt_hazard_clear(session, btree->root_page.page);
+	}
+
+	/* Get the last page of the file. */
+	WT_RET(__btree_last(session));
+
+	return (0);
+}
+
+/*
  * __wt_btree_close --
  *	Close a Btree.
  */
@@ -311,23 +366,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (inuse)
 		return (0);
 
-	/*
-	 * If it's a normal tree, ask the eviction thread to flush any pages
-	 * that remain in the cache.  If there is still a root page in memory,
-	 * it must be an empty page that was not reconciled, so free it.
-	 */
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		WT_TRET(__wt_evict_file_serial(session, 1));
-	if (btree->root_page.page != NULL)
-		__wt_page_out(session, btree->root_page.page, 0);
-
-	/*
-	 * Write out the free list.
-	 * Update the file's description.
-	 * Close the underlying file handle.
-	 */
-	WT_TRET(__wt_block_freelist_write(session));
-	WT_TRET(__wt_desc_update(session));
+	WT_TRET(__btree_close_cache(session));
 	WT_TRET(__wt_close(session, btree->fh));
 
 	/* Free allocated memory. */
@@ -344,11 +383,26 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_rec_destroy(session);
 	__wt_free(session, btree->stats);
 
+	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, session->btree);
 
 	WT_STAT_DECR(conn->stats, file_open);
 
 	return (ret);
+}
+
+/*
+ * __wt_btree_reopen --
+ *	Reset an open btree handle back to its initial state.
+ */
+int
+__wt_btree_reopen(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+{
+	/* Close the existing cache and re-read the metadata. */
+	WT_RET(__btree_close_cache(session));
+	WT_RET(__btree_read_meta(session, cfg, flags));
+
+	return (0);
 }
 
 /*

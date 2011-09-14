@@ -202,8 +202,9 @@ __curfile_close(WT_CURSOR *cursor, const char *config)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config, cfg);
-	WT_UNUSED(cfg);
-	WT_TRET(__wt_btcur_close((WT_CURSOR_BTREE *)cursor, config));
+	WT_TRET(__wt_btcur_close(cbt, cfg));
+	if (session->btree != NULL)
+		__wt_session_release_btree(session);
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 
@@ -313,9 +314,11 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 
 	filename = name;
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
-		WT_RET(__wt_schema_get_btree(session, name, strlen(name)));
+		WT_RET(__wt_schema_get_btree(session,
+		    name, strlen(name), NULL, 0));
 	else if (WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET(__wt_session_get_btree(session, name, filename, NULL));
+		WT_RET(__wt_session_get_btree(session,
+		     name, filename, NULL, NULL, 0));
 	else
 		return (EINVAL);
 

@@ -184,14 +184,13 @@ static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *filename, *treeconf;
+	const char *filename;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
-
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
 		__wt_errx(session, "Unknown object type: %s", name);
@@ -207,14 +206,12 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 	 * it skips loading metadata such as the free list, which could be
 	 * corrupted.
 	 */
-	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(session, name, filename,
-	    treeconf, cfg, WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
+	WT_ERR(__wt_session_get_btree(session, name, filename, NULL, cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
 
 	WT_TRET(__wt_salvage(session, config));
 
-	/* Close the file and discard the WT_BTREE structure. */
-	WT_TRET(__wt_btree_close(session));
+	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);
 
 	return (ret);
@@ -245,13 +242,17 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	ret = __wt_session_find_btree(session,
-	    filename, strlen(filename), &btree_session);
+	    filename, strlen(filename), cfg, WT_BTREE_EXCLUSIVE,
+	    &btree_session);
 
 	/* If the tree isn't open, there's nothing to do. */
 	if (ret == 0) {
 		session->btree = btree_session->btree;
 		ret = __wt_btree_sync(session);
 	}
+
+	/* Release the tree so other threads can use it. */
+	__wt_session_release_btree(session);
 err:	API_END(session);
 
 	return (ret);
@@ -282,7 +283,7 @@ static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *filename, *treeconf;
+	const char *filename;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -297,21 +298,18 @@ __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	/*
-	 * Open a btree handle.
+	 * Get a btree handle.
 	 *
 	 * Tell open that we're going to verify this handle, so it skips loading
 	 * metadata such as the free list, which could be corrupted.
 	 */
-	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(
-	    session, name, filename, treeconf, cfg, WT_BTREE_VERIFY));
+	WT_ERR(__wt_session_get_btree(session, name, filename, NULL, cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_verify(session, config));
 
-	/* Close the file and discard the WT_BTREE structure. */
-	WT_TRET(__wt_btree_close(session));
+	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -323,7 +321,7 @@ static int
 __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	const char *filename, *treeconf;
+	const char *filename;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -338,7 +336,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	/*
-	 * Open a btree handle.
+	 * Get a btree handle.
 	 *
 	 * Tell the eviction thread to ignore this handle, we'll manage our own
 	 * pages (it would be possible for us to let the eviction thread handle
@@ -348,17 +346,13 @@ __session_dumpfile(WT_SESSION *wt_session, const char *name, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_ERR(__wt_schema_table_read(session, name, &treeconf));
-	WT_ERR(__wt_btree_open(session, name, filename,
-	    treeconf, cfg, WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_ERR(__wt_session_get_btree(session, name, filename, NULL, cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
-	WT_ERR(__wt_dumpfile(session, config));
+	WT_TRET(__wt_dumpfile(session, config));
 
+	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);
-
-	/* Close the file and discard the WT_BTREE structure. */
-	if (session->btree != NULL)
-		WT_TRET(__wt_btree_close(session));
 	return (ret);
 }
 

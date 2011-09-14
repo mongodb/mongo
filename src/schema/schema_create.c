@@ -26,8 +26,9 @@ __create_file(WT_SESSION_IMPL *session,
 	is_schema = (strcmp(filename, WT_SCHEMA_FILENAME) == 0);
 
 	/* If the file exists, don't try to recreate it. */
-	if ((ret = __wt_session_get_btree(session,
-	    name, filename, is_schema ? config : NULL)) != WT_NOTFOUND)
+	if ((ret = __wt_session_get_btree(session, name, filename,
+	    is_schema ? config : NULL,
+	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
 		return (ret);
 
 	WT_RET(__wt_btree_create(session, filename));

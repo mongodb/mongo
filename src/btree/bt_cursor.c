@@ -315,11 +315,11 @@ err:	__cursor_func_resolve(cbt, ret);
  *	Close a btree cursor.
  */
 int
-__wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config)
+__wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	__cursor_func_init(cbt, 1);

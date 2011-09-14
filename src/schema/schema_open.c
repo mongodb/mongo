@@ -46,7 +46,8 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
  *	(either a column group or an index).
  */
 int
-__wt_schema_get_btree(WT_SESSION_IMPL *session, const char *objname, size_t len)
+__wt_schema_get_btree(WT_SESSION_IMPL *session,
+    const char *objname, size_t len, const char *cfg[], uint32_t flags)
 {
 	WT_BUF uribuf;
 	WT_CONFIG_ITEM cval;
@@ -80,7 +81,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session, const char *objname, size_t len)
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, uri, filename, NULL);
+	ret = __wt_session_get_btree(session, uri, filename, NULL, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "%s created but '%s' is missing", objname, uri);
@@ -127,7 +128,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_schema_colgroup_name(session, table,
 		    ckey.str, ckey.len, &cgname));
-		ret = __wt_schema_get_btree(session, cgname, strlen(cgname));
+		ret = __wt_schema_get_btree(session,
+		    cgname, strlen(cgname), NULL, WT_BTREE_NO_LOCK);
 		if (ret != 0) {
 			/* It is okay if the table is not yet complete. */
 			if (ret == WT_NOTFOUND)
@@ -178,7 +180,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	filename = fileuri = uribuf.data;
 	(void)WT_PREFIX_SKIP(filename, "file:");
 
-	ret = __wt_session_get_btree(session, fileuri, filename, NULL);
+	ret = __wt_session_get_btree(session, fileuri, filename,
+	    NULL, NULL, WT_BTREE_NO_LOCK);
 	if (ret == ENOENT)
 		__wt_errx(session, "Index '%s' created but '%s' is missing",
 		    uri, fileuri);

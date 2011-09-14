@@ -17,17 +17,16 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 	WT_CLEAR(keybuf);
 
 	/* If open, close the btree handle. */
-	switch ((ret = __wt_session_find_btree(
-	    session, filename, strlen(filename), &btree_session))) {
+	switch ((ret = __wt_session_find_btree(session,
+	    filename, strlen(filename), NULL, WT_BTREE_EXCLUSIVE,
+	    &btree_session))) {
 	case 0:
 		/*
-		 * XXX fail gracefully if other threads have the tree open.
-		 * It only matters that they don't have cursors open, we need
-		 * a count in WT_BTREE_SESSION, plus some synchronization
-		 * when first "pinning" a btree handle.
+		 * XXX We have an exclusive lock, which means there are no
+		 * cursors open but some other thread may have the handle
+		 * cached.
 		 */
 		WT_ASSERT(session, btree_session->btree->refcnt == 1);
-
 		WT_TRET(__wt_session_remove_btree(session, btree_session));
 		break;
 	case WT_NOTFOUND:

@@ -170,6 +170,7 @@ struct __wt_connection_impl {
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
 #define	API_SESSION_INIT(s, h, n, cur, bt)				\
+	WT_BTREE *__oldbtree = (s)->btree;				\
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
@@ -187,8 +188,10 @@ struct __wt_connection_impl {
 	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
 
 #define	API_END(s)							\
-	if ((s) != NULL)						\
+	if ((s) != NULL) {						\
+		(s)->btree = __oldbtree;				\
 		(s)->name = __oldname;					\
+	}								\
 } while (0)
 
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\

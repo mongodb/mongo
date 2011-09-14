@@ -204,6 +204,11 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	if (ret == 0 && cval.val != 0 && cst->clear_func)
 		cst->clear_func(cst->stats_first);
 	__wt_buf_free(session, &cst->pvalue);
+	if (cst->btree != NULL) {
+		session->btree = cst->btree;
+		__wt_session_release_btree(session);
+		session->btree = NULL;
+	}
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 
@@ -218,6 +223,7 @@ int
 __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
+	WT_BTREE *btree;
 	static WT_CURSOR iface = {
 		NULL,
 		NULL,
@@ -253,6 +259,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	const char *filename;
 	int raw, ret;
 
+	btree = NULL;
 	cst = NULL;
 	ret = 0;
 
@@ -260,7 +267,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		return (EINVAL);
 	filename = uri;
 	if (WT_PREFIX_SKIP(filename, "file:")) {
-		WT_ERR(__wt_session_get_btree(session, uri, filename, NULL));
+		WT_ERR(__wt_session_get_btree(session,
+		    uri, filename, NULL, NULL, 0));
+		btree = session->btree;
 		WT_RET(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
 		clear_func = __wt_stat_clear_btree_stats;
@@ -276,6 +285,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &cst));
 	cst->stats_first = stats_first;
 	cst->clear_func = clear_func;
+	cst->btree = btree;
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;

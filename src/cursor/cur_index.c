@@ -310,8 +310,7 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	btree = cindex->cbt.btree;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	WT_UNUSED(cfg);
+	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
 
 	for (i = 0, cp = (cindex)->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)
@@ -326,7 +325,8 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 	if (cindex->value_plan != btree->value_plan)
 		__wt_free(session, cindex->value_plan);
 
-	WT_TRET(__wt_btcur_close(&cindex->cbt, config));
+	WT_TRET(__wt_btcur_close(&cindex->cbt, cfg));
+	__wt_session_release_btree(session);
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 

@@ -78,6 +78,7 @@ struct __wt_btree {
 
 	const char *config;		/* Configuration string */
 
+	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops. */
 	uint32_t refcnt;		/* Sessions using this tree. */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
@@ -135,9 +136,11 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
-#define	WT_BTREE_SALVAGE	0x02	/* Handle is for salvage */
-#define	WT_BTREE_VERIFY		0x04	/* Handle is for verify */
+#define	WT_BTREE_EXCLUSIVE	0x01	/* Need exclusive access to handle */
+#define	WT_BTREE_NO_EVICTION	0x02	/* Ignored by the eviction thread */
+#define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle. */
+#define	WT_BTREE_SALVAGE	0x08	/* Handle is for salvage */
+#define	WT_BTREE_VERIFY		0x10	/* Handle is for verify */
 	uint32_t flags;
 };
 

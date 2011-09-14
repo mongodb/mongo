@@ -111,14 +111,23 @@ extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
+extern int __wt_session_lock_btree(WT_SESSION_IMPL *session,
+    WT_BTREE *btree,
+    const char *cfg[],
+    uint32_t flags);
+extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_find_btree(WT_SESSION_IMPL *session,
     const char *filename,
     size_t namelen,
+    const char *cfg[],
+    uint32_t flags,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
-    const char *tconfig);
+    const char *tconfig,
+    const char *cfg[],
+    uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_block_alloc(WT_SESSION_IMPL *session,
@@ -165,7 +174,7 @@ extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *config);
+extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *cfg[]);
 extern int __wt_debug_addr( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
@@ -201,6 +210,9 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
+extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
+    const char *cfg[],
+    uint32_t flags);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern const char *__wt_page_type_string(u_int type);
@@ -424,7 +436,9 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     char **namebufp);
 extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
     const char *objname,
-    size_t len);
+    size_t len,
+    const char *cfg[],
+    uint32_t flags);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
     WT_TABLE *table);
 extern int __wt_schema_open_index( WT_SESSION_IMPL *session,

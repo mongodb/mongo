@@ -129,6 +129,7 @@ struct __wt_cursor_stat {
 	WT_BUF pvalue;			/* Current stats (pretty). */
 
 	void (*clear_func)(WT_STATS *);	/* Function to clear stats. */
+	WT_BTREE *btree;		/* Pinned btree handle. */
 };
 
 struct __wt_cursor_table {

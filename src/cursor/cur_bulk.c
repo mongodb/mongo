@@ -49,6 +49,8 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
 	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
 	WT_UNUSED(cfg);
 	WT_TRET(__wt_bulk_end(cbulk));
+	if (session->btree != NULL)
+		__wt_session_release_btree(session);
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 

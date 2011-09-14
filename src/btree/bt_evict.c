@@ -582,10 +582,13 @@ __evict_walk(WT_SESSION_IMPL *session)
 			/* Reference the correct WT_BTREE handle. */
 			WT_SET_BTREE_IN_SESSION(session, btree);
 
-			WT_ERR(__evict_walk_file(session, i));
+			ret = __evict_walk_file(session, i);
 			i += WT_EVICT_WALK_PER_TABLE;
 
 			WT_CLEAR_BTREE_IN_SESSION(session);
+
+			if (ret != 0)
+				goto err;
 		}
 	}
 err:	__wt_unlock(session, conn->mtx);
