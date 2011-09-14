@@ -118,10 +118,24 @@ static void edit(const string& var){
         return;
     }
 
-    char filename[] = "/tmp/mongo_editXXXXXX.js";
-    int fd = mkstemps(filename, /*suffix len*/3);
+    string filename;
+    int fd;
+    for (int i=0; i < 10; i++){
+        StringBuilder sb;
+        sb << "/tmp/mongo_edit" << time(0)+i << ".js";
+        filename = sb.str();
+        fd = open(filename.c_str(), O_RDWR|O_CREAT|O_EXCL, 0600);
+        if (fd > 0)
+            break;
+
+        if (errno != EEXIST) {
+            cout << "couldn't open temp file: " << errnoWithDescription() << endl;
+            return;
+        }
+    }
+
     if (fd == -1){
-        cout << "couldn't open temp file: " << errnoWithDescription() << endl;
+        cout << "couldn't create unique temp file after 10 attempts" << endl;
         return;
     }
 
