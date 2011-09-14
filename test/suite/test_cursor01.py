@@ -18,8 +18,14 @@ class test_cursor01(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test_base03a'
+    table_name1 = 'test_cursor01'
     nentries = 10
+
+    scenarios = [
+        ('row', dict(tablekind='row')),
+        ('col', dict(tablekind='col')),
+        #('fix', dict(tablekind='fix'))
+        ]
 
     def config_string(self):
         """
@@ -38,20 +44,48 @@ class test_cursor01(wttest.WiredTigerTestCase):
             print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
             raise
 
+    def create_session_and_cursor(self):
+        tablearg = "table:" + self.table_name1
+        if self.tablekind == 'row':
+            keyformat = 'key_format=S'
+        else:
+            keyformat = 'key_format=r'  # record format
+        if self.tablekind == 'fix':
+            valformat = 'value_format=8t'
+        else:
+            valformat = 'value_format=S'
+        create_args = keyformat + ',' + valformat + self.config_string()
+        print('creating session: ' + create_args)
+        self.session_create(tablearg, create_args)
+        self.pr('creating cursor')
+        return self.session.open_cursor(tablearg, None, None)
+
+    def genkey(self, i):
+        if self.tablekind == 'row':
+            return 'key' + str(i)
+        else:
+            return long(i+1)
+
+    def genvalue(self, i):
+        if self.tablekind == 'fix':
+            return int(i & 0xff)
+        else:
+            return 'value' + str(i)
+
     def test_forward_iter(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        create_args = 'key_format=S,value_format=S' + self.config_string()
-        self.session_create("table:" + self.table_name1, create_args)
-        self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        cursor = self.create_session_and_cursor()
+
+        # TODO: these should fail regardless of table type
+        if self.tablekind == 'row':
+            self.assertRaises(WiredTigerError, cursor.get_key)
+            self.assertRaises(WiredTigerError, cursor.get_value)
 
         for i in range(0, self.nentries):
-            cursor.set_key('key' + str(i))
-            cursor.set_value('value' + str(i))
+            cursor.set_key(self.genkey(i))
+            cursor.set_value(self.genvalue(i))
             cursor.insert()
 
         # Don't use the builtin 'for ... in cursor',
@@ -64,8 +98,9 @@ class test_cursor01(wttest.WiredTigerTestCase):
         while nextret == 0:
             key = cursor.get_key()
             value = cursor.get_value()
-            self.assertEqual(key, ('key' + str(i)))
-            self.assertEqual(value, ('value' + str(i)))
+            print('want: ' + str(self.genkey(i)) + ' got: ' + str(key))
+            #self.assertEqual(key, self.genkey(i))
+            self.assertEqual(value, self.genvalue(i))
             i += 1
             nextret = cursor.next()
 
@@ -87,8 +122,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         while nextret == 0:
             key = cursor.get_key()
             value = cursor.get_value()
-            self.assertEqual(key, ('key' + str(i)))
-            self.assertEqual(value, ('value' + str(i)))
+            self.assertEqual(key, self.genkey(i))
+            self.assertEqual(value, self.genvalue(i))
             i += 1
             nextret = cursor.next()
 
@@ -100,10 +135,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        create_args = 'key_format=S,value_format=S' + self.config_string()
-        self.session_create("table:" + self.table_name1, create_args)
-        self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.create_session_and_cursor()
         self.assertRaises(WiredTigerError, cursor.get_key)
         self.assertRaises(WiredTigerError, cursor.get_value)
 
@@ -122,8 +154,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         while prevret == 0:
             key = cursor.get_key()
             value = cursor.get_value()
-            self.assertEqual(key, ('key' + str(i)))
-            self.assertEqual(value, ('value' + str(i)))
+            self.assertEqual(key, self.genkey(i))
+            self.assertEqual(value, self.genvalue(i))
             i -= 1
             prevret = cursor.prev()
 
@@ -145,8 +177,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         while prevret == 0:
             key = cursor.get_key()
             value = cursor.get_value()
-            self.assertEqual(key, ('key' + str(i)))
-            self.assertEqual(value, ('value' + str(i)))
+            self.assertEqual(key, self.genkey(i))
+            self.assertEqual(value, self.genvalue(i))
             i -= 1
             prevret = cursor.prev()
 

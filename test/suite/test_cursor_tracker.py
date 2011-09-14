@@ -77,26 +77,48 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     def __init__(self, testname):
         wttest.WiredTigerTestCase.__init__(self, testname)
-        self.cur_initial_conditions(None, 0, 0, 0)
+        self.cur_initial_conditions(None, 0, 'row')
 
-    def cur_initial_conditions(self, cursor, npairs, nroom, nupdate):
+    def setup_encoders_decoders(self):
+        if self.tablekind == 'row':
+            self.encode_key = self.encode_key_row
+            self.encode_value = self.encode_value_row
+            self.decode_key = self.decode_key_row
+            self.decode_value = self.decode_value_row
+        elif self.tablekind == 'col':
+            self.encode_key = self.encode_key_col
+            self.encode_value = self.encode_value_col
+            self.decode_key = self.decode_key_col
+            self.decode_value = self.decode_value_col
+        else:
+            self.encode_key = self.encode_key_fix
+            self.encode_value = self.encode_value_fix
+            self.decode_key = self.decode_key_fix
+            self.decode_value = self.decode_value_fix
+
+    def cur_initial_conditions(self, cursor, npairs, tablekind):
         if npairs >= 0xffff:
             raise Exception('cur_initial_conditions: npairs too big')
-        if nroom >= 0xffff:
-            raise Exception('cur_initial_conditions: nroom too big')
-        if nupdate >= 0xffff:
-            raise Exception('cur_initial_conditions: nupdate too big')
-        self.nroom = nroom
-        self.nupdate = nupdate
+        self.tablekind = tablekind
+        self.setup_encoders_decoders()
         self.bitlist = [(x << 32) for x in range(npairs)]
         self.vers = dict((x << 32, 0) for x in range(npairs))
         self.nopos = True  # not positioned on a valid element
         self.curpos = -1
         self.curbits = 0xffffffffffff
-        for i in range(npairs):
-            cursor.set_key(self.encode_key(i << 32))
-            cursor.set_value(self.encode_value(i << 32))
-            cursor.insert()
+        self.curremoved = False # K/V data in cursor does not correspond to active data
+        # TODO: sepearated only for debugging
+        if self.tablekind != 'row':
+            for i in range(npairs):
+                print ('typebefore: ' + str(type((int(self.encode_key(i << 32))))))
+                cursor.set_key(int(self.encode_key(i << 32)))
+                cursor.set_value(self.encode_value(i << 32))
+                cursor.insert()
+        else:
+            for i in range(npairs):
+                cursor.set_key(self.encode_key(i << 32))
+                cursor.set_value(self.encode_value(i << 32))
+                cursor.insert()
 	# TODO: close, reopen the session!
 
     def bits_to_triple(self, bits):
@@ -111,21 +133,63 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def key_to_bits(self, key):
         pass
 
+    # There are variants of encode_key for each table kind: 'row', 'col', 'fix'
+
+    ################   ROW   ################
     # TODO: something more sophisticated
-    def encode_key(self, bits):
+    def encode_key_row(self, bits):
         # Prepend 0's to make the string exactly len 16
         result = str(bits)
         result = '0000000000000000'[len(result):] + result
         return result
 
     # TODO: something more sophisticated
-    def encode_value(self, bits):
+    def encode_value_row(self, bits):
         return self.encode_key(bits)
 
-    def decode_key(self, s):
+    def decode_key_row(self, s):
         return int(s)
 
-    def decode_value(self, s):
+    def decode_value_row(self, s):
+        return int(s)
+
+    ################   COL   ################
+    def encode_key_col(self, bits):
+        # Prepend 0's to make the string exactly len 16
+        maj = ((bits << 32) & 0xffff) + 1
+        min = (bits << 16) & 0xffff
+        return int((maj << 16) | min)
+
+    # TODO: something more sophisticated
+    def encode_value_col(self, bits):
+        return self.encode_key_row(bits)
+
+    def decode_key_col(self, s):
+        maj = ((bits << 16) & 0xffff) - 1
+        min = bits & ffff
+        return ((maj << 32) | (min << 16))
+
+    def decode_value_col(self, s):
+        return int(s)
+
+    ################   FIX   ################
+    def encode_key_fix(self, bits):
+        # Prepend 0's to make the string exactly len 16
+        maj = ((bits << 32) & 0xffff) + 1
+        min = (bits << 16) & 0xffff
+        return int((maj << 16) | min)
+
+    def encode_value_fix(self, bits):
+        # TODO: only 8 bits
+        return self.encode_key_row(bits) & 0xff
+
+    def decode_key_fix(self, s):
+        maj = ((bits << 16) & 0xffff) - 1
+        min = bits & ffff
+        return ((maj << 32) | (min << 16))
+
+    def decode_value_fix(self, s):
+        # TODO: only 8 bits
         return int(s)
 
     def setpos(self, newpos):
@@ -133,21 +197,25 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         if newpos < 0 or newpos >= length:
             self.curpos = -1
             self.nopos = True
+            self.curremoved = False
             self.curbits = 0xffffffffffff
             return False
         else:
             self.curpos = newpos
             self.nopos = False
+            self.curremoved = False
             self.curbits = self.bitlist[newpos]
             return True
 
     def cur_first(self, cursor):
         self.setpos(0)
         cursor.first()
+        self.curremoved = False
 
     def cur_last(self, cursor):
         self.setpos(len(self.bitlist) - 1)
         cursor.last()
+        self.curremoved = False
 
     def cur_update(self, cursor, key):
         # TODO:
@@ -162,6 +230,8 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.vers[bits] = 0
         else:
             raise Exception('cur_insert: key already exists: ' + str(major) + ',' + str(minor))
+        pos = next(i for i in xrange(len(self.bitlist)) if self.bitlist[i] == bits)
+        self.setpos(pos)
         cursor.set_key(self.encode_key(bits))
         cursor.set_value(self.encode_value(bits))
         cursor.insert()
@@ -176,6 +246,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.bitlist.pop(self.curpos)
             self.setpos(self.curpos - 1)
             self.nopos = True
+            self.curremoved = True
         cursor.remove()
 
     def cur_remove(self, cursor, major, minor):
@@ -203,7 +274,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             n = len(self.bitlist)
         for i in range(n):
             self.cur_next(cursor)
-            self.cur_check_bits(cursor)
+            self.cur_check_here(cursor)
 
     def cur_next(self, cursor):
         # Note: asymmetric with cur_previous, nopos corresponds to 'half'
@@ -218,7 +289,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             n = len(self.bitlist)
         for i in range(n):
             self.cur_previous(cursor)
-            self.cur_check_bits(cursor)
+            self.cur_check_here(cursor)
 
     def cur_previous(self, cursor):
         if self.nopos:
@@ -229,10 +300,14 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             bitsret = 0
         else:
             bitsret = wiredtiger.WT_NOTFOUND
-        self.check_cursor_ret(cursor.previous(), bitsret)
+        self.check_cursor_ret(cursor.prev(), bitsret)
 
-    def cur_check_bits(self, cursor):
-        if self.nopos:
+    def cur_check_here(self, cursor):
+        # Cannot check immediately after a remove, since the K/V in the cursor
+        # does not correspond to anything
+        if self.curremoved:
+            raise Exception('cur_check_here: cursor.get_key, get_value are not valid')
+        elif self.nopos:
             self.assertRaises(WiredTigerError, cursor.get_key)
             self.assertRaises(WiredTigerError, cursor.get_value)
         else:
