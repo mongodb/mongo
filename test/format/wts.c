@@ -204,13 +204,14 @@ int
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	time_t now;
 	int ret;
 
 	conn = g.wts_conn;
 	cursor = g.wts_cursor;
+	cursor_insert = g.wts_cursor_insert;
 	session = g.wts_session;
 
 	if (g.logging) {
@@ -221,10 +222,10 @@ wts_teardown(void)
 	}
 
 	/*
-	 * Close the open cursor -- it holds hazard references, and so
-	 * sync will hang.
+	 * Close the open cursors -- they will block sync.
 	 */
-	if ((ret = cursor->close(cursor, NULL)) != 0)
+	if ((ret = cursor_insert->close(cursor_insert, NULL)) != 0 ||
+	    (ret = cursor->close(cursor, NULL)) != 0)
 		die("cursor.close", ret);
 
 	ret = wts_sync();
