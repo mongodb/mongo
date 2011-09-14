@@ -743,6 +743,12 @@ int main(int argc, char* argv[]) {
             journalExplicit = true;
             cmdLine.dur = true;
         }
+        if( (params.count("dur") && params.count("nodur")) ||
+            (params.count("journal") && params.count("nojournal")) ) {
+            warning() << "Both --journal and --nojournal (or legacy --dur and --nodur) are specified!" << endl;
+            warning() << "Journaling is enabled now. Please only specify --nojournal if you don't want durability." << endl;
+        }
+
         if (params.count("durOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();
         }
