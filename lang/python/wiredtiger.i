@@ -49,6 +49,14 @@ from packing import pack, unpack
         }
 }
 
+/* 64 bit typemaps. */
+%typemap(in) uint64_t {
+    $1 = PyLong_AsUnsignedLongLong($input);
+}
+%typemap(out) uint64_t {
+    $result = PyLong_FromUnsignedLongLong($1);
+}
+
 /* Throw away references after close. */
 %define DESTRUCTOR(class, method)
 %feature("shadow") class::method %{
@@ -163,7 +171,15 @@ SELFHELPER(struct wt_cursor)
         }
 
         void _set_recno(uint64_t recno) {
+		/* Remove RAW flag temporarily so we can get past
+		 * the replacement of the key_format in
+		 * cur_std.c:__cursor_set_key().
+		 * TODO: needs cleanup, but where?
+		 */
+                uint32_t save_flags = $self->flags;
+                $self->flags &= ~(WT_CURSTD_RAW);
                 $self->set_key($self, recno);
+                $self->flags = save_flags;
         }
 
         void _set_value(char *data, int size) {
@@ -186,7 +202,15 @@ SELFHELPER(struct wt_cursor)
 
         uint64_t _get_recno() {
                 uint64_t r = 0;
+		/* Remove RAW flag temporarily so we can get past
+		 * the replacement of the key_format in
+		 * cur_std.c:__cursor_get_key().
+		 * TODO: needs cleanup, but where?
+		 */
+                uint32_t save_flags = $self->flags;
+                $self->flags &= ~(WT_CURSTD_RAW);
                 int ret = $self->get_key($self, &r);
+                $self->flags = save_flags;
                 if (ret != 0)
                         SWIG_Python_SetErrorMsg(wtError,
                             wiredtiger_strerror(ret));
