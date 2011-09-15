@@ -67,7 +67,7 @@ namespace mongo {
         Timer() { reset(); }
 
         int seconds() const { 
-            int s = (now() - old) / countsPerSecond;
+            int s = static_cast<int>((now() - old) / countsPerSecond);
             return s;
         }
 
@@ -84,7 +84,7 @@ namespace mongo {
         */
         int millisReset() { 
             unsigned long long nw = now();
-            int m = (nw - old) * 1000.0 / countsPerSecond;
+            int m = static_cast<int>((nw - old) * 1000.0 / countsPerSecond);
             old = nw;
             return m;
        } 
