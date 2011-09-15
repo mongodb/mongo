@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-#include "../db/pdfile.h"
 #include "dbclient.h"
 #include "../bson/util/builder.h"
 #include "../db/jsobj.h"
