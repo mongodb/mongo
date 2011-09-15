@@ -274,7 +274,7 @@ namespace CursorTests {
                 boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
                 Client::Context ctx( ns() );
                 scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), 1, nsdetails( ns() )->idx(1), frv, 1 ) );
-                int initialNscanned = c->nscanned();
+                long long initialNscanned = c->nscanned();
                 ASSERT( initialNscanned < 200 );
                 ASSERT( c->ok() );
                 c->advance();

@@ -83,7 +83,7 @@ namespace mongo {
         /**
          * @return true iff everything went ok
          */
-        bool _setupSockets( const vector<SockAddr>& mine , vector<int>& socks );
+        bool _setupSockets( const vector<SockAddr>& mine , vector<SOCKET>& socks );
         
         void _logListen( int port , bool ssl );
 
