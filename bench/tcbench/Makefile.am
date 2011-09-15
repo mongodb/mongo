@@ -1,5 +1,5 @@
 INCLUDES = -I$(top_builddir)
-LDADD = -L$(top_builddir) -lwiredtiger
+LDADD = $(top_builddir)/libwiredtiger.la
 
 noinst_PROGRAMS = wttest
 wttest_SOURCES = wttest.c
