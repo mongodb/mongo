@@ -38,6 +38,7 @@ new_page:	for (i = cbt->ins_entry_cnt,
 			ins = WT_SKIP_NEXT(ins);
 		cbt->ins = ins;
 
+		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
 		if (cbt->page->type == WT_PAGE_COL_FIX) {
 			val->data = WT_UPDATE_DATA(cbt->ins->upd);
 			val->size = 1;
