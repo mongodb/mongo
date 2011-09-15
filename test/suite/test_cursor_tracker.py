@@ -321,10 +321,10 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             print('  ' + str(self.bits_to_triple(bits)) + ' = ' + str(bits))
 
     def _cursor_key_to_string(self, k):
-            return str(self.bits_to_triple(self.decode_key(k))) + ' = ' + k
+            return str(self.bits_to_triple(self.decode_key(k))) + ' = ' + str(k)
 
     def _cursor_value_to_string(self, v):
-            return str(self.bits_to_triple(self.decode_key(v))) + ' = ' + v
+            return str(self.bits_to_triple(self.decode_value(v))) + ' = ' + v
 
     def _dumpcursor(self, cursor):
         print('cursor')

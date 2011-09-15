@@ -234,7 +234,7 @@ SELFHELPER(struct wt_cursor)
 
         def get_keys(self):
             if self.is_column:
-                return (self._get_recno(),)
+                return [self._get_recno(),]
             else:
                 return unpack(self.key_format, self._get_key())
 
