@@ -44,6 +44,13 @@
 #	structures, and result in incrementing the version number.
 #	Thus, the key remains unchanged, but the associated value
 #	changes (the size of the value may be altered as well).
+#
+#	TODO: we need to separate the cursor tracking information
+#	(the current position where we believe we are) from
+#	the database information (what we think is in the data storage).
+#	Once that's done, we can have multiple cursor tests
+#	(though simulating transactions would probably be beyond what
+#	we want to do here).
 
 import unittest
 import wiredtiger
@@ -52,6 +59,8 @@ import wttest
 
 class TestCursorTracker(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor'
+    DELETED = 0xffffffffffffffff
+    TRACE_API = False    # a print output for each WT API call
 
     def config_string(self):
         """
@@ -79,6 +88,19 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         wttest.WiredTigerTestCase.__init__(self, testname)
         self.cur_initial_conditions(None, 0, 'row')
 
+    # traceapi and friends are used internally in this module
+    def traceapi(self, s):
+        if self.TRACE_API:
+            print('> ' + s)
+
+    def traceapi_before(self, s):
+        if self.TRACE_API:
+            print('> ' + s + '...')
+
+    def traceapi_after(self, s):
+        if self.TRACE_API:
+            print('  ==> ' + s)
+
     def setup_encoders_decoders(self):
         if self.tablekind == 'row':
             self.encode_key = self.encode_key_row
@@ -100,6 +122,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         if npairs >= 0xffff:
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
+        self.isrow = (tablekind == 'row')
         self.setup_encoders_decoders()
         self.bitlist = [(x << 32) for x in range(npairs)]
         self.vers = dict((x << 32, 0) for x in range(npairs))
@@ -107,18 +130,16 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.curpos = -1
         self.curbits = 0xffffffffffff
         self.curremoved = False # K/V data in cursor does not correspond to active data
-        # TODO: sepearated only for debugging
-        if self.tablekind != 'row':
-            for i in range(npairs):
-                print ('typebefore: ' + str(type((int(self.encode_key(i << 32))))))
-                cursor.set_key(int(self.encode_key(i << 32)))
-                cursor.set_value(self.encode_value(i << 32))
-                cursor.insert()
-        else:
-            for i in range(npairs):
-                cursor.set_key(self.encode_key(i << 32))
-                cursor.set_value(self.encode_value(i << 32))
-                cursor.insert()
+        for i in range(npairs):
+            wtkey = self.encode_key(i << 32)
+            wtval = self.encode_value(i << 32)
+            self.traceapi('cursor.set_key(' + str(wtkey) + ')')
+            cursor.set_key(wtkey)
+            self.traceapi('cursor.set_value(' + str(wtval) + ')')
+            cursor.set_value(wtval)
+            self.traceapi('cursor.insert()')
+            cursor.insert()
+
 	# TODO: close, reopen the session!
 
     def bits_to_triple(self, bits):
@@ -155,18 +176,18 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     ################   COL   ################
     def encode_key_col(self, bits):
-        # Prepend 0's to make the string exactly len 16
-        maj = ((bits << 32) & 0xffff) + 1
-        min = (bits << 16) & 0xffff
-        return int((maj << 16) | min)
+        # 64 bit key
+        maj = ((bits >> 32) & 0xffff) + 1
+        min = (bits >> 16) & 0xffff
+        return long((maj << 16) | min)
 
     # TODO: something more sophisticated
     def encode_value_col(self, bits):
         return self.encode_key_row(bits)
 
-    def decode_key_col(self, s):
+    def decode_key_col(self, bits):
         maj = ((bits << 16) & 0xffff) - 1
-        min = bits & ffff
+        min = bits & 0xffff
         return ((maj << 32) | (min << 16))
 
     def decode_value_col(self, s):
@@ -174,46 +195,54 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     ################   FIX   ################
     def encode_key_fix(self, bits):
-        # Prepend 0's to make the string exactly len 16
-        maj = ((bits << 32) & 0xffff) + 1
-        min = (bits << 16) & 0xffff
-        return int((maj << 16) | min)
+        # 64 bit key
+        maj = ((bits >> 32) & 0xffff) + 1
+        min = (bits >> 16) & 0xffff
+        return long((maj << 16) | min)
 
     def encode_value_fix(self, bits):
-        # TODO: only 8 bits
-        return self.encode_key_row(bits) & 0xff
+        # can only encode only 8 bits
+        maj = ((bits >> 32) & 0xff)
+        min = (bits >> 16) & 0xff
+        return (maj ^ min)
 
     def decode_key_fix(self, s):
         maj = ((bits << 16) & 0xffff) - 1
-        min = bits & ffff
+        min = bits & 0xffff
         return ((maj << 32) | (min << 16))
 
     def decode_value_fix(self, s):
-        # TODO: only 8 bits
         return int(s)
 
-    def setpos(self, newpos):
+    def setpos(self, newpos, isforward):
         length = len(self.bitlist)
-        if newpos < 0 or newpos >= length:
-            self.curpos = -1
-            self.nopos = True
-            self.curremoved = False
-            self.curbits = 0xffffffffffff
-            return False
-        else:
-            self.curpos = newpos
-            self.nopos = False
-            self.curremoved = False
-            self.curbits = self.bitlist[newpos]
-            return True
+        while newpos >= 0 and newpos < length:
+            if not self.isrow and self.bitlist[newpos] == self.DELETED:
+                if isforward:
+                    newpos = newpos + 1
+                else:
+                    newpos = newpos - 1
+            else:
+                self.curpos = newpos
+                self.nopos = False
+                self.curremoved = False
+                self.curbits = self.bitlist[newpos]
+                return True
+        self.curpos = -1
+        self.nopos = True
+        self.curremoved = False
+        self.curbits = 0xffffffffffff
+        return False
 
     def cur_first(self, cursor):
-        self.setpos(0)
+        self.setpos(0, True)
+        self.traceapi('cursor.first()')
         cursor.first()
         self.curremoved = False
 
     def cur_last(self, cursor):
-        self.setpos(len(self.bitlist) - 1)
+        self.setpos(len(self.bitlist) - 1, False)
+        self.traceapi('cursor.last()')
         cursor.last()
         self.curremoved = False
 
@@ -221,19 +250,29 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         # TODO:
         pass
 
+    def bitspos(self, bits):
+        list = self.bitlist
+        return next(i for i in xrange(len(list)) if list[i] == bits)
+
     def cur_insert(self, cursor, major, minor):
         bits = self.triple_to_bits(major, minor, 0)
         if bits not in self.vers:
             self.bitlist.append(bits)
-            #TODO: why doesn't self.bitlist.sort() work?
-            self.bitlist = sorted(self.bitlist)
+            if self.isrow:
+                #TODO: why doesn't self.bitlist.sort() work?
+                self.bitlist = sorted(self.bitlist)
             self.vers[bits] = 0
         else:
             raise Exception('cur_insert: key already exists: ' + str(major) + ',' + str(minor))
-        pos = next(i for i in xrange(len(self.bitlist)) if self.bitlist[i] == bits)
-        self.setpos(pos)
-        cursor.set_key(self.encode_key(bits))
-        cursor.set_value(self.encode_value(bits))
+        pos = self.bitspos(bits)
+        self.setpos(pos, True)
+        wtkey = self.encode_key(bits)
+        wtval = self.encode_value(bits)
+        self.traceapi('cursor.set_key(' + str(wtkey) + ')')
+        cursor.set_key(wtkey)
+        self.traceapi('cursor.set_value(' + str(wtval) + ')')
+        cursor.set_value(wtval)
+        self.traceapi('cursor.insert()')
         cursor.insert()
 
     def cur_remove_here(self, cursor):
@@ -243,22 +282,38 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         else:
             expectException = False
             del self.vers[self.curbits & 0xffffffff0000]
-            self.bitlist.pop(self.curpos)
-            self.setpos(self.curpos - 1)
-            self.nopos = True
+            if self.isrow:
+                self.bitlist.pop(self.curpos)
+                self.setpos(self.curpos - 1, True)
+                self.nopos = True
+            else:
+                self.bitlist[self.curpos] = self.DELETED
             self.curremoved = True
+        self.traceapi('cursor.remove()')
         cursor.remove()
 
-    def cur_remove(self, cursor, major, minor):
-        # TODO:
-        raise Exception('cur_remove not yet coded')
-        bits = self.triple_to_bits(major, minor, 0)
-        if bits in self.vers:
-            cursor.set_key(self.encode_key(key))
-            cursor.set_value(self.encode_value(key))
-            cursor.remove()
+    def cur_recno_search(self, cursor, recno):
+        wtkey = long(recno)
+        self.traceapi('cursor.set_key(' + str(wtkey) + ')')
+        cursor.set_key(wtkey)
+        if recno > 0 and recno <= len(self.bitlist):
+            want = 0
         else:
-            raise Exception('cur_remove: key does not exist: ' + str(major) + ',' + str(minor))
+            want = wiredtiger.WT_NOTFOUND
+        self.traceapi('cursor.search()')
+        self.check_cursor_ret(cursor.search(), want)
+
+    def cur_search(self, cursor, major, minor):
+        bits = self.triple_to_bits(major, minor, 0)
+        wtkey = self.encode_key(bits)
+        self.traceapi('cursor.set_key(' + str(wtkey) + ')')
+        cursor.set_key(wtkey)
+        if bits in self.vers:
+            want = 0
+        else:
+            want = wiredtiger.WT_NOTFOUND
+        self.traceapi('cursor.search()')
+        self.check_cursor_ret(cursor.search(), want)
 
     def check_cursor_ret(self, ret, want):
         if ret != want:
@@ -275,14 +330,17 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         for i in range(n):
             self.cur_next(cursor)
             self.cur_check_here(cursor)
+            if self.nopos:
+                break
 
     def cur_next(self, cursor):
         # Note: asymmetric with cur_previous, nopos corresponds to 'half'
-        if self.setpos(self.curpos + 1):
-            bitsret = 0
+        if self.setpos(self.curpos + 1, True):
+            wantret = 0
         else:
-            bitsret = wiredtiger.WT_NOTFOUND
-        self.check_cursor_ret(cursor.next(), bitsret)
+            wantret = wiredtiger.WT_NOTFOUND
+        self.traceapi('cursor.next()')
+        self.check_cursor_ret(cursor.next(), wantret)
 
     def cur_check_backward(self, cursor, n):
         if n < 0:
@@ -290,17 +348,20 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         for i in range(n):
             self.cur_previous(cursor)
             self.cur_check_here(cursor)
+            if self.nopos:
+                break
 
     def cur_previous(self, cursor):
         if self.nopos:
             pos = self.curpos
         else:
             pos = self.curpos - 1
-        if self.setpos(pos):
-            bitsret = 0
+        if self.setpos(pos, False):
+            wantret = 0
         else:
-            bitsret = wiredtiger.WT_NOTFOUND
-        self.check_cursor_ret(cursor.prev(), bitsret)
+            wantret = wiredtiger.WT_NOTFOUND
+        self.traceapi('cursor.prev()')
+        self.check_cursor_ret(cursor.prev(), wantret)
 
     def cur_check_here(self, cursor):
         # Cannot check immediately after a remove, since the K/V in the cursor
@@ -308,12 +369,25 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         if self.curremoved:
             raise Exception('cur_check_here: cursor.get_key, get_value are not valid')
         elif self.nopos:
+            self.traceapi_before('cursor.get_key()')
             self.assertRaises(WiredTigerError, cursor.get_key)
+            self.traceapi_after('<unknown>')
+            self.traceapi_before('cursor.get_value()')
             self.assertRaises(WiredTigerError, cursor.get_value)
+            self.traceapi_after('<unknown>')
         else:
             bits = self.curbits
-            self.cur_check(cursor, cursor.get_key(), self.encode_key(bits), True)
-            self.cur_check(cursor, cursor.get_value(), self.encode_value(bits), False)
+            self.traceapi_before('cursor.get_key()')
+            wtkey = cursor.get_key()
+            self.traceapi_after(str(wtkey))
+            if self.isrow:
+                self.cur_check(cursor, wtkey, self.encode_key(bits), True)
+            else:
+                self.cur_check(cursor, wtkey, self.bitspos(bits) + 1, True)
+            self.traceapi_before('cursor.get_value()')
+            wtval = cursor.get_value()
+            self.traceapi_after(str(wtval))
+            self.cur_check(cursor, wtval, self.encode_value(bits), False)
 
     def dumpbitlist(self):
         print('bits array:')
