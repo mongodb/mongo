@@ -150,10 +150,10 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Move to the previous entry and return the item. */
 	for (;;) {
-		if (cbt->recno == cbt->page->u.col_leaf.recno)
-			return (WT_NOTFOUND);
 		--cbt->recno;
 new_page:	*recnop = cbt->recno;
+		if (cbt->recno < cbt->page->u.col_leaf.recno)
+			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
