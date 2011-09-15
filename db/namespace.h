@@ -318,20 +318,35 @@ namespace mongo {
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);
 
+        /* called to indicate that an update fit in place.  
+           fits also called on an insert -- idea there is that if you had some mix and then went to
+           pure inserts it would adapt and PF would trend to 1.0.  note update calls insert on a move
+           so there is a double count there that must be adjusted for below.
+
+           todo: greater sophistication could be helpful and added later.  for example the absolute 
+                 size of documents might be considered -- in some cases smaller ones are more likely 
+                 to grow than larger ones in the same collection? (not always)
+        */
         void paddingFits() {
-            // do this on a sampled basis to journal less
-            MONGO_SOMETIMES(sometimes, 4) {              
-                double x = paddingFactor - 0.01;
+            MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
+                double x = paddingFactor - 0.001;
                 if ( x >= 1.0 ) {
                     *getDur().writing(&paddingFactor) = x;
                     //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
                 }
             }
         }
-        void paddingTooSmall() {
-            // do this on a sampled basis to journal less
-            MONGO_SOMETIMES(sometimes, 4) {              
-                double x = paddingFactor + 0.6;
+        void paddingTooSmall() {            
+            MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less       
+                /* the more indexes we have, the higher the cost of a move.  so we take that into 
+                   account herein.  note on a move that insert() calls paddingFits(), thus
+                   here for example with no inserts and nIndexes = 1 we have
+                   .001*4-.001 or a 3:1 ratio to non moves -> 75% nonmoves.  insert heavy 
+                   can pushes this down considerably. further tweaking will be a good idea but 
+                   this should be an adequate starting point.
+                */
+                double N = min(nIndexes,7) + 3;
+                double x = paddingFactor + (0.001 * N);
                 if ( x <= 2.0 ) {
                     *getDur().writing(&paddingFactor) = x;
                     //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
