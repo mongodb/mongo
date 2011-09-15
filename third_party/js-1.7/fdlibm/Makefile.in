@@ -1,0 +1,127 @@
+#
+# ***** BEGIN LICENSE BLOCK *****
+# Version: MPL 1.1/GPL 2.0/LGPL 2.1
+#
+# The contents of this file are subject to the Mozilla Public License Version
+# 1.1 (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+# http://www.mozilla.org/MPL/
+#
+# Software distributed under the License is distributed on an "AS IS" basis,
+# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+# for the specific language governing rights and limitations under the
+# License.
+#
+# The Original Code is Mozilla Communicator client code, released
+# March 31, 1998.
+#
+# The Initial Developer of the Original Code is
+# Netscape Communications Corporation.
+# Portions created by the Initial Developer are Copyright (C) 1998
+# the Initial Developer. All Rights Reserved.
+#
+# Contributor(s):
+#
+# Alternatively, the contents of this file may be used under the terms of
+# either of the GNU General Public License Version 2 or later (the "GPL"),
+# or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+# in which case the provisions of the GPL or the LGPL are applicable instead
+# of those above. If you wish to allow use of your version of this file only
+# under the terms of either the GPL or the LGPL, and not to allow others to
+# use your version of this file under the terms of the MPL, indicate your
+# decision by deleting the provisions above and replace them with the notice
+# and other provisions required by the GPL or the LGPL. If you do not delete
+# the provisions above, a recipient may use your version of this file under
+# the terms of any one of the MPL, the GPL or the LGPL.
+#
+# ***** END LICENSE BLOCK *****
+
+DEPTH		= ../../..
+topsrcdir	= @top_srcdir@
+srcdir		= @srcdir@
+VPATH		= @srcdir@
+
+include $(DEPTH)/config/autoconf.mk
+
+MODULE		= js
+LIBRARY_NAME	= fdm
+
+CSRCS		= \
+		e_acos.c \
+		e_asin.c \
+		e_atan2.c \
+		e_exp.c \
+		e_fmod.c \
+		e_log.c \
+		e_pow.c \
+		e_rem_pio2.c \
+		s_scalbn.c \
+		e_sqrt.c \
+		k_cos.c \
+		k_sin.c \
+		k_rem_pio2.c \
+		k_tan.c \
+		s_atan.c \
+		s_ceil.c \
+		s_copysign.c \
+		s_cos.c \
+		s_fabs.c \
+		s_finite.c \
+		s_floor.c \
+		s_isnan.c \
+		s_lib_version.c \
+		s_sin.c \
+		s_tan.c \
+		w_acos.c \
+		w_asin.c \
+		w_atan2.c \
+		w_exp.c \
+		w_fmod.c \
+		w_log.c \
+		w_pow.c \
+		w_sqrt.c \
+		$(NULL)
+
+EXPORTS		= fdlibm.h
+
+# we need to force a static lib for the linking that js/src/Makefile.in wants
+# to do, and we don't really need a shared library ever, so:
+FORCE_STATIC_LIB = 1
+FORCE_USE_PIC = 1
+
+include $(topsrcdir)/config/rules.mk
+
+#
+# Default IEEE libm
+#
+CFLAGS		+= -D_IEEE_LIBM
+
+ifeq ($(OS_ARCH),Linux)
+LDFLAGS		+= -ldl
+endif
+
+ifeq ($(OS_ARCH),OSF1)
+LDFLAGS		+= -lc_r
+endif
+
+ifeq ($(OS_ARCH),SunOS)
+LDFLAGS		+= -lposix4 -ldl -lnsl -lsocket
+ifeq ($(CPU_ARCH),sparc)
+
+ifndef JS_NO_ULTRA
+ULTRA_OPTIONS	:= -xarch=v8plus,-DULTRA_SPARC
+ULTRA_OPTIONSCC	:= -DULTRA_SPARC
+else
+ULTRA_OPTIONS	:= -xarch=v8
+ULTRA_OPTIONSCC	:=
+endif
+
+ifeq ($(shell uname -m),sun4u)
+ASFLAGS		+= -Wa,$(ULTRA_OPTIONS),-P,-L,-D_ASM,-D__STDC__=0 $(ULTRA_OPTIONSCC)
+else
+ASFLAGS		+= -Wa,-xarch=v8,-P,-L,-D_ASM,-D__STDC__=0
+endif
+
+endif
+endif
+

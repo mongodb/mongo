@@ -19,3 +19,16 @@
 // branch prediction.  indicate we expect to be false
 #define unlikely MONGO_unlikely
 
+#if defined(__GNUC__)
+
+#define CACHEALIGN __attribute__((aligned(128))
+
+#elif defined(_MSC_VER)
+
+#define CACHEALIGN __declspec(align(128)) 
+
+#else
+
+#define CACHEALIGN 
+
+#endif

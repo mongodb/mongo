@@ -350,7 +350,7 @@ namespace mongo {
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
         if ( query.isEmpty() && order.isEmpty() ) {
-            // TODO This will not use a covered index.
+            // TODO This will not use a covered index currently.
             return theDataFileMgr.findAll( ns );
         }
         if ( isSimpleIdQuery( query ) ) {

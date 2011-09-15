@@ -42,13 +42,19 @@ t.save( {a:[1,2]} );
 expectRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
 
 // Invalid query with only valid fields used 
-if ( 0 ) { // SERVER-2864
+// SERVER-2864
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1}  );
 t.find( {a:1,b:{$gt:5,$lt:0}} ).itcount();
-expectRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
-}
+expectRecordedPlan( {a:1,b:{$gt:0,$lt:5}}, "a_1" );
+
+// SERVER-2864
+t.drop();
+t.ensureIndex( {a:1} );
+t.save( {a:1} );
+t.find( {a:{$gt:5,$lt:0}} ).itcount();
+expectNoRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
 
 // Dummy query plan not stored
 t.drop();

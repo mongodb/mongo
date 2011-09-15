@@ -125,7 +125,7 @@ namespace mongo {
 
 #endif
 
-    bool Listener::_setupSockets( const vector<SockAddr>& mine , vector<int>& socks ) {
+    bool Listener::_setupSockets( const vector<SockAddr>& mine , vector<SOCKET>& socks ) {
         for (vector<SockAddr>::const_iterator it=mine.begin(), end=mine.end(); it != end; ++it) {
             const SockAddr& me = *it;
 
@@ -192,7 +192,7 @@ namespace mongo {
     
     void Listener::initAndListen() {
         checkTicketNumbers();
-        vector<int> socks;
+        vector<SOCKET> socks;
         set<int> sslSocks;
         
         { // normal sockets
@@ -244,7 +244,7 @@ namespace mongo {
             fd_set fds[1];
             FD_ZERO(fds);
             
-            for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
+            for (vector<SOCKET>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 FD_SET(*it, fds);
             }
 
@@ -280,7 +280,7 @@ namespace mongo {
             _elapsedTime += ret; // assume 1ms to grab connection. very rough
 #endif
 
-            for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
+            for (vector<SOCKET>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 if (! (FD_ISSET(*it, fds)))
                     continue;
 
@@ -295,14 +295,23 @@ namespace mongo {
                     if ( x == 0 && inShutdown() ) {
                         return;   // socket closed
                     }
-                    if( !inShutdown() )
+                    if( !inShutdown() ) {
                         log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
+                        if (x == EMFILE || x == ENFILE) {
+                            // Connection still in listen queue but we can't accept it yet
+                            error() << "Out of file descriptors. Waiting one second before trying to accept more connections." << warnings;
+                            sleepsecs(1);
+                        }
+                    }
                     continue;
                 }
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
-                if ( _logConnect && ! cmdLine.quiet )
-                    log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+                if ( _logConnect && ! cmdLine.quiet ){
+                    int conns = connTicketHolder.used()+1;
+                    const char* word = (conns == 1 ? " connection" : " connections");
+                    log() << "connection accepted from " << from.toString() << " #" << ++connNumber << " (" << conns << word << " now open)" << endl;
+                }
                 
                 Socket newSock = Socket(s, from);
 #ifdef MONGO_SSL

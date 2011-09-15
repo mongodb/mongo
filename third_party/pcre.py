@@ -25,7 +25,7 @@ def getFiles():
 def configure( env , fileLists , options ):
     #fileLists = { "serverOnlyFiles" : [] }
 
-    env.Append( CPPPATH=["./third_party/pcre-7.4/"] )
+    env.Prepend( CPPPATH=["./third_party/pcre-7.4/"] )
 
     myenv = env.Clone()
     myenv.Append( CPPDEFINES=["HAVE_CONFIG_H"] )

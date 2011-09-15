@@ -949,7 +949,7 @@ namespace mongo {
             }
 
             list<BSONObj> all;
-            auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
+            auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
             BSONObjBuilder b;
             while ( i->more() ) {
                 BSONObj o = i->next().removeField("v").getOwned();
@@ -966,6 +966,7 @@ namespace mongo {
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
+                log(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
                 theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
@@ -1817,6 +1818,15 @@ namespace mongo {
 
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+
+            if ( c->requiresAuth() ) {
+                // test that the user at least as read permissions
+                if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
+                    result.append( "errmsg" , "need to login" );
+                    return false;
+                }
+            }
+
             client.curop()->ensureStarted();
             string errmsg;
             int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );

@@ -189,7 +189,7 @@ static int enableRawMode(int fd) {
     raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0; /* 1 byte, no timer */
 
     /* put terminal in raw mode after flushing */
-    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
+    if (tcsetattr(fd,TCSADRAIN,&raw) < 0) goto fatal;
     rawmode = 1;
     return 0;
 
@@ -206,7 +206,7 @@ static void disableRawMode(int fd) {
     console_out = 0;
 #else
     /* Don't even check the return value as it's too late. */
-    if (rawmode && tcsetattr(fd,TCSAFLUSH,&orig_termios) != -1)
+    if (rawmode && tcsetattr(fd,TCSADRAIN,&orig_termios) != -1)
         rawmode = 0;
 #endif
 }
@@ -273,19 +273,19 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
         if (pos < len) {
             /* this scans for a brace matching buf[pos] to highlight */
             int scanDirection = 0;
-            if (memchr("}])", buf[pos], len))
+            if (strchr("}])", buf[pos]))
                 scanDirection = -1; /* backwards */
-            else if (memchr("{[(", buf[pos], len))
+            else if (strchr("{[(", buf[pos]))
                 scanDirection = 1; /* forwards */
 
             if (scanDirection) {
                 int unmatched = scanDirection;
                 int i;
-                for(i = pos + scanDirection; i >= 0 && buf[i]; i += scanDirection){
+                for(i = pos + scanDirection; i >= 0 && i < (int)len; i += scanDirection){
                     /* TODO: the right thing when inside a string */
-                    if (memchr("}])", buf[i], len))
+                    if (strchr("}])", buf[i]))
                         unmatched--;
-                    else if (memchr("{[(", buf[i], len))
+                    else if (strchr("{[(", buf[i]))
                         unmatched++;
 
                     if (unmatched == 0) {

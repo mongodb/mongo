@@ -113,7 +113,7 @@ namespace mongo {
 
                     bool allowFailure = false;
                     failures += i->votes;
-                    if( res.isEmpty() && !initial && failures <= allowableFailures ) {
+                    if( !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
                             assert( m->h().toString() == i->h.toString() );

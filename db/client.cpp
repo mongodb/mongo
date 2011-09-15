@@ -37,11 +37,12 @@
 #include "../scripting/engine.h"
 
 namespace mongo {
-
+  
     Client* Client::syncThread;
     mongo::mutex Client::clientsMutex("clientsMutex");
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
-    boost::thread_specific_ptr<Client> currentClient;
+
+    TSP_DEFINE(Client, currentClient)
 
 #if defined(_DEBUG)
     struct StackChecker;
@@ -418,6 +419,8 @@ namespace mongo {
             b.append( "desc" , _client->desc() );
             if ( _client->_threadId.size() ) 
                 b.append( "threadId" , _client->_threadId );
+            if ( _client->_connectionId )
+                b.appendNumber( "connectionId" , _client->_connectionId );
         }
         
         if ( ! _message.empty() ) {

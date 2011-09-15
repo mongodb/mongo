@@ -331,7 +331,7 @@ namespace mongo {
     }
 
     void BtreeCursor::skipAndCheck() {
-        int startNscanned = _nscanned;
+        long long startNscanned = _nscanned;
         skipUnusedKeys();
         while( 1 ) {
             if ( !skipOutOfRangeKeysAndCheckEnd() ) {

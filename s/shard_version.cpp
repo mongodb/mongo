@@ -82,14 +82,39 @@ namespace mongo {
     /**
      * @return true if had to do something
      */
-    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative , int tryNumber ) {
+    bool checkShardVersion( DBClientBase& conn_in , const string& ns , bool authoritative , int tryNumber ) {
         // TODO: cache, optimize, etc...
 
-        WriteBackListener::init( conn );
+        WriteBackListener::init( conn_in );
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )
             return false;
+
+        DBClientBase* conn = 0;
+
+        switch ( conn_in.type() ) {
+        case ConnectionString::INVALID:
+            assert(0);
+            break;
+        case ConnectionString::MASTER:
+            // great
+            conn = &conn_in;
+            break;
+        case ConnectionString::PAIR:
+            assert( ! "pair not support for sharding" );
+            break;
+        case ConnectionString::SYNC:
+            // TODO: we should check later that we aren't actually sharded on this
+            conn = &conn_in;
+            break;
+        case ConnectionString::SET:
+            DBClientReplicaSet* set = (DBClientReplicaSet*)&conn_in;
+            conn = &(set->masterConn());
+            break;
+        }
+
+        assert(conn);
 
         unsigned long long officialSequenceNumber = 0;
 
@@ -104,7 +129,7 @@ namespace mongo {
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
         // (ie., last time we issued the setShardVersions below)
-        unsigned long long sequenceNumber = connectionShardStatus.getSequence(&conn,ns);
+        unsigned long long sequenceNumber = connectionShardStatus.getSequence(conn,ns);
         if ( sequenceNumber == officialSequenceNumber ) {
             return false;
         }
@@ -112,19 +137,27 @@ namespace mongo {
 
         ShardChunkVersion version = 0;
         if ( isSharded && manager ) {
-            version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
+            version = manager->getVersion( Shard::make( conn->getServerAddress() ) );
         }
 
-        LOG(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
+        if( version == 0 ){
+            LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
+                      ( ! isSharded ? "no longer sharded" :
+                      ( ! manager ? "no chunk manager found" :
+                                    "version is zero" ) ) << endl;
+        }
+
+
+        LOG(2) << " have to set shard version for conn: " << conn << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
 
         BSONObj result;
-        if ( setShardVersion( conn , ns , version , authoritative , result ) ) {
+        if ( setShardVersion( *conn , ns , version , authoritative , result ) ) {
             // success!
             LOG(1) << "      setShardVersion success: " << result << endl;
-            connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
+            connectionShardStatus.setSequence( conn , ns , officialSequenceNumber );
             return true;
         }
 
@@ -134,7 +167,7 @@ namespace mongo {
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
-            checkShardVersion( conn , ns , 1 , tryNumber + 1 );
+            checkShardVersion( *conn , ns , 1 , tryNumber + 1 );
             return true;
         }
         
@@ -152,13 +185,13 @@ namespace mongo {
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
             LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
-                << "going to retry checkShardVersion host: " << conn.getServerAddress() << " " << result << endl;
+                << "going to retry checkShardVersion host: " << conn->getServerAddress() << " " << result << endl;
             sleepmillis( 10 * tryNumber );
-            checkShardVersion( conn , ns , true , tryNumber + 1 );
+            checkShardVersion( *conn , ns , true , tryNumber + 1 );
             return true;
         }
         
-        string errmsg = str::stream() << "setShardVersion failed host: " << conn.getServerAddress() << " " << result;
+        string errmsg = str::stream() << "setShardVersion failed host: " << conn->getServerAddress() << " " << result;
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );
         return true;

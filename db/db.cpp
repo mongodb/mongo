@@ -708,6 +708,12 @@ int main(int argc, char* argv[]) {
         else {
             dbpath = "/data/db/";
         }
+#ifdef _WIN32
+        if (dbpath.size() > 1 && dbpath[dbpath.size()-1] == '/') {
+            // size() check is for the unlikely possibility of --dbpath "/"
+            dbpath = dbpath.erase(dbpath.size()-1);
+        }
+#endif
 
         if ( params.count("directoryperdb")) {
             directoryperdb = true;
@@ -728,10 +734,13 @@ int main(int argc, char* argv[]) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
+        bool journalExplicit = false;
         if( params.count("nodur") || params.count( "nojournal" ) ) {
+            journalExplicit = true;
             cmdLine.dur = false;
         }
         if( params.count("dur") || params.count( "journal" ) ) {
+            journalExplicit = true;
             cmdLine.dur = true;
         }
         if (params.count("durOptions")) {
@@ -1029,6 +1038,15 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 #endif
+
+
+        if (sizeof(void*) == 4 && !journalExplicit){
+            // trying to make this stand out more like startup warnings
+            log() << endl;
+            warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
+            log() << endl;
+        }
+
     }
 
     UnitTest::runTests();
@@ -1077,11 +1095,9 @@ namespace mongo {
         printStackTrace( oss );
         rawOut( oss.str() );
 
-        if( cmdLine.dur ) { 
-            ::exit(EXIT_ABRUPT);
-        }
+        // Don't go through normal shutdown procedure. It may make things worse.
+        ::exit(EXIT_ABRUPT);
 
-        dbexit( EXIT_ABRUPT );
     }
 
     void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
@@ -1114,6 +1130,13 @@ namespace mongo {
         rawOut( "terminate() called, printing stack:" );
         printStackTrace();
         ::abort();
+    }
+
+    // this gets called when new fails to allocate memory
+    void my_new_handler() {
+        rawOut( "out of memory, printing stack and exiting:" );
+        printStackTrace();
+        ::exit(EXIT_ABRUPT);
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
@@ -1149,6 +1172,7 @@ namespace mongo {
         boost::thread it( interruptThread );
 
         set_terminate( myterminate );
+        set_new_handler( my_new_handler );
     }
 
 #else

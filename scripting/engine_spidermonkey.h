@@ -21,18 +21,6 @@
 
 // START inc hacking
 
-#if defined( MOZJS )
-
-#define MOZILLA_1_8_BRANCH
-
-#include "mozjs/jsapi.h"
-#include "mozjs/jsdate.h"
-#include "mozjs/jsregexp.h"
-
-#warning if you are using an ubuntu version of spider monkey, we recommend installing spider monkey from source
-
-#elif defined( OLDJS )
-
 #ifdef WIN32
 #include "jstypes.h"
 #undef JS_PUBLIC_API
@@ -46,30 +34,11 @@
 #include "jsdate.h"
 #include "jsregexp.h"
 
-#else
-
-#include "js/jsapi.h"
-#include "js/jsobj.h"
-#include "js/jsdate.h"
-#include "js/jsregexp.h"
-
-#endif
-
 // END inc hacking
 
 // -- SM 1.6 hacks ---
 #ifndef JSCLASS_GLOBAL_FLAGS
-
-#warning old version of spider monkey ( probably 1.6 ) you should upgrade to at least 1.7
-
-#define JSCLASS_GLOBAL_FLAGS 0
-
-JSBool JS_CStringsAreUTF8() {
-    return false;
-}
-
-#define SM16
-
+#error old version of spider monkey ( probably 1.6 ) you should upgrade to at least 1.7
 #endif
 // -- END SM 1.6 hacks ---
 

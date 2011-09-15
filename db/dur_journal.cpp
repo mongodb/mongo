@@ -589,12 +589,12 @@ namespace mongo {
             }
         }
 
-        int getAgeOutJournalFiles() {
+        /*int getAgeOutJournalFiles() {
             mutex::try_lock lk(j._curLogFileMutex, 4000);
             if( !lk.ok )
                 return -1;
             return j._ageOut ? 1 : 0;
-        }
+        }*/
         void setAgeOutJournalFiles(bool a) {
             scoped_lock lk(j._curLogFileMutex);
             j._ageOut = a;

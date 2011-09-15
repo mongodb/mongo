@@ -992,25 +992,7 @@ namespace mongo {
     }
 
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
-        QueryPattern qp;
-        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
-            assert( !i->second.empty() );
-            if ( i->second.equality() ) {
-                qp._fieldTypes[ i->first ] = QueryPattern::Equality;
-            }
-            else if ( i->second.nontrivial() ) {
-                bool upper = i->second.max().type() != MaxKey;
-                bool lower = i->second.min().type() != MinKey;
-                if ( upper && lower )
-                    qp._fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
-                else if ( upper )
-                    qp._fieldTypes[ i->first ] = QueryPattern::UpperBound;
-                else if ( lower )
-                    qp._fieldTypes[ i->first ] = QueryPattern::LowerBound;
-            }
-        }
-        qp.setSort( sort );
-        return qp;
+        return QueryPattern( *this, sort );
     }
 
     // TODO get rid of this

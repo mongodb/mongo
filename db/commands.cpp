@@ -143,5 +143,44 @@ namespace mongo {
         }
     }
 
+}
+
+#include "../client/connpool.h"
+
+namespace mongo {
+
+    extern DBConnectionPool pool;
+
+    class PoolFlushCmd : public Command {
+    public:
+        PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
+        virtual void help( stringstream &help ) const { help<<"internal"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+            pool.flush();
+            return true;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+    } poolFlushCmd;
+
+    class PoolStats : public Command {
+    public:
+        PoolStats() : Command( "connPoolStats" ) {}
+        virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+            pool.appendInfo( result );
+            result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
+            result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );
+            return true;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+    } poolStatsCmd;
 
 } // namespace mongo

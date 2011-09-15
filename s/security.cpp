@@ -32,6 +32,7 @@ namespace mongo {
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
         if (user == internalSecurity.user) {
+            uassert(15890, "key file must be used to log in with internal user", cmdLine.keyFile);
             pwd = internalSecurity.pwd;
         }
         else {
@@ -50,11 +51,14 @@ namespace mongo {
                 userObj = conn->findOne(systemUsers, query);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                    conn.done(); // return to pool
                     return false;
                 }
             }
 
             pwd = userObj.getStringField("pwd");
+
+            conn.done(); // return to pool
         }
         return true;
     }
@@ -88,9 +92,15 @@ namespace mongo {
                 _warned = true;
                 log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
             }
+
+            // Must return conn to pool
+            // TODO: Check for errors during findOne(), or just let the conn die?
+            conn.done();
             return true;
         }
 
+        // Must return conn to pool
+        conn.done();
         return false;
     }
 

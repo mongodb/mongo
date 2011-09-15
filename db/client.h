@@ -29,6 +29,7 @@
 #include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
+#include "../util/concurrency/threadlocal.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
 
-    extern boost::thread_specific_ptr<Client> currentClient;
+    TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
 
@@ -59,6 +60,12 @@ namespace mongo {
            call this when your thread starts.
         */
         static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
+
+        static void initThreadIfNotAlready(const char *desc) { 
+            if( currentClient.get() )
+                return;
+            initThread(desc);
+        }
 
         ~Client();
 
@@ -87,6 +94,9 @@ namespace mongo {
         const char *desc() const { return _desc; }
         void setLastOp( ReplTime op ) { _lastOp = op; }
         ReplTime getLastOp() const { return _lastOp; }
+
+        /** caution -- use Context class instead */
+        void setContext(Context *c) { _context = c; }
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;

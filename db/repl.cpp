@@ -490,7 +490,7 @@ namespace mongo {
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
                     resyncDrop( db.c_str(), "internal" );
@@ -535,7 +535,8 @@ namespace mongo {
             // Database is already present.
             return true;   
         }
-        if ( ___databaseIgnorer.ignoreAt( db, op.getField( "ts" ).date() ) ) {
+        BSONElement ts = op.getField( "ts" );
+        if ( ( ts.type() == Date || ts.type() == Timestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
             // Database is ignored due to a previous indication that it is
             // missing from master after optime "ts".
             return false;   

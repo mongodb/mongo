@@ -146,10 +146,13 @@ namespace mongo {
             _commitNumber = 0;
         }
 
+        extern unsigned notesThisLock;
+
         void CommitJob::note(void* p, int len) {
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
+            DEV notesThisLock++;
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {

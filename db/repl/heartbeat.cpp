@@ -164,12 +164,12 @@ namespace mongo {
                 int theirConfigVersion = -10000;
 
                 Timer timer;
+                time_t before = curTimeMicros64() / 1000000;
 
                 bool ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(), h.toString(), info, theReplSet->config().version, theirConfigVersion);
 
                 mem.ping = (unsigned int)timer.millis();
 
-                time_t before = timer.startTime() / 1000000;
                 // we set this on any response - we don't get this far if
                 // couldn't connect because exception is thrown
                 time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);

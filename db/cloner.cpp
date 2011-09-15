@@ -468,7 +468,7 @@ namespace mongo {
                were to clone it would get a different point-in-time and not match.
                */
             return cloneFrom(from.c_str(), errmsg, dbname,
-                             /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true, /*mayBeInterrupted*/false);
+                             /*logForReplication=*/!fromRepl, /*slaveOk*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true, /*mayBeInterrupted*/false);
         }
     } cmdclone;
 

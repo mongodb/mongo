@@ -200,6 +200,11 @@ namespace mongo {
                 log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
                 throw;
             }
+            catch( string& se ) {
+                log() << "replSet reconfig exception: " << se << rsLog;
+                errmsg = se;
+                return false;
+            }
 
             return true;
         }

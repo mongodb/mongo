@@ -89,6 +89,11 @@ namespace mongo {
                 cout << "log rotation net yet supported on windows" << endl;
                 return;
 #else
+
+#ifdef POSIX_FADV_DONTNEED
+                posix_fadvise(fileno(_file), 0, 0, POSIX_FADV_DONTNEED);
+#endif
+
                 struct tm t;
                 localtime_r( &_opened , &t );
 

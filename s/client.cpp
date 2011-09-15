@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    /* todo: rename this file clientinfo.cpp would be more intuitive? */
+
     ClientInfo::ClientInfo() {
         _cur = &_a;
         _prev = &_b;

@@ -397,8 +397,7 @@ namespace mongo {
     FindingStartCursor::FindingStartCursor( const QueryPlan & qp ) :
     _qp( qp ),
     _findingStart( true ),
-    _findingStartMode(),
-    _findingStartTimer( 0 )
+    _findingStartMode()
     { init(); }
     
     void FindingStartCursor::next() {

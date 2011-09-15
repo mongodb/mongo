@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    mutex DiagStr::m("diags");
+    SimpleMutex DiagStr::m("diags");
 
     // intentional leak. otherwise destructor orders can be problematic at termination.
     MutexDebugger &mutexDebugger = *(new MutexDebugger());

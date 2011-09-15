@@ -327,6 +327,8 @@ namespace mongo {
             {
                 V8Unlock u;
                 cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
+                if ( ! cursor.get() ) 
+                    return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( scope->getV8Str( "internalCursor" ) ) ) );
             assert( cons );
