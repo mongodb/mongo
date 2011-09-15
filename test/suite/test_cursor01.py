@@ -98,8 +98,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         while nextret == 0:
             key = cursor.get_key()
             value = cursor.get_value()
-            print('want: ' + str(self.genkey(i)) + ' got: ' + str(key))
-            #self.assertEqual(key, self.genkey(i))
+            #print('want: ' + str(self.genkey(i)) + ' got: ' + str(key))
+            self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i += 1
             nextret = cursor.next()

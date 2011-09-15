@@ -510,6 +510,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
+		{ 0 },                  /* raw recno buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
 		0,			/* int saved_err */

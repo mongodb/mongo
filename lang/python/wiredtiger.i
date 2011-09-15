@@ -171,15 +171,14 @@ SELFHELPER(struct wt_cursor)
         }
 
         void _set_recno(uint64_t recno) {
-		/* Remove RAW flag temporarily so we can get past
-		 * the replacement of the key_format in
-		 * cur_std.c:__cursor_set_key().
-		 * TODO: needs cleanup, but where?
-		 */
-                uint32_t save_flags = $self->flags;
-                $self->flags &= ~(WT_CURSTD_RAW);
-                $self->set_key($self, recno);
-                $self->flags = save_flags;
+                WT_ITEM k;
+                uint8_t recno_buf[20];
+                if (wiredtiger_struct_pack(recno_buf, sizeof (recno_buf),
+                    "r", recno) == 0) {
+                        k.data = recno_buf;
+                        k.size = (uint32_t)wiredtiger_struct_size("q", recno);
+                        $self->set_key($self, &k);
+                }
         }
 
         void _set_value(char *data, int size) {
@@ -200,21 +199,18 @@ SELFHELPER(struct wt_cursor)
                 return SWIG_FromCharPtrAndSize(k.data, k.size);
         }
 
-        uint64_t _get_recno() {
-                uint64_t r = 0;
-		/* Remove RAW flag temporarily so we can get past
-		 * the replacement of the key_format in
-		 * cur_std.c:__cursor_get_key().
-		 * TODO: needs cleanup, but where?
-		 */
-                uint32_t save_flags = $self->flags;
-                $self->flags &= ~(WT_CURSTD_RAW);
-                int ret = $self->get_key($self, &r);
-                $self->flags = save_flags;
-                if (ret != 0)
+        PyObject *_get_recno() {
+                WT_ITEM k;
+                uint64_t r;
+                int ret = $self->get_key($self, &k);
+                if (ret == 0)
+                        ret = wiredtiger_struct_unpack(k.data, k.size, "q", &r);
+                if (ret != 0) {
                         SWIG_Python_SetErrorMsg(wtError,
                             wiredtiger_strerror(ret));
-                return r;
+                        return (NULL);
+                }
+                return PyLong_FromUnsignedLongLong(r);
         }
 
         PyObject *_get_value() {

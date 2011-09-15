@@ -381,6 +381,7 @@ struct wt_cursor {
 	} q;                            /* Linked list of WT_CURSORs. */
 
 	uint64_t recno;
+	uint8_t raw_recno_buf[20];	/* Holds a recno in raw mode. */
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 

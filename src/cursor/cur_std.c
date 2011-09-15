@@ -14,6 +14,7 @@
 static int
 __cursor_get_key(WT_CURSOR *cursor, ...)
 {
+	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
@@ -23,12 +24,24 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	if (fmt[0] == 'r' && fmt[1] == '\0')
-		*va_arg(ap, uint64_t *) = cursor->recno;
-	else
+	fmt = cursor->key_format;
+	if (fmt[0] == 'r' && fmt[1] == '\0') {
+		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+			key = va_arg(ap, WT_ITEM *);
+			key->data = cursor->raw_recno_buf;
+			key->size = (uint32_t)
+			    __wt_struct_size(session, "q", cursor->recno);
+			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
+			    sizeof(cursor->raw_recno_buf),
+			    "q", cursor->recno);
+		} else
+			*va_arg(ap, uint64_t *) = cursor->recno;
+	} else {
+		if (F_ISSET(cursor, WT_CURSTD_RAW))
+			fmt = "u";
 		ret = __wt_struct_unpackv(session,
 		    cursor->key.data, cursor->key.size, fmt, ap);
+	}
 	va_end(ap);
 
 err:	API_END(session);
@@ -78,34 +91,43 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	/* Fast path some common cases: single strings or byte arrays. */
+	fmt = cursor->key_format;
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
-		cursor->recno = va_arg(ap, uint64_t);
-		cursor->key.data = &cursor->recno;
-		sz = sizeof(cursor->recno);
+		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+			item = va_arg(ap, WT_ITEM *);
+			WT_ERR(__wt_struct_unpack(session,
+			    item->data, item->size, "q", &cursor->recno));
+		} else
+			cursor->recno = va_arg(ap, uint64_t);
 		if (cursor->recno == 0) {
 			__wt_errx(session,
 			    "Record numbers must be greater than zero");
 			ret = EINVAL;
 			goto err;
 		}
-	} else if (fmt[0] == 'S' && fmt[1] == '\0') {
-		str = va_arg(ap, const char *);
-		sz = strlen(str) + 1;
-		cursor->key.data = (void *)str;
-	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		cursor->key.data = (void *)item->data;
+		cursor->key.data = &cursor->recno;
+		sz = sizeof(cursor->recno);
 	} else {
-		buf = &cursor->key;
-		sz = __wt_struct_sizev(session, cursor->key_format, ap);
-		va_end(ap);
-		va_start(ap, cursor);
-		WT_ERR(__wt_buf_initsize(session, buf, sz));
-		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
-		    cursor->key_format, ap));
+		if (F_ISSET(cursor, WT_CURSTD_RAW))
+			fmt = "u";
+		if (fmt[0] == 'S' && fmt[1] == '\0') {
+			str = va_arg(ap, const char *);
+			sz = strlen(str) + 1;
+			cursor->key.data = (void *)str;
+		} else if (fmt[0] == 'u' && fmt[1] == '\0') {
+			item = va_arg(ap, WT_ITEM *);
+			sz = item->size;
+			cursor->key.data = (void *)item->data;
+		} else {
+			buf = &cursor->key;
+			sz = __wt_struct_sizev(session, cursor->key_format, ap);
+			va_end(ap);
+			va_start(ap, cursor);
+			WT_ERR(__wt_buf_initsize(session, buf, sz));
+			WT_ERR(__wt_struct_packv(session, buf->mem, sz,
+			    cursor->key_format, ap));
+		}
 	}
 	if (sz == 0) {
 		__wt_errx(session, "Empty keys not permitted");

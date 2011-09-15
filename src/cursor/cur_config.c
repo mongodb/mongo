@@ -142,6 +142,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		__curconfig_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
+		{ 0 },                  /* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
 		0,			/* int saved_err */
