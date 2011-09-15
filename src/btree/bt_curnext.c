@@ -30,7 +30,7 @@ __cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		++cbt->ins_entry_cnt;
 
 new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
-		if (cbt->page->type == WT_PAGE_COL_FIX) {
+		if (cbt->btree->type == BTREE_COL_FIX) {
 			val->data = WT_UPDATE_DATA(cbt->ins->upd);
 			val->size = 1;
 			break;
