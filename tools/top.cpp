@@ -107,6 +107,8 @@ namespace mongo {
 
         int run() {
             _sleep = getParam( "sleep" , _sleep );
+
+            auth();
             
             BSONObj prev = getData();
 
