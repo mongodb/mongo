@@ -949,7 +949,7 @@ namespace mongo {
             }
 
             list<BSONObj> all;
-            auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
+            auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
             BSONObjBuilder b;
             while ( i->more() ) {
                 BSONObj o = i->next().removeField("v").getOwned();
