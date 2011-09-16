@@ -43,7 +43,24 @@ def log2chr(val):
         return chr(ord('a') + p - 10)
     
 megabyte = 1024 * 1024
-        
+
+def multiply_scenarios(sep, *args):
+    result = None
+    for scenes in args:
+        if result == None:
+            result = scenes
+        else:
+            total = []
+            for scena in scenes:
+                for scenb in result:
+                    name = scena[0] + sep + scenb[0]
+                    tdict = {}
+                    tdict.update(scena[1])
+                    tdict.update(scenb[1])
+                    total.append((name, tdict))
+            result = total
+    return result
+
 class wtscenario:
     """
     A set of generators for different test scenarios
