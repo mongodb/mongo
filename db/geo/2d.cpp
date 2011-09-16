@@ -1598,6 +1598,8 @@ namespace mongo {
 
                     }
 
+                    // log() << "finished box prefix [" << _prefix << "]" << endl;
+
                     // We're done and our size is large enough
                     _state = DONE_NEIGHBOR;
 
@@ -1637,10 +1639,17 @@ namespace mongo {
                     int j = (_neighbor % 3) - 1;
 
                     if ( ( i == 0 && j == 0 ) ||
-                            ( i < 0 && _centerBox._min._x <= _g->_min ) ||
-                            ( j < 0 && _centerBox._min._y <= _g->_min ) ||
-                            ( i > 0 && _centerBox._max._x >= _g->_max ) ||
-                            ( j > 0 && _centerBox._max._y >= _g->_max ) ) {
+                         ( i < 0 && _centerPrefix.atMinX() ) ||
+                         ( i > 0 && _centerPrefix.atMaxX() ) ||
+                         ( j < 0 && _centerPrefix.atMinY() ) ||
+                         ( j > 0 && _centerPrefix.atMaxY() ) ) {
+
+                        //log() << "not moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() << " " << _centerPrefix << endl;
+                        //log() << _centerPrefix.atMinX() << " "
+                        //        << _centerPrefix.atMinY() << " "
+                        //        << _centerPrefix.atMaxX() << " "
+                        //        << _centerPrefix.atMaxY() << " " << endl;
+
                         continue; // main box or wrapped edge
                         // TODO:  We may want to enable wrapping in future, probably best as layer on top of
                         // this search.
@@ -1652,7 +1661,9 @@ namespace mongo {
                     GeoHash _neighborPrefix = _centerPrefix;
                     _neighborPrefix.move( i, j );
 
-                    GEODEBUG( "moving to " << i << " , " << j << " fringe : " << _fringe.size() );
+                    //log() << "moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() << " " << _centerPrefix << " " << _neighborPrefix << endl;
+
+                    GEODEBUG( "moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() );
                     PREFIXDEBUG( _centerPrefix, _g );
                     PREFIXDEBUG( _neighborPrefix , _g );
                     while( _fringe.size() > 0 ) {
@@ -1670,10 +1681,10 @@ namespace mongo {
                             _fringe.pop_back();
                             continue;
                         }
-                        // Large intersection, refine search
-                        else if( intAmt > 0.5 && _prefix.canRefine() && _fringe.back().size() < 4 /* two bits */ ) {
+                        // Small intersection, refine search
+                        else if( intAmt < 0.5 && _prefix.canRefine() && _fringe.back().size() < 4 /* two bits */ ) {
 
-                            GEODEBUG( "Adding to fringe: " << _fringe.back() << " curr prefix : " << _prefix << " bits : " << _prefix.getBits() );
+                            GEODEBUG( "Intersection small : " << intAmt << ", adding to fringe: " << _fringe.back() << " curr prefix : " << _prefix << " bits : " << _prefix.getBits() );
 
                             // log() << "Diving to level : " << ( _fringe.back().size() / 2 + 1 ) << endl;
 

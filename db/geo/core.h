@@ -48,9 +48,22 @@ namespace mongo {
                 hashedToNormal[fixed] = i;
             }
 
+            long long currAllX = 0, currAllY = 0;
+            for ( int i = 0; i < 64; i++ ){
+                if( i % 2 == 0 ){
+                    allX[ i / 2 ] = currAllX;
+                    currAllX = currAllX + ( 1LL << ( 63 - i ) );
+                }
+                else{
+                    allY[ i / 2 ] = currAllY;
+                    currAllY = currAllY + ( 1LL << ( 63 - i ) );
+                }
+            }
         }
         int masks32[32];
         long long masks64[64];
+        long long allX[32];
+        long long allY[32];
 
         unsigned hashedToNormal[256];
     };
@@ -211,11 +224,11 @@ namespace mongo {
             return getBit( ( pos * 2 ) + 1 );
         }
 
-        BSONObj wrap() const {
+        BSONObj wrap( const char* name = "" ) const {
             BSONObjBuilder b(20);
-            append( b , "" );
+            append( b , name );
             BSONObj o = b.obj();
-            assert( o.objsize() == 20 );
+            if( ! strlen( name ) ) assert( o.objsize() == 20 );
             return o;
         }
 
@@ -225,6 +238,23 @@ namespace mongo {
 
         bool canRefine() const {
            return _bits < 32;
+        }
+
+        bool atMinX() const {
+            return ( _hash & geoBitSets.allX[ _bits ] ) == 0;
+        }
+
+        bool atMinY() const {
+            //log() << " MinY : " << hex << (unsigned long long) _hash << " " << _bits << " " << hex << (unsigned long long) geoBitSets.allY[ _bits ] << endl;
+            return ( _hash & geoBitSets.allY[ _bits ] ) == 0;
+        }
+
+        bool atMaxX() const {
+            return ( _hash & geoBitSets.allX[ _bits ] ) == geoBitSets.allX[ _bits ];
+        }
+
+        bool atMaxY() const {
+            return ( _hash & geoBitSets.allY[ _bits ] ) == geoBitSets.allY[ _bits ];
         }
 
         void move( int x , int y ) {
