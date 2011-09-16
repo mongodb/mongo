@@ -560,6 +560,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             if (c == 0) continue;
         }
 
+        errno = 0;
+
         switch(c) {
         case 13:    /* enter */
             history_len--;
