@@ -31,7 +31,9 @@ void
 __wt_session_dump(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
 	WT_HAZARD *hp;
+	int first;
 
 	conn = S2C(session);
 
@@ -45,16 +47,26 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 
 	__wt_msg(session, "\tstate: %s", __wt_session_print_state(session));
 
+	first = 0;
+	TAILQ_FOREACH(cursor, &session->cursors, q) {
+		if (++first == 1)
+			__wt_msg(session, "\tcursors:");
+		__wt_msg(session, "\t\t%p", cursor);
+	}
+
+	first = 0;
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp) {
 		if (hp->page == NULL)
 			continue;
+		if (++first == 1)
+			__wt_msg(session, "\thazard references:");
 #ifdef HAVE_DIAGNOSTIC
 		__wt_msg(session,
-		    "\thazard: %" PRIu32 " (%s, line %d)",
+		    "\t\t[%" PRIu32 "] (%s, line %d)",
 		    WT_PADDR(hp->page), hp->file, hp->line);
 #else
-		__wt_msg(session, "\thazard: %" PRIu32, WT_PADDR(hp->page));
+		__wt_msg(session, "\t\t%[" PRIu32 "]", WT_PADDR(hp->page));
 #endif
 	}
 }
