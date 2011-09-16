@@ -84,7 +84,7 @@ namespace mongo {
                 }
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
-                ctx.getClient()->setLastOp( ts.asDate() );
+                ctx.getClient()->setLastOp( ts );
             }
         }
     }
@@ -185,7 +185,7 @@ namespace mongo {
                 }
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = hashNew;
-                ctx.getClient()->setLastOp( ts.asDate() );
+                ctx.getClient()->setLastOp( ts );
             }
         }
 
@@ -271,7 +271,7 @@ namespace mongo {
 
         append_O_Obj(r->data, partial, obj);
 
-        context.getClient()->setLastOp( ts.asDate() );
+        context.getClient()->setLastOp( ts );
 
         if ( logLevel >= 6 ) {
             BSONObj temp(r);

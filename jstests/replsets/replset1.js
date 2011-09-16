@@ -43,7 +43,7 @@ doTest = function( signal ) {
         var temp = replTest.getURL();
         temp = temp.substring( 0 , temp.lastIndexOf( "," ) );
         temp = new Mongo( temp ).getDB( "foo" );
-        assert.eq( 1000 , temp.foo.findOne().a , "cppconn 1" );        
+        assert.eq( 1000 , temp.foo.findOne().a , "cppconn 1" );
     }
 
 
@@ -59,7 +59,7 @@ doTest = function( signal ) {
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 
-    { 
+    {
         // this may fail since it has to reconnect
         try {
             cppconn.foo.findOne()
@@ -121,7 +121,11 @@ doTest = function( signal ) {
     t.save({a: 1000});
     t.ensureIndex( { a : 1 } )
 
-    db.getLastError( 3 , 30000 )
+    result = db.runCommand({getLastError : 1, w: 3 , wtimeout :30000 })
+    printjson(result);
+    lastOp = result.lastOp;
+    lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
+    assert.eq(lastOplogOp['ts'], lastOp);
 
     ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } )
 

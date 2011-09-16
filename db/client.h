@@ -92,8 +92,8 @@ namespace mongo {
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
         const char *desc() const { return _desc; }
-        void setLastOp( ReplTime op ) { _lastOp = op; }
-        ReplTime getLastOp() const { return _lastOp; }
+        void setLastOp( OpTime op ) { _lastOp = op; }
+        OpTime getLastOp() const { return _lastOp; }
 
         /** caution -- use Context class instead */
         void setContext(Context *c) { _context = c; }
@@ -118,7 +118,7 @@ namespace mongo {
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
-        ReplTime _lastOp;
+        OpTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;

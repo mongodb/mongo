@@ -286,13 +286,9 @@ namespace mongo {
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
-        if( theReplSet ) {
-            b.append("lastOp" , (long long) _lastOp);
-        }
-        else {
-            OpTime lo(_lastOp);
-            if ( ! lo.isNull() )
-                b.appendTimestamp( "lastOp" , lo.asDate() );
+        // _lastOp is never set if replication is off
+        if( theReplSet || ! _lastOp.isNull() ) {
+            b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
 
