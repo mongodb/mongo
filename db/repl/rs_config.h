@@ -80,6 +80,22 @@ namespace mongo {
                 }
             }
             bool operator==(const MemberCfg& r) const {
+                if (!tags.empty() || !r.tags.empty()) {
+                    if (tags.size() != r.tags.size()) {
+                        return false;
+                    }
+
+                    // if they are the same size and not equal, at least one
+                    // element in A must be different in B
+                    for (map<string,string>::const_iterator lit = tags.begin(); lit != tags.end(); lit++) {
+                        map<string,string>::const_iterator rit = r.tags.find((*lit).first);
+
+                        if (rit == r.tags.end() || (*lit).second != (*rit).second) {
+                            return false;
+                        }
+                    }
+                }
+
                 return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
                        arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
                        buildIndexes == buildIndexes;
