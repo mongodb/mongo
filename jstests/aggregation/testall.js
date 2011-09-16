@@ -496,7 +496,8 @@ var p10 = db.runCommand(
     { $sort : {
 	key: {
         title : 1
-    }}}
+	}
+    }}
 ]});
 
 var p10result = [
@@ -1258,3 +1259,38 @@ var g5result = [
 ];
 
 assert(arrayEq(g5.result, g5result), 'g5 failed');
+
+
+// $first and $last accumulators
+var g6 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $sort : {
+	key: {
+        author : -1
+        }
+    }},
+    /* TEMPORARY, until $group can use _id : <constant> */
+    { $project : {
+	author : 1,
+	bucket : { $add:[0, 1] }
+    }},
+    { $group : {
+	_id : { bucket : 1 },
+	firstAuthor : { $last : "$author" }, /* note reverse sort above */
+	lastAuthor : { $first : "$author" }, /* note reverse sort above */
+	count : { $sum : 1 }
+    }}
+]});
+
+var g6result = [
+    {
+        "_id" : {
+            "bucket" : 1
+        },
+	firstAuthor : "bob",
+	lastAuthor : "jane",
+	count : 3
+    }
+];
+
+assert(arrayEq(g6.result, g6result), 'g6 failed');

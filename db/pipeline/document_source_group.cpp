@@ -125,6 +125,8 @@ namespace mongo {
     static const GroupOpDesc GroupOpTable[] = {
         {"$addToSet", AccumulatorAddToSet::create},
         {"$avg", AccumulatorAvg::create},
+        {"$first", AccumulatorFirst::create},
+        {"$last", AccumulatorLast::create},
         {"$max", AccumulatorMinMax::createMax},
         {"$min", AccumulatorMinMax::createMin},
         {"$push", AccumulatorPush::create},

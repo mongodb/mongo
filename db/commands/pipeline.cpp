@@ -38,7 +38,7 @@ namespace mongo {
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
 	collectionName(),
 	sourceList(),
-        splitMongodPipeline(false /*DEBUG_BUILD == 1*/), /* always split for DEV */
+        splitMongodPipeline(DEBUG_BUILD == 1), /* test: always split for DEV */
         pCtx(pTheCtx) {
     }
 
@@ -53,8 +53,10 @@ namespace mongo {
 
     /* this table must be in alphabetical order by name for bsearch() */
     static const StageDesc stageDesc[] = {
+#ifdef NEVER /* disabled for now in favor of $match */
 	{DocumentSourceFilter::filterName,
 	 DocumentSourceFilter::createFromBson},
+#endif
 	{DocumentSourceGroup::groupName,
 	 DocumentSourceGroup::createFromBson},
 	{DocumentSourceMatch::matchName,

@@ -88,57 +88,64 @@ namespace mongo {
     };
 
 
-    class AccumulatorMinMax :
+    /*
+      This isn't a finished accumulator, but rather a convenient base class
+      for others such as $first, $last, $max, $min, and similar.  It just
+      provides a holder for a single Value, and the getter for that.  The
+      holder is protected so derived classes can manipulate it.
+     */
+    class AccumulatorSingleValue :
         public Accumulator {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
         virtual intrusive_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
 
-        /*
-          Create a summing accumulator.
-
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> createMin(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
-        static intrusive_ptr<Accumulator> createMax(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
-
-    private:
-        AccumulatorMinMax(int theSense);
-
-        int sense; /* 1 for min, -1 for max; used to "scale" comparison */
+    protected:
+        AccumulatorSingleValue();
 
         mutable intrusive_ptr<const Value> pValue; /* current min/max */
     };
 
 
-    class AccumulatorPush :
-        public Accumulator {
+    class AccumulatorFirst :
+        public AccumulatorSingleValue {
     public:
         // virtuals from Expression
 	virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
-        virtual intrusive_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
         /*
-          Create an appending accumulator.
+          Create the accumulator.
 
-	  @param pCtx the expression context
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
-        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
+        AccumulatorFirst();
+    };
 
-        mutable vector<intrusive_ptr<const Value> > vpValue;
-	intrusive_ptr<ExpressionContext> pCtx;
+
+    class AccumulatorLast :
+        public AccumulatorSingleValue {
+    public:
+        // virtuals from Expression
+	virtual intrusive_ptr<const Value> evaluate(
+            const intrusive_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create the accumulator.
+
+          @returns the created accumulator
+         */
+        static intrusive_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        AccumulatorLast();
     };
 
 
@@ -166,6 +173,57 @@ namespace mongo {
         mutable BSONType totalType;
         mutable long long longTotal;
         mutable double doubleTotal;
+    };
+
+
+    class AccumulatorMinMax :
+        public AccumulatorSingleValue {
+    public:
+        // virtuals from Expression
+	virtual intrusive_ptr<const Value> evaluate(
+            const intrusive_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create either the max or min accumulator.
+
+          @returns the created accumulator
+         */
+        static intrusive_ptr<Accumulator> createMin(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> createMax(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        AccumulatorMinMax(int theSense);
+
+        int sense; /* 1 for min, -1 for max; used to "scale" comparison */
+    };
+
+
+    class AccumulatorPush :
+        public Accumulator {
+    public:
+        // virtuals from Expression
+	virtual intrusive_ptr<const Value> evaluate(
+            const intrusive_ptr<Document> &pDocument) const;
+        virtual intrusive_ptr<const Value> getValue() const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create an appending accumulator.
+
+	  @param pCtx the expression context
+          @returns the created accumulator
+         */
+        static intrusive_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
+
+        mutable vector<intrusive_ptr<const Value> > vpValue;
+	intrusive_ptr<ExpressionContext> pCtx;
     };
 
 

@@ -20,6 +20,7 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
     intrusive_ptr<const Value> AccumulatorMinMax::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
@@ -38,13 +39,9 @@ namespace mongo {
         return pValue;
     }
 
-    intrusive_ptr<const Value> AccumulatorMinMax::getValue() const {
-        return pValue;
-    }
-
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
-        sense(theSense),
-        pValue(intrusive_ptr<const Value>()) {
+	AccumulatorSingleValue(),
+        sense(theSense) {
         assert((sense == 1) || (sense == -1)); // CW TODO error
     }
 
