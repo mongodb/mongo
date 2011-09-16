@@ -124,10 +124,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Destroy the handle. */
-	WT_TRET(__wt_connection_destroy(conn));
-
-	if (ret == 0)
-		ret = secondary_err;
+	__wt_connection_destroy(conn);
 
 	return ((ret == 0) ? secondary_err : ret);
 }
