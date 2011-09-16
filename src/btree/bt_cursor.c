@@ -99,63 +99,42 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
-	int (*srch)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, int);
 	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	srch = btree->type == BTREE_ROW ? __wt_row_search : __wt_col_search;
 
 	WT_BSTAT_INCR(session, cursor_read_near);
 
+	__cursor_func_init(cbt, 1);
+
+	WT_ERR(btree->type == BTREE_ROW ?
+	    __wt_row_search(session, cbt, 0) :
+	    __wt_col_search(session, cbt, 0));
+
 	/*
-	 * We assume "range-prefix" semantics are more likely, so where we don't
-	 * have an exact match we prefer to return tree keys greater than the
-	 * search key, rather than less than the search key.
+	 * If we find a record that is not deleted, return it.
 	 *
-	 * If we find an exact match, or the search key is smaller than the tree
-	 * key, and the tree key has not been deleted, return the tree key.
+	 * If we have find a deleted key, first try to move to the next key in
+	 * the tree (bias for prefix searches).  Cursor next skips over deleted
+	 * records, so we don't have to test for them again.
+	 *
+	 * If there's no larger tree key, try to get the previous record (that
+	 * is, the last record in the tree).  If that fails, there's no record
+	 * to return.
 	 */
-	__cursor_func_init(cbt, 1);
-	WT_ERR(srch(session, cbt, 0));
-	if (cbt->compare == 0 || cbt->compare == 1)
-		if (!__cursor_invalid(cbt)) {
-			*exact = cbt->compare;
-			ret = __wt_kv_return(session, cbt, 1);
-			goto done;
-		}
-
-	/*
-	 * Otherwise, we have a deleted key, or the tree key is smaller than the
-	 * search key: move to the next key in the tree.  Cursor next skips over
-	 * deleted records, so we don't have to test for them.
-	 */
-	*exact = 1;
-	if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
-		goto done;
-
-	/*
-	 * If there's no larger tree key, we repeat the search (we've discarded
-	 * the original position information).   This time we'll take anything
-	 * that's not deleted, and we'll look for a previous record instead of
-	 * a subsequent record.  If we don't find a previous record, there's no
-	 * record to return, quit.
-	 */
-	__cursor_func_init(cbt, 1);
-	WT_ERR(srch(session, cbt, 0));
 	if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, 1);
-		goto done;
+	} else if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
+		*exact = 1;
+	else {
+		ret = __wt_btcur_last(cbt);
+		*exact = -1;
 	}
 
-	*exact = -1;
-	ret = __wt_btcur_prev(cbt);
-
-err:
-done:	__cursor_func_resolve(cbt, ret);
-
+err:	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
