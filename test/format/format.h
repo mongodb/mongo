@@ -76,6 +76,7 @@ typedef struct {
 	uint32_t c_key_min;
 	uint32_t c_leaf_node_max;
 	uint32_t c_leaf_node_min;
+	uint32_t c_multithread;
 	uint32_t c_ops;
 	uint32_t c_repeat_data_pct;
 	uint32_t c_rows;

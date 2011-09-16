@@ -76,12 +76,14 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\"%s\"],%s",
+	    "extensions=[\"%s\"]%s%s",
 	    g.progname, g.c_cache, ext,
+	    g.c_multithread ? "" : ",",
+	    g.c_multithread ? "" : "multithread",
+	    g.config_open == NULL ? "" : ",",
 	    g.config_open == NULL ? "" : g.config_open);
 
-	if ((ret =
-	    wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
+	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
