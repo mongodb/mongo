@@ -92,7 +92,7 @@ namespace mongo {
         }
 
         if ( maxOpsQueued ) {
-            log() << "biggest shard has unprocessed writebacks, waiting for completion of migrate" << endl;
+            log() << "biggest shard " << max.first << " has unprocessed writebacks, waiting for completion of migrate" << endl;
             return NULL;
         }
 
