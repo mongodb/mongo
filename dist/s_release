@@ -23,3 +23,6 @@ echo "Running 'dist/s_all' in the release tree"
 
 echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
 (cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)
+
+echo "Packing documentation into $RELEASE_DIR/$PKG-docs.tar.bz2"
+(cd "$RELEASE_DIR" && tar cf - $PKG/[A-Z][A-Z]* $PKG/docs | bzip2 -9 > $PKG-docs.tar.bz2)
