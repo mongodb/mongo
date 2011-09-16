@@ -119,7 +119,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.decode_value = self.decode_value_fix
 
     def cur_initial_conditions(self, tablename, npairs, tablekind):
-        if npairs >= 0xffff:
+        if npairs >= 0xffffffff:
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
         self.isrow = (tablekind == 'row')
@@ -148,13 +148,13 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.session = self.setUpSessionOpen(self.conn)
 
     def bits_to_triple(self, bits):
-        major = (bits >> 32) & 0xffff
+        major = (bits >> 32) & 0xffffffff
         minor = (bits >> 16) & 0xffff
         version = (bits) & 0xffff
         return [major, minor, version]
 
     def triple_to_bits(self, major, minor, version):
-        return ((major & 0xffff) << 32) | ((minor & 0xffff) << 16) | (version & 0xffff)
+        return ((major & 0xffffffff) << 32) | ((minor & 0xffff) << 16) | (version & 0xffff)
 
     def key_to_bits(self, key):
         pass
@@ -164,9 +164,10 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     ################   ROW   ################
     # TODO: something more sophisticated
     def encode_key_row(self, bits):
-        # Prepend 0's to make the string exactly len 16
+        # Prepend 0's to make the string exactly len 20
+        # 64 bits fits in 20 decimal digits
         result = str(bits)
-        result = '0000000000000000'[len(result):] + result
+        result = '00000000000000000000'[len(result):] + result
         return result
 
     # TODO: something more sophisticated
@@ -182,7 +183,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     ################   COL   ################
     def encode_key_col(self, bits):
         # 64 bit key
-        maj = ((bits >> 32) & 0xffff) + 1
+        maj = ((bits >> 32) & 0xffffffff) + 1
         min = (bits >> 16) & 0xffff
         return long((maj << 16) | min)
 
@@ -191,7 +192,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         return self.encode_key_row(bits)
 
     def decode_key_col(self, bits):
-        maj = ((bits << 16) & 0xffff) - 1
+        maj = ((bits << 16) & 0xffffffff) - 1
         min = bits & 0xffff
         return ((maj << 32) | (min << 16))
 
