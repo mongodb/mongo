@@ -317,7 +317,7 @@ namespace mongo {
 
     void ReplSetConfig::checkRsConfig() const {
         uassert(13132,
-                "nonmatching repl set name in _id field; check --replSet command line",
+                str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. " << cmdLine.ourSetName(),
                 _id == cmdLine.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
