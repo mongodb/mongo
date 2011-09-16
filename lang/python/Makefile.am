@@ -5,7 +5,7 @@ if DEBUG
 PY_SETUP_DEBUG = -g
 endif
 all-local: _wiredtiger.so
-$(PYSRC)/wiredtiger_wrap.c: $(top_builddir)/wiredtiger.h $(PYSRC)/wiredtiger.i
+$(PYSRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(PYSRC)/wiredtiger.i
 	@(cd $(PYSRC) && \
 	    $(SWIG) -python -threads -I$(abs_top_builddir) wiredtiger.i)
 

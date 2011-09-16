@@ -65,11 +65,7 @@ AM_CONDITIONAL([DEBUG], [test "$db_cv_enable_debug" = "yes"])
 # Python API
 if test "$db_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
-        AC_PATH_PROG([SWIG], [swig])
-	if test -z "$SWIG" ; then
-                AC_MSG_ERROR(
-		    [Cannot find 'swig'. Download it from http://www.swig.org])
-	fi
+        AC_PATH_PROG([SWIG], [swig], [swig])
 fi
 
 AM_TYPES
