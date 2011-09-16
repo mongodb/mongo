@@ -33,9 +33,8 @@ class test_cursor02(TestCursorTracker):
         create_args = keyformat + ',' + valformat + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
-        cursor = self.session.open_cursor(tablearg, None, 'raw=false')
-        self.cur_initial_conditions(cursor, ninitialentries, self.tablekind)
-        return cursor
+        self.cur_initial_conditions(self.table_name1, ninitialentries, self.tablekind)
+        return self.session.open_cursor(tablearg, None, None)
 
     def test_multiple_remove(self):
         """

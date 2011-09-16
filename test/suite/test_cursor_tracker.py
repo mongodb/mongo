@@ -86,7 +86,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     def __init__(self, testname):
         wttest.WiredTigerTestCase.__init__(self, testname)
-        self.cur_initial_conditions(None, 0, 'row')
+        self.cur_initial_conditions(None, 0, None)
 
     # traceapi and friends are used internally in this module
     def traceapi(self, s):
@@ -118,7 +118,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.decode_key = self.decode_key_fix
             self.decode_value = self.decode_value_fix
 
-    def cur_initial_conditions(self, cursor, npairs, tablekind):
+    def cur_initial_conditions(self, tablename, npairs, tablekind):
         if npairs >= 0xffff:
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
@@ -130,17 +130,22 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.curpos = -1
         self.curbits = 0xffffffffffff
         self.curremoved = False # K/V data in cursor does not correspond to active data
-        for i in range(npairs):
-            wtkey = self.encode_key(i << 32)
-            wtval = self.encode_value(i << 32)
-            self.traceapi('cursor.set_key(' + str(wtkey) + ')')
-            cursor.set_key(wtkey)
-            self.traceapi('cursor.set_value(' + str(wtval) + ')')
-            cursor.set_value(wtval)
-            self.traceapi('cursor.insert()')
-            cursor.insert()
-
-	# TODO: close, reopen the session!
+        if tablekind != None:
+            cursor = self.session.open_cursor('table:' + tablename, None, None)
+            for i in range(npairs):
+                wtkey = self.encode_key(i << 32)
+                wtval = self.encode_value(i << 32)
+                self.traceapi('cursor.set_key(' + str(wtkey) + ')')
+                cursor.set_key(wtkey)
+                self.traceapi('cursor.set_value(' + str(wtval) + ')')
+                cursor.set_value(wtval)
+                self.traceapi('cursor.insert()')
+                cursor.insert()
+            cursor.close()
+            self.pr('reopening the connection')
+            self.conn.close(None)
+            self.conn = self.setUpConnectionOpen(".")
+            self.session = self.setUpSessionOpen(self.conn)
 
     def bits_to_triple(self, bits):
         major = (bits >> 32) & 0xffff
