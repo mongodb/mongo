@@ -234,7 +234,10 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
                 self.curremoved = False
                 self.curbits = self.bitlist[newpos]
                 return True
-        self.curpos = -1
+        if newpos < 0:
+            self.curpos = -1
+        else:
+            self.curpos = length - 1
         self.nopos = True
         self.curremoved = False
         self.curbits = 0xffffffffffff
