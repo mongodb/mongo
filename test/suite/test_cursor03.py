@@ -53,7 +53,8 @@ class test_cursor03(TestCursorTracker):
         self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind)
         return self.session.open_cursor(tablearg, None, None)
 
-    def test_multiple_remove(self):
+    # TODO: test disabled so we can focus on errant test
+    def TODO_test_multiple_remove(self):
         """
         Test multiple deletes at the same place
         """
@@ -73,7 +74,8 @@ class test_cursor03(TestCursorTracker):
         self.cur_dump_here(cursor, 'after second next: ')
         cursor.close(None)
 
-    def test_insert_and_remove(self):
+    # TODO: test disabled so we can focus on errant test
+    def TODO_test_insert_and_remove(self):
         """
         Test a variety of insert, deletes and iteration
         """
@@ -96,7 +98,17 @@ class test_cursor03(TestCursorTracker):
         self.cur_check_backward(cursor, 2)
         self.cur_check_forward(cursor, 5)
         self.cur_check_backward(cursor, -1)
-        # TODO: print statements added to narrow a bug
+        self.cur_check_forward(cursor, -1)
+        self.cur_last(cursor)
+        self.cur_check_backward(cursor, -1)
+        cursor.close(None)
+
+    def test_minimal(self):
+        """
+        Test iteration through existing table
+        """
+        cursor = self.create_session_and_cursor()
+        self.cur_first(cursor)
         print('>>> before iterate forward to the end...')
         self.cur_check_forward(cursor, -1)
         print('>>> after iterate forward to the end...')
