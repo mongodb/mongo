@@ -275,7 +275,6 @@ namespace mongo {
                     log() << "replSet reconfig error with member: " << m.h.toString() << " arbiterOnly cannot change. remove and readd the member instead " << rsLog;
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
-                uassert(14827, "arbiters cannot have tags", !m.arbiterOnly || m.tags.size() == 0 );
             }
             if( m.h.isSelf() )
                 me++;
@@ -518,6 +517,7 @@ namespace mongo {
                     for (BSONObj::iterator c = t.begin(); c.more(); c.next()) {
                         m.tags[(*c).fieldName()] = (*c).String();
                     }
+                    uassert(14827, "arbiters cannot have tags", !m.arbiterOnly || m.tags.empty() );
                 }
                 m.check();
             }
