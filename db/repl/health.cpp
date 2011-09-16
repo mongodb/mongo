@@ -372,8 +372,10 @@ namespace mongo {
             bb.append("health", 1.0);
             bb.append("state", (int)myState.s);
             bb.append("stateStr", myState.toString());
-            bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
-            bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
+            if (!_self->config().arbiterOnly) {
+                bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
+                bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
+            }
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -397,8 +399,10 @@ namespace mongo {
                 bb.append("stateStr", m->state().toString());
             }
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
-            bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
-            bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            if (!m->config().arbiterOnly) {
+                bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
+                bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            }
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
             bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
