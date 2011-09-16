@@ -1124,6 +1124,7 @@ namespace mongo {
 
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get_w(ns);
+        bool autoDedup = c->autoDedup();
 
         if( c->ok() ) {
             set<DiskLoc> seenObjects;
@@ -1184,7 +1185,7 @@ namespace mongo {
                 DiskLoc loc = c->currLoc();
 
                 // TODO Maybe this is unnecessary since we have seenObjects
-                if ( c->getsetdup( loc ) ) {
+                if ( c->getsetdup( loc ) && autoDedup ) {
                     c->advance();
                     continue;
                 }
@@ -1218,7 +1219,7 @@ namespace mongo {
 
                     if ( multi ) {
                         c->advance(); // go to next record in case this one moves
-                        if ( seenObjects.count( loc ) )
+                        if ( autoDedup && seenObjects.count( loc ) )
                             continue;
                     }
 
@@ -1265,7 +1266,8 @@ namespace mongo {
                         BSONObj newObj = mss->createNewFromMods();
                         checkTooLarge(newObj);
                         DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
-                        if ( newLoc != loc || modsIsIndexed ) {
+                        if ( newLoc != loc || modsIsIndexed ){
+                            // log() << "Moved obj " << newLoc.obj()["_id"] << " from " << loc << " to " << newLoc << endl;
                             // object moved, need to make sure we don' get again
                             seenObjects.insert( newLoc );
                         }

@@ -514,6 +514,8 @@ namespace mongo {
          */
         virtual bool getsetdup(DiskLoc loc) { return _c->getsetdup( loc ); }
 
+        virtual bool autoDedup() const { return _c->autoDedup(); }
+
         virtual bool modifiedKeys() const { return _mps->modifiedKeys(); }
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
