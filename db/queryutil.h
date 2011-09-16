@@ -311,6 +311,8 @@ namespace mongo {
         /** @return a client readable representation of 'this' */
         BSONObj obj() const;
         
+        const IndexSpec& getSpec(){ return _indexSpec; }
+
         /**
          * @return true iff the provided document matches valid ranges on all
          * of this FieldRangeVector's fields, which is the case iff this document
