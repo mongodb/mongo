@@ -10,14 +10,13 @@ class SerialArg:
 		self.sized = sized
 
 class Serial:
-	def __init__(self, name, op, spin, args):
+	def __init__(self, name, op, args):
 		self.name = name
 		self.op = op
-		self.spin = spin
 		self.args = args
 
 msgtypes = [
-Serial('col_append', 'WT_WORKQ_FUNC', 1, [
+Serial('col_append', 'WT_WORKQ_FUNC', [
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
@@ -26,17 +25,17 @@ Serial('col_append', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('cache_read', 'WT_WORKQ_READ', 0, [
+Serial('cache_read', 'WT_WORKQ_READ', [
 		SerialArg('WT_PAGE *', 'parent'),
 		SerialArg('WT_REF *', 'parent_ref'),
 		SerialArg('int', 'dsk_verify'),
 	 ]),
 
-Serial('evict_file', 'WT_WORKQ_EVICT', 0, [
+Serial('evict_file', 'WT_WORKQ_EVICT', [
 		SerialArg('int', 'close_method'),
 	]),
 
-Serial('insert', 'WT_WORKQ_FUNC', 1, [
+Serial('insert', 'WT_WORKQ_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
@@ -47,13 +46,13 @@ Serial('insert', 'WT_WORKQ_FUNC', 1, [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('row_key', 'WT_WORKQ_FUNC', 1, [
+Serial('row_key', 'WT_WORKQ_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
 	]),
 
-Serial('update', 'WT_WORKQ_FUNC', 1, [
+Serial('update', 'WT_WORKQ_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
@@ -124,7 +123,7 @@ typedef struct {
 		else:
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
 	f.write('\tret = __wt_session_serialize_func(session,\n')
-	f.write('\t    ' + entry.op + ', ' + str(entry.spin) +
+	f.write('\t    ' + entry.op +
 	    ', __wt_' + entry.name + '_serial_func, args);\n\n')
 	for l in entry.args:
 		if l.sized:

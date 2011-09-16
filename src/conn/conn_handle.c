@@ -8,16 +8,15 @@
 #include "wt_internal.h"
 
 /*
- * __wt_connection_config --
- *	Set configuration for a just-created WT_CONNECTION_IMPL handle.
+ * __wt_connection_init --
+ *	Structure initialization for a just-created WT_CONNECTION_IMPL handle.
  */
 int
-__wt_connection_config(WT_CONNECTION_IMPL *conn)
+__wt_connection_init(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
 	session = &conn->default_session;
-
 						/* Global mutex */
 	WT_RET(__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
 
@@ -39,18 +38,16 @@ __wt_connection_config(WT_CONNECTION_IMPL *conn)
  * __wt_connection_destroy --
  *	Destroy the connection's underlying WT_CONNECTION_IMPL structure.
  */
-int
+void
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = &conn->default_session;
-	ret = 0;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
-		return (0);
+		return;
 
 	if (conn->mtx != NULL)
 		(void)__wt_mtx_destroy(session, conn->mtx);
@@ -63,5 +60,4 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_free(session, conn->stats);
 
 	__wt_free(NULL, conn);
-	return (ret);
 }

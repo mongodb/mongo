@@ -199,7 +199,7 @@ extern void __wt_page_out(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
 extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
-extern int __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
@@ -232,7 +232,7 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE **pagep);
 extern void __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force);
 extern void __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn);
-extern int __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
 extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
     WT_PAGE *page,
@@ -268,7 +268,7 @@ extern int __wt_tree_np(WT_SESSION_IMPL *session,
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int op);
-extern int __wt_col_append_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_col_append_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
@@ -282,7 +282,7 @@ extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     const void *key,
     uint32_t size,
     WT_IKEY **ikeyp);
-extern int __wt_row_key_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_row_key_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
@@ -290,16 +290,16 @@ extern int __wt_row_insert_alloc( WT_SESSION_IMPL *session,
     WT_ITEM *key,
     u_int skipdepth,
     WT_INSERT **insp);
-extern int __wt_insert_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp);
-extern int __wt_update_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
-extern int __wt_connection_config(WT_CONNECTION_IMPL *conn);
-extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
+extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
     const char *home,
     mode_t mode);
@@ -616,8 +616,7 @@ extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
 extern int __wt_session_serialize_func(WT_SESSION_IMPL *session,
     wq_state_t op,
-    int spin,
-    int (*func)(WT_SESSION_IMPL *),
+    void (*func)(WT_SESSION_IMPL *),
     void *args);
 extern void __wt_session_serialize_wrapup(WT_SESSION_IMPL *session,
     WT_PAGE *page,

@@ -50,7 +50,7 @@ __wt_col_append_serial(
 	args->skipdepth = skipdepth;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_FUNC, 1, __wt_col_append_serial_func, args);
+	    WT_WORKQ_FUNC, __wt_col_append_serial_func, args);
 
 	if (!args->new_inslist_taken)
 		__wt_free(session, args->new_inslist);
@@ -121,7 +121,7 @@ __wt_cache_read_serial(
 	args->dsk_verify = dsk_verify;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_READ, 0, __wt_cache_read_serial_func, args);
+	    WT_WORKQ_READ, __wt_cache_read_serial_func, args);
 
 	return (ret);
 }
@@ -153,7 +153,7 @@ __wt_evict_file_serial(
 	args->close_method = close_method;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_EVICT, 0, __wt_evict_file_serial_func, args);
+	    WT_WORKQ_EVICT, __wt_evict_file_serial_func, args);
 
 	return (ret);
 }
@@ -225,7 +225,7 @@ __wt_insert_serial(
 	args->skipdepth = skipdepth;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_FUNC, 1, __wt_insert_serial_func, args);
+	    WT_WORKQ_FUNC, __wt_insert_serial_func, args);
 
 	if (!args->new_inslist_taken)
 		__wt_free(session, args->new_inslist);
@@ -299,7 +299,7 @@ __wt_row_key_serial(
 	args->ikey = ikey;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_FUNC, 1, __wt_row_key_serial_func, args);
+	    WT_WORKQ_FUNC, __wt_row_key_serial_func, args);
 
 	return (ret);
 }
@@ -354,7 +354,7 @@ __wt_update_serial(
 	args->upd = upd;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_WORKQ_FUNC, 1, __wt_update_serial_func, args);
+	    WT_WORKQ_FUNC, __wt_update_serial_func, args);
 
 	if (!args->new_upd_taken)
 		__wt_free(session, args->new_upd);

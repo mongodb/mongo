@@ -75,7 +75,8 @@ struct __wt_session_impl {
 
 					/* WT_SESSION_IMPL workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
-	int     (*wq_func)(WT_SESSION_IMPL *);	/* Function */
+	void    (*wq_func)		/* Function */
+		    (WT_SESSION_IMPL *);
 	void	 *wq_args;		/* Function argument */
 	int	  wq_sleeping;		/* Thread is blocked */
 	int	  wq_ret;		/* Return value */
@@ -155,8 +156,8 @@ struct __wt_connection_impl {
 	WT_FH	   *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
-	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor)
-	    compqh;			/* Locked: compressor list */
+					/* Locked: compressor list */
+	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor) compqh;
 
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
@@ -221,6 +222,7 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
  */
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_ERR_QUIET					0x00000002
+#define	WT_MULTITHREAD					0x00000004
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_EVICT					0x00000004
 #define	WT_REC_LOCKED					0x00000002

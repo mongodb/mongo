@@ -192,7 +192,7 @@ __col_insert_alloc(
  * __wt_col_append_serial_func --
  *	Server function to append an WT_INSERT entry to the tree.
  */
-int
+void
 __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
@@ -255,5 +255,4 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	}
 
 	__wt_session_serialize_wrapup(session, page, 0);
-	return (0);
 }

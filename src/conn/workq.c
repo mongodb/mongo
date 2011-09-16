@@ -32,7 +32,7 @@ __wt_workq_srvr(void *arg)
 				break;
 			case WT_WORKQ_FUNC:
 				request = 1;
-				(void)session->wq_func(session);
+				session->wq_func(session);
 				break;
 			case WT_WORKQ_READ:
 				/*
@@ -56,8 +56,7 @@ __wt_workq_srvr(void *arg)
 				session->wq_state = WT_WORKQ_READ_SCHED;
 
 				/* Queue the request for the read server. */
-				if (session->wq_func(session) != 0)
-					break;
+				session->wq_func(session);
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				call_read = 1;
@@ -76,8 +75,7 @@ __wt_workq_srvr(void *arg)
 				session->wq_state = WT_WORKQ_EVICT_SCHED;
 
 				/* Queue the request for the eviction server. */
-				if (session->wq_func(session) != 0)
-					break;
+				session->wq_func(session);
 				/* FALLTHROUGH */
 			case WT_WORKQ_EVICT_SCHED:
 				call_evict = 1;

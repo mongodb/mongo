@@ -304,6 +304,8 @@ minprefix
 msg
 mtx
 multiprocess
+multithread
+multithreaded
 mutex
 mutexes
 namespaces

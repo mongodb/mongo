@@ -121,7 +121,7 @@ __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
  *	Read/allocation serialization function called when a page-in requires
  *	allocation or a read.
  */
-int
+void
 __wt_cache_read_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
@@ -137,12 +137,13 @@ __wt_cache_read_serial_func(WT_SESSION_IMPL *session)
 	/* Find an empty slot and enter the read request. */
 	WT_READ_REQ_FOREACH(rr, rr_end, cache)
 		if (rr->session == NULL) {
-			__cache_read_req_set
-			    (session, rr, parent, ref, dsk_verify);
-			return (0);
+			__cache_read_req_set(
+			    session, rr, parent, ref, dsk_verify);
+			return;
 		}
+
 	__wt_errx(session, "read server request table full");
-	return (WT_ERROR);
+	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
 }
 
 /*

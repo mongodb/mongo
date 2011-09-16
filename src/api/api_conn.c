@@ -411,7 +411,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	session->event_handler = event_handler;
 
-	WT_ERR(__wt_connection_config(conn));
+	WT_ERR(__wt_connection_init(conn));
 
 	WT_ERR(
 	   __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
@@ -437,6 +437,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			goto err;
 	}
 #endif
+	WT_ERR(__wt_config_gets(session, cfg, "multithread", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_MULTITHREAD);
 
 	WT_ERR(__wt_connection_open(conn, home, 0644));
 	opened = 1;
@@ -469,7 +472,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 err:		if (opened)
 			(void)__wt_connection_close(conn);
 		else
-			(void)__wt_connection_destroy(conn);
+			__wt_connection_destroy(conn);
 	}
 	__wt_buf_free(session, &expath);
 	__wt_buf_free(session, &exconfig);

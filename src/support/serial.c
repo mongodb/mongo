@@ -33,7 +33,7 @@
  */
 int
 __wt_session_serialize_func(WT_SESSION_IMPL *session,
-    wq_state_t op, int spin, int (*func)(WT_SESSION_IMPL *), void *args)
+    wq_state_t op, void (*func)(WT_SESSION_IMPL *), void *args)
 {
 	int done;
 
@@ -42,19 +42,31 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 *	set a function/argument pair in the WT_SESSION_IMPL handle,
 	 *	flush memory,
 	 *	update the WT_SESSION_IMPL workq state, and
-	 *	spins or blocks.
+	 *	spin or block.
 	 *
 	 * The workQ thread notices the state change and calls the serialization
 	 * function.
-	 *
+	 */
+	session->wq_args = args;
+	session->wq_func = func;
+	session->wq_sleeping = op == WT_WORKQ_FUNC ? 0 : 1;
+
+	/*
+	 * If we're multithreaded, the workQ has to schedule all functions; if
+	 * not multithreaded, functions are called directly, only communication
+	 * with other threads goes through serialization.
+	 */
+	if (!F_ISSET(S2C(session), WT_MULTITHREAD) && op == WT_WORKQ_FUNC) {
+		func(session);
+		return (session->wq_ret);
+	}
+
+	/*
 	 * The first memory flush ensures all supporting information is written
 	 * before the wq_state field (which makes the entry visible to the workQ
 	 * thread).  No second memory flush is required, the wq_state field is
 	 * declared volatile.
 	 */
-	session->wq_args = args;
-	session->wq_func = func;
-	session->wq_sleeping = !spin;
 	WT_MEMORY_FLUSH;
 	session->wq_state = op;
 
@@ -63,7 +75,7 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 * satisfied), or block until its mutex is unlocked by another thread
 	 * when the operation has completed.
 	 */
-	if (spin) {
+	if (op == WT_WORKQ_FUNC) {
 		/*
 		 * !!!
 		 * Don't do arithmetic comparisons (even equality) on enum's,

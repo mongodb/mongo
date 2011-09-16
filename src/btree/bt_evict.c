@@ -154,7 +154,7 @@ __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
  *	Eviction serialization function called when a tree is being flushed
  *	or closed.
  */
-int
+void
 __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
@@ -169,10 +169,11 @@ __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
 			__evict_req_set(session, er, close_method);
-			return (0);
+			return;
 		}
+
 	__wt_errx(session, "eviction server request table full");
-	return (WT_ERROR);
+	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
 }
 
 /*

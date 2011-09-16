@@ -330,7 +330,7 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
  * __wt_row_key_serial_func --
  *	Server function to instantiate a key during a row-store search.
  */
-int
+void
 __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_IKEY *ikey;
@@ -351,5 +351,4 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 		rip->key = ikey;
 
 	__wt_session_serialize_wrapup(session, NULL, 0);
-	return (0);
 }
