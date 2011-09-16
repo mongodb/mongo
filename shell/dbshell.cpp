@@ -308,6 +308,9 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 #endif
 
     char * ret = linenoise( prompt );
+	if ( inMultiLine && !ret && errno == EAGAIN ) {
+		gotInterrupted = 1;
+	}
     signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;
