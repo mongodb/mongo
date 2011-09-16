@@ -1075,6 +1075,7 @@ namespace mongo {
 
         /** for debugging only */
         const DiskLoc getBucket() const { return bucket; }
+        int getKeyOfs() const { return keyOfs; }
 
         // just for unit tests
         virtual bool curKeyHasChild() = 0;

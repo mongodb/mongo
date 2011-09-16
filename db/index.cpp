@@ -102,7 +102,16 @@ namespace mongo {
         // for geo:
         virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
         virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
-            typename BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            recordLoc = DiskLoc();
+            const BtreeBucket<V>* bucket = thisLoc.btree<V>();
+            int n = bucket->nKeys();
+
+            if( pos < 0 || pos >= n || n == 0xffff /* bucket deleted */ || ! bucket->isUsed( pos ) ){
+                // log() << "Pos: " << pos << " n " << n << endl;
+                return;
+            }
+
+            typename BtreeBucket<V>::KeyNode kn = bucket->keyNode(pos);
             key = kn.key.toBson();
             recordLoc = kn.recordLoc;
         }
