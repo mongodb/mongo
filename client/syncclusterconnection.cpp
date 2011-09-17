@@ -238,6 +238,9 @@ namespace mongo {
                     return cursor;
                 log() << "query failed to: " << _conns[i]->toString() << " no data" << endl;
             }
+            catch ( std::exception& e ) {
+                log() << "query failed to: " << _conns[i]->toString() << " exception: " << e.what() << endl;
+            }
             catch ( ... ) {
                 log() << "query failed to: " << _conns[i]->toString() << " exception" << endl;
             }
