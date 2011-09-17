@@ -744,7 +744,7 @@ if "uname" in dir(os):
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
     env.Append( LIBS=["ssl"] )
-    if darwin:
+    if darwin or linux:
         env.Append( LIBS=["crypto"] )
 
 try:
