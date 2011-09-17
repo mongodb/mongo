@@ -1254,6 +1254,8 @@ namespace mongo {
                         if ( modsIsIndexed ) {
                             seenObjects.insert( loc );
                         }
+
+                        d->paddingFits();
                     }
                     else {
                         if ( rs )
