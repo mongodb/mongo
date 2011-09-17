@@ -1164,10 +1164,10 @@ namespace mongo {
                 tot++;
                 if( dur::notesThisLock == 0 )
                     zeroes++;
-                else 
-                    log() << "lockd " << endl;
                 if( tot > 1000 ) {
-                    assert( zeroes > tot / 2 );
+                    static int n;
+                    DEV if( n++ == 0 ) 
+                        log() << "warning already writable too often" << endl;
                 }
             }
         }
