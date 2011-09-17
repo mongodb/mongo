@@ -370,6 +370,8 @@ namespace mongo {
                 return -1;
             }
 
+            auth();
+
             _sleep = getParam( "sleep" , _sleep );
             _all = hasParam( "all" );
             if ( _many )
