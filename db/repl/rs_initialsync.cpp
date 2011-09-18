@@ -192,6 +192,7 @@ namespace mongo {
         isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
         OpTime mvoptime = minValid["ts"]._opTime();
         assert( !mvoptime.isNull() );
+        assert( mvoptime >= startingTS );
 
         /* apply relevant portion of the oplog
         */
