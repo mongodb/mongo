@@ -491,7 +491,7 @@ namespace mongo {
         void _syncThread();
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
-        void syncApply(const BSONObj &o);
+        bool syncApply(const BSONObj &o);
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);

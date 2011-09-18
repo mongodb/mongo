@@ -1356,7 +1356,8 @@ namespace mongo {
                 logOp( "i", ns, no );
             return UpdateResult( 0 , 0 , 1 , no );
         }
-        return UpdateResult( 0 , 0 , 0 );
+
+        return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {

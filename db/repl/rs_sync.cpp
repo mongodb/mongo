@@ -32,17 +32,19 @@ namespace mongo {
         }
     }
 
-    /* apply the log op that is in param o */
-    void ReplSetImpl::syncApply(const BSONObj &o) {
+    /* apply the log op that is in param o 
+       @return bool failedUpdate
+    */
+    bool ReplSetImpl::syncApply(const BSONObj &o) {
         const char *ns = o.getStringField("ns");
         if ( *ns == '.' || *ns == 0 ) {
             blank(o);
-            return;
+            return false;
         }
 
         Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
-        applyOperation_inlock(o);
+        return applyOperation_inlock(o);
     }
 
     /* initial oplog application, during initial sync, after cloning.
@@ -57,6 +59,7 @@ namespace mongo {
 
         const string hn = source->h().toString();
         OplogReader r;
+        OplogReader missingObjReader;
         try {
             if( !r.connect(hn) ) {
                 log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
@@ -130,9 +133,30 @@ namespace mongo {
                         throw DBException("primary changed",0);
                     }
 
-                    if( ts >= applyGTE ) {
-                        // optimes before we started copying need not be applied.
-                        syncApply(o);
+                    if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
+                        bool failedUpdate = syncApply(o);
+                        if( failedUpdate ) {
+                            // we don't have the object yet, which is possible on initial sync.  get it.
+                            log() << "replSet info adding missing object" << endl; // rare enough we can log
+                            if( !missingObjReader.connect(hn) ) { // ok to call more than once
+                                log() << "replSet initial sync fails, couldn't connect to " << hn << endl;
+                                return false;
+                            }
+                            const char *ns = o.getStringField("ns");
+                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")[_id]).obj(); // might be more than just _id in the update criteria
+                            BSONObj missingObj = missingObjReader.findOne(
+                                ns, 
+                                query );
+                            assert( !missingObj.isEmpty() );
+                            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+                            assert( !d.isNull() );
+                            // now reapply the update from above
+                            bool failed = syncApply(o);
+                            if( failed ) {
+                                log() << "replSet update still fails after adding missing object " << ns << endl;
+                                assert(false);
+                            }
+                        }
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
                 }
