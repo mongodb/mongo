@@ -370,8 +370,6 @@ namespace mongo {
                 return -1;
             }
 
-            auth();
-
             _sleep = getParam( "sleep" , _sleep );
             _all = hasParam( "all" );
             if ( _many )
@@ -424,6 +422,8 @@ namespace mongo {
             bool showHeaders = ! hasParam( "noheaders" );
             int rowCount = getParam( "rowcount" , 0 );
             int rowNum = 0;
+
+            auth();
 
             BSONObj prev = stats();
             if ( prev.isEmpty() )
