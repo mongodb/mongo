@@ -97,17 +97,6 @@ namespace mongo {
         return true;
     }
 
-    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
-        AuthenticationInfo *ai = cc().getAuthenticationInfo();
-
-        if ( readOnly ) {
-            ai->authorizeReadOnly( cc().database()->name.c_str() , user );
-        }
-        else {
-            ai->authorize( cc().database()->name.c_str() , user );
-        }
-    }
-
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         AuthenticationInfo *ai = cc().getAuthenticationInfo();
         ai->logout(dbname);
