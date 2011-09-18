@@ -35,5 +35,7 @@ namespace mongo {
         virtual ~ClientBasic(){}
         virtual const AuthenticationInfo * getAuthenticationInfo() const = 0;
         virtual HostAndPort getRemote() const = 0;
+
+        static ClientBasic* getCurrent();
     };
 }

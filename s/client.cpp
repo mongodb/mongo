@@ -84,6 +84,11 @@ namespace mongo {
         return info;
     }
 
+    ClientBasic* ClientBasic::getCurrent() {
+        return ClientInfo::get();
+    }
+
+
     void ClientInfo::disconnect() {
         // should be handled by TL cleanup
         _lastAccess = 0;

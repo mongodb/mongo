@@ -464,6 +464,10 @@ namespace mongo {
         }
     }
 
+    ClientBasic* ClientBasic::getCurrent() {
+        return currentClient.get();
+    }
+
     class HandshakeCmd : public Command {
     public:
         void help(stringstream& h) const { h << "internal"; }
