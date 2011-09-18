@@ -16,9 +16,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include "../pch.h"
 #include "writeback_listener.h"
 #include "../db/security.h"
+#include "../db/client_common.h"
 
 namespace mongo {
 
@@ -27,7 +30,7 @@ namespace mongo {
      * 1 per client socket
      * currently implemented with a thread local
      */
-    class ClientInfo {
+    class ClientInfo : public ClientBasic {
     public:
         ClientInfo();
         ~ClientInfo();

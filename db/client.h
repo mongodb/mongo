@@ -30,6 +30,7 @@
 #include "lasterror.h"
 #include "stats/top.h"
 #include "../util/concurrency/threadlocal.h"
+#include "../db/client_common.h"
 
 namespace mongo {
 
@@ -46,7 +47,7 @@ namespace mongo {
     typedef long long ConnectionId;
 
     /** the database's concept of an outside "client" */
-    class Client : boost::noncopyable {
+    class Client : public ClientBasic {
     public:
         class Context;
 
@@ -104,6 +105,7 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         string toString() const;
         void gotHandshake( const BSONObj& o );
+        HostAndPort getRemote() const { assert( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
