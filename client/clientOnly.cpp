@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "../client/dbclient.h"
 #include "../db/cmdline.h"
+#include "../db/client_common.h"
 #include "../s/shard.h"
 
 namespace mongo {
@@ -75,5 +76,10 @@ namespace mongo {
         assert(0);
         return "";
     }
+
+    ClientBasic* ClientBasic::getCurrent() {
+        return 0;
+    }
+
 
 }
