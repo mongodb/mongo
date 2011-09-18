@@ -194,7 +194,7 @@ namespace mongo {
         assert( !mvoptime.isNull() );
         assert( mvoptime >= startingTS );
 
-        /* apply relevant portion of the oplog
+        /* apply startingTS..mvoptime portion of the oplog
         */
         {
             isyncassert( str::stream() << "initial sync source must remain readable throughout our initial sync [2] state now: " << source->state().toString() , source->state().readable() );

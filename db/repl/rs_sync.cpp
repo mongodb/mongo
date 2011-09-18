@@ -116,9 +116,6 @@ namespace mongo {
                 {
                     ts = o["ts"]._opTime();
 
-                    /* if we have become primary, we dont' want to apply things from elsewhere
-                        anymore. assumePrimary is in the db lock so we are safe as long as
-                        we check after we locked above. */
                     if( (source->state() != MemberState::RS_PRIMARY &&
                             source->state() != MemberState::RS_SECONDARY) ||
                             replSetForceInitialSyncFailure ) {
