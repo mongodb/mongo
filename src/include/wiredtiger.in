@@ -612,13 +612,23 @@ struct wt_session {
 
 	/*! Salvage a table.
 	 *
-	 * @todo describe salvage
+	 * Salvage rebuilds the file, or files of which a table is comprised,
+	 * discarding any corrupted file blocks.
+	 *
+	 * Previously deleted records may re-appear, and inserted records may
+	 * disappear, when salvage is done, so salvage should not be run
+	 * unless it is known to be necessary.  Normally, salvage should be
+	 * called after a file or table has been corrupted, as reported by the
+	 * WT_SESSION::verify method.
+	 *
+	 * Files are rebuilt in place, the salvage method overwrites the
+	 * existing files.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->salvage
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to salvage
+	 * @param name the uri of the file or table to salvage
 	 * @configstart{session.salvage, see dist/api_data.py}
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files. The value must be a boolean flag.,\c false}
@@ -669,13 +679,15 @@ struct wt_session {
 
 	/*! Verify a table.
 	 *
-	 * @todo describe verify
+	 * Verify reports if a file, or the files of which a table is
+	 * comprised, have been corrupted.  The WT_SESSION::salvage method
+	 * can be used to repair a corrupted file,
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->verify
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to verify
+	 * @param name the uri of the file or table to verify
 	 * @configempty{session.verify, see dist/api_data.py}
 	 * @errors
 	 */
