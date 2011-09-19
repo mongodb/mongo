@@ -76,11 +76,9 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\"%s\"]%s%s",
+	    "extensions=[\"%s\"],%s,%s",
 	    g.progname, g.c_cache, ext,
-	    g.c_multithread ? "" : ",",
-	    g.c_multithread ? "" : "multithread",
-	    g.config_open == NULL ? "" : ",",
+	    g.c_multithread ? "multithread" : "",
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
@@ -132,30 +130,31 @@ wts_startup(void)
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
 	    "internal_node_min=%d,internal_node_max=%d,"
-	    "leaf_node_min=%d,leaf_node_max=%d,"
-	    "split_min"
-	    "%s",
+	    "leaf_node_min=%d,leaf_node_max=%d,split_min",
 	    (g.c_file_type == ROW) ? "u" : "r",
 	    1U << g.c_intl_node_min,
 	    1U << g.c_intl_node_max,
 	    1U << g.c_leaf_node_min,
-	    1U << g.c_leaf_node_max,
-	    g.c_bzip ? ",block_compressor=\"bzip2_compress\"" : "");
+	    1U << g.c_leaf_node_max);
+
+	if (g.c_bzip)
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2_compress\"");
 
 	switch (g.c_file_type) {
 	case FIX:
-		p += snprintf(
-		    p, (size_t)(end - p), ",value_format=%dt", g.c_bitcnt);
+		p += snprintf(p, (size_t)(end - p),
+		    ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(
-			    p, (size_t)(end - p), ",huffman_key=english");
+			p += snprintf(p, (size_t)(end - p),
+			    ",huffman_key=english");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
-			p += snprintf(
-			    p, (size_t)(end - p), ",huffman_value=english");
+			p += snprintf(p, (size_t)(end - p),
+			    ",huffman_value=english");
 		break;
 	}
 
