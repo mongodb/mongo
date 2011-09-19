@@ -1,26 +1,133 @@
 /*! @page cursors Cursors
 
-Most common operations in WiredTiger are performed using WT_CURSOR handles.  A cursor includes:
+Common operations in WiredTiger are performed using WT_CURSOR handles.
+A cursor includes:
 
 - a position within a data source
-- access to key and value fields
+- getter/setters for key and value fields
 - encoding of fields to store in the data source
-- methods to navigate around and iterate through the data
+- methods to navigate within and iterate through the data
+
+Cursors are created using the WT_SESSION::open_cursor method.   The
+following  are examples from the example program @ex_ref{ex_cursor.c}:
+
+@dontinclude ex_cursor.c
+@skipline open_cursor
+@until close
+
+@skipline open_cursor
+@until close
+
+@skipline open_cursor
+@until close
+
+In addition to simple data sources, cursors in WiredTiger are used to
+access projections and even created data sources such as the run-time
+statistics:
+
+@dontinclude ex_cursor.c
+@skipline statistics:
+@until close
 
 @section cursor_ranges Positioning a Cursor
 
-- how to put a cursor where you want it
-- first, last, next, prev
-- position after an insert
-- position after errors
+Cursors may be positioned at the beginning of the data source, the end
+of the data source, at an exact key within the data source, and near a
+key within the data source.  
 
-@todo write text
+To position a cursor at the beginning or end of the data source, use the
+WT_CURSOR::first and WT_CURSOR::last methods:
 
-"On failure", cursor position is undetermined.  Apps that care need to either dup the cursor, or we could offer a config string that dups on all ops for you...
+@dontinclude ex_cursor.c
+@skipline first
+@until }
+@until }
+
+@dontinclude ex_cursor.c
+@skipline last
+@until }
+@until }
+
+To move a cursor forward or backward in the data source, use the cursor
+WT_CURSOR::next and WT_CURSOR::prev methods:
+
+@dontinclude ex_cursor.c
+@skipline forward_traversal
+@until }
+@until }
+
+@dontinclude ex_cursor.c
+@skipline backward_traversal
+@until }
+@until }
+
+If the WT_CURSOR::next and WT_CURSOR::prev methods are called on cursors
+without a position in the data source, they are positioned at the
+beginning or end of the data source, respectively.
+
+To position a cursor at a specific location in the data source, use the
+WT_CURSOR::search method:
+
+@dontinclude ex_cursor.c
+@skipline search
+@until }
+
+To position a cursor at or near a location in the data source, use the
+WT_CURSOR::search_near method:
+
+@dontinclude ex_cursor.c
+@skipline search_near
+@until }
+@until }
 
 @section cursor_writes Inserting and Updating
 
-@todo describe insert, update, append, insert-overwrite
+To insert new data, and optionally update existing data, using a cursor,
+use the WT_CURSOR::insert method:
+
+@dontinclude ex_cursor.c
+@skipline cursor_insert
+@until }
+
+By default, when updating an underlying row-store, the WT_CURSOR::insert
+method returns and error if the key already exists in the store,
+otherwise it inserts a new key/value pair.   If the
+<code>overwrite</code> configuration string is specified to the
+WT_SESSION::open_cursor method, any previously existing key/value pair
+is updated to the new value rather than returning an error.
+
+By default, when updating an underlying column-store, the
+WT_CURSOR::insert method ignores the application's key value, instead,
+it allocates an unused record number in the store and returns that
+record number in the application's key.  If the <code>overwrite</code>
+configuration string is specified to the WT_SESSION::open_cursor method,
+the application's key value will be used to specify the record number
+being inserted or updated.
+
+To update existing data using a cursor, use the WT_CURSOR::update method:
+
+@dontinclude ex_cursor.c
+@skipline cursor_update
+@until }
+
+In all cases, calling WT_CURSOR::update where the key does not already
+exist in the store will return an error.
+
+To remove existing data using a cursor, use the WT_CURSOR::remove method:
+
+@dontinclude ex_cursor.c
+@skipline cursor_remove
+@until }
+
+
+@section cursor_error Cursor Position after Error
+
+After any cursor handle method failure, the cursor's position is
+undetermined.  Applications that cannot re-position the cursor after
+failure must duplicate the cursor before calling a cursor method that
+will attempt to re-position the cursor.  <b>Cursor duplication is not
+yet available in WiredTiger.</b>
+
 
 @section cursor_types Cursor Types
 
@@ -42,6 +149,27 @@ The following are builtin cursor types:
 
 @subsection cursor_statistics Statistics Cursors
 
+Cursors can return run-time statistics about the WiredTiger engine as
+well as the underlying row- and column-store files.  Each cursor
+iteration sets three separate values: the entry's unsigned 64-bit
+integral value, a printable string version of that integral value, and
+a string description of the entry.
+
+To return run-time statistics about the WiredTiger engine, open a
+statistics cursor:
+
+@dontinclude ex_stat.c
+@skipline statistics(WT_SESSION *session)
+@until }
+@until }
+
+To return run-time statistics about an underlying file, open a statistics
+cursor on the file object:
+
+@dontinclude ex_stat.c
+@skipline statistics_file(WT_SESSION *session, const char *filename)
+@until }
+
 @section cursor_projections Projections
 
 Cursors on tables, column groups, indices and files can return a subset of
@@ -53,24 +181,8 @@ This is particularly useful with index cursors, because if all columns in the
 projection are available in the index (including primary key columns, which are
 the values of the index), there is no need to access any column groups.
 
-@section cursor_ranges Restricting the Range of a Scan
+@section cursor_restriction Restricting the Range of a Scan
 
-@todo explain how to do a range scan
-
-@section cursor_examples Code Samples
-
-The code below is taken from the complete example program @ex_ref{ex_cursor.c}.
-
-@todo expand cursor example description
-
-@dontinclude ex_cursor.c
-
-@skipline open_cursor
-
-@skipline open_cursor
-
-@skipline open_cursor
-
-@skipline open_cursor
+<b>Range scan restriction is not yet available in WiredTiger.</b>
 
  */
