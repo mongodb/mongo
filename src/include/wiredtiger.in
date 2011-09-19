@@ -1049,12 +1049,13 @@ int wiredtiger_open(const char *home,
     WT_EVENT_HANDLER *errhandler, const char *config,
     WT_CONNECTION **connectionp);
 
-/*! Get information about an error as a string.
+/*! Return information about an error as a string; wiredtiger_strerror is a
+ * superset of the ISO C99/POSIX 1003.1-2001 function strerror.
  *
  * @dontinclude ex_all.c
  * @skipline wiredtiger_strerror
  *
- * @param err a return value from a WiredTiger call
+ * @param err a return value from a WiredTiger, C library or POSIX function
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int err);
