@@ -51,7 +51,7 @@
 /* Count the leading zero bytes. */
 #ifdef __GNUC__
 #define	WT_LEADING_ZEROS(x, i)                                          \
-        (i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
+	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {                                     \
 	uint64_t __x = (x);                                             \
