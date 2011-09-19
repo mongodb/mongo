@@ -358,7 +358,7 @@ struct wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @configstart{cursor.close, see dist/api_data.py}
-	 * @config{clear, for statistics cursors\, reset statistics counters..
+	 * @config{clear, for statistics cursors\, reset statistics counters.
 	 * The value must be a boolean flag.,\c false}
 	 * @configend
 	 * @errors
@@ -512,7 +512,7 @@ struct wt_session {
 	 * value must be an integer between 512B and 128MB.,\c 512B}
 	 * @config{block_compressor, use indicated compressor for database
 	 * blocks.  Permitted values are empty (off) or \c "<name>".  See @ref
-	 * compressors for more details.. The value must be a string.,}
+	 * compressors for more details. The value must be a string.,}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are
