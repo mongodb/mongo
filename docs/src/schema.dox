@@ -117,8 +117,8 @@ The code below is taken from the complete example program @ex_ref{ex_call_center
 @skip create
 @until conn->close
 
-@section schema_advanced Advanced Schemas
+@todo new section: schema_advanced Advanced Schemas
+@todo non-relational data such as multiple index keys per row
+@todo application-supplied extractors and collators may need to be registered before recovery can run.
 
-- non-relational data such as multiple index keys per row
-- application-supplied extractors and collators may need to be registered before recovery can run.
  */
