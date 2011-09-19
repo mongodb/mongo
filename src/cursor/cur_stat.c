@@ -206,7 +206,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	__wt_buf_free(session, &cst->pvalue);
 	if (cst->btree != NULL) {
 		session->btree = cst->btree;
-		__wt_session_release_btree(session);
+		WT_TRET(__wt_session_release_btree(session));
 		session->btree = NULL;
 	}
 	WT_TRET(__wt_cursor_close(cursor, config));

@@ -62,6 +62,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
+	ret = 0;
 
 	/*
 	 * If we had exclusive access, reopen the tree without special flags so

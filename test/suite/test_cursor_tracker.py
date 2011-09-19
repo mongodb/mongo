@@ -60,7 +60,7 @@ import wttest
 class TestCursorTracker(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor'
     DELETED = 0xffffffffffffffff
-    TRACE_API = False    # a print output for each WT API call
+    TRACE_API = True    # a print output for each WT API call
 
     def config_string(self):
         """

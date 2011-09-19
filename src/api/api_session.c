@@ -252,7 +252,7 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	/* Release the tree so other threads can use it. */
-	__wt_session_release_btree(session);
+	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);
 
 	return (ret);
