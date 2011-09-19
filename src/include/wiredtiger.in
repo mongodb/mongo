@@ -1201,18 +1201,19 @@ struct wt_collator {
 struct wt_compressor {
 	/*! Callback to compress a chunk of data.
 	 *
-	 * On entry, the \c dest field will point to allocated memory, with
-	 * the size of the memory in \c dest->size.  After successful
-	 * completion, the callback should return \c 0 and set \c dest->size
-	 * to the number of bytes required for the compressed representation.
+	 * On entry, the \c dest field will point to memory, with the size
+	 * of the memory in \c dest->size.  After successful completion,
+	 * the callback should return \c 0 and set \c dest->size to the
+	 * number of bytes required for the compressed representation.
 	 *
 	 * If the \c dest buffer is not big enough to hold the compressed data,
 	 * the callback should set \c compression_failed to a non-zero value
 	 * and return 0.
 	 *
-	 * @param[in] source the data to compress
-	 * @param[in] dest \c data field points to allocated memory;
-	 *	\c size set to maximum permitted size of compressed data
+	 * @param[in] source the data to compress \c data field points to
+	 *	memory; \c size field set to the number of bytes
+	 * @param[in] dest \c data field points to memory;
+	 *	\c size field set to maximum permitted size of compressed data
 	 * @param[out] dest \c size the actual size of the compressed data
 	 * @param[out] compression_failed \c non-zero if compression did not
 	 * decrease the size of the data (compression may not have completed)
@@ -1223,17 +1224,18 @@ struct wt_compressor {
 
 	/*! Callback to decompress a chunk of data.
 	 *
-	 * On entry, the \c dest field will point to allocated memory, with
-	 * the size of the memory in \c dest->size.  After successful
-	 * completion, the callback should return \c 0 and set \c dest->size
-	 * to the number of bytes required for the decompressed representation.
+	 * On entry, the \c dest field will point to memory, with the size of
+	 * the memory in \c dest->size.  After successful completion, the
+	 * callback should return \c 0 and set \c dest->size to the number of
+	 * bytes required for the decompressed representation.
 	 *
 	 * If the \c dest buffer is not big enough to hold the decompressed
 	 * data, the callback should return an error.
 	 *
-	 * @param[in] source the compressed data
-	 * @param[in] dest \c data field points to allocated memory;
-	 *	\c size set to maximum permitted size of compressed data
+	 * @param[in] source the compressed data \c data field points to
+	 *	memory; \c size field set to the number of bytes
+	 * @param[in] dest \c data field points to memory;
+	 *	\c size set to maximum permitted size of decompressed data
 	 * @param[out] dest \c size the actual size of the decompressed data
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
