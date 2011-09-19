@@ -91,9 +91,9 @@ file_meta = format_meta + [
 		minimum page size for leaf nodes, in bytes''',
 		min='512B', max='512MB'),
 	Config('block_compressor', '', r'''
-		use indicated compressor for database blocks.  Permitted values
-		are empty (off) or \c "<name>".  See @ref compressor for
-		more details.'''),
+		use indicated compressor for database blocks.  Permitted
+		values are empty (off) or \c "<name>".  See @ref compressors
+		for more details.'''),
 	Config('prefix_compression', 'true', r'''
 		configure the Btree for prefix compression, storing keys as a
 		count of bytes matching the previous key plus a unique
