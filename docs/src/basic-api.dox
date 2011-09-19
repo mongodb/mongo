@@ -61,7 +61,7 @@ Now we iterate through all of the records in the table, printing them out as we 
 
 @until }
 
-Note that the key and value parts of the records are returned as C strings because the table was created that way (even if it was created by a previous run of the example).  No extracting or converting of needs to be done in the application.
+Note that the key and value parts of the records are returned as C strings because the table was created that way (even if it was created by a previous run of the example).  No data extraction or conversion is required in the application.
 
 Because the cursor was positioned in the table after the WT_CURSOR::insert call, we had to re-position it using the WT_CURSOR::first call; if we weren't using the cursor for the call to WT_CURSOR::insert above, this loop would simplify to:
 
