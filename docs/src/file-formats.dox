@@ -1,4 +1,4 @@
-/*! @page fileformats Table File Formats
+/*! @page file_formats Table File Formats
 
 Keys in row stores and variable-length values can be compressed with Huffman encoding.  See @subpage huffman for more details.
 

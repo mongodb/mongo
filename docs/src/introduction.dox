@@ -23,14 +23,14 @@ For full details about using WiredTiger, see:
 - @ref wt\n
   the reference manual for the WiredTiger API.
 
+- @subpage command_line\n
+  the reference for the WiredTiger command-line utility.
+
+- @subpage extending\n
+  how to extend WiredTiger.
+
 - @ref wt_ext\n
   the reference manual for WiredTiger extensions.
 
-- @subpage utility\n
-  the reference for the WiredTiger command-line utility.
-
-- @subpage sql_mapping
-
-- @subpage architecture\n
-  the architecture of the WiredTiger engine.
+- @subpage file_formats
 */

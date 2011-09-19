@@ -1,6 +1,6 @@
 /*! @page cursors Cursors
 
-Most common operations in WiredTiger are performed using cursors.  A cursor includes:
+Most common operations in WiredTiger are performed using WT_CURSOR handles.  A cursor includes:
 
 - a position within a data source
 - access to key and value fields

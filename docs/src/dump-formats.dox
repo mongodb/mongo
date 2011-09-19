@@ -1,0 +1,10 @@
+/*! @page dump_formats Dump Formats
+
+The @ref utility_dump command produces a text representation of a table that can be loaded by @ref utility_load.  This page describes the format of dump file.
+
+Dump files consist of a header and a body.  The header consists of key / value pairs, where the key is the URI passed to WT_SESSION::create and the value is corresponding config string.  The table can be recreated (empty) by calling WT_SESSION::create for each line in the header.
+
+The body of the dump consists of a text representation of the records in the table.  For column store tables (with <code>"r"</code> format for keys), there is one line per record in the dump, consisting of a text representation of the value.  For row stores, there are two lines per record: the first is the text encoding of the key, the second is the text encoding of the value.
+
+@todo expand
+ */

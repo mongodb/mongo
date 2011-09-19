@@ -30,7 +30,10 @@ filter=
 while :
 	do case "$1" in
 	-b)     # Include the Berkeley DB cross-reference
-		filter="| sed 's,src/bdb-map.dox,,'"
+		filter="$filter| sed 's,src/bdb-map.dox,,'"
+		shift;;
+	-t)     # Include the Berkeley DB cross-reference
+		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
 		shift;;
 	*)
 		break;;

@@ -1,6 +1,8 @@
 /*! @page threads Multithreading
 
-WT_CONNECTION handles can be shared between threads, and applications should generally only open one connection per process.  WT_SESSION and WT_CURSOR handles cannot be shared between threads: applications should open one WT_SESSION for each thread that accesses a database.
+WT_CONNECTION handles can be shared between threads, and applications should generally only open one connection to a given database per process.
+
+WT_SESSION and WT_CURSOR handles cannot be shared between threads: applications should open one WT_SESSION for each thread that accesses a database.
 
 @todo expand
 
@@ -8,8 +10,16 @@ WT_CONNECTION handles can be shared between threads, and applications should gen
 
 The code below is taken from the complete example program @ex_ref{ex_thread.c}.
 
+This is an example of a thread entry point.  A new session is opened for the thread and used for all operations within that thread.
+
 @dontinclude ex_thread.c
-@skip {
-@until conn->close
+@skip WT_CONNECTION
+@skip scan_thread
+@until }
+@until }
+
+Here is the main function that starts the threads.  It opens a single connection, shared between the threads, and closes the connection after waiting for all of the threads to exit.
+
+@until }
 
  */

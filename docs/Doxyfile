@@ -496,7 +496,7 @@ STRICT_PROTO_MATCHING  = NO
 # disable (NO) the todo list. This list is created by putting \todo 
 # commands in the documentation.
 
-GENERATE_TODOLIST      = YES
+GENERATE_TODOLIST      = NO
 
 # The GENERATE_TESTLIST tag can be used to enable (YES) or 
 # disable (NO) the test list. This list is created by putting \test 
@@ -696,7 +696,12 @@ RECURSIVE              = YES
 # excluded from the INPUT source files. This way you can easily exclude a 
 # subdirectory from a directory tree whose root is specified with the INPUT tag.
 
-EXCLUDE                = src/bdb-map.dox
+EXCLUDE                = \
+                         src/architecture.dox \
+                         src/bdb-map.dox \
+                         src/design.dox \
+                         src/processes.dox \
+                         src/sql-map.dox
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 
 # directories that are symbolic links (a Unix file system feature) are excluded 

@@ -26,10 +26,11 @@ Keys are processed in order from left to right, with later settings overriding e
 
 The parser for configuration strings will accept additional formatting as follows:
 
-- parentheses may be round or square brackets or curly braces: '()', '[]' or '{}'
+- parentheses may be round or square brackets or curly braces:
+  <code>'()'</code>, <code>'[]'</code> or <code>'{}'</code>
 - the whole configuration string may optionally be wrapped in parentheses
-- the key/value separator can be a colon: ':'
-- keys and values may be in double quotes: '"'
+- the key/value separator can be a colon: <code>':'</code>
+- keys and values may be in double quotes: <code>"key" = "value"</code>
 - quoted strings are interpreted as UTF-8 values
 
 The result of this relaxed parsing is that applications may pass strings representing valid <a href="http://json.org/">JSON objects</a> wherever configuration strings are required.
@@ -47,14 +48,13 @@ For example, in Python, code might look as follows:
   })
 \endcode
 
-
 @section config_examples Code Samples
-
-The code below is taken from the complete example program @ex_ref{ex_config.c}.
 
 @todo improve the example
 
 @dontinclude ex_config.c
+
+The code below is taken from the complete example program @ex_ref{ex_config.c}.
 
 Open a connection to a database, creating it if it does not exist and set a cache size of 10MB:
 

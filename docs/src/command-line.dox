@@ -1,0 +1,168 @@
+/*! @page command_line Command Line Utility
+
+WiredTiger includes a command line utility, \c wt.
+
+@section Synopsis
+<code>wt [-Vv] [-h directory] command [command-specific arguments]</code>
+
+@section Description
+The \c wt tool is a command-line utility that provides access to
+various pieces of the WiredTiger functionality.
+
+@section Options
+There are three global options:
+
+@par <code>-V</code>
+Display WiredTiger version and exit.
+@par <code>-v</code>
+Set verbose output.
+@par <code>-h directory</code>
+Specify a database home directory.
+
+The \c wt tool supports several commands.
+
+
+@section utility_create wt create: create a table or file
+
+The \c create command creates the specified \c uri with the specified
+configuration.  It is equivalent to a call to WT_SESSION::create with
+the specified string arguments.
+
+@subsection utility_create_synopsis Synopsis
+<code>wt [-Vv] [-h directory] create [-d] [-c config] uri</code>
+
+@subsection utility_create_options Options
+The following are command-specific options for the \c create command:
+
+@par <code>-c</code>
+Include a configuration string to be passed to WT_SESSION::create.
+
+@par <code>-d</code>
+Enable verbose debugging output.
+
+
+@section utility_dump wt dump: export data in a text format
+
+The \c dump command outputs the specified table in a portable format
+which can be re-loaded into a new table using the \c load command.
+
+See @subpage dump_formats for details of the dump file formats.
+
+@subsection utility_dump_synopsis Synopsis
+<code>wt [-Vv] [-h directory] dump [-dp] [-f output] uri</code>
+
+@subsection utility_dump_options Options
+The following are command-specific options for the \c dump command:
+
+@par <code>-d</code>
+Dump the specified table or file in a debugging format.
+
+@par <code>-f</code>
+By default, the \c dump command output is written to the standard output;
+the <code>-f</code> option re-directs the output to the specified file.
+
+@par <code>-p</code>
+Use a printable format, so that ASCII strings are included without
+translation in the dump.
+
+
+@section utility_dumpfile wt dumpfile: dumps the file in a debugging format
+
+The \c dumpfile command dumps the specified physical file in a non-portable,
+debugging format, exiting success if the file is correct, and failure if the
+file is corrupted.
+
+@subsection utility_dumpfile_synopsis Synopsis
+<code>wt [-Vv] [-h directory] dumpfile file</code>
+
+@subsection utility_dumpfile_options Options
+The \c dumpfile command has no command-specific options.
+
+
+@section utility_load wt load: import a table from a text dump
+
+The \c load command loads the specified table based on the input.
+
+See @ref dump_formats for details of the dump file formats.
+
+@subsection utility_load_synopsis Synopsis
+<code>wt [-Vv] [-h directory] load [-dT] [-c config] [-f input] table</code>
+
+@subsection utility_load_options Options
+The following are command-specific options for the \c load command:
+
+@par <code>-c</code>
+@todo Reference the possible configuration options.
+
+@par <code>-d</code>
+Configure for debugging.
+
+@par <code>-f</code>
+By default, the \c load command reads from the standard output; the
+<code>-f</code> option reads the input from the specified file.
+
+@par <code>-T</code>
+The input is printable text, that is, the input was generated using the
+\c dump command's <code>-p</code> option.
+
+
+@section utility_printlog wt printlog: output the database log
+
+The \c printlog command outputs the database log.
+
+@subsection utility_printlog_synopsis Synopsis
+<code>wt [-Vv] [-h directory] printlog [-dp] [-f output]</code>
+
+@subsection utility_printlog_options Options
+The following are command-specific options for the \c printlog command:
+
+@par <code>-d</code>
+Configure for debugging.
+
+@par <code>-f</code>
+By default, the \c printlog command output is written to the standard
+output; the <code>-f</code> option re-directs the output to the specified
+file.
+
+@par <code>-p</code>
+Display the log in a printable format.
+
+
+@section utility_salvage wt salvage: recover data from a corrupted file.
+
+The \c salvage command salvages the specified file, discarding any data
+that cannot be recovered.  The file is re-written in place, overwriting
+the original file contents.
+
+@subsection utility_salvage_synopsis Synopsis
+<code>wt [-Vv] [-h directory] salvage file</code>
+
+@subsection utility_salvage_options Options
+The \c salvage command has no command-specific options.
+
+
+@section utility_stat wt stat: output statistics for the specified object
+
+The \c stat command outputs statistics for the specified table.
+
+@subsection utility_stat_synopsis Synopsis
+<code>wt [-Vv] [-h directory] stat [-d] table</code>
+
+@subsection utility_stat_options Options
+The following are command-specific options for the \c stat command:
+
+@par <code>-d</code>
+Configure for debugging.
+
+
+@section utility_verify wt verify: check the structural integrity of a file
+
+The \c verify command verifies the specified file, exiting success if the
+file is correct, and failure if the file is corrupted.
+
+@subsection utility_verify_synopsis Synopsis
+<code>wt [-Vv] [-h directory] verify file</code>
+
+@subsection utility_verify_options Options
+The \c verify command has no command-specific options.
+*/
