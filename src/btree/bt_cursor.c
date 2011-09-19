@@ -109,29 +109,33 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 
 	__cursor_func_init(cbt, 1);
 
-	WT_ERR(btree->type == BTREE_ROW ?
-	    __wt_row_search(session, cbt, 0) :
-	    __wt_col_search(session, cbt, 0));
-
 	/*
 	 * If we find a record that is not deleted, return it.
 	 *
-	 * If we have find a deleted key, first try to move to the next key in
-	 * the tree (bias for prefix searches).  Cursor next skips over deleted
-	 * records, so we don't have to test for them again.
+	 * If we find a deleted key, first try to move to the next key in the
+	 * tree (bias for prefix searches).  Cursor next skips deleted records,
+	 * so we don't have to test for them here.
 	 *
-	 * If there's no larger tree key, try to get the previous record (that
-	 * is, the last record in the tree).  If that fails, there's no record
-	 * to return.
+	 * If there's no larger tree key, redo the search and try and find an
+	 * earlier record.  If that fails, quit, there's no record to return.
 	 */
+	WT_ERR(btree->type == BTREE_ROW ?
+	    __wt_row_search(session, cbt, 0) :
+	    __wt_col_search(session, cbt, 0));
 	if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, 1);
 	} else if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
 		*exact = 1;
 	else {
-		ret = __wt_btcur_last(cbt);
-		*exact = -1;
+		WT_ERR(btree->type == BTREE_ROW ?
+		    __wt_row_search(session, cbt, 0) :
+		    __wt_col_search(session, cbt, 0));
+		if (!__cursor_invalid(cbt)) {
+			*exact = cbt->compare;
+			ret = __wt_kv_return(session, cbt, 1);
+		} else if ((ret = __wt_btcur_prev(cbt)) != WT_NOTFOUND)
+			*exact = -1;
 	}
 
 err:	__cursor_func_resolve(cbt, ret);
