@@ -6,7 +6,7 @@ The remote interface is the way languages other than C/C++ are supported, and th
 
 The server can be embedded in an application or run from the command line.  To embed the RPC server in your application, pass <code>"multiprocess"</code> in the configuration string to ::wiredtiger_open.  Note that in this case, when your application exits, all client connections are forcibly closed.
 
-For details on running a standalone RPC server, see @ref command_line.
+For details on running a standalone RPC server, see @ref utility.
 
 @section processes_sharing Opening Connections from Multiple Processes
 
