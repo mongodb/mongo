@@ -112,6 +112,7 @@ msg
 msgs
 multi
 multiprocess
+multithread
 multithreading
 multiversion
 mutex
