@@ -47,12 +47,11 @@ struct __wt_read_req {
  */
 struct __wt_cache {
 	/*
-	 * The cache thread sets/clears the evict_sleeping flag when blocked
-	 * on the mtx_evict mutex.  The workQ thread uses the evict_sleeping
-	 * flag to wake the cache eviction thread as necessary.
+	 * The workQ thread sets evict_pending when it posts a message to
+	 * the cache thread, which clears it when the message is handled.
 	 */
 	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
-	u_int volatile evict_sleeping;	/* Sleeping */
+	u_int volatile evict_pending;	/* Message queued */
 
 	/*
 	 * File sync can temporarily fail when a tree is active, that is, we may
@@ -70,12 +69,11 @@ struct __wt_cache {
 					   slot available if session is NULL */
 
 	/*
-	 * The I/O thread sets/clears the read_sleeping flag when blocked on the
-	 * mtx_read mutex.  The cache thread uses the read_sleeping flag to wake
-	 * the I/O thread as necessary.
+	 * The workQ thread sets read_pending when it posts a message to the
+	 * I/O thread, which clears it when the message is handled.
 	 */
 	WT_MTX *mtx_read;		/* Cache read server mutex */
-	u_int volatile read_sleeping;	/* Sleeping */
+	u_int volatile read_pending;	/* Message queued */
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:

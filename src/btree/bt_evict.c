@@ -100,7 +100,7 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	session = &conn->default_session;
 
 	/* If the eviction server is running, there's nothing to do. */
-	if (!cache->evict_sleeping)
+	if (cache->evict_pending)
 		return;
 
 	/*
@@ -121,7 +121,7 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
 
-	cache->evict_sleeping = 0;
+	cache->evict_pending = 1;
 	__wt_unlock(session, cache->mtx_evict);
 }
 
@@ -138,15 +138,8 @@ __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
 	cache = conn->cache;
 	session = &conn->default_session;
 
-	/*
-	 * Wait until any current operation completes because the eviction
-	 * server only checks the WT_SERVER_RUN flag on waking from sleep.
-	 */
-	while (!cache->evict_sleeping)
-		__wt_yield();
-
-	cache->evict_sleeping = 0;
-	__wt_unlock(session, cache->mtx_evict);
+	if (!cache->evict_pending)
+		__wt_unlock(session, cache->mtx_evict);
 }
 
 /*
@@ -214,10 +207,10 @@ __wt_cache_evict_server(void *arg)
 	 */
 	F_SET(session, WT_SESSION_INTERNAL);
 
-	for (;;) {
+	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, EVICTSERVER, "eviction server sleeping");
-		cache->evict_sleeping = 1;
 		__wt_lock(session, cache->mtx_evict);
+		cache->evict_pending = 0;
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, EVICTSERVER, "eviction server waking");
@@ -245,9 +238,6 @@ err:		__wt_err(session, ret, "cache eviction server error");
 
 	if (session != &conn->default_session)
 		(void)wt_session->close(wt_session, NULL);
-
-	/* Flag that we are done to the closing thread. */
-	cache->evict_sleeping = 1;
 
 	return (NULL);
 }

@@ -77,7 +77,7 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 	}
 
 	/* If the cache read server is running, there's nothing to do. */
-	if (!cache->read_sleeping)
+	if (cache->read_pending)
 		return;
 
 	/*
@@ -88,7 +88,7 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 	if (!force && cache->read_lockout)
 		return;
 
-	cache->read_sleeping = 0;
+	cache->read_pending = 1;
 	__wt_unlock(session, cache->mtx_read);
 }
 
@@ -105,15 +105,8 @@ __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
 	cache = conn->cache;
 	session = &conn->default_session;
 
-	/*
-	 * Wait until any current operation completes because the read server
-	 * only checks the WT_SERVER_RUN flag on waking from sleep.
-	 */
-	while (!cache->read_sleeping)
-		__wt_yield();
-
-	cache->read_sleeping = 0;
-	__wt_unlock(session, cache->mtx_read);
+	if (!cache->read_pending)
+		__wt_unlock(session, cache->mtx_read);
 }
 
 /*
@@ -187,10 +180,10 @@ __wt_cache_read_server(void *arg)
 	 */
 	F_SET(session, WT_SESSION_INTERNAL);
 
-	for (;;) {
+	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, READSERVER, "read server sleeping");
-		cache->read_sleeping = 1;
 		__wt_lock(session, cache->mtx_read);
+		cache->read_pending = 0;
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, READSERVER, "read server waking");
@@ -233,9 +226,6 @@ __wt_cache_read_server(void *arg)
 
 	WT_VERBOSE(session, READSERVER, "read server exiting");
 	(void)wt_session->close(wt_session, NULL);
-
-	/* Flag that we are done to the closing thread. */
-	cache->read_sleeping = 1;
 
 	return (NULL);
 }
