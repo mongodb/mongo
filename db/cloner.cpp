@@ -83,6 +83,12 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
+
+            // for now, skip the "v" field so that v:0 indexes will be upgraded to v:1
+            if ( string("v") == e.fieldName() ) {
+                continue;
+            }
+
             if ( string("ns") == e.fieldName() ) {
                 uassert( 10024 , "bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
