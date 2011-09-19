@@ -122,7 +122,7 @@ namespace mongo {
         }
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
-            const int flags = d.reservedField();
+            const int flags = d.reservedField() | InsertOption_ContinueOnError; // ContinueOnError is always on when using sharding.
             map<ChunkPtr, vector<BSONObj> > insertsForChunk; // Group bulk insert for appropriate shards
             try {
                 while ( d.moreJSObjs() ) {
