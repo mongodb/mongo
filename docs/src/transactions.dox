@@ -1,6 +1,9 @@
 /*! @page transactions Transactions
 
-Note: the initial release of WiredTiger does not include support for transactions.  This page describes the behavior of a future release.
+<b>
+The 1.X releases of WiredTiger do not include support for transactions.
+This page describes the expected behavior of the 2.X releases.
+</b>
 
 @section transactions_acid The ACID properties.
 
