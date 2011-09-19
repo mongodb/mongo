@@ -558,7 +558,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		session->btree = table->colgroup[0];
 		WT_RET(__wt_session_lock_btree(session,
 		    session->btree, NULL, 0));
-		return (__wt_curfile_create(session, 0, config, cursorp));
+		/*
+		 * The returned cursor should be public: it is not part of a
+		 * larger table cursor.
+		 */
+		return (__wt_curfile_create(session, 1, config, cursorp));
 	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
