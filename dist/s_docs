@@ -9,6 +9,7 @@ type doxygen > /dev/null 2>&1 || {
 	exit 0
 }
 
+e=0
 spellchk()
 {
 	# If aspell has been installed, run a spell check.
@@ -23,6 +24,19 @@ spellchk()
 		echo 'Update docs/src/spell.ok to remove warnings.'
 		sed -e 's/^/	/' < $t
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		e=1
+	}
+}
+
+build()
+{
+	# Run doxygen to generate HTML documentation.
+	(cd ../docs &&
+	    (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen -
+	test -s doxygen.log && cat doxygen.log) > $t 2>&1
+	test -s $t && {
+		cat $t
+		e=1
 	}
 }
 
@@ -43,11 +57,7 @@ done
 # Spell check the documentation.
 spellchk
 
-# Run doxygen to generate HTML documentation.
-cd ../docs &&
-    (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen - > $t 2>&1
-test -s $t && {
-	cat $t
-	exit 1
-}
-exit 0
+# Build the documentation.
+build
+
+exit $e
