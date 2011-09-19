@@ -123,7 +123,6 @@ namespace mongo {
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
             const int flags = d.reservedField();
-            bool keepGoing = flags & InsertOption_ContinueOnError; // modified before assertion if should abort
             map<ChunkPtr, vector<BSONObj> > insertsForChunk; // Group bulk insert for appropriate shards
             try {
                 while ( d.moreJSObjs() ) {
@@ -179,7 +178,6 @@ namespace mongo {
 
                             manager = r.getChunkManager();
                             if( ! manager ) {
-                                keepGoing = false;
                                 uasserted(14804, "collection no longer sharded");
                             }
 
@@ -193,10 +191,10 @@ namespace mongo {
                     assert( inShutdown() || gotThrough ); // not caught below
                 }
             } catch (const UserException&){
-                if (!keepGoing || !d.moreJSObjs()){
+                if (!d.moreJSObjs()){
                     throw;
                 }
-                    // otherwise ignore and keep going
+                // Ignore and keep going. ContinueOnError is implied with sharding.
             }
         }
 
