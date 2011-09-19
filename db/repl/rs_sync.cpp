@@ -116,9 +116,9 @@ namespace mongo {
                 if( !r.more() )
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-                {
-                    ts = o["ts"]._opTime();
+                ts = o["ts"]._opTime();
 
+                {
                     if( (source->state() != MemberState::RS_PRIMARY &&
                             source->state() != MemberState::RS_SECONDARY) ||
                             replSetForceInitialSyncFailure ) {
@@ -170,7 +170,11 @@ namespace mongo {
                         start = now;
                     }
                 }
-                
+
+                if ( ts > minValid ) {
+                    break;
+                }
+
                 getDur().commitIfNeeded();
             }
             catch (DBException& e) {
