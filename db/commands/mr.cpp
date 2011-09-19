@@ -395,7 +395,7 @@ namespace mongo {
                 return;
             }
 
-            uassert( 13604 , "too much data for in memory map/reduce" , _size < ( BSONObjMaxUserSize / 2 ) );
+            uassert( 13604 , "too much data for in memory map/reduce" , _size < BSONObjMaxUserSize );
 
             BSONArrayBuilder b( (int)(_size * 1.2) ); // _size is data size, doesn't count overhead and keys
 
@@ -415,8 +415,6 @@ namespace mongo {
             }
 
             BSONArray res = b.arr();
-            uassert( 13605 , "too much data for in memory map/reduce" , res.objsize() < ( BSONObjMaxUserSize * 2 / 3 ) );
-
             final.append( "results" , res );
         }
 
