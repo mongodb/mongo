@@ -132,6 +132,11 @@ namespace mongo {
 
         static void validateObjectIdString( const string &str );
 
+        /** increments the number of times a scope was used */
+        void incTimeUsed() { ++_numTimeUsed; }
+        /** gets the number of times a scope was used */
+        int getTimeUsed() { return _numTimeUsed; }
+
     protected:
 
         virtual ScriptingFunction _createFunction( const char * code ) = 0;
@@ -141,6 +146,7 @@ namespace mongo {
         set<string> _storedNames;
         static long long _lastVersion;
         map<string,ScriptingFunction> _cachedFunctions;
+        int _numTimeUsed;
 
         static int _numScopes;
     };
@@ -168,7 +174,12 @@ namespace mongo {
 
         static void setup();
 
+        /** gets a scope from the pool or a new one if pool is empty
+         * @param pool An identifier for the pool, usually the db name
+         * @return the scope */
         auto_ptr<Scope> getPooledScope( const string& pool );
+
+        /** call this method to release some JS resources when a thread is done */
         void threadDone();
 
         struct Unlocker { virtual ~Unlocker() {} };

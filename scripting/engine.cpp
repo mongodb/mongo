@@ -26,7 +26,7 @@ namespace mongo {
 
     int Scope::_numScopes = 0;
 
-    Scope::Scope() : _localDBName("") , _loadedVersion(0) {
+    Scope::Scope() : _localDBName("") , _loadedVersion(0), _numTimeUsed(0) {
         _numScopes++;
     }
 
@@ -284,7 +284,8 @@ namespace mongo {
         void done( const string& pool , Scope * s ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
-            if ( l.size() > 10 ) {
+            // make we dont keep to many contexts, or use them for too long
+            if ( l.size() > 10 || s->getTimeUsed() > 100 ) {
                 delete s;
             }
             else {
@@ -302,6 +303,7 @@ namespace mongo {
             Scope * s = l.back();
             l.pop_back();
             s->reset();
+            s->incTimeUsed();
             return s;
         }
 
