@@ -39,7 +39,7 @@ void *scan_thread(void *arg)
 		printf("Got record: %s : %s\n", key, value);
 	}
 
-	return (NULL);
+	return (arg);
 }
 
 int main(void)
