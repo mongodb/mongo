@@ -24,10 +24,17 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 		# package, so use an uncommon range, specifically, -31,800 to
 		# -31,999.
 		v = -31800
-		for name, msg in api_data.errors:
-			tfile.write('/*! %s. */\n' % (msg[0].upper() + msg[1:]))
+		for err in api_data.errors:
+			name, desc = err.name, err.desc
+			if 'undoc' in err.flags:
+				tfile.write('/*! @cond internal\n * %s.\n */\n' %
+				    (desc[0].upper() + desc[1:]))
+			else:
+				tfile.write('/*! %s. */\n' % (desc[0].upper() + desc[1:]))
 			tfile.write('#define\t%s\t%d\n' % (name, v))
 			v -= 1
+			if 'undoc' in err.flags:
+				tfile.write('/*! @endcond */\n')
 		tfile.write('/*\n')
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
@@ -55,9 +62,9 @@ wiredtiger_strerror(int error)
 	switch (error) {
 ''')
 
-for l in api_data.errors:
-	tfile.write('\tcase ' + l[0] + ':\n')
-	tfile.write('\t\treturn ("' + l[0] + ': ' + l[1] + '");\n')
+for err in api_data.errors:
+	tfile.write('\tcase ' + err.name + ':\n')
+	tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
 
 tfile.write('''\
 	default:

@@ -981,7 +981,7 @@ struct wt_connection {
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
 	 * connection's error handler is used
-	 * @configempty{conn.open_session, see dist/api_data.py}
+	 * @configempty{connection.open_session, see dist/api_data.py}
 	 * @param sessionp the new session handle
 	 * @errors
 	 */
@@ -1159,8 +1159,11 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 #define	WT_ERROR	-31802
 /*! Item not found. */
 #define	WT_NOTFOUND	-31803
-/*! Restart the operation (internal). */
+/*! @cond internal
+ * Restart the operation (internal).
+ */
 #define	WT_RESTART	-31804
+/*! @endcond */
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

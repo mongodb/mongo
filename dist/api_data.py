@@ -1,11 +1,17 @@
 # This file is a python script that describes the WiredTiger API.
 
+class Error:
+	def __init__(self, name, desc, **flags):
+		self.name = name
+		self.desc = desc
+		self.flags = flags
+
 errors = [
-	('WT_DEADLOCK', 'conflict with concurrent operation'),
-	('WT_DUPLICATE_KEY', 'attempt to insert an existing key'),
-	('WT_ERROR', 'non-specific WiredTiger error'),
-	('WT_NOTFOUND', 'item not found'),
-	('WT_RESTART', 'restart the operation (internal)'),
+	Error('WT_DEADLOCK', 'conflict with concurrent operation'),
+	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key'),
+	Error('WT_ERROR', 'non-specific WiredTiger error'),
+	Error('WT_NOTFOUND', 'item not found'),
+	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
 class Method:
