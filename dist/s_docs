@@ -9,6 +9,8 @@ type doxygen > /dev/null 2>&1 || {
 	exit 0
 }
 
+. ./RELEASE
+
 e=0
 spellchk()
 {
@@ -40,7 +42,7 @@ build()
 	}
 }
 
-filter=
+filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
 while :
 	do case "$1" in
 	-b)     # Include the Berkeley DB cross-reference
