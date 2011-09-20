@@ -60,8 +60,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	int ret;
 
-	ret = 0;
-
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
 	ret = 0;
