@@ -8,18 +8,18 @@ A cursor includes:
 - encoding of fields to store in the data source
 - methods to navigate within and iterate through the data
 
+@section cursor_opening Opening a cursor
+
 Cursors are created using the WT_SESSION::open_cursor method.   The
 following  are examples from the example program @ex_ref{ex_cursor.c}:
 
 @dontinclude ex_cursor.c
 @skipline open_cursor
-@until close
 
 @skipline open_cursor
-@until close
+@until ;
 
 @skipline open_cursor
-@until close
 
 In addition to simple data sources, cursors in WiredTiger are used to
 access projections and even created data sources such as the run-time
@@ -29,7 +29,21 @@ statistics:
 @skipline statistics:
 @until close
 
-@section cursor_ranges Positioning a Cursor
+@section cursor_types Cursor Types
+
+The following are builtin cursor types:
+<table>
+@hrow{URI, Function}
+@row{<tt>table:\<tablename\>[</tt>, ordinary table cursor}
+@row{<tt>file:\<filename\></tt>, ordinary table cursor}
+@row{<tt>colgroup:\<tablename\>.\<columnset\></tt>, column group cursor}
+@row{<tt>index:\<tablename\>.\<index\></tt>, index cursor}
+@row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>, Join the contents of multiple cursors together.}
+@row{<tt>config:[\<uri\>]</tt>, iterate through the configuration of an object}
+@row{<tt>statistics:[file:\<filename\>]</tt>, database or file statistics (key=(string)fieldname\, data=((uint64_t)value\, (string)printvalue\, (string)description)}
+</table>
+
+@section cursor_position Positioning a Cursor
 
 Cursors may be positioned at the beginning of the data source, the end
 of the data source, at an exact key within the data source, and near a
@@ -39,25 +53,24 @@ To position a cursor at the beginning or end of the data source, use the
 WT_CURSOR::first and WT_CURSOR::last methods:
 
 @dontinclude ex_cursor.c
-@skipline first
+
+@skip home
+@skipline int
 @until }
 @until }
 
-@dontinclude ex_cursor.c
-@skipline last
+@skipline int
 @until }
 @until }
 
 To move a cursor forward or backward in the data source, use the cursor
 WT_CURSOR::next and WT_CURSOR::prev methods:
 
-@dontinclude ex_cursor.c
-@skipline forward_traversal
+@skipline int
 @until }
 @until }
 
-@dontinclude ex_cursor.c
-@skipline backward_traversal
+@skipline int
 @until }
 @until }
 
@@ -68,15 +81,13 @@ beginning or end of the data source, respectively.
 To position a cursor at a specific location in the data source, use the
 WT_CURSOR::search method:
 
-@dontinclude ex_cursor.c
-@skipline search
+@skipline int
 @until }
 
 To position a cursor at or near a location in the data source, use the
 WT_CURSOR::search_near method:
 
-@dontinclude ex_cursor.c
-@skipline search_near
+@skipline int
 @until }
 @until }
 
@@ -85,12 +96,11 @@ WT_CURSOR::search_near method:
 To insert new data, and optionally update existing data, using a cursor,
 use the WT_CURSOR::insert method:
 
-@dontinclude ex_cursor.c
-@skipline cursor_insert
+@skipline int
 @until }
 
-By default, when updating an underlying row-store, the WT_CURSOR::insert
-method returns and error if the key already exists in the store,
+By default, when inserting into a row-store, the WT_CURSOR::insert
+method returns an error if the key already exists in the store,
 otherwise it inserts a new key/value pair.   If the
 <code>overwrite</code> configuration string is specified to the
 WT_SESSION::open_cursor method, any previously existing key/value pair
@@ -106,8 +116,7 @@ being inserted or updated.
 
 To update existing data using a cursor, use the WT_CURSOR::update method:
 
-@dontinclude ex_cursor.c
-@skipline cursor_update
+@skipline int
 @until }
 
 In all cases, calling WT_CURSOR::update where the key does not already
@@ -115,8 +124,7 @@ exist in the store will return an error.
 
 To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
-@dontinclude ex_cursor.c
-@skipline cursor_remove
+@skipline int
 @until }
 
 
@@ -128,20 +136,8 @@ failure must duplicate the cursor before calling a cursor method that
 will attempt to re-position the cursor.  <b>Cursor duplication is not
 yet available in WiredTiger.</b>
 
+@todo update when cursor duplication is implemented
 
-@section cursor_types Cursor Types
-
-The following are builtin cursor types:
-<table>
-@hrow{URI, Function}
-@row{<tt>table:\<tablename\>[</tt>, ordinary table cursor}
-@row{<tt>file:\<filename\></tt>, ordinary table cursor}
-@row{<tt>colgroup:\<tablename\>.\<columnset\></tt>, column group cursor}
-@row{<tt>index:\<tablename\>.\<index\></tt>, index cursor}
-@row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>, Join the contents of multiple cursors together.}
-@row{<tt>config:[\<uri\>]</tt>, iterate through the configuration of an object}
-@row{<tt>statistics:[file:\<filename\>]</tt>, database or file statistics (key=(string)fieldname\, data=((uint64_t)value\, (string)printvalue\, (string)description)}
-</table>
 
 @subsection cursor_table Table Cursors
 
@@ -159,15 +155,16 @@ To return run-time statistics about the WiredTiger engine, open a
 statistics cursor:
 
 @dontinclude ex_stat.c
-@skipline statistics(WT_SESSION *session)
+
+@skip home
+@skipline int
 @until }
 @until }
 
 To return run-time statistics about an underlying file, open a statistics
 cursor on the file object:
 
-@dontinclude ex_stat.c
-@skipline statistics_file(WT_SESSION *session, const char *filename)
+@skipline int
 @until }
 
 @section cursor_projections Projections
@@ -180,9 +177,5 @@ the listed columns are returned by WT_CURSOR::get_value.
 This is particularly useful with index cursors, because if all columns in the
 projection are available in the index (including primary key columns, which are
 the values of the index), there is no need to access any column groups.
-
-@section cursor_restriction Restricting the Range of a Scan
-
-<b>Range scan restriction is not yet available in WiredTiger.</b>
 
  */

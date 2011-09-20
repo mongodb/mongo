@@ -15,10 +15,13 @@
 
 #include <wiredtiger.h>
 
+int print_connection_stats(WT_SESSION *session);
+int print_file_stats(WT_SESSION *session, const char *filename);
+
 const char *home = "WT_TEST";
 
 int 
-statistics(WT_SESSION *session)
+print_connection_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	const char *description, *pvalue;
@@ -43,7 +46,7 @@ statistics(WT_SESSION *session)
 }
 
 int 
-statistics_file(WT_SESSION *session, const char *filename)
+print_file_stats(WT_SESSION *session, const char *filename)
 {
 	WT_CURSOR *cursor;
 	size_t len;
@@ -77,7 +80,8 @@ main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	ret = statistics(session);
+	ret = print_connection_stats(session);
+	ret = print_file_stats(session, f);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }
