@@ -99,7 +99,7 @@ file_meta = format_meta + [
 	Config('block_compressor', '', r'''
 		use indicated compressor for database blocks.  Permitted
 		values are empty (off) or \c "<name>".  See @ref compressors
-		for more details.'''),
+		for more details'''),
 	Config('prefix_compression', 'true', r'''
 		configure the Btree for prefix compression, storing keys as a
 		count of bytes matching the previous key plus a unique
@@ -148,7 +148,7 @@ methods = {
 
 'cursor.close' : Method([
 	Config('clear', 'false', r'''
-		for statistics cursors, reset statistics counters.''',
+		for statistics cursors, reset statistics counters''',
 		type='boolean'),
 ]),
 
