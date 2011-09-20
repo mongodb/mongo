@@ -205,7 +205,7 @@ extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
-    const char *treeconfig,
+    const char *config,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
