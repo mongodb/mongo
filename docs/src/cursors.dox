@@ -138,11 +138,28 @@ undetermined.  Applications that cannot re-position the cursor after
 failure must duplicate the cursor before calling a cursor method that
 will attempt to re-position the cursor.  @notyet{cursor duplication}
 
-@subsection cursor_table Table Cursors
+@section cursor_projections Projections
 
-@subsection cursor_file File Cursors
+Cursors on tables, column groups, indices and files can return a subset of
+columns.  This is done by listing the column names in parenthesis in the
+<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields from
+the listed columns are returned by WT_CURSOR::get_value.
 
-@subsection cursor_statistics Statistics Cursors
+This is particularly useful with index cursors, because if all columns in the
+projection are available in the index (including primary key columns, which are
+the values of the index), there is no need to access any column groups.
+
+@section cursor_index Index Cursors
+
+When an index is created for a table, records are inserted into the index whenever the table is updated.  These records use a different key to the primary table, as specified when the index is created with the WT_SESSION::create method.
+
+A cursor opened on an index has the specified index columns as its key, accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns default to returning the value columns from the table, but this can be overridden by configuring a projection cursor (see @ref cursor_projections), which can access the table key columns or a subset of the value columns.
+
+@section cursor_file File Cursors
+
+WiredTiger's schema layer can be bypassed by opening cursors with a \c "file:" URI, using the name of the underlying file.  This can be useful for seeing the contents of a column group or index without reading all of the columns from the table.
+
+@section cursor_statistics Statistics Cursors
 
 Cursors can return run-time statistics about the WiredTiger engine as
 well as the underlying row- and column-store files.  Each cursor
@@ -165,16 +182,4 @@ cursor on the file object:
 
 @skipline int
 @until }
-
-@section cursor_projections Projections
-
-Cursors on tables, column groups, indices and files can return a subset of
-columns.  This is done by listing the column names in parenthesis in the
-<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields from
-the listed columns are returned by WT_CURSOR::get_value.
-
-This is particularly useful with index cursors, because if all columns in the
-projection are available in the index (including primary key columns, which are
-the values of the index), there is no need to access any column groups.
-
  */
