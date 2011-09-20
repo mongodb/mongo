@@ -68,7 +68,6 @@ extern "C" {
 /*******************************************
  * Public forward structure declarations
  *******************************************/
-struct wt_buf;		    typedef struct wt_buf WT_BUF;
 struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
 struct wt_compressor;	    typedef struct wt_compressor WT_COMPRESSOR;
 struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
@@ -101,6 +100,10 @@ struct wt_item {
 	uint32_t size;
 };
 
+#ifndef DOXYGEN
+/* Forward structure declarations */
+struct wt_buf;		    typedef struct wt_buf WT_BUF;
+
 /*!
  * A data item with memory management.  Used internally to manage returned keys
  * and values in the WT_CURSOR implementation.
@@ -125,6 +128,7 @@ struct wt_buf {
 	/*! Managed memory size (internal use). */
 	size_t memsize;
 };
+#endif
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
