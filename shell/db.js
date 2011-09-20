@@ -335,6 +335,7 @@ DB.prototype.help = function() {
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.serverStatus()");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
+    print("\tdb.setVerboseShell(flag) display extra information in shell output");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
     print("\tdb.version() current version of the server");
@@ -383,6 +384,32 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     return this._dbCommand( cmd );
 }
 
+/**
+ * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
+ * <p> Default is off. <p>
+ * @param {Bool} verbosity on / off
+ */
+DB.prototype.setVerboseShell = function(value) {
+    this._mongo.setVerboseShell(value);
+}
+
+DB.prototype._initExtraInfo = function() { 
+    this.startTime = new Date().getTime(); 
+} 
+ 
+DB.prototype._getExtraInfo = function() { 
+    if ( this._mongo.verboseShell ) {       
+        var res = this.getLastErrorCmd(); 
+        if (res) {  
+            var info = "Modified " + res.n;  
+            if (res.n > 0 && res.updatedExisting != undefined) info += " " + (res.updatedExisting ? "existing" : "new")  
+            info += " record(s)";  
+            var time = new Date().getTime() - this.startTime;  
+            info += " in " + time + "ms";  
+            return info;  
+        } 
+    } 
+} 
 
 /**
  *  <p> Evaluate a js expression at the database server.</p>

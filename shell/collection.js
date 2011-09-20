@@ -182,7 +182,9 @@ DBCollection.prototype.remove = function( t , justOne ){
             throw "can't have _id set to undefined in a remove expression"
         }
     }
+    this._db._initExtraInfo();
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
+    return this._db._getExtraInfo();
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -199,7 +201,9 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         // we're basically inserting a brand new object, do full validation
         this._validateForStorage( obj );
     }
+    this._db._initExtraInfo();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
+    return this._db._getExtraInfo();
 }
 
 DBCollection.prototype.save = function( obj ){
