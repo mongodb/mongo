@@ -29,11 +29,6 @@ Mongo.prototype.setSlaveOk = function( value ) {
     this.slaveOk = value;
 }
 
-Mongo.prototype.setVerboseShell = function( value ) {
-    if( value == undefined ) value = true;
-    this.verboseShell = value;
-}
-
 Mongo.prototype.getDB = function( name ){
     return new DB( this , name );
 }

@@ -384,31 +384,23 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     return this._dbCommand( cmd );
 }
 
-/**
- * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
- * <p> Default is off. <p>
- * @param {Bool} verbosity on / off
- */
-DB.prototype.setVerboseShell = function(value) {
-    this._mongo.setVerboseShell(value);
-}
-
 DB.prototype._initExtraInfo = function() { 
+    if ( !_verboseShell ) return;
     this.startTime = new Date().getTime(); 
 } 
  
 DB.prototype._getExtraInfo = function() { 
-    if ( this._mongo.verboseShell ) {       
-        var res = this.getLastErrorCmd(); 
-        if (res) {  
-            var info = "Modified " + res.n;  
-            if (res.n > 0 && res.updatedExisting != undefined) info += " " + (res.updatedExisting ? "existing" : "new")  
-            info += " record(s)";  
-            var time = new Date().getTime() - this.startTime;  
-            info += " in " + time + "ms";  
-            return info;  
-        } 
-    } 
+    if ( !_verboseShell ) return;
+
+    var res = this.getLastErrorCmd(); 
+    if (res) {  
+        var info = "Modified " + res.n;  
+        if (res.n > 0 && res.updatedExisting != undefined) info += " " + (res.updatedExisting ? "existing" : "new")  
+        info += " record(s)";  
+        var time = new Date().getTime() - this.startTime;  
+        info += " in " + time + "ms";
+        return info;  
+    }
 } 
 
 /**

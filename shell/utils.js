@@ -38,6 +38,16 @@ printStackTrace = function(){
     }
 }
 
+/**
+ * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
+ * <p> Default is off. <p>
+ * @param {Bool} verbosity on / off
+ */
+setVerboseShell = function( value ) { 
+    if( value == undefined ) value = true; 
+    _verboseShell = value; 
+}
+
 doassert = function (msg) {
     if (msg.indexOf("assert") == 0)
         print(msg);
