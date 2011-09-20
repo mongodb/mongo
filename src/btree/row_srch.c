@@ -51,6 +51,10 @@ __search_insert(WT_SESSION_IMPL *session,
 			continue;
 		}
 
+		/*
+		 * Comparisons may be repeated as we drop down skiplist levels;
+		 * don't repeat comparisons, they might be expensive.
+		 */
 		if (ret_ins != *ins) {
 			ret_ins = *ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
