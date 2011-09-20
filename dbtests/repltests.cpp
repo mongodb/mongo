@@ -28,6 +28,8 @@
 #include "../db/oplog.h"
 #include "../db/queryoptimizer.h"
 
+#include "../db/repl/rs.h"
+
 namespace mongo {
     void createOplog();
 }
@@ -1101,7 +1103,26 @@ namespace ReplTests {
             ASSERT_EXCEPTION( fsc.recoverFromYield(), MsgAssertionException );
         }
     };
-    
+
+    /** Check ReplSetConfig::MemberCfg equality */
+    class ReplSetMemberCfgEquality : public Base {
+    public:
+        void run() {
+            ReplSetConfig::MemberCfg m1, m2;
+            assert(m1 == m2);
+            m1.tags["x"] = "foo";
+            assert(m1 != m2);
+            m2.tags["y"] = "bar";
+            assert(m1 != m2);
+            m1.tags["y"] = "bar";
+            assert(m1 != m2);
+            m2.tags["x"] = "foo";
+            assert(m1 == m2);
+            m1.tags.clear();
+            assert(m1 != m2);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "repl" ) {
@@ -1158,6 +1179,7 @@ namespace ReplTests {
             add< DatabaseIgnorerUpdate >();
             add< FindingStartCursorStale >();
             add< FindingStartCursorYield >();
+            add< ReplSetMemberCfgEquality >();
         }
     } myall;
 
