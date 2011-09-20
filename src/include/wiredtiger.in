@@ -506,7 +506,7 @@ struct wt_session {
 	 * @until ;
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the object to create, such as \c "table:stock"
+	 * @param name the URI of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes. The
 	 * value must be an integer between 512B and 128MB.,\c 512B}
@@ -586,7 +586,7 @@ struct wt_session {
 	 * @skipline ->drop
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to drop, such as \c "table:stock"
+	 * @param name the URI of the table to drop, such as \c "table:stock"
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist. The value
 	 * must be a boolean flag.,\c false}
@@ -602,7 +602,7 @@ struct wt_session {
 	 * @skipline ->rename
 	 *
 	 * @param session the session handle
-	 * @param oldname the current uri of the table, such as \c "table:old"
+	 * @param oldname the current URI of the table, such as \c "table:old"
 	 * @param newname the new name of the table, e.g., \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
 	 * @errors
@@ -628,7 +628,7 @@ struct wt_session {
 	 * @skipline ->salvage
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the file or table to salvage
+	 * @param name the URI of the file or table to salvage
 	 * @configstart{session.salvage, see dist/api_data.py}
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files. The value must be a boolean flag.,\c false}
@@ -649,7 +649,7 @@ struct wt_session {
 	 * @skipline ->sync
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to sync
+	 * @param name the URI of the table to sync
 	 * @configempty{session.sync, see dist/api_data.py}
 	 * @errors
 	 */
@@ -662,7 +662,7 @@ struct wt_session {
 	 * @skipline ->truncate
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to truncate
+	 * @param name the URI of the table to truncate
 	 * @param start optional cursor marking the start of the truncate
 	 * operation.  If <code>NULL</code>, the truncate starts from the
 	 * beginning of the table
@@ -687,7 +687,7 @@ struct wt_session {
 	 * @skipline ->verify
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the file or table to verify
+	 * @param name the URI of the file or table to verify
 	 * @configempty{session.verify, see dist/api_data.py}
 	 * @errors
 	 */
@@ -804,7 +804,7 @@ struct wt_session {
 	 * @skipline ->dumpfile
 	 *
 	 * @param session the session handle
-	 * @param name the uri of the table to verify
+	 * @param name the URI of the table to verify
 	 * @configempty{session.dumpfile, see dist/api_data.py}
 	 * @errors
 	 */

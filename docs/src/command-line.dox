@@ -132,11 +132,11 @@ file.
 Display the log in a printable format.
 
 
-@section utility_salvage wt salvage: recover data from a corrupted uri
+@section utility_salvage wt salvage: recover data from a corrupted file
 
-The \c salvage command salvages the specified file or table, discarding
-any data that cannot be recovered.  Underlying files are re-written in
-place, overwriting the original file contents.
+The \c salvage command salvages the specified file, discarding any data
+that cannot be recovered.  Underlying files are re-written in place,
+overwriting the original file contents.
 
 @subsection utility_salvage_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] salvage [-F force] uri</code>
@@ -162,9 +162,9 @@ engine, or, if specified, for the command-line file.
 The \c stat command has no command-specific options.
 
 
-@section utility_verify wt verify: check the structural integrity of a uri
+@section utility_verify wt verify: check the structural integrity of a table or file
 
-The \c verify command verifies the specified file or table, exiting
+The \c verify command verifies the specified table or file, exiting
 success if the object is correct, and failure if the object is corrupted.
 
 @subsection utility_verify_synopsis Synopsis
