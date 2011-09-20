@@ -143,13 +143,25 @@ namespace mongo {
                                 return false;
                             }
                             const char *ns = o.getStringField("ns");
-                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")[_id]).obj(); // might be more than just _id in the update criteria
-                            BSONObj missingObj = missingObjReader.findOne(
-                                ns, 
-                                query );
+                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj(); // might be more than just _id in the update criteria
+                            BSONObj missingObj;
+                            try {
+                                missingObj = missingObjReader.findOne(
+                                    ns, 
+                                    query );
+                            } catch(...) { 
+                                log() << "replSet assertion fetching missing object" << endl;
+                                throw;
+                            }
                             assert( !missingObj.isEmpty() );
-                            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-                            assert( !d.isNull() );
+                            Client::Context ctx(ns);
+                            try {
+                                DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+                                assert( !d.isNull() );
+                            } catch(...) { 
+                                log() << "replSet assertion during insert of missing object" << endl;
+                                throw;
+                            }
                             // now reapply the update from above
                             bool failed = syncApply(o);
                             if( failed ) {
