@@ -59,6 +59,8 @@ namespace mongo {
 #endif
 	{DocumentSourceGroup::groupName,
 	 DocumentSourceGroup::createFromBson},
+	{DocumentSourceLimit::limitName,
+	 DocumentSourceLimit::createFromBson},
 	{DocumentSourceMatch::matchName,
 	 DocumentSourceMatch::createFromBson},
 #ifdef LATER
@@ -67,6 +69,8 @@ namespace mongo {
 #endif
 	{DocumentSourceProject::projectName,
 	 DocumentSourceProject::createFromBson},
+	{DocumentSourceSkip::skipName,
+	 DocumentSourceSkip::createFromBson},
 	{DocumentSourceSort::sortName,
 	 DocumentSourceSort::createFromBson},
     };
