@@ -26,7 +26,6 @@ __search_insert(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 	compare = btree->btree_compare;
-	ret_ins = NULL;
 
 	/* Fast-path appends. */
 	if ((ins = &inshead->tail[0]) != NULL) {
@@ -37,7 +36,8 @@ __search_insert(WT_SESSION_IMPL *session,
 				cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
 				    &inshead->tail[i]->next[i] :
 				    &inshead->head[i];
-			goto done;
+			cbt->compare = -cmp;
+			return (NULL);
 		}
 	}
 
@@ -45,6 +45,7 @@ __search_insert(WT_SESSION_IMPL *session,
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
+	ret_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
 		if (*ins == NULL) {
 			cbt->ins_stack[i--] = ins--;
@@ -74,8 +75,7 @@ __search_insert(WT_SESSION_IMPL *session,
 	 * For every insert element we review, we're getting closer to a better
 	 * choice; update the compare field to its new value.
 	 */
-done:	cbt->compare = -cmp;
-
+	cbt->compare = -cmp;
 	return (ret_ins);
 }
 
