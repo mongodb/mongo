@@ -24,7 +24,7 @@ uses variable-sized encoding of values to reduce the data size.
 
 The remaining characters in the format string specify the type of each field to be packed into or unpacked from a byte array.  See @ref schema_types for the list of supported types.
 
-@todo Descripe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
+@todo Describe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
 
 @section config_examples Code Samples
 
