@@ -71,51 +71,30 @@ typedef struct __wt_named_compressor {
  *	A btree handle.
  */
 struct __wt_btree {
+	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops. */
+	uint32_t refcnt;		/* Sessions using this tree. */
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
 	const char *name;		/* Logical name */
 	const char *filename;		/* File name */
-
 	const char *config;		/* Configuration string */
-
-	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops. */
-	uint32_t refcnt;		/* Sessions using this tree. */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
 		BTREE_ROW=3		/* Row-store */
 	} type;				/* Type */
 
-	WT_REF	 root_page;		/* Root page reference */
-	WT_FH	*fh;			/* Backing file handle */
-	uint64_t lsn;			/* LSN file/offset pair */
+	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 	const char *key_format;		/* Key format */
 	const char *value_format;	/* Value format */
 	const char *key_plan;		/* Key projection plan for indices */
 	const char *value_plan;		/* Value projection plan for indices */
 
-	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_value;		/* Value huffman encoding */
-
-	WT_COMPRESSOR *compressor;	/* Page compressor */
-
-	uint8_t bitcnt;			/* Fixed-length field size in bits */
-					/* Comparison function */
+					/* Row-store comparison function */
 	int (*btree_compare)(WT_BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	WT_BUF   key_srch;		/* Search key buffer */
-	uint32_t key_gap;		/* Btree instantiated key gap */
-
-	uint64_t freelist_bytes;	/* Free-list byte count */
-	uint32_t freelist_entries;	/* Free-list entry count */
-
-					/* Free-list queues */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size pair */
-	uint32_t free_size;
+	uint32_t key_gap;		/* Row-store prefix key gap */
 
 	uint32_t intlitemsize;		/* Maximum item size for overflow */
 	uint32_t leafitemsize;
@@ -125,6 +104,26 @@ struct __wt_btree {
 	uint32_t intlmax;
 	uint32_t leafmin;		/* Min/max leaf page size */
 	uint32_t leafmax;
+
+	void *huffman_key;		/* Key huffman encoding */
+	void *huffman_value;		/* Value huffman encoding */
+
+	WT_COMPRESSOR *compressor;	/* Page compressor */
+
+	WT_REF	 root_page;		/* Root page reference */
+	WT_FH	*fh;			/* Backing file handle */
+	uint64_t lsn;			/* LSN file/offset pair */
+
+	uint64_t freelist_bytes;	/* Free-list byte count */
+	uint32_t freelist_entries;	/* Free-list entry count */
+					/* Free-list queues */
+	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
+	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	int	 freelist_dirty;	/* Free-list has been modified */
+	uint32_t free_addr;		/* Free-list addr/size pair */
+	uint32_t free_size;
+
+	WT_BUF   key_srch;		/* Search key buffer */
 
 	WT_WALK  evict_walk;		/* Eviction thread's walk state */
 	WT_PAGE *evict_page;		/* Eviction thread's page */

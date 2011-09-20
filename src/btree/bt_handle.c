@@ -12,7 +12,6 @@ static int __btree_conf(
 static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
-static int __btree_type(WT_SESSION_IMPL *);
 
 /*
  * __wt_btree_create --
@@ -126,6 +125,8 @@ __btree_conf(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COMPRESSOR *ncomp;
+	uint32_t bitcnt;
+	int fixed;
 
 	btree = session->btree;
 	conn = S2C(session);
@@ -138,33 +139,50 @@ __btree_conf(WT_SESSION_IMPL *session,
 	/* Take the config string: it will be freed with the btree handle. */
 	btree->config = config;
 
-	btree->root_page.addr = WT_ADDR_INVALID;
+	/* Validate file types and check the data format plan. */
+	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
+	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	if (cval.len > 0 && strncmp(cval.str, "r", cval.len) == 0)
+		btree->type = BTREE_COL_VAR;
+	else
+		btree->type = BTREE_ROW;
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
-	TAILQ_INIT(&btree->freeqa);
-	TAILQ_INIT(&btree->freeqs);
+	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
-	btree->free_addr = WT_ADDR_INVALID;
+	/* Row-store key comparison and key gap for prefix compression. */
+	if (btree->type == BTREE_ROW) {
+		btree->btree_compare = __wt_btree_lex_compare;
 
-	btree->btree_compare = __wt_btree_lex_compare;
+		WT_RET(__wt_config_getones(
+		    session, btree->config, "key_gap", &cval));
+		btree->key_gap = (uint32_t)cval.val;
+	}
 
-	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
+	/* Check for fixed-size data. */
+	if (btree->type == BTREE_COL_VAR) {
+		WT_RET(__wt_struct_check(
+		    session, cval.str, cval.len, &fixed, &bitcnt));
+		if (fixed) {
+			if (bitcnt == 0 || bitcnt > 8) {
+				__wt_errx(session,
+				    "the fixed-width field size must be "
+				    "greater than 0 and less than or equal "
+				    "to 8");
+				return (WT_ERROR);
+			}
+			btree->bitcnt = (uint8_t)bitcnt;
+			btree->type = BTREE_COL_FIX;
+		}
+	}
 
-	/* File type. */
-	WT_RET(__btree_type(session));
+	WT_RET(__btree_page_sizes(session));		/* Page sizes */
 
-	/* Page sizes. */
-	WT_RET(__btree_page_sizes(session));
+	WT_RET(__wt_btree_huffman_open(session));	/* Huffman encoding */
 
-	/* Huffman encoding configuration. */
-	WT_RET(__wt_btree_huffman_open(session));
-
-	/* Set the key gap for prefix compression. */
-	WT_RET(__wt_config_getones(session, btree->config, "key_gap", &cval));
-	btree->key_gap = (uint32_t)cval.val;
-
-	/* Page compressor configuration. */
-	WT_RET(__wt_config_getones(session,
-	    btree->config, "block_compressor", &cval));
+	WT_RET(__wt_config_getones(			/* Page compressor */
+	    session, btree->config, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
 			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
@@ -178,6 +196,14 @@ __btree_conf(WT_SESSION_IMPL *session,
 			return (EINVAL);
 		}
 	}
+
+	btree->root_page.addr = WT_ADDR_INVALID;
+
+	TAILQ_INIT(&btree->freeqa);
+	TAILQ_INIT(&btree->freeqs);
+	btree->free_addr = WT_ADDR_INVALID;
+
+	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
 	return (0);
 }
@@ -404,52 +430,6 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	WT_RET(__btree_close_cache(session));
 	WT_RET(__btree_read_meta(session, cfg, flags));
 
-	return (0);
-}
-
-/*
- * __btree_type --
- *	Figure out the database type.
- */
-static int
-__btree_type(WT_SESSION_IMPL *session)
-{
-	const char *config;
-	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
-	uint32_t bitcnt;
-	int fixed;
-
-	btree = session->btree;
-	config = btree->config;
-
-	/* Validate types and check for fixed-length data. */
-	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
-	if (cval.len > 0 && strncmp(cval.str, "r", cval.len) == 0)
-		btree->type = BTREE_COL_VAR;
-	else
-		btree->type = BTREE_ROW;
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
-
-	WT_RET(__wt_config_getones(session, config, "value_format", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
-
-	if (btree->type == BTREE_COL_VAR) {
-		WT_RET(__wt_struct_check(
-		    session, cval.str, cval.len, &fixed, &bitcnt));
-		if (fixed) {
-			if (bitcnt == 0 || bitcnt > 8) {
-				__wt_errx(session,
-				    "the fixed-width field size must be "
-				    "greater than 0 and "
-				    "less than or equal to 8");
-				return (WT_ERROR);
-			}
-			btree->bitcnt = (uint8_t)bitcnt;
-			btree->type = BTREE_COL_FIX;
-		}
-	}
 	return (0);
 }
 
