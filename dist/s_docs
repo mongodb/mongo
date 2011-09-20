@@ -48,7 +48,10 @@ while :
 	-b)     # Include the Berkeley DB cross-reference
 		filter="$filter| sed 's,src/bdb-map.dox,,'"
 		shift;;
-	-t)     # Include the Berkeley DB cross-reference
+	-p)     # Generate PDFs
+		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
+		shift;;
+	-t)     # Include the TODO list
 		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
 		shift;;
 	*)

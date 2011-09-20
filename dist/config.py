@@ -15,23 +15,27 @@ tfile = open(tmp_file, 'w')
 
 cbegin_re = re.compile(r'(\s*\*\s*)@config(?:empty|start)\{(.*?),.*\}')
 
+def gettype(c):
+	'''Derive the type of a config item'''
+	checks = c.flags
+	ctype = checks.get('type', None)
+	if not ctype and ('min' in checks or 'max' in checks):
+		ctype = 'int'
+	return ctype or 'string'
+
 def typedesc(c):
 	'''Descripe what type of value is expected for the given config item'''
 	checks = c.flags
-	ctype = checks.get('type', None)
 	cmin = str(checks.get('min', ''))
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
-	if not ctype and ('min' in checks or 'max' in checks):
-		ctype = 'int'
-	desc = '. The value'
-	if ctype:
-		desc += ' must be ' + {'boolean' : 'a boolean flag',
-				'format': 'a format string',
-				'int' : 'an integer',
-				'list': 'a list'}[ctype]
-	else:
-		desc += ' must be a string'
+	ctype = gettype(c)
+	desc = '. The value must be ' + {
+		'boolean' : 'a boolean flag',
+		'format'  : 'a format string',
+		'int'     : 'an integer',
+		'list'    : 'a list',
+		'string'  : 'a string'}[ctype]
 	if cmin and cmax:
 		desc += ' between ' + cmin + ' and ' + cmax
 	elif cmin:
@@ -92,7 +96,8 @@ for line in open(f, 'r'):
 		desc = textwrap.dedent(c.desc)
 		desc += typedesc(c)
 		desc = desc.replace(',', '\\,')
-		default = '\\c ' + str(c.default) if c.default else ''
+		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
+				else 'empty'
 		output = '@config{' + name + ',' + desc + ',' + default + '}'
 		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
@@ -121,14 +126,12 @@ def checkstr(c):
 	'''Generate the JSON string used by __wt_config_check to validate the
 	config string'''
 	checks = c.flags
-	ctype = checks.get('type', None)
+	ctype = gettype(c)
 	cmin = str(checks.get('min', ''))
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
-	if not ctype and ('min' in checks or 'max' in checks):
-		ctype = 'int'
 	result = []
-	if ctype:
+	if ctype != 'string':
 		result.append('type=' + ctype)
 	if cmin:
 		result.append('min=' + cmin)
