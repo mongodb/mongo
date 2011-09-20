@@ -1,8 +1,5 @@
 /*! @page packing Packing and Unpacking Data
 
-- native C structs
-- portability between programming languages
-
 WiredTiger's data packing uses format strings similar to those specified in the
 Python struct module:
   http://docs.python.org/library/struct
@@ -23,11 +20,15 @@ If the first character is not one of these, '.' (big-endian, packed) is
 assumed: it naturally sorts in lexicographic order, and the packed format
 uses variable-sized encoding of values to reduce the data size.
 
-See @ref schema_types for the list of supported types.
+@notyet{format types}  <b>Only the default big-endian, packed format is currently supported.</b>
+
+The remaining characters in the format string specify the type of each field to be packed into or unpacked from a byte array.  See @ref schema_types for the list of supported types.
+
+@todo Descripe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
 
 @section config_examples Code Samples
 
-The code below is taken from the complete example program @ex_ref{ex_pack.c}.
+The code below is taken from the complete example program @ex_ref{ex_pack.c}.  It demonstrates how to pack three integer values into a buffer and then unpack them again.
 
 @dontinclude ex_pack.c
 @skip struct_size
