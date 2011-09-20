@@ -8,7 +8,7 @@ var db1 = r1.getDB('test');
 
 var t = '';
 for (var i = 0; i < 1000; i++) t += 'a';
-for (var i = 0; i < 10000; i++) db.foo.insert( {_id:i, x:i%1000, t:t} );
+for (var i = 0; i < 10000; i++) db1.foo.insert( {_id:i, x:i%1000, t:t} );
 db1.foo.createIndex( {x:1}, {v: 0} );
 
 var r2 = rs.add();
