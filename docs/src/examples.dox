@@ -17,8 +17,11 @@ Shows some common cursor types and operations.
 @example ex_pack.c
 Shows basic packing and unpacking of fields.
 
+@cond sharing
+@notyet{inter-process sharing}
 @example ex_process.c
 Shows how to connect to a database from multiple processes.
+@endcond
 
 @example ex_stat.c
 Shows how to access database and table statistics.
@@ -30,14 +33,17 @@ Shows how to create column-oriented data and access individual columns.
 Shows how to access a database with multiple threads.
 
 @example ex_transaction.c
-Shows how to use transactions.
+Shows how to use transactions.  @notyet{transactions}
 
 @example ex_call_center.c
 A more complex schema based on a call center example, showing how to map some
 SQL constructs onto the WiredTiger API.
 
+@cond bdb
+@notyet{remove bdb code from TPC-B example}
 @example ex_tpcb.c
 Translates the Berkeley DB TPC-B example program onto the WiredTiger API.
+@endcond
 
 @example ex_extending.c
 Shows how to extend WiredTiger with application-specific collations, extractors and cursor types.
