@@ -202,7 +202,8 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = "errors=\returns zero on success and a non-zero error code on failure" \
+ALIASES                = "notyet{1}=<b>Not yet supported in WiredTiger.</b>\n@todo fix when \1 supported\n\n" \
+			 "errors=\returns zero on success and a non-zero error code on failure" \
                          "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \

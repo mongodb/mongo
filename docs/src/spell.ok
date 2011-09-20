@@ -130,6 +130,7 @@ nolocking
 nommap
 nosync
 notgranted
+notyet
 nowait
 nul
 num

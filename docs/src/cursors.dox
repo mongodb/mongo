@@ -34,13 +34,16 @@ statistics:
 The following are builtin cursor types:
 <table>
 @hrow{URI, Function}
-@row{<tt>table:\<tablename\>[</tt>, ordinary table cursor}
-@row{<tt>file:\<filename\></tt>, ordinary table cursor}
+@row{<tt>table:\<tablename\></tt>, ordinary table cursor}
 @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>, column group cursor}
 @row{<tt>index:\<tablename\>.\<index\></tt>, index cursor}
-@row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>, Join the contents of multiple cursors together.}
+@row{<tt>file</tt><tt>:\<filename\></tt>, low-level file cursor}
+@row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>, Join the contents
+of multiple cursors together. @notyet{join cursors}}
 @row{<tt>config:[\<uri\>]</tt>, iterate through the configuration of an object}
-@row{<tt>statistics:[file:\<filename\>]</tt>, database or file statistics (key=(string)fieldname\, data=((uint64_t)value\, (string)printvalue\, (string)description)}
+@row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>, database or file
+statistics (key=(string)fieldname\,
+data=((uint64_t)value\, (string)printvalue\, (string)description)}
 </table>
 
 @section cursor_position Positioning a Cursor
@@ -133,11 +136,7 @@ To remove existing data using a cursor, use the WT_CURSOR::remove method:
 After any cursor handle method failure, the cursor's position is
 undetermined.  Applications that cannot re-position the cursor after
 failure must duplicate the cursor before calling a cursor method that
-will attempt to re-position the cursor.  <b>Cursor duplication is not
-yet available in WiredTiger.</b>
-
-@todo update when cursor duplication is implemented
-
+will attempt to re-position the cursor.  @notyet{cursor duplication}
 
 @subsection cursor_table Table Cursors
 

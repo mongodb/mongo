@@ -1,5 +1,7 @@
 /*! @page processes Sharing Between Processes
 
+@notyet{inter-process sharing}
+
 WiredTiger includes a server that provides remote access to databases.  The primary process to open a database can optionally start a server that handles requests from other processes.
 
 The remote interface is the way languages other than C/C++ are supported, and the interface for client processes in multiprocess C/C++ applications.
