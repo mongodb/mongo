@@ -549,8 +549,10 @@ string sayReplSetMemberState() {
                 MemberState ms(s);
                 return ms.toString();
             }
-            else if( str::equals(info.getStringField("info"), "mongos") ) { 
-                return "mongos";
+            else {
+                string s = info.getStringField("info");
+                if( s.size() < 20 )
+                    return s; // "mongos", "configsvr"
             }
         }
     }

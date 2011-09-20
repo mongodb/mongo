@@ -590,6 +590,9 @@ namespace mongo {
         bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) {
                 errmsg = "not running with --replSet";
+                if( cmdLine.configsvr ) { 
+                    result.append("info", "configsvr"); // for shell prompt
+                }
                 return false;
             }
 
