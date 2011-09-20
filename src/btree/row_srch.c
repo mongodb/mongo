@@ -26,6 +26,7 @@ __search_insert(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 	compare = btree->btree_compare;
+	ret_ins = NULL;
 
 	/* Fast-path appends. */
 	if ((ins = &inshead->tail[0]) != NULL) {
@@ -50,10 +51,12 @@ __search_insert(WT_SESSION_IMPL *session,
 			continue;
 		}
 
-		ret_ins = *ins;
-		insert_key.data = WT_INSERT_KEY(*ins);
-		insert_key.size = WT_INSERT_KEY_SIZE(*ins);
-		cmp = compare(btree, key, &insert_key);
+		if (ret_ins != *ins) {
+			ret_ins = *ins;
+			insert_key.data = WT_INSERT_KEY(ret_ins);
+			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
+			cmp = compare(btree, key, &insert_key);
+		}
 
 		if (cmp == 0)			/* Exact match: return */
 			break;
