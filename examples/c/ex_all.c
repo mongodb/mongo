@@ -79,11 +79,13 @@ session_ops(WT_SESSION *session)
 	int ret;
 
 	WT_CURSOR *cursor;
-	ret = session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	ret = session->open_cursor(session, "table:mytable",
+	    NULL, NULL, &cursor);
 
 	cursor_ops(cursor);
 
-	ret = session->create(session, "table:mytable", "key_format=S,value_format=S");
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S");
 
 	ret = session->rename(session, "table:old", "table:new", NULL);
 
@@ -279,7 +281,7 @@ int main(void)
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 
-	fprintf(stderr, "Error during operation: %s\n", wiredtiger_strerror(ret));
+	fprintf(stderr, "An error occurred: %s\n", wiredtiger_strerror(ret));
 	}
 
 	{

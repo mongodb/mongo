@@ -5,7 +5,8 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
-    ls  ../src/include/*.[hi] \
+    ls  ../examples/c/*.c \
+	../src/include/*.[hi] \
 	../src/include/*.in \
 	../test/format/*.[ch] \
 	../test/thread/*.[ch] \

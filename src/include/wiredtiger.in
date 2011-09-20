@@ -463,7 +463,7 @@ struct wt_session {
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip cursor;
-	 * @until ->open_cursor
+	 * @until ;
 	 *
 	 * @param session the session handle
 	 * @param uri the data source on which the cursor operates
@@ -499,12 +499,11 @@ struct wt_session {
 	/*! @name Table operations
 	 * @{
 	 */
-	/*! Create a table.
-	 *
-	 * @todo Allow both sets of syntax for describing schemas.
+	/*! Create a table, column group or index.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->create
+	 * @until ;
 	 *
 	 * @param session the session handle
 	 * @param name the uri of the object to create, such as \c "table:stock"

@@ -5,7 +5,8 @@
  *	All rights reserved.
  *
  * ex_thread.c
- *	This is an example demonstrating how to create and access a simple table.
+ *	This is an example demonstrating how to create and access a simple
+ *	table from multiple threads.
  */
 
 #include <stdio.h>
@@ -29,7 +30,8 @@ void *scan_thread(void *arg)
 	int ret;
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->open_cursor(session, "table:access", NULL, NULL, &cursor);
+	ret = session->open_cursor(session, "table:access",
+	    NULL, NULL, &cursor);
 
 	/* Show all records. */
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -49,7 +51,8 @@ int main(void)
 	pthread_t threads[NUM_THREADS];
 	int i, ret;
 
-	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)
+	if ((ret = wiredtiger_open(home, NULL,
+	    "create,multithread", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */

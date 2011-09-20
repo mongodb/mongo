@@ -25,7 +25,8 @@ const char *home = "WT_TEST";
  * CREATE INDEX CustomersPhone ON Customers(phone)
  *
  * CREATE TABLE Calls(id INTEGER PRIMARY KEY, call_date DATE,
- *     cust_id INTEGER, emp_id INTEGER, call_type VARCHAR(12), notes VARCHAR(25))
+ *     cust_id INTEGER, emp_id INTEGER, call_type VARCHAR(12),
+ *     notes VARCHAR(25))
  * CREATE INDEX CallsCustDate ON Calls(cust_id, call_date)
  *
  * In this example, both tables will use record numbers for their IDs, which
