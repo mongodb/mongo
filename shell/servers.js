@@ -520,7 +520,7 @@ printShardingStatus = function( configDB , verbose ){
     
     var version = configDB.getCollection( "version" ).findOne();
     if ( version == null ){
-        print( "printShardingStatus: not a shard db!" );
+        print( "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a mongos from the shell and not to a mongod." );
         return;
     }
     
