@@ -7,6 +7,7 @@ DBTs
 DbCursor
 DbEnv
 DbMultiple
+EB
 EmpId
 MVCC's
 RepMgr
@@ -31,8 +32,8 @@ cds
 checksums
 ckp
 colgroup
-cond
 command's
+cond
 config
 conn
 const
