@@ -37,12 +37,14 @@ stored as overflow items in the file.  In variable-length column-stores,
 values too large to fit on a normal page are stored as overflow items
 in the file.
 
-The minimum file allocation unit WiredTiger supports is 512B, the
-maximum file allocation unit is 512MB.  The minimum maximum file size
-is almost 2TB, the maximum maximum file size is 512PB.
+WiredTiger allocates space from the underlying files in block units.
+The minimum file allocation unit WiredTiger supports is 512B and the
+maximum file allocation unit is 512MB.  File block offsets are 32-bit,
+meaning the minimum maximum file size is 2TB and the maximum maximum
+file size is 2EB.
 
-Variable-length byte strings can be any length up to almost 4GB.
-Fixed-length values are limited to 8-bits (that is, only values between
-0 and 255 may be stored in fixed-length column-store files).
+Variable-length byte strings can be up to (4GB - 512B) in length.
+Fixed-length values are limited to 8-bits (that is, only values
+between 0 and 255 may be stored in fixed-length column-store files).
 
 */

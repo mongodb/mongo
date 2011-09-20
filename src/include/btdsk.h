@@ -20,12 +20,12 @@
 #define	WT_ADDR_INVALID		(UINT32_MAX)		/* Invalid address */
 
 /*
- * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
- * maximum maximum file size is almost 512PB (2^27 x 2^32 - 2).
+ * The minimum maximum file size is 2TB (512B x 2^32), and the maximum maximum
+ * file size is 2EB (512MB x 2^32).
  *
- * In summary, small file allocation units limit the file size, (but minimize
- * wasted space when storing overflow items), and when the allocation unit
- * grows, the maximum size of the file grows as well.
+ * In summary, small file allocation units limit the file size and minimize
+ * wasted space when storing overflow items; as the allocation unit grows,
+ * the maximum size of the file grows as well.
  *
  * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
  * (The maximum of 512MB is enforced by the software, it could be set as high
