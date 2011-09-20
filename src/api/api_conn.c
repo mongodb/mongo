@@ -261,10 +261,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	/* Free memory for compressors */
-	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__conn_remove_compressor(wt_conn, ncomp->compressor));
-
 	/* Close open sessions. */
 	for (tp = conn->sessions; (s = *tp) != NULL;) {
 		if (!F_ISSET(s, WT_SESSION_INTERNAL)) {
@@ -279,6 +275,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		} else
 			++tp;
 	}
+
+	/* Free memory for compressors */
+	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
+		WT_TRET(__conn_remove_compressor(wt_conn, ncomp->compressor));
 
 	WT_TRET(__wt_connection_close(conn));
 	/* We no longer have a session, don't try to update it. */
