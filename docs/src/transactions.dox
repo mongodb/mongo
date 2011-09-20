@@ -1,9 +1,7 @@
 /*! @page transactions Transactions
 
-<b>
-The 1.X releases of WiredTiger do not include support for transactions.
-This page describes the expected behavior of the 2.X releases.
-</b>
+@notyet{transactions}
+<b>This page describes the expected behavior of the 2.X releases.</b>
 
 @section transactions_acid The ACID properties.
 
@@ -26,9 +24,7 @@ When transactions are used, operations may fail with additional errors such as :
 
 @section transactions_cc Concurrency Control
 
-WiredTiger uses a timestamp-based optimistic concurrency control algorithm.  This avoids the bottleneck of a centralized lock manager and expensive graph searching to identify deadlock cycles.
-
-@todo write more about concurrency control 
+WiredTiger uses an optimistic concurrency control algorithm.  This avoids the bottleneck of a centralized lock manager and expensive graph searching to identify deadlock cycles.
 
 @section transaction_isolation Isolation Levels
 
