@@ -7,7 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_conf(
+	WT_SESSION_IMPL *, const char *, const char *, const char *);
 static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
@@ -51,7 +52,7 @@ __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name, const char *filename,
-    const char *treeconfig, const char *cfg[], uint32_t flags)
+    const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -78,8 +79,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 	__wt_unlock(session, conn->mtx);
 	if (matched) {
-		/* The treeconfig string will not be needed: free it now. */
-		__wt_free(session, treeconfig);
+		/* The config string will not be needed: free it now. */
+		__wt_free(session, config);
 		return (0);
 	}
 
@@ -87,11 +88,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &btree));
 	session->btree = btree;
 
-	/* Use the config string: it will be freed when the btree handle. */
-	btree->config = treeconfig;
-
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session, name, filename));
+	WT_ERR(__btree_conf(session, name, filename, config));
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0666, 1, &btree->fh));
@@ -121,7 +119,8 @@ err:	if (btree->fh != NULL)
  *	Initialize the WT_BTREE structure, after a zero-filled allocation.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
+__btree_conf(WT_SESSION_IMPL *session,
+    const char *name, const char *filename, const char *config)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -135,6 +134,9 @@ __btree_conf(WT_SESSION_IMPL *session, const char *name, const char *filename)
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
 	WT_RET(__wt_strdup(session, filename, &btree->filename));
+
+	/* Take the config string: it will be freed with the btree handle. */
+	btree->config = config;
 
 	btree->root_page.addr = WT_ADDR_INVALID;
 
