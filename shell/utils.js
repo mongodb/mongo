@@ -1668,7 +1668,8 @@ help = shellHelper.help = function (x) {
     else if (x == "") {
         print("\t" + "db.help()                    help on db methods");
         print("\t" + "db.mycoll.help()             help on collection methods");
-        print("\t" + "rs.help()                    help on replica set methods");
+        print("\t" + "sh.help()                    sharding helpers");
+        print("\t" + "rs.help()                    replica set helpers");
         print("\t" + "help admin                   administrative help");
         print("\t" + "help connect                 connecting to a db help");
         print("\t" + "help keys                    key shortcuts");
