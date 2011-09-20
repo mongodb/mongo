@@ -18,6 +18,7 @@ ack'ed
 api
 apiflags
 arg
+bdb
 bdbmap
 bool
 boolean
@@ -30,6 +31,7 @@ cds
 checksums
 ckp
 colgroup
+cond
 command's
 config
 conn
@@ -59,6 +61,7 @@ dumpfile
 dup
 dups
 endcode
+endcond
 endian
 english
 env

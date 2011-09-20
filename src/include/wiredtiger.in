@@ -596,7 +596,7 @@ struct wt_session {
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Rename a table.
+	/*! Rename a table. @notyet{session->rename}
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->rename
@@ -646,7 +646,7 @@ struct wt_session {
 	int __F(sync)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a table.
+	/*! Truncate a table. @notyet{session->rename}
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->truncate
@@ -686,7 +686,7 @@ struct wt_session {
 	/*! @name Transactions
 	 * @{
 	 */
-	/*! Start a transaction in this session.
+	/*! Start a transaction in this session. @notyet{transactions}
 	 *
 	 * All cursors opened in this session that support transactional
 	 * semantics will operate in the context of the transaction.  The
@@ -719,7 +719,7 @@ struct wt_session {
 	 */
 	int __F(begin_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Commit the current transaction.
+	/*! Commit the current transaction. @notyet{transactions}
 	 *
 	 * Any cursors opened during the transaction will be closed before
 	 * the commit is processed.
@@ -735,7 +735,7 @@ struct wt_session {
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Roll back the current transaction.
+	/*! Roll back the current transaction. @notyet{transactions}
 	 *
 	 * Any cursors opened during the transaction will be closed before
 	 * the rollback is processed.
@@ -752,6 +752,7 @@ struct wt_session {
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
 	/*! Flush the cache and/or the log and optionally archive log files.
+	 * @notyet{checkpoint}
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->checkpoint
@@ -842,7 +843,7 @@ struct wt_connection {
 	int __F(load_extension)(WT_CONNECTION *connection,
 	    const char *path, const char *config);
 
-	/*! Add a new type of cursor.
+	/*! Add a new type of cursor. @notyet{custom cursors}
 	 *
 	 * @dontinclude ex_all.c
 	 *
@@ -866,7 +867,7 @@ struct wt_connection {
 	int __F(add_cursor_type)(WT_CONNECTION *connection,
 	    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config);
 
-	/*! Add a custom collation function.
+	/*! Add a custom collation function. @notyet{custom collation}
 	 *
 	 * @dontinclude ex_all.c
 	 *
@@ -889,7 +890,7 @@ struct wt_connection {
 	int __F(add_collator)(WT_CONNECTION *connection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
-	/*! Add a compression function
+	/*! Add a compression function.
 	 *
 	 * @dontinclude ex_all.c
 	 *
@@ -913,6 +914,7 @@ struct wt_connection {
 	    const char *name, WT_COMPRESSOR *compressor, const char *config);
 
 	/*! Add a custom extractor for index keys or column groups.
+	 * @notyet{custom extractors}
 	 *
 	 * @dontinclude ex_all.c
 	 *
