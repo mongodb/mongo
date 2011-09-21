@@ -1808,7 +1808,7 @@ const StringData _jscode_raw_utils_sh =
 "\n" 
 "sh.moveChunk = function( fullName , find , to ) {\n" 
 "sh._checkFullName( fullName );\n" 
-"sh._adminCommand( { moveChunk : fullName , find : find , to : to } )\n" 
+"return sh._adminCommand( { moveChunk : fullName , find : find , to : to } )\n" 
 "}\n" 
 "\n" 
 "sh.setBalancerState = function( onOrNot ) {\n" 
