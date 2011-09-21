@@ -53,6 +53,7 @@
 #	we want to do here).
 
 import unittest
+import hashlib
 import wiredtiger
 from wiredtiger import WiredTigerError
 import wttest
@@ -86,7 +87,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
 
     def __init__(self, testname):
         wttest.WiredTigerTestCase.__init__(self, testname)
-        self.cur_initial_conditions(None, 0, None)
+        self.cur_initial_conditions(None, 0, None, None, None)
 
     # traceapi and friends are used internally in this module
     def traceapi(self, s):
@@ -104,21 +105,21 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def setup_encoders_decoders(self):
         if self.tablekind == 'row':
             self.encode_key = self.encode_key_row
-            self.encode_value = self.encode_value_row
             self.decode_key = self.decode_key_row
-            self.decode_value = self.decode_value_row
+            self.encode_value = self.encode_value_row_or_col
+            self.decode_value = self.decode_value_row_or_col
         elif self.tablekind == 'col':
-            self.encode_key = self.encode_key_col
-            self.encode_value = self.encode_value_col
-            self.decode_key = self.decode_key_col
-            self.decode_value = self.decode_value_col
+            self.encode_key = self.encode_key_col_or_fix
+            self.decode_key = self.decode_key_col_or_fix
+            self.encode_value = self.encode_value_row_or_col
+            self.decode_value = self.decode_value_row_or_col
         else:
-            self.encode_key = self.encode_key_fix
+            self.encode_key = self.encode_key_col_or_fix
+            self.decode_key = self.decode_key_col_or_fix
             self.encode_value = self.encode_value_fix
-            self.decode_key = self.decode_key_fix
             self.decode_value = self.decode_value_fix
 
-    def cur_initial_conditions(self, tablename, npairs, tablekind):
+    def cur_initial_conditions(self, tablename, npairs, tablekind, keysizes, valuesizes):
         if npairs >= 0xffffffff:
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
@@ -130,6 +131,8 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.curpos = -1
         self.curbits = 0xffffffffffff
         self.curremoved = False # K/V data in cursor does not correspond to active data
+        self.keysizes = keysizes
+        self.valuesizes = valuesizes
         if tablekind != None:
             cursor = self.session.open_cursor('table:' + tablename, None, None)
             for i in range(npairs):
@@ -159,63 +162,79 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def key_to_bits(self, key):
         pass
 
-    # There are variants of encode_key for each table kind: 'row', 'col', 'fix'
+    def stretch_content(self, s, sizes):
+        result = s
+        if sizes != None:
+            sha224 = hashlib.sha224(s)
+            md5 = sha224.digest()
+            low = sizes[0] - len(s)
+            if low < 0:
+                low = 0
+            high = sizes[1] - len(s)
+            if high < 0:
+                high = 0
+            diff = high - low
+            nextra = (ord(md5[4]) % (diff + 1)) + low
+            extra = sha224.hexdigest()
+            while len(extra) < nextra:
+                extra = extra + extra
+            result = s + extra[0:nextra]
+        return result
 
-    ################   ROW   ################
-    # TODO: something more sophisticated
+    def check_content(self, s, sizes):
+        if sizes != None:
+            stretched = self.stretch_content(s[0:20], sizes)
+            self.assertEquals(s, stretched)
+
+    # There are variants of {encode,decode}_{key,value} to be
+    # used with each table kind: 'row', 'col', 'fix'
+
     def encode_key_row(self, bits):
         # Prepend 0's to make the string exactly len 20
         # 64 bits fits in 20 decimal digits
+        # Then, if we're configured to have a longer key
+        # size, we'll append some additional length
+        # that can be regenerated based on the first part of the key
         result = str(bits)
         result = '00000000000000000000'[len(result):] + result
+        if self.keysizes != None:
+            result = self.stretch_content(result, self.keysizes)
         return result
 
-    # TODO: something more sophisticated
-    def encode_value_row(self, bits):
-        return self.encode_key(bits)
-
     def decode_key_row(self, s):
-        return int(s)
+        self.check_content(s, self.keysizes)
+        return int(s[0:20])
 
-    def decode_value_row(self, s):
-        return int(s)
+    def encode_value_row_or_col(self, bits):
+        # We use the same scheme as key.  So the 20 digits will
+        # be the same, but the last part may well be different
+        # if the size configuration is different.
+        result = str(bits)
+        result = '00000000000000000000'[len(result):] + result
+        if self.valuesizes != None:
+            result = self.stretch_content(result, self.valuesizes)
+        return result
 
-    ################   COL   ################
-    def encode_key_col(self, bits):
+    def decode_value_row_or_col(self, s):
+        self.check_content(s, self.valuesizes)
+        return int(s[0:20])
+
+    def encode_key_col_or_fix(self, bits):
         # 64 bit key
         maj = ((bits >> 32) & 0xffffffff) + 1
         min = (bits >> 16) & 0xffff
         return long((maj << 16) | min)
 
-    # TODO: something more sophisticated
-    def encode_value_col(self, bits):
-        return self.encode_key_row(bits)
-
-    def decode_key_col(self, bits):
+    def decode_key_col_or_fix(self, bits):
         maj = ((bits << 16) & 0xffffffff) - 1
         min = bits & 0xffff
         return ((maj << 32) | (min << 16))
-
-    def decode_value_col(self, s):
-        return int(s)
-
-    ################   FIX   ################
-    def encode_key_fix(self, bits):
-        # 64 bit key
-        maj = ((bits >> 32) & 0xffff) + 1
-        min = (bits >> 16) & 0xffff
-        return long((maj << 16) | min)
 
     def encode_value_fix(self, bits):
         # can only encode only 8 bits
         maj = ((bits >> 32) & 0xff)
         min = (bits >> 16) & 0xff
         return (maj ^ min)
-
-    def decode_key_fix(self, s):
-        maj = ((bits << 16) & 0xffff) - 1
-        min = bits & 0xffff
-        return ((maj << 32) | (min << 16))
 
     def decode_value_fix(self, s):
         return int(s)

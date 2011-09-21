@@ -22,7 +22,7 @@ class test_cursor03(TestCursorTracker):
     key/value content and to track/verify content
     after inserts and removes.
     """
-    TODO_scenarios = multiply_scenarios('.', [
+    scenarios = multiply_scenarios('.', [
             ('row', dict(tablekind='row', keysize=None, valsize=None)),
             ('col', dict(tablekind='col', keysize=None, valsize=None)),
             #('fix', dict(tablekind='fix', keysize=None, valsize=None))
@@ -30,12 +30,9 @@ class test_cursor03(TestCursorTracker):
             ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000])),
             ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000])),
         ], [
-            ('count1000', dict(tablecount=1000)),
-            ('count100000', dict(tablecount=100000))
+            ('count1000', dict(tablecount=1000,cache_size=20*1024*1024)),
+            ('count10000', dict(tablecount=10000, cache_size=64*1024*1024))
             ])
-
-    # TODO: use the scenarios above.  For now we have a single fixed scenario:
-    scenarios = [('count100000.col', dict(tablekind='col', tablecount=100000, keysize=None, valsize=None))]
 
     def create_session_and_cursor(self):
         tablearg = "table:" + self.table_name1
@@ -50,11 +47,16 @@ class test_cursor03(TestCursorTracker):
         create_args = keyformat + ',' + valformat + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
-        self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind)
+        self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind, self.keysize, self.valsize)
         return self.session.open_cursor(tablearg, None, None)
 
-    # TODO: test disabled so we can focus on errant test
-    def TODO_test_multiple_remove(self):
+    def setUpConnectionOpen(self, dir):
+        wtopen_args = 'create,cache_size=' + str(self.cache_size);
+        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
+        self.pr(`conn`)
+        return conn
+
+    def test_multiple_remove(self):
         """
         Test multiple deletes at the same place
         """
@@ -71,11 +73,9 @@ class test_cursor03(TestCursorTracker):
         self.cur_check_here(cursor)
         self.cur_check_forward(cursor, 2)
 
-        self.cur_dump_here(cursor, 'after second next: ')
         cursor.close(None)
 
-    # TODO: test disabled so we can focus on errant test
-    def TODO_test_insert_and_remove(self):
+    def test_insert_and_remove(self):
         """
         Test a variety of insert, deletes and iteration
         """
@@ -99,19 +99,6 @@ class test_cursor03(TestCursorTracker):
         self.cur_check_forward(cursor, 5)
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
-        self.cur_last(cursor)
-        self.cur_check_backward(cursor, -1)
-        cursor.close(None)
-
-    def test_minimal(self):
-        """
-        Test iteration through existing table
-        """
-        cursor = self.create_session_and_cursor()
-        self.cur_first(cursor)
-        print('>>> before iterate forward to the end...')
-        self.cur_check_forward(cursor, -1)
-        print('>>> after iterate forward to the end...')
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
         cursor.close(None)
