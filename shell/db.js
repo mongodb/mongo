@@ -390,7 +390,10 @@ DB.prototype._initExtraInfo = function() {
 }
 
 DB.prototype._getExtraInfo = function(action) {
-    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) {
+        __callLastError = true;
+        return;
+    }
 
     // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
     var res = this.getLastErrorCmd(1); 
@@ -400,7 +403,6 @@ DB.prototype._getExtraInfo = function(action) {
             return res.err;
         }
 
-        if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
         var info = action + " ";  
         // hack for inserted because res.n is 0
         info += action != "Inserted" ? res.n : 1;

@@ -1,5 +1,6 @@
 __quiet = false;
 __magicNoPrint = { __magicNoPrint : 1111 }
+__callLastError = false; 
 _verboseShell = false;
 
 chatty = function(s){
@@ -1016,8 +1017,15 @@ testLog = function(x){
 }
 
 shellPrintHelper = function (x) {
-
     if (typeof (x) == "undefined") {
+        if (__callLastError) {
+            __callLastError = false;
+            // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
+            var err = db.getLastError(1);
+            if (err != null) {
+                print(err);
+            }
+        }
         return;
     }
 
