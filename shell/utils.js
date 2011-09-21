@@ -1470,7 +1470,7 @@ rs.help = function () {
     print("\tan error, even if the command succeeds.");
     print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
-rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
+rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }

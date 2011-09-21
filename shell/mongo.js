@@ -29,6 +29,10 @@ Mongo.prototype.setSlaveOk = function( value ) {
     this.slaveOk = value;
 }
 
+Mongo.prototype.getSlaveOk = function() {
+    return this.slaveOk || false;
+}
+
 Mongo.prototype.getDB = function( name ){
     return new DB( this , name );
 }

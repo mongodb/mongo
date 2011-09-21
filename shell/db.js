@@ -844,3 +844,13 @@ DB.autocomplete = function(obj){
     }
     return ret;
 }
+
+DB.prototype.setSlaveOk = function( value ) {
+    if( value == undefined ) value = true;
+    this._slaveOk = value;
+}
+
+DB.prototype.getSlaveOk = function() {
+    if (this._slaveOk != undefined) return this._slaveOk;
+    return this._mongo.getSlaveOk();
+}

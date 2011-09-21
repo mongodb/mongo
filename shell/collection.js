@@ -142,14 +142,14 @@ DBCollection.prototype._validateForStorage = function( o ){
 };
 
 
-DBCollection.prototype.find = function( query , fields , limit , skip ){
+DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
     return new DBQuery( this._mongo , this._db , this ,
-                        this._fullName , this._massageObject( query ) , fields , limit , skip );
+                        this._fullName , this._massageObject( query ) , fields , limit , skip , batchSize , options || this.getQueryOptions() );
 }
 
-DBCollection.prototype.findOne = function( query , fields ){
+DBCollection.prototype.findOne = function( query , fields, options ){
     var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , 
-        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , 0 /* options */ );
+        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , options || this.getQueryOptions() /* options */ );
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();
@@ -844,6 +844,19 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
    
 }
 
+DBCollection.prototype.setSlaveOk = function( value ) {
+    if( value == undefined ) value = true;
+    this._slaveOk = value;
+}
 
+DBCollection.prototype.getSlaveOk = function() {
+    if (this._slaveOk != undefined) return this._slaveOk;
+    return this._db.getSlaveOk();
+}
 
+DBCollection.prototype.getQueryOptions = function() {
+    var options = 0;
+    if (this.getSlaveOk()) options |= 4;
+    return options;
+}
 
