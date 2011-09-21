@@ -123,8 +123,6 @@ struct __wt_btree {
 	uint32_t free_addr;		/* Free-list addr/size pair */
 	uint32_t free_size;
 
-	WT_BUF   key_srch;		/* Search key buffer */
-
 	WT_WALK  evict_walk;		/* Eviction thread's walk state */
 	WT_PAGE *evict_page;		/* Eviction thread's page */
 

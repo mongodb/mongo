@@ -209,19 +209,19 @@ new_page:	*recnop = cbt->recno;
 				continue;
 			case WT_CELL_VALUE:
 				if (session->btree->huffman_value == NULL) {
-					cbt->value.data = unpack.data;
-					cbt->value.size = unpack.size;
+					cbt->tmp.data = unpack.data;
+					cbt->tmp.size = unpack.size;
 					break;
 				}
 				/* FALLTHROUGH */
 			default:
 				WT_RET(__wt_cell_unpack_copy(
-				    session, &unpack, &cbt->value));
+				    session, &unpack, &cbt->tmp));
 			}
 			cbt->vslot = slot;
 		}
-		val->data = cbt->value.data;
-		val->size = cbt->value.size;
+		val->data = cbt->tmp.data;
+		val->size = cbt->tmp.size;
 		return (0);
 	}
 	/* NOTREACHED */

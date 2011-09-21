@@ -329,7 +329,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *cfg[])
 
 	__cursor_func_init(cbt, 1);
 
-	__wt_buf_free(session, &cbt->value);
+	__wt_buf_free(session, &cbt->tmp);
 
 	return (0);
 }

@@ -178,9 +178,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			_item.size = ikey->size;
 			item = &_item;
 		} else {
-			WT_ERR(
-			    __wt_row_key(session, page, rip, &btree->key_srch));
-			item = (WT_ITEM *)&btree->key_srch;
+			WT_ERR(__wt_row_key(session, page, rip, &cbt->tmp));
+			item = (WT_ITEM *)&cbt->tmp;
 		}
 
 		cmp = compare(btree, key, item);
