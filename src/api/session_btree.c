@@ -39,10 +39,12 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		__wt_writelock(session, btree->rwlock);
 		/*
-		 * If we are locking a newly opened handle, cfg is NULL, so
-		 * this test checks when we need to reconfigure an open handle.
+		 * Check if the handle needs to be reopened.  If the handle
+		 * was just opened, cfg is NULL, so there is no need to reopen
+		 * in that case.
 		 */
-		if (LF_ISSET(WT_BTREE_SALVAGE | WT_BTREE_VERIFY) && cfg != NULL)
+		if (cfg != NULL && LF_ISSET(
+		    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
 			return (__wt_btree_reopen(session, cfg, flags));
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
@@ -68,7 +70,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had exclusive access, reopen the tree without special flags so
 	 * that other threads can use it.
 	 */
-	if (F_ISSET(btree, WT_BTREE_VERIFY | WT_BTREE_SALVAGE)) {
+	if (F_ISSET(btree,
+	    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 		ret = __wt_btree_reopen(session, NULL, 0);
 	} else if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))

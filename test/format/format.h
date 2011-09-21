@@ -115,7 +115,7 @@ int	 wts_ops(void);
 uint32_t wts_rand(void);
 int	 wts_read_scan(void);
 int	 wts_salvage(void);
-int	 wts_startup(void);
+int	 wts_startup(int);
 int	 wts_stats(void);
 int	 wts_teardown(void);
 int	 wts_verify(const char *);

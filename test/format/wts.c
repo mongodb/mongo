@@ -113,7 +113,7 @@ wts_close(WT_CONNECTION *conn)
 }
 
 int
-wts_startup(void)
+wts_startup(int open_cursors)
 {
 	time_t now;
 	WT_CONNECTION *conn;
@@ -164,27 +164,32 @@ wts_startup(void)
 		return (1);
 	}
 
-	/*
-	 * We open 2 cursors, one configured for overwriting, one not configured
-	 * for overwriting.  The reason is that for row-store and column-store
-	 * files where we're testing with existing records, we don't track if a
-	 * record was deleted or not, which means we need to use cursor->insert
-	 * with overwriting configured.  But, in column-store files where we're
-	 * testing with new, appended records, we don't want to have to specify 
-	 * the record number, which means we can't configure with overwriting.
-	 */
-	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, NULL, &cursor_insert)) != 0) {
-		fprintf(stderr, "%s: open_cursor: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, "overwrite", &cursor)) != 0) {
-		fprintf(stderr, "%s: open_cursor: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	if (open_cursors) {
+		/*
+		 * We open 2 cursors, one configured for overwriting, one not
+		 * configured for overwriting.  The reason is that for
+		 * row-store and column-store files where we're testing with
+		 * existing records, we don't track if a record was deleted or
+		 * not, which means we need to use cursor->insert with
+		 * overwriting configured.  But, in column-store files where
+		 * we're testing with new, appended records, we don't want to
+		 * have to specify the record number, which means we can't
+		 * configure with overwriting.
+		 */
+		if ((ret = session->open_cursor(
+		    session, WT_TABLENAME, NULL, NULL, &cursor_insert)) != 0) {
+			fprintf(stderr, "%s: open_cursor: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
+			return (1);
+		}
+		if ((ret = session->open_cursor(
+		    session, WT_TABLENAME, NULL, "overwrite", &cursor)) != 0) {
+			fprintf(stderr, "%s: open_cursor: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
+			return (1);
+		}
+	} else
+		cursor = cursor_insert = NULL;
 
 	if (g.logging) {
 		(void)time(&now);
@@ -194,9 +199,9 @@ wts_startup(void)
 	}
 
 	g.wts_conn = conn;
-	g.wts_session = session;
 	g.wts_cursor = cursor;
 	g.wts_cursor_insert = cursor_insert;
+	g.wts_session = session;
 
 	return (0);
 }
@@ -225,8 +230,9 @@ wts_teardown(void)
 	/*
 	 * Close the open cursors -- they will block sync.
 	 */
-	if ((ret = cursor_insert->close(cursor_insert, NULL)) != 0 ||
-	    (ret = cursor->close(cursor, NULL)) != 0)
+	if ((cursor_insert != NULL &&
+	    (ret = cursor_insert->close(cursor_insert, NULL)) != 0) ||
+	    (cursor != NULL && (ret = cursor->close(cursor, NULL)) != 0))
 		die("cursor.close", ret);
 
 	ret = wts_sync();

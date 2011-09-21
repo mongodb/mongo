@@ -308,17 +308,26 @@ int
 __wt_curfile_open(WT_SESSION_IMPL *session,
     const char *name, const char *config, WT_CURSOR **cursorp)
 {
+	WT_CONFIG_ITEM cval;
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 	const char *filename;
+	uint32_t open_flags;
+
+	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
+	if (cval.val != 0)
+		open_flags = WT_BTREE_EXCLUSIVE | WT_BTREE_BULK;
+	else
+		open_flags = 0;
 
 	/* TODO: handle projections. */
 
 	filename = name;
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		WT_RET(__wt_schema_get_btree(session,
-		    name, strlen(name), NULL, 0));
+		    name, strlen(name), NULL, open_flags));
 	else if (WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET(__wt_session_get_btree(session,
-		     name, filename, NULL, NULL, 0));
+		     name, filename, NULL, NULL, open_flags));
 	else
 		return (EINVAL);
 

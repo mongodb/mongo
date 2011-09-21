@@ -79,7 +79,7 @@ main(int argc, char *argv[])
 		config_print(0);		/* Dump run configuration */
 
 		bdb_startup();			/* Initial file config */
-		if (wts_startup())
+		if (wts_startup(0))
 			return (EXIT_FAILURE);
 
 		key_gen_setup();		/* Setup keys */
@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {
-			if (wts_startup())
+			if (wts_startup(1))
 				goto err;
 
 			if (wts_read_scan())
