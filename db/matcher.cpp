@@ -311,24 +311,34 @@ namespace mongo {
 
     bool Matcher::parseClause( const BSONElement &e ) {
         const char *ef = e.fieldName();
+
         if ( ef[ 0 ] != '$' )
             return false;
+        
+        // $and
         if ( ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' ) {
             parseExtractedClause( e, _andMatchers );
+            return true;
         }
-        else if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
+
+        // $or
+        if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
             parseExtractedClause( e, _orMatchers );
+            return true;
         }
-        else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
+        
+        // $nor
+        if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
             parseExtractedClause( e, _norMatchers );
+            return true;
         }
-        else if ( ef[ 1 ] == 'c' && ef[ 2 ] == 'o' && ef[ 3 ] == 'm' && str::equals( ef , "$comment" ) ) {
-            // $comment is a noop
+        
+        // $comment
+        if ( ef[ 1 ] == 'c' && ef[ 2 ] == 'o' && ef[ 3 ] == 'm' && str::equals( ef , "$comment" ) ) {
+            return true;
         }
-        else {
-            return false;
-        }
-        return true;
+
+        return false;
     }
     
     void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
