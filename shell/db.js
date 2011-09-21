@@ -384,12 +384,13 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     return this._dbCommand( cmd );
 }
 
-DB.prototype._initExtraInfo = function() { 
-    if ( !_verboseShell ) return;
-    this.startTime = new Date().getTime(); 
-} 
- 
-DB.prototype._getExtraInfo = function(action) { 
+DB.prototype._initExtraInfo = function() {
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
+    this.startTime = new Date().getTime();
+}
+
+DB.prototype._getExtraInfo = function(action) {
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
 
     // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
     var res = this.getLastErrorCmd(1); 
@@ -399,7 +400,7 @@ DB.prototype._getExtraInfo = function(action) {
             return res.err;
         }
 
-        if ( !_verboseShell ) return;
+        if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
         var info = action + " ";  
         // hack for inserted because res.n is 0
         info += action != "Inserted" ? res.n : 1;
