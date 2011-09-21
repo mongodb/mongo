@@ -81,12 +81,14 @@ class wtscenario:
             for imax in powerrange(imin, 512*megabyte, 1024):
                 for lmin in powerrange(512, 512*megabyte, 1024):
                     for lmax in powerrange(lmin, 512*megabyte, 1024):
-                        scen = wtscenario()
-                        scen.imin = imin
-                        scen.imax = imax
-                        scen.lmin = lmin
-                        scen.lmax = lmax
-                        s.append((scen.shortName(), dict(session_create_scenario=scen)))
+                        for cache in [megabyte, 32*megabyte, 1000*megabyte]:
+                            scen = wtscenario()
+                            scen.imin = imin
+                            scen.imax = imax
+                            scen.lmin = lmin
+                            scen.lmax = lmax
+                            scen.cache_size = cache
+                            s.append((scen.shortName(), dict(session_create_scenario=scen)))
         return s
 
     def shortName(self):
@@ -95,7 +97,7 @@ class wtscenario:
         representing the four values for {internal,leaf} {minimum, maximum}
         page size.
         """
-        return 'scen_' + log2chr(self.imin) + log2chr(self.imax) + log2chr(self.lmin) + log2chr(self.lmax)
+        return 'scen_' + log2chr(self.imin) + log2chr(self.imax) + log2chr(self.lmin) + log2chr(self.lmax) + log2chr(self.cache_size)
 
     def configString(self):
         """
