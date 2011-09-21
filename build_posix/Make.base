@@ -37,7 +37,8 @@ $(srcdir)/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/mak
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
 
-$(srcdir)/src/include/extern.h: prototype.chk
+$(top_srcdir)/src/include/extern.h: auto-includes.chk
+$(top_srcdir)/src/include/wt_internal.in: auto-includes.chk
 
-prototype.chk: $(libwiredtiger_la_SOURCES)
-	@(cd $(srcdir)/dist && sh s_prototypes) && touch $@
+auto-includes.chk: $(libwiredtiger_la_SOURCES)
+	@(cd $(srcdir)/dist && sh s_prototypes && sh s_typedef -b) && touch $@
