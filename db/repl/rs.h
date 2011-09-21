@@ -485,7 +485,8 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool initialSyncOplogApplication(OpTime applyGTE, OpTime minValid);
+        bool initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid);
+        bool _initialSyncOplogApplication(OplogReader& r, const Member *source, const OpTime& applyGTE, const OpTime& minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();

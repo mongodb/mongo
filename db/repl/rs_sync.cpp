@@ -51,16 +51,29 @@ namespace mongo {
        @return false on failure.
        this method returns an error and doesn't throw exceptions (i think).
     */
-    bool ReplSetImpl::initialSyncOplogApplication(OpTime applyGTE, OpTime minValid) {
+    bool ReplSetImpl::initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid) {
         Member *source = 0;
         OplogReader r;
 
-        if( (source = _getOplogReader(r, applyGTE.isNull())) == 0) {
-            log() << "replSet initial sync error: couldn't find oplog to sync from" << rsLog;
-            return false;
+        // keep trying to initial sync from oplog until we run out of targets
+        while ((source = _getOplogReader(r, applyGTE.isNull())) != 0) {
+            if (_initialSyncOplogApplication(r, source, applyGTE, minValid)) {
+                return true;
+            }
+
+            r.resetConnection();
+            veto(source->fullName(), 60);
+            log() << "replSet applying oplog from " << source->fullName() << " failed, trying again" << endl;
         }
 
-        const string hn = source->h().toString();
+        log() << "replSet initial sync error: couldn't find oplog to sync from" << rsLog;
+        return false;
+    }
+
+    bool ReplSetImpl::_initialSyncOplogApplication(OplogReader& r, const Member *source,
+        const OpTime& applyGTE, const OpTime& minValid) {
+
+        const string hn = source->fullName();
         OplogReader missingObjReader;
         try {
             r.tailingQueryGTE( rsoplog, applyGTE );
