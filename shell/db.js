@@ -389,12 +389,20 @@ DB.prototype._initExtraInfo = function() {
     this.startTime = new Date().getTime(); 
 } 
  
-DB.prototype._getExtraInfo = function() { 
-    if ( !_verboseShell ) return;
+DB.prototype._getExtraInfo = function(action) { 
 
-    var res = this.getLastErrorCmd(); 
-    if (res) {  
-        var info = "Modified " + res.n;  
+    // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
+    var res = this.getLastErrorCmd(1); 
+    if (res) {
+        if (res.err != undefined && res.err != null) {
+            // error occured, display it
+            return res.err;
+        }
+
+        if ( !_verboseShell ) return;
+        var info = action + " ";  
+        // hack for inserted because res.n is 0
+        info += action != "Inserted" ? res.n : 1;
         if (res.n > 0 && res.updatedExisting != undefined) info += " " + (res.updatedExisting ? "existing" : "new")  
         info += " record(s)";  
         var time = new Date().getTime() - this.startTime;  

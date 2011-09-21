@@ -172,8 +172,10 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
             obj[key] = tmp[key];
         }
     }
+    this._db._initExtraInfo();
     this._mongo.insert( this._fullName , obj );
     this._lastID = obj._id;
+    return this._db._getExtraInfo("Inserted");
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
@@ -184,7 +186,7 @@ DBCollection.prototype.remove = function( t , justOne ){
     }
     this._db._initExtraInfo();
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
-    return this._db._getExtraInfo();
+    return this._db._getExtraInfo("Removed");
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -203,7 +205,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     }
     this._db._initExtraInfo();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
-    return this._db._getExtraInfo();
+    return this._db._getExtraInfo("Updated");
 }
 
 DBCollection.prototype.save = function( obj ){
