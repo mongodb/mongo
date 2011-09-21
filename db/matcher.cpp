@@ -322,6 +322,9 @@ namespace mongo {
         else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
             parseExtractedClause( e, _norMatchers );
         }
+        else if ( ef[ 1 ] == 'c' && ef[ 2 ] == 'o' && ef[ 3 ] == 'm' && str::equals( ef , "$comment" ) ) {
+            // $comment is a noop
+        }
         else {
             return false;
         }
