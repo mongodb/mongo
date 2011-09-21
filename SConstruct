@@ -376,9 +376,11 @@ serverOnlyFiles = Split( "util/compress.cpp db/key.cpp db/btreebuilder.cpp util/
 serverOnlyFiles += [ "db/index.cpp" , "db/scanandorder.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
-serverOnlyFiles += Glob( "db/commands/*.cpp" )
-coreServerFiles += Glob( "db/stats/*.cpp" )
+serverOnlyFiles += [ "db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+
+coreServerFiles += Glob( "db/stats/*.cpp" )
+coreServerFiles += [ "db/commands/isself.cpp" ]
 
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
