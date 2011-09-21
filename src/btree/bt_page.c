@@ -374,7 +374,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
-		 * prefix-compressed page.
+		 * prefix-compressed key.
 		 */
 		if (!unpack->ovfl) {
 			tmp = last;
@@ -455,9 +455,9 @@ static int
 __inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
+	WT_BUF *tmp;
 	WT_ROW *rip;
 	uint32_t i;
-	uint8_t *list;
 	int ret;
 
 	btree = session->btree;
@@ -481,15 +481,16 @@ __inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(__bit_alloc(session, page->entries, &list));
-	__inmem_row_leaf_slots(list, 0, page->entries, btree->key_gap);
+	WT_RET(__wt_scr_alloc(session, __bitstr_size(page->entries), &tmp));
+
+	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row_leaf.d, i = 0; i < page->entries; ++rip, ++i)
-		if (__bit_test(list, i))
+		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
 
-err:	__wt_free(session, list);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
