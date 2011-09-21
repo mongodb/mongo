@@ -27,7 +27,7 @@ int showprgr;                            /* whether to show progression */
 /* function prototypes */
 int main(int argc, char **argv);
 void usage(void);
-int setup(char *name, const char *tconfig, const char *cconfig, WT_CURSOR **cursor);
+int setup(char *name, const char *kf, const char *vf, const char *cconfig, WT_CURSOR **cursor);
 int teardown(void);
 int runwrite(int argc, char **argv);
 int runread(int argc, char **argv);
@@ -296,19 +296,21 @@ int myrand(void){
 
 WT_CONNECTION *conn;
 
-int setup(char *name, const char *tconfig, const char *cconfig, WT_CURSOR **cursor){
+int setup(char *name, const char *kf, const char *vf, const char *cconfig, WT_CURSOR **cursor){
   WT_SESSION *session;
   int creating, ret;
+  char tconfig[64];
 
-  creating = (tconfig != NULL);
+  creating = (kf != NULL);
 
   if((ret = wiredtiger_open(NULL, NULL, NULL, &conn) != 0) ||
-     (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
     return ret;
 
   /* If we get a configuration, create the table. */
   if(creating) {
     (void)session->drop(session, name, "force");
+    snprintf(tconfig, sizeof(tconfig), "key_format=%s,value_format=%s", kf, vf);
     if ((ret = session->create(session, name, tconfig)) != 0)
       return ret;
   }
@@ -334,7 +336,7 @@ int dowrite(char *name, int rnum, int bulk, int rnd){
   if(showprgr)
     printf("<Write Test of Row Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=u,value_format=u", bulk ? "bulk" : NULL, &c) != 0) {
+  if(setup(name, "u", "u", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
@@ -382,7 +384,7 @@ int doread(char *name, int rnum, int rnd){
   if(showprgr)
     printf("<Read Test of Row Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, NULL, NULL, &c) != 0){
+  if(setup(name, NULL, NULL, NULL, &c) != 0){
     fprintf(stderr, "open failed\n");
     return 1;
   }
@@ -430,7 +432,7 @@ int dovlcswrite(char *name, int rnum, int bulk, int rnd){
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=r,value_format=u", bulk ? "bulk" : NULL, &c) != 0) {
+  if(setup(name, "r", "u", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
@@ -477,7 +479,7 @@ int dovlcsread(char *name, int rnum, int rnd){
   if(showprgr)
     printf("<Read Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, NULL, NULL, &c) != 0){
+  if(setup(name, NULL, NULL, NULL, &c) != 0){
     fprintf(stderr, "open failed\n");
     return 1;
   }
@@ -522,7 +524,7 @@ int doflcswrite(char *name, int rnum, int bulk, int rnd){
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, "key_format=r,value_format=8t", bulk ? "bulk" : NULL, &c) != 0) {
+  if(setup(name, "r", "8t", bulk ? "bulk" : NULL, &c) != 0) {
     fprintf(stderr, "create failed\n");
     (void)teardown();
     return 1;
@@ -568,7 +570,7 @@ int doflcsread(char *name, int rnum, int rnd){
   if(showprgr)
     printf("<Read Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
   /* open a database */
-  if(setup(name, NULL, NULL, &c) != 0){
+  if(setup(name, NULL, NULL, NULL, &c) != 0){
     fprintf(stderr, "open failed\n");
     return 1;
   }
