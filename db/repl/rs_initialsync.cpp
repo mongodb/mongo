@@ -79,8 +79,9 @@ namespace mongo {
         d->emptyCappedCollection(rsoplog);
     }
 
-    const Member* ReplSetImpl::getMemberToSyncTo() {
+    Member* ReplSetImpl::getMemberToSyncTo() {
         Member *closest = 0;
+        time_t now = 0;
 
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
@@ -98,7 +99,27 @@ namespace mongo {
                 (m->state() == MemberState::RS_PRIMARY ||
                  (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
                 (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
-                closest = m;
+
+                map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
+                if (vetoed == _veto.end()) {
+                    closest = m;
+                    break;
+                }
+
+                if (now == 0) {
+                    now = time(0);
+                }
+
+                // if this was on the veto list, check if it was vetoed in the last "while"
+                if ((*vetoed).second < now) {
+                    _veto.erase(vetoed);
+                    closest = m;
+                    break;
+                }
+
+                // if it was recently vetoed, skip
+                log() << "replSet not trying to sync from " << (*vetoed).first
+                      << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
             }
         }
 
@@ -115,7 +136,11 @@ namespace mongo {
 
         sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
 
-        return const_cast<Member*>(closest);
+        return closest;
+    }
+
+    void ReplSetImpl::veto(const string& host, const unsigned secs) {
+        _veto[host] = time(0)+secs;
     }
 
     /**
@@ -175,6 +200,7 @@ namespace mongo {
                     }
                     if( !ok ) {
                         sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
+                        veto(source->fullName(), 600);
                         sleepsecs(300);
                         return;
                     }
@@ -194,11 +220,10 @@ namespace mongo {
         assert( !mvoptime.isNull() );
         assert( mvoptime >= startingTS );
 
-        /* apply startingTS..mvoptime portion of the oplog
-        */
+        // apply startingTS..mvoptime portion of the oplog
         {
-            isyncassert( str::stream() << "initial sync source must remain readable throughout our initial sync [2] state now: " << source->state().toString() , source->state().readable() );
-            if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
+            // note we assume here that this call does not throw
+            if( ! initialSyncOplogApplication(startingTS, mvoptime) ) {
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
                 

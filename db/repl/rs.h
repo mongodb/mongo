@@ -345,7 +345,8 @@ namespace mongo {
         /**
          * Find the closest member (using ping time) with a higher latest optime.
          */
-        const Member* getMemberToSyncTo();
+        Member* getMemberToSyncTo();
+        void veto(const string& host, unsigned secs=10);
         Member* _currentSyncTarget;
 
         // set of electable members' _ids
@@ -484,8 +485,7 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        /* pulling data from primary related - see rs_sync.cpp */
-        bool initialSyncOplogApplication(const Member *primary, OpTime applyGTE, OpTime minValid);
+        bool initialSyncOplogApplication(OpTime applyGTE, OpTime minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
@@ -495,8 +495,17 @@ namespace mongo {
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
-        bool _getOplogReader(OplogReader& r, string& hn);
-        bool _isStale(OplogReader& r, const string& hn);
+
+        // get an oplog reader for a server with an oplog entry timestamp greater
+        // than or equal to minTS, if set.
+        Member* _getOplogReader(OplogReader& r, const OpTime& minTS);
+
+        // check lastOpTimeWritten against the remote's earliest op, filling in
+        // remoteOldestOp.
+        bool _isStale(OplogReader& r, const OpTime& minTS, BSONObj& remoteOldestOp);
+
+        // keep a list of hosts that we've tried recently that didn't work
+        map<string,time_t> _veto;
     public:
         void syncThread();
         const OpTime lastOtherOpTime() const;
