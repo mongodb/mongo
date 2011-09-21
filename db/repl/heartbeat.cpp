@@ -203,7 +203,7 @@ namespace mongo {
                     HeartbeatInfo::numPings++;
 
                     if( mem.upSince == 0 ) {
-                        log() << "replSet info member " << h.toString() << " is up" << rsLog;
+                        log() << "replSet member " << h.toString() << " is up" << rsLog;
                         mem.upSince = mem.lastHeartbeat;
                     }
                     mem.health = 1.0;
