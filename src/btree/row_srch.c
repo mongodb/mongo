@@ -37,7 +37,7 @@ __search_insert(WT_SESSION_IMPL *session,
 				    &inshead->tail[i]->next[i] :
 				    &inshead->head[i];
 			cbt->compare = -cmp;
-			return (NULL);
+			return (inshead->tail[0]);
 		}
 	}
 
@@ -66,7 +66,7 @@ __search_insert(WT_SESSION_IMPL *session,
 		if (cmp == 0)			/* Exact match: return */
 			break;
 		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(*ins)->next[i];
+			ins = &(ret_ins)->next[i];
 		else				/* Drop down a level */
 			cbt->ins_stack[i--] = ins--;
 	}
