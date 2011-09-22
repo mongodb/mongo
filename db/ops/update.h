@@ -577,9 +577,16 @@ namespace mongo {
 
             switch ( m.op ) {
 
-            case Mod::PUSH:
-                b.appendArray( m.shortFieldName, m.getEach() );
+            case Mod::PUSH: {
+                if ( m.isEach() ) {
+                    b.appendArray( m.shortFieldName, m.getEach() );
+                } else {
+                    BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
+                    arr.appendAs( m.elt, "0" );
+                    arr.done();
+                }
                 break;
+            }
             case Mod::ADDTOSET: {
                 if ( m.isEach() ) {
                     // Remove any duplicates in given array
