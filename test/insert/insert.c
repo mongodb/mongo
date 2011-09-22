@@ -24,16 +24,6 @@
 #define	DUPS	0x01
 #define	PRINT	0x02
 
-#define timespecsub(vvp, uvp)						\
-	do {								\
-		(vvp)->tv_sec -= (uvp)->tv_sec;				\
-		(vvp)->tv_nsec -= (uvp)->tv_nsec;			\
-		if ((vvp)->tv_nsec < 0) {				\
-			(vvp)->tv_sec--;				\
-			(vvp)->tv_nsec += 1000000000;			\
-		}							\
-	} while (0)
-
 const char *progname;
 u_int	flags =  0;
 int	bitcnt = 3;
@@ -44,6 +34,9 @@ int	nrecs = 10;
 #define	VAR	3
 int	file_type;
 
+void col_search(WT_SESSION *);
+void print(WT_SESSION *);
+void row_search(WT_SESSION *);
 void run(void);
 int  usage(void);
 
@@ -130,9 +123,8 @@ run(void)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	const char *key, *value;
-	char *p, config[256], kbuf[64], vbuf[64];
-	int cnt, exact, ikey, ret;
+	char config[256], kbuf[64], vbuf[64];
+	int cnt, ikey, ret;
 	uint8_t bitf;
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
@@ -208,21 +200,36 @@ run(void)
 	stop = clock();
 	fprintf(stderr, "timer: %.2lf\n",
 	    (stop - start) / (double)CLOCKS_PER_SEC);
-	if (!(flags & PRINT))
-		goto done;
-	fprintf(stderr, "\n");
 
 	assert(cursor->close(cursor, 0) == 0);
-
 	assert(session->sync(session, "file:" FILENAME, NULL) == 0);
+
+	/* Optionally print out the results and let the user search for keys. */
+	if (flags & PRINT) {
+		print(session);
+		if (file_type == ROW)
+			row_search(session);
+		else
+			col_search(session);
+	}
+
+	assert(conn->close(conn, 0) == 0);
+}
+
+void
+print(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+	const char *key, *value;
+	uint8_t bitf;
 
 	assert(session->open_cursor(
 	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
 	while ((ret = cursor->next(cursor)) == 0) {
 		switch (file_type) {
 		case FIX:
-			if ((ret =
-			    cursor->get_value(cursor, &bitf)) != 0)
+			if ((ret = cursor->get_value(cursor, &bitf)) != 0)
 				break;
 			printf("0x%02x\n", bitf);
 			break;
@@ -248,15 +255,27 @@ run(void)
 		    progname, wiredtiger_strerror(ret));
 		exit (EXIT_FAILURE);
 	}
+}
+
+void
+row_search(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int exact, ret;
+	char *p, buf[256];
+	const char *key, *value;
+
+	assert(session->open_cursor(
+	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
 
 	for (;;) {
-		fprintf(stderr, "search-near string >>> ");
+		fprintf(stdout, "search-near string >>> ");
 		fflush(stdout);
-		if (fgets(config, sizeof(config), stdin) == NULL)
+		if (fgets(buf, sizeof(buf), stdin) == NULL)
 			break;
-		if ((p = strchr(config, '\n')) != NULL)
+		if ((p = strchr(buf, '\n')) != NULL)
 			*p = '\0';
-		cursor->set_key(cursor, config);
+		cursor->set_key(cursor, buf);
 		if ((ret = cursor->search_near(cursor, &exact)) != 0) {
 			fprintf(stderr,
 			    "cursor->search_near: %s\n",
@@ -269,8 +288,67 @@ run(void)
 			    wiredtiger_strerror(ret));
 			exit (EXIT_FAILURE);
 		}
-		fprintf(stderr, "%d: %s\n", exact, key);
+		if ((ret = cursor->get_value(cursor, &value)) != 0) {
+			fprintf(stderr,
+			    "cursor->get_value: %s\n",
+			    wiredtiger_strerror(ret));
+			exit (EXIT_FAILURE);
+		}
+		fprintf(stdout, "%d: %s/%s\n", exact, key, value);
 	}
+}
 
-done:	assert(conn->close(conn, 0) == 0);
+void
+col_search(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	uint64_t recno;
+	int exact, ret;
+	uint8_t bitf;
+	char *p, buf[256];
+	const char *value;
+
+	assert(session->open_cursor(
+	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
+
+	for (;;) {
+		fprintf(stdout, "search-near string >>> ");
+		fflush(stdout);
+		if (fgets(buf, sizeof(buf), stdin) == NULL)
+			break;
+		if ((p = strchr(buf, '\n')) != NULL)
+			*p = '\0';
+		recno = (uint64_t)atoi(buf);
+		cursor->set_key(cursor, recno);
+		if ((ret = cursor->search_near(cursor, &exact)) != 0) {
+			fprintf(stderr,
+			    "cursor->search_near: %s\n",
+			    wiredtiger_strerror(ret));
+			exit (EXIT_FAILURE);
+		}
+		if ((ret = cursor->get_key(cursor, &recno)) != 0) {
+			fprintf(stderr,
+			    "cursor->get_key: %s\n",
+			    wiredtiger_strerror(ret));
+			exit (EXIT_FAILURE);
+		}
+		if (file_type == VAR) {
+			if ((ret = cursor->get_value(cursor, &value)) != 0) {
+				fprintf(stderr,
+				    "cursor->get_value: %s\n",
+				    wiredtiger_strerror(ret));
+				exit (EXIT_FAILURE);
+			}
+			fprintf(stdout, "%d: %llu/%s\n", exact, recno, value);
+		} else {
+			if ((ret = cursor->get_value(cursor, &bitf)) != 0) {
+				fprintf(stderr,
+				    "cursor->get_value: %s\n",
+				    wiredtiger_strerror(ret));
+				exit (EXIT_FAILURE);
+			}
+			fprintf(
+			    stdout, "%d: %llu/0x%02x\n", exact, recno, bitf);
+		}
+	}
 }
