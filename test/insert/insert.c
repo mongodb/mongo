@@ -124,7 +124,7 @@ run(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char config[256], kbuf[64], vbuf[64];
-	int cnt, ikey, ret;
+	int cnt, ret;
 	uint8_t bitf;
 
 	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
@@ -152,15 +152,14 @@ run(void)
 
 	/* Create the initial key/value pairs. */
 	start = clock();
-	ikey = 1;
-	for (cnt = 0; cnt < nrecs; ++cnt, ++ikey) {
+	for (cnt = 1; cnt < nrecs + 1; ++cnt) {
 		switch (file_type) {			/* Build the key. */
 		case FIX:
 		case VAR:
-			cursor->set_key(cursor, (uint64_t)ikey);
+			cursor->set_key(cursor, (uint64_t)cnt);
 			break;
 		case ROW:
-			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
+			snprintf(kbuf, sizeof(kbuf), "%010d KEY------", cnt);
 			cursor->set_key(cursor, kbuf);
 			break;
 		}
