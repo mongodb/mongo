@@ -60,7 +60,7 @@ static inline WT_INSERT *
 __col_insert_search_stack(
     WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
 {
-	WT_INSERT **ins;
+	WT_INSERT **ins, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
@@ -71,7 +71,7 @@ __col_insert_search_stack(
 			ins_stack[i] = (inshead->tail[i] != NULL) ?
 				    &inshead->tail[i]->next[i] :
 				    &inshead->head[i];
-		return (NULL);
+		return (inshead->tail[0]);
 	}
 
 	/*
@@ -84,17 +84,18 @@ __col_insert_search_stack(
 			continue;
 		}
 
-		ins_recno = WT_INSERT_RECNO(*ins);
+		ret_ins = *ins;
+		ins_recno = WT_INSERT_RECNO(ret_ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
 		if (cmp == 0)			/* Exact match: return */
-			return (*ins);
+			break;
 		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(*ins)->next[i];
+			ins = &(ret_ins)->next[i];
 		else				/* Drop down a level */
 			ins_stack[i--] = ins--;
 	}
-	return (NULL);
+	return (ret_ins);
 }
 
 /*
