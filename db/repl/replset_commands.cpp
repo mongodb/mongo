@@ -285,6 +285,27 @@ namespace mongo {
         }
     } cmdReplSetStepDown;
 
+    class CmdReplSetMaintenance: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "{ replSetMaintenance : bool }\n";
+            help << "Enable or disable maintenance mode.";
+        }
+
+        CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
+            if( theReplSet->box.getState().primary() ) {
+                errmsg = "primaries can't modify maintenance mode";
+                return false;
+            }
+
+            theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue());
+            return true;
+        }
+    } cmdReplSetMaintenance;
+
     using namespace bson;
     using namespace mongoutils::html;
     extern void fillRsLog(stringstream&);
