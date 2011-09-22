@@ -1758,9 +1758,30 @@ namespace mongo {
         }
     } emptyCappedCmd;
 
+    bool _execCommand(Command *c, const string& dbname, BSONObj& cmdObj, int queryOptions, BSONObjBuilder& result, bool fromRepl) {
+
+        try {
+            string errmsg;
+            if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
+                result.append( "errmsg" , errmsg );
+                return false;
+            }
+        }
+        catch ( DBException& e ) {
+            stringstream ss;
+            ss << "exception: " << e.what();
+            result.append( "errmsg" , ss.str() );
+            result.append( "code" , e.getCode() );
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * this handles
      - auth
+     - maintenance mode
      - locking
      - context
      then calls run()
@@ -1816,6 +1837,7 @@ namespace mongo {
             theReplSet->setMaintenanceMode(true);
         }
 
+        bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
 
@@ -1828,47 +1850,25 @@ namespace mongo {
             }
 
             client.curop()->ensureStarted();
-            string errmsg;
-            int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
-            if ( ! ok )
-                result.append( "errmsg" , errmsg );
 
-            if (c->maintenanceMode() && theReplSet) {
-                theReplSet->setMaintenanceMode(false);
+            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+        }
+        else {
+            bool needWriteLock = c->locktype() == Command::WRITE;
+
+            if ( ! needWriteLock ) {
+                assert( ! c->logTheOp() );
             }
 
-            return ok;
-        }
+            mongolock lk( needWriteLock );
+            client.curop()->ensureStarted();
+            Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
 
-        bool needWriteLock = c->locktype() == Command::WRITE;
+            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
 
-        if ( ! needWriteLock ) {
-            assert( ! c->logTheOp() );
-        }
-
-        mongolock lk( needWriteLock );
-        client.curop()->ensureStarted();
-        Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
-
-        bool retval = true;
-
-        try {
-            string errmsg;
-            if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
-                result.append( "errmsg" , errmsg );
-                retval = false;
+            if ( retval && c->logTheOp() && ! fromRepl ) {
+                logOp("c", cmdns, cmdObj);
             }
-        }
-        catch ( DBException& e ) {
-            stringstream ss;
-            ss << "exception: " << e.what();
-            result.append( "errmsg" , ss.str() );
-            result.append( "code" , e.getCode() );
-            retval = false;
-        }
-
-        if ( retval && c->logTheOp() && ! fromRepl ) {
-            logOp("c", cmdns, cmdObj);
         }
 
         if (c->maintenanceMode() && theReplSet) {

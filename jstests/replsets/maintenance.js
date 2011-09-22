@@ -23,10 +23,21 @@ print("joining");
 join();
 
 print("check secondary becomes a secondary again");
-var x = 0;
-assert.soon(function() {
-    var im = conns[2].getDB("admin").isMaster();
-    if (x++ % 5 == 0) printjson(im);
-    return im.secondary;
-});
+var secondarySoon = function() {
+    var x = 0;
+    assert.soon(function() {
+        var im = conns[2].getDB("admin").isMaster();
+        if (x++ % 5 == 0) printjson(im);
+        return im.secondary;
+    });
+};
 
+secondarySoon();
+
+print("make sure compact works on a secondary (SERVER-3923)");
+master.getDB("foo").bar.drop();
+replTest.awaitReplication();
+var result = conns[2].getDB("foo").runCommand({compact : "bar"});
+assert.eq(result.ok, 0, tojson(result));
+
+secondarySoon();
