@@ -337,7 +337,7 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 
 	/*
 	 * If we don't have a search page, then we're done, we're starting at
-	 * the beginning or end of the tree, not as a result of a saerch.
+	 * the beginning or end of the tree, not as a result of a search.
 	 */
 	if ((page = cbt->page) == NULL)
 		return;
