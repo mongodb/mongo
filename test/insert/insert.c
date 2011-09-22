@@ -140,7 +140,8 @@ run(void)
 	switch (file_type) {
 	case FIX:
 		(void)snprintf(
-		    config, sizeof(config), "key_format=r,value_format=%dt");
+		    config, sizeof(config), "key_format=r,value_format=%dt",
+		    bitcnt);
 		break;
 	case ROW:
 		(void)snprintf(
