@@ -335,7 +335,10 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 	 */
 	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
-	/* If we don't have a search page, then we're done. */
+	/*
+	 * If we don't have a search page, then we're done, we're starting at
+	 * the beginning or end of the tree, not as a result of a saerch.
+	 */
 	if ((page = cbt->page) == NULL)
 		return;
 
