@@ -20,7 +20,6 @@
 #include <wiredtiger.h>
 
 #define	FILENAME	"xx"
-#define	PSIZE		2048
 
 #define	DUPS	0x01
 #define	PRINT	0x02
@@ -132,7 +131,7 @@ run(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	const char *key, *value;
-	char config[256], kbuf[64], vbuf[64];
+	char *p, config[256], kbuf[64], vbuf[64];
 	int cnt, exact, ikey, ret;
 	uint8_t bitf;
 
@@ -140,28 +139,16 @@ run(void)
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	switch (file_type) {
 	case FIX:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=%dt,"
-		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    bitcnt, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		(void)snprintf(
+		    config, sizeof(config), "key_format=r,value_format=%dt");
 		break;
 	case ROW:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=S,value_format=S,"
-		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		(void)snprintf(
+		    config, sizeof(config), "key_format=S,value_format=S");
 		break;
 	case VAR:
-		(void)snprintf(config, sizeof(config),
-		    "key_format=r,value_format=S,"
-		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		(void)snprintf(
+		    config, sizeof(config), "key_format=r,value_format=S");
 		break;
 	default:
 		assert(0);
@@ -266,6 +253,8 @@ run(void)
 		fflush(stdout);
 		if (fgets(config, sizeof(config), stdin) == NULL)
 			break;
+		if ((p = strchr(config, '\n')) != NULL)
+			*p = '\0';
 		cursor->set_key(cursor, config);
 		if ((ret = cursor->search_near(cursor, &exact)) != 0) {
 			fprintf(stderr,
