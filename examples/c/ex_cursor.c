@@ -44,7 +44,7 @@ cursor_last(WT_CURSOR *cursor)
 	const char *key, *value;
 	int ret;
 
-	if ((ret = cursor->first(cursor)) == 0) {
+	if ((ret = cursor->last(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &key);
 		ret = cursor->get_value(cursor, &value);
 	}
