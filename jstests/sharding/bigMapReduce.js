@@ -23,7 +23,7 @@ for ( iter=0; iter<5; iter++ ){
         gotAGoodOne = true
     }
     catch ( e ){
-        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.assertionCode == 13388 ){
+        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
             // TODO: SERVER-2396
             sleep( 1000 );
             continue;
@@ -48,7 +48,7 @@ for (iter = 0; iter < 5; iter++) {
         gotAGoodOne = true;
     }
     catch ( e ){
-        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.assertionCode == 13388 ){
+        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
             // TODO: SERVER-2396
             sleep( 1000 );
             continue;
