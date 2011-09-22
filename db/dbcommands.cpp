@@ -419,9 +419,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus", true) {
-            started = time(0);
-        }
+        CmdServerStatus() : Command("serverStatus", true) {}
 
         virtual LockType locktype() const { return NONE; }
 
@@ -439,7 +437,7 @@ namespace mongo {
             result.append( "host" , prettyHostName() );
             result.append("version", versionString);
             result.append("process","mongod");
-            result.append("uptime",(double) (time(0)-started));
+            result.append("uptime",(double) (time(0)-cmdLine.started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
 
@@ -627,7 +625,6 @@ namespace mongo {
 
             return true;
         }
-        time_t started;
     } cmdServerStatus;
 
     class CmdGetOpTime : public Command {
