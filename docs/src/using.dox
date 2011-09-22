@@ -11,4 +11,5 @@ example programs:
 - @subpage transactions
 - @subpage tuning
 - @subpage packing
+- @subpage keyvalue
  */
