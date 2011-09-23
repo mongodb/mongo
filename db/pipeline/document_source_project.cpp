@@ -141,7 +141,7 @@ namespace mongo {
 	if (excludeId)
 	    insides.append(Document::idName, false);
 	pEO->documentToBson(&insides, unwindName, 0);
-	pBuilder->append("$project", insides.done());
+	pBuilder->append(projectName, insides.done());
     }
 
     intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create() {

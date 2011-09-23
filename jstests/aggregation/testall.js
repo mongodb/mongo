@@ -52,14 +52,229 @@ var p1result = [
 assert(arrayEq(p1.result, p1result), 'p1 failed');
 
 
-// unwinding an array
+// a simple array unwinding
+var u1 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $unwind : "$tags" }
+]});
+
+var u1result = [
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a8fe"),
+        "title" : "this is my title",
+        "author" : "bob",
+        "posted" : ISODate("2004-03-21T18:59:54Z"),
+        "pageViews" : 5,
+        "tags" : "fun",
+        "comments" : [
+            {
+                "author" : "joe",
+                "text" : "this is cool"
+            },
+            {
+                "author" : "sam",
+                "text" : "this is bad"
+            }
+        ],
+        "other" : {
+            "foo" : 5
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a8fe"),
+        "title" : "this is my title",
+        "author" : "bob",
+        "posted" : ISODate("2004-03-21T18:59:54Z"),
+        "pageViews" : 5,
+        "tags" : "good",
+        "comments" : [
+            {
+                "author" : "joe",
+                "text" : "this is cool"
+            },
+            {
+                "author" : "sam",
+                "text" : "this is bad"
+            }
+        ],
+        "other" : {
+            "foo" : 5
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a8fe"),
+        "title" : "this is my title",
+        "author" : "bob",
+        "posted" : ISODate("2004-03-21T18:59:54Z"),
+        "pageViews" : 5,
+        "tags" : "fun",
+        "comments" : [
+            {
+                "author" : "joe",
+                "text" : "this is cool"
+            },
+            {
+                "author" : "sam",
+                "text" : "this is bad"
+            }
+        ],
+        "other" : {
+            "foo" : 5
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a8ff"),
+        "title" : "this is your title",
+        "author" : "dave",
+        "posted" : ISODate("2100-08-08T04:11:10Z"),
+        "pageViews" : 7,
+        "tags" : "fun",
+        "comments" : [
+            {
+                "author" : "barbara",
+                "text" : "this is interesting"
+            },
+            {
+                "author" : "jenny",
+                "text" : "i like to play pinball",
+                "votes" : 10
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a8ff"),
+        "title" : "this is your title",
+        "author" : "dave",
+        "posted" : ISODate("2100-08-08T04:11:10Z"),
+        "pageViews" : 7,
+        "tags" : "nasty",
+        "comments" : [
+            {
+                "author" : "barbara",
+                "text" : "this is interesting"
+            },
+            {
+                "author" : "jenny",
+                "text" : "i like to play pinball",
+                "votes" : 10
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a900"),
+        "title" : "this is some other title",
+        "author" : "jane",
+        "posted" : ISODate("2000-12-31T05:17:14Z"),
+        "pageViews" : 6,
+        "tags" : "nasty",
+        "comments" : [
+            {
+                "author" : "will",
+                "text" : "i don't like the color"
+            },
+            {
+                "author" : "jenny",
+                "text" : "can i get that in green?"
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    },
+    {
+        "_id" : ObjectId("4e7bdfa4909a512bf221a900"),
+        "title" : "this is some other title",
+        "author" : "jane",
+        "posted" : ISODate("2000-12-31T05:17:14Z"),
+        "pageViews" : 6,
+        "tags" : "filthy",
+        "comments" : [
+            {
+                "author" : "will",
+                "text" : "i don't like the color"
+            },
+            {
+                "author" : "jenny",
+                "text" : "can i get that in green?"
+            }
+        ],
+        "other" : {
+            "bar" : 14
+        }
+    }
+];
+
+assert(arrayEq(u1.result, u1result), 'u1 failed');
+
+// unwind an array at the end of a dotted path
+db.ut.drop();
+db.ut.save({a:1, b:{e:7, f:[4, 3, 2, 1]}, c:12, d:17});
+var u2 = db.runCommand(
+{ aggregate : "ut", pipeline : [
+    { $unwind : "$b.f" }
+]});
+
+var u2result = [
+    {
+        "_id" : ObjectId("4e7be21a702bfc656111df9b"),
+        "a" : 1,
+        "b" : {
+            "e" : 7,
+            "f" : 4
+        },
+        "c" : 12,
+        "d" : 17
+    },
+    {
+        "_id" : ObjectId("4e7be21a702bfc656111df9b"),
+        "a" : 1,
+        "b" : {
+            "e" : 7,
+            "f" : 3
+        },
+        "c" : 12,
+        "d" : 17
+    },
+    {
+        "_id" : ObjectId("4e7be21a702bfc656111df9b"),
+        "a" : 1,
+        "b" : {
+            "e" : 7,
+            "f" : 2
+        },
+        "c" : 12,
+        "d" : 17
+    },
+    {
+        "_id" : ObjectId("4e7be21a702bfc656111df9b"),
+        "a" : 1,
+        "b" : {
+            "e" : 7,
+            "f" : 1
+        },
+        "c" : 12,
+        "d" : 17
+    }
+];
+
+assert(arrayEq(u2.result, u2result), 'u2 failed');
+
+
+// combining a projection with unwinding an array
 var p2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	pageViews : 1
-    }}
+    }},
+    { $unwind : "$tags" }
 ]});
 
 var p2result = [
@@ -67,43 +282,43 @@ var p2result = [
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
         "author" : "bob",
         "pageViews" : 5,
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
         "author" : "bob",
         "pageViews" : 5,
-        "tag" : "good"
+        "tags" : "good"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
         "author" : "bob",
         "pageViews" : 5,
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
         "author" : "dave",
         "pageViews" : 7,
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
         "author" : "dave",
         "pageViews" : 7,
-        "tag" : "nasty"
+        "tags" : "nasty"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066f"),
         "author" : "jane",
         "pageViews" : 6,
-        "tag" : "nasty"
+        "tags" : "nasty"
     },
     {
         "_id" : ObjectId("4dc07fedd8420ab8d0d4066f"),
         "author" : "jane",
         "pageViews" : 6,
-        "tag" : "filthy"
+        "tags" : "filthy"
     }
 ];
 
@@ -173,11 +388,12 @@ var p5 = db.runCommand(
     { $project : {
 	author : 1,
 	pageViews : 1,
-	tag : { $unwind : "$tags" }
+	tags : 1
     }},
+    { $unwind : "$tags" },
     { $project : {
 	author : 1,
-	subDocument : { foo : "$pageViews", bar : "$tag"  }
+	subDocument : { foo : "$pageViews", bar : "$tags"  }
     }}
 ]});
 
@@ -249,16 +465,17 @@ var p6 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	pageViews : 1
     }},
+    { $unwind : "$tags" },
     { $project : {
 	author : 1,
-	tag : 1,
+	tag : "$tags",
 	pageViews : 1,
 	daveWroteIt : { $eq:["$author", "dave"] },
 	weLikeIt : { $or:[ { $eq:["$author", "dave"] },
-			   { $eq:["$tag", "good"] } ] }
+			   { $eq:["$tags", "good"] } ] }
     }}
 ]});
 
@@ -358,9 +575,10 @@ var p8 = db.runCommand(
     { $project : {
 	_id : 0,
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	"comments.author" : 1
-    }}
+    }},
+    { $unwind : "$tags" }
 ]});
 
 var p8result = [
@@ -374,7 +592,7 @@ var p8result = [
                 "author" : "sam"
             }
         ],
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "author" : "bob",
@@ -386,7 +604,7 @@ var p8result = [
                 "author" : "sam"
             }
         ],
-        "tag" : "good"
+        "tags" : "good"
     },
     {
         "author" : "bob",
@@ -398,7 +616,7 @@ var p8result = [
                 "author" : "sam"
             }
         ],
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "author" : "dave",
@@ -410,7 +628,7 @@ var p8result = [
                 "author" : "jenny"
             }
         ],
-        "tag" : "fun"
+        "tags" : "fun"
     },
     {
         "author" : "dave",
@@ -422,7 +640,7 @@ var p8result = [
                 "author" : "jenny"
             }
         ],
-        "tag" : "nasty"
+        "tags" : "nasty"
     },
     {
         "author" : "jane",
@@ -434,7 +652,7 @@ var p8result = [
                 "author" : "jenny"
             }
         ],
-        "tag" : "nasty"
+        "tags" : "nasty"
     },
     {
         "author" : "jane",
@@ -446,7 +664,7 @@ var p8result = [
                 "author" : "jenny"
             }
         ],
-        "tag" : "filthy"
+        "tags" : "filthy"
     }
 ];
 
@@ -593,10 +811,11 @@ db.p11.save( {
 
 var p11 = db.runCommand(
 { aggregate : "p11", pipeline : [
+    { $unwind : "$items.authors" },
     { $project : {
 	name : 1,
-	author : { $unwind : "$items.authors" },
-    }}
+	author : "$items.authors"
+    }},
 ]});
 
 p11result = [
@@ -946,10 +1165,11 @@ var m2 = db.runCommand(
 	title : 1,
 	author : 1,
 	pageViews : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	comments : 1
     }},
-    { $match : { tag : "nasty" } }
+    { $unwind : "$tags" },
+    { $match : { tags : "nasty" } }
 ]});
 
 var m2result = [
@@ -969,7 +1189,7 @@ var m2result = [
                 "votes" : 10
             }
         ],
-        "tag" : "nasty"
+        "tags" : "nasty"
     },
     {
         "_id" : ObjectId("4de54958bf1505139918fce8"),
@@ -986,7 +1206,7 @@ var m2result = [
                 "text" : "can i get that in green?"
             }
         ],
-        "tag" : "nasty"
+        "tags" : "nasty"
     }
 ];
 
@@ -998,11 +1218,12 @@ var g1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	pageViews : 1
     }},
+    { $unwind : "$tags" },
     { $group : {
-	_id: { tag : 1 },
+	_id: { tags : 1 },
 	docsByTag : { $sum : 1 },
 	viewsByTag : { $sum : "$pageViews" }
     }}
@@ -1011,28 +1232,28 @@ var g1 = db.runCommand(
 var g1result = [
     {
         "_id" : {
-            "tag" : "filthy"
+            "tags" : "filthy"
         },
         "docsByTag" : 1,
         "viewsByTag" : 6
     },
     {
         "_id" : {
-            "tag" : "fun"
+            "tags" : "fun"
         },
         "docsByTag" : 3,
         "viewsByTag" : 17
     },
     {
         "_id" : {
-            "tag" : "good"
+            "tags" : "good"
         },
         "docsByTag" : 1,
         "viewsByTag" : 5
     },
     {
         "_id" : {
-            "tag" : "nasty"
+            "tags" : "nasty"
         },
         "docsByTag" : 2,
         "viewsByTag" : 13
@@ -1047,18 +1268,19 @@ var g2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	pageViews : 1
     }},
+    { $unwind : "$tags" },
     { $group : {
-	_id: { tag : 1 },
+	_id: { tags : 1 },
 	docsByTag : { $sum : 1 },
 	viewsByTag : { $sum : "$pageViews" },
 	mostViewsByTag : { $max : "$pageViews" },
     }},
     { $project : {
 	_id: false,
-	tag : "$_id.tag",
+	tag : "$_id.tags",
 	mostViewsByTag : 1,
 	docsByTag : 1,
 	viewsByTag : 1,
@@ -1105,10 +1327,11 @@ var g3 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" }
+	tags : 1,
     }},
+    { $unwind : "$tags" },
     { $group : {
-	_id : { tag : 1 },
+	_id : { tags : 1 },
 	authors : { $push : "$author" }
     }}
 ]});
@@ -1116,7 +1339,7 @@ var g3 = db.runCommand(
 var g3result = [
     {
         "_id" : {
-            "tag" : "filthy"
+            "tags" : "filthy"
         },
         "authors" : [
             "jane"
@@ -1124,7 +1347,7 @@ var g3result = [
     },
     {
         "_id" : {
-            "tag" : "fun"
+            "tags" : "fun"
         },
         "authors" : [
             "bob",
@@ -1134,7 +1357,7 @@ var g3result = [
     },
     {
         "_id" : {
-            "tag" : "good"
+            "tags" : "good"
         },
         "authors" : [
             "bob"
@@ -1142,7 +1365,7 @@ var g3result = [
     },
     {
         "_id" : {
-            "tag" : "nasty"
+            "tags" : "nasty"
         },
         "authors" : [
             "dave",
@@ -1159,11 +1382,12 @@ var g4 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" },
+	tags : 1,
 	pageViews : 1
     }},
+    { $unwind : "$tags" },
     { $group : {
-	_id: { tag : 1 },
+	_id: { tags : 1 },
 	docsByTag : { $sum : 1 },
 	viewsByTag : { $sum : "$pageViews" },
 	avgByTag : { $avg : "$pageViews" },
@@ -1173,7 +1397,7 @@ var g4 = db.runCommand(
 var g4result = [
     {
         "_id" : {
-            "tag" : "filthy"
+            "tags" : "filthy"
         },
         "docsByTag" : 1,
         "viewsByTag" : 6,
@@ -1181,7 +1405,7 @@ var g4result = [
     },
     {
         "_id" : {
-            "tag" : "fun"
+            "tags" : "fun"
         },
         "docsByTag" : 3,
         "viewsByTag" : 17,
@@ -1189,7 +1413,7 @@ var g4result = [
     },
     {
         "_id" : {
-            "tag" : "good"
+            "tags" : "good"
         },
         "docsByTag" : 1,
         "viewsByTag" : 5,
@@ -1197,7 +1421,7 @@ var g4result = [
     },
     {
         "_id" : {
-            "tag" : "nasty"
+            "tags" : "nasty"
         },
         "docsByTag" : 2,
         "viewsByTag" : 13,
@@ -1213,10 +1437,11 @@ var g5 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
 	author : 1,
-	tag : { $unwind : "$tags" }
+	tags : 1,
     }},
+    { $unwind : "$tags" },
     { $group : {
-	_id : { tag : 1 },
+	_id : { tags : 1 },
 	authors : { $addToSet : "$author" }
     }}
 ]});
@@ -1224,7 +1449,7 @@ var g5 = db.runCommand(
 var g5result = [
     {
         "_id" : {
-            "tag" : "filthy"
+            "tags" : "filthy"
         },
         "authors" : [
             "jane"
@@ -1232,7 +1457,7 @@ var g5result = [
     },
     {
         "_id" : {
-            "tag" : "fun"
+            "tags" : "fun"
         },
         "authors" : [
             "bob",
@@ -1241,7 +1466,7 @@ var g5result = [
     },
     {
         "_id" : {
-            "tag" : "good"
+            "tags" : "good"
         },
         "authors" : [
             "bob"
@@ -1249,7 +1474,7 @@ var g5result = [
     },
     {
         "_id" : {
-            "tag" : "nasty"
+            "tags" : "nasty"
         },
         "authors" : [
             "dave",

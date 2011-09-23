@@ -26,6 +26,7 @@ namespace mongo {
 	virtual ~FieldPath();
 
 	FieldPath(const string &fieldPath);
+	FieldPath();
 
 	/*
 	  Get the number of path elements in the field path.
@@ -57,6 +58,8 @@ namespace mongo {
 	  @param fieldPrefix whether or not to include the field prefix
 	*/
 	void writePath(ostream &outStream, bool fieldPrefix) const;
+
+	FieldPath &operator=(const FieldPath &rRHS);
 
     private:
 	vector<string> vFieldName;

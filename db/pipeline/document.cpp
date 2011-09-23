@@ -110,8 +110,17 @@ namespace mongo {
     void Document::setField(size_t index,
                             const string &fieldName,
 			    const intrusive_ptr<const Value> &pValue) {
+	/* special case:  should this field be removed? */
+	if (!pValue.get()) {
+	    vFieldName.erase(vFieldName.begin() + index);
+	    vpValue.erase(vpValue.begin() + index);
+	    return;
+	}
+
+	/* make sure we have a valid value */
 	assert(pValue->getType() != Undefined);
 
+	/* set the indicated field */
         vFieldName[index] = fieldName;
         vpValue[index] = pValue;
     }

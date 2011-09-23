@@ -22,6 +22,10 @@ namespace mongo {
     FieldPath::~FieldPath() {
     }
 
+    FieldPath::FieldPath():
+	vFieldName() {
+    }
+
     FieldPath::FieldPath(const string &fieldPath):
 	vFieldName() {
         /*
@@ -65,4 +69,13 @@ namespace mongo {
 	for(size_t i = 1; i < n; ++i)
 	    outStream << "." << vFieldName[i];
     }
+
+    FieldPath &FieldPath::operator=(const FieldPath &rRHS) {
+	if (this != &rRHS) {
+	    vFieldName = rRHS.vFieldName;
+	}
+
+	return *this;
+    }
+
 }

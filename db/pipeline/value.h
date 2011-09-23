@@ -140,7 +140,7 @@ namespace mongo {
         /*
           Getters.
 
-          @return the Value's value; asserts if the requested value type is
+          @returns the Value's value; asserts if the requested value type is
           incorrect.
         */
         double getDouble() const;
@@ -155,6 +155,14 @@ namespace mongo {
         int getInt() const;
         unsigned long long getTimestamp() const;
         long long getLong() const;
+
+	/*
+	  Get the length of an array value.
+
+	  @returns the length of the array, if this is array-valued; otherwise
+	     throws an error
+	*/
+	size_t getArrayLength() const;
 
         /*
           Add this value to the BSON object under construction.
@@ -361,6 +369,11 @@ namespace mongo {
 
     inline BSONType Value::getType() const {
         return type;
+    }
+
+    inline size_t Value::getArrayLength() const {
+        assert(getType() == Array);
+	return vpValue.size();
     }
 
     inline intrusive_ptr<const Value> Value::getUndefined() {

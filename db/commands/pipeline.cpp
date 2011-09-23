@@ -69,6 +69,8 @@ namespace mongo {
 	 DocumentSourceProject::createFromBson},
 	{DocumentSourceSort::sortName,
 	 DocumentSourceSort::createFromBson},
+	{DocumentSourceUnwind::unwindName,
+	 DocumentSourceUnwind::createFromBson},
     };
     static const size_t nStageDesc = sizeof(stageDesc) / sizeof(StageDesc);
 

@@ -53,6 +53,11 @@ namespace mongo {
           Clone a document.
 
           The new document shares all the fields' values with the original.
+
+	  This is not a deep copy.  Only the fields on the top-level document
+	  are cloned.
+
+	  @returns the shallow clone of the document
         */
         intrusive_ptr<Document> clone();
 
@@ -93,6 +98,9 @@ namespace mongo {
           Document.  This will replace any field that is currently in that
           position.  The index must be within the current range of field
           indices.
+
+	  pValue.get() may be NULL, in which case the field will be
+	  removed.  fieldName is ignored in this case.
 
 	  @param index the field index in the list of fields
 	  @param fieldName the new field name
