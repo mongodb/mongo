@@ -1102,6 +1102,10 @@ namespace mongo {
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str(), query, sort);
+            if ( ! cursor ) {
+                errmsg = "need an index on { files_id : 1 , n : 1 }";
+                return false;
+            }
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
             int n = 0;
