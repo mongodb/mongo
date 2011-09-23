@@ -224,7 +224,8 @@ namespace mongo {
         {
             // note we assume here that this call does not throw
             if( ! initialSyncOplogApplication(startingTS, mvoptime) ) {
-                log() << "replSet initial sync failed during applyoplog" << rsLog;
+                log() << "replSet initial sync failed during oplog application phase" << rsLog;
+
                 emptyOplog(); // otherwise we'll be up!
                 
                 lastOpTimeWritten = OpTime();
@@ -237,6 +238,9 @@ namespace mongo {
                     cx.db()->flushFiles(true);
                 }
                 log() << "replSet cleaning up [2]" << rsLog;
+
+                log() << "replSet initial sync failed will try again" << endl;
+
                 sleepsecs(5);
                 return;
             }

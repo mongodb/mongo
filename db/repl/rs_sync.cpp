@@ -224,7 +224,7 @@ namespace mongo {
 
                 if( ts <= minValid ) {
                     // didn't make it far enough
-                    log() << "replSet initial sync failing, error applying oplog " << e.toString() << rsLog;
+                    log() << "replSet initial sync failing, error applying oplog : " << e.toString() << rsLog;
                     return false;
                 }
 
