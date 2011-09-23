@@ -15,22 +15,14 @@
 
 #include <wiredtiger.h>
 
-int print_connection_stats(WT_SESSION *session);
-int print_file_stats(WT_SESSION *session, const char *filename);
-
 const char *home = "WT_TEST";
 
-int 
-print_connection_stats(WT_SESSION *session)
+int
+display(WT_CURSOR *cursor)
 {
-	WT_CURSOR *cursor;
 	const char *description, *pvalue;
-	int ret;
 	uint64_t value;
-
-	if ((ret = session->open_cursor(
-	    session, "statistics:", NULL, NULL, &cursor)) != 0)
-		return (ret);
+	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_value(
@@ -39,10 +31,20 @@ print_connection_stats(WT_SESSION *session)
 		printf("%s=%s\n", description, pvalue);
 	}
 
-	if (ret == WT_NOTFOUND)
-		ret = 0;
+	return (ret == WT_NOTFOUND ? 0 : ret);
+}
 
-	return (ret);
+int 
+print_database_stats(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	if ((ret = session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor)) != 0)
+		return (ret);
+
+	return (display(cursor));
 }
 
 int 
@@ -50,20 +52,22 @@ print_file_stats(WT_SESSION *session, const char *filename)
 {
 	WT_CURSOR *cursor;
 	size_t len;
-	char *object;
+	char *uri;
 	int ret;
 
 	len = strlen("statistics:") + strlen(filename) + 1;
-	if ((object = malloc(len)) == NULL)
+	if ((uri = malloc(len)) == NULL)
 		return (ENOMEM);
-	(void)snprintf(object, len, "statistics:%s", filename);
+	(void)snprintf(uri, len, "statistics:%s", filename);
 	if ((ret = session->open_cursor(
-	    session, object, NULL, NULL, &cursor)) != 0)
+	    session, uri, NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	/* Display statistics. */
+	ret = display(cursor);
 
-	return (0);
+	free(uri);
+
+	return (ret);
 }
 
 int
@@ -80,7 +84,7 @@ main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	ret = print_connection_stats(session);
+	ret = print_database_stats(session);
 	ret = print_file_stats(session, f);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
