@@ -7,6 +7,7 @@ var master = replTest.getMaster();
 db = master.getDB("foo")
 db.foo.save({a: 1000});
 replTest.awaitReplication();
+replTest.awaitSecondaryNodes();
 
 assert.eq( 1 , db.foo.count() , "setup" );
 
