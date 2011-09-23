@@ -15,18 +15,22 @@
 
 #include <wiredtiger.h>
 
+int print_cursor(WT_CURSOR *);
+int print_database_stats(WT_SESSION *);
+int print_file_stats(WT_SESSION *);
+
 const char *home = "WT_TEST";
 
 int
-display(WT_CURSOR *cursor)
+print_cursor(WT_CURSOR *cursor)
 {
 	const char *description, *pvalue;
 	uint64_t value;
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(
-		    cursor, &value, &pvalue, &description)) != 0)
+		if ((ret = cursor->get_value(cursor,
+		    &value, &pvalue, &description)) != 0)
 			return (ret);
 		printf("%s=%s\n", description, pvalue);
 	}
@@ -40,34 +44,24 @@ print_database_stats(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int ret;
 
-	if ((ret = session->open_cursor(
-	    session, "statistics:", NULL, NULL, &cursor)) != 0)
+	if ((ret = session->open_cursor(session,
+	    "statistics:", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	return (display(cursor));
+	return (print_cursor(cursor));
 }
 
 int 
-print_file_stats(WT_SESSION *session, const char *filename)
+print_file_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	size_t len;
-	char *uri;
 	int ret;
 
-	len = strlen("statistics:") + strlen(filename) + 1;
-	if ((uri = malloc(len)) == NULL)
-		return (ENOMEM);
-	(void)snprintf(uri, len, "statistics:%s", filename);
-	if ((ret = session->open_cursor(
-	    session, uri, NULL, NULL, &cursor)) != 0)
+	if ((ret = session->open_cursor(session,
+	    "statistics:file:foo..wt", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	ret = display(cursor);
-
-	free(uri);
-
-	return (ret);
+	return (print_cursor(cursor));
 }
 
 int
@@ -75,7 +69,6 @@ main(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	const char *f = "foo";
 	int ret;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
@@ -85,7 +78,7 @@ main(void)
 	/* Note: further error checking omitted for clarity. */
 
 	ret = print_database_stats(session);
-	ret = print_file_stats(session, f);
+	ret = print_file_stats(session);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }

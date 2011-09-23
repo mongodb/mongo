@@ -22,7 +22,6 @@ main(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	const char *f = "foo";
 	int ret;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
