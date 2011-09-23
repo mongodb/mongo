@@ -17,6 +17,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_COL_REF *cref;
+	WT_INSERT *ins;
+	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	uint64_t recno;
 	uint32_t base, indx, limit;
@@ -24,7 +26,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	__cursor_search_clear(cbt);
 
-	cbt->recno = recno = cbt->iface.recno;
+	recno = cbt->iface.recno;
 
 	btree = session->btree;
 	cref = NULL;
@@ -85,6 +87,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_MEMORY_FLUSH;
 	}
 	cbt->page = page;
+	cbt->recno = recno;
 	cbt->compare = 0;
 
 	/*
@@ -95,39 +98,57 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno >= page->u.col_leaf.recno + page->entries) {
 			cbt->recno = page->u.col_leaf.recno + page->entries;
-			cbt->compare = -1;
-			cbt->ins_head = WT_COL_APPEND(page);
+			goto past_end;
 		} else
-			cbt->ins_head = WT_COL_UPDATE_SINGLE(page);
-	} else {
+			ins_head = WT_COL_UPDATE_SINGLE(page);
+	} else
 		if ((cip = __col_var_search(page, recno)) == NULL) {
 			cbt->recno = __col_last_recno(page);
-			cbt->compare = -1;
-			cbt->ins_head = WT_COL_APPEND(page);
+			goto past_end;
 		} else {
 			cbt->slot = WT_COL_SLOT(page, cip);
-			cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+			ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		}
-	}
 
 	/*
-	 * Search the insert or append list for a match; __search_insert sets
-	 * the return insert information appropriately.
+	 * We have a match on the page, check for an update.  Check the page's
+	 * update list (fixed-length), or slot's update list (variable-length)
+	 * for a better match.  The only better match we can find is an exact
+	 * match, otherwise the existing match on the page is the one we want.
+	 * For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT pair
+	 * until we know we have a useful entry.
 	 */
-	if (cbt->ins_head == NULL)
-		cbt->ins = NULL;
-	else
-		if ((cbt->ins = __col_insert_search_stack(
-		    cbt->ins_head, cbt->ins_stack, recno)) != NULL) {
-			cbt->recno = WT_INSERT_RECNO(cbt->ins);
-			if (recno == cbt->recno)
-				cbt->compare = 0;
-			else if (recno < cbt->recno)
-				cbt->compare = 1;
-			else
-				cbt->compare = -1;
+	if (ins_head != NULL && (ins =
+	    __col_insert_search_stack(ins_head, cbt->ins_stack, recno)) != NULL)
+		if (recno == WT_INSERT_RECNO(ins)) {
+			cbt->ins_head = ins_head;
+			cbt->ins = ins;
 		}
+	return (0);
 
+past_end:
+	/*
+	 * A record past the end of the page's standard information.  Check the
+	 * append list; by definition, any record on the append list is closer
+	 * than the last record on the page, so it's a better choice for return.
+	 * This is a rarely used path: we normally find exact matches, because
+	 * column-store files are dense, but in this case the caller searched
+	 * past the end of the table.
+	 */
+	cbt->ins_head = WT_COL_APPEND(page);
+	if (cbt->ins_head == NULL || (cbt->ins =
+	    __col_insert_search_stack(
+	    cbt->ins_head, cbt->ins_stack, recno)) == NULL)
+		cbt->compare = -1;
+	else {
+		cbt->recno = WT_INSERT_RECNO(cbt->ins);
+		if (recno == cbt->recno)
+			cbt->compare = 0;
+		else if (recno < cbt->recno)
+			cbt->compare = 1;
+		else
+			cbt->compare = -1;
+	}
 	return (0);
 
 err:	__wt_page_release(session, page);
