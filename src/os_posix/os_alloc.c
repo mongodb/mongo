@@ -8,12 +8,13 @@
 #include "wt_internal.h"
 
 /*
- * There's no malloc interface, WiredTiger never calls malloc.  The problem is
- * an application might: allocate memory, write secret stuff into it, free the
- * memory, then we allocate the memory and use it for a file page or log record,
- * and then write it to disk.  That would result in the secret stuff being
- * protected by the WiredTiger permission mechanisms, potentially inappropriate
- * for the secret stuff.
+ * There's no malloc interface, WiredTiger never calls malloc.
+ *
+ * The problem is an application might allocate memory, write secret stuff in
+ * it, free the memory, then WiredTiger allocates the memory and uses it for a
+ * file page or log record, then writes it to disk, without having overwritten
+ * it fully.  That results in the secret stuff being protected by WiredTiger's
+ * permission mechanisms, potentially inappropriate for the secret stuff.
  */
 
 /*
