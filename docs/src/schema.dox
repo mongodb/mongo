@@ -1,7 +1,7 @@
 /*! @page schema Schemas
 
-The tables we have seen so far have all had simple key/value pairs for
-records.  We now explain how to deal with more complex data in WiredTiger.
+While many tables have simple key/value pairs for records, WiredTiger
+also supports more complex data patterns.
 
 @section schema_intro Tables, Rows and Columns
 
