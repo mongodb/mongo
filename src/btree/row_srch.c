@@ -9,7 +9,8 @@
 
 /*
  * __search_insert --
- *	Search the slot's insert list.
+ *	Search a row-store slot's insert list, creating a skiplist stack as we
+ * go.
  */
 static inline WT_INSERT *
 __search_insert(WT_SESSION_IMPL *session,
@@ -28,9 +29,9 @@ __search_insert(WT_SESSION_IMPL *session,
 	compare = btree->btree_compare;
 
 	/* Fast-path appends. */
-	if ((ins = &inshead->tail[0]) != NULL) {
-		insert_key.data = WT_INSERT_KEY(*ins);
-		insert_key.size = WT_INSERT_KEY_SIZE(*ins);
+	if (inshead->tail[0] != NULL) {
+		insert_key.data = WT_INSERT_KEY(inshead->tail[0]);
+		insert_key.size = WT_INSERT_KEY_SIZE(inshead->tail[0]);
 		if ((cmp = compare(btree, key, &insert_key)) > 0) {
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?

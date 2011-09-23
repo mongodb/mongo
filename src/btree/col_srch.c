@@ -118,8 +118,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT pair
 	 * until we know we have a useful entry.
 	 */
-	if (ins_head != NULL && (ins =
-	    __col_insert_search_stack(ins_head, cbt->ins_stack, recno)) != NULL)
+	if ((ins =
+	    __col_insert_search(ins_head, cbt->ins_stack, recno)) != NULL)
 		if (recno == WT_INSERT_RECNO(ins)) {
 			cbt->ins_head = ins_head;
 			cbt->ins = ins;
@@ -136,9 +136,8 @@ past_end:
 	 * past the end of the table.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if (cbt->ins_head == NULL || (cbt->ins =
-	    __col_insert_search_stack(
-	    cbt->ins_head, cbt->ins_stack, recno)) == NULL)
+	if ((cbt->ins =
+	    __col_insert_search(cbt->ins_head, cbt->ins_stack, recno)) == NULL)
 		cbt->compare = -1;
 	else {
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);

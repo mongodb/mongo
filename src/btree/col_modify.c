@@ -198,12 +198,14 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
-	WT_INSERT *new_ins, ***ins_stack;
+	WT_INSERT *ins, *new_ins, ***ins_stack;
 	uint64_t recno;
 	u_int i, skipdepth;
+	int ret;
 
 	btree = session->btree;
 	page = btree->last_page;
+	ret = 0;
 
 	__wt_col_append_unpack(session, &inshead, &ins_stack,
 	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
@@ -236,7 +238,13 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
-	(void)__col_insert_search_stack(*inshead, ins_stack, recno);
+	ins = __col_insert_search(*inshead, ins_stack, recno);
+
+	/* If we find the record number, there's been a race. */
+	if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
+		ret = WT_RESTART;
+		goto done;
+	}
 
 	/*
 	 * First, point the new WT_INSERT item's skiplist references to the next
@@ -254,5 +262,5 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_session_serialize_wrapup(session, page, 0);
+done:	__wt_session_serialize_wrapup(session, page, ret);
 }

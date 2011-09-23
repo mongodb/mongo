@@ -6,11 +6,11 @@
  */
 
 /*
- * __col_insert_search --
- *	Search an column-store insert list.
+ * __col_insert_search_match --
+ *	Search an column-store insert list for an exact match.
  */
 static inline WT_INSERT *
-__col_insert_search(WT_INSERT_HEAD *inshead, uint64_t recno)
+__col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
 {
 	WT_INSERT **ins;
 	uint64_t ins_recno;
@@ -21,8 +21,8 @@ __col_insert_search(WT_INSERT_HEAD *inshead, uint64_t recno)
 		return (NULL);
 
 	/* Fast path the check for values at the end of the skiplist. */
-	ins = &inshead->tail[0];
-	if (*ins != NULL && recno > WT_INSERT_RECNO(*ins))
+	if (inshead->tail[0] != NULL &&
+	    recno > WT_INSERT_RECNO(inshead->tail[0]))
 		return (NULL);
 
 	/*
@@ -53,24 +53,27 @@ __col_insert_search(WT_INSERT_HEAD *inshead, uint64_t recno)
 }
 
 /*
- * __col_insert_search_stack --
- *	Search a column-store insert list, updating the skiplist stack as we go.
+ * __col_insert_search --
+ *	Search a column-store insert list, creating a skiplist stack as we go.
  */
 static inline WT_INSERT *
-__col_insert_search_stack(
+__col_insert_search(
     WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
 {
 	WT_INSERT **ins, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
+	/* If there's no insert chain to search, we're done. */
+	if (inshead == NULL)
+		return (NULL);
+
 	/* Fast path appends. */
-	ins = &inshead->tail[0];
-	if (*ins != NULL && recno > WT_INSERT_RECNO(*ins)) {
+	if (inshead->tail[0] != NULL &&
+	    recno > WT_INSERT_RECNO(inshead->tail[0])) {
 		for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 			ins_stack[i] = (inshead->tail[i] != NULL) ?
-				    &inshead->tail[i]->next[i] :
-				    &inshead->head[i];
+			    &inshead->tail[i]->next[i] : &inshead->head[i];
 		return (inshead->tail[0]);
 	}
 

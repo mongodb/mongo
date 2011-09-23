@@ -101,7 +101,7 @@ new_page:	*recnop = cbt->recno;
 		 * to search the entire list.  We use the skiplist structure,
 		 * rather than doing it linearly.
 		 */
-		if ((ins = __col_insert_search(
+		if ((ins = __col_insert_search_match(
 		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
 			val->data = WT_UPDATE_DATA(ins->upd);
 			val->size = 1;
@@ -170,7 +170,7 @@ new_page:	*recnop = cbt->recno;
 		 * to search the entire list.  We use the skiplist structure,
 		 * rather than doing it linearly.
 		 */
-		if ((ins = __col_insert_search(
+		if ((ins = __col_insert_search_match(
 		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				continue;
