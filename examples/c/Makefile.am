@@ -9,7 +9,6 @@ noinst_PROGRAMS = \
 	ex_file \
 	ex_hello \
 	ex_pack \
-	ex_page \
 	ex_process \
 	ex_schema \
 	ex_sequence \
