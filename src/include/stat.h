@@ -72,12 +72,12 @@ struct __wt_btree_stats {
 	WT_STATS page_write;
 	WT_STATS file_size;
 	WT_STATS file_fixed_len;
+	WT_STATS file_intlovfl;
+	WT_STATS file_leafovfl;
 	WT_STATS file_magic;
 	WT_STATS file_major;
 	WT_STATS file_intlmax;
 	WT_STATS file_leafmax;
-	WT_STATS file_intlmin;
-	WT_STATS file_leafmin;
 	WT_STATS file_minor;
 	WT_STATS file_freelist_bytes;
 	WT_STATS file_freelist_entries;

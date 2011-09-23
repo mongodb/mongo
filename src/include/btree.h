@@ -67,6 +67,13 @@ typedef struct __wt_named_compressor {
 } WT_NAMED_COMPRESSOR;
 
 /*
+ * Split page size calculation -- we don't want to repeatedly split every time
+ * a new entry is added, so we split to a smaller-than-maximum page size.
+ */
+#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
+	WT_ALIGN(((pagesize) * (pct)) / 100, allocsize)
+
+/*
  * WT_BTREE --
  *	A btree handle.
  */
@@ -96,14 +103,11 @@ struct __wt_btree {
 
 	uint32_t key_gap;		/* Row-store prefix key gap */
 
-	uint32_t intlitemsize;		/* Maximum item size for overflow */
-	uint32_t leafitemsize;
-
 	uint32_t allocsize;		/* Allocation size */
-	uint32_t intlmin;		/* Min/max internal page size */
-	uint32_t intlmax;
-	uint32_t leafmin;		/* Min/max leaf page size */
-	uint32_t leafmax;
+	uint32_t intlmax;		/* Internal page size max */
+	uint32_t intlovfl;		/* Internal page overflow size */
+	uint32_t leafmax;		/* Leaf page size max */
+	uint32_t leafovfl;		/* Leaf page overflow size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */

@@ -1,9 +1,130 @@
 /*! @page tuning Performance Tuning
 
-- Performance monitoring with statistics
-- Cache size
-- Page size ranges
-- Log buffer sizing
+@section statistics Performance Monitoring with Statistics
 
-@todo write this page
+WiredTiger maintains a variety of statistics that can be read with a
+cursor.  The statistics are at two levels: per-database statistics and
+per-underlying file statistics.  The database statistics are the
+default; the underlying file statistics are available by specifying the
+appropriate uri.
+
+The following is an example printing out the database statistics:
+
+@dontinclude ex_stat.c
+@skipline print_database_stats
+@until }
+
+The following is an example printing out the underlying file statistics:
+
+@dontinclude ex_stat.c
+@skipline print_file_stats
+@until }
+
+Both examples can use a common display routine that iterates through the
+statistics until the cursor returns the end of the list. 
+
+@dontinclude ex_stat.c
+@skipline display
+@until }
+@until }
+
+Note the raw value of the statistic is available from the /c value
+field, as well as a printable string version of the value.
+
+@section cache Cache Size
+
+The cache size for the database is configurable by setting the \c
+cache_size configuration string when calling the ::wiredtiger_open
+function.
+
+The effectiveness of the cache can be measured by reviewing the page
+eviction statistics for the database.
+
+An example of setting a cache size to 10MB:
+
+@dontinclude ex_config.c
+@skipline wiredtiger_open
+@until wiredtiger_strerror
+
+@section page Page and Overflow Sizes
+
+There are four page and overflow size configuration values: \c
+internal_node_max, \c internal_overflow_size, \c leaf_node_max and \c
+leaf_overflow_size.  All four should be specified to the
+WT_SESSION::create method, that is, they are configurable on a per-file
+basis.
+
+The \c internal_node_max and \c leaf_node_max configuration values
+specify the maximum size for Btree internal and leaf pages.  That is,
+when an internal or leaf page reaches the specified size, it splits into
+two pages.   Generally, internal pages should be sized to fit into the
+system's L1 or L2 caches in order to minimize cache misses when
+searching the tree, while leaf pages should be sized to maximize I/O
+performance (if reading from disk is necessary, it is usually desirable
+to read a large amount of data, assuming some locality of reference in
+the application's access pattern).
+
+The \c internal_overflow_size and \c leaf_overflow_size configuration
+values specify the minimum size at which an object will be stored
+off-page (that is, will be stored separately in the file from the page
+where the item logically appears).  Referencing overflow items is more
+expensive than referencing on-page items, requiring additional I/O if
+the object is not already cached.  For this reason, it is important to
+avoid creating large numbers of overflow items that are repeatedly
+referenced, and the overflow item size should probably be increased if
+many overflow items are being created.  Because pages must be large
+enough to store any item that is not an overflow item, increasing the
+size of the overflow items may also require increasing the page sizes.
+
+With respect to compression, page and overflow sizes do not necessarily
+reflect the actual size of the page or item on disk, if block
+compression has been configured.  Block compression in WiredTiger
+happens within the disk I/O subsystem, and so a page might split even
+if subsequent compression would result in a resulting page size that
+would be small enough to leave as a single page.  In other words, page
+and overflow sizes are based on in-memory sizes, not disk sizes.
+
+There are two other, related configuration values, also settable by the
+WT_SESSION::create method.  They are \c allocation_size, and \c split_pct.
+
+The \c allocation_size configuration value is the underlying unit of
+allocation for the file.  As the unit of file allocation, it has two
+effects: first, it limits the ultimate size of the file, and second, it
+determines how much space is wasted when storing overflow items.
+
+By limiting the size of the file, the allocation size limits the amount
+of data that can be stored in a file.  For example, if the allocation
+size is set to the minimum possible (512B), the maximum file size is
+2TB, that is, attempts to allocate new file blocks will fail when the
+file reaches 2TB in size.  If the allocation size is set to the maximum
+possible (512MB), the maximum file size is 2EB.
+
+The unit of allocation also determines how much space is wasted when
+storing overflow items.  For example, if the allocation size were set
+to the minimum value of 512B, an overflow item of 1100 bytes would
+require 3 allocation sized file units, or 1536 bytes, wasting almost 500
+bytes.  For this reason, as the allocation size increases, page sizes
+and overflow item sizes will likely increase as well, to ensure that
+significant space isn't wasted by overflow items.
+
+The last configuration value is \c split_pct, which configures the size
+of a split page.  When a page grows sufficiently large that it must be
+split, the newly split page's size is \c split_pct percent of the
+maximum page size.  This value should be selected to avoid creating a
+large number of tiny pages or repeatedly splitting whenever new entries
+are inserted.  For example, if the maximum page size is 1MB, a \c
+split_pct value of 10% would potentially result in creating a large
+number of 10KB pages, which may not be optimal for future I/O.   Or, if
+the maximum page size is 1MB, a \c split_pct value of 90% would
+potentially result in repeatedly splitting pages as the split pages grow
+to 1MB over and over.  The default value for \c split_pct is 75%,
+intended to keep large pages relatively large, while still giving split
+pages room to grow.
+
+An example of configuring page sizes:
+
+@dontinclude ex_file.c
+@skipline file:example
+@until );
+
  */

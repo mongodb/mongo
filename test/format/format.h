@@ -33,7 +33,7 @@
 #define	VAR		3
 
 /* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
+#define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
 
 #define	WT_TABLENAME	"file:__wt"
 
@@ -71,11 +71,9 @@ typedef struct {
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
 	uint32_t c_intl_node_max;
-	uint32_t c_intl_node_min;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_node_max;
-	uint32_t c_leaf_node_min;
 	uint32_t c_multithread;
 	uint32_t c_ops;
 	uint32_t c_repeat_data_pct;

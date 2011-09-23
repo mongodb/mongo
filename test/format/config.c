@@ -62,15 +62,6 @@ config_setup(void)
 	/* Periodically, set the delete percentage to 0 so salvage gets run. */
 	if (!g.replay && g.run_cnt % 10 == 0)
 		g.c_delete_pct = 0;
-
-	/*
-	 * There are a couple of corrections the table doesn't handle, where
-	 * initialized values are relative to each other.
-	 */
-	if (g.c_intl_node_max < g.c_intl_node_min)
-		g.c_intl_node_max = g.c_intl_node_min;
-	if (g.c_leaf_node_max < g.c_leaf_node_min)
-		g.c_leaf_node_max = g.c_leaf_node_min;
 }
 
 /*

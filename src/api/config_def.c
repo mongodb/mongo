@@ -78,21 +78,20 @@ const char *
 __wt_confdfl_file_meta =
     "allocation_size=512B,block_compressor=,columns=,huffman_key=,"
     "huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
-    "internal_node_min=2KB,key_format=u,key_gap=10,leaf_node_max=1MB,"
-    "leaf_node_min=32KB,prefix_compression=true,split_min=false,split_pct=75,"
-    "type=btree,value_format=u";
+    "internal_overflow_size=64B,key_format=u,key_gap=10,leaf_node_max=1MB,"
+    "leaf_overflow_size=470B,prefix_compression=true,split_pct=75,type=btree,"
+    "value_format=u";
 
 const char *
 __wt_confchk_file_meta =
     "allocation_size=(type=int,min=512B,max=128MB),block_compressor=(),"
     "columns=(type=list),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
-    "min=512B,max=512MB),internal_node_min=(type=int,min=512B,max=512MB),"
+    "min=512B,max=512MB),internal_overflow_size=(type=int,min=40B),"
     "key_format=(type=format),key_gap=(type=int,min=0),"
-    "leaf_node_max=(type=int,min=512B,max=512MB),leaf_node_min=(type=int,"
-    "min=512B,max=512MB),prefix_compression=(type=boolean),"
-    "split_min=(type=boolean),split_pct=(type=int,min=0,max=100),"
-    "type=(choices=[\"btree\"]),value_format=(type=format)";
+    "leaf_node_max=(type=int,min=512B,max=512MB),leaf_overflow_size=(type=int"
+    ",min=40B),prefix_compression=(type=boolean),split_pct=(type=int,min=25,"
+    "max=100),type=(choices=[\"btree\"]),value_format=(type=format)";
 
 const char *
 __wt_confdfl_index_meta =
@@ -143,10 +142,10 @@ const char *
 __wt_confdfl_session_create =
     "allocation_size=512B,block_compressor=,colgroups=,columns=,columns=,"
     "exclusive=false,filename=,huffman_key=,huffman_value=,"
-    "internal_key_truncate=true,internal_node_max=2KB,internal_node_min=2KB,"
-    "key_format=u,key_format=u,key_gap=10,leaf_node_max=1MB,"
-    "leaf_node_min=32KB,prefix_compression=true,split_min=false,split_pct=75,"
-    "type=btree,value_format=u,value_format=u";
+    "internal_key_truncate=true,internal_node_max=2KB,"
+    "internal_overflow_size=64B,key_format=u,key_format=u,key_gap=10,"
+    "leaf_node_max=1MB,leaf_overflow_size=470B,prefix_compression=true,"
+    "split_pct=75,type=btree,value_format=u,value_format=u";
 
 const char *
 __wt_confchk_session_create =
@@ -154,12 +153,11 @@ __wt_confchk_session_create =
     "colgroups=(),columns=(type=list),columns=(type=list),"
     "exclusive=(type=boolean),filename=(),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
-    "min=512B,max=512MB),internal_node_min=(type=int,min=512B,max=512MB),"
+    "min=512B,max=512MB),internal_overflow_size=(type=int,min=40B),"
     "key_format=(type=format),key_format=(type=format),key_gap=(type=int,"
     "min=0),leaf_node_max=(type=int,min=512B,max=512MB),"
-    "leaf_node_min=(type=int,min=512B,max=512MB),"
-    "prefix_compression=(type=boolean),split_min=(type=boolean),"
-    "split_pct=(type=int,min=0,max=100),type=(choices=[\"btree\"]),"
+    "leaf_overflow_size=(type=int,min=40B),prefix_compression=(type=boolean),"
+    "split_pct=(type=int,min=25,max=100),type=(choices=[\"btree\"]),"
     "value_format=(type=format),value_format=(type=format)";
 
 const char *

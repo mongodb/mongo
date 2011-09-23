@@ -508,10 +508,11 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
-	 * @config{allocation_size, file unit allocation size\, in bytes. The
-	 * value must be an integer between 512B and 128MB.,\c 512B}
-	 * @config{block_compressor, use indicated compressor for database
-	 * blocks.  Permitted values are empty (off) or \c "<name>".  See @ref
+	 * @config{allocation_size, configure the file unit allocation size\, in
+	 * bytes; the size must a power-of-two. The value must be an integer
+	 * between 512B and 128MB.,\c 512B}
+	 * @config{block_compressor, configure a compressor for file blocks.
+	 * Permitted values are empty (off) or \c "<name>".  See @ref
 	 * compressors for more details. The value must be a string.,empty}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
@@ -531,19 +532,22 @@ struct wt_session {
 	 * specified configuration. The value must be a boolean flag.,\c false}
 	 * @config{filename, override the default filename derived from the
 	 * object name. The value must be a string.,empty}
-	 * @config{huffman_key, use Huffman encoding for Btree keys.  Permitted
+	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
 	 * huffman for more details. The value must be a string.,empty}
-	 * @config{huffman_value, use Huffman encoding for Btree values.
+	 * @config{huffman_value, configure Huffman encoding for values.
 	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
 	 * See @ref huffman for more details. The value must be a string.,empty}
 	 * @config{internal_key_truncate, configure the Btree for truncation of
 	 * internal keys\, discarding unnecessary trailing bytes on internal
 	 * keys. The value must be a boolean flag.,\c true}
-	 * @config{internal_node_max, maximum page size for internal nodes\, in
-	 * bytes. The value must be an integer between 512B and 512MB.,\c 2KB}
-	 * @config{internal_node_min, minimum page size for internal nodes\, in
-	 * bytes. The value must be an integer between 512B and 512MB.,\c 2KB}
+	 * @config{internal_node_max, configure the maximum page size for
+	 * internal nodes\, in bytes; the size must be a multiple of the
+	 * allocation size. The value must be an integer between 512B and
+	 * 512MB.,\c 2KB}
+	 * @config{internal_overflow_size, configure the internal node overflow
+	 * key size\, in bytes. The value must be an integer greater than or
+	 * equal to 40B.,\c 64B}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref packing for details.  By default\, applications use the
 	 * WT_ITEM struct to manipulate raw byte arrays.  Key items of type \c
@@ -553,22 +557,22 @@ struct wt_session {
 	 * in a Btree leaf page\, constraining the number of keys processed to
 	 * instantiate a random Btree leaf page key. The value must be an
 	 * integer greater than or equal to 0.,\c 10}
-	 * @config{leaf_node_max, maximum page size for leaf nodes\, in bytes.
+	 * @config{leaf_node_max, configure the maximum page size for leaf
+	 * nodes\, in bytes; the size must be a multiple of the allocation size.
 	 * The value must be an integer between 512B and 512MB.,\c 1MB}
-	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes.
-	 * The value must be an integer between 512B and 512MB.,\c 32KB}
+	 * @config{leaf_overflow_size, configure the leaf node overflow key
+	 * size\, in bytes. The value must be an integer greater than or equal
+	 * to 40B.,\c 470B}
 	 * @config{prefix_compression, configure the Btree for prefix
 	 * compression\, storing keys as a count of bytes matching the previous
 	 * key plus a unique suffix. The value must be a boolean flag.,\c true}
-	 * @config{split_min, configure minimal splits in Btree reconciliation
-	 * code (debugging only). The value must be a boolean flag.,\c false}
 	 * @config{split_pct, configure the Btree page split size as a
 	 * percentage of the maximum Btree page size\, that is\, when a Btree
 	 * page is split\, it will be split into smaller pages\, where each page
 	 * is the specified percentage of the maximum Btree page size. The value
-	 * must be an integer between 0 and 100.,\c 75}
-	 * @config{type, the file type. The value must be a string\, chosen from
-	 * the following options: \c "btree".,\c btree}
+	 * must be an integer between 25 and 100.,\c 75}
+	 * @config{type, configure the file type. The value must be a string\,
+	 * chosen from the following options: \c "btree".,\c btree}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref packing for details.  By default\, applications use the
 	 * WT_ITEM struct to manipulate raw byte arrays.  Value items of type \c

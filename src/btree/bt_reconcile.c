@@ -28,7 +28,6 @@ typedef struct {
 	int locked;			/* The tree is locked down */
 	int salvage;			/* Called from salvage */
 
-	int	 btree_split_min;	/* use tiny split sizes (debugging) */
 	uint32_t btree_split_pct;	/* Split page percent */
 
 	/*
@@ -200,7 +199,7 @@ static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_cell_build_key(
-		WT_SESSION_IMPL *, const void *, uint32_t, int *);
+		WT_SESSION_IMPL *, const void *, uint32_t, int, int *);
 static int  __rec_cell_build_ovfl(
 		WT_SESSION_IMPL *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(
@@ -238,8 +237,7 @@ static int  __rec_row_split(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split(WT_SESSION_IMPL *);
 static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
-static int  __rec_split_init(
-		WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
+static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
 static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *);
@@ -567,11 +565,6 @@ __rec_init(WT_SESSION_IMPL *session, uint32_t flags)
 		r->last = &r->_last;
 
 		/* Configuration. */
-		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "split_min", &cval));
-		if (cval.val != 0)
-			r->btree_split_min = 1;
-
 		WT_RET(__wt_config_getones(session,
 		    session->btree->config, "split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
@@ -1011,8 +1004,8 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Initialization for the reconciliation split functions.
  */
 static int
-__rec_split_init(WT_SESSION_IMPL *session,
-    WT_PAGE *page, uint64_t recno, uint32_t max, uint32_t min)
+__rec_split_init(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, uint32_t max)
 {
 	WT_BTREE *btree;
 	WT_PAGE_DISK *dsk;
@@ -1058,16 +1051,15 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * information at that point.  That allows us to go back and split the
 	 * page at the boundary points if we eventually overflow the maximum
 	 * page size.
+	 *
+	 * Finally, fixed-size column-store pages can split under (very) rare
+	 * circumstances, but they're usually allocated at a fixed page size,
+	 * never anything smaller.
 	 */
 	r->page_size = max;
-	if (r->btree_split_min)
-		r->split_size = min;
-	else {
-		r->split_size = WT_ALIGN(
-		    (max * r->btree_split_pct) / 100, btree->allocsize);
-		if (r->split_size < min)
-			r->split_size = min;
-	}
+	r->split_size = page->type == WT_PAGE_COL_FIX ?
+	    max :
+	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, r->btree_split_pct);
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
@@ -1510,9 +1502,8 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 static int
 __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__rec_split_init(session, page,
-	    page->u.col_int.recno,
-	    session->btree->intlmax, session->btree->intlmin));
+	WT_RET(__rec_split_init(
+	    session, page, page->u.col_int.recno, session->btree->intlmax));
 
 	/*
 	 * Walking the row-store internal pages is complicated by the fact that
@@ -1620,7 +1611,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(
-	    session, page, page->u.bulk.recno, btree->leafmax, btree->leafmax));
+	    session, page, page->u.bulk.recno, btree->leafmax));
 
 	/* Copy the updated, disk-image bytes into place. */
 	memcpy(r->first_free, page->u.col_leaf.bitf,
@@ -1703,8 +1694,8 @@ __rec_col_fix_slvg(
 	 * for fixed-length format ranges to overlap during salvage, and I
 	 * don't want to have to retrofit the code later.
 	 */
-	WT_RET(__rec_split_init(session,
-	    page, page->u.col_leaf.recno, btree->leafmax, btree->leafmax));
+	WT_RET(__rec_split_init(
+	    session, page, page->u.col_leaf.recno, btree->leafmax));
 
 	/* We may not be taking all of the entries on the original page. */
 	page_take = salvage->take == 0 ? page->entries : salvage->take;
@@ -1759,7 +1750,7 @@ __rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Allocate the memory -- we know the entire page will fit. */
 	WT_RET(__rec_split_init(
-	    session, page, page->u.bulk.recno, btree->leafmax, btree->leafmax));
+	    session, page, page->u.bulk.recno, btree->leafmax));
 
 	/* Copy the bytes into place. */
 	len = __bitstr_size(page->entries * btree->bitcnt);
@@ -1873,9 +1864,8 @@ __rec_col_var(
 	data = NULL;
 	size = 0;
 
-	WT_RET(__rec_split_init(session, page,
-	    page->u.col_leaf.recno,
-	    session->btree->leafmax, session->btree->leafmin));
+	WT_RET(__rec_split_init(
+	    session, page, page->u.col_leaf.recno, session->btree->leafmax));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
@@ -2120,9 +2110,8 @@ __rec_col_var_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r = session->btree->reconcile;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session, page,
-	    page->u.bulk.recno,
-	    session->btree->leafmax, session->btree->leafmin));
+	WT_RET(__rec_split_init(
+	    session, page, page->u.bulk.recno, session->btree->leafmax));
 
 	/* For each entry in the update list... */
 	rle = 1;
@@ -2179,8 +2168,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session,
-	    page, 0ULL, session->btree->intlmax, session->btree->intlmin));
+	WT_RET(__rec_split_init(session, page, 0ULL, session->btree->intlmax));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -2298,7 +2286,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		} else
 			WT_RET(__rec_cell_build_key(session,
 			    WT_IKEY_DATA(ikey),
-			    r->cell_zero ? 1 : ikey->size, &ovfl_key));
+			    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -2319,7 +2307,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
-				    session, NULL, 0, &ovfl_key));
+				    session, NULL, 0, 1, &ovfl_key));
 		}
 
 		/* Copy the key onto the page. */
@@ -2393,7 +2381,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		ikey = r->merge_ref == NULL ? rref->key : r->merge_ref->key;
 		r->merge_ref = NULL;
 		WT_RET(__rec_cell_build_key(session, WT_IKEY_DATA(ikey),
-		    r->cell_zero ? 1 : ikey->size, &ovfl_key));
+		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -2408,7 +2396,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
-				    session, NULL, 0, &ovfl_key));
+				    session, NULL, 0, 1, &ovfl_key));
 		}
 
 		/* Copy the key onto the page. */
@@ -2461,8 +2449,7 @@ __rec_row_leaf(
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session,
-	    page, 0ULL, session->btree->leafmax, session->btree->leafmin));
+	WT_RET(__rec_split_init(session, page, 0ULL, session->btree->leafmax));
 
 	/*
 	 * Bulk-loaded pages are just an insert list and nothing more.  As
@@ -2580,11 +2567,11 @@ __rec_row_leaf(
 			ovfl_key = 1;
 		} else if (ikey != NULL)
 			WT_ERR(__rec_cell_build_key(session,
-			    WT_IKEY_DATA(ikey), ikey->size, &ovfl_key));
+			    WT_IKEY_DATA(ikey), ikey->size, 0, &ovfl_key));
 		else {
 			WT_ERR(__wt_row_key(session, page, rip, tmp));
 			WT_ERR(__rec_cell_build_key(
-			    session, tmp->data, tmp->size, &ovfl_key));
+			    session, tmp->data, tmp->size, 0, &ovfl_key));
 		}
 
 		/*
@@ -2610,7 +2597,7 @@ __rec_row_leaf(
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_ERR(__rec_cell_build_key(
-				    session, NULL, 0, &ovfl_key));
+				    session, NULL, 0, 0, &ovfl_key));
 		}
 
 		/* Copy the key/value pair onto the page. */
@@ -2660,7 +2647,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 			    WT_UPDATE_DATA(upd), upd->size, (uint64_t)0));
 
 		WT_RET(__rec_cell_build_key(session,	/* Build key cell. */
-		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
+		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), 0, &ovfl_key));
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
@@ -2678,7 +2665,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
-				    session, NULL, 0, &ovfl_key));
+				    session, NULL, 0, 0, &ovfl_key));
 		}
 
 		/* Copy the key/value pair onto the page. */
@@ -2956,8 +2943,8 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
  * stored on the page.
  */
 static int
-__rec_cell_build_key(
-    WT_SESSION_IMPL *session, const void *data, uint32_t size, int *is_ovflp)
+__rec_cell_build_key(WT_SESSION_IMPL *session,
+    const void *data, uint32_t size, int is_internal, int *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -3017,7 +3004,8 @@ __rec_cell_build_key(
 		    key->buf.data, key->buf.size, &key->buf));
 
 	/* Create an overflow object if the data won't fit. */
-	if (key->buf.size > btree->leafitemsize) {
+	if (key->buf.size >=
+	    (is_internal ? btree->intlovfl : btree->leafovfl)) {
 		WT_BSTAT_INCR(session, rec_ovfl_key);
 
 		/*
@@ -3029,7 +3017,8 @@ __rec_cell_build_key(
 			return (__rec_cell_build_ovfl(
 			    session, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 		}
-		return (__rec_cell_build_key(session, NULL, 0, is_ovflp));
+		return (__rec_cell_build_key(
+		    session, NULL, 0, is_internal, is_ovflp));
 	}
 
 	key->cell_len = __wt_cell_pack_key(&key->cell, pfx, key->buf.size);
@@ -3071,7 +3060,7 @@ __rec_cell_build_val(
 			    val->buf.data, val->buf.size, &val->buf));
 
 		/* Create an overflow object if the data won't fit. */
-		if (val->buf.size > btree->leafitemsize) {
+		if (val->buf.size > btree->leafovfl) {
 			WT_BSTAT_INCR(session, rec_ovfl_value);
 
 			return (__rec_cell_build_ovfl(

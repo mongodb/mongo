@@ -270,7 +270,7 @@ initsize
 inmem
 intl
 intlmax
-intlmin
+intlovfl
 intpack
 ints
 inuse
@@ -279,7 +279,7 @@ ispo
 keyname
 kv
 leafmax
-leafmin
+leafovfl
 len
 lex
 lexicographically

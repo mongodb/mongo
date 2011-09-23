@@ -72,10 +72,6 @@ static CONFIG c[] = {
 	  "maximum size of Btree internal nodes",
 	  0, 0, 9, 17, &g.c_intl_node_max },
 
-	{ "intl_node_min",
-	  "minimum size of Btree internal nodes",
-	  0, 0, 9, 17, &g.c_intl_node_min },
-
 	{ "key_max",
 	  "maximum size of keys",
 	  C_ROW, 0, 64, 128, &g.c_key_max },
@@ -87,10 +83,6 @@ static CONFIG c[] = {
 	{ "leaf_node_max",
 	  "maximum size of Btree leaf nodes",
 	  0, 0, 9, 17, &g.c_leaf_node_max },
-
-	{ "leaf_node_min",
-	  "minimum size of Btree leaf nodes",
-	  0, 0, 9, 17, &g.c_leaf_node_min },
 
 	{ "multithread",
 	  "configured for multi-threading",		/* 50% */

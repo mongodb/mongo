@@ -25,6 +25,7 @@
 #define	SLVG	"__slvg.build"			/* Salvage file */
 
 #define	PSIZE	(2 * 1024)
+#define	OSIZE	(PSIZE / 20)
 
 void build(int, int, int);
 void copy(u_int, u_int);
@@ -448,25 +449,25 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=7t,"
 		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		    "internal_node_max=%d,internal_overflow_size=%d,"
+		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	case WT_PAGE_COL_VAR:
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,"
 		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		    "internal_node_max=%d,internal_overflow_size=%d,"
+		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		(void)snprintf(config, sizeof(config),
 		    "key_format=u,"
 		    "allocation_size=%d,"
-		    "internal_node_min=%d,internal_node_max=%d,"
-		    "leaf_node_min=%d,leaf_node_max=%d",
-		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		    "internal_node_max=%d,internal_overflow_size=%d,"
+		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	default:
 		assert(0);

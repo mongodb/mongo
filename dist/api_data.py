@@ -65,14 +65,19 @@ format_meta = column_meta + [
 # Per-file configuration
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
-		file unit allocation size, in bytes''',
+		configure the file unit allocation size, in bytes; the size
+		must a power-of-two''',
 		min='512B', max='128MB'),
+	Config('block_compressor', '', r'''
+		configure a compressor for file blocks.  Permitted values
+		are empty (off) or \c "<name>".  See @ref compressors for
+		more details'''),
 	Config('huffman_key', '', r'''
-		use Huffman encoding for Btree keys.  Permitted values are
+		configure Huffman encoding for keys.  Permitted values are
 		empty (off), \c "english" or \c "<filename>".  See @ref huffman
 		for more details'''),
 	Config('huffman_value', '', r'''
-		use Huffman encoding for Btree values.  Permitted values are
+		configure Huffman encoding for values.  Permitted values are
 		empty (off), \c "english" or \c "<filename>".  See @ref huffman
 		for more details'''),
 	Config('internal_key_truncate', 'true', r'''
@@ -80,43 +85,37 @@ file_meta = format_meta + [
 		unnecessary trailing bytes on internal keys''',
 		type='boolean'),
 	Config('internal_node_max', '2KB', r'''
-		maximum page size for internal nodes, in bytes''',
+		configure the maximum page size for internal nodes, in bytes;
+		the size must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('internal_node_min', '2KB', r'''
-		minimum page size for internal nodes, in bytes''',
-		min='512B', max='512MB'),
+	Config('internal_overflow_size', '64B', r'''
+		configure the internal node overflow key size, in bytes''',
+		min='40B'),
 	Config('key_gap', '10', r'''
 		configure the maximum gap between instantiated keys in a Btree
 		leaf page, constraining the number of keys processed to
 		instantiate a random Btree leaf page key''',
 		min='0'),
 	Config('leaf_node_max', '1MB', r'''
-		maximum page size for leaf nodes, in bytes''',
+		configure the maximum page size for leaf nodes, in bytes;
+		the size must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('leaf_node_min', '32KB', r'''
-		minimum page size for leaf nodes, in bytes''',
-		min='512B', max='512MB'),
-	Config('block_compressor', '', r'''
-		use indicated compressor for database blocks.  Permitted
-		values are empty (off) or \c "<name>".  See @ref compressors
-		for more details'''),
+	Config('leaf_overflow_size', '470B', r'''
+		configure the leaf node overflow key size, in bytes''',
+		min='40B'),
 	Config('prefix_compression', 'true', r'''
 		configure the Btree for prefix compression, storing keys as a
 		count of bytes matching the previous key plus a unique
 		suffix''',
-		type='boolean'),
-	Config('split_min', 'false', r'''
-		configure minimal splits in Btree reconciliation code
-		(debugging only)''',
 		type='boolean'),
 	Config('split_pct', '75', r'''
 		configure the Btree page split size as a percentage of the
 		maximum Btree page size, that is, when a Btree page is split,
 		it will be split into smaller pages, where each page is the
 		specified percentage of the maximum Btree page size''',
-		min='0', max='100'),
+		min='25', max='100'),
 	Config('type', 'btree', r'''
-		the file type''',
+		configure the file type''',
 		choices=['btree']),
 ]
 

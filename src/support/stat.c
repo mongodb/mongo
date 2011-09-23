@@ -55,12 +55,12 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	    "number of entries in the freelist";
 	stats->file_intlmax.name = "file_intlmax";
 	stats->file_intlmax.desc = "maximum internal page size";
-	stats->file_intlmin.name = "file_intlmin";
-	stats->file_intlmin.desc = "minimum internal page size";
+	stats->file_intlovfl.name = "file_intlovfl";
+	stats->file_intlovfl.desc = "internal page overflow size";
 	stats->file_leafmax.name = "file_leafmax";
 	stats->file_leafmax.desc = "maximum leaf page size";
-	stats->file_leafmin.name = "file_leafmin";
-	stats->file_leafmin.desc = "minimum leaf page size";
+	stats->file_leafovfl.name = "file_leafovfl";
+	stats->file_leafovfl.desc = "leaf page overflow size";
 	stats->file_magic.name = "file_magic";
 	stats->file_magic.desc = "magic number";
 	stats->file_major.name = "file_major";
@@ -132,9 +132,9 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_freelist_bytes.v = 0;
 	stats->file_freelist_entries.v = 0;
 	stats->file_intlmax.v = 0;
-	stats->file_intlmin.v = 0;
+	stats->file_intlovfl.v = 0;
 	stats->file_leafmax.v = 0;
-	stats->file_leafmin.v = 0;
+	stats->file_leafovfl.v = 0;
 	stats->file_magic.v = 0;
 	stats->file_major.v = 0;
 	stats->file_minor.v = 0;

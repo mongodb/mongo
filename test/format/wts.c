@@ -119,23 +119,30 @@ wts_startup(int open_cursors)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
+	uint32_t intlmax, intlovfl, leafmax, leafovfl;
 	int ret;
 	char config[512], *end, *p;
 
 	if (wts_open(&conn, &session))
 		return (1);
 
+	intlmax = 1U << g.c_intl_node_max;
+	intlovfl = MMRAND(intlmax / 50, intlmax / 40);
+	if (intlovfl < 40)
+		intlovfl = 40;
+	leafmax = 1U << g.c_leaf_node_max;
+	leafovfl = MMRAND(leafmax / 50, leafmax / 40);
+	if (leafovfl < 40)
+		leafovfl = 40;
+
 	p = config;
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
-	    "internal_node_min=%d,internal_node_max=%d,"
-	    "leaf_node_min=%d,leaf_node_max=%d,split_min",
+	    "internal_node_max=%d,internal_overflow_size=%d,"
+	    "leaf_node_max=%d,leaf_overflow_size=%d",
 	    (g.c_file_type == ROW) ? "u" : "r",
-	    1U << g.c_intl_node_min,
-	    1U << g.c_intl_node_max,
-	    1U << g.c_leaf_node_min,
-	    1U << g.c_leaf_node_max);
+	    intlmax, intlovfl, leafmax, leafovfl);
 
 	if (g.c_bzip)
 		p += snprintf(p, (size_t)(end - p),
