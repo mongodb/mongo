@@ -10,8 +10,8 @@ A cursor includes:
 
 @section cursor_opening Opening a cursor
 
-Cursors are created using the WT_SESSION::open_cursor method.   The
-following  are examples from the example program @ex_ref{ex_cursor.c}:
+Cursors are created using the WT_SESSION::open_cursor method.  The
+following are examples from the example program @ex_ref{ex_cursor.c}:
 
 @dontinclude ex_cursor.c
 @skipline open_cursor
@@ -48,9 +48,9 @@ data=((uint64_t)value\, (string)printvalue\, (string)description)}
 
 @section cursor_position Positioning a Cursor
 
-Cursors may be positioned at the beginning of the data source, the end
-of the data source, at an exact key within the data source, and near a
-key within the data source.  
+Cursors may be positioned at the beginning of the data source, the end of
+the data source, at an exact key within the data source, and near a key
+within the data source.  
 
 To position a cursor at the beginning or end of the data source, use the
 WT_CURSOR::first and WT_CURSOR::last methods:
@@ -78,8 +78,8 @@ WT_CURSOR::next and WT_CURSOR::prev methods:
 @until }
 
 If the WT_CURSOR::next and WT_CURSOR::prev methods are called on cursors
-without a position in the data source, they are positioned at the
-beginning or end of the data source, respectively.
+without a position in the data source, they are positioned at the beginning
+or end of the data source, respectively.
 
 To position a cursor at a specific location in the data source, use the
 WT_CURSOR::search method:
@@ -102,20 +102,19 @@ use the WT_CURSOR::insert method:
 @skipline int
 @until }
 
-By default, when inserting into a row-store, the WT_CURSOR::insert
-method returns an error if the key already exists in the store,
-otherwise it inserts a new key/value pair.   If the
-<code>overwrite</code> configuration string is specified to the
-WT_SESSION::open_cursor method, any previously existing key/value pair
-is updated to the new value rather than returning an error.
+By default, when inserting into a row-store, the WT_CURSOR::insert method
+returns an error if the key already exists in the store, otherwise it
+inserts a new key/value pair.  If the <code>overwrite</code> configuration
+string is specified to the WT_SESSION::open_cursor method, any previously
+existing key/value pair is updated to the new value rather than returning
+an error.
 
-By default, when updating an underlying column-store, the
-WT_CURSOR::insert method ignores the application's key value, instead,
-it allocates an unused record number in the store and returns that
-record number in the application's key.  If the <code>overwrite</code>
-configuration string is specified to the WT_SESSION::open_cursor method,
-the application's key value will be used to specify the record number
-being inserted or updated.
+By default, when updating an underlying column-store, the WT_CURSOR::insert
+method ignores the application's key value, instead, it allocates an unused
+record number in the store and returns that record number in the
+application's key.  If the <code>overwrite</code> configuration string is
+specified to the WT_SESSION::open_cursor method, the application's key
+value will be used to specify the record number being inserted or updated.
 
 To update existing data using a cursor, use the WT_CURSOR::update method:
 
@@ -135,37 +134,52 @@ To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
 After any cursor handle method failure, the cursor's position is
 undetermined.  Applications that cannot re-position the cursor after
-failure must duplicate the cursor before calling a cursor method that
-will attempt to re-position the cursor.  @notyet{cursor duplication}
+failure must duplicate the cursor before calling a cursor method that will
+attempt to re-position the cursor.  @notyet{cursor duplication}
 
 @section cursor_projections Projections
 
 Cursors on tables, column groups, indices and files can return a subset of
 columns.  This is done by listing the column names in parenthesis in the
-<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields from
-the listed columns are returned by WT_CURSOR::get_value.
+<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields
+from the listed columns are returned by WT_CURSOR::get_value.
 
-This is particularly useful with index cursors, because if all columns in the
-projection are available in the index (including primary key columns, which are
-the values of the index), there is no need to access any column groups.
+This is particularly useful with index cursors, because if all columns in
+the projection are available in the index (including primary key columns,
+which are the values of the index), there is no need to access any column
+groups.
 
 @section cursor_index Index Cursors
 
-When an index is created for a table, records are inserted into the index whenever the table is updated.  These records use a different key to the primary table, as specified when the index is created with the WT_SESSION::create method.
+When an index is created for a table, records are inserted into the index
+whenever the table is updated.  These records use a different key to the
+primary table, as specified when the index is created with the
+WT_SESSION::create method.
 
-A cursor opened on an index has the specified index columns as its key, accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns default to returning the value columns from the table, but this can be overridden by configuring a projection cursor (see @ref cursor_projections), which can access the table key columns or a subset of the value columns.
+A cursor opened on an index has the specified index columns as its key,
+accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns
+default to returning the value columns from the table, but this can be
+overridden by configuring a projection cursor (see @ref cursor_projections),
+which can access the table key columns or a subset of the value columns.
 
 @section cursor_file File Cursors
 
-WiredTiger's schema layer can be bypassed by opening cursors with a \c "file:" URI, using the name of the underlying file.  This can be useful for seeing the contents of a column group or index without reading all of the columns from the table.
+WiredTiger's schema layer can be bypassed by opening cursors with a \c
+"file:" URI, using the name of the underlying file.  This can be useful for
+seeing the contents of a column group or index without reading all of the
+columns from the table.
+
+For example, if an index becomes inconsistent with its primary, a file
+cursor can read from the index without errors (even though some of the keys
+that are returned may not exist in the primary).
 
 @section cursor_statistics Statistics Cursors
 
-Cursors can return run-time statistics about the WiredTiger engine as
-well as the underlying row- and column-store files.  Each cursor
-iteration sets three separate values: the entry's unsigned 64-bit
-integral value, a printable string version of that integral value, and
-a string description of the entry.
+Cursors can return run-time statistics about the WiredTiger engine as well
+as the underlying row- and column-store files.  Each cursor iteration sets
+three separate values: the entry's unsigned 64-bit integral value, a
+printable string version of that integral value, and a string description
+of the entry.
 
 To return run-time statistics about the WiredTiger engine, open a
 statistics cursor:

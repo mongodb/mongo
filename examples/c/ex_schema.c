@@ -81,7 +81,7 @@ int main(void)
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,
 	    "index:population.country_year(country,id)",
-	    NULL, "dup=first", &cursor);
+	    NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &country);
