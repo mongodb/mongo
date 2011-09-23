@@ -434,10 +434,10 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 			__debug_hex_byte(ds, v);
 			__dmsg(ds, "}\n");
 
-			/* Check for a match on the insert list. */
+			/* Check for a match on the update list. */
 			if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
 				__dmsg(ds,
-				    "\tinsert %" PRIu64 "\n",
+				    "\tupdate %" PRIu64 "\n",
 				    WT_INSERT_RECNO(ins));
 				__debug_update(ds, ins->upd, 1);
 				ins = WT_SKIP_NEXT(ins);
