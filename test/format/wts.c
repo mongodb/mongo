@@ -777,12 +777,13 @@ wts_np(int next, int insert, int *notfoundp)
 			return (1);
 		}
 	} else {
-		if (keyno != atoll(bdb_key.data)) {
-			if ((p = strchr(bdb_key.data, '.')) != NULL)
+		if (keyno != (uint64_t)atoll(bdb_key.data)) {
+			if ((p = strchr((char *)bdb_key.data, '.')) != NULL)
 				*p = '\0';
 			fprintf(stderr,
 			    "wts_np: %s key mismatch: %.*s != %" PRIu64 "\n",
-			    which, (int)bdb_key.size, bdb_key.data, keyno);
+			    which,
+			    (int)bdb_key.size, (char *)bdb_key.data, keyno);
 			return (1);
 		}
 	}
