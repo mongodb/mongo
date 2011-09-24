@@ -725,14 +725,11 @@ wts_np(int next, int insert, int *notfoundp)
 	int notfound, ret;
 	uint8_t bitfield;
 	const char *which;
+	char *p;
 
 	cursor = insert ? g.wts_cursor_insert : g.wts_cursor;
 	session = g.wts_session;
 	which = next ? "next" : "prev";
-
-	/* Log the operation */
-	if (g.logging)
-		(void)session->msg_printf(session, "%-10s", which);
 
 	/* Retrieve the BDB value. */
 	if (bdb_np(next, &bdb_key.data, &bdb_key.size,
@@ -742,17 +739,24 @@ wts_np(int next, int insert, int *notfoundp)
 
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
-	if (ret == 0) {
-		if (g.c_file_type == FIX) {
+	if (ret == 0)
+		switch (g.c_file_type) {
+		case FIX:
 			if ((ret = cursor->get_key(cursor, &keyno)) == 0 &&
 			    (ret = cursor->get_value(cursor, &bitfield)) == 0) {
 				value.data = &bitfield;
 				value.size = 1;
 			}
-		} else
+			break;
+		case ROW:
 			if ((ret = cursor->get_key(cursor, &key)) == 0)
 				ret = cursor->get_value(cursor, &value);
-	}
+			break;
+		case VAR:
+			if ((ret = cursor->get_key(cursor, &keyno)) == 0)
+				ret = cursor->get_value(cursor, &value);
+			break;
+		}
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
 		    "%s: wts_%s: %s\n",
@@ -772,6 +776,15 @@ wts_np(int next, int insert, int *notfoundp)
 			wts_stream_item(" wt-key", &key);
 			return (1);
 		}
+	} else {
+		if (keyno != atoll(bdb_key.data)) {
+			if ((p = strchr(bdb_key.data, '.')) != NULL)
+				*p = '\0';
+			fprintf(stderr,
+			    "wts_np: %s key mismatch: %.*s != %" PRIu64 "\n",
+			    which, (int)bdb_key.size, bdb_key.data, keyno);
+			return (1);
+		}
 	}
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
@@ -780,6 +793,17 @@ wts_np(int next, int insert, int *notfoundp)
 		wts_stream_item(" wt-value", &value);
 		return (1);
 	}
+
+	if (g.logging)
+		if (g.c_file_type == ROW)
+			(void)session->msg_printf(session, "%-10s{%.*s/%.*s}",
+			    which,
+			    (int)key.size, (char *)key.data,
+			    (int)value.size, (char *)value.data);
+		else
+			(void)session->msg_printf(
+			    session, "%-10s{%" PRIu64 "/%.*s}",
+			    which, keyno, (int)value.size, (char *)value.data);
 	return (0);
 }
 
