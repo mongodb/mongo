@@ -73,18 +73,12 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
-	/*
-	 * Reset the insert list reference so any subsequent cursor next
-	 * works correctly.
-	 */
-	cbt->ins = NULL;
-
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno =
-		    cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
+		cbt->recno = cbt->last_standard_recno;
 		goto new_page;
 	}
 
@@ -95,12 +89,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		--cbt->recno;
 new_page:	*recnop = cbt->recno;
 
-		/*
-		 * Check any insert list for a matching record.  Insert lists
-		 * are in forward sorted order, in a last-to-first walk we have
-		 * to search the entire list.  We use the skiplist structure,
-		 * rather than doing it linearly.
-		 */
+		/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
 		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
 			val->data = WT_UPDATE_DATA(ins->upd);
@@ -130,25 +119,17 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_SESSION_IMPL *session;
 	uint64_t *recnop;
-	uint32_t slot;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
-	/*
-	 * Reset the insert list reference so any subsequent cursor next
-	 * works correctly.
-	 */
-	cbt->ins = NULL;
-
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->recno =
-		    cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->vslot = UINT32_MAX;
+		cbt->recno = cbt->last_standard_recno;
 		goto new_page;
 	}
 
@@ -162,14 +143,8 @@ new_page:	*recnop = cbt->recno;
 		/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
-		slot = WT_COL_SLOT(cbt->page, cip);
 
-		/*
-		 * Check any insert list for a matching record.  Insert lists
-		 * are in forward sorted order, in a last-to-first walk we have
-		 * to search the entire list.  We use the skiplist structure,
-		 * rather than doing it linearly.
-		 */
+		/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
 		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
@@ -184,7 +159,7 @@ new_page:	*recnop = cbt->recno;
 		 * no matching insert list item, re-use the return information.
 		 * Otherwise, unpack the cell and build the return information.
 		 */
-		if (slot != cbt->vslot) {
+		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
@@ -202,7 +177,7 @@ new_page:	*recnop = cbt->recno;
 				WT_RET(__wt_cell_unpack_copy(
 				    session, &unpack, &cbt->tmp));
 			}
-			cbt->vslot = slot;
+			cbt->cip_saved = cip;
 		}
 		val->data = cbt->tmp.data;
 		val->size = cbt->tmp.size;

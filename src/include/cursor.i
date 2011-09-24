@@ -25,7 +25,7 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 
 	cbt->compare = 2;			/* Illegal value */
 
-	cbt->vslot = WT_CBT_VSLOT_OOB;
+	cbt->cip_saved = NULL;
 
 	cbt->flags = 0;
 }

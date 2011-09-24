@@ -55,13 +55,10 @@ struct __wt_cursor_btree {
 	 * Variable-length column-store values are run-length encoded and may
 	 * be overflow values or Huffman encoded.   To avoid repeatedly reading
 	 * overflow values or decompressing encoded values, process it once and
-	 * store the result in a temporary buffer.  The vslot field is used to
-	 * determine if we're returning information from the same slot as the
-	 * last iteration on the cursor; we're never going to have UINT32_MAX
-	 * slots on a page, use that as our out-of-band value.
+	 * store the result in a temporary buffer.  The cip_saved field is used
+	 * to determine if we've switched columns since our last cursor call.
 	 */
-#define	WT_CBT_VSLOT_OOB	UINT32_MAX
-	uint32_t vslot;			/* Huffman or overflow value slot */
+	WT_COL *cip_saved;		/* Last iteration reference */
 
 	/*
 	 * We also need a temporary buffer in the cursor during row-leaf page
