@@ -91,7 +91,7 @@ namespace mongo {
         }
 
         throw boost::system::system_error(
-            ::GetLastError(), boost::system::system_category);
+            ::GetLastError(), boost::system::get_system_category());
     }
 
 #if defined(_UNICODE)
