@@ -492,13 +492,14 @@ string finishCode( string code ) {
     while ( ! isBalanced( code ) ) {
         inMultiLine = 1;
         code += "\n";
+        // cancel multiline if two blank lines are entered
+        if ( code.find("\n\n\n") != string::npos )
+            return ";";
         char * line = shellReadline("... " , 1 );
         if ( gotInterrupted )
             return "";
         if ( ! line )
             return "";
-        if ( code.find("\n\n\n") != string::npos ) // cancel multiline if two blank lines are entered
-            return ";";
 
         while (startsWith(line, "... "))
             line += 4;
