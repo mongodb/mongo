@@ -306,7 +306,7 @@ DB.prototype.help = function() {
     print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-    print("\tdb.currentOp() displays the current operation in the db");
+    print("\tdb.currentOp() displays currently executing operations in the db");
     print("\tdb.dropDatabase()");
     print("\tdb.eval(func, args) run code server-side");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
