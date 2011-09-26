@@ -32,7 +32,7 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 }
 
 /*
- * __cache_read_req_set --
+ * __cache_read_req_clr --
  *	Clear a request slot.
  */
 static inline void
