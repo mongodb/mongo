@@ -203,7 +203,7 @@ namespace mongo {
             DEV mutexDebugger.entering(_name);
         }
         void unlock() {
-            mutexDebugger.leaving(_name);
+            DEV mutexDebugger.leaving(_name);
             check( pthread_rwlock_unlock( &_lock ) );
         }
 
