@@ -141,8 +141,6 @@ struct __wt_connection_impl {
 	void		 *session_array;	/* Session array */
 	uint32_t	  session_cnt;		/* Session count */
 
-	uint32_t volatile api_gen;	/* API generation number */
-
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
 	 * control, by default.  There's no code path that requires more than 15

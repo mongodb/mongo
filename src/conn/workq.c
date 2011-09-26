@@ -22,7 +22,6 @@ __wt_workq_srvr(void *arg)
 
 	/* Walk the WT_SESSION_IMPL list and execute requests. */
 	while (F_ISSET(conn, WT_WORKQ_RUN)) {
-		++conn->api_gen;
 		WT_STAT_INCR(conn->stats, workq_passes);
 
 		call_evict = call_read = request = 0;
