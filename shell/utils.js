@@ -1179,6 +1179,22 @@ shellHelper.use = function (dbname) {
     print("switched to db " + db.getName());
 }
 
+shellHelper.set = function (str) {
+    if (str == "") {
+        print("bad use parameter");
+        return;
+    }
+    tokens = str.split(" ");
+    param = tokens[0];
+    value = tokens[1];
+    
+    if( value == undefined ) value = true; 
+    if (param == "verbose") {
+        _verboseShell = value;
+    }
+    print("set " + param + " to " + value);
+}
+
 shellHelper.it = function(){
     if ( typeof( ___it___ ) == "undefined" || ___it___ == null ){
         print( "no cursor" );
@@ -1647,6 +1663,9 @@ help = shellHelper.help = function (x) {
         print("\to.isObjectId()");
         print("\to.toString()");
         print("\to.equals(otherid)");
+        print();
+        print("\td = ISODate()                       like Date() but behaves more intuitively when used");
+        print("\td = ISODate(datestr)                  without an explicit \"new \" prefix on construction");
         return;
     }
     else if (x == "admin") {

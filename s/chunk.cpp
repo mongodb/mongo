@@ -499,7 +499,7 @@ namespace mongo {
             conn->update( chunkMetadataNS , BSON( "_id" << genID() ) , BSON( "$set" << BSON( "jumbo" << true ) ) );
             conn.done();
         }
-        catch ( std::exception& e ) {
+        catch ( std::exception& ) {
             warning() << "couldn't set jumbo for chunk: " << genID() << endl;
         }
     }

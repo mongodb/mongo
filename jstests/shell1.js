@@ -1,4 +1,3 @@
-
 x = 1;
 
 shellHelper( "show", "tables;" )
