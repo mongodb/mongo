@@ -32,6 +32,7 @@ cds
 checksums
 ckp
 colgroup
+colgroups
 command's
 cond
 config
@@ -152,6 +153,7 @@ png
 posix
 pre
 primary's
+printf
 printlog
 printvalue
 qnx
@@ -168,6 +170,7 @@ ret
 ro
 rpc
 sHQ
+scanf
 schemas
 selectable
 seqname

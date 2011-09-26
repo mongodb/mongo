@@ -26,7 +26,7 @@ and applications are responsible to creating unique key/value pairs.
 Column-stores with variable-length byte string values support three
 types of compression: run-length encoding (where duplicate values are
 only stored a single time), Huffman encoding of individual value items,
-(see @subpage huffman for more details), and stream compression of the
+(see @ref huffman for more details), and stream compression of the
 blocks in the file.
 
 Column-stores with fixed-length byte values support a single type of

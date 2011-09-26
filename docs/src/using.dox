@@ -10,6 +10,4 @@ example programs:
 - @subpage threads
 - @subpage transactions
 - @subpage tuning
-- @subpage packing
-- @subpage keyvalue
  */

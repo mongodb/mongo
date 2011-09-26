@@ -51,8 +51,10 @@ key and value are raw byte arrays accessed with WT_ITEM.  Keys can be up to
 4GB, but depending on how page sizes are configured, keys larger than some
 size will be stored on overflow pages.  
 
+See @subpage keyvalue for more details on raw key / value items.
+
 The schema layer allows key and value types to be chosen from a list, or
-composite keys or values made up of columns with any combination of types.
+composite keys or values consisting of columns with any combination of types.
 The 4GB limit on keys and values still applies.
 
 WiredTiger's uses format strings similar to those specified in the Python
@@ -78,7 +80,7 @@ struct module to describe the types of columns in a table:
 @row{s, char[], String, string, fixed length}
 @row{S, char[], String, string, variable}
 @row{t, unsigned char, byte, integer, fixed bit length}
-@row{u, WT_ITEM, byte[], string, variable}
+@row{u, WT_ITEM *, byte[], string, variable}
 </table>
 
 The <code>'r'</code> type is used for record number keys in column stores.
@@ -106,29 +108,69 @@ There is a default collator that gives lexicographic (byte-wise)
 comparisons, and the default encoding is designed so that lexicographic
 ordering of encoded keys is usually the expected ordering.  For example,
 the variable-length encoding of integers is designed so that they have the
-natural integer ordering under the default collator.  WiredTiger can also
-be extended with @ref collators "custom collators".
+natural integer ordering under the default collator.
+
+See @subpage packing for details of WiredTiger's packing format.
+
+WiredTiger can also be extended with @ref collators "custom collators".
 
 @section schema_data_access Columns in key and values
 
-@todo Describe how to use WT_CURSOR::get_key, WT_CURSOR::get_value,
-WT_CURSOR::set_key and WT_CURSOR::set_value to access columns.
+Every table has a key format and a value format as describe in @ref
+schema_types.  These types are configured when the table is created by
+passing \c key_format and \c value_format keys to WT_SESSION::create.
+
+Cursors for a table have the same key format as the table itself.  The key
+columns of a cursor are set with WT_CURSOR::set_key and accessed with
+WT_CURSOR::get_key.  WT_CURSOR::set_key is analogous to \c printf, and takes
+a list of values in the order the key columns are configured in \c
+key_format.  The columns values are accessed with WT_CURSOR::get_key, which
+is analogous to \c scanf, and takes a list of pointers to values in the same
+order.
+
+Cursors for a table have the same value format as the table, unless a
+projection is specified to WT_SESSION::open_cursor.  WT_CURSOR::set_value is
+used to set value columns, and WT_CURSOR::get_value is used to get value
+columns.
 
 @section schema_columns Describing Columns
 
-@todo describe how to add columns to a schema
+The columns in a table can be assigned names by passing a \c columns key to
+WT_SESSION::create.  The column names are assigned first to the columns in
+the \c key_format, and then to the columns in \c value_format.  There must be
+a name for every column, and no column names may be repeated.
 
 @section schema_column_groups Storing Groups of Columns Together
 
-@todo define and describe column groups
+Once column names are assigned, they can be used to configure column groups,
+where groups of columns are stored in separate files.
+
+There are two steps involved in setting up column groups: first, pass a list
+of names for the column groups in the \c colgroups configuration key to
+WT_SESSION::create.  Then make a call to WT_SESSION::create for each column
+group, using the URI <code>colgroup:\<table\>:\<colgroup name\></code> and a
+\c columns key in the configuration.  Columns can be stored in multiple
+column groups, but all value columns must appear in at least on column group.
+
+Column groups have the same key as the table.  This is particularly useful
+for column stores, because record numbers are not stored explicitly on disk,
+so there is no repetition of keys across multiple files.  Also note that key
+columns cannot be stored in column group values: they can be retrieved with
+WT_CURSOR::get_key.
 
 @section schema_indices Adding an Index
 
-@todo describe how to add indices to a schema
+Schema columns can also be used to configure indices on tables.  To create an
+index, call WT_SESSION::create using the URI
+<code>index:\<table\>:\<index name\></code> and include a \c columns key in
+the configuration.  WiredTiger updates all indices for a table whenever the
+table is modified.
 
-@section schema_mapping Column Storage
-
-@todo describe how to store some columns separately
+A cursor can be opened on an index by passing the index URI to
+WT_SESSION::open_cursor.  Index cursors use the specified index key columns
+for WT_CURSOR::get_key and WT_CURSOR::set_key, and by default return all of
+the table value columns in WT_CURSOR::get_value.  Index cursors are
+read-only: they cannot be used to perform updates.
 
 @section schema_examples Code Samples
 
