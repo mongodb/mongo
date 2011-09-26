@@ -715,8 +715,6 @@ namespace mongo {
 	 */
         void populate();
         bool populated;
-        long long limit;
-        long long skip;
         long long count;
 
 	/* these two parallel each other */
@@ -769,7 +767,7 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
 
         /*
-          Create a new sorting DocumentSource.
+          Create a new limiting DocumentSource.
 
 	  @param pCtx the expression context
 	  @returns the DocumentSource
@@ -778,25 +776,13 @@ namespace mongo {
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 	/*
-	  Add sort key field.
-
-	  Adds a sort key field to the key being built up.  A concatenated
-	  key is built up by calling this repeatedly.
-
-	  @params fieldPath the field path to the key component
-	  @params ascending if true, use the key for an ascending sort,
-	    otherwise, use it for descending
-	*/
-	void addKey(const string &fieldPath, bool ascending);
-
-	/*
-	  Create a sorting DocumentSource from BSON.
+	  Create a limiting DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
 	  a BSONElement that has been deteremined to be an Object with an
-	  element named $group.
+	  element named $limit.
 
-	  @param pBsonElement the BSONELement that defines the group
+	  @param pBsonElement the BSONELement that defines the limit
 	  @param pCtx the expression context
 	  @returns the grouping DocumentSource
 	 */
@@ -831,7 +817,7 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
 
         /*
-          Create a new sorting DocumentSource.
+          Create a new skipping DocumentSource.
 
 	  @param pCtx the expression context
 	  @returns the DocumentSource
@@ -840,25 +826,13 @@ namespace mongo {
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 	/*
-	  Add sort key field.
-
-	  Adds a sort key field to the key being built up.  A concatenated
-	  key is built up by calling this repeatedly.
-
-	  @params fieldPath the field path to the key component
-	  @params ascending if true, use the key for an ascending sort,
-	    otherwise, use it for descending
-	*/
-	void addKey(const string &fieldPath, bool ascending);
-
-	/*
-	  Create a sorting DocumentSource from BSON.
+	  Create a skipping DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
 	  a BSONElement that has been deteremined to be an Object with an
-	  element named $group.
+	  element named $skip.
 
-	  @param pBsonElement the BSONELement that defines the group
+	  @param pBsonElement the BSONELement that defines the skip
 	  @param pCtx the expression context
 	  @returns the grouping DocumentSource
 	 */
