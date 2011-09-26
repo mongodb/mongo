@@ -385,14 +385,8 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	    "eviction: %s file request: %s",
 	    btree->name, er->close_method ? "close" : "sync");
 
-	/* Release any page we're holding -- we want to re-start the walk. */
-	if (btree->evict_page != NULL) {
-		__wt_page_release(session, btree->evict_page);
-		btree->evict_page = NULL;
-	}
-
 	/*
-	 * We can't release the page just returned to us, it marks our place in
+	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
 	next_page = NULL;
