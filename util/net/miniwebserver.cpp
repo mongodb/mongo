@@ -166,8 +166,13 @@ namespace mongo {
         ss << responseMsg;
         string response = ss.str();
 
-        sock.send( response.c_str(), response.size() , "http response" );
-        sock.close();
+        try {
+            sock.send( response.c_str(), response.size() , "http response" );
+            sock.close();
+        }
+        catch ( SocketException& e ) {
+            log(1) << "couldn't send data to http client: " << e << endl;
+        }
     }
 
     string MiniWebServer::getHeader( const char * req , string wanted ) {

@@ -560,7 +560,8 @@ printShardingStatus = function( configDB , verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
-                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) + " " +
+                                                ( chunk.jumbo ? "jumbo " : "" ) );
                                     }
                                 );
                             }

@@ -335,6 +335,7 @@ DB.prototype.help = function() {
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.serverStatus()");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
+    print("\tdb.setVerboseShell(flag) display extra information in shell output");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
     print("\tdb.version() current version of the server");
@@ -383,6 +384,35 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     return this._dbCommand( cmd );
 }
 
+DB.prototype._initExtraInfo = function() {
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) return;
+    this.startTime = new Date().getTime();
+}
+
+DB.prototype._getExtraInfo = function(action) {
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) {
+        __callLastError = true;
+        return;
+    }
+
+    // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
+    var res = this.getLastErrorCmd(1); 
+    if (res) {
+        if (res.err != undefined && res.err != null) {
+            // error occured, display it
+            return res.err;
+        }
+
+        var info = action + " ";  
+        // hack for inserted because res.n is 0
+        info += action != "Inserted" ? res.n : 1;
+        if (res.n > 0 && res.updatedExisting != undefined) info += " " + (res.updatedExisting ? "existing" : "new")  
+        info += " record(s)";  
+        var time = new Date().getTime() - this.startTime;  
+        info += " in " + time + "ms";
+        return info;  
+    }
+} 
 
 /**
  *  <p> Evaluate a js expression at the database server.</p>
@@ -824,4 +854,14 @@ DB.autocomplete = function(obj){
             ret.push(colls[i]);
     }
     return ret;
+}
+
+DB.prototype.setSlaveOk = function( value ) {
+    if( value == undefined ) value = true;
+    this._slaveOk = value;
+}
+
+DB.prototype.getSlaveOk = function() {
+    if (this._slaveOk != undefined) return this._slaveOk;
+    return this._mongo.getSlaveOk();
 }

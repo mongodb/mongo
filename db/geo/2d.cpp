@@ -2540,7 +2540,7 @@ namespace mongo {
                         shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query, uniqueDocs ) );
                         return c;
                     }
-                    throw UserException( 13058 , (string)"unknown $within type: " + type );
+                    throw UserException( 13058 , str::stream() << "unknown $within information : " << context << ", a shape must be specified." );
                 }
                 default:
                     // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center

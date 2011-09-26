@@ -1,5 +1,7 @@
 __quiet = false;
 __magicNoPrint = { __magicNoPrint : 1111 }
+__callLastError = false; 
+_verboseShell = false;
 
 chatty = function(s){
     if ( ! __quiet )
@@ -36,6 +38,16 @@ printStackTrace = function(){
     } catch (e) {
         print(e.stack);
     }
+}
+
+/**
+ * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
+ * <p> Default is off. <p>
+ * @param {Bool} verbosity on / off
+ */
+setVerboseShell = function( value ) { 
+    if( value == undefined ) value = true; 
+    _verboseShell = value; 
 }
 
 doassert = function (msg) {
@@ -1005,16 +1017,15 @@ testLog = function(x){
 }
 
 shellPrintHelper = function (x) {
-
     if (typeof (x) == "undefined") {
-
-        if (typeof (db) != "undefined" && db.getLastError) {
+        if (__callLastError) {
+            __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
-            var e = db.getLastError(1);
-            if (e != null)
-                print(e);
+            var err = db.getLastError(1);
+            if (err != null) {
+                print(err);
+            }
         }
-
         return;
     }
 
@@ -1166,6 +1177,22 @@ shellHelper.use = function (dbname) {
     }
     db = db.getMongo().getDB(dbname);
     print("switched to db " + db.getName());
+}
+
+shellHelper.set = function (str) {
+    if (str == "") {
+        print("bad use parameter");
+        return;
+    }
+    tokens = str.split(" ");
+    param = tokens[0];
+    value = tokens[1];
+    
+    if( value == undefined ) value = true; 
+    if (param == "verbose") {
+        _verboseShell = value;
+    }
+    print("set " + param + " to " + value);
 }
 
 shellHelper.it = function(){
@@ -1460,7 +1487,7 @@ rs.help = function () {
     print("\tan error, even if the command succeeds.");
     print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
-rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
+rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }

@@ -333,17 +333,17 @@ namespace mongo {
 
     const Member* ReplSetImpl::findById(unsigned id) const {
         if( _self && id == _self->id() ) return _self;
-        
+
         for( Member *m = head(); m; m = m->next() )
             if( m->id() == id )
                 return m;
         return 0;
     }
-    
+
     const OpTime ReplSetImpl::lastOtherOpTime() const {
         OpTime closest(0,0);
-        
-        for( Member *m = _members.head(); m; m=m->next() ) {                
+
+        for( Member *m = _members.head(); m; m=m->next() ) {
             if (!m->hbinfo().up()) {
                 continue;
             }
@@ -372,10 +372,17 @@ namespace mongo {
             bb.append("health", 1.0);
             bb.append("state", (int)myState.s);
             bb.append("stateStr", myState.toString());
+            bb.append("uptime", (unsigned)(time(0) - cmdLine.started));
             if (!_self->config().arbiterOnly) {
                 bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
                 bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
             }
+
+            int maintenance = _maintenanceMode;
+            if (maintenance) {
+                bb.append("maintenanceMode", maintenance);
+            }
+
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);

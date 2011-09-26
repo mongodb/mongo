@@ -395,7 +395,7 @@ namespace mongo {
                 return;
             }
 
-            uassert( 13604 , "too much data for in memory map/reduce" , _size < ( BSONObjMaxUserSize / 2 ) );
+            uassert( 13604 , "too much data for in memory map/reduce" , _size < BSONObjMaxUserSize );
 
             BSONArrayBuilder b( (int)(_size * 1.2) ); // _size is data size, doesn't count overhead and keys
 
@@ -415,8 +415,6 @@ namespace mongo {
             }
 
             BSONArray res = b.arr();
-            uassert( 13605 , "too much data for in memory map/reduce" , res.objsize() < ( BSONObjMaxUserSize * 2 / 3 ) );
-
             final.append( "results" , res );
         }
 
@@ -424,17 +422,17 @@ namespace mongo {
          * Does post processing on output collection.
          * This may involve replacing, merging or reducing.
          */
-        long long State::postProcessCollection() {
+        long long State::postProcessCollection(CurOp* op, ProgressMeterHolder& pm) {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
             if (_config.outNonAtomic)
-                return postProcessCollectionNonAtomic();
+                return postProcessCollectionNonAtomic(op, pm);
             writelock lock;
-            return postProcessCollectionNonAtomic();
+            return postProcessCollectionNonAtomic(op, pm);
         }
 
-        long long State::postProcessCollectionNonAtomic() {
+        long long State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm) {
 
             if ( _config.finalLong == _config.tempLong )
                 return _db.count( _config.finalLong );
@@ -452,19 +450,23 @@ namespace mongo {
             }
             else if ( _config.outType == Config::MERGE ) {
                 // merge: upsert new docs into old collection
+                op->setMessage( "m/r: merge post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                     getDur().commitIfNeeded();
+                    pm.hit();
                 }
                 _db.dropCollection( _config.tempLong );
+                pm.finished();
             }
             else if ( _config.outType == Config::REDUCE ) {
                 // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
+                op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
@@ -488,8 +490,10 @@ namespace mongo {
                         Helpers::upsert( _config.finalLong , temp );
                     }
                     getDur().commitIfNeeded();
+                    pm.hit();
                 }
                 _db.dropCollection( _config.tempLong );
+                pm.finished();
             }
 
             return _db.count( _config.finalLong );
@@ -980,9 +984,9 @@ namespace mongo {
                 try {
                     state.init();
                     state.prepTempCollection();
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
-                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
                     long long mapTime = 0;
                     {
                         readlock lock( config.ns );
@@ -1074,6 +1078,35 @@ namespace mongo {
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
+
+                    long long finalCount = state.postProcessCollection(op, pm);
+                    state.appendResults( result );
+
+                    timingBuilder.append( "total" , t.millis() );
+
+                    if (!config.outDB.empty()) {
+                        BSONObjBuilder loc;
+                        if ( !config.outDB.empty())
+                            loc.append( "db" , config.outDB );
+                        if ( !config.finalShort.empty() )
+                            loc.append( "collection" , config.finalShort );
+                        result.append("result", loc.obj());
+                    }
+                    else {
+                        if ( !config.finalShort.empty() )
+                            result.append( "result" , config.finalShort );
+                    }
+                    result.append( "timeMillis" , t.millis() );
+                    countsBuilder.appendNumber( "output" , finalCount );
+                    if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
+                    result.append( "counts" , countsBuilder.obj() );
+
+                    if ( finalCount == 0 && shouldHaveData ) {
+                        result.append( "cmd" , cmd );
+                        errmsg = "there were emits but no data!";
+                        return false;
+                    }
+
                 }
                 // TODO:  The error handling code for queries is v. fragile,
                 // *requires* rethrow AssertionExceptions - should probably fix.
@@ -1088,34 +1121,6 @@ namespace mongo {
                 catch ( ... ) {
                     log() << "mr failed for unknown reason, removing collection" << endl;
                     throw;
-                }
-
-                long long finalCount = state.postProcessCollection();
-                state.appendResults( result );
-
-                timingBuilder.append( "total" , t.millis() );
-
-                if (!config.outDB.empty()) {
-                    BSONObjBuilder loc;
-                    if ( !config.outDB.empty())
-                        loc.append( "db" , config.outDB );
-                    if ( !config.finalShort.empty() )
-                        loc.append( "collection" , config.finalShort );
-                    result.append("result", loc.obj());
-                }
-                else {
-                    if ( !config.finalShort.empty() )
-                        result.append( "result" , config.finalShort );
-                }
-                result.append( "timeMillis" , t.millis() );
-                countsBuilder.appendNumber( "output" , finalCount );
-                if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
-                result.append( "counts" , countsBuilder.obj() );
-
-                if ( finalCount == 0 && shouldHaveData ) {
-                    result.append( "cmd" , cmd );
-                    errmsg = "there were emits but no data!";
-                    return false;
                 }
 
                 return true;
@@ -1137,6 +1142,8 @@ namespace mongo {
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
                 bool postProcessOnly = !(postProcessCollection.empty());
+                Client& client = cc();
+                CurOp * op = client.curop();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
                 State state(config);
@@ -1152,6 +1159,7 @@ namespace mongo {
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
+                ProgressMeterHolder pm( op->setMessage( "m/r: merge sort and reduce" ) );
                 if (postProcessOnly) {
                     if (!state._db.exists(config.tempLong)) {
                         // nothing to do
@@ -1238,7 +1246,7 @@ namespace mongo {
                     result.append( "shardCounts" , shardCounts );
                 }
 
-                long long finalCount = state.postProcessCollection();
+                long long finalCount = state.postProcessCollection(op, pm);
                 state.appendResults( result );
 
                 // fix the global counts

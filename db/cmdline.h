@@ -133,6 +133,8 @@ namespace mongo {
                            boost::program_options::options_description& hidden,
                            boost::program_options::positional_options_description& positional,
                            boost::program_options::variables_map &output );
+
+        time_t started;
     };
 
     // todo move to cmdline.cpp?
@@ -142,6 +144,8 @@ namespace mongo {
         quota(false), quotaFiles(8), cpu(false), durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
         syncdelay(60), noUnixSocket(false), socket("/tmp") 
     {
+        started = time(0);
+
         journalCommitInterval = 0; // 0 means use default
         dur = false;
 #if defined(_DURABLEDEFAULTON)

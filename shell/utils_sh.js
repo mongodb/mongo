@@ -94,7 +94,7 @@ sh.splitAt = function( fullName , middle ) {
 
 sh.moveChunk = function( fullName , find , to ) {
     sh._checkFullName( fullName );
-    sh._adminCommand( { moveChunk : fullName , find : find , to : to } )
+    return sh._adminCommand( { moveChunk : fullName , find : find , to : to } )
 }
 
 sh.setBalancerState = function( onOrNot ) { 

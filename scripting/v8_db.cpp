@@ -314,9 +314,6 @@ namespace mongo {
             fields = scope->v8ToMongo( args[2]->ToObject() );
 
         Local<v8::Object> mongo = args.This();
-        Local<v8::Value> slaveOkVal = mongo->Get( scope->getV8Str( "slaveOk" ) );
-        jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
-        bool slaveOk = slaveOkVal->BooleanValue();
 
         try {
             auto_ptr<mongo::DBClientCursor> cursor;
@@ -326,7 +323,7 @@ namespace mongo {
             int options = (int)(args[6]->ToNumber()->Value());
             {
                 V8Unlock u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
                 if ( ! cursor.get() ) 
                     return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
             }

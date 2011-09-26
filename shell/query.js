@@ -290,20 +290,25 @@ DBQuery.prototype.pretty = function(){
 
 DBQuery.prototype.shellPrint = function(){
     try {
+        var start = new Date().getTime();
         var n = 0;
         while ( this.hasNext() && n < DBQuery.shellBatchSize ){
             var s = this._prettyShell ? tojson( this.next() ) : tojson( this.next() , "" , true );
             print( s );
             n++;
         }
-        if ( this.hasNext() ){
-            print( "has more" );
+        if (typeof _verboseShell !== 'undefined' && _verboseShell == true) {
+            var time = new Date().getTime() - start;
+            print("Fetched " + n + " record(s) in " + time + "ms");
+        }
+         if ( this.hasNext() ){
+            print( "Cursor has more records" );
             ___it___  = this;
         }
         else {
             ___it___  = null;
         }
-    }
+   }
     catch ( e ){
         print( e );
     }
