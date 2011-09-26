@@ -107,23 +107,28 @@ namespace mongo {
 	    DocumentSourceSort::create(pCtx));
 
         /* check for then iterate over the sort object */
-        for (BSONObjIterator sortObjIterator(pBsonElement->Obj().begin());
-                sortObjIterator.more(); ) {
+	size_t sortKeys = 0;
+	for(BSONObjIterator keyIterator(pBsonElement->Obj().begin());
+	    keyIterator.more();) {
+	    BSONElement keyField(keyIterator.next());
+	    const char *pKeyFieldName = keyField.fieldName();
+	    int sortOrder = 0;
+		
+	    if (keyField.isNumber()) {
+		sortOrder = (int)keyField.numberInt();
+	    }
+	    else {
+		assert(false);
+		// CW TODO illegal sort order specification
+	    }
 
-            BSONElement keyField(sortObjIterator.next());
-            const char *pKeyFieldName = keyField.fieldName();
-            int sortOrder = 0;
+	    assert(sortOrder != 0); // CW TODO illegal sort order value
+	    pSort->addKey(pKeyFieldName, (sortOrder > 0));
+	    ++sortKeys;
+	}
 
-            if (keyField.isNumber()) {
-                sortOrder = (int)keyField.numberInt();
-            }
-            else {
-                assert(false); // CW TODO illegal sort order specification
-            }
-
-            assert(sortOrder != 0); // CW TODO illegal sort order value
-            pSort->addKey(pKeyFieldName, (sortOrder > 0));
-        }
+	assert(sortKeys > 0);
+	// CW TODO error must be at least one sort key
 
         return pSort;
     }

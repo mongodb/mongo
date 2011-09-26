@@ -711,11 +711,8 @@ assert(arrayEq(p9.result, p9result), 'p9 failed');
 // simple sort
 var p10 = db.runCommand(
 { aggregate : "article", pipeline : [
-    { $sort : {
-	key: {
-        title : 1
-	}
-    }}
+    { $sort : { title : 1 }
+    }
 ]});
 
 var p10result = [
@@ -1489,11 +1486,8 @@ assert(arrayEq(g5.result, g5result), 'g5 failed');
 // $first and $last accumulators
 var g6 = db.runCommand(
 { aggregate : "article", pipeline : [
-    { $sort : {
-	key: {
-        author : -1
-        }
-    }},
+    { $sort : { author : -1 }
+    },
     /* TEMPORARY, until $group can use _id : <constant> */
     { $project : {
 	author : 1,
