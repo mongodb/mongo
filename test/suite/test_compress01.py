@@ -31,7 +31,7 @@ class test_compress01_base(wttest.WiredTigerTestCase):
         self.bigvalue = ''.join([`num` for num in xrange(1,10000)])  # about 38K chars long
 
     def create_table(self, tablename):
-        extra_params = ',internal_node_min=512,internal_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
+        extra_params = ',internal_node_max=16384,leaf_node_max=131072'
         comp_params = ''
         if self.compressor_name != None:
             comp_params = ',block_compressor=' + self.compressor_name

@@ -34,9 +34,9 @@ class test_base02(wttest.WiredTigerTestCase):
         conf_confsize = [
             None,
             'allocation_size=1024',
-            'internal_node_max=64k,internal_node_min=4k',
-            'leaf_node_max=128k,leaf_node_min=512',
-            'leaf_node_max=256k,leaf_node_min=1k,internal_node_max=8k,internal_node_min=512',
+            'internal_node_max=64k,internal_overflow_size=1k',
+            'leaf_node_max=128k,leaf_overflow_size=512',
+            'leaf_node_max=256k,leaf_overflow_size=256,internal_node_max=8k,internal_overflow_size=128',
             ]
         conf_col = [
             'columns=(first,second, third)',

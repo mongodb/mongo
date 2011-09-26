@@ -83,9 +83,9 @@ class wtscenario:
                     for lmax in powerrange(lmin, 512*megabyte, 1024):
                         for cache in [megabyte, 32*megabyte, 1000*megabyte]:
                             scen = wtscenario()
-                            scen.imin = imin
+                            scen.ioverflow = max(imin / 40, 40)
                             scen.imax = imax
-                            scen.lmin = lmin
+                            scen.loverflow = max(lmin / 40, 40)
                             scen.lmax = lmax
                             scen.cache_size = cache
                             s.append((scen.shortName(), dict(session_create_scenario=scen)))
@@ -97,19 +97,19 @@ class wtscenario:
         representing the four values for {internal,leaf} {minimum, maximum}
         page size.
         """
-        return 'scen_' + log2chr(self.imin) + log2chr(self.imax) + log2chr(self.lmin) + log2chr(self.lmax) + log2chr(self.cache_size)
+        return 'scen_' + log2chr(self.ioverflow) + log2chr(self.imax) + log2chr(self.loverflow) + log2chr(self.lmax) + log2chr(self.cache_size)
 
     def configString(self):
         """
         Return the associated configuration string
         """
         res = ''
-        if hasattr(self, 'imin'):
-            res += ',internal_node_min=' + str(self.imin)
+        if hasattr(self, 'ioverflow'):
+            res += ',internal_overflow_size=' + str(self.ioverflow)
         if hasattr(self, 'imax'):
             res += ',internal_node_max=' + str(self.imax)
-        if hasattr(self, 'lmin'):
-            res += ',leaf_node_min=' + str(self.lmin)
+        if hasattr(self, 'loverflow'):
+            res += ',leaf_overflow_size=' + str(self.loverflow)
         if hasattr(self, 'lmax'):
             res += ',leaf_node_max=' + str(self.lmax)
         return res

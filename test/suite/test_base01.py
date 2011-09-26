@@ -21,7 +21,7 @@ class test_base01(wttest.WiredTigerTestCase):
     table_name2 = 'test_base01b.wt'
 
     def create_table(self, tablename):
-        extra_params = ',internal_node_min=512,internal_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
+        extra_params = ',allocation_size=512,internal_node_max=16384,leaf_node_max=131072'
         self.pr('create_table')
         self.session.create('table:' + tablename, 'key_format=S,value_format=S' + extra_params)
 
