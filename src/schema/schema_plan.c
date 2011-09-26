@@ -302,3 +302,28 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	return (0);
 }
+
+/*
+ * __wt_struct_truncate --
+ *	Return a packing string for the first N columns in a value.
+ */
+int
+__wt_struct_truncate(WT_SESSION_IMPL *session,
+    const char *input_fmt, u_int ncols, WT_BUF *format)
+{
+	WT_PACK pack;
+	WT_PACK_VALUE pv;
+
+	WT_RET(__pack_init(session, &pack, input_fmt));
+	while (ncols-- > 0) {
+		WT_RET(__pack_next(&pack, &pv));
+		if (pv.havesize)
+			WT_RET(__wt_buf_sprintf(session, format, "%d%c",
+			    (int)pv.size, pv.type));
+		else
+			WT_RET(__wt_buf_sprintf(session, format, "%c",
+			    pv.type));
+	}
+
+	return (0);
+}

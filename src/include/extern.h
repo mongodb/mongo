@@ -489,6 +489,10 @@ extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
     const char *extra_cols,
     int value_only,
     WT_BUF *format);
+extern int __wt_struct_truncate(WT_SESSION_IMPL *session,
+    const char *input_fmt,
+    u_int ncols,
+    WT_BUF *format);
 extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
     WT_CURSOR **cp,
     const char *proj_arg,

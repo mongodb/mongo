@@ -163,10 +163,12 @@ static int
 __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *uri, const char *idxconf, WT_BTREE **btreep)
 {
-	WT_BUF cols, plan, uribuf;
+	WT_BTREE *btree;
+	WT_BUF cols, fmt, plan, uribuf;
 	WT_CONFIG colconf;
 	WT_CONFIG_ITEM ckey, cval, icols;
 	const char *filename, *fileuri;
+	u_int cursor_key_cols;
 	int i, ret;
 
 	ret = 0;
@@ -189,21 +191,29 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	if (ret != 0)
 		goto err;
 
+	btree = session->btree;
+
 	/*
 	 * The key format for an index is somewhat subtle: the application
 	 * specifies a set of columns that it will use for the key, but the
 	 * engine usually adds some hidden columns in order to derive the
-	 * primary key.  These hidden columns are part of the file's key, which
-	 * we are calculating now.
+	 * primary key.  These hidden columns are part of the file's key.
 	 *
-	 * Start with the declared index columns.
+	 * The file's key_format is stored persistently, we need to calculate
+	 * the index cursor key format (which will usually omit some of those
+	 * keys).
 	 */
-	WT_CLEAR(cols);
 	WT_ERR(__wt_config_getones(session, idxconf, "columns", &icols));
+
+	/* Start with the declared index columns. */
 	WT_ERR(__wt_config_subinit(session, &colconf, &icols));
-	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0)
+	WT_CLEAR(cols);
+	cursor_key_cols = 0;
+	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
 		WT_ERR(__wt_buf_sprintf(session, &cols, "%.*s,",
 		    (int)ckey.len, ckey.str));
+		++cursor_key_cols;
+	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
 
@@ -230,15 +240,21 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CLEAR(plan);
 	WT_ERR(__wt_struct_plan(session,
 	    table, cols.data, cols.size, 0, &plan));
-	session->btree->key_plan = __wt_buf_steal(session, &plan, NULL);
+	btree->key_plan = __wt_buf_steal(session, &plan, NULL);
+
+	/* Set up the cursor key format (the visible columns). */
+	WT_CLEAR(fmt);
+	WT_ERR(__wt_struct_truncate(session,
+	    btree->key_format, cursor_key_cols, &fmt));
+	btree->idxkey_format = __wt_buf_steal(session, &fmt, NULL);
 
 	/* By default, index cursor values are the table value columns. */
-	/* XXX Optimize to use index columns in preference to table lookups. */
+	/* TODO Optimize to use index columns in preference to table lookups. */
 	WT_ERR(__wt_struct_plan(session,
 	    table, table->colconf.str, table->colconf.len, 1, &plan));
-	session->btree->value_plan = __wt_buf_steal(session, &plan, NULL);
+	btree->value_plan = __wt_buf_steal(session, &plan, NULL);
 
-	*btreep = session->btree;
+	*btreep = btree;
 
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
@@ -271,7 +287,7 @@ __wt_schema_open_index(
 	 */
 	WT_RET(__wt_schema_table_cursor(session, &cursor));
 
-	/* Open each column group. */
+	/* Open each index. */
 	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_SKIP(uri, "index:") ||

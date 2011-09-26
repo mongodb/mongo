@@ -94,9 +94,10 @@ struct __wt_btree {
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 	const char *key_format;		/* Key format */
+	const char *key_plan;		/* Key projection plan */
+	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *value_format;	/* Value format */
-	const char *key_plan;		/* Key projection plan for indices */
-	const char *value_plan;		/* Value projection plan for indices */
+	const char *value_plan;		/* Value projection plan */
 
 					/* Row-store comparison function */
 	WT_COLLATOR *collator;          /* Comparison function */

@@ -403,6 +403,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->key_plan);
+	__wt_free(session, btree->idxkey_format);
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);

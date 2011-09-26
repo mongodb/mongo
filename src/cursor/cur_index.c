@@ -81,11 +81,15 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 	    i++, cp++) {
 		if (*cp == NULL)
 			continue;
-		/* Set the primary key. */
 		if (firstkey == NULL) {
+			/*
+			 * Set the primary key -- note that we need the primary
+			 * key columns, so we have to use the full key format,
+			 * not just the public columns.
+			 */
 			WT_RET(__wt_schema_project_slice(session,
-			    cp, cindex->key_plan, 1,
-			    cindex->cbt.iface.key_format,
+			    cp, cindex->cbt.btree->key_plan,
+			    1, cindex->cbt.btree->key_format,
 			    (WT_ITEM *)&cindex->cbt.iface.key));
 			firstkey = &(*cp)->key;
 			recno = (*cp)->recno;
@@ -445,11 +449,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	*cursor = iface;
 	cursor->session = &session->iface;
 
-	/*
-	 * XXX: not exactly, the cursor may not expose all of the key columns,
-	 * and should use the table's value format by default.
-	 */
-	cursor->key_format = cbt->btree->key_format;
+	cursor->key_format = cbt->btree->idxkey_format;
 	cursor->value_format = table->value_format;
 
 	__wt_cursor_init(cursor, 1, cfg);
