@@ -1636,6 +1636,9 @@ help = shellHelper.help = function (x) {
         print("\to.isObjectId()");
         print("\to.toString()");
         print("\to.equals(otherid)");
+        print();
+        print("\td = ISODate()                       like Date() but behaves more intuitively when used");
+        print("\td = ISODate(datestr)                  without an explicit \"new \" prefix on construction");
         return;
     }
     else if (x == "admin") {
