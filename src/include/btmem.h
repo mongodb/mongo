@@ -189,7 +189,7 @@ struct __wt_page {
  * A single in-memory page and the state information used to determine if it's
  * OK to dereference the pointer to the page.
  *
- * Synchronization is based on the WT_REF->state field, which has 4 states:
+ * Synchronization is based on the WT_REF->state field, which has 3 states:
  *
  * WT_REF_DISK:
  *      The default setting before any pages are brought into memory, and set
