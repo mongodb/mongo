@@ -284,13 +284,22 @@ namespace mongo {
         void done( const string& pool , Scope * s ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
-            // make we dont keep to many contexts, or use them for too long
-            if ( l.size() > 10 || s->getTimeUsed() > 100 ) {
+            string err = s->getError();
+            bool oom = (err.find("out of memory") != string::npos);
+
+            // do not keep too many contexts, or use them for too long
+            if ( l.size() > 10 || s->getTimeUsed() > 100 || oom ) {
                 delete s;
             }
             else {
                 l.push_back( s );
                 s->reset();
+            }
+
+            if (oom) {
+                // out of mem, make some room
+                log() << "Clearing all idle JS contexts due to out of memory" << endl;
+                clear();
             }
         }
 
