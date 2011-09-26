@@ -795,7 +795,7 @@ wts_np(int next, int insert, int *notfoundp)
 		return (1);
 	}
 
-	if (g.logging)
+	if (g.logging) {
 		if (g.c_file_type == ROW)
 			(void)session->msg_printf(session, "%-10s{%.*s/%.*s}",
 			    which,
@@ -805,6 +805,8 @@ wts_np(int next, int insert, int *notfoundp)
 			(void)session->msg_printf(
 			    session, "%-10s{%" PRIu64 "/%.*s}",
 			    which, keyno, (int)value.size, (char *)value.data);
+	}
+
 	return (0);
 }
 
