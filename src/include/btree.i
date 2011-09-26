@@ -210,8 +210,8 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_BTREE_CMP(s, bt, k1, k2, __cmp)				\
+#define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
 	(((bt)->collator == NULL) ?					\
-	(__cmp = __wt_btree_lex_compare((k1), (k2)), 0) :		\
+	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
 	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
-	    (k1), (k2), &__cmp, NULL))
+	    (k1), (k2), &(cmp), NULL))

@@ -7,7 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config);
+static int __curtable_open_indices(WT_CURSOR_TABLE *ctable);
+static int __curtable_update(WT_CURSOR *cursor);
 
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
@@ -22,7 +23,7 @@ static int __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config);
 	WT_BTREE *btree;						\
 	WT_CURSOR **__cp;						\
 	int __i;							\
-	WT_RET(__curtable_open_indices(ctable, NULL));			\
+	WT_RET(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
 		btree = ((WT_CURSOR_BTREE *)*__cp)->btree;		\
@@ -283,6 +284,25 @@ err:	API_END(session);
 }
 
 /*
+ * __curtable_search --
+ *	WT_CURSOR->search method for the table cursor type.
+ */
+static int
+__curtable_search(WT_CURSOR *cursor)
+{
+	WT_CURSOR_TABLE *ctable;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	ctable = (WT_CURSOR_TABLE *)cursor;
+	CURSOR_API_CALL(cursor, session, search, NULL);
+	APPLY_CG(ctable, search);
+err:	API_END(session);
+
+	return (ret);
+}
+
+/*
  * __curtable_search_near --
  *	WT_CURSOR->search_near method for the table cursor type.
  */
@@ -327,9 +347,26 @@ __curtable_insert(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, insert, NULL);
 	cp = ctable->cg_cursors;
 
-	/* Split out the first insert, it may be allocating a recno. */
+	/*
+	 * Split out the first insert, it may be allocating a recno, and this
+	 * is also the point at which we discover whether this is an overwrite.
+	 */
 	primary = *cp++;
-	WT_ERR(primary->insert(primary));
+	if ((ret = primary->insert(primary)) != 0) {
+		if (ret == WT_DUPLICATE_KEY &&
+		    F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+			/*
+			 * !!! The insert failure clears these flags, but does
+			 * not touch the items.  We could make a copy every time
+			 * for overwrite cursors, but for now we just reset the
+			 * flags.
+			 */
+			F_SET(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+			ret = __curtable_update(cursor);
+		}
+		goto err;
+	}
+
 	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
 		(*cp)->recno = primary->recno;
 		WT_ERR((*cp)->insert(*cp));
@@ -354,8 +391,26 @@ __curtable_update(WT_CURSOR *cursor)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, update, NULL);
+	WT_ERR(__curtable_open_indices(ctable));
+	/*
+	 * If the table has indices, first delete any old index keys, then
+	 * update the primary, then insert the new index keys.  This is
+	 * complicated by the fact that we need the old value to generate the
+	 * old index keys, so we make a temporary copy of the new value.
+	 */
+	if (ctable->idx_cursors != NULL) {
+		WT_ERR(__wt_schema_project_merge(session,
+		    ctable->cg_cursors, ctable->plan,
+		    cursor->value_format, &cursor->value));
+		APPLY_CG(ctable, search);
+		APPLY_IDX(ctable, remove);
+		WT_ERR(__wt_schema_project_slice(session,
+		    ctable->cg_cursors, ctable->plan, 0,
+		    cursor->value_format, (WT_ITEM *)&cursor->value));
+	}
 	APPLY_CG(ctable, update);
-	APPLY_IDX(ctable, update);
+	if (ctable->idx_cursors != NULL)
+		APPLY_IDX(ctable, insert);
 err:	API_END(session);
 
 	return (ret);
@@ -376,7 +431,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, remove, NULL);
 
 	/* Find the old record so it can be removed from indices */
-	WT_ERR(__curtable_open_indices(ctable, NULL));
+	WT_ERR(__curtable_open_indices(ctable));
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		APPLY_IDX(ctable, remove);
@@ -430,15 +485,22 @@ err:	API_END(session);
 }
 
 static int
-__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *config)
+__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	const char *cfg_no_overwrite[4];
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
+
+	/* Underlying column groups are always opened without overwrite */
+	cfg_no_overwrite[0] = cfg[0];
+	cfg_no_overwrite[1] = cfg[1];
+	cfg_no_overwrite[2] = "overwrite=false";
+	cfg_no_overwrite[3] = NULL;
 
 	if (!table->cg_complete) {
 		__wt_errx(session,
@@ -456,17 +518,18 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *config)
 		session->btree = table->colgroup[i];
 		WT_RET(__wt_session_lock_btree(session,
 		    session->btree, NULL, 0));
-		WT_RET(__wt_curfile_create(session, 0, config, cp));
+		WT_RET(__wt_curfile_create(session, 0, cfg_no_overwrite, cp));
 	}
 	return (0);
 }
 
 static int
-__curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config)
+__curtable_open_indices(WT_CURSOR_TABLE *ctable)
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
@@ -481,7 +544,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config)
 		session->btree = table->index[i];
 		WT_RET(__wt_session_lock_btree(session,
 		    session->btree, NULL, 0));
-		WT_RET(__wt_curfile_create(session, 0, config, cp));
+		WT_RET(__wt_curfile_create(session, 0, cfg, cp));
 	}
 	return (0);
 }
@@ -492,7 +555,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable, const char *config)
  */
 int
 __wt_curtable_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -506,7 +569,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_last,
 		__curtable_next,
 		__curtable_prev,
-		NULL,
+		__curtable_search,
 		__curtable_search_near,
 		__curtable_insert,
 		__curtable_update,
@@ -521,6 +584,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_BUF fmt, plan;
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
 	WT_TABLE *table;
@@ -562,7 +626,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		 * The returned cursor should be public: it is not part of a
 		 * larger table cursor.
 		 */
-		return (__wt_curfile_create(session, 1, config, cursorp));
+		return (__wt_curfile_create(session, 1, cfg, cursorp));
 	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
@@ -586,15 +650,19 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
 
+	WT_ERR(__wt_config_gets(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
 	 * any operation.  We defer opening index cursors until we need them
 	 * for an update.
 	 */
-	WT_ERR(__curtable_open_colgroups(ctable, config));
+	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	__wt_cursor_init(cursor, 1, config);
+	__wt_cursor_init(cursor, 1, cfg);
 	*cursorp = cursor;
 
 	if (0) {

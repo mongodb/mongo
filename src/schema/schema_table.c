@@ -40,10 +40,11 @@ err:	__wt_free(session, schemaconf);
 int
 __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
 	WT_RET(__wt_session_lock_btree(session, session->btree, NULL, 0));
-	return (__wt_curfile_create(session, 0, NULL, cursorp));
+	return (__wt_curfile_create(session, 0, cfg, cursorp));
 }
 
 /*

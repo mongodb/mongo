@@ -90,21 +90,19 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
-	/* Config parsing is done by each implementation. */
-	WT_UNUSED(cfg);
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __wt_curfile_open(session, uri, config, cursorp);
+		ret = __wt_curfile_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "config:"))
-		ret = __wt_curconfig_open(session, uri, config, cursorp);
+		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, config, cursorp);
+		ret = __wt_curfile_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, config, cursorp);
+		ret = __wt_curindex_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
-		ret = __wt_curstat_open(session, uri, config, cursorp);
+		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __wt_curtable_open(session, uri, config, cursorp);
+		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else {
 		__wt_errx(session, "Unknown cursor type '%s'", uri);
 		ret = EINVAL;

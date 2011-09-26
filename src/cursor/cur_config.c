@@ -120,7 +120,7 @@ __curconfig_close(WT_CURSOR *cursor, const char *config)
  */
 int
 __wt_curconfig_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -151,7 +151,6 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_CONFIG *cconfig;
 	WT_CURSOR *cursor;
 
-	WT_UNUSED(config);
 	WT_UNUSED(uri);
 
 	WT_RET(__wt_calloc_def(session, 1, &cconfig));
@@ -162,7 +161,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	cursor->key_format = cursor->value_format = "S";
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
-	__wt_cursor_init(cursor, 1, config);
+	__wt_cursor_init(cursor, 1, cfg);
 	*cursorp = cursor;
 
 	return (0);

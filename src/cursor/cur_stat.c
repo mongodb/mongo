@@ -221,7 +221,7 @@ err:	API_END(session);
  */
 int
 __wt_curstat_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_BTREE *btree;
 	static WT_CURSOR iface = {
@@ -255,7 +255,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 	const char *filename;
 	int raw, ret;
 
@@ -299,7 +298,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cursor->set_value = __curstat_set_value;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
-	__wt_cursor_init(cursor, 1, config);
+	__wt_cursor_init(cursor, 1, cfg);
 
 	/*
 	 * We return the name of the statistics field as the key, and

@@ -335,7 +335,7 @@ err:	API_END(session);
 
 static int
 __curindex_open_colgroups(
-    WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *config)
+    WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg[])
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
@@ -355,7 +355,7 @@ __curindex_open_colgroups(
 		session->btree = table->colgroup[arg];
 		WT_RET(__wt_session_lock_btree(session,
 		    session->btree, NULL, 0));
-		WT_RET(__wt_curfile_create(session, 0, config, &cp[arg]));
+		WT_RET(__wt_curfile_create(session, 0, cfg, &cp[arg]));
 	}
 
 	return (0);
@@ -367,7 +367,7 @@ __curindex_open_colgroups(
  */
 int
 __wt_curindex_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -439,7 +439,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cindex->value_plan = session->btree->value_plan;
 
 	/* Open the column groups needed for this index cursor. */
-	WT_RET(__curindex_open_colgroups(session, cindex, config));
+	WT_RET(__curindex_open_colgroups(session, cindex, cfg));
 
 	cursor = &cbt->iface;
 	*cursor = iface;
@@ -452,7 +452,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cursor->key_format = cbt->btree->key_format;
 	cursor->value_format = table->value_format;
 
-	__wt_cursor_init(cursor, 1, config);
+	__wt_cursor_init(cursor, 1, cfg);
 	*cursorp = cursor;
 
 	return (0);

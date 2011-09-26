@@ -42,9 +42,9 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.pr('drop table')
 		self.session.drop(self.tablename, None)
 
-	def cursor(self):
+	def cursor(self, config=None):
 		self.pr('open cursor')
-		c = self.session.open_cursor(self.tablename, None, None)
+		c = self.session.open_cursor(self.tablename, None, config)
 		self.assertNotEqual(c, None)
 		return c
 
@@ -76,6 +76,22 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.assertEqual(cursor.insert(), 0)
 		cursor.close(None)
 
+	def insert_overwrite(self, *cols):
+		self.pr('insert')
+		cursor = self.cursor(config='overwrite')
+		cursor.set_key(*cols[:2]);
+		cursor.set_value(*cols[2:])
+		self.assertEqual(cursor.insert(), 0)
+		cursor.close(None)
+
+	def update(self, *cols):
+		self.pr('insert')
+		cursor = self.cursor()
+		cursor.set_key(*cols[:2]);
+		cursor.set_value(*cols[2:])
+		self.assertEqual(cursor.update(), 0)
+		cursor.close(None)
+
 	def remove(self, name, ID):
 		self.pr('remove')
 		cursor = self.cursor()
@@ -96,6 +112,33 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.create_table()
 		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
 		self.check_exists('smith', 1, 0)
+		for i in xrange(self.NUM_INDICES):
+			print 'Index(%d) contents:' % i
+			print '\n'.join(repr(cols) for cols in self.index_iter(i))
+			print
+		self.drop_table()
+
+	def test_update(self):
+		'''Create a table, add a key, update it, get it back'''
+		self.create_table()
+		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
+		self.update('smith', 1, 'HR', 'janitor', 10000, 1970)
+		self.check_exists('smith', 1, 0)
+		for i in xrange(self.NUM_INDICES):
+			print 'Index(%d) contents:' % i
+			print '\n'.join(repr(cols) for cols in self.index_iter(i))
+			print
+		self.drop_table()
+
+	def test_insert_overwrite(self):
+		'''Create a table, add a key, insert-overwrite it,
+		   insert-overwrite a nonexistent record, get them both back'''
+		self.create_table()
+		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
+		self.insert_overwrite('smith', 1, 'HR', 'janitor', 10000, 1970)
+		self.insert_overwrite('jones', 2, 'IT', 'sysadmin', 50000, 1980)
+		self.check_exists('smith', 1, 0)
+		self.check_exists('jones', 2, 0)
 		for i in xrange(self.NUM_INDICES):
 			print 'Index(%d) contents:' % i
 			print '\n'.join(repr(cols) for cols in self.index_iter(i))

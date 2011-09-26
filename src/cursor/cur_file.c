@@ -217,7 +217,7 @@ err:	API_END(session);
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    int is_public, const char *config, WT_CURSOR **cursorp)
+    int is_public, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -251,7 +251,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CURSOR_BTREE *cbt;
 	size_t csize;
 	int bulk, dump, printable, raw, ret;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
 	cbt = NULL;
 	ret = 0;
@@ -290,7 +289,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	__wt_cursor_init(cursor, is_public, config);
+	__wt_cursor_init(cursor, is_public, cfg);
 	*cursorp = cursor;
 
 	if (0) {
@@ -306,10 +305,9 @@ err:		__wt_free(session, cbt);
  */
 int
 __wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *name, const char *config, WT_CURSOR **cursorp)
+    const char *name, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 	const char *filename;
 	uint32_t open_flags;
 
@@ -331,5 +329,5 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	else
 		return (EINVAL);
 
-	return (__wt_curfile_create(session, 1, config, cursorp));
+	return (__wt_curfile_create(session, 1, cfg, cursorp));
 }

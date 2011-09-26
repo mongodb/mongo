@@ -249,11 +249,11 @@ err:	API_END(session);
  *	WT_SESSION->close that we prefer to avoid.
  */
 void
-__wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *config)
+__wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	if (cursor->get_key == NULL)
