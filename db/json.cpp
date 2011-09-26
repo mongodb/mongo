@@ -373,7 +373,7 @@ namespace mongo {
     struct timestampEnd {
         timestampEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            b.back()->appendTimestamp( b.fieldName(), (long) b.timestamp.getSecs()*1000, b.timestamp.getInc() );
+            b.back()->appendTimestamp( b.fieldName(), b.timestamp.asDate() );
         }
         ObjectBuilder &b;
     };
