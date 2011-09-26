@@ -44,9 +44,6 @@ namespace mongo {
         assert(listIterator != documents.end()); // CW TODO error
 
         ++listIterator;
-        ++count;
-        if (count >= limit)
-            listIterator = documents.end();
         if (listIterator == documents.end()) {
             pCurrent.reset();
             count = 0;
@@ -91,9 +88,6 @@ namespace mongo {
     DocumentSourceSort::DocumentSourceSort(
 	const intrusive_ptr<ExpressionContext> &pTheCtx):
         populated(false),
-        limit(LLONG_MAX),
-        skip(0),
-        count(0),
         pCtx(pTheCtx) {
     }
 
@@ -112,58 +106,23 @@ namespace mongo {
         intrusive_ptr<DocumentSourceSort> pSort(
 	    DocumentSourceSort::create(pCtx));
 
+        /* check for then iterate over the sort object */
         for (BSONObjIterator sortObjIterator(pBsonElement->Obj().begin());
                 sortObjIterator.more(); ) {
-            BSONElement sortVarField(sortObjIterator.next());
-            const char *pFieldName = sortVarField.fieldName();
 
-            /* check for the limit field */
-            if (!strcmp(pFieldName,"limit")) {
-                pSort->limit = sortVarField.numberLong();
-                if (pSort->limit <= 0)
-                    pSort->limit = LLONG_MAX;
-                continue;
+            BSONElement keyField(sortObjIterator.next());
+            const char *pKeyFieldName = keyField.fieldName();
+            int sortOrder = 0;
+
+            if (keyField.isNumber()) {
+                sortOrder = (int)keyField.numberInt();
+            }
+            else {
+                assert(false); // CW TODO illegal sort order specification
             }
 
-            /* check for the skip field */
-            if (!strcmp(pFieldName,"skip")) {
-                pSort->skip = sortVarField.numberLong();
-                if (pSort->skip <= 0)
-                    pSort->skip = 0;
-                    continue;
-            }
-            
-            /* check for then iterate over the key object */
-            if (!strcmp(pFieldName,"key")) {
-                BSONObjIterator keyIterator(sortVarField.embeddedObject());
-                while(keyIterator.more()) {
-                    BSONElement keyField(keyIterator.next());
-                    const char *pKeyFieldName = keyField.fieldName();
-                    int sortOrder = 0;
-
-                    switch(keyField.type()) {
-                    case NumberInt:
-                    sortOrder = keyField.Int();
-                    break;
-
-                    case NumberLong:
-                    sortOrder = (int)keyField.Long();
-                    break;
-
-                    case NumberDouble:
-                    sortOrder = (int)keyField.Double();
-                    break;
-
-                    default:
-                    assert(false); // CW TODO illegal sort order specification
-                    break;
-	                }
-
-                assert(sortOrder != 0); // CW TODO illegal sort order value
-                pSort->addKey(pKeyFieldName, (sortOrder > 0));
-                }
-                continue;
-            }
+            assert(sortOrder != 0); // CW TODO illegal sort order value
+            pSort->addKey(pKeyFieldName, (sortOrder > 0));
         }
 
         return pSort;
@@ -184,11 +143,6 @@ namespace mongo {
         /* start the sort iterator */
         listIterator = documents.begin();
 
-        for ( int i = 0; i < skip; ++i ) {
-            ++listIterator;
-            if (listIterator == documents.end())
-                break;
-        }
         if (listIterator != documents.end())
             pCurrent = listIterator->pDocument;
         populated = true;

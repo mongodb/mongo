@@ -715,8 +715,6 @@ namespace mongo {
 	 */
         void populate();
         bool populated;
-        long long limit;
-        long long skip;
         long long count;
 
 	/* these two parallel each other */
@@ -754,6 +752,112 @@ namespace mongo {
 	ListType documents;
 
         ListType::iterator listIterator;
+        intrusive_ptr<Document> pCurrent;
+
+	intrusive_ptr<ExpressionContext> pCtx;
+    };
+
+
+    class DocumentSourceLimit :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceLimit();
+        virtual bool eof();
+        virtual bool advance();
+        virtual intrusive_ptr<Document> getCurrent();
+
+        /*
+          Create a new limiting DocumentSource.
+
+	  @param pCtx the expression context
+	  @returns the DocumentSource
+         */
+        static intrusive_ptr<DocumentSourceLimit> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+	/*
+	  Create a limiting DocumentSource from BSON.
+
+	  This is a convenience method that uses the above, and operates on
+	  a BSONElement that has been deteremined to be an Object with an
+	  element named $limit.
+
+	  @param pBsonElement the BSONELement that defines the limit
+	  @param pCtx the expression context
+	  @returns the grouping DocumentSource
+	 */
+        static intrusive_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+
+	static const char limitName[];
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+        DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pCtx);
+
+        long long limit;
+        long long count;
+        intrusive_ptr<Document> pCurrent;
+
+	intrusive_ptr<ExpressionContext> pCtx;
+    };
+
+    class DocumentSourceSkip :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceSkip();
+        virtual bool eof();
+        virtual bool advance();
+        virtual intrusive_ptr<Document> getCurrent();
+
+        /*
+          Create a new skipping DocumentSource.
+
+	  @param pCtx the expression context
+	  @returns the DocumentSource
+         */
+        static intrusive_ptr<DocumentSourceSkip> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+	/*
+	  Create a skipping DocumentSource from BSON.
+
+	  This is a convenience method that uses the above, and operates on
+	  a BSONElement that has been deteremined to be an Object with an
+	  element named $skip.
+
+	  @param pBsonElement the BSONELement that defines the skip
+	  @param pCtx the expression context
+	  @returns the grouping DocumentSource
+	 */
+        static intrusive_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+
+	static const char skipName[];
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+        DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pCtx);
+
+        /*
+          Skips initial documents.
+         */
+        void skipper();
+
+        long long skip;
+        long long count;
         intrusive_ptr<Document> pCurrent;
 
 	intrusive_ptr<ExpressionContext> pCtx;
@@ -841,6 +945,7 @@ namespace mongo {
 	  @returns a partial deep clone of pNoUnwindDocument
 	 */
 	intrusive_ptr<Document> clonePath() const;
+
     };
 
 }
