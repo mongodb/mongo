@@ -71,7 +71,7 @@ typedef struct __wt_named_compressor {
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
 #define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((pagesize) * (pct)) / 100, allocsize)
+	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
 
 /*
  * WT_BTREE --
