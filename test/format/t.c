@@ -100,8 +100,11 @@ main(int argc, char *argv[])
 			 * If no operations scheduled, quit after a single
 			 * read pass.
 			 */
-			if (g.c_ops == 0)
+			if (g.c_ops == 0) {
+				if (wts_stats())
+					goto err;
 				break;
+			}
 
 			if (wts_ops())		/* Random operations */
 				goto err;
