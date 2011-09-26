@@ -1665,7 +1665,7 @@ help = shellHelper.help = function (x) {
         print("\to.equals(otherid)");
         print();
         print("\td = ISODate()                       like Date() but behaves more intuitively when used");
-        print("\td = ISODate(datestr)                  without an explicit \"new \" prefix on construction");
+        print("\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
         return;
     }
     else if (x == "admin") {
