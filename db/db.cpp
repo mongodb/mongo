@@ -740,6 +740,10 @@ int main(int argc, char* argv[]) {
             cmdLine.dur = false;
         }
         if( params.count("dur") || params.count( "journal" ) ) {
+            if (journalExplicit) {
+                log() << "Can't specify both --journal and --nojournal options." << endl;
+                return EXIT_BADOPTIONS;
+            }
             journalExplicit = true;
             cmdLine.dur = true;
         }
