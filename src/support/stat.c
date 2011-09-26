@@ -175,14 +175,12 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_evict_hazard.desc =
 	    "cache: pages selected for eviction not evicted because of a hazard reference";
 	stats->cache_evict_modified.name = "cache_evict_modified";
-	stats->cache_evict_modified.desc =
-	    "cache: modified pages selected for eviction";
+	stats->cache_evict_modified.desc = "cache: modified pages evicted";
 	stats->cache_evict_slow.name = "cache_evict_slow";
 	stats->cache_evict_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_evict_unmodified.name = "cache_evict_unmodified";
-	stats->cache_evict_unmodified.desc =
-	    "cache: unmodified pages selected for eviction";
+	stats->cache_evict_unmodified.desc = "cache: unmodified pages evicted";
 	stats->cache_pages_inuse.name = "cache_pages_inuse";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
