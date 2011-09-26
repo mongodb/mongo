@@ -112,7 +112,7 @@ namespace mongo {
         static map<string,MongoFile*> pathToFile;
 
         // lock order: lock dbMutex before this if you lock both
-        static RWLockRecursive mmmutex;
+        static RWLockRecursiveNongreedy mmmutex;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.

@@ -29,7 +29,9 @@ namespace mongo {
     public:
         const char * const _name;
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
-        RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { }
+        RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { 
+            x = 0;
+        }
         void lock() {
             RWLockBase::lock();
             DEV mutexDebugger.entering(_name);
@@ -41,23 +43,47 @@ namespace mongo {
 
         void lock_shared() { RWLockBase::lock_shared(); }
         void unlock_shared() { RWLockBase::unlock_shared(); }
-
+    private:
         void lockAsUpgradable() { RWLockBase::lockAsUpgradable(); }
         void unlockFromUpgradable() { // upgradable -> unlocked
             RWLockBase::unlockFromUpgradable();
         }
+        int x;
+    public:
         void upgrade() { // upgradable -> exclusive lock
+            assert( x == 1 );
             RWLockBase::upgrade();
+            x++;
         }
 
         bool lock_shared_try( int millis ) { return RWLockBase::lock_shared_try(millis); }
 
         bool lock_try( int millis = 0 ) {
             if( RWLockBase::lock_try(millis) ) {
+                DEV mutexDebugger.entering(_name);
                 return true;
             }
             return false;
         }
+
+        class Upgradable : boost::noncopyable { 
+            RWLock& _r;
+        public:
+            Upgradable(RWLock& r) : _r(r) { 
+                r.lockAsUpgradable();
+                assert( _r.x == 0 );
+                _r.x++;
+            }
+            ~Upgradable() {
+                if( _r.x == 1 )
+                    _r.unlockFromUpgradable();
+                else {
+                    assert( _r.x == 2 ); // has been upgraded
+                    _r.x = 0;
+                    _r.unlock();
+                }
+            }
+        };
     };
 
     /** throws on failure to acquire in the specified time period. */
@@ -136,66 +162,92 @@ namespace mongo {
         const bool _write;
     };
 
-    /** recursive on shared locks is ok for this implementation */
-    class RWLockRecursive : boost::noncopyable {
-        ThreadLocalValue<int> _state;
-        RWLock _lk;
-        friend class Exclusive;
-    public:
-        /** @param lpwaitms lazy wait */
-        RWLockRecursive(const char *name, int lpwaitms) : _lk(name, lpwaitms) { }
+    // ----------------------------------------------------------------------------------------
 
-        void assertExclusivelyLocked() {
-            dassert( _state.get() < 0 );
+    /** recursive on shared locks is ok for this implementation */
+    class RWLockRecursive : protected RWLockBase {
+    protected:
+        ThreadLocalValue<int> _state;
+        void lock(); // not implemented - Lock() should be used; didn't overload this name to avoid mistakes
+        virtual void Lock() { RWLockBase::lock(); }
+    public:
+        const char * const _name;
+        RWLockRecursive(const char *name) : _name(name) { }
+
+        void assertExclusivelyLocked() { 
+            assert( _state.get() < 0 );
         }
 
-        // RWLockRecursive::Exclusive scoped lock
         class Exclusive : boost::noncopyable { 
             RWLockRecursive& _r;
-            rwlock *_scopedLock;
         public:
-            Exclusive(RWLockRecursive& r) : _r(r), _scopedLock(0) {
+            Exclusive(RWLockRecursive& r) : _r(r) {
                 int s = _r._state.get();
                 dassert( s <= 0 );
                 if( s == 0 )
-                    _scopedLock = new rwlock(_r._lk, true);
+                    _r.Lock();
                 _r._state.set(s-1);
             }
             ~Exclusive() {
                 int s = _r._state.get();
                 DEV wassert( s < 0 ); // wassert: don't throw from destructors
                 _r._state.set(s+1);
-                delete _scopedLock;
+                _r.unlock();
             }
         };
 
-        // RWLockRecursive::Shared scoped lock
         class Shared : boost::noncopyable { 
             RWLockRecursive& _r;
-            bool _alreadyExclusive;
+            bool _alreadyLockedExclusiveByUs;
         public:
             Shared(RWLockRecursive& r) : _r(r) {
                 int s = _r._state.get();
-                _alreadyExclusive = s < 0;
-                if( !_alreadyExclusive ) {
+                _alreadyLockedExclusiveByUs = s < 0;
+                if( !_alreadyLockedExclusiveByUs ) {
                     dassert( s >= 0 ); // -1 would mean exclusive
                     if( s == 0 )
-                        _r._lk.lock_shared(); 
+                        _r.lock_shared(); 
                     _r._state.set(s+1);
                 }
             }
             ~Shared() {
-                if( _alreadyExclusive ) {
+                if( _alreadyLockedExclusiveByUs ) {
                     DEV wassert( _r._state.get() < 0 );
                 }
                 else {
                     int s = _r._state.get() - 1;
                     if( s == 0 ) 
-                        _r._lk.unlock_shared();
+                        _r.unlock_shared();
                     _r._state.set(s);
                     DEV wassert( s >= 0 );
                 }
             }
         };
     };
+
+    class RWLockRecursiveNongreedy : public RWLockRecursive { 
+        virtual void Lock() { 
+            bool got = false;
+            for ( int i=0; i<lowPriorityWaitMS; i++ ) {
+                if ( lock_try(0) ) {
+                    got = true;
+                    break;
+                }                            
+                int sleep = 1;
+                if ( i > ( lowPriorityWaitMS / 20 ) )
+                    sleep = 10;
+                sleepmillis(sleep);
+                i += ( sleep - 1 );
+            }
+            if ( ! got ) {
+                log() << "couldn't lazily get rwlock" << endl;
+                RWLockBase::lock();
+            }
+        }
+
+    public:
+        const int lowPriorityWaitMS;
+        RWLockRecursiveNongreedy(const char *nm, int lpwaitms) : RWLockRecursive(nm), lowPriorityWaitMS(lpwaitms) { }
+    };
+
 }

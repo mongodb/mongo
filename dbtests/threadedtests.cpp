@@ -232,6 +232,7 @@ namespace ThreadedTests {
 
             writelocktry lk( "" , 0 );
             ASSERT( lk.got() );
+            ASSERT( dbMutex.isWriteLocked() );
         }
     };
 
@@ -464,7 +465,7 @@ namespace ThreadedTests {
         }
     };
 
-#if 0
+#if 1
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
     public:
@@ -486,7 +487,7 @@ namespace ThreadedTests {
 
             sleepmillis(100*x);
 
-            log() << x << what[x] << " request" << endl;
+            log() << x << ' ' << what[x] << " request" << endl;
             switch( what[x] ) { 
             case 'w':
                 {
@@ -501,7 +502,7 @@ namespace ThreadedTests {
             case 'U':
                 {
                     Timer t;
-                    m.lockAsUpgradable();
+                    RWLock::Upgradable u(m);
                     log() << x << " U got" << endl;
                     if( what[x] == 'U' ) {
                         if( t.millis() > 20 ) {
@@ -516,7 +517,6 @@ namespace ThreadedTests {
                     }
                     sleepsecs(1);
                     log() << x << " U unlock" << endl;
-                    m.unlockFromUpgradable();
                 }
                 break;
             case 'r':
@@ -585,7 +585,7 @@ namespace ThreadedTests {
 
         void setupTests() {
             add< WriteLocksAreGreedy >();
-            //add< UpgradableTest >();
+            add< UpgradableTest >();
             add< List1Test >();
             add< List1Test2 >();
 
