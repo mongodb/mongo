@@ -901,16 +901,13 @@ namespace mongo {
 	size_t getExclusionCount() const;
 
 	/*
-	  Specialized BSON conversion that allows for writing out an
-	  $unwind specification.  This creates a standalone object, which must
+	  Specialized BSON conversion that allows for writing out a
+	  $project specification.  This creates a standalone object, which must
 	  be added to a containing object with a name
 
 	  @params pBuilder where to write the object to
-	  @params unwindField which field to unwind, or empty
 	 */
-	void documentToBson(
-	    BSONObjBuilder *pBuilder, const string &unwindField,
-	    unsigned depth) const;
+	void documentToBson(BSONObjBuilder *pBuilder, unsigned depth) const;
 
     private:
         ExpressionObject();

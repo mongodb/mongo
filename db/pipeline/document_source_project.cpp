@@ -31,104 +31,35 @@ namespace mongo {
 
     DocumentSourceProject::DocumentSourceProject():
 	excludeId(false),
-	pEO(ExpressionObject::create()),
-	unwindName(),
-        pNoUnwindDocument(),
-        pUnwindArray(),
-        pUnwind() {
+	pEO(ExpressionObject::create()) {
     }
 
     bool DocumentSourceProject::eof() {
-        /*
-          If we're unwinding an array, and there are more elements, then we
-          can return more documents.
-        */
-        if (pUnwind.get() && pUnwind->more())
-            return false;
-
         return pSource->eof();
     }
 
     bool DocumentSourceProject::advance() {
-        if (pUnwind.get() && pUnwind->more()) {
-            pUnwindValue = pUnwind->next();
-            return true;
-        }
-
-        /* release the last document and advance */
-        pUnwindValue.reset();
-        pUnwind.reset();
-        pUnwindArray.reset();
-        pNoUnwindDocument.reset();
         return pSource->advance();
     }
 
     intrusive_ptr<Document> DocumentSourceProject::getCurrent() {
-        if (!pNoUnwindDocument.get()) {
-            intrusive_ptr<Document> pInDocument(pSource->getCurrent());
+	intrusive_ptr<Document> pInDocument(pSource->getCurrent());
 
-	    /* create the result document */
-	    const size_t sizeHint =
-		pEO->getSizeHint(pInDocument) + (excludeId ? 0 : 1);
-	    pNoUnwindDocument = Document::create(sizeHint);
+	/* create the result document */
+	const size_t sizeHint =
+	    pEO->getSizeHint(pInDocument) + (excludeId ? 0 : 1);
+	intrusive_ptr<Document> pResultDocument(Document::create(sizeHint));
 
-	    if (!excludeId) {
-		intrusive_ptr<const Value> pId(
-		    pInDocument->getField(Document::idName));
-		pNoUnwindDocument->addField(Document::idName, pId);
-	    }
-
-	    /* use the ExpressionObject to create the base result */
-	    pEO->addToDocument(pNoUnwindDocument, pInDocument);
-
-	    /*
-	      If we're unwinding this field, and it's an array, then we're
-	      going to pick off elements one by one, and make fields of
-	      them below.
-	    */
-	    if (unwindName.length() &&
-		((unwindWhich = pNoUnwindDocument->getFieldIndex(unwindName)) <
-		 pNoUnwindDocument->getFieldCount())) {
-		Document::FieldPair outPair(
-		    pNoUnwindDocument->getField(unwindWhich));
-		if (outPair.second->getType() == Array) {
-		    pUnwindArray = outPair.second;
-		    pUnwind = pUnwindArray->getArray();
-
-                    /*
-                      The $unwind of an empty array is a NULL value.  If we
-                      encounter this, use the non-unwind path, but replace
-                      pOutField with a nul.
-                    */
-                    if (pUnwind->more())
-                        pUnwindValue = pUnwind->next();
-                    else {
-                        pUnwindArray.reset();
-                        pUnwind.reset();
-			pNoUnwindDocument->setField(
-			    unwindWhich, unwindName, Value::getNull());
-                    }
-		}
-	    }
+	if (!excludeId) {
+	    intrusive_ptr<const Value> pId(
+		pInDocument->getField(Document::idName));
+	    pResultDocument->addField(Document::idName, pId);
 	}
 
+	/* use the ExpressionObject to create the base result */
+	pEO->addToDocument(pResultDocument, pInDocument);
 
-        /*
-          If we're unwinding a field, create an alternate document.  In the
-          alternate (clone), replace the unwound array field with the element
-          at the appropriate index.
-         */
-        if (pUnwindArray.get()) {
-            /* clone the document with an array we're unwinding */
-            intrusive_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
-
-            /* substitute the named field into the prototype document */
-            pUnwindDocument->setField(unwindWhich, unwindName, pUnwindValue);
-
-            return pUnwindDocument;
-        }
-
-        return pNoUnwindDocument;
+        return pResultDocument;
     }
 
     void DocumentSourceProject::optimize() {
@@ -140,7 +71,7 @@ namespace mongo {
 	BSONObjBuilder insides;
 	if (excludeId)
 	    insides.append(Document::idName, false);
-	pEO->documentToBson(&insides, unwindName, 0);
+	pEO->documentToBson(&insides, 0);
 	pBuilder->append(projectName, insides.done());
     }
 
@@ -151,22 +82,8 @@ namespace mongo {
     }
 
     void DocumentSourceProject::addField(
-        const string &fieldName, const intrusive_ptr<Expression> &pExpression,
-	bool unwindArray) {
+        const string &fieldName, const intrusive_ptr<Expression> &pExpression) {
         assert(pExpression); // CW TODO must be a non-null expression
-
-        /* if we're unwinding, remember which field */
-        if (unwindArray) {
-	    assert(!unwindName.length());
-	                           // CW TODO ERROR: only one unwind allowed
-
-	    FieldPath fp(fieldName);
-	    assert(fp.getPathLength() == 1);
-	                   // CW TODO ERROR: can only unwind a top-level field
-
-	    /* remember which field */
-	    unwindName = fieldName;
-	}
 
 	pEO->addField(fieldName, pExpression);
     }
@@ -207,7 +124,6 @@ namespace mongo {
         BSONObj projectObj(pBsonElement->Obj());
         BSONObjIterator fieldIterator(projectObj);
 	Expression::ObjectCtx objectCtx(
-	    Expression::ObjectCtx::UNWIND_OK |
 	    Expression::ObjectCtx::DOCUMENT_OK);
         while(fieldIterator.more()) {
             BSONElement outFieldElement(fieldIterator.next());
@@ -253,24 +169,15 @@ IncludeExclude:
 		pProject->addField(
 		    outFieldPath,
 		    ExpressionFieldPath::create(
-			Expression::removeFieldPrefix(inFieldName)), false);
+			Expression::removeFieldPrefix(inFieldName)));
 		break;
 
             case Object: {
-                bool hasUnwound = objectCtx.unwindUsed();
-
                 intrusive_ptr<Expression> pDocument(
                     Expression::parseObject(&outFieldElement, &objectCtx));
 
-                /*
-                  Add The document expression to the projection.  We detect
-                  an unwound field if we haven't unwound a field yet for this
-                  projection, and after parsing find that we have just gotten a
-                  $unwind specification.
-                 */
-                pProject->addField(
-                    outFieldPath, pDocument,
-                    !hasUnwound && objectCtx.unwindUsed());
+                /* add The document expression to the projection */
+                pProject->addField(outFieldPath, pDocument);
                 break;
             }
 

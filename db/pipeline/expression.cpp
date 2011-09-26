@@ -1336,8 +1336,7 @@ namespace mongo {
     }
 
     void ExpressionObject::documentToBson(
-	BSONObjBuilder *pBuilder, const string &unwindField,
-	unsigned depth) const {
+	BSONObjBuilder *pBuilder, unsigned depth) const {
 
 	/* emit any inclusion/exclusion paths */
 	vector<string> vPath;
@@ -1353,14 +1352,6 @@ namespace mongo {
 	    if (path.find(fieldName) != pathEnd)
 		continue;
 
-	    if (unwindField.compare(fieldName) == 0) {
-		BSONObjBuilder unwind;
-		vpExpression[iField]->addToBsonObj(
-		    &unwind, Expression::unwindName, depth + 1);
-		pBuilder->append(vFieldName[iField], unwind.done());
-		continue;
-	    }
-
 	    vpExpression[iField]->addToBsonObj(pBuilder, fieldName, depth + 1);
 	}
     }
@@ -1369,7 +1360,7 @@ namespace mongo {
 	BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, string(), depth);
+	documentToBson(&objBuilder, depth);
 	pBuilder->append(fieldName, objBuilder.done());
     }
 
@@ -1377,7 +1368,7 @@ namespace mongo {
 	BSONArrayBuilder *pBuilder, unsigned depth) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, string(), depth);
+	documentToBson(&objBuilder, depth);
 	pBuilder->append(objBuilder.done());
     }
 

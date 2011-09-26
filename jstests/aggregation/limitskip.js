@@ -52,9 +52,10 @@ print("TODO: invalid skip"); // once assert has been replaced with uassert
 print("on virtual collection");
 doc = db.runCommand({ aggregate : coll, pipeline : [
     {
-        $project : {
-            m : {$unwind : "$mod"}
-        }
+	$unwind : "$mod"
+    },
+    {
+        $project : { m : "$mod" }
     },
     {
         $sort : {

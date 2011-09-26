@@ -605,15 +605,9 @@ namespace mongo {
 
           @param fieldName the name of the field as it will appear
           @param pExpression the expression used to compute the field
-          @param unwindArray if the result of the expression is an array value,
-              the projection will create one Document per value in the array;
-              a sequence of documents is generated, with each one containing one
-              value from the array.  Note there can only be one unwound field
-	      per projection.
         */
         void addField(const string &fieldName,
-		      const intrusive_ptr<Expression> &pExpression,
-		      bool unwindArray);
+		      const intrusive_ptr<Expression> &pExpression);
 
 	/*
 	  Create a new projection DocumentSource from BSON.
@@ -640,15 +634,6 @@ namespace mongo {
         // configuration state
 	bool excludeId;
 	intrusive_ptr<ExpressionObject> pEO;
-	string unwindName; // name of the field to unwind, if any
-        size_t unwindWhich; // if unwinding, current Document's index
-
-        // iteration state
-        intrusive_ptr<Document> pNoUnwindDocument;
-                                              // document to return, pre-unwind
-        intrusive_ptr<const Value> pUnwindArray; // field being unwound
-        intrusive_ptr<ValueIterator> pUnwind; // iterator used for unwinding
-        intrusive_ptr<const Value> pUnwindValue; // current value
     };
 
 
