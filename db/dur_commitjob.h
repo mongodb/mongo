@@ -164,6 +164,8 @@ namespace mongo {
 
             CommitJob();
 
+            ~CommitJob(){ assert(!"shouldn't destroy CommitJob!"); }
+
             /** record/note an intent to write */
             void note(void* p, int len);
 
@@ -212,7 +214,7 @@ namespace mongo {
             unsigned _nSinceCommitIfNeededCall;
         };
 
-        extern CommitJob commitJob;
+        extern CommitJob& commitJob;
 
     }
 }

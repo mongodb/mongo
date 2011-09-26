@@ -83,7 +83,7 @@ namespace mongo {
         */
         static void groupCommit();
 
-        CommitJob commitJob;
+        CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
         Stats stats;
 
