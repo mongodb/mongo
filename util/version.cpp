@@ -168,7 +168,7 @@ namespace mongo {
             f.open("/proc/self/numa_maps", /*read_only*/true);
             if ( f.is_open() && ! f.bad() ) {
                 char line[100]; //we only need the first line
-                read(f.fd, line, sizeof(line));
+                assert( read(f.fd, line, sizeof(line)) <= 100 );
                 
                 // just in case...
                 line[98] = ' ';
