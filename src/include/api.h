@@ -44,7 +44,15 @@ typedef	enum {
 	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
+/* Get the connection implementation for a session. */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
+
+/*
+ * Count of sessions handles opened internally: one for the eviction server and
+ * one for the read server.  This is used to determine how many sessions the
+ * application has open.
+ */
+#define	WT_INTERNAL_SESSIONS	2
 
 /*
  * WT_SESSION_IMPL --

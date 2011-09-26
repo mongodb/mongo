@@ -463,9 +463,18 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	/* Check to see if there's an available session slot. */
 	if (conn->session_cnt == conn->session_size - 1) {
-		__wt_err(session, 0,
+		__wt_errx(session,
 		    "WiredTiger only configured to support %d thread contexts",
 		    conn->session_size);
+		return (WT_ERROR);
+	}
+
+	/* Check for multiple sessions without multithread support. */
+	if (!F_ISSET(conn, WT_MULTITHREAD) &&
+	    conn->session_cnt > WT_INTERNAL_SESSIONS) {
+		__wt_errx(session,
+		    "wiredtiger_open not configured with 'multithread': "
+		    "only a single session is permitted");
 		return (WT_ERROR);
 	}
 

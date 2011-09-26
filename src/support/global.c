@@ -58,7 +58,7 @@ __wt_attach(WT_SESSION_IMPL *session)
 	if (session == NULL)
 		__wt_session_dump_all(session);
 
-	__wt_err(session, 0, "process ID %" PRIdMAX
+	__wt_errx(session, "process ID %" PRIdMAX
 	    ": waiting for debugger...", (intmax_t)getpid());
 	while (__wt_debugger_attach == 0)
 		__wt_sleep(10, 0);
