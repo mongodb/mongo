@@ -239,18 +239,18 @@ __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 		goto err;
 	}
 
-	ret = __wt_session_find_btree(session,
-	    filename, strlen(filename), cfg, WT_BTREE_EXCLUSIVE,
-	    &btree_session);
+	ret = __wt_session_find_btree(session, filename,
+	    strlen(filename), cfg, WT_BTREE_EXCLUSIVE, &btree_session);
 
 	/* If the tree isn't open, there's nothing to do. */
 	if (ret == 0) {
 		session->btree = btree_session->btree;
 		ret = __wt_btree_sync(session);
+
+		/* Release the tree so other threads can use it. */
+		WT_TRET(__wt_session_release_btree(session));
 	}
 
-	/* Release the tree so other threads can use it. */
-	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);
 
 	return (ret);
