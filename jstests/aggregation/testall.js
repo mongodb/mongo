@@ -1210,7 +1210,7 @@ var m2result = [
 assert(arrayEq(m2.result, m2result), 'm2 failed');
 
 
-// group by tag
+// group by tag, _id is a field reference
 var g1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
@@ -1220,7 +1220,7 @@ var g1 = db.runCommand(
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id: { tags : 1 },
+	_id : "$tags",
 	docsByTag : { $sum : 1 },
 	viewsByTag : { $sum : "$pageViews" }
     }}
@@ -1228,30 +1228,22 @@ var g1 = db.runCommand(
 
 var g1result = [
     {
-        "_id" : {
-            "tags" : "filthy"
-        },
+        "_id" : "filthy",
         "docsByTag" : 1,
         "viewsByTag" : 6
     },
     {
-        "_id" : {
-            "tags" : "fun"
-        },
+        "_id" : "fun",
         "docsByTag" : 3,
         "viewsByTag" : 17
     },
     {
-        "_id" : {
-            "tags" : "good"
-        },
+        "_id" : "good",
         "docsByTag" : 1,
         "viewsByTag" : 5
     },
     {
-        "_id" : {
-            "tags" : "nasty"
-        },
+        "_id" : "nasty",
         "docsByTag" : 2,
         "viewsByTag" : 13
     }
@@ -1260,7 +1252,7 @@ var g1result = [
 assert(arrayEq(g1.result, g1result), 'g1 failed');
 
 
-// $max, and averaging in a final projection
+// $max, and averaging in a final projection; _id is structured
 var g2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
@@ -1483,18 +1475,12 @@ var g5result = [
 assert(arrayEq(g5.result, g5result), 'g5 failed');
 
 
-// $first and $last accumulators
+// $first and $last accumulators, constant _id
 var g6 = db.runCommand(
 { aggregate : "article", pipeline : [
-    { $sort : { author : -1 }
-    },
-    /* TEMPORARY, until $group can use _id : <constant> */
-    { $project : {
-	author : 1,
-	bucket : { $add:[0, 1] }
-    }},
+    { $sort : { author : -1 } },
     { $group : {
-	_id : { bucket : 1 },
+	_id : "authors", /* constant string, *not* a field reference */
 	firstAuthor : { $last : "$author" }, /* note reverse sort above */
 	lastAuthor : { $first : "$author" }, /* note reverse sort above */
 	count : { $sum : 1 }
@@ -1503,9 +1489,7 @@ var g6 = db.runCommand(
 
 var g6result = [
     {
-        "_id" : {
-            "bucket" : 1
-        },
+        "_id" : "authors",
 	firstAuthor : "bob",
 	lastAuthor : "jane",
 	count : 3

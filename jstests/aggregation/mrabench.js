@@ -4,7 +4,7 @@
   One way to do this is to dump and restore it using mongodump and mongorestore
   */
 
-db = db.getSisterDB( "mongousage" )
+db = db.getSiblingDB( "mongousage" )
 
 function rollupMap() {
     emit( this._id.t , { total : this.value , unique : 1 } )

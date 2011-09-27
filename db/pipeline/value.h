@@ -59,6 +59,9 @@ namespace mongo {
         /*
           Construct a Value from a BSONElement.
 
+	  This ignores the name of the element, and only uses the value,
+	  whatever type it is.
+
           @returns a new Value initialized from the bsonElement
         */
         static intrusive_ptr<const Value> createFromBsonElement(

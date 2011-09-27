@@ -152,18 +152,66 @@ namespace mongo {
 
             if (strcmp(pFieldName, Document::idName.c_str()) == 0) {
                 assert(!idSet); // CW TODO _id specified multiple times
-                assert(groupField.type() == Object); // CW TODO error message
 
-                /*
-                  Use the projection-like set of field paths to create the
-                  group-by key.
-                 */
-		Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                intrusive_ptr<Expression> pId(
-                    Expression::parseObject(&groupField, &oCtx));
+		BSONType groupType = groupField.type();
 
-                pGroup->setIdExpression(pId);
-                idSet = true;
+		if (groupType == Object) {
+		    /*
+		      Use the projection-like set of field paths to create the
+		      group-by key.
+		    */
+		    Expression::ObjectCtx oCtx(
+			Expression::ObjectCtx::DOCUMENT_OK);
+		    intrusive_ptr<Expression> pId(
+			Expression::parseObject(&groupField, &oCtx));
+
+		    pGroup->setIdExpression(pId);
+		    idSet = true;
+		}
+		else if (groupType == String) {
+		    string groupString(groupField.String());
+		    const char *pGroupString = groupString.c_str();
+		    if ((groupString.length() == 0) ||
+			(pGroupString[0] != '$'))
+			goto StringConstantId;
+
+		    string pathString(
+			Expression::removeFieldPrefix(groupString));
+		    intrusive_ptr<ExpressionFieldPath> pFieldPath(
+			ExpressionFieldPath::create(pathString));
+		    pGroup->setIdExpression(pFieldPath);
+		    idSet = true;
+		}
+		else {
+		    /* pick out the constant types that are allowed */
+		    switch(groupType) {
+		    case NumberDouble:
+		    case String:
+		    case Object:
+		    case Array:
+		    case jstOID:
+		    case Bool:
+		    case Date:
+		    case NumberInt:
+		    case Timestamp:
+		    case NumberLong:
+		    case jstNULL:
+		    StringConstantId: // from string case above
+		    {
+			intrusive_ptr<const Value> pValue(
+			    Value::createFromBsonElement(&groupField));
+			intrusive_ptr<ExpressionConstant> pConstant(
+			    ExpressionConstant::create(pValue));
+			pGroup->setIdExpression(pConstant);
+			idSet = true;
+			break;
+		    }
+
+		    default:
+			assert(false);
+			// CW TODO disallowed constant group key
+		    }
+		}
             }
             else {
                 /*
