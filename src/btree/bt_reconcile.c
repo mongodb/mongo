@@ -414,9 +414,10 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	ret = 0;
 
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile %s page addr %" PRIu32 " (type %s)",
+	    "reconcile: addr %" PRIu32 " (%s, %s)",
+	    WT_PADDR(page),
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
-	    WT_PADDR(page), __wt_page_type_string(page->type));
+	    __wt_page_type_string(page->type));
 
 	/*
 	 * Handle pages marked for deletion or split.
@@ -2699,7 +2700,7 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (r->bnd_next == 0) {
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: delete page %" PRIu32 " (%" PRIu32 "B)",
+		    "reconcile: delete addr %" PRIu32 " (%" PRIu32 "B)",
 		    WT_PADDR(page), WT_PSIZE(page));
 		WT_BSTAT_INCR(session, rec_page_delete);
 
@@ -2804,7 +2805,7 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * physical pages -- create a new internal page.
 		 */
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: %" PRIu32 " (%" PRIu32 "B) splitting",
+		    "reconcile: splitting %" PRIu32 " (%" PRIu32 "B)",
 		    WT_PADDR(page), WT_PSIZE(page));
 
 		switch (page->type) {
@@ -3174,7 +3175,7 @@ __rec_row_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		}
 
 		WT_VERBOSE(session, RECONCILE,
-		    "split: %" PRIu32 " (%" PRIu32 "B)",
+		    "reconcile: split %" PRIu32 " (%" PRIu32 "B)",
 		    bnd->off.addr, bnd->off.size);
 	}
 
@@ -3250,7 +3251,7 @@ __rec_col_split(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		}
 
 		WT_VERBOSE(session, RECONCILE,
-		    "split: %" PRIu32 " (%" PRIu32 "B), "
+		    "reconcile: split %" PRIu32 " (%" PRIu32 "B), "
 		    "starting record %" PRIu64,
 		    bnd->off.addr, bnd->off.size, bnd->recno);
 	}
@@ -3457,7 +3458,8 @@ __rec_discard_evict(WT_SESSION_IMPL *session)
 			    session, discard->addr, discard->size));
 		else {
 			WT_VERBOSE(session, RECONCILE,
-			    "discard addr %" PRIu32 "/%" PRIu32 " (%s)",
+			    "reconcile: discard addr %" PRIu32 "/%" PRIu32
+			    " (%s)",
 			    discard->addr, discard->size,
 			    __wt_page_type_string(discard->page->type));
 			__wt_page_out(session, discard->page, 0);
@@ -3554,7 +3556,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	WT_BSTAT_INCR(session, rec_hazard);
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: %" PRIu32 " hazard request failed", ref->addr);
+	    "reconcile: addr %" PRIu32 " hazard request failed", ref->addr);
 
 	/* Return the page to in-use. */
 	ref->state = WT_REF_MEM;
