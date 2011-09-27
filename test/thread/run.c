@@ -47,6 +47,8 @@ r(void)
 int
 run(int readers, int writers)
 {
+	clock_t start, stop;
+	double seconds;
 	pthread_t *tids;
 	int i, ret;
 	void *thread_ret;
@@ -56,6 +58,8 @@ run(int readers, int writers)
 	    (size_t)(readers + writers), sizeof(*run_stats))) == NULL ||
 	    (tids = calloc((size_t)(readers + writers), sizeof(*tids))) == NULL)
 		die("calloc", errno);
+
+	start = clock();
 
 	/* Create threads. */
 	for (i = 0; i < readers; ++i)
@@ -71,6 +75,11 @@ run(int readers, int writers)
 	/* Wait for the threads. */
 	for (i = 0; i < readers + writers; ++i)
 		(void)pthread_join(tids[i], &thread_ret);
+
+	stop = clock();
+	seconds = (stop - start) / (double)CLOCKS_PER_SEC;
+	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
+	    seconds, (int)(((readers + writers) * nops) / seconds));
 
 	print_stats(readers + writers);
 
