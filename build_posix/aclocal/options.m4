@@ -60,17 +60,6 @@ esac
 AC_MSG_RESULT($db_cv_enable_python)
 AM_CONDITIONAL(PYTHON, test x$db_cv_enable_python = xyes)
 
-AC_MSG_CHECKING(if --enable-test option specified)
-AC_ARG_ENABLE(test,
-	[AC_HELP_STRING([--enable-test],
-	    [Build the test programs by default.])], r=$enableval, r=no)
-case "$r" in
-no)	db_cv_enable_test=no;;
-*)	db_cv_enable_test=yes;;
-esac
-AC_MSG_RESULT($db_cv_enable_test)
-AM_CONDITIONAL(BUILD_TESTS, test x$db_cv_enable_test = xyes)
-
 AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --enable-verbose option specified)
 AC_ARG_ENABLE(verbose,

@@ -94,6 +94,7 @@ AC_CONFIG_FILES([
 	ext/compressors/nop_compress/Makefile
 	lang/python/Makefile
 	test/format/Makefile
+	test/insert/Makefile
 	test/salvage/Makefile
 	test/thread/Makefile
 ])

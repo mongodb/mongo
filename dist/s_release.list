@@ -5,4 +5,8 @@ lang/python/src
 src/bdb
 src/server
 src/txn
+test/format
 test/insert
+test/packing
+test/salvage
+test/thread

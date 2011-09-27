@@ -6,13 +6,16 @@ endif
 if PYTHON
   PYBUILD = lang/python
 endif
-if BUILD_TESTS
-  TEST_SUBDIRS = test/format test/salvage test/thread
-endif
+
 SUBDIRS = . \
-	bench/tcbench examples/c \
+	bench/tcbench \
+	examples/c \
 	ext/compressors/nop_compress \
-	$(BZBUILD) $(PYBUILD) $(TEST_SUBDIRS)
+	test/format \
+	test/salvage \
+	test/thread \
+	$(BZBUILD) \
+	$(PYBUILD)
 
 lib_LTLIBRARIES = libwiredtiger.la
 LDADD = $(lib_LTLIBRARIES)
