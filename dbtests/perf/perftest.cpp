@@ -24,6 +24,7 @@
 #include "../../db/ops/query.h"
 #include "../../db/queryoptimizer.h"
 #include "../../util/file_allocator.h"
+#include "../../db/btree.h"
 
 #include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -720,6 +721,48 @@ namespace Plan {
         }
     } all;
 } // namespace Plan
+
+namespace Memmove {
+    // this is an extreme test, we suppose all 8k data is _KeyNode
+    // and then we shift one right to see how these two cases differ.
+    class CopyEachTime {
+    public:
+        void run() {
+            int iterations = 1000*1000*50;
+            BtreeBucket<V1>::_KeyNode *data = (BtreeBucket<V1>::_KeyNode*)buf;
+            while(iterations--){
+                int n = (8192/sizeof(*data)-1);
+                while(n){
+                    data[n] = data[n-1];
+                    n--;
+                }
+            }
+        }
+        char buf[8192];
+    };
+
+    class MemmoveTime {
+    public:
+        void run() {
+            int iterations = 1000*1000*50;
+            BtreeBucket<V1>::_KeyNode *data = (BtreeBucket<V1>::_KeyNode*)buf;
+            while(iterations--){
+                int n = (8192/sizeof(*data)-1);
+                memmove((char*)data+sizeof(*data), data, sizeof(*data)*(n-1));
+            }
+        }
+        char buf[8192];
+    };
+
+    class All : public RunnerSuite {
+    public:
+        All() : RunnerSuite("memmove") {}
+        void setupTests() {
+            add< CopyEachTime >();
+            add< MemmoveTime >();
+        }
+    } all;
+} // namespace Memmove
 
 namespace Misc {
     class TimeMicros64 {
