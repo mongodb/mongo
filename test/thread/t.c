@@ -40,7 +40,7 @@ main(int argc, char *argv[])
 	runs = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:r:t:w:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:t:W:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			runs = 1;
@@ -48,21 +48,24 @@ main(int argc, char *argv[])
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
-		case 'k':
+		case 'k':			/* rows */
 			nkeys = (u_int)atoi(optarg);
 			break;
-		case 'l':
+		case 'l':			/* log */
 			if ((logfp = fopen(optarg, "w")) == NULL) {
 				fprintf(stderr,
 				    "%s: %s\n", optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
-		case 'n':
+		case 'n':			/* operations */
 			nops = (u_int)atoi(optarg);
 			break;
-		case 'r':
+		case 'R':
 			readers = atoi(optarg);
+			break;
+		case 'r':			/* runs */
+			runs = atoi(optarg);
 			break;
 		case 't':
 			switch (optarg[0]) {
@@ -79,7 +82,7 @@ main(int argc, char *argv[])
 				return (usage());
 			}
 			break;
-		case 'w':
+		case 'W':
 			writers = atoi(optarg);
 			break;
 		default:
@@ -220,8 +223,8 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-1] [-C wiredtiger-config] [-l log] [-r readers] [-t f|r|v] "
-	    "[-w writers]\n",
+	    "[-1] [-C wiredtiger-config]\n    "
+	    "[-l log] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
@@ -229,8 +232,9 @@ usage(void)
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
-	    "\t-r set number of reading threads\n"
+	    "\t-R set number of reading threads\n"
+	    "\t-r set number of runs\n"
 	    "\t-t set a file type (fix | row | var)\n"
-	    "\t-w set number of writing threads\n");
+	    "\t-W set number of writing threads\n");
 	return (EXIT_FAILURE);
 }
