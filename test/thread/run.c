@@ -114,11 +114,11 @@ reader(void *arg)
 	s = &run_stats[id];
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die("conn.open_session", ret);
 
 	if ((ret =
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
-		die("cursor.open", ret);
+		die("session.open_cursor", ret);
 
 	for (i = 0; i < nops; ++i, ++s->reads, sched_yield()) {
 		keyno = r() % nkeys;
@@ -130,7 +130,7 @@ reader(void *arg)
 		} else
 			cursor->set_key(cursor, (uint32_t)keyno);
 		if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND)
-			die("cursor.insert", ret);
+			die("cursor.search", ret);
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -165,11 +165,11 @@ writer(void *arg)
 	s = &run_stats[id];
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die("conn.open_session", ret);
 
 	if ((ret =
 	    session->open_cursor(session, FNAME, NULL, NULL, &cursor)) != 0)
-		die("cursor.open", ret);
+		die("session.open_cursor", ret);
 
 	for (i = 0; i < nops; ++i, sched_yield()) {
 		keyno = r() % nkeys;
