@@ -63,14 +63,13 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
-			break;
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (printf("%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}
-	}
+
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	else {

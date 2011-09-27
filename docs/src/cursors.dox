@@ -175,11 +175,14 @@ that are returned may not exist in the primary).
 
 @section cursor_statistics Statistics Cursors
 
-Cursors can return run-time statistics about the WiredTiger engine as well
-as the underlying row- and column-store files.  Each cursor iteration sets
-three separate values: the entry's unsigned 64-bit integral value, a
-printable string version of that integral value, and a string description
-of the entry.
+Cursors can return run-time statistics about the WiredTiger engine as
+well as statistics for the underlying row- and column-store files.  Each
+cursor iteration sets three separate values: a printable description of
+the entry, a printable version of the entry's value, and the entry's
+unsigned 64-bit integral value,
+
+The following is an example of printing run-time statistics about the
+WiredTiger engine:
 
 @dontinclude ex_stat.c
 
@@ -188,15 +191,10 @@ of the entry.
 @until }
 @until }
 
-To return run-time statistics about the WiredTiger engine, open a
-statistics cursor:
+The following is an example of printing statistics about an underlying
+file:
 
 @skipline int
 @until }
 
-To return run-time statistics about an underlying file, open a statistics
-cursor on the file object:
-
-@skipline int
-@until }
  */

@@ -93,9 +93,9 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		item->data = cursor->value.data;
 		item->size = cursor->value.size;
 	} else {
-		*va_arg(ap, uint64_t *) = cst->stats->v;
-		*va_arg(ap, const char **) = cst->pvalue.data;
 		*va_arg(ap, const char **) = cst->stats->desc;
+		*va_arg(ap, const char **) = cst->pvalue.data;
+		*va_arg(ap, uint64_t *) = cst->stats->v;
 	}
 err:	va_end(ap);
 	API_END(session);

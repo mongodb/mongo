@@ -31,11 +31,12 @@ stats(void)
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
-			break;
+
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
-	}
+
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor, NULL)) != 0)
@@ -45,11 +46,12 @@ stats(void)
 	if ((ret = session->open_cursor(session,
 	    "statistics:" FNAME, NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
-			break;
+
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
-	}
+
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor, NULL)) != 0)

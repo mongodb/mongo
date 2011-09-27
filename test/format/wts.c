@@ -388,7 +388,7 @@ wts_stats(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	FILE *fp;
-	const char *name, *pval, *desc;
+	const char *pval, *desc;
 	uint64_t v;
 	int ret;
 
@@ -406,15 +406,13 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
-		    (ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
-			break;
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}
-	}
+
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor, NULL)) != 0)
@@ -427,15 +425,13 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &name)) != 0 ||
-		    (ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
-			break;
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
 		}
-	}
+
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor, NULL)) != 0)

@@ -24,16 +24,14 @@ const char *home = "WT_TEST";
 int
 print_cursor(WT_CURSOR *cursor)
 {
-	const char *description, *pvalue;
+	const char *desc, *pvalue;
 	uint64_t value;
 	int ret;
 
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor,
-		    &value, &pvalue, &description)) != 0)
-			return (ret);
-		printf("%s=%s\n", description, pvalue);
-	}
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+		printf("%s=%s\n", desc, pvalue);
 
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
@@ -58,7 +56,7 @@ print_file_stats(WT_SESSION *session)
 	int ret;
 
 	if ((ret = session->open_cursor(session,
-	    "statistics:file:foo..wt", NULL, NULL, &cursor)) != 0)
+	    "statistics:file:foo.wt", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
 	return (print_cursor(cursor));
