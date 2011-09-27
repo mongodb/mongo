@@ -555,7 +555,9 @@ namespace mongo {
                 dbrefT = str_p( "Dbref" ) >> '(' >> str[ dbrefNS( self.b ) ] >> ',' >>
                          quotedOid >> ')';
 
-                timestamp = ch_p( '{' ) >> "\"$timestamp\"" >> ':' >> '{' >> uint_parser<unsigned long long, 10, 1, -1>()[ timestampSecs(self.b) ] >> ',' >> uint_parser<unsigned int, 10, 1, -1>()[ timestampInc(self.b) ] >> '}' >>'}';
+                timestamp = ch_p( '{' ) >> "\"$timestamp\"" >> ':' >> '{' >>
+                    "\"t\"" >> ':' >> uint_parser<unsigned long long, 10, 1, -1>()[ timestampSecs(self.b) ] >> ',' >>
+                    "\"i\"" >> ':' >> uint_parser<unsigned int, 10, 1, -1>()[ timestampInc(self.b) ] >> '}' >>'}';
 
                 oid = oidS | oidT;
                 oidS = ch_p( '{' ) >> "\"$oid\"" >> ':' >> quotedOid >> '}';
