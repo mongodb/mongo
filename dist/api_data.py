@@ -320,7 +320,6 @@ flags = {
 	'block_read' : [ 'ERR_QUIET', 'VERIFY' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],
-	'tree_walk' : [ 'WALK_CACHE' ],
 	'verbose' : [
 		'VERB_ALLOCATE',
 		'VERB_EVICTSERVER',

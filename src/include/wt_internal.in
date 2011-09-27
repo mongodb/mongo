@@ -135,10 +135,6 @@ struct __wt_table;
     typedef struct __wt_table WT_TABLE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
-struct __wt_walk;
-    typedef struct __wt_walk WT_WALK;
-struct __wt_walk_entry;
-    typedef struct __wt_walk_entry WT_WALK_ENTRY;
 /*
  * Forward structure declarations for internal structures: END
  * DO NOT EDIT: automatically built by dist/s_typedef.

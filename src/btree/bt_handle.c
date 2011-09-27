@@ -282,7 +282,7 @@ __btree_last(WT_SESSION_IMPL *session)
 
 /*
  * __btree_close_cache --
- *	Close a the in-memory cache of a btree.
+ *	Close an in-memory cache of a btree.
  */
 static int
 __btree_close_cache(WT_SESSION_IMPL *session)
@@ -407,7 +407,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);
-	__wt_walk_end(session, &btree->evict_walk, 1);
 	__wt_rec_destroy(session);
 	__wt_free(session, btree->stats);
 

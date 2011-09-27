@@ -246,7 +246,6 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_VERB_SALVAGE					0x00000002
 #define	WT_VERB_WRITE					0x00000001
 #define	WT_VERIFY					0x00000001
-#define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 /*
  * API flags section: END

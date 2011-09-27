@@ -30,33 +30,6 @@ struct __wt_salvage_cookie {
 };
 
 /*
- * WT_WALK_ENTRY --
- *	Node for walking one level of a tree.
- */
-struct __wt_walk_entry {
-	WT_PAGE	*page;		/* Page being traversed */
-	uint32_t indx;		/* Page's next child slot to return */
-
-	int	 child;		/* If all children have been returned */
-	int	 visited;	/* If the page itself has been returned */
-
-	WT_PAGE *hazard;	/* Last page returned -- has hazard reference */
-};
-
-/*
- * WT_WALK --
- *	Structure describing a position during a walk through a tree.
- */
-struct __wt_walk {
-	WT_WALK_ENTRY *tree;
-
-	size_t   tree_len;	/* Tree stack in bytes */
-	u_int	 tree_slot;	/* Current tree stack slot */
-
-	uint32_t flags;		/* Flags specified for the walk */
-};
-
-/*
  * WT_NAMED_COMPRESSOR --
  *	A compressor list entry
  */
@@ -128,7 +101,7 @@ struct __wt_btree {
 	uint32_t free_addr;		/* Free-list addr/size pair */
 	uint32_t free_size;
 
-	WT_WALK  evict_walk;		/* Eviction thread's walk state */
+	WT_PAGE *evict_page;		/* Eviction thread's location */
 
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
