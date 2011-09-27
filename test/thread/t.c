@@ -153,10 +153,10 @@ wt_shutdown(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->sync(session, FNAME, NULL)) != 0)
+	if ((ret = session->verify(session, FNAME, NULL)) != 0)
 		die("session.sync", ret);
 
-	if ((ret = session->verify(session, FNAME, NULL)) != 0)
+	if ((ret = session->sync(session, FNAME, NULL)) != 0)
 		die("session.sync", ret);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
