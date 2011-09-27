@@ -1,21 +1,24 @@
 ACLOCAL_AMFLAGS = -I build_posix/aclocal
 
 if BZIP2
-  BZBUILD = ext/compressors/bzip2_compress
+  BZIP2_BUILD = ext/compressors/bzip2_compress
 endif
 if PYTHON
-  PYBUILD = lang/python
+  PYTHON_BUILD = lang/python
+endif
+if HAVE_BDB
+  FORMAT_BUILD = test/format
 endif
 
 SUBDIRS = . \
 	bench/tcbench \
 	examples/c \
 	ext/compressors/nop_compress \
-	test/format \
 	test/salvage \
 	test/thread \
-	$(BZBUILD) \
-	$(PYBUILD)
+	$(BZIP2_BUILD) \
+	$(FORMAT_BUILD) \
+	$(PYTHON_BUILD)
 
 lib_LTLIBRARIES = libwiredtiger.la
 LDADD = $(lib_LTLIBRARIES)

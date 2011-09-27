@@ -80,6 +80,9 @@ AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN
 
+# Is there a link to a BDB tree that we can use for test/format?
+AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
+
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
