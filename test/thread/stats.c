@@ -15,7 +15,8 @@ void
 stats(void)
 {
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
+	uint64_t v;
+	const char *pval, *desc;
 	WT_SESSION *session;
 	FILE *fp;
 	int ret;
@@ -28,19 +29,12 @@ stats(void)
 
 	/* Connection statistics. */
 	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, "printable", &cursor)) != 0)
+	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
 	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
-		    (ret = cursor->get_value(cursor, &value)) != 0)
+		if ((ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
 			break;
-		if (fwrite(key.data, 1, key.size, fp) != key.size ||
-		    fwrite("=", 1, 1, fp) != 1 ||
-		    fwrite(value.data, 1, value.size, fp) != value.size ||
-		    fwrite("\n", 1, 1, fp) != 1) {
-			ret = errno;
-			break;
-		}
+		(void)fprintf(fp, "%s=%s\n", desc, pval);
 	}
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
@@ -49,19 +43,12 @@ stats(void)
 	
 	/* File statistics. */
 	if ((ret = session->open_cursor(session,
-	    FNAME, NULL, "statistics,printable", &cursor)) != 0)
+	    "statistics:" FNAME, NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
 	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
-		    (ret = cursor->get_value(cursor, &value)) != 0)
+		if ((ret = cursor->get_value(cursor, &v, &pval, &desc)) != 0)
 			break;
-		if (fwrite(key.data, 1, key.size, fp) != key.size ||
-		    fwrite("=", 1, 1, fp) != 1 ||
-		    fwrite(value.data, 1, value.size, fp) != value.size ||
-		    fwrite("\n", 1, 1, fp) != 1) {
-			ret = errno;
-			break;
-		}
+		(void)fprintf(fp, "%s=%s\n", desc, pval);
 	}
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
