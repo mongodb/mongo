@@ -26,6 +26,25 @@ while :
 	esac
 done
 
+# Build configure.ac
+(
+echo "# DO NOT EDIT"
+echo "# This file is built automatically from build_posix/configure.ac.in."
+
+sed -n '1,/BEGIN check existence/p' configure.ac.in
+
+sed -n '/BEGIN check existence/,/END check existence/p' configure.ac.in |
+    sed '/^#/d' | while read l ; do
+        f=`echo $l | sed -e 's/^.*\[//' -e 's/:.*//' -e 's/\].*//'`
+	case "$f" in
+	[a-z]*) [ -d ../`dirname $f` ] || continue ;;
+	esac
+	echo "$l"
+    done
+
+sed -n '/END check existence/,$p' configure.ac.in
+) > ../configure.ac
+
 # Build Makefile.am
 sh ./makemake
 

@@ -83,21 +83,19 @@ AC_C_BIGENDIAN
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
-AC_CONFIG_LINKS([
-	test/format/s_dumpcmp:test/format/s_dumpcmp
-])
+# BEGIN check existence -- code that may be excluded
+AC_CONFIG_LINKS([test/format/s_dumpcmp:test/format/s_dumpcmp])
 
-AC_CONFIG_FILES([
-	bench/tcbench/Makefile
-	examples/c/Makefile
-	ext/compressors/bzip2_compress/Makefile
-	ext/compressors/nop_compress/Makefile
-	lang/python/Makefile
-	test/format/Makefile
-	test/insert/Makefile
-	test/salvage/Makefile
-	test/thread/Makefile
-])
+AC_CONFIG_FILES([bench/tcbench/Makefile])
+AC_CONFIG_FILES([examples/c/Makefile])
+AC_CONFIG_FILES([ext/compressors/bzip2_compress/Makefile])
+AC_CONFIG_FILES([ext/compressors/nop_compress/Makefile])
+AC_CONFIG_FILES([lang/python/Makefile])
+AC_CONFIG_FILES([test/format/Makefile])
+AC_CONFIG_FILES([test/insert/Makefile])
+AC_CONFIG_FILES([test/salvage/Makefile])
+AC_CONFIG_FILES([test/thread/Makefile])
+# END check existence
 
 AC_CONFIG_FILES([
 	Makefile
