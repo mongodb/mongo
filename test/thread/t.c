@@ -131,7 +131,7 @@ wt_connect(char *config_open)
 	char config[128];
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=5MB%s%s",
+	    "error_prefix=\"%s\",multithread,cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
