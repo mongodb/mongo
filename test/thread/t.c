@@ -99,8 +99,8 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
-		printf("    %d: %d readers, %d writers\n",
-		    cnt, readers, writers);
+		printf(
+		    "    %d: %d readers, %d writers\n", cnt, readers, writers);
 
 		shutdown();			/* Clean up previous runs */
 
