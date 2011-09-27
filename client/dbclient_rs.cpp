@@ -296,9 +296,16 @@ namespace mongo {
     void ReplicaSetMonitor::_checkStatus(DBClientConnection *conn) {
         BSONObj status;
 
-        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ||
-                !status.hasField("members") ||
-                status["members"].type() != Array) {
+        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ) {
+            LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
+            return;
+        }
+        if( !status.hasField("members") ) { 
+            log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;
+            return;
+        }
+        if( status["members"].type() != Array) {
+            log() << "dbclient_rs error expected members field in replSetGetStatus result to be an array" << endl;
             return;
         }
 
@@ -309,15 +316,18 @@ namespace mongo {
 
             int m = -1;
             if ((m = _find(host)) < 0) {
+                LOG(1) << "dbclient_rs _checkStatus couldn't _find(" << host << ')' << endl;
                 continue;
             }
 
             double state = member["state"].Number();
             if (member["health"].Number() == 1 && (state == 1 || state == 2)) {
+                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = true " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = true;
             }
             else {
+                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = false " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = false;
             }
