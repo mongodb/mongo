@@ -94,3 +94,41 @@ print_func('connection', connection_stats)
 f.close()
 
 compare_srcfile(tmp_file, '../src/support/stat.c')
+
+
+# print_dox --
+#	Print the tables for the dox file.
+def print_dox(name, list):
+	f.write('<table>\n')
+	f.write('@hrow{' + name + ' Statistics}\n')
+
+	# Sort the structure fields by their description, so the eventual
+	# disply is sorted by string.
+	for l in sorted(list, key=attrgetter('desc')):
+		f.write('@row{' + l.desc + '}\n')
+	f.write('</table>\n\n')
+
+
+# Update dox file
+tmp_file = '__tmp'
+f = open(tmp_file, 'w')
+skip = 0
+for line in open('../docs/src/stat-desc.dox', 'r'):
+	if not skip:
+		f.write(line)
+	if line.count('connection statistics section: END'):
+		f.write(line)
+		skip = 0
+	elif line.count('connection statistics section: BEGIN'):
+		f.write('\n')
+		skip = 1
+		print_dox('Connection', connection_stats)
+	if line.count('file statistics section: END'):
+		f.write(line)
+		skip = 0
+	elif line.count('file statistics section: BEGIN'):
+		f.write('\n')
+		skip = 1
+		print_dox('File', btree_stats)
+f.close()
+compare_srcfile(tmp_file, '../docs/src/stat-desc.dox')

@@ -1,0 +1,87 @@
+/*! @page stat_desc Statistics Description
+
+WiredTiger includes a variety of statistics at both the database level
+and on a per-file basis.
+
+The following statistics are available for the database.
+
+\internal connection statistics section: BEGIN \endinternal
+
+<table>
+@hrow{Connection Statistics}
+@row{blocks read from a file}
+@row{blocks written to a file}
+@row{cache: bytes currently held in the cache}
+@row{cache: eviction server unable to reach eviction goal}
+@row{cache: maximum bytes configured}
+@row{cache: modified pages evicted}
+@row{cache: pages currently held in the cache}
+@row{cache: pages selected for eviction not evicted because of a hazard reference}
+@row{cache: unmodified pages evicted}
+@row{files currently open}
+@row{mutex lock calls}
+@row{rwlock readlock calls}
+@row{rwlock writelock calls}
+@row{total memory allocations}
+@row{total memory frees}
+@row{total read I/Os}
+@row{total write I/Os}
+@row{workQ queue passes}
+@row{workQ yields}
+</table>
+
+\internal connection statistics section: END \endinternal
+
+The following statistics are available for individual, underlying files.
+
+\internal file statistics section: BEGIN \endinternal
+
+<table>
+@hrow{File Statistics}
+@row{bulk-loaded entries}
+@row{column-store deleted values}
+@row{column-store fixed-size leaf pages}
+@row{column-store internal pages}
+@row{column-store variable-size leaf pages}
+@row{cursor-first}
+@row{cursor-inserts}
+@row{cursor-last}
+@row{cursor-read}
+@row{cursor-read-near}
+@row{cursor-read-next}
+@row{cursor-read-prev}
+@row{cursor-removes}
+@row{cursor-updates}
+@row{file: block allocations}
+@row{file: block allocations required file extension}
+@row{file: block frees}
+@row{file: overflow pages read from the file}
+@row{file: pages read from the file}
+@row{file: pages written to the file}
+@row{file: size}
+@row{fixed-record size}
+@row{internal page overflow size}
+@row{leaf page overflow size}
+@row{magic number}
+@row{major version number}
+@row{maximum internal page size}
+@row{maximum leaf page size}
+@row{minor version number}
+@row{number of bytes in the freelist}
+@row{number of entries in the freelist}
+@row{overflow pages}
+@row{page size allocation unit}
+@row{reconcile: deleted or temporary pages merged}
+@row{reconcile: internal pages split}
+@row{reconcile: leaf pages split}
+@row{reconcile: overflow key}
+@row{reconcile: overflow value}
+@row{reconcile: pages deleted}
+@row{reconcile: unable to acquire hazard reference}
+@row{row-store internal pages}
+@row{row-store leaf pages}
+@row{total entries}
+</table>
+
+\internal file statistics section: END \endinternal
+*/

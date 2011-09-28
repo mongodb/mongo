@@ -8,6 +8,8 @@
 
 @section cursor_types Adding Cursor Types
 
+- @subpage stat_desc
+
 @todo explain how to add cursor types
 
 @section collators Custom Collators

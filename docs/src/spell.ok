@@ -52,6 +52,7 @@ dbc
 dbm
 dbt
 del
+desc
 destructor
 destructors
 dlp
@@ -65,6 +66,7 @@ dups
 endcode
 endcond
 endian
+endinternal
 english
 env
 eof
@@ -79,6 +81,7 @@ filesystem
 fillfactor
 firstname
 fput
+freelist
 gdbm
 getter
 gid
@@ -158,6 +161,7 @@ printlog
 printvalue
 qnx
 rdbms
+readlock
 readonly
 realloc
 realloc'd
@@ -169,6 +173,7 @@ rerequests
 ret
 ro
 rpc
+rwlock
 sHQ
 scanf
 schemas
@@ -211,6 +216,8 @@ vec
 versa
 whitespace
 wiredtiger
+workQ
+writelock
 writelocks
 xa
 yieldcpu
