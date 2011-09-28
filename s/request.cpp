@@ -58,7 +58,7 @@ namespace mongo {
         reset();
     }
 
-    void Request::reset( bool reload ) {
+    void Request::reset( bool reload, bool forceReload ) {
         if ( _m.operation() == dbKillCursors ) {
             return;
         }
@@ -70,7 +70,7 @@ namespace mongo {
         _config = grid.getDBConfig( nsStr );
         if ( reload ) {
             if ( _config->isSharded( nsStr ) )
-                _config->getChunkManager( nsStr , true );
+                _config->getChunkManager( nsStr , true, forceReload );
             else
                 _config->reload();
         }
@@ -137,7 +137,7 @@ namespace mongo {
                 ShardConnection::checkMyConnectionVersions( getns() );
                 if (!staleConfig.justConnection() )
                     sleepsecs( attempt );
-                reset( ! staleConfig.justConnection() );
+                reset( ! staleConfig.justConnection(), attempt >= 2 );
                 _d.markReset();
                 process( attempt + 1 );
                 return;

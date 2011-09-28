@@ -235,7 +235,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             rs.awaitReplication();
 	    var xxx = new Mongo( rs.getURL() );
 	    xxx.name = rs.getURL();
-            this._connections.push( xxx );
+            this._connections.push( xxx )
+            this["shard" + i] = xxx
         }
         
         this._configServers = []
@@ -260,6 +261,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var conn = startMongodTest( 30000 + i , testName + i, 0, options );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
+            this["shard" + i] = conn
         }
 
         if ( otherParams.sync ){

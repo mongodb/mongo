@@ -1000,8 +1000,8 @@ jsTestOptions = function(){
     return {}
 }
 
-testLog = function(x){
-    print( jsTestFile() + " - " + x )
+jsTestLog = function(msg){
+    print( "\n\n----\n" + msg + "\n----\n\n" )
 }
 
 shellPrintHelper = function (x) {
