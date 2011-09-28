@@ -950,7 +950,7 @@ def doConfigure( myenv , shell=False ):
                     found = True
                     break
             if not found:
-                raise "can't find a static %s" % l
+                raise RuntimeError("can't find a static %s" % l)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
