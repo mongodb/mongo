@@ -95,7 +95,6 @@ f.close()
 
 compare_srcfile(tmp_file, '../src/support/stat.c')
 
-
 # print_dox --
 #	Print the tables for the dox file.
 def print_dox(name, list):
@@ -107,7 +106,6 @@ def print_dox(name, list):
 	for l in sorted(list, key=attrgetter('desc')):
 		f.write('@row{' + l.desc + '}\n')
 	f.write('</table>\n\n')
-
 
 # Update dox file
 tmp_file = '__tmp'

@@ -457,7 +457,8 @@ struct wt_session {
 	 *   		(key=index key\, value=table value)}
 	 *   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
 	 *   		database or table statistics
-	 *   		(key=(string)description\, value=(string)value\, (uint64_t)value)}
+	 *   		(key=(string)description\,
+	 *		    value=(string)value\, (uint64_t)value)}
 	 * </table>
 	 *
 	 * See @ref cursor_types for more information.
