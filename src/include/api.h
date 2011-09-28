@@ -115,7 +115,7 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(wt_btree_qh, __wt_btree) dbqh; /* Locked: database list */
+	TAILQ_HEAD(wt_btree_qh, __wt_btree) btqh; /* Locked: btree list */
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
@@ -123,7 +123,7 @@ struct __wt_connection_impl {
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh)
 	    dlhqh;			/* Locked: library list */
 
-	u_int dbqcnt;			/* Locked: database list count */
+	u_int btqcnt;			/* Locked: btree count */
 	u_int next_file_id;		/* Locked: file ID counter */
 
 	/*

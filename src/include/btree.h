@@ -112,10 +112,11 @@ struct __wt_btree {
 
 #define	WT_BTREE_BULK		0x01	/* Handle is for bulk load. */
 #define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_BTREE_NO_EVICTION	0x04	/* Ignored by the eviction thread */
-#define	WT_BTREE_NO_LOCK	0x08	/* Do not lock the handle. */
-#define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
-#define	WT_BTREE_VERIFY		0x20	/* Handle is for verify */
+#define	WT_BTREE_OPEN		0x08	/* Handle is open. */
+#define	WT_BTREE_NO_EVICTION	0x10	/* Ignored by the eviction thread */
+#define	WT_BTREE_NO_LOCK	0x20	/* Do not lock the handle. */
+#define	WT_BTREE_SALVAGE	0x40	/* Handle is for salvage */
+#define	WT_BTREE_VERIFY		0x80	/* Handle is for verify */
 	uint32_t flags;
 };
 

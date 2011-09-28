@@ -7,8 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(
-	WT_SESSION_IMPL *, const char *, const char *, const char *);
+static int __btree_alloc(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_conf(WT_SESSION_IMPL *, const char *);
 static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
@@ -71,7 +71,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	/* Increment the reference count if we already have the btree open. */
 	matched = 0;
 	__wt_lock(session, conn->mtx);
-	TAILQ_FOREACH(btree, &conn->dbqh, q) {
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(filename, btree->filename) == 0) {
 			++btree->refcnt;
 			session->btree = btree;
@@ -79,19 +79,50 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 			break;
 		}
 	}
-	__wt_unlock(session, conn->mtx);
 	if (matched) {
+		__wt_unlock(session, conn->mtx);
+
+		/* Check that the handle is open. */
+		__wt_readlock(session, btree->rwlock);
+		matched = F_ISSET(btree, WT_BTREE_OPEN);
+		__wt_rwunlock(session, btree->rwlock);
+
+		if (!matched) {
+			__wt_writelock(session, btree->rwlock);
+			if (!F_ISSET(btree, WT_BTREE_OPEN)) {
+				/* We're going to overwrite the old config. */
+				__wt_free(session, btree->config);
+				goto conf;
+			}
+
+			/* It was opened while we waited. */
+			__wt_rwunlock(session, btree->rwlock);
+		}
+
 		/* The config string will not be needed: free it now. */
 		__wt_free(session, config);
 		return (0);
 	}
 
-	/* Create the WT_BTREE structure. */
-	WT_RET(__wt_calloc_def(session, 1, &btree));
-	session->btree = btree;
+	/* Allocate the WT_BTREE structure. */
+	if ((ret = __btree_alloc(session, name, filename)) == 0) {
+		btree = session->btree;
+
+		/* Lock the handle before it is inserted in the list. */
+		__wt_writelock(session, btree->rwlock);
+
+		/* Add to the connection list. */
+		btree->refcnt = 1;
+		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
+		++conn->btqcnt;
+	}
+	__wt_unlock(session, conn->mtx);
+
+	if (ret != 0)
+		return (ret);
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session, name, filename, config));
+conf:	WT_ERR(__btree_conf(session, config));
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0666, 1, &btree->fh));
@@ -99,30 +130,47 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	/* Read in the root page. */
 	WT_ERR(__btree_read_meta(session, cfg, flags));
 
-	/* Add to the connection list. */
-	__wt_lock(session, conn->mtx);
-	btree->refcnt = 1;
-	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
-	++conn->dbqcnt;
-	__wt_unlock(session, conn->mtx);
-
 	WT_STAT_INCR(conn->stats, file_open);
 
-	return (0);
+	if (0) {
+err:		if (btree->fh != NULL) {
+			(void)__wt_close(session, btree->fh);
+			btree->fh = NULL;
+		}
+		F_CLR(btree, WT_BTREE_OPEN);
+	}
 
-err:	if (btree->fh != NULL)
-		(void)__wt_close(session, btree->fh);
-	__wt_free(session, session->btree);
+	__wt_rwunlock(session, btree->rwlock);
 	return (ret);
 }
 
 /*
- * __btree_conf --
- *	Initialize the WT_BTREE structure, after a zero-filled allocation.
+ * __btree_alloc --
+ *	Allocate a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config)
+__btree_alloc(WT_SESSION_IMPL *session, const char *name, const char *filename)
+{
+	WT_BTREE *btree;
+
+	WT_RET(__wt_calloc_def(session, 1, &btree));
+	session->btree = btree;
+
+	WT_RET(__wt_rwlock_alloc(session, "btree handle", &btree->rwlock));
+
+	/* Take copies of names for the new handle. */
+	WT_RET(__wt_strdup(session, name, &btree->name));
+	WT_RET(__wt_strdup(session, filename, &btree->filename));
+
+	return (0);
+}
+
+/*
+ * __btree_conf --
+ *	Configure a WT_BTREE structure.
+ */
+static int
+__btree_conf(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -133,11 +181,6 @@ __btree_conf(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 	conn = S2C(session);
-
-	WT_RET(__wt_rwlock_alloc(session, "btree handle", &btree->rwlock));
-
-	WT_RET(__wt_strdup(session, name, &btree->name));
-	WT_RET(__wt_strdup(session, filename, &btree->filename));
 
 	/* Take the config string: it will be freed with the btree handle. */
 	btree->config = config;
@@ -328,6 +371,7 @@ __btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	btree = session->btree;
 
 	btree->flags = flags;
+	F_SET(session->btree, WT_BTREE_OPEN);
 
 	/*
 	 * Read the file's metadata (unless it's a salvage operation and the
@@ -389,15 +433,19 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_lock(session, conn->mtx);
 	inuse = (--btree->refcnt > 0);
 	if (!inuse) {
-		TAILQ_REMOVE(&conn->dbqh, btree, q);
-		--conn->dbqcnt;
+		TAILQ_REMOVE(&conn->btqh, btree, q);
+		--conn->btqcnt;
 	}
 	__wt_unlock(session, conn->mtx);
 	if (inuse)
 		return (0);
 
-	WT_TRET(__btree_close_cache(session));
-	WT_TRET(__wt_close(session, btree->fh));
+	if (F_ISSET(btree, WT_BTREE_OPEN)) {
+		WT_TRET(__btree_close_cache(session));
+		WT_TRET(__wt_close(session, btree->fh));
+
+		WT_STAT_DECR(conn->stats, file_open);
+	}
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->name);
@@ -414,8 +462,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, session->btree);
-
-	WT_STAT_DECR(conn->stats, file_open);
 
 	return (ret);
 }

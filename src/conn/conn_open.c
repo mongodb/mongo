@@ -72,7 +72,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	ret = secondary_err = 0;
 
 	/* Complain if WT_BTREE handles weren't closed. */
-	while ((btree = TAILQ_FIRST(&conn->dbqh)) != NULL) {
+	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		__wt_errx(session,
 		    "Connection has open btree handles: %s", btree->name);
 		session->btree = btree;
@@ -111,12 +111,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	__wt_cache_destroy(conn);
 
 	/* Close extensions. */
-	__wt_lock(session, conn->mtx);
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
 		WT_TRET(__wt_dlclose(session, dlh));
 	}
-	__wt_unlock(session, conn->mtx);
 
 	if (conn->log_fh != NULL) {
 		WT_TRET(__wt_close(session, conn->log_fh));

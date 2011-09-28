@@ -558,7 +558,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	ret = 0;
 	__wt_lock(session, conn->mtx);
 
-	elem = WT_EVICT_WALK_BASE + (conn->dbqcnt * WT_EVICT_WALK_PER_TABLE);
+	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
 		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
@@ -566,7 +566,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	}
 
 	i = WT_EVICT_WALK_BASE;
-	TAILQ_FOREACH(btree, &conn->dbqh, q) {
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		/* Skip trees we're not allowed to touch. */
 		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			continue;
