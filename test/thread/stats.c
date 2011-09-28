@@ -34,7 +34,7 @@ stats(void)
 
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) &&
+	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
 	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
 
@@ -50,7 +50,7 @@ stats(void)
 
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) &&
+	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
 	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
 
