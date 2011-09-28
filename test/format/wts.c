@@ -406,8 +406,10 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
@@ -425,8 +427,10 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;

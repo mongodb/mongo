@@ -129,6 +129,7 @@ struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
 	WT_STATS *stats_first;		/* First stats references */
+	WT_STATS *stats_last;		/* Last stats references */
 	WT_STATS *stats;		/* Current stats reference */
 
 	WT_BUF pvalue;			/* Current stats (pretty). */

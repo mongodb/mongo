@@ -156,10 +156,16 @@ The \c stat command outputs run-time statistics for the WiredTiger
 engine, or, if specified, for the command-line file.
 
 @subsection utility_stat_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] stat [file]</code>
+<code>wt [-Vv] [-C config] [-h directory] stat [-p prefix] [file]</code>
 
 @subsection utility_stat_options Options
-The \c stat command has no command-specific options.
+The following are command-specific options for the \c stat command:
+
+@par <code>-p prefix</code>
+By default, stat prints all available statistics.  The \c -p option
+specifies a prefix of the statistics to be printed: all of the
+statistics where the statistic's description field begins with the
+argument \c prefix will be printed.
 
 
 @section utility_verify wt verify: check the structural integrity of a table or file

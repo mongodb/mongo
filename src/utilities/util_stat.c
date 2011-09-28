@@ -15,15 +15,18 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
 	uint64_t v;
-	size_t urilen;
+	size_t len, urilen;
 	int ch, objname_free, ret;
 	const char *pval, *desc;
-	char *objname, *uri;
+	char *objname, *pfx, *uri;
 
-	objname = uri = NULL;
 	objname_free = 0;
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	objname = pfx = uri = NULL;
+	while ((ch = util_getopt(argc, argv, "p:")) != EOF)
 		switch (ch) {
+		case 'p':
+			pfx = util_optarg;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -63,16 +66,40 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		if (printf("%s=%s\n", desc, pval) < 0) {
-			ret = errno;
-			break;
+	/* Optionally search for a specific value. */
+	if (pfx == NULL) {
+		while (
+		    (ret = cursor->next(cursor)) == 0 &&
+		    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+		    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+			if (printf("%s=%s\n", desc, pval) < 0) {
+				ret = errno;
+				break;
+			}
+	} else {
+		cursor->set_key(cursor, pfx);
+		if ((ret = cursor->search(cursor)) == 0 &&
+		    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+		    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+			if (printf("%s=%s\n", desc, pval) < 0)
+				ret = errno;
+		if (ret == 0) {
+			len = strlen(pfx);
+			while ((ret = cursor->next(cursor)) == 0 &&
+			    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+			    (ret = cursor->get_value(
+			    cursor, &pval, &v)) == 0 &&
+			    strncmp(pfx, desc, len) == 0)
+				if (printf("%s=%s\n", desc, pval) < 0) {
+					ret = errno;
+					break;
+				}
 		}
-
+	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
-	else {
+
+	if (ret != 0) {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
 		    progname, objname, wiredtiger_strerror(ret));
 		goto err;
@@ -94,7 +121,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "stat [file]\n",
+	    "stat [-p prefix] [file]\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
