@@ -2917,8 +2917,7 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 	parent_ref->addr = addr;
 	parent_ref->size = size;
 	parent_ref->page = replace;
-	WT_MEMORY_FLUSH;
-	parent_ref->state = state;
+	WT_SET_MB(parent_ref->state, state);
 
 	/*
 	 * If it's not the root page, mark the parent page dirty.

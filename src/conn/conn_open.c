@@ -41,7 +41,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *home, mode_t mode)
 
 	/* Start worker threads. */
 	F_SET(conn, WT_WORKQ_RUN | WT_SERVER_RUN);
-	WT_MEMORY_FLUSH;
+	WT_WRITE_BARRIER();
 
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
@@ -90,7 +90,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
-	WT_MEMORY_FLUSH;
+	WT_WRITE_BARRIER();
 
 	/* Force the cache server threads to run and wait for them to exit. */
 	__wt_workq_evict_server_exit(conn);
@@ -104,7 +104,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * request from the workQ, or vice-versa.
 	 */
 	F_CLR(conn, WT_WORKQ_RUN);
-	WT_MEMORY_FLUSH;
+	WT_WRITE_BARRIER();
 	WT_TRET(__wt_thread_join(conn->workq_tid));
 
 	/* Discard the cache. */

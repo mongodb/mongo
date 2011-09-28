@@ -64,11 +64,9 @@ __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 					/* Should be empty */
 	WT_ASSERT(session, r->session == NULL);
 
+	WT_CLEAR(*r);
 	r->close_method = close_method;
-	WT_MEMORY_FLUSH;		/* Flush before turning entry on */
-
-	r->session = session;
-	WT_MEMORY_FLUSH;		/* Turn entry on */
+	WT_SET_MB(r->session, session);
 }
 
 /*
@@ -79,10 +77,7 @@ static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	__wt_free(session, r->retry);
-
-	memset(r, 0, sizeof(WT_EVICT_REQ));
-
-	WT_MEMORY_FLUSH;		/* Turn entry off */
+	WT_SET_MB(r->session, NULL);
 }
 
 /*

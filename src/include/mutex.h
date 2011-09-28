@@ -60,24 +60,37 @@
  * a memory barrier instruction at appropriate points in order to force an
  * explicit re-load of the memory location.
  */
-extern void *__wt_addr;
 
 #if defined(_lint)
-#define	WT_MEMORY_FLUSH
+#define	WT_READ_BARRIER()
+#define	WT_WRITE_BARRIER()
 #elif defined(sun)
 #include <atomic.h>
-#define	WT_MEMORY_FLUSH							\
-	membar_enter()
-#elif defined(sparc) && defined(__GNUC__)
-#define	WT_MEMORY_FLUSH							\
-	({asm volatile("stbar");})
+#define	WT_READ_BARRIER()						\
+	membar_safe("#LoadLoad")
+#define	WT_WRITE_BARRIER()						\
+	membar_safe("#StoreLoad")
 #elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
-#define	WT_MEMORY_FLUSH							\
-    ({ asm volatile ("mfence" ::: "memory"); 1; })
+#define	WT_READ_BARRIER()						\
+    ({ asm volatile ("lfence" ::: "memory"); 1; })
+#define	WT_WRITE_BARRIER()						\
+    ({ asm volatile ("sfence" ::: "memory"); 1; })
 #elif (defined(i386) || defined(__i386__)) && defined(__GNUC__)
-#define	WT_MEMORY_FLUSH							\
-    ({ asm volatile ("lock; addl $0, %0" ::"m" (__wt_addr): "memory"); 1; })
+#define	WT_READ_BARRIER()						\
+    ({ asm volatile ("lock; addl $0, %0" ::: "memory"); 1; })
+#define	WT_WRITE_BARRIER()						\
+    ({ asm volatile ("lock; addl $0, %0" ::: "memory"); 1; })
 #endif
+
+#define	WT_SET_MB(v, val) do {						\
+	WT_WRITE_BARRIER();						\
+	(v) = (val);							\
+} while (0)
+
+#define	WT_GET_MB(v, val) do {						\
+	(v) = (val);							\
+	WT_READ_BARRIER();						\
+} while (0)
 
 /*
  * Mutexes:

@@ -50,12 +50,11 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * Memory flush needed; the hazard array isn't declared volatile
 		 * and an explicit memory flush is necessary.
 		 */
-		hp->page = ref->page;
+		WT_SET_MB(hp->page, ref->page);
 #ifdef HAVE_DIAGNOSTIC
 		hp->file = file;
 		hp->line = line;
 #endif
-		WT_MEMORY_FLUSH;
 
 		/*
 		 * Check to see if it's still valid (where valid means a state
@@ -78,8 +77,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * to minimize the amount of time we're tying down a pointer we
 		 * know we can't have.
 		 */
-		hp->page = NULL;
-		WT_MEMORY_FLUSH;
+		WT_SET_MB(hp->page, NULL);
 		return (0);
 	}
 
@@ -160,8 +158,7 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			hp->page = NULL;
-			WT_MEMORY_FLUSH;
+			WT_SET_MB(hp->page, NULL);
 
 			__wt_errx(session,
 			    "unexpected hazard reference at session.close");

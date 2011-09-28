@@ -25,10 +25,7 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 	rr->parent = parent;
 	rr->ref = ref;
 	rr->dsk_verify = dsk_verify;
-	WT_MEMORY_FLUSH;		/* Flush before turning entry on */
-
-	rr->session = session;
-	WT_MEMORY_FLUSH;		/* Turn entry on */
+	WT_SET_MB(rr->session, session);
 }
 
 /*
@@ -38,8 +35,7 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 static inline void
 __cache_read_req_clr(WT_READ_REQ *rr)
 {
-	rr->session = NULL;
-	WT_MEMORY_FLUSH;		/* Turn entry off */
+	WT_SET_MB(rr->session, NULL);
 }
 
 /*

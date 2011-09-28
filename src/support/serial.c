@@ -67,8 +67,7 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 * thread).  No second memory flush is required, the wq_state field is
 	 * declared volatile.
 	 */
-	WT_MEMORY_FLUSH;
-	session->wq_state = op;
+	WT_SET_MB(session->wq_state, op);
 
 	/*
 	 * Callers can spin on the session state (implying the call is quickly
@@ -122,8 +121,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * The return value isn't volatile, so requires an explicit flush.
 	 */
 	session->wq_ret = ret;
-	session->wq_state = WT_WORKQ_NONE;
-	WT_MEMORY_FLUSH;
+	WT_SET_MB(session->wq_state, WT_WORKQ_NONE);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

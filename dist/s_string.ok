@@ -69,6 +69,7 @@ LSB
 LSN
 LSN's
 LSNs
+LoadLoad
 Lookup
 MBUF
 MEM
@@ -111,6 +112,7 @@ SYS
 Skiplist
 Solaris
 Split's
+StoreLoad
 Subtree
 Subtrees
 TAILQ
@@ -284,6 +286,7 @@ leafovfl
 len
 lex
 lexicographically
+lfence
 llll
 logput
 lookup
@@ -369,6 +372,7 @@ searchable
 serializable
 sessionp
 setv
+sfence
 sizeof
 sizev
 skiplist

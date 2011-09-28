@@ -254,7 +254,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
-	WT_MEMORY_FLUSH;
+	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if ((*inshead)->tail[i] == NULL ||
 		    ins_stack[i] == &(*inshead)->tail[i]->next[i])

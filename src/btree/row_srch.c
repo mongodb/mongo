@@ -158,12 +158,12 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	/*
 	 * Copy the leaf page's write generation value before reading the page.
-	 * Use a memory barrier to ensure we read the value before we read any
-	 * of the page's contents.
+	 * Use a read memory barrier to ensure we read the value before we read
+	 * any of the page's contents.
 	 */
 	if (is_modify) {
 		cbt->write_gen = page->write_gen;
-		WT_MEMORY_FLUSH;
+		WT_READ_BARRIER();
 	}
 	cbt->page = page;
 

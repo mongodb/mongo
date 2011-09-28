@@ -229,7 +229,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
-	WT_MEMORY_FLUSH;
+	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if ((*inshead)->tail[i] == NULL ||
 		    ins_stack[i] == &(*inshead)->tail[i]->next[i])
@@ -306,8 +306,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * to ensure the list is never broken.
 	 */
 	upd->next = *upd_entry;
-	WT_MEMORY_FLUSH;
-	*upd_entry = upd;
+	WT_SET_MB(*upd_entry, upd);
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }
