@@ -302,7 +302,7 @@ DBQuery.prototype.shellPrint = function(){
             print("Fetched " + n + " record(s) in " + time + "ms");
         }
          if ( this.hasNext() ){
-            print( "Cursor has more records" );
+            print( "Type \"it\" for more" );
             ___it___  = this;
         }
         else {
