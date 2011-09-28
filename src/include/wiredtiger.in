@@ -450,14 +450,14 @@ struct wt_session {
 	 *
 	 * The following are common builtin cursor types:
 	 * <table>
-	 *   @hrow{URI, Function}
+	 *   @hrow{URI, Type}
 	 *   @row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor
 	 *   		(key=table key\, value=table value)}
 	 *   @row{<tt>index:\<tablename\>.\<indexname\></tt>, index cursor
 	 *   		(key=index key\, value=table value)}
 	 *   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
 	 *   		database or table statistics
-	 *   		(key=(string)keyname\, value=(int64_t)value)}
+	 *   		(key=(string)name\, value=(uint64_t)value)}
 	 * </table>
 	 *
 	 * See @ref cursor_types for more information.
