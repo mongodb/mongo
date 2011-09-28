@@ -263,7 +263,7 @@ struct wt_cursor {
 	 */
 	int __F(prev)(WT_CURSOR *cursor);
 
-	/*! Return a record.
+	/*! Return a record; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->prev
@@ -275,7 +275,7 @@ struct wt_cursor {
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
-	/*! Return a record, or a nearby record.
+	/*! Return a record, or a nearby record; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->search
@@ -457,7 +457,7 @@ struct wt_session {
 	 *   		(key=index key\, value=table value)}
 	 *   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
 	 *   		database or table statistics
-	 *   		(key=(string)name\, value=(uint64_t)value)}
+	 *   		(key=(string)description\, value=(string)value\, (uint64_t)value)}
 	 * </table>
 	 *
 	 * See @ref cursor_types for more information.
