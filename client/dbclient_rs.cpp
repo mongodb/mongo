@@ -251,15 +251,15 @@ namespace mongo {
 
         scoped_lock lk( _lock );
 
-        for ( unsigned i = 0; i < _nodes.size(); i++ ) {
+        for ( unsigned ii = 0; ii < _nodes.size(); ii++ ) {
             _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-            if ( i == _master ){
-                LOG(2) << "not selecting " << _nodes[i] << " as it is the current master" << endl;
+            if ( _nextSlave == _master ) {
+                LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is the current master" << endl;
                 continue;
             }
-            if ( _nodes[ i ].okForSecondaryQueries() )
+            if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
                 return _nodes[ _nextSlave ].addr;
-            LOG(2) << "not selecting " << _nodes[i] << " as it is not ok to use" << endl;
+            LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is not ok to use" << endl;
         }                
         
         LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ] << endl;
