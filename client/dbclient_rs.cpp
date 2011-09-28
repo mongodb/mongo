@@ -247,35 +247,20 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
+        LOG(2) << "selecting a slave from replica set " << getServerAddress() << endl;
 
-        LOG(2) << "selecting new slave from replica set " << getServerAddress() << endl;
+        scoped_lock lk( _lock );
 
-        // Logic is to retry three times for any secondary node, if we can't find any secondary, we'll take
-        // any "ok" node
-        // TODO: Could this query hidden nodes?
-        const int MAX = 3;
-        for ( int xxx=0; xxx<MAX; xxx++ ) {
-
-            {
-                scoped_lock lk( _lock );
-                
-                unsigned i = 0;
-                for ( ; i<_nodes.size(); i++ ) {
-                    _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-                    if ( _nextSlave == _master ){
-                        LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is the current master" << endl;
-                        continue;
-                    }
-                    if ( _nodes[ _nextSlave ].okForSecondaryQueries() || ( _nodes[ _nextSlave ].ok && ( xxx + 1 ) >= MAX ) )
-                        return _nodes[ _nextSlave ].addr;
-                    
-                    LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is not ok to use" << endl;
-                }
-                
+        for ( unsigned i = 0; i < _nodes.size(); i++ ) {
+            _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+            if ( i == _master ){
+                LOG(2) << "not selecting " << _nodes[i] << " as it is the current master" << endl;
+                continue;
             }
-
-            check(false);
-        }
+            if ( _nodes[ i ].okForSecondaryQueries() )
+                return _nodes[ _nextSlave ].addr;
+            LOG(2) << "not selecting " << _nodes[i] << " as it is not ok to use" << endl;
+        }                
         
         LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ] << endl;
 
