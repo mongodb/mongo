@@ -430,10 +430,8 @@ struct wt_session {
 
 	/*! Open a cursor.
 	 *
-	 * Open a new cursor on the specified data source.  An existing cursor
-	 * can be duplicated by passing it as the \c to_dup parameter.  Cursor
-	 * handles should be closed by calling WT_CURSOR::close to release
-	 * resources associated with the cursor.
+	 * Open a new cursor on the specified data source.  Cursor handles
+	 * should be discarded by calling WT_CURSOR::close.
 	 *
 	 * Cursors are opened in the context of the current transaction.  The
 	 * cursor must be closed before the transaction can end.  If
@@ -441,13 +439,16 @@ struct wt_session {
 	 * are called with cursors open in the transaction, the cursor handles
 	 * will be closed implicitly and must not be accessed again.
 	 *
+	 * An existing cursor can be duplicated by passing it as the \c to_dup
+	 * parameter, otherwise the \c to_dup parameter should be NULL.
+	 *
 	 * Cursors are commonly opened on ordinary tables.  However, cursors
 	 * can be opened on any data source, regardless of whether it is
 	 * ultimately stored in a table.  Some cursor types may have limited
-	 * functionality (e.g., be read-only, or not support transactional
-	 * updates).
+	 * functionality (for example, be read-only, or not support
+	 * transactional updates).
 	 *
-	 * These are some of the common builtin cursor types:
+	 * The following are common builtin cursor types:
 	 * <table>
 	 *   @hrow{URI, Function}
 	 *   @row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor
