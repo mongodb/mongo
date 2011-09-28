@@ -87,9 +87,8 @@ namespace mongo {
             out << "            \t    REC - recovering\n";
             out << "            \t    UNK - unknown\n";
             out << "            \t    SLV - slave\n";
-            out << "            \t    RTR - mongos process ("RouTeR)"\n";
+            out << "            \t    RTR - mongos process (\"router\")\n";
         }
-
 
         BSONObj stats() {
             if ( _http ) {
