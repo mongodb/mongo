@@ -353,11 +353,13 @@ namespace mongo {
         }
         for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
             if( i->isSelf() ) {
-                if( sss == 1 )
+                if( sss == 1 ) {
                     LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+                }
             }
-            else
+            else {
                 log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            }
         }
     }
 
@@ -632,10 +634,12 @@ namespace mongo {
                         startupStatusMsg.set("can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         static unsigned once;
-                        if( ++once == 1 )
+                        if( ++once == 1 ) {
                             log() << "replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done" << rsLog;
-                        if( _seeds->size() == 0 )
+                        }
+                        if( _seeds->size() == 0 ) {
                             LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
+                        }
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
