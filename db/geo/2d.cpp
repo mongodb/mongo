@@ -2647,7 +2647,10 @@ namespace mongo {
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
                 bb.append( "dis" , dis );
-                if( includeLocs ) bb.append( "loc" , p._pt );
+                if( includeLocs ){
+                    if( p._pt.couldBeArray() ) bb.append( "loc", BSONArray( p._pt ) );
+                    else bb.append( "loc" , p._pt );
+                }
                 bb.append( "obj" , p._o );
                 bb.done();
             }
