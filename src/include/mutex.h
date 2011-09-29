@@ -14,9 +14,9 @@
  * For example, if 8-bits of a 32-bit quantity were written, then the rest of
  * the 32-bits were written, and another thread of control was able to read the
  * memory location after the first 8-bits were written and before the subsequent
- * 24-bits were written, WiredTiger would * break.   Or, if two threads of
- * control attempt to write the same location simultaneously, the result must be
- * one or the other of the two values, not some combination of both.
+ * 24-bits were written, WiredTiger would break.   Or, if two threads of control
+ * attempt to write the same location simultaneously, the result must be one or
+ * the other of the two values, not some combination of both.
  *
  * To reduce memory requirements, we use a 32-bit type on 64-bit machines, which
  * is OK if the compiler doesn't accumulate two adjacent 32-bit variables into a
@@ -24,7 +24,7 @@
  * bits, not a load/store of 64 bits, where the 64 bits is comprised of two
  * adjacent 32-bit locations.  The problem is when two threads are cooperating
  * (thread X finds 32-bits set to 0, writes in a new value, flushes memory;
- * thread Y  reads 32-bits that are non-zero, does some operation, resets the
+ * thread Y reads 32-bits that are non-zero, does some operation, resets the
  * memory location to 0 and flushes).   If thread X were to read the 32 bits
  * adjacent to a different 32 bits, and write them both, the two threads could
  * race.  If that can happen, you must increase the size of the memory type to
@@ -35,9 +35,9 @@
  * can run on machines with a 32-bit memory bus.
  *
  * We don't depend on writes across cache lines being atomic, and to make sure
- * that never happens, we check address alignment in debugging mode -- we have
- * not seen any architectures with cache lines other than a multiple of 4 bytes
- * in size, so an aligned 4-byte access will always be in a single cache line.
+ * that never happens, we check address alignment: we know of no architectures
+ * with cache lines other than a multiple of 4 bytes in size, so aligned 4-byte
+ * accesses will always be in a single cache line.
  *
  * Atomic writes are often associated with memory barriers, implemented by the
  * WT_READ_BARRIER and WT_WRITE_BARRIER macros.  WiredTiger's requirement as
