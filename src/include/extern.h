@@ -359,7 +359,7 @@ extern int __wt_dlsym( WT_SESSION_IMPL *session,
     const char *name,
     void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
-extern int __wt_exist(const char *path);
+extern int __wt_exist(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
@@ -383,6 +383,7 @@ extern int __wt_open(WT_SESSION_IMPL *session,
     int ok_create,
     WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_has_priv(void);
 extern int __wt_remove(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_read(WT_SESSION_IMPL *session,
     WT_FH *fh,
@@ -546,6 +547,9 @@ extern int __wt_failure(WT_SESSION_IMPL *session,
     6)));
 extern int __wt_file_format(WT_SESSION_IMPL *session);
 extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
+extern int __wt_filename(WT_SESSION_IMPL *session,
+    const char *name,
+    WT_BUF **retp);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);

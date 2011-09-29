@@ -14,6 +14,7 @@
 int
 __wt_remove(WT_SESSION_IMPL *session, const char *name)
 {
+	WT_BUF *tmp;
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
 	int ret;
@@ -34,9 +35,16 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	/* This should be caught at a higher level. */
 	WT_ASSERT(session, fh == NULL);
 
+	WT_RET(__wt_filename(session, name, &tmp));
+	name = tmp->data;
+
 	SYSCALL_RETRY(remove(name), ret);
+
+	__wt_scr_free(&tmp);
+
 	if (ret == 0)
 		return (0);
+
 	__wt_err(session, errno, "%s", name);
-	return (WT_ERROR);
+	return (errno);
 }

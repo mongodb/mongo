@@ -39,8 +39,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *filename)
 	WT_RET(__wt_buf_sprintf(session, &keybuf, "file:%s", filename));
 	WT_ERR(__wt_schema_table_remove(session, keybuf.data));
 
-	/* TODO: use the connection home directory. */
-	if (__wt_exist(filename))
+	if (__wt_exist(session, filename))
 		ret = __wt_remove(session, filename);
 
 err:	__wt_buf_free(session, &keybuf);

@@ -274,6 +274,16 @@ methods = {
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
+	Config('home_environment', 'false', r'''
+		use the WIREDTIGER_HOME environment variable for naming unless
+		the process is running with special privileges.
+		See @ref home for details''',
+		type='boolean'),
+	Config('home_environment_priv', 'false', r'''
+		use the WIREDTIGER_HOME environment variable for naming
+		regardless of whether or not the process is running with
+		special privileges.  See @ref home for details''',
+		type='boolean'),
 	Config('exclusive', 'false', r'''
 		fail if the database already exists''',
 		type='boolean'),

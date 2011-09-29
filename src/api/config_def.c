@@ -255,14 +255,16 @@ __wt_confchk_table_meta =
 const char *
 __wt_confdfl_wiredtiger_open =
     "cache_size=20MB,create=false,error_prefix=,exclusive=false,extensions=,"
-    "hazard_max=30,logging=false,multiprocess=false,multithread=false,"
-    "session_max=50,verbose=";
+    "hazard_max=30,home_environment=false,home_environment_priv=false,"
+    "logging=false,multiprocess=false,multithread=false,session_max=50,"
+    "verbose=";
 
 const char *
 __wt_confchk_wiredtiger_open =
     "cache_size=(type=int,min=1MB,max=10TB),create=(type=boolean),"
     "error_prefix=(),exclusive=(type=boolean),extensions=(type=list),"
-    "hazard_max=(type=int,min=15),logging=(type=boolean),"
+    "hazard_max=(type=int,min=15),home_environment=(type=boolean),"
+    "home_environment_priv=(type=boolean),logging=(type=boolean),"
     "multiprocess=(type=boolean),multithread=(type=boolean),"
     "session_max=(type=int,min=1),verbose=(type=list,choices=[\"allocate\","
     "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\",\"readserver\""

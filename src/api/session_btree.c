@@ -126,7 +126,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, !LF_ISSET(WT_BTREE_NO_EVICTION));
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
-	} else if (ret == WT_NOTFOUND && __wt_exist(filename)) {
+	} else if (ret == WT_NOTFOUND && __wt_exist(session, filename)) {
 		/*
 		 * A fixed configuration is passed in for special files, such
 		 * as the schema table itself.

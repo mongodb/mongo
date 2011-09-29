@@ -27,7 +27,7 @@ __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 	int ret;
 
 	/* Check to see if the file exists -- we don't want to overwrite it. */
-	if (__wt_exist(filename)) {
+	if (__wt_exist(session, filename)) {
 		__wt_errx(session,
 		    "the file %s already exists; to re-create it, remove it "
 		    "first, then create it",

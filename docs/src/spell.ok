@@ -159,6 +159,7 @@ primary's
 printf
 printlog
 printvalue
+priv
 qnx
 rdbms
 readlock

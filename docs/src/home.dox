@@ -1,0 +1,31 @@
+/*! @page home WiredTiger Home Directory
+
+@section home Specifying the Database Directory
+
+WiredTiger file naming is based on the \c home argument specified to the
+::wiredtiger_open function or the \c WIREDTIGER_HOME environment variable.
+
+If the \c home argument is specified to the ::wiredtiger_open function,
+it is used as the database directory and the \c WIREDTIGER_HOME
+environment variable is ignored.
+
+If no \c home argument is specified to the ::wiredtiger_open function,
+the WIREDTIGER_HOME environment variable is set, and the
+::wiredtiger_open function was configured with the \c home_environment
+string, the WIREDTIGER_HOME environment variable will be used to specify
+the database directory.
+
+If no \c home argument is specified to the ::wiredtiger_open function,
+the WIREDTIGER_HOME environment variable is set, the ::wiredtiger_open
+function was configured with the \c home_environment_priv string, and
+the process is running with appropriate privileges, the WIREDTIGER_HOME
+environment variable will be used to specify the database directory.
+
+If no \c home argument is specified to the ::wiredtiger_open function
+and the WIREDTIGER_HOME environment variable is not set, the database
+directory is the process' current working directory.  The current
+working directory path is not maintained by the WiredTiger library and
+changing the working directory after opening the WiredTiger database may
+cause failures.
+
+*/

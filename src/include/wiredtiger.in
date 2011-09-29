@@ -1015,7 +1015,8 @@ struct wt_connection {
  * @skip conn;
  * @until wiredtiger_open
  *
- * @param home The path to the database home directory
+ * @param home The path to the database home directory.  See @ref home
+ * for more information.
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
@@ -1032,6 +1033,13 @@ struct wt_connection {
  * list of strings.,empty}
  * @config{hazard_max, number of simultaneous hazard references per session
  * handle. The value must be an integer greater than or equal to 15.,\c 30}
+ * @config{home_environment, use the WIREDTIGER_HOME environment variable for
+ * naming unless the process is running with special privileges. See @ref home
+ * for details. The value must be a boolean flag.,\c false}
+ * @config{home_environment_priv, use the WIREDTIGER_HOME environment variable
+ * for naming regardless of whether or not the process is running with special
+ * privileges.  See @ref home for details. The value must be a boolean flag.,\c
+ * false}
  * @config{logging, enable logging. The value must be a boolean flag.,\c false}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary

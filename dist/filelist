@@ -67,6 +67,7 @@ src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
 src/os_posix/os_mtx.c
 src/os_posix/os_open.c
+src/os_posix/os_priv.c
 src/os_posix/os_remove.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
@@ -82,6 +83,7 @@ src/schema/schema_project.c
 src/schema/schema_table.c
 src/support/cksum.c
 src/support/err.c
+src/support/filename.c
 src/support/global.c
 src/support/hazard.c
 src/support/huffman.c

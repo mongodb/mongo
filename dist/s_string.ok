@@ -337,6 +337,7 @@ pfx
 posint
 prepended
 printf
+priv
 pthread
 pv
 py

@@ -15,14 +15,17 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
+	WT_BUF *tmp;
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
 	int f, fd, matched, ret;
 
 	conn = S2C(session);
 	fh = NULL;
+	fd = -1;
+	ret = 0;
 
-	 WT_VERBOSE(session, FILEOPS, "fileops: %s: open", name);
+	WT_VERBOSE(session, FILEOPS, "fileops: %s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
@@ -38,6 +41,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_unlock(session, conn->mtx);
 	if (matched)
 		return (0);
+
+	WT_RET(__wt_filename(session, name, &tmp));
+	name = tmp->data;
 
 	f = O_RDWR;
 #ifdef O_BINARY
@@ -62,11 +68,11 @@ __wt_open(WT_SESSION_IMPL *session,
 			break;
 		default:
 			__wt_err(session, errno, "%s", name);
-			return (WT_ERROR);
+			WT_ERR(errno);
 		}
 	}
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
+	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
@@ -79,7 +85,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
 	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1) {
 		__wt_err(session, errno, "%s: fcntl", name);
-		goto err;
+		WT_ERR(errno);
 	}
 #endif
 
@@ -95,13 +101,16 @@ __wt_open(WT_SESSION_IMPL *session,
 	TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
 	__wt_unlock(session, conn->mtx);
 
-	return (0);
-
-err:	if (fh != NULL) {
-		__wt_free(session, fh->name);
-		__wt_free(session, fh);
+	if (0) {
+err:		if (fh != NULL) {
+			__wt_free(session, fh->name);
+			__wt_free(session, fh);
+		}
+		if (fd != -1)
+			(void)close(fd);
 	}
-	(void)close(fd);
+
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 

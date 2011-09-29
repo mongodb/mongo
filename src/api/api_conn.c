@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __conn_home(WT_CONNECTION_IMPL *, const char *, const char **);
+
 /*
  * api_err_printf --
  *	Extension API call to print to the error stream.
@@ -386,7 +388,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_RET(__wt_calloc_def(NULL, 1, &conn));
 	conn->iface = stdc;
-	WT_ERR(__wt_strdup(NULL, home, &conn->home));
 
 	session = &conn->default_session;
 	session->iface.connection = &conn->iface;
@@ -415,6 +416,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(
 	   __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
+
+	WT_ERR(__conn_home(conn, home, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
 	conn->cache_size = cval.val;
@@ -478,4 +481,58 @@ err:		if (opened)
 	__wt_buf_free(session, &exconfig);
 
 	return (ret);
+}
+
+/*
+ * __conn_home --
+ *	Set the database home directory.
+ */
+static int
+__conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = &conn->default_session;
+
+	/* If the application specifies a home directory, use it. */
+	if (home != NULL)
+		goto copy;
+
+	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL) {
+		home = ".";
+		goto copy;
+	}
+
+	/*
+	 * Security stuff:
+	 *
+	 * If the "home_environment" configuration string is set, use the
+	 * environment variable for all processes.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "home_environment", &cval));
+	if (cval.val != 0)
+		goto copy;
+
+	/*
+	 * If the "home_environment_priv" configuration string is set, use the
+	 * environment variable if the process has appropriate privileges.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
+	if (cval.val == 0) {
+		__wt_errx(session, "%s",
+		    "WIREDTIGER environment variable set but WiredTiger not "
+		    "configured to use an environment variable");
+		return (WT_ERROR);
+	}
+
+	if (!__wt_has_priv()) {
+		__wt_errx(session, "%s",
+		    "WIREDTIGER environment variable set but process lacks "
+		    "privileges to use the environment variable");
+		return (WT_ERROR);
+	}
+
+copy:	return (__wt_strdup(session, home, &conn->home));
 }
