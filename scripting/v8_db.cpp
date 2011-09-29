@@ -355,7 +355,7 @@ namespace mongo {
 
         if( args[1]->IsArray() ){
 
-            v8::Local<v8::Array> arr = Array::Cast( *args[1] );
+            v8::Local<v8::Array> arr = v8::Array::Cast( *args[1] );
             vector<BSONObj> bos;
             uint32_t len = arr->Length();
 
