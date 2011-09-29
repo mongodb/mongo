@@ -65,7 +65,6 @@
  *
  * In summary, locking > barriers > volatile.
  */
-
 #if defined(_lint)
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
