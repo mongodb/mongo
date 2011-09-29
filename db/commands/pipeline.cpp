@@ -265,7 +265,7 @@ namespace mongo {
 	while(!tempVector.empty()) {
 	    intrusive_ptr<DocumentSource> &pSource = tempVector.front();
 
-#ifdef LATER /* see https://jira.mongodb.org/browse/SERVER-3832 */
+#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
 	    DocumentSourceSort *pSort =
 		dynamic_cast<DocumentSourceSort *>(pSource.get());
 	    if (pSort) {
@@ -336,7 +336,7 @@ namespace mongo {
 	const DocumentSourceSort *pSort = 
 	    dynamic_cast<DocumentSourceSort *>(pSC.get());
 
-#ifdef LATER /* see https://jira.mongodb.org/browse/SERVER-3832 */
+#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
 	if (pSort) {
 	    /* build the sort key */
 	    pSort->sortKeyToBson(pSortBuilder, false);

@@ -99,8 +99,10 @@ namespace mongo {
 	shared_ptr<Cursor> pCursor(
 	    NamespaceDetailsTransient::getCursor(
 		fullName.c_str(), query
-		/* LATER see https://jira.mongodb.org/browse/SERVER-3832 
-		   , sort */));
+#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
+		   , sort
+#endif
+		));
 
 	/* wrap the cursor with a DocumentSource */
 	intrusive_ptr<DocumentSource> pSource(
