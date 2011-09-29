@@ -351,15 +351,19 @@ namespace mongo {
         DBClientBase * conn = getConnection( args );
         GETNS;
 
+        v8::Handle<v8::Object> in = args[1]->ToObject();
+
         if( args[1]->IsArray() ){
 
             v8::Local<v8::Array> arr = Array::Cast( *args[1] );
-
             vector<BSONObj> bos;
             uint32_t len = arr->Length();
+
             for( uint32_t i = 0; i < len; i++ ){
 
                 v8::Local<v8::Object> el = arr->CloneElementAt( i );
+
+                // Set ID on the element if necessary
                 if ( ! el->Has( scope->getV8Str( "_id" ) ) ) {
                     v8::Handle<v8::Value> argv[1];
                     el->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
@@ -374,12 +378,11 @@ namespace mongo {
                 conn->insert( ns , bos );
             }
             catch ( ... ) {
-                return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+                return v8::ThrowException( v8::String::New( "socket error on bulk insert" ) );
             }
+
         }
         else {
-
-            v8::Handle<v8::Object> in = args[1]->ToObject();
 
             if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
                 v8::Handle<v8::Value> argv[1];
@@ -396,6 +399,7 @@ namespace mongo {
             catch ( ... ) {
                 return v8::ThrowException( v8::String::New( "socket error on insert" ) );
             }
+
         }
 
         return v8::Undefined();

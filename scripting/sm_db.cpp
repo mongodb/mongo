@@ -308,7 +308,6 @@ namespace mongo {
         }
 
         DBClientWithCommands * conn = getConnection( cx, obj );
-
         uassert( 10248 ,  "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
@@ -316,7 +315,6 @@ namespace mongo {
         try {
             JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
 
-            log() << "Is array? " << JS_IsArrayObject( cx, insertObj ) << endl;
             if( JS_IsArrayObject( cx, insertObj ) ){
                 vector<BSONObj> bos;
 
@@ -343,7 +341,6 @@ namespace mongo {
 
                 conn->insert( ns , o );
                 return JS_TRUE;
-
             }
         }
         catch ( std::exception& e ) {
