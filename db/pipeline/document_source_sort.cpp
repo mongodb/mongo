@@ -63,18 +63,7 @@ namespace mongo {
 
     void DocumentSourceSort::sourceToBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
-
-	/* add the key fields */
-	const size_t n = vSortKey.size();
-	for(size_t i = 0; i < n; ++i) {
-	    /* create the "field name" */
-	    stringstream ss;
-	    vSortKey[i]->writeFieldPath(ss, false);
-
-	    /* append a named integer based on the sort order */
-	    insides.append(ss.str(), (vSortKey[i] ? 1 : -1));
-	}
-
+	sortKeyToBson(&insides, false);
 	pBuilder->append(sortName, insides.done());
     }
 
@@ -96,6 +85,20 @@ namespace mongo {
 	    ExpressionFieldPath::create(fieldPath));
 	vSortKey.push_back(pE);
 	vAscending.push_back(ascending);
+    }
+
+    void DocumentSourceSort::sortKeyToBson(
+	BSONObjBuilder *pBuilder, bool usePrefix) const {
+	/* add the key fields */
+	const size_t n = vSortKey.size();
+	for(size_t i = 0; i < n; ++i) {
+	    /* create the "field name" */
+	    stringstream ss;
+	    vSortKey[i]->writeFieldPath(ss, usePrefix);
+
+	    /* append a named integer based on the sort order */
+	    pBuilder->append(ss.str(), (vAscending[i] ? 1 : -1));
+	}
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(

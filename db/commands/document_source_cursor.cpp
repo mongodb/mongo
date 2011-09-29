@@ -92,6 +92,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
 	const shared_ptr<Cursor> &pCursor) {
+	assert(pCursor.get());
 	intrusive_ptr<DocumentSourceCursor> pSource(
 	    new DocumentSourceCursor(pCursor));
 	    return pSource;

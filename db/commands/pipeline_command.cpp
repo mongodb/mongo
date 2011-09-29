@@ -79,19 +79,28 @@ namespace mongo {
 	if (!pPipeline.get())
 	    return false;
 
-	/* get a query to use */
+	/* get a query to use, if any */
 	BSONObjBuilder queryBuilder;
-	pPipeline->getMatcherQuery(&queryBuilder);
+	BSONObjBuilder sortBuilder;
+	pPipeline->getCursorMods(&queryBuilder, &sortBuilder);
 	BSONObj query(queryBuilder.done());
+	BSONObj sort(sortBuilder.done());
 
-	/* remove that query from the pipeline */
-	pPipeline->removeMatcherQuery();
-
+	/* for debugging purposes, show what the query and sort are */
+	DEV {
+	    (log() << "\n---- query BSON\n" <<
+	     query.jsonString(Strict, 1) << "\n----\n").flush();
+	    (log() << "\n---- sort BSON\n" <<
+	     sort.jsonString(Strict, 1) << "\n----\n").flush();
+	}
+	
 	/* create a cursor for that query */
 	string fullName(db + "." + pPipeline->getCollectionName());
 	shared_ptr<Cursor> pCursor(
 	    NamespaceDetailsTransient::getCursor(
-		fullName.c_str(), query));
+		fullName.c_str(), query
+		/* LATER see https://jira.mongodb.org/browse/SERVER-3832 
+		   , sort */));
 
 	/* wrap the cursor with a DocumentSource */
 	intrusive_ptr<DocumentSource> pSource(

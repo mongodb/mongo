@@ -37,7 +37,7 @@ namespace mongo {
 
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
 	collectionName(),
-	sourceList(),
+	sourceVector(),
         splitMongodPipeline(DEBUG_BUILD == 1), /* test: always split for DEV */
         pCtx(pTheCtx) {
     }
@@ -63,7 +63,7 @@ namespace mongo {
 	 DocumentSourceLimit::createFromBson},
 	{DocumentSourceMatch::matchName,
 	 DocumentSourceMatch::createFromBson},
-#ifdef LATER
+#ifdef LATER /* https://jira.mongodb.org/browse/SERVER-3253 */
 	{DocumentSourceOut::outName,
 	 DocumentSourceOut::createFromBson},
 #endif
@@ -133,7 +133,7 @@ namespace mongo {
 
           Set up the specified document source pipeline.
         */
-	SourceList *pSourceList = &pPipeline->sourceList; // set up shorthand
+	SourceVector *pSourceVector = &pPipeline->sourceVector; // shorthand
 
         /* iterate over the steps in the pipeline */
         const size_t nSteps = pipeline.size();
@@ -169,11 +169,11 @@ namespace mongo {
                 }
             }
 
-	    pSourceList->push_back(pSource);
+	    pSourceVector->push_back(pSource);
         }
 
 	/* if there aren't any pipeline stages, there's nothing more to do */
-	if (!pSourceList->size())
+	if (!pSourceVector->size())
 	    return pPipeline;
 
 	/*
@@ -181,8 +181,33 @@ namespace mongo {
 
 	  CW TODO -- move filter past projections where possible, and noting
 	  corresponding field renaming.
+	*/
 
-	  Then coalesce adjacent filters where possible.  Two adjacent filters
+	/*
+	  Wherever there is a match immediately following a sort, swap them.
+	  This means we sort fewer items.  Neither changes the documents in
+	  the stream, so this transformation shouldn't affect the result.
+
+	  We do this first, because then when we coalesce operators below,
+	  any adjacent matches will be combined.
+	 */
+	for(size_t srcn = pSourceVector->size(), srci = 1;
+	    srci < srcn; ++srci) {
+	    intrusive_ptr<DocumentSource> &pSource = pSourceVector->at(srci);
+	    if (dynamic_cast<DocumentSourceMatch *>(pSource.get())) {
+		intrusive_ptr<DocumentSource> &pPrevious =
+		    pSourceVector->at(srci - 1);
+		if (dynamic_cast<DocumentSourceSort *>(pPrevious.get())) {
+		    /* swap this item with the previous */
+		    intrusive_ptr<DocumentSource> pTemp(pPrevious);
+		    pPrevious = pSource;
+		    pSource = pTemp;
+		}
+	    }
+	}
+
+	/*
+	  Coalesce adjacent filters where possible.  Two adjacent filters
 	  are equivalent to one filter whose predicate is the conjunction of
 	  the two original filters' predicates.  For now, capture this by
 	  giving any DocumentSource the option to absorb it's successor; this
@@ -192,36 +217,33 @@ namespace mongo {
 	  to coalesce with its successor.  If successful, remove the
 	  successor.
 
-	  Start by moving all document sources to a temporary list.
+	  Move all document sources to a temporary list.
 	*/
-	SourceList tempList;
-	tempList.splice(tempList.begin(), *pSourceList);
+	SourceVector tempVector(*pSourceVector);
+	pSourceVector->clear();
 
 	/* move the first one to the final list */
-	intrusive_ptr<DocumentSource> pLastSource(tempList.front());
-	pSourceList->push_back(pLastSource);
-	tempList.pop_front();
+	pSourceVector->push_back(tempVector[0]);
 
 	/* run through the sources, coalescing them or keeping them */
-	for(SourceList::iterator iter(tempList.begin()),
-		listEnd(tempList.end()); iter != listEnd; ++iter) {
-
+	for(size_t tempn = tempVector.size(), tempi = 1;
+	    tempi < tempn; ++tempi) {
 	    /*
 	      If we can't coalesce the source with the last, then move it
 	      to the final list, and make it the new last.  (If we succeeded,
 	      then we're still on the same last, and there's no need to move
-	      or do anything with the source -- the destruction of tempList
+	      or do anything with the source -- the destruction of tempVector
 	      will take care of the rest.)
 	    */
-	    if (!pLastSource->coalesce(*iter)) {
-		pLastSource = *iter;
-		pSourceList->push_back(pLastSource);
-	    }
+	    intrusive_ptr<DocumentSource> &pLastSource = pSourceVector->back();
+	    intrusive_ptr<DocumentSource> &pTemp = tempVector.at(tempi);
+	    if (!pLastSource->coalesce(pTemp))
+		pSourceVector->push_back(pTemp);
 	}
 
 	/* optimize the elements in the pipeline */
-	for(SourceList::iterator iter(pSourceList->begin()),
-		listEnd(pSourceList->end()); iter != listEnd; ++iter)
+	for(SourceVector::iterator iter(pSourceVector->begin()),
+		listEnd(pSourceVector->end()); iter != listEnd; ++iter)
 	    (*iter)->optimize();
 
 	return pPipeline;
@@ -233,16 +255,17 @@ namespace mongo {
 	pShardPipeline->collectionName = collectionName;
 
 	/* put the source list aside */
-	SourceList tempList;
-	tempList.splice(tempList.begin(), sourceList);
+	SourceVector tempVector(sourceVector);
+	sourceVector.clear();
 
 	/*
 	  Run through the pipeline, looking for points to split it into
 	  shard pipelines, and the rest.
 	 */
-	while(!tempList.empty()) {
-	    intrusive_ptr<DocumentSource> &pSource = tempList.front();
+	while(!tempVector.empty()) {
+	    intrusive_ptr<DocumentSource> &pSource = tempVector.front();
 
+#ifdef LATER /* see https://jira.mongodb.org/browse/SERVER-3832 */
 	    DocumentSourceSort *pSort =
 		dynamic_cast<DocumentSourceSort *>(pSource.get());
 	    if (pSort) {
@@ -250,29 +273,38 @@ namespace mongo {
 		  There's no point in sorting until the result is combined.
 		  Therefore, sorts should be done in mongos, and not in
 		  the shard at all.  Add all the remaining operators to
-		  the shardlist.
+		  the mongos list and quit.
+
+		  TODO:  unless the sort key is the shard key.
+		  TODO:  we could also do a merge sort in mongos in the
+		  future, and split here.
 		*/
-		sourceList.splice(sourceList.end(), tempList);
+		for(size_t tempn = tempVector.size(), tempi = 0;
+		    tempi < tempn; ++tempi)
+		    sourceVector.push_back(tempVector[tempi]);
 		break;
 	    }
+#endif
 
-	    /* hang on to this in advance, because tempList.pop_ will modify */
+	    /* hang on to this in advance, in case it is a group */
 	    DocumentSourceGroup *pGroup =
 		dynamic_cast<DocumentSourceGroup *>(pSource.get());
 
-	    /* move the source from the tempList to the shard sourceList */
-	    pShardPipeline->sourceList.push_back(pSource);
-	    tempList.pop_front();
+	    /* move the source from the tempVector to the shard sourceVector */
+	    pShardPipeline->sourceVector.push_back(pSource);
+	    tempVector.erase(tempVector.begin());
 
 	    /*
 	      If we found a group, that's a split point.
 	     */
 	    if (pGroup) {
 		/* start this pipeline with the group merger */
-		sourceList.push_back(pGroup->createMerger());
+		sourceVector.push_back(pGroup->createMerger());
 
-		/* and then add everything that remains */
-		sourceList.splice(sourceList.end(), tempList);
+		/* and then add everything that remains and quit */
+		for(size_t tempn = tempVector.size(), tempi = 0;
+		    tempi < tempn; ++tempi)
+		    sourceVector.push_back(tempVector[tempi]);
 		break;
 	    }
 	}
@@ -280,27 +312,46 @@ namespace mongo {
 	return pShardPipeline;
     }
 
-    void Pipeline::getMatcherQuery(BSONObjBuilder *pQueryBuilder) const {
-	const intrusive_ptr<DocumentSource> &pFirst = sourceList.front();
-	intrusive_ptr<DocumentSourceMatch> pMatch(
-	    dynamic_pointer_cast<DocumentSourceMatch>(pFirst));
-	if (!pMatch.get())
+    void Pipeline::getCursorMods(BSONObjBuilder *pQueryBuilder,
+	BSONObjBuilder *pSortBuilder) {
+	/* look for an initial $match */
+	if (!sourceVector.size())
 	    return;
+	const intrusive_ptr<DocumentSource> &pMC = sourceVector.front();
+	const DocumentSourceMatch *pMatch =
+	    dynamic_cast<DocumentSourceMatch *>(pMC.get());
 
-	pMatch->toMatcherBson(pQueryBuilder);
-    }
+	if (pMatch) {
+	    /* build the query */
+	    pMatch->toMatcherBson(pQueryBuilder);
 
-    void Pipeline::removeMatcherQuery() {
-	const intrusive_ptr<DocumentSource> &pFirst = sourceList.front();
-	if (dynamic_cast<DocumentSourceMatch *>(pFirst.get()))
-	    sourceList.pop_front();
+	    /* remove the match from the pipeline */
+	    sourceVector.erase(sourceVector.begin());
+	}
+
+	/* look for an initial $sort */
+	if (!sourceVector.size())
+	    return;
+	const intrusive_ptr<DocumentSource> &pSC = sourceVector.front();
+	const DocumentSourceSort *pSort = 
+	    dynamic_cast<DocumentSourceSort *>(pSC.get());
+
+#ifdef LATER /* see https://jira.mongodb.org/browse/SERVER-3832 */
+	if (pSort) {
+	    /* build the sort key */
+	    pSort->sortKeyToBson(pSortBuilder, false);
+
+	    /* remove the sort from the pipeline */
+	    sourceVector.erase(sourceVector.begin());
+	}
+#endif
     }
 
     void Pipeline::toBson(BSONObjBuilder *pBuilder) const {
 	/* create an array out of the pipeline operations */
 	BSONArrayBuilder arrayBuilder;
-	for(SourceList::const_iterator iter(sourceList.begin()),
-		listEnd(sourceList.end()); iter != listEnd; ++iter) {
+	for(SourceVector::const_iterator iter(sourceVector.begin()),
+		listEnd(sourceVector.end()); iter != listEnd; ++iter) {
 	    intrusive_ptr<DocumentSource> pSource(*iter);
 	    pSource->addToBsonArray(&arrayBuilder);
 	}
@@ -321,8 +372,8 @@ namespace mongo {
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
 		       intrusive_ptr<DocumentSource> pSource) {
 	/* chain together the sources we found */
-	for(SourceList::iterator iter(sourceList.begin()),
-		listEnd(sourceList.end()); iter != listEnd; ++iter) {
+	for(SourceVector::iterator iter(sourceVector.begin()),
+		listEnd(sourceVector.end()); iter != listEnd; ++iter) {
 	    intrusive_ptr<DocumentSource> pTemp(*iter);
 	    pTemp->setSource(pSource);
 	    pSource = pTemp;

@@ -645,6 +645,11 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
+	/*
+	  TODO
+	  Adjacent sorts should reduce to the last sort.
+	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+	*/
 
         /*
           Create a new sorting DocumentSource.
@@ -666,6 +671,14 @@ namespace mongo {
 	    otherwise, use it for descending
 	*/
 	void addKey(const string &fieldPath, bool ascending);
+
+	/*
+	  Write out an object whose contents are the sort key.
+
+	  @param pBuilder initialized object builder.
+	  @param fieldPrefix specify whether or not to include the field prefix
+	 */
+	void sortKeyToBson(BSONObjBuilder *pBuilder, bool usePrefix) const;
 
 	/*
 	  Create a sorting DocumentSource from BSON.

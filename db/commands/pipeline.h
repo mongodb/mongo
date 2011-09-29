@@ -70,25 +70,38 @@ namespace mongo {
 	boost::shared_ptr<Pipeline> splitForSharded();
 
 	/*
+	  Get Cursor creation modifiers.
+
+	  If we have a $match or a $sort at the beginning of the pipeline,
+	  these can be extracted and used to modify the cursor we'll use for
+	  the initial collection scan.
+
 	  If there is a Matcher query at the beginning of the pipeline,
 	  get it, by adding its terms to the object under construction.  If
 	  not, this adds nothing to the object under construction.
 
+	  If there is a sort at the beginning of the pipeline, get it, by
+	  adding its terms to the object under construction.  If not, this adds
+	  nothing.
+
+	  Optimization steps in parseCommand make sure that for any pairs
+	  of adjacent matches and sorts, the match comes first.  This ensures
+	  that we sort a minimum of items, and doesn't change the result.
+	  When getCursorMods() examines the pipeline, it looks for an initial
+	  $match.  If present, that is put into pQueryBuilder.  If there is
+	  a query, then the next stage is checked for a $sort, which will go
+	  into pSortBuilder.  If there is no initial $match, then a check is
+	  made for an initial $sort, which will then still be put into
+	  pSortBuilder.
+
+	  As a side-effect, retrieving the Cursor modifications removes them
+	  from the pipeline.
+
 	  @param pQueryBuilder an initialized object builder
+	  @param pSortBuilder an initialized object builder
 	 */
-	void getMatcherQuery(BSONObjBuilder *pQueryBuilder) const;
-
-	/*
-	  If there is a matcher query at the beginning of the pipeline,
-	  remove it from the pipeline.
-
-	  This is used after we use the query optimizer to create a Cursor
-	  that already captures the Matcher query predicate, so we don't need
-	  to evaluate that predicate in the pipeline again.
-
-	  If there is no Matcher query, does nothing.
-	 */
-	void removeMatcherQuery();
+	void getCursorMods(BSONObjBuilder *pQueryBuilder,
+			   BSONObjBuilder *pSortBuilder);
 
 	/*
 	  Write the Pipeline as a BSONObj command.  This should be the
@@ -140,8 +153,8 @@ namespace mongo {
         Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
 
 	string collectionName;
-	typedef list<intrusive_ptr<DocumentSource> > SourceList;
-	SourceList sourceList;
+	typedef vector<intrusive_ptr<DocumentSource> > SourceVector;
+	SourceVector sourceVector;
 
 	bool splitMongodPipeline;
 	intrusive_ptr<ExpressionContext> pCtx;

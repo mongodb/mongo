@@ -1359,7 +1359,7 @@ namespace mongo {
 	      If the system isn't running sharded, or the target collection
 	      isn't sharded, pass this on to a mongod.
 	    */
-	    DBConfigPtr conf = grid.getDBConfig(dbName , false);
+	    DBConfigPtr conf(grid.getDBConfig(dbName , false));
 	    if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
 		return passthrough(conf, cmdObj, result);
 
@@ -1373,8 +1373,11 @@ namespace mongo {
 	    BSONObj shardedCommand(commandBuilder.done());
 
 	    BSONObjBuilder shardQueryBuilder;
-	    pShardPipeline->getMatcherQuery(&shardQueryBuilder);
+	    BSONObjBuilder shardSortBuilder;
+	    pShardPipeline->getCursorMods(
+		&shardQueryBuilder, &shardSortBuilder);
 	    BSONObj shardQuery(shardQueryBuilder.done());
+	    BSONObj shardSort(shardSortBuilder.done());
 
 	    ChunkManagerPtr cm(conf->getChunkManager(fullns));
 	    set<Shard> shards;
