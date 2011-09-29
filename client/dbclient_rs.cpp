@@ -247,23 +247,27 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        LOG(2) << "selecting a slave from replica set " << getServerAddress() << endl;
+        LOG(2) << "dbclient_rs getSlave " << getServerAddress() << endl;
 
         scoped_lock lk( _lock );
 
         for ( unsigned ii = 0; ii < _nodes.size(); ii++ ) {
             _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-            if ( _nextSlave == _master ) {
-                LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is the current master" << endl;
-                continue;
+            if ( _nextSlave != _master ) {
+                if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
+                    return _nodes[ _nextSlave ].addr;
+                LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
             }
-            if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
-                return _nodes[ _nextSlave ].addr;
-            LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is not ok to use" << endl;
-        }                
-        
-        LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ] << endl;
+        }
 
+        if( _master >= 0 ) { 
+            assert( static_cast<unsigned>(_master) < _nodes.size() );
+            LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
+            return _nodes[_master].addr;
+        }
+        
+        LOG(2) << "dbclient_rs getSlave no suitable member found, returning first node " << _nodes[ 0 ] << endl;
+        assert( _nodes.size() > 0 );
         return _nodes[0].addr;
     }
 
