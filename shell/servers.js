@@ -763,8 +763,8 @@ ShardingTest.prototype.isSharded = function( collName ){
 
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     
-    split = split || key;
-    move = move || split;
+    split = ( split != false ? ( split || key ) : split )
+    move = ( split != false && move != false ? ( move || split ) : false )
     
     if( collName.getDB )
         dbName = "" + collName.getDB()
@@ -785,12 +785,16 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
         assert( false )
     }
     
+    if( split == false ) return
+    
     result = this.s.adminCommand( { split : c , middle : split } );
     if( ! result.ok ){
         printjson( result )
         assert( false )
     }
         
+    if( move == false ) return
+    
     var result = null
     for( var i = 0; i < 5; i++ ){
         result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
