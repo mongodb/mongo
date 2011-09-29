@@ -16,5 +16,5 @@ for ( i = 0; i < 1000; i++ ) {
             { loc : { $within : { $center : [ [ Random.rand() * 180, Random.rand() * 180 ], Random.rand() * 50 ] } } },
             { $set : { v : big } }, false, true )
     db.getLastError();
-    print( i );
+    if( i % 10 == 0 ) print( i );
 }

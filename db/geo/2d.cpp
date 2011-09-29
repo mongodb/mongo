@@ -935,7 +935,7 @@ namespace mongo {
                 cursor->advance();
             }
 
-            if( ! count ) LOG( CDEBUG ) << "No key found for " << _key << endl;
+            if( ! count ) { LOG( CDEBUG ) << "No key found for " << _key << endl; }
 
             _dirty = false;
 
