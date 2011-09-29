@@ -326,6 +326,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
+            Client::GodScope _;
             if (_config.incLong != _config.tempLong) {
                 // create the inc collection and make sure we have index on "0" key
                 _db.dropCollection( _config.incLong );
@@ -426,18 +427,33 @@ namespace mongo {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
-            if (_config.outNonAtomic)
-                return postProcessCollectionNonAtomic(op, pm);
-            writelock lock;
-            return postProcessCollectionNonAtomic(op, pm);
+            // Do following reads before writelock below so db.count's Context::_auth won't think we are trying to write when only trying to read. Needed when user has read-only permission. We allow read-only users to output only to new collections (or return inline).
+            bool newOutColl = !_db.exists( _config.finalLong );
+            long long tempLongCount = _db.count( _config.tempLong );
+
+            if (_config.outNonAtomic) {
+                postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
+            } else {
+                writelock lock;
+                postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
+            }
+            return _db.count( _config.finalLong );
         }
 
-        long long State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm) {
+        void State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm, bool newOutColl, long long tempLongCount) {
 
             if ( _config.finalLong == _config.tempLong )
-                return _db.count( _config.finalLong );
+                return;
 
-            if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
+            if ( newOutColl ) {
+                Client::GodScope _; // OK to output to new collection even if don't have write permission
+                writelock lock;
+                BSONObj info;
+                if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
+                    uasserted( 15897 , str::stream() << "rename failed: " << info );
+                }
+            }
+            else if ( _config.outType == Config::REPLACE ) {
                 writelock lock;
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
@@ -446,11 +462,11 @@ namespace mongo {
                     uasserted( 10076 ,  str::stream() << "rename failed: " << info );
                 }
                          
-                _db.dropCollection( _config.tempLong );
+                //_db.dropCollection( _config.tempLong );  why drop after rename? -tony
             }
             else if ( _config.outType == Config::MERGE ) {
                 // merge: upsert new docs into old collection
-                op->setMessage( "m/r: merge post processing" , _db.count( _config.tempLong, BSONObj() ) );
+                op->setMessage( "m/r: merge post processing" , tempLongCount );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
@@ -466,7 +482,7 @@ namespace mongo {
                 // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
-                op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
+                op->setMessage( "m/r: reduce post processing" , tempLongCount );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
@@ -495,8 +511,6 @@ namespace mongo {
                 _db.dropCollection( _config.tempLong );
                 pm.finished();
             }
-
-            return _db.count( _config.finalLong );
         }
 
         /**
@@ -515,6 +529,7 @@ namespace mongo {
          * Insert doc into the inc collection, taking proper lock
          */
         void State::insertToInc( BSONObj& o ) {
+            Client::GodScope _;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
             _insertToInc(o);
@@ -655,6 +670,7 @@ namespace mongo {
          */
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
 
+            Client::GodScope _;
             if (_jsMode) {
                 // apply the reduce within JS
                 if (_onDisk) {
@@ -788,6 +804,7 @@ namespace mongo {
                 return;
             }
 
+            Client::GodScope _;
             auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             _dupCount = 0;
@@ -828,6 +845,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
+            Client::GodScope _;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
 
@@ -864,6 +882,7 @@ namespace mongo {
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
+            Client::GodScope _;
             if (_jsMode) {
                 // try to reduce if it is beneficial
                 int dupCt = _scope->getNumberInt("_dupCt");
@@ -951,7 +970,6 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
-                Client::GodScope cg;
                 Client& client = cc();
                 CurOp * op = client.curop();
 
