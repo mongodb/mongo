@@ -499,6 +499,12 @@ Array.stdDev = function( arr ){
     return Math.sqrt( sum / arr.length );
 }
 
+if( typeof Array.isArray != "function" ){
+    Array.isArray = function( arr ){
+        return arr.constructor == Array
+    }
+}
+
 //these two are helpers for Array.sort(func)
 compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); }
 
