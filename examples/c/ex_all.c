@@ -91,6 +91,8 @@ session_ops(WT_SESSION *session)
 
 	ret = session->drop(session, "table:mytable", NULL);
 
+	ret = session->sync(session, "table:mytable", NULL);
+
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
 
 	ret = session->verify(session, "table:mytable", NULL);
