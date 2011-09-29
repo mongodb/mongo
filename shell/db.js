@@ -400,7 +400,8 @@ DB.prototype._getExtraInfo = function(action) {
     if (res) {
         if (res.err != undefined && res.err != null) {
             // error occured, display it
-            return res.err;
+            print(res.err);
+            return;
         }
 
         var info = action + " ";  
@@ -410,7 +411,7 @@ DB.prototype._getExtraInfo = function(action) {
         info += " record(s)";  
         var time = new Date().getTime() - this.startTime;  
         info += " in " + time + "ms";
-        return info;  
+        print(info);
     }
 } 
 
