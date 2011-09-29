@@ -267,7 +267,18 @@ namespace mongo {
 
     // --- engine ---
 
+//    void fatalHandler(const char* s1, const char* s2) {
+//        cout << "Fatal handler " << s1 << " " << s2;
+//    }
+
     V8ScriptEngine::V8ScriptEngine() {
+        int K = 1024;
+        v8::ResourceConstraints rc;
+        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size(64 * K * K);
+        v8::SetResourceConstraints(&rc);
+        v8::V8::IgnoreOutOfMemoryException();
+//        v8::V8::SetFatalErrorHandler(fatalHandler);
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -385,6 +396,12 @@ namespace mongo {
         lzArrayTemplate.Dispose();
         roObjectTemplate.Dispose();
         internalFieldObjects.Dispose();
+    }
+
+    bool V8Scope::hasOutOfMemoryException() {
+        if (!_context.IsEmpty())
+            return _context->HasOutOfMemoryException();
+        return false;
     }
 
     /**

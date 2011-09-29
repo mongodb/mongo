@@ -93,6 +93,7 @@ namespace mongo {
             throw UserException( 9004 , (string)"invoke failed: " + getError() );
         }
         virtual string getError() = 0;
+        virtual bool hasOutOfMemoryException() = 0;
 
         int invoke( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 );
         void invokeSafe( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 ) {

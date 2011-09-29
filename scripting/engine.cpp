@@ -284,8 +284,7 @@ namespace mongo {
         void done( const string& pool , Scope * s ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
-            string err = s->getError();
-            bool oom = (err.find("out of memory") != string::npos);
+            bool oom = s->hasOutOfMemoryException();
 
             // do not keep too many contexts, or use them for too long
             if ( l.size() > 10 || s->getTimeUsed() > 100 || oom ) {
@@ -434,6 +433,10 @@ namespace mongo {
 
         string getError() {
             return _real->getError();
+        }
+
+        bool hasOutOfMemoryException() {
+            return _real->hasOutOfMemoryException();
         }
 
         bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) {
