@@ -114,12 +114,18 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *tconfig,
+    const char *name, const char *fileuri, const char *tconfig,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE_SESSION *btree_session;
-	const char *treeconf;
+	const char *filename, *treeconf;
 	int ret;
+
+	filename = fileuri;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
+		__wt_errx(session, "Expected a 'file:' URI: %s", fileuri);
+		return (EINVAL);
+	}
 
 	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), cfg, flags, &btree_session)) == 0) {
@@ -134,8 +140,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		if (tconfig != NULL)
 			WT_RET(__wt_strdup(session, tconfig, &treeconf));
 		else
-			WT_RET(
-			    __wt_schema_table_read(session, name, &treeconf));
+			WT_RET(__wt_schema_table_read(session,
+			    fileuri, &treeconf));
 		WT_RET(__wt_btree_open(
 		    session, name, filename, treeconf, cfg, flags));
 		WT_RET(__wt_session_lock_btree(

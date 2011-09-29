@@ -305,10 +305,9 @@ err:		__wt_free(session, cbt);
  */
 int
 __wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *name, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
-	const char *filename;
 	uint32_t open_flags;
 
 	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
@@ -319,13 +318,12 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 
 	/* TODO: handle projections. */
 
-	filename = name;
-	if (WT_PREFIX_MATCH(name, "colgroup:"))
+	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		WT_RET(__wt_schema_get_btree(session,
-		    name, strlen(name), NULL, open_flags));
-	else if (WT_PREFIX_SKIP(filename, "file:"))
+		    uri, strlen(uri), NULL, open_flags));
+	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree(session,
-		     name, filename, NULL, NULL, open_flags));
+		     uri, uri, NULL, NULL, open_flags));
 	else
 		return (EINVAL);
 

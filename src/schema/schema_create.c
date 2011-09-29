@@ -9,15 +9,21 @@
 
 static int
 __create_file(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config)
+    const char *name, const char *fileuri, const char *config)
 {
 	WT_BUF keybuf;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
-	const char *treeconf;
+	const char *filename, *treeconf;
 	int is_schema, ret;
 
 	WT_CLEAR(keybuf);
+
+	filename = fileuri;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
+		__wt_errx(session, "Expecting a 'file:' URI: %s", fileuri);
+		return (EINVAL);
+	}
 
 	/*
 	 * Opening the schema table is a special case, use the config
@@ -26,7 +32,7 @@ __create_file(WT_SESSION_IMPL *session,
 	is_schema = (strcmp(filename, WT_SCHEMA_FILENAME) == 0);
 
 	/* If the file exists, don't try to recreate it. */
-	if ((ret = __wt_session_get_btree(session, name, filename,
+	if ((ret = __wt_session_get_btree(session, name, fileuri,
 	    is_schema ? config : NULL,
 	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
 		return (ret);
@@ -56,18 +62,20 @@ static int
 __create_colgroup(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	WT_BUF fmt, namebuf;
+	WT_BUF fmt, namebuf, uribuf;
 	WT_CONFIG_ITEM cval;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_colgroup_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
-	const char *cgconf, *cgname, *fileconf, *filename, *tablename;
+	const char **cfgp;
+	const char *cgconf, *cgname, *fileconf, *filename, *fileuri, *tablename;
 	size_t tlen;
 	int ret;
 
 	cgconf = fileconf = NULL;
 	WT_CLEAR(fmt);
 	WT_CLEAR(namebuf);
+	WT_CLEAR(uribuf);
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
@@ -96,20 +104,24 @@ __create_colgroup(
 		return (EINVAL);
 	}
 
+	/* Find the first NULL entry in the cfg stack. */
+	for (cfgp = &cfg[1]; *cfgp; cfgp++)
+		;
+
 	/* Add the filename to the colgroup config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_RET(__wt_buf_sprintf(session, &namebuf,
+		WT_ERR(__wt_buf_sprintf(session, &namebuf,
 		    "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
-	} else if (cgname == NULL) {
-		WT_ERR(__wt_buf_sprintf(session, &namebuf,
-		    "filename=%.*s.wt", (int)tlen, tablename));
-		cfg[2] = filename = namebuf.data;
-		(void)WT_PREFIX_SKIP(filename, "filename=");
 	} else {
-		WT_ERR(__wt_buf_sprintf(session, &namebuf,
-		    "filename=%.*s_%s.wt", (int)tlen, tablename, cgname));
-		cfg[2] = filename = namebuf.data;
+		if (cgname == NULL)
+			WT_ERR(__wt_buf_sprintf(session, &namebuf,
+			    "filename=%.*s.wt", (int)tlen, tablename));
+		else
+			WT_ERR(__wt_buf_sprintf(session, &namebuf,
+			    "filename=%.*s_%s.wt", (int)tlen, tablename,
+			    cgname));
+		*cfgp++ = filename = namebuf.data;
 		(void)WT_PREFIX_SKIP(filename, "filename=");
 	}
 
@@ -135,7 +147,10 @@ __create_colgroup(
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__create_file(session, name, filename, fileconf));
+	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%s", filename));
+	fileuri = uribuf.data;
+
+	WT_ERR(__create_file(session, name, fileuri, fileconf));
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
@@ -302,14 +317,10 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	const char *fullname;
-
-	fullname = name;
-
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
-	else if (WT_PREFIX_SKIP(name, "file:"))
-		return (__create_file(session, fullname, name, config));
+	else if (WT_PREFIX_MATCH(name, "file:"))
+		return (__create_file(session, name, name, config));
 	else if (WT_PREFIX_MATCH(name, "index:"))
 		return (__create_index(session, name, config));
 	else if (WT_PREFIX_MATCH(name, "table:"))

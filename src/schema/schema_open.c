@@ -52,7 +52,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	WT_BUF uribuf;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
-	const char *filename, *name, *objconf, *uri;
+	const char *fileuri, *name, *objconf;
 	int ret;
 
 	cursor = NULL;
@@ -72,8 +72,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_init(session, &uribuf, 0));
 	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
 	    (int)cval.len, cval.str));
-	filename = uri = uribuf.data;
-	(void)WT_PREFIX_SKIP(filename, "file:");
+	fileuri = uribuf.data;
 
 	/* !!! Close the schema cursor first, this overwrites session->btree. */
 	ret = cursor->close(cursor, NULL);
@@ -81,10 +80,10 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, uri, filename, NULL, cfg, flags);
+	ret = __wt_session_get_btree(session, name, fileuri, NULL, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
-		    "%s created but '%s' is missing", objname, uri);
+		    "%s created but '%s' is missing", objname, fileuri);
 
 err:	__wt_buf_free(session, &uribuf);
 	if (name != objname)
@@ -167,7 +166,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_BUF cols, fmt, plan, uribuf;
 	WT_CONFIG colconf;
 	WT_CONFIG_ITEM ckey, cval, icols;
-	const char *filename, *fileuri;
+	const char *fileuri;
 	u_int cursor_key_cols;
 	int i, ret;
 
@@ -179,10 +178,9 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_ERR(__wt_buf_init(session, &uribuf, 0));
 	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
 	    (int)cval.len, cval.str));
-	filename = fileuri = uribuf.data;
-	(void)WT_PREFIX_SKIP(filename, "file:");
+	fileuri = uribuf.data;
 
-	ret = __wt_session_get_btree(session, fileuri, filename,
+	ret = __wt_session_get_btree(session, uri, fileuri,
 	    NULL, NULL, WT_BTREE_NO_LOCK);
 	if (ret == ENOENT)
 		__wt_errx(session, "Index '%s' created but '%s' is missing",

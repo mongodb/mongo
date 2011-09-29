@@ -338,7 +338,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_STATS *stats_first, *stats_last;
 	void (*clear_func)(WT_STATS *);
-	const char *filename;
 	int raw, ret;
 
 	btree = NULL;
@@ -347,10 +346,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
-	filename = uri;
-	if (WT_PREFIX_SKIP(filename, "file:")) {
+	if (WT_PREFIX_MATCH(uri, "file:")) {
 		WT_ERR(__wt_session_get_btree(session,
-		    uri, filename, NULL, NULL, 0));
+		    uri, uri, NULL, NULL, 0));
 		btree = session->btree;
 		WT_RET(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
