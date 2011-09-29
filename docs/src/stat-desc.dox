@@ -1,9 +1,13 @@
 /*! @page stat_desc Statistics Description
 
-WiredTiger includes a variety of statistics at both the database level
-and on a per-file basis.
+WiredTiger includes a variety of statistics at the database level and
+on a per-file basis.
 
-The following statistics are available for the database.
+Statistics may not be portable across WiredTiger releases, that is, the
+statistic's names and meanings may change without notice between
+releases.
+
+The following statistics are available for the database in this release:
 
 \internal connection statistics section: BEGIN \endinternal
 
@@ -32,7 +36,8 @@ The following statistics are available for the database.
 
 \internal connection statistics section: END \endinternal
 
-The following statistics are available for individual, underlying files.
+The following statistics are available for individual, underlying files
+in this release:
 
 \internal file statistics section: BEGIN \endinternal
 
