@@ -85,7 +85,7 @@ namespace mongo {
                 Date_t pingTime;
 
                 try {
-                    ScopedDbConnection conn( addr );
+                    ScopedDbConnection conn( addr, 30.0 );
 
                     pingTime = jsTime();
 
