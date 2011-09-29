@@ -114,11 +114,6 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Evaluate javascript at the server.\n" "http://www.mongodb.org/display/DOCS/Server-side+Code+Execution";
         }
-        // We need at least read only access to run db.eval - auth for eval'd writes will be checked
-        // as they are requested.
-        virtual bool requiresAuth() {
-            return false;
-        }
         virtual LockType locktype() const { return NONE; }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

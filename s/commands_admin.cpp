@@ -946,9 +946,6 @@ namespace mongo {
                 return true;
             }
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() {
-                return false;
-            }
             virtual void help( stringstream &help ) const {
                 help << "{whatsmyuri:1}";
             }
@@ -962,7 +959,6 @@ namespace mongo {
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1010,7 +1006,6 @@ namespace mongo {
         CmdShardingResetError() : Command( "resetError" , false , "reseterror" ) {}
 
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool slaveOk() const {
             return true;
         }

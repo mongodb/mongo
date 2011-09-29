@@ -77,7 +77,6 @@ namespace mongo {
     class CmdResetError : public Command {
     public:
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -238,7 +237,6 @@ namespace mongo {
     class CmdGetPrevError : public Command {
     public:
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -1560,9 +1558,6 @@ namespace mongo {
             return true;
         }
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() {
-            return false;
-        }
         virtual void help( stringstream &help ) const {
             help << "{whatsmyuri:1}";
         }
