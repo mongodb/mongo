@@ -422,7 +422,7 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
-                // Sharding interacts with indexing in at least two ways:
+                // Sharding interacts with indexing in at least three ways:
                 //
                 // 1. A unique index must have the sharding key as its prefix. Otherwise maintaining uniqueness would
                 // require coordinated access to all shards. Trying to shard a collection with such an index is not
@@ -433,6 +433,8 @@ namespace mongo {
                 // be slow. Requiring the index upfront allows the admin to plan before sharding and perhaps use
                 // background index construction. One exception to the rule: empty collections. It's fairly easy to
                 // create the index as part of the sharding process.
+                //
+                // 3. If unique : true is specified, we require that the sharding index be unique or created as unique.
                 //
                 // We enforce both these conditions in what comes next.
 
@@ -474,13 +476,14 @@ namespace mongo {
                         if ( proposedKey.isPrefixOf( idx["key"].embeddedObjectUserCheck() ) )
                             continue;
 
-                        errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
+                        errmsg = str::stream() << "can't shard collection '" << ns << "' with unique index on: " + idx.toString()
+                                               << ", uniqueness can't be maintained across unless shard key index is a prefix";
                         conn.done();
                         return false;
                     }
-                    
+
                     if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
-                        errmsg = (string)"can't shard collection " + ns + ", index not unique";
+                        errmsg = (string)"can't shard collection " + ns + ", shard key index not unique and unique index explicitly specified";
                         conn.done();
                         return false;
                     }
