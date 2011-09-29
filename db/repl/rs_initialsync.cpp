@@ -210,8 +210,6 @@ namespace mongo {
 
         sethbmsg("initial sync query minValid",0);
 
-        isyncassert( "initial sync source must remain readable throughout our initial sync", source->state().readable() );
-
         /* our cloned copy will be strange until we apply oplog events that occurred
            through the process.  we note that time point here. */
         BSONObj minValid = r.getLastOp(rsoplog);
