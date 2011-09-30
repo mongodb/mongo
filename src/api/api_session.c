@@ -490,13 +490,13 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->event_handler = session->event_handler;
 	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
 
-	/* Make the entry visible to the workQ. */
-	conn->sessions[conn->session_cnt++] = session_ret;
-
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
 	if (event_handler != NULL)
 		session_ret->event_handler = event_handler;
+
+	/* Make the entry visible to the workQ. */
+	WT_PUBLISH(conn->sessions[conn->session_cnt++], session_ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*sessionp = session_ret;
