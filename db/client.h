@@ -105,6 +105,7 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         string toString() const;
         void gotHandshake( const BSONObj& o );
+        bool hasRemote() const { return _mp; }
         HostAndPort getRemote() const { assert( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }

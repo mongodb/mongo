@@ -41,6 +41,8 @@ namespace mongo {
         /** client disconnected */
         void disconnect();
 
+        bool hasRemote() const { return true; }
+
         /**
          * @return remote socket address of the client
          */
