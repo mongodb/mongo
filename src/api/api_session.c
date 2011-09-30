@@ -65,7 +65,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	conn->sessions[conn->session_cnt] = NULL;
 
 	/* Make the session array entry available for re-use. */
-	WT_SET_MB(session->iface.connection, NULL);
+	session->iface.connection = NULL;
 
 	session = &conn->default_session;
 	__wt_unlock(session, conn->mtx);
@@ -426,7 +426,7 @@ __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 
 /*
  * __wt_open_session --
- *	Allocate a session handle.
+ *	Allocate a session handle.  Must be called holding conn->mtx.
  */
 int
 __wt_open_session(WT_CONNECTION_IMPL *conn,
@@ -497,7 +497,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
 
 	/* Make the entry visible to the workQ. */
-	WT_SET_MB(conn->sessions[conn->session_cnt++], session_ret);
+	conn->sessions[conn->session_cnt++] = session_ret;
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);

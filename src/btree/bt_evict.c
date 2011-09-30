@@ -66,7 +66,7 @@ __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 
 	WT_CLEAR(*r);
 	r->close_method = close_method;
-	WT_SET_MB(r->session, session);
+	r->session = session;
 }
 
 /*
@@ -77,7 +77,7 @@ static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	__wt_free(session, r->retry);
-	WT_SET_MB(r->session, NULL);
+	r->session = NULL;
 }
 
 /*

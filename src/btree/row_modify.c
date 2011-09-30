@@ -302,11 +302,11 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * Insert the new WT_UPDATE item into the linked list and flush memory
-	 * to ensure the list is never broken.
+	 * Insert the new WT_UPDATE item into the linked list and use a write
+	 * barrier to ensure the list never appears broken.
 	 */
 	upd->next = *upd_entry;
-	WT_SET_MB(*upd_entry, upd);
+	WT_PUBLISH(*upd_entry, upd);
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }

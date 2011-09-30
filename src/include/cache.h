@@ -19,7 +19,7 @@ struct __wt_evict_list {
  *	Encapsulation of a eviction request.
  */
 struct __wt_evict_req {
-	WT_SESSION_IMPL *session;		/* Requesting thread */
+	WT_SESSION_IMPL *volatile session;	/* Requesting thread */
 	WT_BTREE *btree;			/* Btree */
 
 	WT_PAGE **retry;			/* Pages to retry */
@@ -36,7 +36,7 @@ struct __wt_evict_req {
  *	Encapsulation of a read request.
  */
 struct __wt_read_req {
-	WT_SESSION_IMPL *session;			/* Requesting thread */
+	WT_SESSION_IMPL *volatile session;	/* Requesting thread */
 	WT_PAGE *parent;			/* Parent */
 	WT_REF  *ref;				/* Reference/Address */
 	int	 dsk_verify;			/* Verify the disk image */

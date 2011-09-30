@@ -317,8 +317,6 @@ __btree_last(WT_SESSION_IMPL *session)
 	if (!F_ISSET(page, WT_PAGE_PINNED)) {
 		F_SET(page, WT_PAGE_PINNED);
 
-		WT_WRITE_BARRIER();		/* flush pin before release */
-
 		__wt_hazard_clear(session, page);
 	}
 	return (0);
@@ -402,8 +400,6 @@ __btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 		WT_RET(__wt_page_in(session, NULL,
 		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
-
-		WT_WRITE_BARRIER();		/* flush pin before release */
 
 		__wt_hazard_clear(session, btree->root_page.page);
 	}

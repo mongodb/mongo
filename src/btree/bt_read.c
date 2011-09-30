@@ -25,7 +25,7 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 	rr->parent = parent;
 	rr->ref = ref;
 	rr->dsk_verify = dsk_verify;
-	WT_SET_MB(rr->session, session);
+	WT_PUBLISH(rr->session, session);
 }
 
 /*
@@ -35,7 +35,7 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 static inline void
 __cache_read_req_clr(WT_READ_REQ *rr)
 {
-	WT_SET_MB(rr->session, NULL);
+	rr->session = NULL;
 }
 
 /*

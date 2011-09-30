@@ -62,12 +62,11 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * The first memory flush ensures all supporting information is written
+	 * Use a memory barrier to ensures all supporting information is written
 	 * before the wq_state field (which makes the entry visible to the workQ
-	 * thread).  No second memory flush is required, the wq_state field is
-	 * declared volatile.
+	 * thread).
 	 */
-	WT_SET_MB(session->wq_state, op);
+	WT_PUBLISH(session->wq_state, op);
 
 	/*
 	 * Callers can spin on the session state (implying the call is quickly
@@ -75,24 +74,16 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 * when the operation has completed.
 	 */
 	if (op == WT_WORKQ_FUNC) {
-		/*
-		 * !!!
-		 * Don't do arithmetic comparisons (even equality) on enum's,
-		 * it makes some compilers/lint tools angry.
-		 */
-		for (done = 0; !done;) {
-			switch (session->wq_state) {
-			case WT_WORKQ_NONE:
-				done = 1;
+		for (;;) {
+			/*
+			 * Make sure all reads after the state change see final
+			 * values (particularly wq_ret).
+			 */
+			WT_ORDERED_READ(done,
+			    session->wq_state == WT_WORKQ_NONE);
+			if (done)
 				break;
-			case WT_WORKQ_FUNC:
-			case WT_WORKQ_EVICT:
-			case WT_WORKQ_EVICT_SCHED:
-			case WT_WORKQ_READ:
-			case WT_WORKQ_READ_SCHED:
-				__wt_yield();
-				break;
-			}
+			__wt_yield();
 		}
 	} else
 		__wt_lock(session, session->mtx);
@@ -121,7 +112,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * The return value isn't volatile, so requires an explicit flush.
 	 */
 	session->wq_ret = ret;
-	WT_SET_MB(session->wq_state, WT_WORKQ_NONE);
+	WT_PUBLISH(session->wq_state, WT_WORKQ_NONE);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

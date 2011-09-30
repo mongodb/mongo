@@ -40,25 +40,30 @@
  * in size, so an aligned 4-byte access will always be in a single cache line.
  *
  * Atomic writes are often associated with memory barriers, implemented by the
- * WT_MEMORY_FLUSH macro.  WiredTiger's requirement as described by the Solaris
- * membar_enter description:
+ * WT_READ_BARRIER and WT_WRITE_BARRIER macros.  WiredTiger's requirement as
+ * described by the Solaris membar_enter description:
  *
  *	No stores from after the memory barrier will reach visibility and
  *	no loads from after the barrier will be resolved before the lock
  *	acquisition reaches global visibility
  *
- * In other words, the WT_MEMORY_FLUSH macro must ensure that memory stores by
- * the processor, made before the WT_MEMORY_FLUSH call, be visible to all
+ * In other words, the WT_WRITE_BARRIER macro must ensure that memory stores by
+ * the processor, made before the WT_WRITE_BARRIER call, be visible to all
  * processors in the system before any memory stores by the processor, made
- * after the WT_MEMORY_FLUSH call, are visible to any processor.  In addition,
- * the processor will discard registers across WT_MEMORY_FLUSH calls.  The
- * WT_MEMORY_FLUSH macro makes no requirement with respect to loads by any
- * other processor than the processor making the call.
+ * after the WT_WRITE_BARRIER call, are visible to any processor.  The
+ * WT_READ_BARRIER macro ensures that all loads before the barrier are complete
+ * before any loads after the barrier.  The compiler cannot reorder or cache
+ * values across a barrier.
  *
- * Code handling shared data has two choices: either mark the data location
- * volatile, forcing the compiler to re-load the data on each access, or, use
- * a memory barrier instruction at appropriate points in order to force an
- * explicit re-load of the memory location.
+ * Lock and unlock operations imply both read and write barriers.  In other
+ * words, barriers are not required for values protected by locking.
+ *
+ * Data locations may also be marked volatile, forcing the compiler to re-load
+ * the data on each access.  This is a weaker semantic than barriers provide,
+ * only ensuring that the compiler will not cache values.  It makes no ordering
+ * guarantees and may have no effect on systems with weaker cache guarantees.
+ *
+ * In summary, locking > barriers > volatile.
  */
 
 #if defined(_lint)
@@ -66,28 +71,44 @@
 #define	WT_WRITE_BARRIER()
 #elif defined(sun)
 #include <atomic.h>
-#define	WT_READ_BARRIER()						\
-	membar_safe("#LoadLoad")
-#define	WT_WRITE_BARRIER()						\
-	membar_safe("#StoreLoad")
+#define	WT_READ_BARRIER() do {						\
+	membar_safe("#LoadLoad");					\
+} while (0)
+#define	WT_WRITE_BARRIER() do {						\
+	membar_safe("#StoreLoad");					\
+} while (0)
 #elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
-#define	WT_READ_BARRIER()						\
-    ({ asm volatile ("lfence" ::: "memory"); 1; })
-#define	WT_WRITE_BARRIER()						\
-    ({ asm volatile ("sfence" ::: "memory"); 1; })
+#define	WT_READ_BARRIER() do {						\
+	asm volatile ("lfence" ::: "memory");				\
+} while (0)
+#define	WT_WRITE_BARRIER() do {						\
+	asm volatile ("sfence" ::: "memory");				\
+} while (0)
 #elif (defined(i386) || defined(__i386__)) && defined(__GNUC__)
-#define	WT_READ_BARRIER()						\
-    ({ asm volatile ("lock; addl $0, %0" ::: "memory"); 1; })
-#define	WT_WRITE_BARRIER()						\
-    ({ asm volatile ("lock; addl $0, %0" ::: "memory"); 1; })
+#define	WT_READ_BARRIER() do {						\
+	asm volatile ("lock; addl $0, %0" ::: "memory");		\
+} while (0);
+#define	WT_WRITE_BARRIER() do {						\
+	asm volatile ("lock; addl $0, %0" ::: "memory");		\
+} while (0)
+#else
+#error "No write barrier implementation for this platform"
 #endif
 
-#define	WT_SET_MB(v, val) do {						\
+/*
+ * Publish a value to a shared location.  All previous stores must complete
+ * before the value is made public.
+ */
+#define	WT_PUBLISH(v, val) do {						\
 	WT_WRITE_BARRIER();						\
 	(v) = (val);							\
 } while (0)
 
-#define	WT_GET_MB(v, val) do {						\
+/*
+ * Read a shared location and guarantee that subsequent reads do not see any
+ * earlier state.
+ */
+#define	WT_ORDERED_READ(v, val) do {					\
 	(v) = (val);							\
 	WT_READ_BARRIER();						\
 } while (0)

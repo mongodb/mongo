@@ -47,10 +47,11 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 			continue;
 
 		/*
-		 * Memory flush needed; the hazard array isn't declared volatile
-		 * and an explicit memory flush is necessary.
+		 * A write barrier is needed to ensure the current values in
+		 * ref are stored before the pointer becomes visible in the
+		 * hazard list.
 		 */
-		WT_SET_MB(hp->page, ref->page);
+		WT_PUBLISH(hp->page, ref->page);
 #ifdef HAVE_DIAGNOSTIC
 		hp->file = file;
 		hp->line = line;
@@ -72,12 +73,9 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * sees our hazard reference before evicting the page, it will
 		 * return the page to use, no harm done.  In the worst case, we
 		 * could be asleep for a long time; that won't hurt anything,
-		 * we just might prevent random pages from being evicted.  We
-		 * flush memory to clear our reference, not for correctness but
-		 * to minimize the amount of time we're tying down a pointer we
-		 * know we can't have.
+		 * we just might prevent random pages from being evicted.
 		 */
-		WT_SET_MB(hp->page, NULL);
+		hp->page = NULL;
 		return (0);
 	}
 
@@ -116,14 +114,11 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page == page) {
-			hp->page = NULL;
 			/*
-			 * We don't have to flush memory here for correctness;
-			 * it would give the page server thread faster access
-			 * to the block were the block selected to be evicted,
-			 * but the generation number was just set which makes
-			 * it unlikely to be selected for eviction.
+			 * Make sure any changes to the page are visible before
+			 * we give up our hazard reference.
 			 */
+			WT_PUBLISH(hp->page, NULL);
 			return;
 		}
 	WT_FAILURE(session, "hazard reference not found");
@@ -158,7 +153,7 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			WT_SET_MB(hp->page, NULL);
+			hp->page = NULL;
 
 			__wt_errx(session,
 			    "unexpected hazard reference at session.close");
