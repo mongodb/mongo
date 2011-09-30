@@ -611,8 +611,12 @@ namespace mongo {
         DDD( "collectionFallback [" << name << "]" );
 
         v8::Handle<v8::Value> real = info.This()->GetPrototype()->ToObject()->Get( name );
-        if ( ! real->IsUndefined() )
+        if ( !real->IsUndefined() )
             return real;
+
+        if (info.This()->HasRealNamedProperty(name)) {
+            return info.This()->GetRealNamedProperty( name );
+        }
 
         string sname = toSTLString( name );
         if ( sname[0] == '_' ) {
@@ -628,7 +632,10 @@ namespace mongo {
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
 
-        return f->Call( info.This() , 1 , argv );
+        v8::Local<v8::Value> coll = f->Call( info.This() , 1 , argv );
+        // cache collection for reuse
+        info.This()->Set(name, coll);
+        return coll;
     }
 
     v8::Handle<v8::Value> dbQueryIndexAccess( unsigned int index , const v8::AccessorInfo& info ) {
