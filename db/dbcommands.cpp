@@ -107,7 +107,6 @@ namespace mongo {
     public:
         CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
         virtual LockType locktype() const { return NONE;  }
-        virtual bool requiresAuth()       { return false; }
         virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
         virtual void help( stringstream& help ) const {

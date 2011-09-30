@@ -21,7 +21,7 @@ assert.throws( function() { t.findOne() }, [], "read without login" );
 print("make sure we can't run certain commands w/out auth");
 var errmsg = "need to login";
 assert.eq(db.runCommand({eval : "function() { return 1; }"}).errmsg, errmsg);
-//assert.eq(db.runCommand({getLastError : 1}).errmsg, errmsg);
+assert.eq(db.runCommand({getLastError : 1}).errmsg, errmsg);
 assert.eq(db.runCommand({whatsmyuri : 1}).errmsg, errmsg);
 assert.eq(db.runCommand({availableQueryOptions : 1}).errmsg, errmsg);
 assert.eq(db.adminCommand({getLog : 1}).errmsg, errmsg);

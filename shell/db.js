@@ -71,11 +71,18 @@ DB.prototype.addUser = function( username , pass, readOnly ){
     u.pwd = hex_md5( username + ":mongo:" + pass );
 
     c.save( u );
-    var le = this.getLastErrorObj();
-    printjson( le )
+    print( tojson( u ) );
+
+    // in mongod version 2.1.0-, this worked
+    var le = {};
+    try {
+        le = this.getLastErrorObj();
+        printjson( le )
+    }
+    catch (e) {}
+
     if ( le.err )
         throw "couldn't add user: " + le.err
-    print( tojson( u ) );
 }
 
 DB.prototype.logout = function(){
