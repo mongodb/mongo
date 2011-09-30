@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-void *__wt_addr;				/* Memory flush address. */
-
 /*
  * __wt_library_init --
  *	Some things to do, before we do anything else.
@@ -16,12 +14,6 @@ void *__wt_addr;				/* Memory flush address. */
 int
 __wt_library_init(void)
 {
-	/*
-	 * We need an address for memory flushing -- it doesn't matter which
-	 * one we choose.
-	 */
-	__wt_addr = &__wt_addr;
-
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
 	WT_RET(__wt_breakpoint());
