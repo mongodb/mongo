@@ -11,6 +11,5 @@ ext/compressors/bzip2_compress BZIP2
 ext/compressors/nop_compress
 lang/python PYTHON
 test/format HAVE_BDB
-test/insert
 test/salvage
 test/thread

@@ -13,5 +13,5 @@ backup:
 clean-local:
 	rm -rf BACKUP __* vgout.*
 
-s_dumpcmp: $(srcdir)/s_dumpcmp
-	cp $< $@
+s_dumpcmp:
+	cp $(srcdir)/s_dumpcmp.in $@
