@@ -4,9 +4,7 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l="`cd .. && echo src/include/*.[hi] src/include/*.in`"
-l="`cd .. && echo test/format/*.c`"
-l="`cd .. && echo test/salvage/*.c`"
-l="`cd .. && echo test/thread/*.c`"
+l="`cd .. && echo test/*/*.c`"
 l="`cd .. && echo */*.i`"
 l="$l `sed -e '/^[a-z]/! d' filelist`"
 
