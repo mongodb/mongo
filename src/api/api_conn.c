@@ -522,15 +522,15 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
 	if (cval.val == 0) {
 		__wt_errx(session, "%s",
-		    "WIREDTIGER environment variable set but WiredTiger not "
-		    "configured to use an environment variable");
+		    "WIREDTIGER_HOME environment variable set but WiredTiger "
+		    "not configured to use that environment variable");
 		return (WT_ERROR);
 	}
 
 	if (!__wt_has_priv()) {
 		__wt_errx(session, "%s",
-		    "WIREDTIGER environment variable set but process lacks "
-		    "privileges to use the environment variable");
+		    "WIREDTIGER_HOME environment variable set but process "
+		    "lacks privileges to use that environment variable");
 		return (WT_ERROR);
 	}
 
