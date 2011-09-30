@@ -4,6 +4,7 @@
 #include "../../util/net/listen.h"
 #include "../commands.h"
 #include "../../client/dbclient.h"
+#include "../security.h"
 
 #ifndef _WIN32
 # ifndef __sunos__
@@ -208,6 +209,11 @@ namespace mongo {
             string errmsg;
             if ( ! conn.connect( host , errmsg ) ) {
                 // should this go in the cache?
+                return false;
+            }
+
+            if (!noauth && cmdLine.keyFile &&
+                !conn.auth("local", internalSecurity.user, internalSecurity.pwd, errmsg, false)) {
                 return false;
             }
 
