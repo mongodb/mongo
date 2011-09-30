@@ -5,24 +5,32 @@
 
 # Build Makefile.am
 
-# Process Make.base, removing any subdirs that don't exist.
-# This is used in release trees, which exclude some parts of
-# the development tree.
-(sed -n '1,/^SUBDIRS/p' Make.base
+# Process Make.base, insert subdirs that exist from Make.subdirs
+# (in release trees, some of the subdirs might be excluded).
+(sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
-sed '1,/^SUBDIRS/d' Make.base | sed -e '/^$/,$d' -e 's/ \\$//' | \
-    while read d ; do
-	case "$d" in
-	[a-z]*) [ -d ../$d ] || continue ;;
-	esac
-	echo "	$d \\"
-    done | sed '$s/ \\$//'
+SUBDIRS=.
+sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | (while read dir cond ; do
+	test -d ../$dir || continue
+	if test -n "$cond" ; then
+		cat <<EOF
+if ${cond}
+  ${cond}_BUILD = $dir
+endif
+EOF
+		SUBDIRS="$SUBDIRS \\
+	\$(${cond}_BUILD)"
+	else
+		SUBDIRS="$SUBDIRS \\
+	$dir"
+	fi
+done
 
-# Terminate the list with a blank line
 echo
+echo "SUBDIRS = $SUBDIRS")
 
 # Write the rest of Make.base
-sed '1,/^SUBDIRS/d' Make.base | sed '1,/^$/d'
+sed -n '/END SUBDIRS/,$p' Make.base
 
 echo
 echo "libwiredtiger_la_LDFLAGS = -release @VERSION@"

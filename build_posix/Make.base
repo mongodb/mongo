@@ -1,24 +1,7 @@
 ACLOCAL_AMFLAGS = -I build_posix/aclocal
 
-if BZIP2
-  BZIP2_BUILD = ext/compressors/bzip2_compress
-endif
-if PYTHON
-  PYTHON_BUILD = lang/python
-endif
-if HAVE_BDB
-  FORMAT_BUILD = test/format
-endif
-
-SUBDIRS = . \
-	bench/tcbench \
-	examples/c \
-	ext/compressors/nop_compress \
-	test/salvage \
-	test/thread \
-	$(BZIP2_BUILD) \
-	$(FORMAT_BUILD) \
-	$(PYTHON_BUILD)
+# BEGIN SUBDIRS, maintained by makemake and subdirs.list
+# END SUBDIRS
 
 lib_LTLIBRARIES = libwiredtiger.la
 LDADD = $(lib_LTLIBRARIES)

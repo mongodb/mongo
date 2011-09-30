@@ -86,18 +86,7 @@ AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
-# BEGIN check existence -- code that may be excluded
-AC_CONFIG_LINKS([test/format/s_dumpcmp:test/format/s_dumpcmp])
-
-AC_CONFIG_FILES([bench/tcbench/Makefile])
-AC_CONFIG_FILES([examples/c/Makefile])
-AC_CONFIG_FILES([ext/compressors/bzip2_compress/Makefile])
-AC_CONFIG_FILES([ext/compressors/nop_compress/Makefile])
-AC_CONFIG_FILES([lang/python/Makefile])
-AC_CONFIG_FILES([test/format/Makefile])
-AC_CONFIG_FILES([test/insert/Makefile])
-AC_CONFIG_FILES([test/salvage/Makefile])
-AC_CONFIG_FILES([test/thread/Makefile])
+# BEGIN check existence -- maintained by reconf and Make.subdirs
 # END check existence
 
 AC_CONFIG_FILES([

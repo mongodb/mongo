@@ -172,7 +172,8 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
-	const char *fileconf, *filename, *fileuri, *idxconf, *idxname, *tablename;
+	const char *fileconf, *filename, *fileuri, *idxconf, *idxname;
+	const char *tablename;
 	size_t tlen;
 	int i, ret;
 

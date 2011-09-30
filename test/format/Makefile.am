@@ -2,6 +2,7 @@ BDB = $(top_builddir)/db
 INCLUDES = -I$(top_builddir) -I$(BDB)
 
 noinst_PROGRAMS = t
+noinst_DATA = s_dumpcmp
 t_SOURCES = config.h format.h bdb.c config.c t.c util.c wts.c
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
 t_LDFLAGS = -static
@@ -11,3 +12,6 @@ backup:
 
 clean-local:
 	rm -rf BACKUP __* vgout.*
+
+s_dumpcmp: $(srcdir)/s_dumpcmp
+	cp $< $@
