@@ -159,26 +159,28 @@ err:    __wt_free(session, cgconf);
 	__wt_free(session, fileconf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
+	__wt_buf_free(session, &uribuf);
 	return (ret);
 }
 
 static int
 __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	WT_BUF extra_cols, fmt;
+	WT_BUF extra_cols, fmt, namebuf, uribuf;
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
-	const char *fileconf, *idxconf, *idxname, *tablename;
-	char *filename, *namebuf;
-	size_t namelen, tlen;
+	const char *fileconf, *filename, *fileuri, *idxconf, *idxname, *tablename;
+	size_t tlen;
 	int i, ret;
 
-	idxconf = fileconf = namebuf = NULL;
+	idxconf = fileconf = NULL;
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
+	WT_CLEAR(namebuf);
+	WT_CLEAR(uribuf);
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -201,14 +203,13 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	/* Add the filename to the index config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &namebuf));
-		filename = namebuf;
+		WT_ERR(__wt_buf_sprintf(session, &namebuf,
+		    "%.*s", (int)cval.len, cval.str));
+		filename = namebuf.data;
 	} else {
-		namelen = sizeof("filename=_.wti") + tlen + strlen(idxname);
-		WT_RET(__wt_calloc_def(session, namelen, &namebuf));
-		snprintf(namebuf, namelen, "filename=%.*s_%s.wti",
-		    (int)tlen, tablename, idxname);
-		cfg[2] = filename = namebuf;
+		WT_ERR(__wt_buf_sprintf(session, &namebuf,
+		    "filename=%.*s_%s.wti", (int)tlen, tablename, idxname));
+		cfg[2] = filename = namebuf.data;
 		(void)WT_PREFIX_SKIP(filename, "filename=");
 	}
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
@@ -251,14 +252,18 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__create_file(session, name, filename, fileconf));
+	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%s", filename));
+	fileuri = uribuf.data;
+
+	WT_ERR(__create_file(session, name, fileuri, fileconf));
 	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
-	__wt_free(session, namebuf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &extra_cols);
+	__wt_buf_free(session, &namebuf);
+	__wt_buf_free(session, &uribuf);
 	return (ret);
 }
 
