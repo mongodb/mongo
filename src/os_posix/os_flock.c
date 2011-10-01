@@ -33,5 +33,5 @@ __wt_bytelock(WT_FH *fhp, off_t byte, int lock)
 
 	SYSCALL_RETRY(fcntl(fhp->fd, F_SETLK, &fl), ret);
 
-	return (ret == 0 ? 0 : errno);
+	return (ret);
 }

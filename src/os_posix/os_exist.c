@@ -29,9 +29,11 @@ __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
 		*existp = 1;
 		return (0);
 	}
-	if (errno == ENOENT) {
+	if (ret == ENOENT) {
 		*existp = 0;
 		return (0);
 	}
-	return (errno);
+
+	__wt_err(session, ret, "%s: fstat", name);
+	return (ret);
 }

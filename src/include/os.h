@@ -7,10 +7,13 @@
 
 #define	SYSCALL_RETRY(call, ret) do {					\
 	int __retry;							\
-	for (__retry = 0; __retry < 5; --__retry) {			\
-		(ret) = (call);						\
-		if ((ret) != EAGAIN &&					\
-		    (ret) != EBUSY && (ret) != EINTR && (ret) != EIO)	\
+	for (__retry = 0; __retry < 5; ++__retry) {			\
+		if (((ret) = (call)) == 0)				\
+			break;						\
+		/* Return the errno, not the call's failure return. */	\
+		ret = errno;						\
+		if (errno != EAGAIN &&					\
+		    errno != EBUSY && errno != EINTR && errno != EIO)	\
 			break;						\
 		__wt_sleep(1L, 0L);					\
 	}								\
