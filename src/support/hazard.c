@@ -46,20 +46,17 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		if (hp->page != NULL)
 			continue;
 
-		/*
-		 * A write barrier is needed to ensure the current values in
-		 * ref are stored before the pointer becomes visible in the
-		 * hazard list.
-		 */
-		WT_PUBLISH(hp->page, ref->page);
+		hp->page = ref->page;
 #ifdef HAVE_DIAGNOSTIC
 		hp->file = file;
 		hp->line = line;
 #endif
+		/* Publish the hazard reference. */
+		WT_WRITE_BARRIER();
 
 		/*
-		 * Check to see if it's still valid (where valid means a state
-		 * of WT_REF_MEM).
+		 * Check to see if the page state is still valid (where valid
+		 * means a state of WT_REF_MEM).
 		 */
 		if (ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, HAZARD,
@@ -69,11 +66,15 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 
 		/*
 		 * The page isn't available, it's being considered for eviction
-		 * (or being evicted for all we know).  If the eviction server
+		 * (or being evicted, for all we know).  If the eviction server
 		 * sees our hazard reference before evicting the page, it will
-		 * return the page to use, no harm done.  In the worst case, we
-		 * could be asleep for a long time; that won't hurt anything,
-		 * we just might prevent random pages from being evicted.
+		 * return the page to use, no harm done, if it doesn't, it will
+		 * go ahead and complete the eviction.
+		 *
+		 * We don't bother publishing this update: the worst case is we
+		 * prevent the page from being evicted, but that's not going to
+		 * happen repeatedly, the eviction thread gives up and won't try
+		 * again until it loops around through the tree.
 		 */
 		hp->page = NULL;
 		return (0);
@@ -114,11 +115,14 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page == page) {
+			hp->page = NULL;
 			/*
-			 * Make sure any changes to the page are visible before
-			 * we give up our hazard reference.
+			 * We don't have to flush memory here for correctness;
+			 * it would give the page server thread faster access
+			 * to the block were the block selected to be evicted,
+			 * but the generation number was just set which makes
+			 * it unlikely to be selected for eviction.
 			 */
-			WT_PUBLISH(hp->page, NULL);
 			return;
 		}
 	WT_FAILURE(session, "hazard reference not found");
@@ -142,9 +146,7 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 	 * we find can't be real because the session is being closed when we're
 	 * called).   We do this work because it's not expensive, and we don't
 	 * want to let a hazard reference lie around, keeping a page from being
-	 * flushed.  The flush isn't necessary for correctness, but gives the
-	 * cache eviction thread immediate access to any page our reference
-	 * blocks.
+	 * evicted.
 	 */
 #ifdef HAVE_DIAGNOSTIC
 	__hazard_dump(session);

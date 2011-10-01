@@ -64,8 +64,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	*tp = conn->sessions[conn->session_cnt];
 	conn->sessions[conn->session_cnt] = NULL;
 
-	/* Make the session array entry available for re-use. */
-	session->iface.connection = NULL;
+	/*
+	 * Publish, making the session array entry available for re-use.  There
+	 * must be a barrier here to ensure the cleanup above completes before
+	 * the entry is re-used.
+	 */
+	WT_PUBLISH(session->iface.connection, NULL);
 
 	session = &conn->default_session;
 	__wt_unlock(session, conn->mtx);
@@ -481,9 +485,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	/* Session entries are re-used, clear the old contents. */
 	WT_CLEAR(*session_ret);
 
-	/* We can't use the new session: it hasn't been configured yet. */
 	WT_RET(__wt_mtx_alloc(session, "session", 1, &session_ret->mtx));
-
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 	WT_ASSERT(session, session->event_handler != NULL);
@@ -495,7 +497,11 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	if (event_handler != NULL)
 		session_ret->event_handler = event_handler;
 
-	/* Make the entry visible to the workQ. */
+	/*
+	 * Publish: make the entry visible to the workQ.  There must be a
+	 * barrier to ensure the structure fields are set before any other
+	 * thread can see the session.
+	 */
 	WT_PUBLISH(conn->sessions[conn->session_cnt++], session_ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);

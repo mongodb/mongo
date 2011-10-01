@@ -36,14 +36,14 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn)
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(conn));
 
-	/* Start worker threads. */
-	F_SET(conn, WT_WORKQ_RUN | WT_SERVER_RUN);
-
 	/*
-	 * Make sure the connection structure is filled in before other threads
-	 * read from the pointer.
+	 * Publish: there must be a barrier to ensure the connection structure
+	 * fields are set before other threads read from the pointer.
 	 */
 	WT_WRITE_BARRIER();
+
+	/* Start worker threads. */
+	F_SET(conn, WT_WORKQ_RUN | WT_SERVER_RUN);
 
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
@@ -97,8 +97,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
-
-	/* Force the cache server threads to run and wait for them to exit. */
 	__wt_workq_evict_server_exit(conn);
 	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
 	__wt_workq_read_server_exit(conn);

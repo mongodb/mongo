@@ -25,6 +25,10 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 	rr->parent = parent;
 	rr->ref = ref;
 	rr->dsk_verify = dsk_verify;
+	/*
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the read thread can see the request.
+	 */
 	WT_PUBLISH(rr->session, session);
 }
 
@@ -35,6 +39,10 @@ __cache_read_req_set(WT_SESSION_IMPL *session,
 static inline void
 __cache_read_req_clr(WT_READ_REQ *rr)
 {
+	/*
+	 * Publish: no barrier is required as there are no associated structure
+	 * fields that need to be reset.
+	 */
 	rr->session = NULL;
 }
 

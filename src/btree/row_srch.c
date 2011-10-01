@@ -161,10 +161,9 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * Use a read memory barrier to ensure we read the value before we read
 	 * any of the page's contents.
 	 */
-	if (is_modify) {
-		cbt->write_gen = page->write_gen;
-		WT_READ_BARRIER();
-	}
+	if (is_modify)
+		WT_ORDERED_READ(cbt->write_gen, page->write_gen);
+
 	cbt->page = page;
 
 	/* Do a binary search of the leaf page. */

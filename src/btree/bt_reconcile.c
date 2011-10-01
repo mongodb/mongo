@@ -2908,15 +2908,13 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 		WT_RET(__rec_discard_add_block(
 		    session, parent_ref->addr, parent_ref->size));
 
-	/*
-	 * Updating the state of the parent reference turns on the change.  Set
-	 * the parent's WT_REF addr/size pair and memory reference, flush memory
-	 * and then update the state of the entry (no further flush is required
-	 * as the page state is declared volatile).
-	 */
 	parent_ref->addr = addr;
 	parent_ref->size = size;
 	parent_ref->page = replace;
+	/*
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the state change makes the page available to readers.
+	 */
 	WT_PUBLISH(parent_ref->state, state);
 
 	/*

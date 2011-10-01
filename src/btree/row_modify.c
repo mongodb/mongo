@@ -222,10 +222,10 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * First, point the new WT_INSERT item's skiplist references to the next
-	 * elements in the insert list, then flush memory.  Second, update the
-	 * skiplist elements that reference the new WT_INSERT item, this ensures
-	 * the list is never inconsistent.
+	 * Publish: First, point the new WT_INSERT item's skiplist references
+	 * to the next elements in the insert list, then flush memory.  Second,
+	 * update the skiplist elements that reference the new WT_INSERT item,
+	 * this ensures the list is never inconsistent.
 	 */
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
@@ -301,11 +301,11 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 		__wt_update_new_upd_taken(session, page);
 	}
 
-	/*
-	 * Insert the new WT_UPDATE item into the linked list and use a write
-	 * barrier to ensure the list never appears broken.
-	 */
 	upd->next = *upd_entry;
+	/*
+	 * Publish: there must be a barrier to ensure the new entry's next
+	 * pointer is set before we update the linked list.
+	 */
 	WT_PUBLISH(*upd_entry, upd);
 
 err:	__wt_session_serialize_wrapup(session, page, ret);

@@ -247,10 +247,10 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * First, point the new WT_INSERT item's skiplist references to the next
-	 * elements in the insert list, then flush memory.  Second, update the
-	 * skiplist elements that reference the new WT_INSERT item, this ensures
-	 * the list is never inconsistent.
+	 * Publish: First, point the new WT_INSERT item's skiplist references
+	 * to the next elements in the insert list, then flush memory.  Second,
+	 * update the skiplist elements that reference the new WT_INSERT item,
+	 * this ensures the list is never inconsistent.
 	 */
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];

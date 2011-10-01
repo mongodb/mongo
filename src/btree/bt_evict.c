@@ -66,7 +66,12 @@ __evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
 
 	WT_CLEAR(*r);
 	r->close_method = close_method;
-	r->session = session;
+
+	/*
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the eviction thread can see the request.
+	 */
+	WT_PUBLISH(r->session, session);
 }
 
 /*
@@ -77,7 +82,12 @@ static inline void
 __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 {
 	__wt_free(session, r->retry);
-	r->session = NULL;
+
+	/*
+	 * Publish; there must be a barrier to ensure the structure fields are
+	 * set before the entry is made available for re-use.
+	 */
+	WT_PUBLISH(r->session, NULL);
 }
 
 /*
