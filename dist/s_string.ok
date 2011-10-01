@@ -220,6 +220,7 @@ enum's
 eof
 eop
 errhandler
+errno
 errv
 errx
 esc
