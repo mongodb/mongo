@@ -1246,6 +1246,24 @@ doneCheckOrder:
             // No matches are possible in the index so the index may be useful.
             return true;   
         }
+
+        if ( d->idx( idxNo ).info.obj()["filter"].ok() ) {
+            BSONObj filter_obj = d->idx( idxNo ).info.obj()["filter"].Obj();
+            BSONObj query = frsp.simplifiedQueryForIndex( d, idxNo, filter_obj );
+
+            FieldRangeSetPair filter_obj_frsp( frsp.ns(), filter_obj, true );
+            FieldRangeSetPair query_frsp( frsp.ns(), query, true );
+
+            if (query.nFields() > 0) {
+                if ((filter_obj_frsp &= query_frsp)._singleKey.nNontrivialRanges() != query.nFields()) {
+                    return false;
+                }
+            } else {
+                
+                return false;
+            }
+        }
+
         return d->idx( idxNo ).getSpec().suitability( frsp.simplifiedQueryForIndex( d, idxNo, keyPattern ), order ) != USELESS;
     }
     

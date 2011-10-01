@@ -22,6 +22,7 @@
 #include "btree.h"
 #include "ops/query.h"
 #include "background.h"
+#include "matcher.h"
 #include "../util/text.h"
 
 namespace mongo {
@@ -81,6 +82,15 @@ namespace mongo {
         _sparse = info["sparse"].trueValue();
         uassert( 13529 , "sparse only works for single field keys" , ! _sparse || _nFields );
 
+        {
+            BSONElement _filter = info["filter"];
+            if ( _filter.ok() ) {
+                BSONObj filter_obj = _filter.Obj();
+                _matcher.reset(new Matcher(filter_obj));
+            } else {
+                _matcher.reset();
+            }
+        }
 
         {
             // build _nullKey
@@ -375,7 +385,11 @@ namespace mongo {
                 // No array, so generate a single key.
                 if ( _spec._sparse && numNotFound == _spec._nFields ) {
                     return;
-                }            
+                }
+                if ( _spec._matcher && ! _spec._matcher->matches(obj) ) {
+                    // this is a filtered index and it doesn't match this document
+                    return;
+                }
                 BSONObjBuilder b(_spec._sizeTracker);
                 for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i ) {
                     b.appendAs( *i, "" );

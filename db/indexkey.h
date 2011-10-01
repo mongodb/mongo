@@ -21,6 +21,7 @@
 #include "../pch.h"
 #include "diskloc.h"
 #include "jsobj.h"
+#include "matcher.h"
 #include <map>
 
 namespace mongo {
@@ -180,6 +181,8 @@ namespace mongo {
 
         int _nFields; // number of fields in the index
         bool _sparse; // if the index is sparse
+        shared_ptr<Matcher> _matcher; // matcher of the filtered index
+
         shared_ptr<IndexType> _indexType;
         const IndexDetails * _details;
 
