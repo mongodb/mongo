@@ -51,7 +51,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		hp->file = file;
 		hp->line = line;
 #endif
-		/* Publish the hazard reference. */
+		/* Publish the hazard reference before reading page's state. */
+		WT_READ_BARRIER();
 		WT_WRITE_BARRIER();
 
 		/*

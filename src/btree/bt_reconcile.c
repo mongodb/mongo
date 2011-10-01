@@ -3543,6 +3543,10 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	ref->state = WT_REF_LOCKED;
 
+	/* Publish the page's state before reading the hazard references. */
+	WT_READ_BARRIER();
+	WT_WRITE_BARRIER();
+
 	/* Get a fresh copy of the hazard reference array. */
 	__hazard_copy(session);
 
