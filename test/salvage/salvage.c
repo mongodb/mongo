@@ -440,7 +440,7 @@ build(int ikey, int ivalue, int cnt)
 	char config[256], kbuf[64], vbuf[64];
 	int new_slvg;
 
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(wiredtiger_open(NULL, NULL, "create", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->drop(session, "file:" LOAD, "force") == 0);
 

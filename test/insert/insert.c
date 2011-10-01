@@ -127,7 +127,7 @@ run(void)
 	int cnt, ret;
 	uint8_t bitf;
 
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(wiredtiger_open(NULL, NULL, "create", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	switch (file_type) {
 	case FIX:

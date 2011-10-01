@@ -12,7 +12,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *fileuri)
 {
 	WT_BTREE_SESSION *btree_session;
 	const char *filename;
-	int ret;
+	int exist, ret;
 
 	filename = fileuri;
 
@@ -43,7 +43,8 @@ __drop_file(WT_SESSION_IMPL *session, const char *fileuri)
 
 	WT_ERR(__wt_schema_table_remove(session, fileuri));
 
-	if (__wt_exist(session, filename))
+	WT_ERR(__wt_exist(session, filename, &exist));
+	if (exist)
 		ret = __wt_remove(session, filename);
 
 err:	return (ret);

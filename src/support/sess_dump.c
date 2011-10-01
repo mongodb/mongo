@@ -19,6 +19,9 @@ __wt_session_dump_all(WT_SESSION_IMPL *session)
 {
 	WT_SESSION_IMPL **tp;
 
+	if (session == NULL)
+		return;
+
 	for (tp = S2C(session)->sessions; *tp != NULL; ++tp)
 		__wt_session_dump(*tp);
 }

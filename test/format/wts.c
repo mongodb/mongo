@@ -75,7 +75,7 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 * end so they can override "standard" configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
+	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
 	    "extensions=[\"%s\"],%s,%s",
 	    g.progname, g.c_cache, ext,
 	    g.c_multithread ? "multithread" : "",

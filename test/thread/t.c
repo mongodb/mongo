@@ -134,7 +134,7 @@ wt_connect(char *config_open)
 	char config[128];
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",multithread,cache_size=5MB%s%s",
+	    "create,error_prefix=\"%s\",multithread,cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
@@ -173,7 +173,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)system("rm -f __schema.wt __wt*");
+	(void)system("rm -f WildTiger __schema.wt __wt*");
 }
 
 static int

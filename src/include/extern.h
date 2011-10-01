@@ -288,9 +288,7 @@ extern int __wt_row_search(WT_SESSION_IMPL *session,
     int is_modify);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_connection_open(WT_CONNECTION_IMPL *conn,
-    const char *home,
-    mode_t mode);
+extern int __wt_connection_open(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern void *__wt_workq_srvr(void *arg);
@@ -359,8 +357,9 @@ extern int __wt_dlsym( WT_SESSION_IMPL *session,
     const char *name,
     void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
-extern int __wt_exist(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
+extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
 extern int __wt_mtx_alloc(WT_SESSION_IMPL *session,

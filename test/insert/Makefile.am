@@ -6,4 +6,4 @@ t_LDADD = $(top_builddir)/libwiredtiger.la
 t_LDFLAGS = -static
 
 clean-local:
-	rm -rf xx __schema.wt
+	rm -rf WiredTiger xx __schema.wt

@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __conn_home(WT_CONNECTION_IMPL *, const char *, const char **);
+static int __conn_single(WT_CONNECTION_IMPL *, const char **);
 
 /*
  * api_err_printf --
@@ -239,9 +240,7 @@ __conn_get_home(WT_CONNECTION *wt_conn)
 static int
 __conn_is_new(WT_CONNECTION *wt_conn)
 {
-	WT_UNUSED(wt_conn);
-
-	return (0);
+	return (((WT_CONNECTION_IMPL *)wt_conn)->is_new);
 }
 
 /*
@@ -330,7 +329,6 @@ int
 wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
-	static int library_init = 0;
 	static WT_CONNECTION stdc = {
 		__conn_load_extension,
 		__conn_add_cursor_type,
@@ -363,39 +361,37 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	int ret;
 	const char *cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
-	int opened, ret;
 
 	*wt_connp = NULL;
 	session = NULL;
 	WT_CLEAR(expath);
 	WT_CLEAR(exconfig);
-	opened = 0;
 
-	/*
-	 * We end up here before we do any real work.   Check the build itself,
-	 * and do some global stuff.
-	 */
-	if (library_init == 0) {
-		WT_RET(__wt_library_init());
-		library_init = 1;
-	}
+	WT_RET(__wt_library_init());
 
-	/*
-	 * !!!
-	 * We don't yet have a session handle to pass to the memory allocation
-	 * functions.
-	 */
 	WT_RET(__wt_calloc_def(NULL, 1, &conn));
 	conn->iface = stdc;
+
+	/*
+	 * Immediately link the structure into the connection structure list:
+	 * the only thing ever looked at on that list is the database name,
+	 * and a NULL value is fine.
+	 */
+	__wt_lock(NULL, __wt_process.mtx);
+	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
+	__wt_unlock(NULL, __wt_process.mtx);
 
 	session = &conn->default_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
 
 	/*
-	 * If the application didn't configure an event handler, use the default
-	 * one, use the default entries for any not set by the application.
+	 * Configure event handling as soon as possible so errors are handled
+	 * correctly.  If the application didn't configure an event handler,
+	 * use the default one, and use default entries for any entries not
+	 * set by the application.
 	 */
 	if (event_handler == NULL)
 		event_handler = __wt_event_handler_default;
@@ -412,20 +408,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	session->event_handler = event_handler;
 
-	WT_ERR(__wt_connection_init(conn));
-
+	/* Check the configuration strings. */
 	WT_ERR(
-	   __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
+	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
 
-	WT_ERR(__conn_home(conn, home, cfg));
-
-	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
-	conn->cache_size = cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
-	conn->hazard_size = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
-	conn->session_size = (uint32_t)cval.val;
-
+	/*
+	 * Configure verbose flags as soon as possible so we don't lose verbose
+	 * messages.
+	 */
 	conn->verbose = 0;
 #ifdef HAVE_VERBOSE
 	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
@@ -440,12 +430,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			goto err;
 	}
 #endif
+
+	/* Remaining basic initialization of the connection structure. */
+	WT_ERR(__wt_connection_init(conn));
+
+	/* Get the database home. */
+	WT_ERR(__conn_home(conn, home, cfg));
+
+	/* Make sure no other thread of control already owns this database. */
+	WT_ERR(__conn_single(conn, cfg));
+
+	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
+	conn->cache_size = cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
+	conn->hazard_size = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
+	conn->session_size = (uint32_t)cval.val;
+
 	WT_ERR(__wt_config_gets(session, cfg, "multithread", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_MULTITHREAD);
-
-	WT_ERR(__wt_connection_open(conn, home, 0644));
-	opened = 1;
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
@@ -465,17 +469,22 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
-	else if (ret != 0)
-		goto err;
+	WT_ERR(ret);
+
+	/*
+	 * Open the connection; if that fails, the connection handle has been
+	 * destroyed by the time the open function returns.
+	 */
+	if ((ret = __wt_connection_open(conn)) != 0) {
+		conn = NULL;
+		WT_ERR(ret);
+	}
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
 	if (0) {
-err:		if (opened)
-			(void)__wt_connection_close(conn);
-		else
-			__wt_connection_destroy(conn);
+err:		__wt_connection_destroy(conn);
 	}
 	__wt_buf_free(session, &expath);
 	__wt_buf_free(session, &exconfig);
@@ -535,4 +544,117 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 	}
 
 copy:	return (__wt_strdup(session, home, &conn->home));
+}
+
+/*
+ * __conn_single --
+ *	Confirm that no other thread of control is using this database.
+ */
+static int
+__conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *t;
+	WT_SESSION_IMPL *session;
+	off_t size;
+	uint32_t len;
+	int created, exist, ret;
+	char buf[256];
+
+	session = &conn->default_session;
+
+#define	WT_FLAGFILE	"WiredTiger"
+	/*
+	 * We need to check that no other process, or thread in this process,
+	 * "owns" this database.
+	 *
+	 * Check for exclusive creation.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "exclusive", &cval));
+	if (cval.val) {
+		WT_RET(__wt_exist(session, WT_FLAGFILE, &exist));
+		if (exist) {
+			__wt_errx(session,
+			    "%s", "WiredTiger database already exists");
+			return (EEXIST);
+		}
+	}
+
+	/*
+	 * Optionally create the wiredtiger flag file if it doesn't already
+	 * exist.  We don't actually care if we create it or not, the "am I
+	 * the only locker" tests are all that matter.  The tricky part is
+	 * the "exclusive" flag, but if another thread, with which we are
+	 * racing, does the actual create, and we still win the eventual "am
+	 * I the only locker" test, we don't care that we didn't do the actual
+	 * physical create of the file, we are the final owner and get to act
+	 * as if we created the database.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
+	WT_RET(__wt_open(session,
+	    WT_FLAGFILE, 0666, cval.val == 0 ? 0 : 1, &conn->lock_fh));
+
+	/*
+	 * Lock a byte of the file: if we don't get the lock, some other process
+	 * is holding it, we're done.  Note the file may be zero-length length,
+	 * and that's OK, the underlying call supports acquisition of locks past
+	 * the end-of-file.
+	 */
+	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0) {
+		__wt_errx(session, "%s",
+		    "WiredTiger database is already being managed by another "
+		    "process");
+		WT_ERR(EBUSY);
+	}
+
+	/* Check to see if another thread of control has this database open. */
+	ret = 0;
+	__wt_lock(session, __wt_process.mtx);
+	TAILQ_FOREACH(t, &__wt_process.connqh, q)
+		if (t->home != NULL &&
+		    t != conn && strcmp(t->home, conn->home) == 0) {
+			ret = EBUSY;
+			break;
+		}
+	__wt_unlock(session, __wt_process.mtx);
+	if (ret != 0) {
+		__wt_errx(session, "%s",
+		    "WiredTiger database is already being managed by another "
+		    "thread in this process");
+		WT_ERR(EBUSY);
+	}
+
+	/*
+	 * If the size of the file is 0, we created it (or we're racing with
+	 * the thread that created it, it doesn't matter), write some bytes
+	 * into the file.  Strictly speaking, this isn't even necessary, but
+	 * zero-length files always make me nervous.
+	 */
+	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
+	if (size == 0) {
+		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
+		    WT_FLAGFILE, wiredtiger_version(NULL, NULL, NULL));
+		WT_ERR(__wt_write(
+		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
+		created = 1;
+	} else
+		created = 0;
+
+	/*
+	 * If we found a zero-length WiredTiger lock file, and eventually ended
+	 * as the database owner, return that we created the database.  (There
+	 * is a theoretical chance that another process created the WiredTiger
+	 * lock file but we won the race to add the WT_CONNECTION_IMPL structure
+	 * to the process' list.  It doesn't much matter, only one thread will
+	 * be told it created the database.)
+	 */
+	conn->is_new = created;
+
+	return (0);
+
+err:	if (conn->lock_fh != NULL) {
+		(void)__wt_close(session, conn->lock_fh);
+		conn->lock_fh = NULL;
+	}
+	return (ret);
 }

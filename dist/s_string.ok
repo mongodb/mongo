@@ -160,6 +160,7 @@ btmem
 btree
 buf
 builtin
+bytelock
 calloc
 cfg
 checkfrag

@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_DIAGNOSTIC
 /*
  * We pass around a session handle and output information, group it together.
  */
@@ -21,7 +22,9 @@ typedef struct {
 	WT_BUF		*msg;			/* Buffered message */
 } WT_DBG;
 
-#ifdef HAVE_DIAGNOSTIC
+/* Diagnostic output separator. */
+static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+
 static void __debug_byte_string(WT_DBG *, const uint8_t *, size_t);
 static int  __debug_cell(WT_DBG *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
@@ -447,11 +450,11 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	}
 
 	if (WT_COL_UPDATE_SINGLE(page) != NULL) {
-		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__dmsg(ds, "%s", sep);
 		__debug_col_list(ds, WT_COL_UPDATE_SINGLE(page), "update", 1);
 	}
 	if (WT_COL_APPEND(page) != NULL) {
-		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__dmsg(ds, "%s", sep);
 		__debug_col_list(ds, WT_COL_APPEND(page), "append", 1);
 	}
 }
@@ -492,12 +495,10 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT_HEAD *inshead;
-	WT_SESSION_IMPL *session;
 	uint64_t recno, rle;
 	uint32_t i;
 	char tag[64];
 
-	session = ds->session;
 	unpack = &_unpack;
 	recno = page->u.col_leaf.recno;
 
@@ -518,7 +519,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	}
 
 	if (WT_COL_APPEND(page) != NULL) {
-		__dmsg(ds, "%s\n", S2C(session)->sep);
+		__dmsg(ds, "%s", sep);
 		__debug_col_list(ds, WT_COL_APPEND(page), "append", 0);
 	}
 

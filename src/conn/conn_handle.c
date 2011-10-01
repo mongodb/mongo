@@ -17,7 +17,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 
 	session = &conn->default_session;
-						/* Global mutex */
+						/* Connection mutex */
 	WT_RET(__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
 
 	TAILQ_INIT(&conn->btqh);		/* WT_BTREE list */
@@ -27,9 +27,6 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
-
-	/* Diagnostic output separator. */
-	conn->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
 
 	return (0);
 }
@@ -49,8 +46,24 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	if (conn == NULL)
 		return;
 
+	/*
+	 * Close remaining open files (before discarding the mutex, the
+	 * underlying file-close code uses the mutex to guard lists of
+	 * open files.
+	 */
+	if (conn->lock_fh != NULL)
+		(void)__wt_close(session, conn->lock_fh);
+
+	if (conn->log_fh != NULL)
+		(void)__wt_close(session, conn->log_fh);
+
 	if (conn->mtx != NULL)
 		(void)__wt_mtx_destroy(session, conn->mtx);
+
+	/* Remove from the list of connections. */
+	__wt_lock(session, __wt_process.mtx);
+	TAILQ_REMOVE(&__wt_process.connqh, conn, q);
+	__wt_unlock(session, __wt_process.mtx);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

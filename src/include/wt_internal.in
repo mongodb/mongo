@@ -113,6 +113,8 @@ struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_disk;
     typedef struct __wt_page_disk WT_PAGE_DISK;
+struct __wt_process;
+    typedef struct __wt_process WT_PROCESS;
 struct __wt_read_req;
     typedef struct __wt_read_req WT_READ_REQ;
 struct __wt_ref;

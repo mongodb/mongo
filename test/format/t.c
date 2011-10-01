@@ -174,7 +174,7 @@ startup(void)
 	}
 
 	/* Remove the run's files except for __rand. */
-	(void)system("rm -f __[a-qs-z]* __run");
+	(void)system("rm -f WiredTiger __[a-qs-z]* __run");
 
 	/* Open/truncate the logging file. */
 	if (g.logging) {
@@ -194,7 +194,7 @@ onint(int signo)
 	UNUSED(signo);
 
 	/* Remove the run's files except for __rand. */
-	(void)system("rm -f __[a-qs-z]* __run");
+	(void)system("rm -f WiredTiger __[a-qs-z]* __run");
 
 	fprintf(stderr, "\n");
 	exit (EXIT_FAILURE);

@@ -12,13 +12,10 @@
  *	Open a connection.
  */
 int
-__wt_connection_open(WT_CONNECTION_IMPL *conn, const char *home, mode_t mode)
+__wt_connection_open(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 	int ret;
-
-	WT_UNUSED(home);
-	WT_UNUSED(mode);
 
 	/* Default session. */
 	conn->default_session.iface.connection = &conn->iface;
@@ -71,26 +68,31 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 	WT_DLH *dlh;
 	WT_FH *fh;
-	int ret, secondary_err;
+	int ret;
 
 	session = &conn->default_session;
-	ret = secondary_err = 0;
+	ret = 0;
 
 	/* Complain if WT_BTREE handles weren't closed. */
-	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		__wt_errx(session,
-		    "Connection has open btree handles: %s", btree->name);
-		session->btree = btree;
+		    "Connection has open btree handle: %s", btree->name);
+
+		WT_SET_BTREE_IN_SESSION(session, btree);
 		WT_TRET(__wt_btree_close(session));
-		secondary_err = WT_ERROR;
 	}
 
-	/* Complain if files weren't closed. */
-	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL && fh != conn->log_fh) {
+	/*
+	 * Complain if files weren't closed (ignoring the lock and logging
+	 * files, we'll close them in a minute.
+	 */
+	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+		if (fh == conn->lock_fh || fh == conn->log_fh)
+			continue;
+
 		__wt_errx(session,
-		    "connection has open file handles: %s", fh->name);
+		    "Connection has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(session, fh));
-		secondary_err = WT_ERROR;
 	}
 
 	/* Shut down the server threads. */
@@ -119,13 +121,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_dlclose(session, dlh));
 	}
 
-	if (conn->log_fh != NULL) {
-		WT_TRET(__wt_close(session, conn->log_fh));
-		conn->log_fh = NULL;
-	}
-
 	/* Destroy the handle. */
 	__wt_connection_destroy(conn);
 
-	return ((ret == 0) ? secondary_err : ret);
+	return (ret);
 }

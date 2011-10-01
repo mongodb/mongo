@@ -5,6 +5,17 @@
  *	All rights reserved.
  */
 
+/*
+ * WT_PROCESS --
+ *	Per-process information for the library.
+ */
+struct __wt_process {
+	WT_MTX *mtx;			/* Per-process mutex */
+
+					/* Locked: connection queue */
+	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
+};
+
 struct __wt_btree_session {
 	WT_BTREE *btree;
 
@@ -104,18 +115,24 @@ struct __wt_session_impl {
 struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
-	const char *home;
-
 	WT_SESSION_IMPL default_session;/* For operations without an
 					   application-supplied session. */
 
-	WT_MTX *mtx;			/* Global mutex */
+	WT_MTX *mtx;			/* Connection mutex */
+					/* Connection queue */
+	TAILQ_ENTRY(__wt_connection_impl) q;
+
+	const char *home;		/* Database home */
+	int is_new;			/* Connection created database */
+
+	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t workq_tid;		/* workQ thread ID */
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(wt_btree_qh, __wt_btree) btqh; /* Locked: btree list */
+					/* Locked: btree list */
+	TAILQ_HEAD(wt_btree_qh, __wt_btree) btqh;
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
@@ -160,7 +177,6 @@ struct __wt_connection_impl {
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
-	const char *sep;		/* Display separator line */
 
 					/* Locked: compressor list */
 	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor) compqh;
@@ -221,6 +237,7 @@ struct __wt_connection_impl {
  *******************************************/
 extern WT_EVENT_HANDLER *__wt_event_handler_default;
 extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
+extern WT_PROCESS __wt_process;
 
 /*
  * DO NOT EDIT: automatically built by dist/api_flags.py.

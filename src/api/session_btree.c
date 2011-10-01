@@ -119,7 +119,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 {
 	WT_BTREE_SESSION *btree_session;
 	const char *filename, *treeconf;
-	int ret;
+	int exist, ret;
 
 	filename = fileuri;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
@@ -132,25 +132,28 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, !LF_ISSET(WT_BTREE_NO_EVICTION));
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
-	} else if (ret == WT_NOTFOUND && __wt_exist(session, filename)) {
-		/*
-		 * A fixed configuration is passed in for special files, such
-		 * as the schema table itself.
-		 */
-		if (tconfig != NULL)
-			WT_RET(__wt_strdup(session, tconfig, &treeconf));
-		else
-			WT_RET(__wt_schema_table_read(session,
-			    fileuri, &treeconf));
-		WT_RET(__wt_btree_open(
-		    session, name, filename, treeconf, cfg, flags));
-		WT_RET(__wt_session_lock_btree(
-		    session, session->btree, NULL, flags));
-		WT_RET(__wt_session_add_btree(session, &btree_session));
-		ret = 0;
+		return (0);
 	}
+	if (ret != WT_NOTFOUND)
+		return (ret);
 
-	return (ret);
+	WT_RET(__wt_exist(session, filename, &exist));
+	if (!exist)
+		return (WT_NOTFOUND);
+
+	/*
+	 * A fixed configuration is passed in for special files, such
+	 * as the schema table itself.
+	 */
+	if (tconfig != NULL)
+		WT_RET(__wt_strdup(session, tconfig, &treeconf));
+	else
+		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
+	WT_RET(__wt_btree_open(session, name, filename, treeconf, cfg, flags));
+	WT_RET(__wt_session_lock_btree(session, session->btree, NULL, flags));
+	WT_RET(__wt_session_add_btree(session, &btree_session));
+
+	return (0);
 }
 
 /*

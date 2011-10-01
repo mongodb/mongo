@@ -19,12 +19,13 @@ __wt_mtx_alloc(WT_SESSION_IMPL *session,
 	pthread_condattr_t condattr;
 	pthread_mutexattr_t mutexattr;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTX), &mtx));
-
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
-	 *
+	 */
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTX), &mtx));
+
+	/*
 	 * Initialize the mutex.
 	 * Mutexes are shared between processes.
 	 */
@@ -63,7 +64,13 @@ __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(session, MUTEX, "lock %s mutex (%p)",  mtx->name, mtx);
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
+	 */
+	if (session != NULL)
+		WT_VERBOSE(
+		    session, MUTEX, "lock %s mutex (%p)",  mtx->name, mtx);
 
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
 
@@ -85,7 +92,8 @@ __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 	}
 
 	mtx->locked = 1;
-	WT_CSTAT_INCR(session, mtx_lock);
+	if (session != NULL)
+		WT_CSTAT_INCR(session, mtx_lock);
 
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;
@@ -103,7 +111,13 @@ __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(session, MUTEX, "unlock %s mutex (%p)",  mtx->name, mtx);
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
+	 */
+	if (session != NULL)
+		WT_VERBOSE(
+		    session, MUTEX, "unlock %s mutex (%p)",  mtx->name, mtx);
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
