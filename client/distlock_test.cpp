@@ -21,6 +21,7 @@
 #include "distlock.h"
 #include "../db/commands.h"
 #include "../util/bson_util.h"
+#include "../util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail
 #include <boost/config.hpp>

@@ -23,6 +23,8 @@
 #include "../util/net/hostandport.h"
 
 namespace mongo {
+
+    class AuthenticationInfo;
     
     /**
      * this is the base class for Client and ClientInfo
