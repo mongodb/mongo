@@ -30,6 +30,7 @@
 #include "commands.h"
 #include "repl_block.h"
 #include "../util/processinfo.h"
+#include "../util/timer.h"
 
 namespace mongo {
 

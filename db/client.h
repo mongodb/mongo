@@ -31,6 +31,7 @@
 #include "stats/top.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../db/client_common.h"
+#include "../util/net/message_port.h"
 
 namespace mongo {
 

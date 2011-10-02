@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "security.h"
+//#include "../pch.h"
+//#include "security.h"
+#include "../util/net/hostandport.h"
 
 namespace mongo {
     

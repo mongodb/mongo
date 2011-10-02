@@ -17,16 +17,17 @@
 
 #pragma once
 
-#include "../pch.h"
+//#include "../pch.h"
 #include "jsobj.h"
-#include "../util/timer.h"
-#include "../client/dbclient.h"
+//#include "../util/timer.h"
+//#include "../client/dbclient.h"
 
 namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
     class Client;
+    class Timer;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
