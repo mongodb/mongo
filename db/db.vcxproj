@@ -497,7 +497,9 @@
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
-    <ClCompile Include="commands\distinct.cpp" />
+    <ClCompile Include="commands\distinct.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\group.cpp" />
     <ClCompile Include="commands\isself.cpp" />
