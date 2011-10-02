@@ -24,6 +24,7 @@
 #include "connpool.h"
 #include "dbclient_rs.h"
 #include "../util/background.h"
+#include "../util/timer.h"
 
 namespace mongo {
 
