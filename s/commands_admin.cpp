@@ -31,6 +31,7 @@
 #include "../util/processinfo.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
+#include "../util/timer.h"
 
 #include "../client/connpool.h"
 

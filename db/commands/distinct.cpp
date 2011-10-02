@@ -20,7 +20,7 @@
 #include "../instance.h"
 #include "../queryoptimizer.h"
 #include "../clientcursor.h"
-#include "../util/timer.h"
+#include "../../util/timer.h"
 
 namespace mongo {
 

@@ -20,6 +20,7 @@
 #include "../db/cmdline.h"
 #include "../db/client_common.h"
 #include "../s/shard.h"
+#include "../util/timer.h"
 
 namespace mongo {
 
