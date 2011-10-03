@@ -224,7 +224,7 @@ namespace mongo {
             if( _log )
                 log() << "journalCleanup..." << endl;
             try {
-                scoped_lock lk(_curLogFileMutex);
+                SimpleMutex::scoped_lock lk(_curLogFileMutex);
                 closeCurrentJournalFile();
                 removeJournalFiles();
             }
@@ -458,7 +458,7 @@ namespace mongo {
 
         void Journal::open() {
             assert( MongoFile::notifyPreFlush == preFlush );
-            mutex::scoped_lock lk(_curLogFileMutex);
+            SimpleMutex::scoped_lock lk(_curLogFileMutex);
             _open();
         }
 
@@ -597,15 +597,18 @@ namespace mongo {
             return j._ageOut ? 1 : 0;
         }*/
         void setAgeOutJournalFiles(bool a) {
-            scoped_lock lk(j._curLogFileMutex);
+            SimpleMutex::scoped_lock lk(j._curLogFileMutex);
             j._ageOut = a;
         }
 
         void Journal::_rotate() {
-            assert( !dbMutex.atLeastReadLocked() );
-            RACECHECK
+            if( dbMutex.atLeastReadLocked() ) { 
+                log() << "info journal _rotate called insider dbMutex - ok but should be somewhat rare" << endl;
+            }
 
-            scoped_lock lk(_curLogFileMutex);
+            RACECHECK;
+
+            _curLogFileMutex.dassertLocked();
 
             if ( inShutdown() || !_curLogFile )
                 return;
@@ -688,7 +691,7 @@ namespace mongo {
             }
 
             try {
-                mutex::scoped_lock lk(_curLogFileMutex);
+                SimpleMutex::scoped_lock lk(_curLogFileMutex);
 
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 assert( _curLogFile );

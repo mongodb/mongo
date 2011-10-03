@@ -25,11 +25,12 @@
 namespace mongo {
 
     class RWLock : public RWLockBase { 
+        enum { NilState, UpgradableState, Exclusive } x;
     public:
         const char * const _name;
         //int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         RWLock(const char *name) : _name(name) { 
-            x = 0;
+            x = NilState;
         }
         void lock() {
             RWLockBase::lock();
@@ -47,12 +48,11 @@ namespace mongo {
         void unlockFromUpgradable() { // upgradable -> unlocked
             RWLockBase::unlockFromUpgradable();
         }
-        int x;
     public:
         void upgrade() { // upgradable -> exclusive lock
-            assert( x == 1 );
+            assert( x == UpgradableState );
             RWLockBase::upgrade();
-            x++;
+            x = Exclusive;
         }
 
         bool lock_shared_try( int millis ) { return RWLockBase::lock_shared_try(millis); }
@@ -65,20 +65,26 @@ namespace mongo {
             return false;
         }
 
+        /** acquire upgradable state.  You must be unlocked before creating.
+            unlocks on destruction, whether in upgradable state or upgraded to exclusive
+            in the interim.
+            */
         class Upgradable : boost::noncopyable { 
             RWLock& _r;
         public:
             Upgradable(RWLock& r) : _r(r) { 
                 r.lockAsUpgradable();
-                assert( _r.x == 0 );
-                _r.x++;
+                assert( _r.x == NilState );
+                _r.x = RWLock::UpgradableState;
             }
             ~Upgradable() {
-                if( _r.x == 1 )
+                if( _r.x == RWLock::UpgradableState ) {
+                    _r.x = NilState;
                     _r.unlockFromUpgradable();
+                }
                 else {
-                    assert( _r.x == 2 ); // has been upgraded
-                    _r.x = 0;
+                    assert( _r.x == Exclusive ); // has been upgraded
+                    _r.x = NilState;
                     _r.unlock();
                 }
             }

@@ -17,16 +17,15 @@
 
 #pragma once
 
-#include <map>
-#include <set>
 #include "../heapcheck.h"
+#include "threadlocal.h"
+#if defined(_DEBUG)
 #include "mutexdebugger.h"
+#endif
 
 namespace mongo {
 
     void printStackTrace( ostream &o );
-
-    class mutex;
 
     inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
@@ -138,8 +137,30 @@ namespace mongo {
         SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
         ~SimpleMutex() { DeleteCriticalSection(&_cs); }
 
-        void lock() { EnterCriticalSection(&_cs); }
-        void unlock() { LeaveCriticalSection(&_cs); }
+#if defined(_DEBUG)
+        ThreadLocalValue<int> _nlocksByMe;
+        void lock() { 
+            assert( _nlocksByMe.get() == 0 ); // indicates you rae trying to lock recursively
+            _nlocksByMe.set(1);
+            EnterCriticalSection(&_cs); 
+        }
+        void dassertLocked() const { 
+            assert( _nlocksByMe.get() == 1 );
+        }
+        void unlock() { 
+            dassertLocked();
+            _nlocksByMe.set(0);
+            LeaveCriticalSection(&_cs); 
+        }
+#else
+        void dassertLocked() const { }
+        void lock() { 
+            EnterCriticalSection(&_cs); 
+        }
+        void unlock() { 
+            LeaveCriticalSection(&_cs); 
+        }
+#endif;
 
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
@@ -154,6 +175,7 @@ namespace mongo {
 #else
     class SimpleMutex : boost::noncopyable {
     public:
+        void dassertLocked() const { }
         SimpleMutex(const char* name) { assert( pthread_mutex_init(&_lock,0) == 0 ); }
         ~SimpleMutex(){ 
             if ( ! StaticObserver::_destroyingStatics ) { 
