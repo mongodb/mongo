@@ -25,6 +25,7 @@ function durPassThrough() {
         function _run(x) {
             if (/[\/\\]_/.test(x.name) ||
                     !/\.js$/.test(x.name) ||
+		    x.name == 'jstests/mr_auth.js' ||
                     /repair/.test(x.name) ||
                     //		/numberlong/.test(x.name) ||
                     false // placeholder so all real tests end in ||
@@ -61,7 +62,10 @@ function durPassThrough() {
     if( !skippingTo ) {
 	    // run something that will almost surely pass and is fast just to make sure our framework 
 	    // here is really working
+
 	    runTest({ name: 'jstests/basic1.js' });
+
+	    runTest({ name: 'jstests/update.js' });
 
 	    // run "suspicious" tests early.  these are tests that have ever failed in buildbot.  we run them 
 	    // early and try to get a fail fast
