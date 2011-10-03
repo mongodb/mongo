@@ -115,7 +115,7 @@ namespace mongo {
         // safe as we pass by value:
         V get(K k) { 
             SimpleMutex::scoped_lock lk(m);
-            map<K,V>::iterator i = val.find(k);
+            typename map<K,V>::iterator i = val.find(k);
             if( i == val.end() )
                 return K();
             return i->second;
