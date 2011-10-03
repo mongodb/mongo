@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "mutex.h"
+#include "spin_lock.h"
 
 namespace mongo {
 
@@ -45,35 +45,40 @@ namespace mongo {
         }
     };
 
+    /** there is now one mutex per DiagStr.  If you have hundreds or millions of
+        DiagStrs you'll need to do something different.
+    */
     class DiagStr {
+        mutable SpinLock m;
         string _s;
-        static SimpleMutex m;
     public:
         DiagStr(const DiagStr& r) : _s(r.get()) { }
+        DiagStr(const string& r) : _s(r) { }
         DiagStr() { }
         bool empty() const { 
-            SimpleMutex::scoped_lock lk(m);
+            scoped_spinlock lk(m);
             return _s.empty();
         }
         string get() const { 
-            SimpleMutex::scoped_lock lk(m);
+            scoped_spinlock lk(m);
             return _s;
         }
-
         void set(const char *s) {
-            SimpleMutex::scoped_lock lk(m);
+            scoped_spinlock lk(m);
             _s = s;
         }
         void set(const string& s) { 
-            SimpleMutex::scoped_lock lk(m);
+            scoped_spinlock lk(m);
             _s = s;
         }
         operator string() const { return get(); }
         void operator=(const string& s) { set(s); }
         void operator=(const DiagStr& rhs) { 
-            SimpleMutex::scoped_lock lk(m);
-            _s = rhs.get();
+            set( rhs.get() );
         }
+
+        // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
+        bool operator==(const string& s) const; 
     };
 
     /** Thread safe map.  

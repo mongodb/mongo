@@ -286,10 +286,9 @@ namespace mongo {
     // ------ hostname -------------------
 
     string hostbyname(const char *hostname) {
-        {
+        if( *hostname == '#' ) {
             string s = dynHostNames.get(hostname);
-            if( !s.empty() )
-                return s;
+            return s;
         }
 
         string addr =  SockAddr(hostname, 0).getAddr();
@@ -311,7 +310,7 @@ namespace mongo {
         return buf;
     }
 
-    string _hostNameCached;
+    DiagStr _hostNameCached;
     static void _hostNameCachedInit() {
         _hostNameCached = getHostName();
     }
