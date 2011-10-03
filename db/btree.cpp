@@ -39,7 +39,7 @@ namespace mongo {
     NOINLINE_DECL void checkFailed(unsigned line) {
         static time_t last;
         if( time(0) - last >= 10 ) { 
-            msgasserted(0, str::stream() << "error in index possibly corruption consider repairing " << line);
+            msgasserted(15898, str::stream() << "error in index possibly corruption consider repairing " << line);
         }
     }
 
