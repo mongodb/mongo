@@ -72,7 +72,7 @@ namespace mongo {
         void operator=(const string& s) { set(s); }
         void operator=(const DiagStr& rhs) { 
             SimpleMutex::scoped_lock lk(m);
-            _s = rhs._s;
+            _s = rhs.get();
         }
     };
 
