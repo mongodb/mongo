@@ -20,7 +20,7 @@
 
 #include "pch.h"
 #include "connpool.h"
-#include "../db/commands.h"
+//#include "../db/commands.h"
 #include "syncclusterconnection.h"
 #include "../s/shard.h"
 
@@ -402,39 +402,6 @@ namespace mongo {
         : _host( shard->getConnString() ) , _conn( pool.get(_host, socketTimeout) ), _socketTimeout( socketTimeout ) {
         _setSocketTimeout();
     }
-
-
-    class PoolFlushCmd : public Command {
-    public:
-        PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
-        virtual void help( stringstream &help ) const { help<<"internal"; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
-            pool.flush();
-            return true;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-
-    } poolFlushCmd;
-
-    class PoolStats : public Command {
-    public:
-        PoolStats() : Command( "connPoolStats" ) {}
-        virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
-            pool.appendInfo( result );
-            result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
-            result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );
-            return true;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-
-    } poolStatsCmd;
 
     AtomicUInt AScopedConnection::_numConnections;
 

@@ -65,8 +65,11 @@ namespace mongo {
                     p->clearCounters();
 
                     if ( ! p->recv(m) ) {
-                        if( !cmdLine.quiet )
-                            log() << "end connection " << otherSide << endl;
+                        if( !cmdLine.quiet ){
+                            int conns = connTicketHolder.used()-1;
+                            const char* word = (conns == 1 ? " connection" : " connections");
+                            log() << "end connection " << otherSide << " (" << conns << word << " now open)" << endl;
+                        }
                         p->shutdown();
                         break;
                     }

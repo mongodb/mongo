@@ -29,6 +29,7 @@
 #include "extsort.h"
 #include "compact.h"
 #include "../util/concurrency/task.h"
+#include "../util/timer.h"
 
 namespace mongo {
 

@@ -62,7 +62,11 @@ namespace mongo {
         ElementMatcher( BSONElement e , int op , const BSONObj& array, bool isNot );
 
         ~ElementMatcher() { }
-
+        
+        bool negativeCompareOp() const { return _compareOp == BSONObj::NE || _compareOp == BSONObj::NIN; }
+        int inverseOfNegativeCompareOp() const;
+        bool negativeCompareOpContainsNull() const;
+        
         BSONElement _toMatch;
         int _compareOp;
         bool _isNot;
@@ -124,7 +128,11 @@ namespace mongo {
             const BSONElement& toMatch, const BSONObj& obj,
             int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details );
 
-        int matchesNe(
+        /**
+         * Perform a NE or NIN match by returning the inverse of the opposite matching operation.
+         * Missing values are considered matches unless the match must not equal null.
+         */
+        int inverseMatch(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
             const ElementMatcher&bm, MatchDetails * details );

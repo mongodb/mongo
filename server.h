@@ -10,6 +10,7 @@
 #pragma once
 
 #include "bson/inline_decls.h"
+using namespace bson;
 
 /* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
 
@@ -20,6 +21,18 @@
 #define unlikely MONGO_unlikely
 
 // prefetch data from memory
-#define PREFETCH MONGOPREFETCH
+//#define PREFETCH MONGOPREFETCH
 
-using namespace bson;
+#if defined(__GNUC__)
+
+#define CACHEALIGN __attribute__((aligned(64))
+
+#elif defined(_MSC_VER)
+
+#define CACHEALIGN __declspec(align(64)) 
+
+#else
+
+#define CACHEALIGN 
+
+#endif

@@ -51,24 +51,16 @@ namespace mongo {
                 userObj = conn->findOne(systemUsers, query);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
+                    conn.done(); // return to pool
                     return false;
                 }
             }
 
             pwd = userObj.getStringField("pwd");
+
+            conn.done(); // return to pool
         }
         return true;
-    }
-
-    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
-        AuthenticationInfo *ai = ClientInfo::get()->getAuthenticationInfo();
-
-        if ( readOnly ) {
-            ai->authorizeReadOnly( dbname , user );
-        }
-        else {
-            ai->authorize( dbname , user );
-        }
     }
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {

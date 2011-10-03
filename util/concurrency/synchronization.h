@@ -45,7 +45,8 @@ namespace mongo {
 
     private:
         mongo::mutex _mutex;          // protects state below
-        bool _notified;               // was notifyOne() issued?
+        unsigned long long lookFor;
+        unsigned long long cur;
         boost::condition _condition;  // cond over _notified being true
     };
 

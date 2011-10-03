@@ -53,6 +53,9 @@ namespace mongo {
             ("host,h",po::value<string>(), "mongo host to connect to ( <set name>/s1,s2 for sets)" )
             ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
             ("ipv6", "enable IPv6 support (disabled by default)")
+#ifdef MONGO_SSL
+            ("ssl", "use all for connections")
+#endif
 
             ("username,u",po::value<string>(), "username" )
             ("password,p", new PasswordValue( &_password ), "password" )
@@ -169,6 +172,13 @@ namespace mongo {
                 logLevel = s.length();
             }
         }
+
+
+#ifdef MONGO_SSL
+        if (_params.count("ssl")) {
+            mongo::cmdLine.sslOnNormalPorts = true;
+        }
+#endif
 
         preSetup();
 
@@ -289,7 +299,7 @@ namespace mongo {
 	}
 
         if ( currentClient.get() )
-            currentClient->shutdown();
+            currentClient.get()->shutdown();
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );
@@ -392,7 +402,7 @@ namespace mongo {
             // findOne throws an AssertionException if it's not authenticated.
             if (_coll.size() > 0) {
                 // BSONTools don't have a collection
-                conn().findOne(getNS(), Query("{}"));
+                conn().findOne(getNS(), Query("{}"), 0, QueryOption_SlaveOk);
             }
             return;
         }
@@ -406,7 +416,7 @@ namespace mongo {
         if ( _conn->auth( "admin" , _username , _password , errmsg ) )
             return;
 
-        throw UserException( 9997 , (string)"auth failed: " + errmsg );
+        throw UserException( 9997 , (string)"authentication failed: " + errmsg );
     }
 
     BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )
@@ -441,7 +451,7 @@ namespace mongo {
 
         FILE* file = fopen( _fileName.c_str() , "rb" );
         if ( ! file ) {
-            log() << "error opening file: " << _fileName << endl;
+            log() << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
             return 0;
         }
 

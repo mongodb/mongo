@@ -29,6 +29,7 @@
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
+#include "../util/timer.h"
 
 #include "chunk.h" // for static genID only
 #include "config.h"

@@ -277,7 +277,6 @@ namespace mongo {
                     log() << "replSet reconfig error with member: " << m.h.toString() << " arbiterOnly cannot change. remove and readd the member instead " << rsLog;
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
-                uassert(14827, "arbiters cannot have tags", !m.arbiterOnly || m.tags.size() == 0 );
             }
             if( m.h.isSelf() )
                 me++;
@@ -298,9 +297,29 @@ namespace mongo {
         _ok = false;
     }
 
+    void ReplSetConfig::setMajority() {
+        int total = members.size();
+        int nonArbiters = total;
+        int strictMajority = total/2+1;
+
+        for (vector<MemberCfg>::iterator it = members.begin(); it < members.end(); it++) {
+            if ((*it).arbiterOnly) {
+                nonArbiters--;
+            }
+        }
+
+        // majority should be all "normal" members if we have something like 4
+        // arbiters & 3 normal members
+        _majority = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
+    }
+
+    int ReplSetConfig::getMajority() const {
+        return _majority;
+    }
+
     void ReplSetConfig::checkRsConfig() const {
         uassert(13132,
-                "nonmatching repl set name in _id field; check --replSet command line",
+                str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. " << cmdLine.ourSetName(),
                 _id == cmdLine.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
@@ -500,6 +519,7 @@ namespace mongo {
                     for (BSONObj::iterator c = t.begin(); c.more(); c.next()) {
                         m.tags[(*c).fieldName()] = (*c).String();
                     }
+                    uassert(14827, "arbiters cannot have tags", !m.arbiterOnly || m.tags.empty() );
                 }
                 m.check();
             }
@@ -535,6 +555,9 @@ namespace mongo {
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
         }
+
+        // figure out the majority for this config
+        setMajority();
     }
 
     static inline void configAssert(bool expr) {

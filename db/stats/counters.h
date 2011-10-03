@@ -74,6 +74,7 @@ namespace mongo {
     public:
         IndexCounters();
 
+        // used without a mutex intentionally (can race)
         void btree( char * node ) {
             if ( ! _memSupported )
                 return;

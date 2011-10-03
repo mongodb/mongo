@@ -267,7 +267,18 @@ namespace mongo {
 
     // --- engine ---
 
+//    void fatalHandler(const char* s1, const char* s2) {
+//        cout << "Fatal handler " << s1 << " " << s2;
+//    }
+
     V8ScriptEngine::V8ScriptEngine() {
+        int K = 1024;
+        v8::ResourceConstraints rc;
+        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size(64 * K * K);
+        v8::SetResourceConstraints(&rc);
+        v8::V8::IgnoreOutOfMemoryException();
+//        v8::V8::SetFatalErrorHandler(fatalHandler);
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -385,6 +396,12 @@ namespace mongo {
         lzArrayTemplate.Dispose();
         roObjectTemplate.Dispose();
         internalFieldObjects.Dispose();
+    }
+
+    bool V8Scope::hasOutOfMemoryException() {
+        if (!_context.IsEmpty())
+            return _context->HasOutOfMemoryException();
+        return false;
     }
 
     /**
@@ -701,7 +718,7 @@ namespace mongo {
         if (recv != 0)
             v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
         else
-            v8recv = _emptyObj;
+            v8recv = _global;
 
         enableV8Interrupt(); // because of v8 locker we can check interrupted, then enable
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( v8recv , nargs , nargs ? args.get() : 0 );
@@ -967,7 +984,7 @@ namespace mongo {
                 break;
 
             case CodeWScope:
-                if ( f.codeWScopeObject().isEmpty() )
+                if ( !f.codeWScopeObject().isEmpty() )
                     log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
                 o->Set( name, newFunction( f.codeWScopeCode() ) );
                 break;
@@ -1174,7 +1191,7 @@ namespace mongo {
             return newFunction( f.valuestr() );
 
         case CodeWScope:
-            if ( f.codeWScopeObject().isEmpty() )
+            if ( !f.codeWScopeObject().isEmpty() )
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction( f.codeWScopeCode() );
 

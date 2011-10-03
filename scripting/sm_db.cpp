@@ -245,13 +245,12 @@ namespace mongo {
 
         int nToReturn = (int) c.toNumber( argv[3] );
         int nToSkip = (int) c.toNumber( argv[4] );
-        bool slaveOk = c.getBoolean( obj , "slaveOk" );
         int batchSize = (int) c.toNumber( argv[5] );
         int options = (int)c.toNumber( argv[6] );
 
         try {
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , options , batchSize );
             if ( ! cursor.get() ) {
                 log() << "query failed : " << ns << " " << q << " to: " << conn->toString() << endl;
                 JS_ReportError( cx , "error doing query: failed" );
@@ -314,11 +313,35 @@ namespace mongo {
         string ns = c.toString( argv[0] );
 
         try {
-            BSONObj o = c.toObject( argv[1] );
-            // TODO: add _id
+            JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
 
-            conn->insert( ns , o );
-            return JS_TRUE;
+            if( JS_IsArrayObject( cx, insertObj ) ){
+                vector<BSONObj> bos;
+
+                jsuint len;
+                JSBool gotLen = JS_GetArrayLength( cx, insertObj, &len );
+                smuassert( cx, "could not get length of array", gotLen );
+
+                for( jsuint i = 0; i < len; i++ ){
+
+                    jsval el;
+                    JSBool inserted = JS_GetElement( cx, insertObj, i, &el);
+                    smuassert( cx, "could not find element in array object", inserted );
+
+                    bos.push_back( c.toObject( el ) );
+                }
+
+                conn->insert( ns, bos );
+
+                return JS_TRUE;
+            }
+            else {
+                BSONObj o = c.toObject( argv[1] );
+                // TODO: add _id
+
+                conn->insert( ns , o );
+                return JS_TRUE;
+            }
         }
         catch ( std::exception& e ) {
             stringstream ss;
@@ -1066,7 +1089,7 @@ zzz
             c.setProperty( obj , "_batchSize" , JSVAL_ZERO );
 
         if ( argc > 9 && JSVAL_IS_NUMBER( argv[9] ) )
-            c.setProperty( obj , "_options" , argv[8] );
+            c.setProperty( obj , "_options" , argv[9] );
         else
             c.setProperty( obj , "_options" , JSVAL_ZERO );
 

@@ -135,7 +135,7 @@ namespace mongo {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
-                s << color( linkify( clean(v,i).c_str() ) );
+                s << color( linkify( clean(v,i).c_str() ) ) << '\n';
             }
             else {
                 stringstream x;

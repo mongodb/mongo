@@ -1299,6 +1299,11 @@ namespace mongo {
 
         }
 
+        bool hasOutOfMemoryException() {
+            string err = getError();
+            return err.find("out of memory") != string::npos;
+        }
+
         void externalSetup() {
             smlock;
             uassert( 10224 ,  "already local connected" , ! _localConnect );

@@ -116,12 +116,9 @@ printjson(e);
 
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
-result = s.getDB("test").runCommand({getLastError : 1});
-assert.eq(result.err, "unauthorized");
-
-logout(adminUser);
 
 login(testUser);
+assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});

@@ -129,6 +129,13 @@ namespace mongo {
         dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
 
+    // this gets called when new fails to allocate memory
+    void my_new_handler() {
+        rawOut( "out of memory, printing stack and exiting:" );
+        printStackTrace();
+        ::exit(EXIT_ABRUPT);
+    }
+
     void setupSignals( bool inFork ) {
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
@@ -142,6 +149,8 @@ namespace mongo {
 #if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
 #endif
+
+        set_new_handler( my_new_handler );
     }
 
     void init() {

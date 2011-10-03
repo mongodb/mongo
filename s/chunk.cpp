@@ -61,6 +61,8 @@ namespace mongo {
 
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
+        
+        _jumbo = from["jumbo"].trueValue();
 
         uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
         uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
@@ -73,7 +75,7 @@ namespace mongo {
 
 
     Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
-        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0), _dataWritten(mkDataWritten())
+        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0), _jumbo(false), _dataWritten(mkDataWritten())
     {}
 
     long Chunk::mkDataWritten() {
@@ -484,6 +486,22 @@ namespace mongo {
 
     ShardKeyPattern Chunk::skey() const {
         return _manager->getShardKey();
+    }
+
+    void Chunk::markAsJumbo() const {
+        // set this first
+        // even if we can't set it in the db
+        // at least this mongos won't try and keep moving
+        _jumbo = true;
+
+        try {
+            ScopedDbConnection conn( configServer.modelServer() );
+            conn->update( chunkMetadataNS , BSON( "_id" << genID() ) , BSON( "$set" << BSON( "jumbo" << true ) ) );
+            conn.done();
+        }
+        catch ( std::exception& ) {
+            warning() << "couldn't set jumbo for chunk: " << genID() << endl;
+        }
     }
 
     // -------  ChunkManager --------

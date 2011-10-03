@@ -18,6 +18,7 @@
 #pragma once
 
 #include "jsobj.h"
+#include "queryutil.h"
 
 namespace mongo {
 
@@ -31,7 +32,7 @@ namespace mongo {
      */
     class QueryPattern {
     public:
-        friend class FieldRangeSet;
+        QueryPattern( const FieldRangeSet &frs, const BSONObj &sort );
         enum Type {
             Equality,
             LowerBound,
@@ -43,8 +44,9 @@ namespace mongo {
         bool operator==( const QueryPattern &other ) const;
         /** for testing only */
         bool operator!=( const QueryPattern &other ) const;
+        /** for development / debugging */
+        string toString() const;
     private:
-        QueryPattern() {}
         void setSort( const BSONObj sort );
         static BSONObj normalizeSort( const BSONObj &spec );
         map<string,Type> _fieldTypes;

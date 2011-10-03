@@ -29,7 +29,7 @@
  */
 namespace mongo {
 
-    boost::thread_specific_ptr<Client> currentClient;
+    TSP_DEFINE(Client,currentClient)
 
     Client::Client(const char *desc , AbstractMessagingPort *p) :
         _context(0),

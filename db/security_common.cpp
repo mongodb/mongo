@@ -28,7 +28,7 @@
 #include "commands.h"
 #include "nonce.h"
 #include "../util/md5.hpp"
-
+#include "client_common.h"
 #include <sys/stat.h>
 
 namespace mongo {
@@ -106,6 +106,20 @@ namespace mongo {
 
         return true;
     }
+
+    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
+        ClientBasic* c = ClientBasic::getCurrent();
+        assert(c);
+        AuthenticationInfo *ai = c->getAuthenticationInfo();
+
+        if ( readOnly ) {
+            ai->authorizeReadOnly( dbname , user );
+        }
+        else {
+            ai->authorize( dbname , user );
+        }
+    }
+
 
     bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
         {

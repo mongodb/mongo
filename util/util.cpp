@@ -21,8 +21,22 @@
 #include "file_allocator.h"
 #include "optime.h"
 #include "time_support.h"
+#include "mongoutils/str.h"
+#include "timer.h"
 
 namespace mongo {
+
+#if defined(_WIN32)
+    unsigned long long Timer::countsPerSecond;
+    struct AtStartup {
+        AtStartup() {
+            LARGE_INTEGER x;
+            bool ok = QueryPerformanceFrequency(&x);
+            assert(ok);
+            Timer::countsPerSecond = x.QuadPart;
+        }
+    } atstartuputil;
+#endif
 
     string hexdump(const char *data, unsigned len) {
         assert( len < 1000000 );
@@ -46,6 +60,13 @@ namespace mongo {
         static unsigned N = 0;
 
         if ( strcmp( name , "conn" ) == 0 ) {
+            string* x = _threadName.get();
+            if ( x && mongoutils::str::startsWith( *x , "conn" ) ) {
+                int n = atoi( x->c_str() + 4 );
+                if ( n > 0 )
+                    return n;
+                warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
+            }
             unsigned n = ++N;
             stringstream ss;
             ss << name << n;

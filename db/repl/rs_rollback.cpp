@@ -341,7 +341,7 @@ namespace mongo {
                 {
                     /* TODO : slow.  lots of round trips. */
                     n++;
-                    bo good= them->findOne(d.ns, d._id.wrap()).getOwned();
+                    bo good= them->findOne(d.ns, d._id.wrap(), NULL, QueryOption_SlaveOk).getOwned();
                     totSize += good.objsize();
                     uassert( 13410, "replSet too much data to roll back", totSize < 300 * 1024 * 1024 );
 

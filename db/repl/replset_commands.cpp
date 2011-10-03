@@ -200,6 +200,11 @@ namespace mongo {
                 log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
                 throw;
             }
+            catch( string& se ) {
+                log() << "replSet reconfig exception: " << se << rsLog;
+                errmsg = se;
+                return false;
+            }
 
             return true;
         }
@@ -279,6 +284,27 @@ namespace mongo {
             return theReplSet->stepDown(secs);
         }
     } cmdReplSetStepDown;
+
+    class CmdReplSetMaintenance: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "{ replSetMaintenance : bool }\n";
+            help << "Enable or disable maintenance mode.";
+        }
+
+        CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
+            if( theReplSet->box.getState().primary() ) {
+                errmsg = "primaries can't modify maintenance mode";
+                return false;
+            }
+
+            theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue());
+            return true;
+        }
+    } cmdReplSetMaintenance;
 
     using namespace bson;
     using namespace mongoutils::html;

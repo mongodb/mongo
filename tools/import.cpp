@@ -396,7 +396,7 @@ public:
                         break;
                     }
                     len += bytesProcessed;
-                    line += len;
+                    line += bytesProcessed;
                 }
                 else {
                     if (!parseRow(in, o, len)) {

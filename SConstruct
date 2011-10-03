@@ -376,9 +376,11 @@ serverOnlyFiles = Split( "util/compress.cpp db/key.cpp db/btreebuilder.cpp util/
 serverOnlyFiles += [ "db/index.cpp" , "db/scanandorder.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
-serverOnlyFiles += Glob( "db/commands/*.cpp" )
-coreServerFiles += Glob( "db/stats/*.cpp" )
+serverOnlyFiles += [ "db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+
+coreServerFiles += Glob( "db/stats/*.cpp" )
+coreServerFiles += [ "db/commands/isself.cpp" ]
 
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
@@ -673,7 +675,7 @@ if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
-        env.Append( CPPFLAGS=" -Werror " )
+        env.Append( CPPFLAGS=" -Werror -pipe " )
         if not has_option('clang'): 
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
@@ -744,6 +746,8 @@ if "uname" in dir(os):
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
     env.Append( LIBS=["ssl"] )
+    if darwin:
+        env.Append( LIBS=["crypto"] )
 
 try:
     umask = os.umask(022)
@@ -946,7 +950,7 @@ def doConfigure( myenv , shell=False ):
                     found = True
                     break
             if not found:
-                raise "can't find a static %s" % l
+                raise RuntimeError("can't find a static %s" % l)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
@@ -1079,7 +1083,7 @@ Default( mongod )
 
 # tools
 allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
-normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" ]
+normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" , "oplog" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
     env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )

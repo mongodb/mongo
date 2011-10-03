@@ -25,6 +25,7 @@
 #include "../db/commands.h"
 #include "../db/queryutil.h"
 #include "../scripting/engine.h"
+#include "../util/timer.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -1349,7 +1350,22 @@ namespace mongo {
                 anObjBuilder.append( "help" , help.str() );
             }
             else {
-                ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
+                try {
+                    ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
+                }
+                catch (DBException& e) {
+                    int code = e.getCode();
+                    if (code == 9996) { // code for StaleConfigException
+                        throw;
+                    }
+
+                    {
+                        stringstream ss;
+                        ss << "exception: " << e.what();
+                        anObjBuilder.append( "errmsg" , ss.str() );
+                        anObjBuilder.append( "code" , code );
+                    }
+                }
             }
 
             BSONObj tmp = anObjBuilder.asTempObj();

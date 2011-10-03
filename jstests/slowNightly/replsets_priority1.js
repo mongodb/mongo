@@ -165,6 +165,9 @@ for (i=0; i<n; i++) {
 
     rs.restart(max._id);
     master = rs.getMaster();
+
+    print("Restarted max.  Checking statuses.");
+    checkPrimaryIs(max);
 }
 
 print("priority1.js SUCCESS!");

@@ -27,6 +27,7 @@
 #include "../curop-inl.h"
 #include "../matcher.h"
 #include "core.h"
+#include "../../util/timer.h"
 
 // Note: we use indexinterface herein to talk to the btree code. In the future it would be nice to 
 //       be able to use the V1 key class (see key.h) instead of toBson() which has some cost.
@@ -527,6 +528,13 @@ namespace mongo {
             if( _min._y < g->_min ) _min._y = g->_min;
             if( _max._x > g->_max ) _max._x = g->_max;
             if( _max._y > g->_max ) _max._y = g->_max;
+        }
+
+        void fudge( const Geo2dType* g ) {
+            _min._x -= g->_error;
+            _min._y -= g->_error;
+            _max._x += g->_error;
+            _max._y += g->_error;
         }
 
         bool onBoundary( Point p, double fudge = 0 ) {
@@ -2305,6 +2313,9 @@ namespace mongo {
             _want._min = Point( i.next() );
             _want._max = Point( i.next() );
 
+            _wantRegion = _want;
+            _wantRegion.fudge( g ); // Need to make sure we're checking regions within error bounds of where we want
+            fixBox( g, _wantRegion );
             fixBox( g, _want );
 
             uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
@@ -2323,18 +2334,18 @@ namespace mongo {
         }
 
         void fixBox( const Geo2dType* g, Box& box ) {
-            if( _want._min._x > _want._max._x )
-                swap( _want._min._x, _want._max._x );
-            if( _want._min._y > _want._max._y )
-                swap( _want._min._y, _want._max._y );
+            if( box._min._x > box._max._x )
+                swap( box._min._x, box._max._x );
+            if( box._min._y > box._max._y )
+                swap( box._min._y, box._max._y );
 
             double gMin = g->_min;
             double gMax = g->_max;
 
-            if( _want._min._x < gMin ) _want._min._x = gMin;
-            if( _want._min._y < gMin ) _want._min._y = gMin;
-            if( _want._max._x > gMax) _want._max._x = gMax;
-            if( _want._max._y > gMax ) _want._max._y = gMax;
+            if( box._min._x < gMin ) box._min._x = gMin;
+            if( box._min._y < gMin ) box._min._y = gMin;
+            if( box._max._x > gMax) box._max._x = gMax;
+            if( box._max._y > gMax ) box._max._y = gMax;
         }
 
         void swap( double& a, double& b ) {
@@ -2352,7 +2363,7 @@ namespace mongo {
         }
 
         virtual double intersectsBox( Box& cur ) {
-            return cur.intersects( _want );
+            return cur.intersects( _wantRegion );
         }
 
         virtual KeyResult approxKeyCheck( const Point& p, double& d ) {
@@ -2366,6 +2377,7 @@ namespace mongo {
         }
 
         Box _want;
+        Box _wantRegion;
         double _wantLen;
         double _fudge;
 
@@ -2392,7 +2404,8 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
-            _bounds.truncate( g );
+            _bounds.fudge( g ); // We need to check regions within the error bounds of these bounds
+            _bounds.truncate( g ); // We don't need to look anywhere outside the space
 
             _maxDim = _g->_error + _bounds.maxDim() / 2;
 
@@ -2528,7 +2541,7 @@ namespace mongo {
                         shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query, uniqueDocs ) );
                         return c;
                     }
-                    throw UserException( 13058 , (string)"unknown $within type: " + type );
+                    throw UserException( 13058 , str::stream() << "unknown $within information : " << context << ", a shape must be specified." );
                 }
                 default:
                     // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center
@@ -2635,7 +2648,10 @@ namespace mongo {
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
                 bb.append( "dis" , dis );
-                if( includeLocs ) bb.append( "loc" , p._pt );
+                if( includeLocs ){
+                    if( p._pt.couldBeArray() ) bb.append( "loc", BSONArray( p._pt ) );
+                    else bb.append( "loc" , p._pt );
+                }
                 bb.append( "obj" , p._o );
                 bb.done();
             }

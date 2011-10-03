@@ -204,6 +204,7 @@ them both to 0; an emulation function will be used. */
 /* Define if linking statically (TODO: make nice with Libtool) */
 /* mongodb */
 #define PCRE_STATIC 
+#define PCRECPP_STATIC
 
 /* When calling PCRE via the POSIX interface, additional working storage is
    required for holding the pointers to capturing substrings because PCRE

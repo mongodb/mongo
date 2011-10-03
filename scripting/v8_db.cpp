@@ -314,9 +314,6 @@ namespace mongo {
             fields = scope->v8ToMongo( args[2]->ToObject() );
 
         Local<v8::Object> mongo = args.This();
-        Local<v8::Value> slaveOkVal = mongo->Get( scope->getV8Str( "slaveOk" ) );
-        jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
-        bool slaveOk = slaveOkVal->BooleanValue();
 
         try {
             auto_ptr<mongo::DBClientCursor> cursor;
@@ -326,7 +323,9 @@ namespace mongo {
             int options = (int)(args[6]->ToNumber()->Value());
             {
                 V8Unlock u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
+                if ( ! cursor.get() ) 
+                    return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( scope->getV8Str( "internalCursor" ) ) ) );
             assert( cons );
@@ -354,20 +353,53 @@ namespace mongo {
 
         v8::Handle<v8::Object> in = args[1]->ToObject();
 
-        if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
-            v8::Handle<v8::Value> argv[1];
-            in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
-        }
+        if( args[1]->IsArray() ){
 
-        BSONObj o = scope->v8ToMongo( in );
+            v8::Local<v8::Array> arr = v8::Array::Cast( *args[1] );
+            vector<BSONObj> bos;
+            uint32_t len = arr->Length();
 
-        DDD( "want to save : " << o.jsonString() );
-        try {
-            V8Unlock u;
-            conn->insert( ns , o );
+            for( uint32_t i = 0; i < len; i++ ){
+
+                v8::Local<v8::Object> el = arr->CloneElementAt( i );
+
+                // Set ID on the element if necessary
+                if ( ! el->Has( scope->getV8Str( "_id" ) ) ) {
+                    v8::Handle<v8::Value> argv[1];
+                    el->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
+                }
+
+                bos.push_back( scope->v8ToMongo( arr->CloneElementAt( i ) ) );
+            }
+
+            DDD( "want to save batch : " << bos.length );
+            try {
+                V8Unlock u;
+                conn->insert( ns , bos );
+            }
+            catch ( ... ) {
+                return v8::ThrowException( v8::String::New( "socket error on bulk insert" ) );
+            }
+
         }
-        catch ( ... ) {
-            return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+        else {
+
+            if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
+                v8::Handle<v8::Value> argv[1];
+                in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
+            }
+
+            BSONObj o = scope->v8ToMongo( in );
+
+            DDD( "want to save : " << o.jsonString() );
+            try {
+                V8Unlock u;
+                conn->insert( ns , o );
+            }
+            catch ( ... ) {
+                return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+            }
+
         }
 
         return v8::Undefined();
@@ -579,8 +611,12 @@ namespace mongo {
         DDD( "collectionFallback [" << name << "]" );
 
         v8::Handle<v8::Value> real = info.This()->GetPrototype()->ToObject()->Get( name );
-        if ( ! real->IsUndefined() )
+        if ( !real->IsUndefined() )
             return real;
+
+        if (info.This()->HasRealNamedProperty(name)) {
+            return info.This()->GetRealNamedProperty( name );
+        }
 
         string sname = toSTLString( name );
         if ( sname[0] == '_' ) {
@@ -596,7 +632,10 @@ namespace mongo {
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
 
-        return f->Call( info.This() , 1 , argv );
+        v8::Local<v8::Value> coll = f->Call( info.This() , 1 , argv );
+        // cache collection for reuse
+        info.This()->Set(name, coll);
+        return coll;
     }
 
     v8::Handle<v8::Value> dbQueryIndexAccess( unsigned int index , const v8::AccessorInfo& info ) {

@@ -52,20 +52,23 @@ t.save({ loc : [3,-1] })  // Add a point below the center of the bottom
 assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman double point" );
 
 // Make sure we can't add bad polygons
+okay = true
 try{ 
 	t.find( { loc : { $within : { $polygon : [1, 2] } } } ).toArray()
-	assert( false )
+    okay = false
 }
 catch(e){}
+assert(okay)
 try{ 
 	t.find( { loc : { $within : { $polygon : [[1, 2]] } } } ).toArray()
-	assert( false )
+    okay = false
 }
 catch(e){}
+assert(okay)
 try{ 
 	t.find( { loc : { $within : { $polygon : [[1, 2], [2, 3]] } } } ).toArray()
-	assert( false )
+    okay = false
 }
 catch(e){}
-
+assert(okay)
 

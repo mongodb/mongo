@@ -79,7 +79,7 @@ prt("6: stop non-overflowed secondary")
 
 rsA.stop( goodSec, undefined, true )
 
-prt("7: check our regular and slaveok query")
+prt("7: check our regular and slaveOk query")
 
 assert.eq( coll.find().itcount(), collSOk.find().itcount() )
 
@@ -91,7 +91,7 @@ prt("9: wait for recovery")
 
 rsA.waitForState( rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 )
 
-prt("10: check our regular and slaveok query")
+prt("10: check our regular and slaveOk query")
 
 assert.eq( coll.find().itcount(), collSOk.find().itcount() )
 

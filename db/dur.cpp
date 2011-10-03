@@ -83,7 +83,7 @@ namespace mongo {
         */
         static void groupCommit();
 
-        CommitJob commitJob;
+        CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
         Stats stats;
 
@@ -123,7 +123,7 @@ namespace mongo {
             return ss.str();
         }
 
-        int getAgeOutJournalFiles();
+        //int getAgeOutJournalFiles();
         BSONObj Stats::S::_asObj() {
             BSONObjBuilder b;
             b << 
@@ -140,11 +140,11 @@ namespace mongo {
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
                            );
-            int r = getAgeOutJournalFiles();
+            /*int r = getAgeOutJournalFiles();
             if( r == -1 )
                 b << "ageOutJournalFiles" << "mutex timeout";
             if( r == 0 )
-                b << "ageOutJournalFiles" << false;
+                b << "ageOutJournalFiles" << false;*/
             if( cmdLine.journalCommitInterval != 0 )
                 b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
@@ -737,7 +737,10 @@ namespace mongo {
 
         void recover();
 
+        unsigned notesThisLock = 0;
+
         void releasingWriteLock() {
+            DEV notesThisLock = 0;
             // implicit commitIfNeeded check on each write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {

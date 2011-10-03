@@ -6,8 +6,12 @@
 //var skippingTo = /null.js/;
 var skippingTo = false;
 
+print("dur_passthrough.js starting mongod");
 conn = startMongodEmpty("--port", 30100, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles");
 db = conn.getDB("test");
+print("dur_passthrough.js 0");
+
+var lastRan = null;
 
 function durPassThrough() {
 
@@ -21,11 +25,13 @@ function durPassThrough() {
         function _run(x) {
             if (/[\/\\]_/.test(x.name) ||
                     !/\.js$/.test(x.name) ||
+		    x.name == 'jstests/mr_auth.js' ||
                     /repair/.test(x.name) ||
-//		/numberlong/.test(x.name) ||
+                    //		/numberlong/.test(x.name) ||
                     false // placeholder so all real tests end in ||
-                ) {
-                print("dur_passthrough.js >>>> skipping " + x.name);
+                ) 
+            {
+                print("dur_passthrough.js >>>> skipping test " + x.name);
                 return;
             }
             print();
@@ -36,21 +42,30 @@ function durPassThrough() {
         if (ran[x.name])
             return;
         ran[x.name] = true;
+	printjson(x);
         try {
+	    lastRan = x;
             _run(x);
         }
         catch (e) {
-            print("\n\n\n\ndur_passthrough.js FAIL " + x.name + "\n\n\n");
+            print("\n\n\n\ndur_passthrough.js FAIL");
+	    print("dur_passthrough.js failed test : " + x.name + "\n\n\n");
             throw e;
         }
+	print("after run");
     }
 
+    print("dur_passthrough.js 1");
     var files = listFiles("jstests");
+    print("dur_passthrough.js 2");
 
     if( !skippingTo ) {
 	    // run something that will almost surely pass and is fast just to make sure our framework 
 	    // here is really working
+
 	    runTest({ name: 'jstests/basic1.js' });
+
+	    runTest({ name: 'jstests/update.js' });
 
 	    // run "suspicious" tests early.  these are tests that have ever failed in buildbot.  we run them 
 	    // early and try to get a fail fast
@@ -63,7 +78,12 @@ function durPassThrough() {
 	    runTest({ name: 'jstests/shellkillop.js' });
     }
 
+    print("dur_passthrough.js 3");
+
     files = files.sort(compareOn('name'));
+
+    print("dur_passthrough.js 4");
+
     files.forEach(
         function (x) {
             if (skippingTo && !skippingTo.test(x.name)) {
@@ -73,17 +93,33 @@ function durPassThrough() {
             skippingTo = false;
 
             // to keep memory usage low on 32 bit:
-            db.adminCommand("closeAllDatabases");
-
+	    try {
+		db.adminCommand("closeAllDatabases");
+	    }
+	    catch(e) { 
+		print("dur_passthrough.js ERROR exception calling closeAllDatabases between tests : " + e);
+		throw(e);
+	    }
             runTest(x);
         }
     );
 
-    print("dur_passthrough.js stopMongod");
+    print("dur_passthrough.js ending, calling stopMongod");
     stopMongod(30100);
     var runnerEnd = new Date();
     print("dur_passthrough.js total runner time: " + ((runnerEnd.getTime() - runnerStart.getTime()) / 1000) + "secs")
 }
 
-durPassThrough();
-print("dur_passthrough.js SUCCESS");
+try {
+    durPassThrough();
+}
+catch(e) { 
+    print("\n\n\ndur_passthrough.js error, exception in dur_passthrough.js : " + e);
+    print("dur_passthrough.js FAIL");
+    print("dur_passthrough.js lastRan :");
+    printjson(lastRan);
+    print("\n\n\n");
+    throw e;
+}
+
+print("\n\n\ndur_passthrough.js SUCCESS\n\n\n");

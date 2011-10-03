@@ -57,30 +57,23 @@
 #include "../util/log.cpp"
 #include "../util/password.cpp"
 #include "../util/net/message_port.cpp"
-
 #include "../util/concurrency/thread_pool.cpp"
 #include "../util/concurrency/vars.cpp"
 #include "../util/concurrency/task.cpp"
 #include "../util/concurrency/spin_lock.cpp"
-
 #include "connpool.cpp"
 #include "syncclusterconnection.cpp"
 #include "dbclient.cpp"
 #include "clientOnly.cpp"
 #include "gridfs.cpp"
 #include "dbclientcursor.cpp"
-
 #include "../util/text.cpp"
 #include "dbclient_rs.cpp"
 #include "../bson/oid.cpp"
-
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
-//#include "../db/common.cpp"
 #include "../db/nonce.cpp"
-#include "../db/commands.cpp"
-
 #include "../pch.cpp"
 
 extern "C" {

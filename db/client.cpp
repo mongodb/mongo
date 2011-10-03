@@ -37,11 +37,12 @@
 #include "../scripting/engine.h"
 
 namespace mongo {
-
+  
     Client* Client::syncThread;
     mongo::mutex Client::clientsMutex("clientsMutex");
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
-    boost::thread_specific_ptr<Client> currentClient;
+
+    TSP_DEFINE(Client, currentClient)
 
 #if defined(_DEBUG)
     struct StackChecker;
@@ -285,13 +286,9 @@ namespace mongo {
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
-        if( theReplSet ) {
-            b.append("lastOp" , (long long) _lastOp);
-        }
-        else {
-            OpTime lo(_lastOp);
-            if ( ! lo.isNull() )
-                b.appendTimestamp( "lastOp" , lo.asDate() );
+        // _lastOp is never set if replication is off
+        if( theReplSet || ! _lastOp.isNull() ) {
+            b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
 
@@ -418,6 +415,8 @@ namespace mongo {
             b.append( "desc" , _client->desc() );
             if ( _client->_threadId.size() ) 
                 b.append( "threadId" , _client->_threadId );
+            if ( _client->_connectionId )
+                b.appendNumber( "connectionId" , _client->_connectionId );
         }
         
         if ( ! _message.empty() ) {
@@ -463,6 +462,10 @@ namespace mongo {
         if (theReplSet && o.hasField("member")) {
             theReplSet->ghost->associateSlave(_remoteId, o["member"].Int());
         }
+    }
+
+    ClientBasic* ClientBasic::getCurrent() {
+        return currentClient.get();
     }
 
     class HandshakeCmd : public Command {

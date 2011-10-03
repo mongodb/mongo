@@ -814,6 +814,7 @@ namespace mongo {
 
                 const char * fieldName = f.fieldName();
 
+                uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
                 uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
                 uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
                 uassert( 10150 ,  "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
@@ -1254,6 +1255,8 @@ namespace mongo {
                         if ( modsIsIndexed ) {
                             seenObjects.insert( loc );
                         }
+
+                        d->paddingFits();
                     }
                     else {
                         if ( rs )
@@ -1354,7 +1357,8 @@ namespace mongo {
                 logOp( "i", ns, no );
             return UpdateResult( 0 , 0 , 1 , no );
         }
-        return UpdateResult( 0 , 0 , 0 );
+
+        return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {

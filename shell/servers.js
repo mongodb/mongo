@@ -191,6 +191,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numMongos = params.mongos || 1
         otherParams = params.other || {}
         keyFile = params.keyFile || otherParams.keyFile
+        otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
+        otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
     }
     
     this._testName = testName;
@@ -235,7 +237,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             rs.awaitReplication();
 	    var xxx = new Mongo( rs.getURL() );
 	    xxx.name = rs.getURL();
-            this._connections.push( xxx );
+            this._connections.push( xxx )
+            this["shard" + i] = xxx
         }
         
         this._configServers = []
@@ -260,6 +263,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var conn = startMongodTest( 30000 + i , testName + i, 0, options );
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
+            this["shard" + i] = conn
         }
 
         if ( otherParams.sync ){
@@ -560,7 +564,8 @@ printShardingStatus = function( configDB , verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
-                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) + " " +
+                                                ( chunk.jumbo ? "jumbo " : "" ) );
                                     }
                                 );
                             }
@@ -760,8 +765,8 @@ ShardingTest.prototype.isSharded = function( collName ){
 
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     
-    split = split || key;
-    move = move || split;
+    split = ( split != false ? ( split || key ) : split )
+    move = ( split != false && move != false ? ( move || split ) : false )
     
     if( collName.getDB )
         dbName = "" + collName.getDB()
@@ -782,12 +787,16 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
         assert( false )
     }
     
+    if( split == false ) return
+    
     result = this.s.adminCommand( { split : c , middle : split } );
     if( ! result.ok ){
         printjson( result )
         assert( false )
     }
         
+    if( move == false ) return
+    
     var result = null
     for( var i = 0; i < 5; i++ ){
         result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
@@ -1706,6 +1715,11 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     return this.start( n , options , true, wait );
 }
 
+ReplSetTest.prototype.stopMaster = function( signal , wait ) {
+    var master = this.getMaster();
+    var master_id = this.getNodeId( master );
+    return this.stop( master_id , signal , wait );
+}
 
 // Stops a particular node or nodes, specified by conn or id
 ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){

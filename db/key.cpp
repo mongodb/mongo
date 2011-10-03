@@ -232,6 +232,13 @@ namespace mongo {
         _keyData = (const unsigned char *) b.buf();
     }
 
+    KeyV1Owned::KeyV1Owned(const KeyV1& rhs) {
+        b.appendBuf( rhs.data(), rhs.dataSize() );
+        _keyData = (const unsigned char *) b.buf();
+        dassert( b.len() == dataSize() ); // check datasize method is correct
+        dassert( (*_keyData & cNOTUSED) == 0 );
+    }
+
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
         BSONObj::iterator i(obj);
@@ -304,13 +311,18 @@ namespace mongo {
             case NumberLong:
                 {
                     long long n = e._numberLong();
-                    double d = (double) n;
-                    if( d != n ) { 
+                    long long m = 2LL << 52;
+                    DEV {
+                        long long d = m-1;
+                        assert( ((long long) ((double) -d)) == -d );
+                    }
+                    if( n >= m || n <= -m ) {
+                        // can't represent exactly as a double
                         traditional(obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
-                    b.appendNum(d);
+                    b.appendNum((double) n);
                     break;
                 }
             case NumberDouble:
@@ -453,16 +465,21 @@ namespace mongo {
             {
                 int L = *l;
                 int R = *r;
+                int llen = binDataCodeToLength(L);
                 int diff = L-R; // checks length and subtype simultaneously
-                if( diff )
+                if( diff ) {
+                    // unfortunately nibbles are backwards to do subtype and len in one check (could bit swap...)
+                    int rlen = binDataCodeToLength(R);
+                    if( llen != rlen ) 
+                        return llen - rlen;
                     return diff;
+                }
                 // same length, same type
                 l++; r++;
-                int len = binDataCodeToLength(L);
-                int res = memcmp(l, r, len);
+                int res = memcmp(l, r, llen);
                 if( res ) 
                     return res;
-                l += len; r += len;
+                l += llen; r += llen;
                 break;
             }
         case cdate:
@@ -613,14 +630,18 @@ namespace mongo {
                 break;
             case cstring:
                 {
+                    if( *l != *r ) 
+                        return false; // not same length
                     unsigned sz = ((unsigned) *l) + 1;
-                    if( memcmp(l, r, sz) ) // first byte checked is the length byte
+                    if( memcmp(l, r, sz) )
                         return false;
                     l += sz; r += sz;
                     break;
                 }
             case cbindata:
                 {
+                    if( *l != *r )
+                        return false; // len or subtype mismatch
                     int len = binDataCodeToLength(*l) + 1;
                     if( memcmp(l, r, len) ) 
                         return false;

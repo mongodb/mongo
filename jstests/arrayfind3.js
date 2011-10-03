@@ -12,10 +12,5 @@ assert.eq( 1 , t.find( {a:{$elemMatch:{$gte:3, $lte: 5}}} ).itcount() , "A2" )
 
 t.ensureIndex( { a : 1 } )
 
-printjson( t.find( {a:{$gte:3, $lte: 5}} ).explain() );
-
-//assert.eq( 2 , t.find( {a:{$gte:3, $lte: 5}} ).itcount() , "B1" ); // SERVER-1264
+assert.eq( 2 , t.find( {a:{$gte:3, $lte: 5}} ).itcount() , "B1" );
 assert.eq( 1 , t.find( {a:{$elemMatch:{$gte:3, $lte: 5}}} ).itcount() , "B2" )
-
-
-

@@ -392,7 +392,7 @@ namespace mongo {
         */
         unsigned _pinValue;
 
-        bool _doingDeletes;
+        bool _doingDeletes; // when true we are the delete and aboutToDelete shouldn't manipulate us
         ElapsedTracker _yieldSometimesTracker;
 
         ShardChunkManagerPtr _chunkManager;

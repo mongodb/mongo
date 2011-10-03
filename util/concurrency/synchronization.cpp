@@ -20,21 +20,24 @@
 
 namespace mongo {
 
-    Notification::Notification() : _mutex ( "Notification" ) , _notified( false ) { 
+    Notification::Notification() : _mutex ( "Notification" ){ 
+        lookFor = 1;
+        cur = 0;
     }
 
     Notification::~Notification() { }
 
     void Notification::waitToBeNotified() {
         scoped_lock lock( _mutex );
-        while ( ! _notified )
+        while ( lookFor != cur )
             _condition.wait( lock.boost() );
+        lookFor++;
     }
 
     void Notification::notifyOne() {
         scoped_lock lock( _mutex );
-        assert( !_notified );
-        _notified = true;
+        assert( cur != lookFor );
+        cur++;
         _condition.notify_one();
     }
 

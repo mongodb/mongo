@@ -26,23 +26,20 @@ namespace mongo {
     // ---------- public -------------
 
     struct UpdateResult {
-        bool existing; // if existing objects were modified
-        bool mod;      // was this a $ mod
-        long long num; // how many objects touched
+        const bool existing; // if existing objects were modified
+        const bool mod;      // was this a $ mod
+        const long long num; // how many objects touched
         OID upserted;  // if something was upserted, the new _id of the object
 
         UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
             : existing(e) , mod(m), num(n) {
             upserted.clear();
-
             BSONElement id = upsertedObject["_id"];
             if ( ! e && n == 1 && id.type() == jstOID ) {
                 upserted = id.OID();
             }
         }
-
     };
-
 
     class RemoveSaver;
 
@@ -580,10 +577,32 @@ namespace mongo {
 
             switch ( m.op ) {
 
-            case Mod::PUSH:
+            case Mod::PUSH: {
+                if ( m.isEach() ) {
+                    b.appendArray( m.shortFieldName, m.getEach() );
+                } else {
+                    BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
+                    arr.appendAs( m.elt, "0" );
+                    arr.done();
+                }
+                break;
+            }
             case Mod::ADDTOSET: {
                 if ( m.isEach() ) {
-                    b.appendArray( m.shortFieldName , m.getEach() );
+                    // Remove any duplicates in given array
+                    BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
+                    BSONElementSet toadd;
+                    m.parseEach( toadd );
+                    BSONObjIterator i( m.getEach() );
+                    int n = 0;
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( toadd.count(e) ) {
+                            arr.appendAs( e , BSONObjBuilder::numStr( n++ ) );
+                            toadd.erase( e );
+                        }
+                    }
+                    arr.done();
                 }
                 else {
                     BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );

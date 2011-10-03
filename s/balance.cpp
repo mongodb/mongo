@@ -87,8 +87,14 @@ namespace mongo {
                 res = BSONObj();
                 c->singleSplit( true , res );
                 log() << "forced split results: " << res << endl;
+                
+                if ( ! res["ok"].trueValue() ) {
+                    log() << "marking chunk as jumbo: " << c->toString() << endl;
+                    c->markAsJumbo();
+                    // we increment moveCount so we do another round right away
+                    movedCount++;
+                }
 
-                // TODO: if the split fails, mark as jumbo SERVER-2571
             }
         }
 
@@ -199,6 +205,8 @@ namespace mongo {
             cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
             while ( cursor->more() ) {
                 BSONObj chunk = cursor->nextSafe();
+                if ( chunk["jumbo"].trueValue() )
+                    continue;
                 vector<BSONObj>& chunks = shardToChunksMap[chunk["shard"].String()];
                 chunks.push_back( chunk.getOwned() );
             }

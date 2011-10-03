@@ -353,20 +353,19 @@ namespace mongo {
         }
         currentOp.ensureStarted();
         currentOp.done();
-        int ms = currentOp.totalTimeMillis();
+        debug.executionTime = currentOp.totalTimeMillis();
 
         //DEV log = true;
-        if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
+        if ( log || debug.executionTime > logThreshold ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && debug.executionTime < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
-                debug.executionTime = ms;
                 mongo::tlog() << debug << endl;
             }
         }
 
-        if ( currentOp.shouldDBProfile( ms ) ) {
+        if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if ( dbMutex.getState() < 0 ) {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
@@ -586,32 +585,41 @@ namespace mongo {
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
-        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-        int n = 0;
-        BSONObj js(_js);
-        while( 1 ) {
+    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
+        size_t i;
+        for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(ns, js);
-                ++n;
+                checkAndInsert(ns, objs[i]);
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
-                if (!keepGoing || !d.moreJSObjs()){
-                    globalOpCounters.incInsertInWriteLock(n);
+                if (!keepGoing || i == objs.size()-1){
+                    globalOpCounters.incInsertInWriteLock(i);
                     throw;
                 }
                 // otherwise ignore and keep going
             }
-            if( !d.moreJSObjs() )
-                break;
-            js = d.nextJsObj();
         }
+
+        globalOpCounters.incInsertInWriteLock(i);
     }
 
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
+
+        if( !d.moreJSObjs() ) {
+            // strange.  should we complain?
+            return;
+        }
+        BSONObj first = d.nextJsObj();
+
+        vector<BSONObj> multi;
+        while (d.moreJSObjs()){
+            if (multi.empty()) // first pass
+                multi.push_back(first);
+            multi.push_back( d.nextJsObj() );
+        }
 
         writelock lk(ns);
 
@@ -623,17 +631,13 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        if( !d.moreJSObjs() ) { 
-            // strange.  should we complain?
-            return;
-        }
-        BSONObj js = d.nextJsObj();
-        if( d.moreJSObjs() ) { 
-            insertMulti(d, ns, js);
+        if( !multi.empty() ) {
+            const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+            insertMulti(keepGoing, ns, multi);
             return;
         }
 
-        checkAndInsert(ns, js);
+        checkAndInsert(ns, first);
         globalOpCounters.incInsertInWriteLock(1);
     }
 
@@ -961,9 +965,8 @@ namespace mongo {
                 if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
-                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                             << "recommend removing file and running --repair\n"
-                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                             << "Unclean shutdown detected.\n"
+                             << "Please visit http://dochub.mongodb.org/core/repair for recovery instructions.\n"
                              << "*************";
                 }
             }
