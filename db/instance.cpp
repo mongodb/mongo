@@ -353,20 +353,19 @@ namespace mongo {
         }
         currentOp.ensureStarted();
         currentOp.done();
-        int ms = currentOp.totalTimeMillis();
+        debug.executionTime = currentOp.totalTimeMillis();
 
         //DEV log = true;
-        if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
+        if ( log || debug.executionTime > logThreshold ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && debug.executionTime < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
-                debug.executionTime = ms;
                 mongo::tlog() << debug << endl;
             }
         }
 
-        if ( currentOp.shouldDBProfile( ms ) ) {
+        if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if ( dbMutex.getState() < 0 ) {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
