@@ -438,7 +438,7 @@ namespace JsobjTests {
 
                 long long n = 0x3333111122224444;
                 {
-                    double d = n;
+                    double d = (double) n;
                     BSONObj a = BSON( "x" << n );
                     BSONObj b = BSON( "x" << d );
 

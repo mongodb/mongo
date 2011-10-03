@@ -25,11 +25,10 @@
 namespace mongo {
 
     class RWLock : public RWLockBase { 
-        const int _lowPriorityWaitMS;
     public:
         const char * const _name;
-        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
-        RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { 
+        //int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
+        RWLock(const char *name) : _name(name) { 
             x = 0;
         }
         void lock() {
@@ -118,33 +117,7 @@ namespace mongo {
             : _lock( (RWLock&)lock ) , _write( write ) {            
             {
                 if ( _write ) {
-                    
-                    if ( ! lowPriorityWaitMS && lock.lowPriorityWaitMS() )
-                        lowPriorityWaitMS = lock.lowPriorityWaitMS();
-                    
-                    if ( lowPriorityWaitMS ) { 
-                        bool got = false;
-                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {
-                            if ( _lock.lock_try(0) ) {
-                                got = true;
-                                break;
-                            }
-                            
-                            int sleep = 1;
-                            if ( i > ( lowPriorityWaitMS / 20 ) )
-                                sleep = 10;
-                            sleepmillis(sleep);
-                            i += ( sleep - 1 );
-                        }
-                        if ( ! got ) {
-                            log() << "couldn't get lazy rwlock" << endl;
-                            _lock.lock();
-                        }
-                    }
-                    else { 
-                        _lock.lock();
-                    }
-
+                    _lock.lock();
                 }
                 else { 
                     _lock.lock_shared();
@@ -216,10 +189,10 @@ namespace mongo {
                 }
                 else {
                     int s = _r._state.get() - 1;
+                    DEV wassert( s >= 0 );
+                    _r._state.set(s);
                     if( s == 0 ) 
                         _r.unlock_shared();
-                    _r._state.set(s);
-                    DEV wassert( s >= 0 );
                 }
             }
         };
@@ -248,6 +221,10 @@ namespace mongo {
     public:
         const int lowPriorityWaitMS;
         RWLockRecursiveNongreedy(const char *nm, int lpwaitms) : RWLockRecursive(nm), lowPriorityWaitMS(lpwaitms) { }
+        const char * implType() const { return RWLockRecursive::implType(); }
+
+        //just for testing:
+        bool __lock_try( int millis ) { return RWLockRecursive::lock_try(millis); }
     };
 
 }

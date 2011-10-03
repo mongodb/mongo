@@ -249,17 +249,17 @@ namespace ThreadedTests {
     class RWLockTest2 { 
     public:
         
-        static void worker1( const RWLock * lk , AtomicUInt * x ) {
+        static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
             (*x)++; // 1
             //cout << "lock b try" << endl;
-            rwlock b( *lk , true ); 
+            RWLockRecursiveNongreedy::Exclusive b(*lk);
             //cout << "lock b got" << endl;
             (*x)++; // 2
         }
 
-        static void worker2( const RWLock * lk , AtomicUInt * x ) {
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
             //cout << "lock c try" << endl;
-            rwlock c( *lk , false );
+            RWLockRecursiveNongreedy::Shared c(*lk);
             (*x)++;
             //cout << "lock c got" << endl;
         }
@@ -269,10 +269,10 @@ namespace ThreadedTests {
              * note: this test will deadlock if the code breaks
              */
             
-            RWLock lk( "eliot2" , 120 * 1000 );
+            RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
 
-            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );
             
             AtomicUInt x1 = 0;
             cout << "A : " << &x1 << endl;
@@ -308,10 +308,10 @@ namespace ThreadedTests {
     class RWLockTest3 { 
     public:
         
-        static void worker2( RWLock * lk , AtomicUInt * x ) {
-    	    assert( ! lk->lock_try(0) );
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
+    	    assert( ! lk->__lock_try(0) );
             //cout << "lock c try" << endl;
-            rwlock c( *lk , false );
+            RWLockRecursiveNongreedy::Shared c( *lk  );
             (*x)++;
             //cout << "lock c got" << endl;
         }
@@ -321,9 +321,9 @@ namespace ThreadedTests {
              * note: this test will deadlock if the code breaks
              */
             
-            RWLock lk( "eliot2" , 120 * 1000 );
+            RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             
-            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
             
             AtomicUInt x2 = 0;
 
