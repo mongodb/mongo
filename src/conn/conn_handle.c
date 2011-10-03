@@ -17,8 +17,6 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 
 	session = &conn->default_session;
-						/* Connection mutex */
-	WT_RET(__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
 
 	TAILQ_INIT(&conn->btqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
@@ -28,7 +26,14 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
-	return (0);
+	/*
+	 * Connection mutex.
+	 *
+	 * !!!
+	 * Don't allocate the mutex until after we allocate statistics,
+	 * the lock functions update the statistics.
+	 */
+	return (__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
 }
 
 /*

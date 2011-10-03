@@ -1056,6 +1056,11 @@ struct wt_connection {
  * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
  * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "write".,empty}
  * @configend
+ * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
+ * home directory, it is read for configuration values (see @ref config_file
+ * for details).  Configuration values specified in the \c config argument to
+ * the ::wiredtiger_open function override configuration values specified in
+ * the \c WiredTiger.config file.
  * @param connectionp A pointer to the newly opened connection handle
  * @errors
  */

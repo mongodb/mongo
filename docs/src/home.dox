@@ -1,7 +1,5 @@
 /*! @page home WiredTiger Home Directory
 
-@section home Specifying the Database Directory
-
 WiredTiger file naming is based on the \c home argument specified to the
 ::wiredtiger_open function or the \c WIREDTIGER_HOME environment variable.
 
@@ -27,5 +25,12 @@ directory is the process' current working directory.  The current
 working directory path is not maintained by the WiredTiger library and
 changing the working directory after opening the WiredTiger database may
 cause failures.
+
+@section home_config Home Directory Configuration Strings
+
+The WiredTiger home directory optionally includes a file named \c
+WiredTiger.config.  If this file exists when ::wiredtiger_open is
+called, it is read for configuration strings.  See @ref config_file
+for details.
 
 */

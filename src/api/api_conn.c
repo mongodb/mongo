@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __conn_config(WT_CONNECTION_IMPL *, const char **, WT_BUF **);
 static int __conn_home(WT_CONNECTION_IMPL *, const char *, const char **);
 static int __conn_single(WT_CONNECTION_IMPL *, const char **);
 
@@ -356,16 +357,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "write",	WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
-	WT_BUF expath, exconfig;
+	WT_BUF *cbuf, expath, exconfig;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 	int ret;
-	const char *cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
+	const char *cfg[] =
+	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
 
 	*wt_connp = NULL;
 	session = NULL;
+	cbuf = NULL;
 	WT_CLEAR(expath);
 	WT_CLEAR(exconfig);
 
@@ -408,34 +411,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	session->event_handler = event_handler;
 
+	/* Remaining basic initialization of the connection structure. */
+	WT_ERR(__wt_connection_init(conn));
+
 	/* Check the configuration strings. */
 	WT_ERR(
 	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
 
-	/*
-	 * Configure verbose flags as soon as possible so we don't lose verbose
-	 * messages.
-	 */
-	conn->verbose = 0;
-#ifdef HAVE_VERBOSE
-	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
-	for (vt = verbtypes; vt->vname != NULL; vt++) {
-		WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
-		skey.str = vt->vname;
-		skey.len = strlen(vt->vname);
-		ret = __wt_config_getraw(&subconfig, &skey, &sval);
-		if (ret == 0 && sval.val)
-			FLD_SET(conn->verbose, vt->vflag);
-		else if (ret != WT_NOTFOUND)
-			goto err;
-	}
-#endif
-
-	/* Remaining basic initialization of the connection structure. */
-	WT_ERR(__wt_connection_init(conn));
-
 	/* Get the database home. */
 	WT_ERR(__conn_home(conn, home, cfg));
+
+	/* Read the database-home configuration file. */
+	WT_ERR(__conn_config(conn, cfg, &cbuf));
 
 	/* Make sure no other thread of control already owns this database. */
 	WT_ERR(__conn_single(conn, cfg));
@@ -450,6 +437,22 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "multithread", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_MULTITHREAD);
+
+	/* Configure verbose flags. */
+	conn->verbose = 0;
+#ifdef HAVE_VERBOSE
+	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
+	for (vt = verbtypes; vt->vname != NULL; vt++) {
+		WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
+		skey.str = vt->vname;
+		skey.len = strlen(vt->vname);
+		ret = __wt_config_getraw(&subconfig, &skey, &sval);
+		if (ret == 0 && sval.val)
+			FLD_SET(conn->verbose, vt->vflag);
+		else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+#endif
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
@@ -486,6 +489,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (0) {
 err:		__wt_connection_destroy(conn);
 	}
+	if (cbuf != NULL)
+		__wt_buf_free(session, cbuf);
 	__wt_buf_free(session, &expath);
 	__wt_buf_free(session, &exconfig);
 
@@ -656,5 +661,134 @@ err:	if (conn->lock_fh != NULL) {
 		(void)__wt_close(session, conn->lock_fh);
 		conn->lock_fh = NULL;
 	}
+	return (ret);
+}
+
+/*
+ * __conn_config --
+ *	Read in any WiredTiger_config file in the home directory.
+ */
+static int
+__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
+{
+	WT_BUF *cbuf;
+	WT_FH *fh;
+	WT_SESSION_IMPL *session;
+	off_t size;
+	uint32_t len;
+	int exist, quoted, ret;
+	uint8_t *p, *t;
+
+	*cbufp = NULL;				/* Returned buffer */
+
+	cbuf = NULL;
+	fh = NULL;
+	session = &conn->default_session;
+	ret = 0;
+
+	/* Check for an optional configuration file. */
+#define	WT_CONFIGFILE	"WiredTiger.config"
+	WT_RET(__wt_exist(session, WT_CONFIGFILE, &exist));
+	if (!exist)
+		return (0);
+
+	/* Open the configuration file. */
+	WT_RET(__wt_open(session, WT_CONFIGFILE, 0444, 0, &fh));
+	WT_ERR(__wt_filesize(session, fh, &size));
+	if (size == 0)
+		goto err;
+
+	/*
+	 * Sanity test: a 100KB configuration file would be insane.  (There's
+	 * no practical reason to limit the file size, but I can either limit
+	 * the file size to something rational, or I can add code to test if
+	 * the off_t size is larger than a uint32_t, which is more complicated
+	 * and a waste of time.)
+	 */
+	if (size > 100 * 1024) {
+		__wt_err(session, EFBIG, WT_CONFIGFILE);
+		WT_ERR(EFBIG);
+	}
+	len = (uint32_t)size;
+
+	/*
+	 * Copy the configuration file into memory, with a little slop, I'm not
+	 * interested in debugging off-by-ones.
+	 *
+	 * The beginning of a file is the same as if we run into an unquoted
+	 * newline character, simplify the parsing loop by pretending that's
+	 * what we're doing.
+	 */
+	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
+	WT_ERR(
+	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	((uint8_t *)cbuf->mem)[0] = '\n';
+	cbuf->size = len + 1;
+
+	/*
+	 * Collapse the string by replacing newlines with commas, and discarding
+	 * any lines where the first non-white-space character is a #.  The only
+	 * override is quoted strings; text in double-quotes gets copied without
+	 * change.
+	 */
+	for (quoted = 0, p = t = cbuf->mem; len > 0;) {
+		if (quoted || *p == '"') {		/* Quoted strings */
+			if (*p == '"')
+				quoted = !quoted;
+			*t++ = *p++;
+			--len;
+			continue;
+		}
+
+		/*
+		 * Replace any newline characters with commas (and strings of
+		 * commas are safe).
+		 *
+		 * After any newline, skip to a non-white-space character; if
+		 * the next character is a hash mark, skip to the next newline.
+		 */
+		while (*p == '\n') {
+			for (*t++ = ','; --len > 0 && isspace(*++p);)
+				;
+			if (len == 0)
+				break;
+			if (*p != '#')
+				break;
+			while (--len > 0 && *++p != '\n')
+				;
+			if (len == 0)
+				break;
+		}
+		if (len > 0) {
+			*t++ = *p++;
+			--len;
+		}
+	}
+	*t = '\0';
+
+#if 0
+	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
+#endif
+
+	/* Check the configuration string. */
+	WT_ERR(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, cbuf->data));
+
+	/*
+	 * The configuration file falls between the default configuration and
+	 * the wiredtiger_open() configuration, overriding the defaults but not
+	 * overriding the wiredtiger_open() configuration.
+	 */
+	cfg[2] = cfg[1];
+	cfg[1] = cbuf->data;
+
+	*cbufp = cbuf;
+
+	if (0) {
+err:		if (cbuf != NULL)
+			__wt_buf_free(session, cbuf);
+	}
+	if (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
 	return (ret);
 }
