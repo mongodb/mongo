@@ -424,10 +424,11 @@ __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 
 /*
  * __wt_open_session --
- *	Allocate a session handle.  Must be called holding conn->mtx.
+ *	Allocate a session handle.  The internal parameter is used for sessions
+ *	opened by WiredTiger for its own use.
  */
 int
-__wt_open_session(WT_CONNECTION_IMPL *conn,
+__wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
     WT_EVENT_HANDLER *event_handler, const char *config,
     WT_SESSION_IMPL **sessionp)
 {
@@ -451,26 +452,36 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	};
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t slot;
+	int ret;
 
 	WT_UNUSED(config);
+	ret = 0;
 	session = &conn->default_session;
 	session_ret = NULL;
+
+	__wt_lock(session, conn->mtx);
 
 	/* Check to see if there's an available session slot. */
 	if (conn->session_cnt == conn->session_size - 1) {
 		__wt_errx(session,
 		    "WiredTiger only configured to support %d thread contexts",
 		    conn->session_size);
-		return (WT_ERROR);
+		ret = WT_ERROR;
+		goto err;
 	}
 
 	/* Check for multiple sessions without multithread support. */
-	if (!F_ISSET(conn, WT_MULTITHREAD) &&
-	    conn->session_cnt > WT_INTERNAL_SESSIONS) {
-		__wt_errx(session,
-		    "wiredtiger_open not configured with 'multithread': "
-		    "only a single session is permitted");
-		return (WT_ERROR);
+	if (!internal) {
+		if (!F_ISSET(conn, WT_MULTITHREAD) &&
+		    conn->app_session_cnt > 0) {
+			__wt_errx(session,
+			    "wiredtiger_open not configured with 'multithread':"
+			    " only a single session is permitted");
+			ret = WT_ERROR;
+			goto err;
+		}
+
+		++conn->app_session_cnt;
 	}
 
 	/*
@@ -485,7 +496,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	/* Session entries are re-used, clear the old contents. */
 	WT_CLEAR(*session_ret);
 
-	WT_RET(__wt_mtx_alloc(session, "session", 1, &session_ret->mtx));
+	WT_ERR(__wt_mtx_alloc(session, "session", 1, &session_ret->mtx));
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 	WT_ASSERT(session, session->event_handler != NULL);
@@ -498,6 +509,15 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		session_ret->event_handler = event_handler;
 
 	/*
+	 * Public sessions are automatically closed during WT_CONNECTION->close.
+	 * If the session handles for internal threads were to go on the public
+	 * list, there would be complex ordering issues during close.  Set a
+	 * flag to avoid this: internal sessions are not closed automatically.
+	 */
+	if (internal)
+		F_SET(session_ret, WT_SESSION_INTERNAL);
+
+	/*
 	 * Publish: make the entry visible to the workQ.  There must be a
 	 * barrier to ensure the structure fields are set before any other
 	 * thread can see the session.
@@ -507,5 +527,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*sessionp = session_ret;
 
-	return (0);
+err:	__wt_unlock(session, conn->mtx);
+	return (ret);
 }

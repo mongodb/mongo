@@ -59,13 +59,6 @@ typedef	enum {
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 /*
- * Count of sessions handles opened internally: one for the eviction server and
- * one for the read server.  This is used to determine how many sessions the
- * application has open.
- */
-#define	WT_INTERNAL_SESSIONS	2
-
-/*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
  */
@@ -157,6 +150,7 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
 	void		 *session_array;	/* Session array */
 	uint32_t	  session_cnt;		/* Session count */
+	uint32_t	  app_session_cnt;	/* Application session count */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of

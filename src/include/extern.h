@@ -1,6 +1,7 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
+    int internal,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);

@@ -310,11 +310,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	__wt_lock(session, conn->mtx);
-	WT_TRET(__wt_open_session(conn, event_handler, config, &session_ret));
-	__wt_unlock(session, conn->mtx);
+	WT_ERR(__wt_open_session(conn, 0, event_handler, config, &session_ret));
 
-	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_sessionp = &session_ret->iface;
 err:	API_END(session);
 

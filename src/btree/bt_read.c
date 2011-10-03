@@ -154,35 +154,17 @@ __wt_cache_read_server(void *arg)
 	WT_SESSION_IMPL *session, *request_session;
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
-	WT_SESSION *wt_session;
 	int didwork, ret;
 
 	conn = arg;
 	cache = conn->cache;
 	ret = 0;
 
-	/*
-	 * We need a thread of control because we're reading/writing pages.
-	 * Start with the default session to keep error handling simple.
-	 *
-	 * There is some complexity involved in using the public API, because
-	 * public sessions are implicitly closed during WT_CONNECTION->close.
-	 * If the eviction thread's session were to go on the public list, the
-	 * eviction thread would have to be shut down before the public session
-	 * handles are closed.
-	 */
-	session = &conn->default_session;
-	if ((ret = conn->iface.open_session(&conn->iface,
-	    NULL, NULL, &wt_session)) != 0) {
+	/* We need a session handle because we're reading/writing pages. */
+	if ((ret = __wt_open_session(conn, 1, NULL, NULL, &session)) != 0) {
 		__wt_err(session, ret, "cache read server error");
 		return (NULL);
 	}
-	session = (WT_SESSION_IMPL *)wt_session;
-	/*
-	 * Don't close this session during WT_CONNECTION->close: we do it
-	 * before the thread completes.
-	 */
-	F_SET(session, WT_SESSION_INTERNAL);
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, READSERVER, "read server sleeping");
@@ -229,7 +211,7 @@ __wt_cache_read_server(void *arg)
 	}
 
 	WT_VERBOSE(session, READSERVER, "read server exiting");
-	(void)wt_session->close(wt_session, NULL);
+	(void)session->iface.close(&session->iface, NULL);
 
 	return (NULL);
 }
