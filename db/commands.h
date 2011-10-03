@@ -64,7 +64,8 @@ namespace mongo {
         void htmlHelp(stringstream&) const;
 
         /* Like adminOnly, but even stricter: we must either be authenticated for admin db,
-           or, if running without auth, on the local interface.
+           or, if running without auth, on the local interface.  Used for things which 
+           are so major that remote invocation may not make sense (e.g., shutdownServer).
 
            When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
         */

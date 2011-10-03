@@ -114,6 +114,7 @@ namespace mongo {
             {
                 scoped_lock lk(m);
                 d.push_back(msg);
+                wassert( d.size() < 1024 );
             }
             c.notify_one();
         }

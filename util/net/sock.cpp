@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "sock.h"
 #include "../background.h"
+#include "../concurrency/value.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -38,7 +39,6 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
-
 
 namespace mongo {
 
@@ -281,9 +281,17 @@ namespace mongo {
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
+    mapsf<string,string> dynHostNames;
+
     // ------ hostname -------------------
 
     string hostbyname(const char *hostname) {
+        {
+            string s = dynHostNames.get(hostname);
+            if( !s.empty() )
+                return s;
+        }
+
         string addr =  SockAddr(hostname, 0).getAddr();
         if (addr == "0.0.0.0")
             return "";
@@ -303,13 +311,14 @@ namespace mongo {
         return buf;
     }
 
-
     string _hostNameCached;
     static void _hostNameCachedInit() {
         _hostNameCached = getHostName();
     }
     boost::once_flag _hostNameCachedInitFlags = BOOST_ONCE_INIT;
 
+    /** we store our host name once */
+    // ok w dynhosts map?
     string getHostNameCached() {
         boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
         return _hostNameCached;
