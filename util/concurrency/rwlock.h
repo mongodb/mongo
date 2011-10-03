@@ -144,6 +144,7 @@ namespace mongo {
         void lock(); // not implemented - Lock() should be used; didn't overload this name to avoid mistakes
         virtual void Lock() { RWLockBase::lock(); }
     public:
+        virtual ~RWLockRecursive() { }
         const char * const _name;
         RWLockRecursive(const char *name) : _name(name) { }
 
