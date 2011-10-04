@@ -5,7 +5,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l="`sed -e '/^[a-z]/! d' -e 's,^,../,' filelist`"
 l="$l `ls ../src/include/*.[hi] ../src/include/*.in`"
-l="$l `ls ../test/*/*.c | egrep -v '/packing/|/insert/'`"
+l="$l `find ../test -name '*.c' -print | egrep -v '/packing/|/insert/'`"
 
 # Look for '%l': that suggests we're trying to print a long value, and that's
 # almost always wrong: we should use a portable PRI* macro to construct the
