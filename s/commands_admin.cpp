@@ -854,6 +854,18 @@ namespace mongo {
                         return false;
                     }
 
+                    BSONObj primaryLocalDoc = BSON("_id" << "local" <<  "primary" << s.getName() );
+                    PRINT(primaryLocalDoc);
+                    if (conn->count("config.databases", primaryLocalDoc)) {
+                        log() << "This shard is listed as primary of local db. Removing entry." << endl;
+                        conn->remove("config.databases", BSON("_id" << "local"));
+                        errmsg = conn->getLastError();
+                        if ( errmsg.size() ) {
+                            log() << "error removing local db: " << errmsg << endl;
+                            return false;
+                        }
+                    }
+
                     Shard::reloadShardInfo();
 
                     result.append( "msg"   , "draining started successfully" );
