@@ -790,7 +790,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 
 #if 0
 	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
-	exit (0);
+	exit(0);
 #endif
 
 	/* Check the configuration string. */
