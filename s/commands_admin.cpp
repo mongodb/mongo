@@ -836,6 +836,25 @@ namespace mongo {
                     return false;
                 }
 
+                BSONObj primaryDoc = BSON( "_id" << NE << "local" << "primary" << s.getName() );
+                BSONObj dbInfo; // appended at end of result on success
+                {
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query("config.databases", primaryDoc));
+                    if (cursor->more()) { // skip block and allocations if empty
+                        BSONObjBuilder dbInfoBuilder;
+                        dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
+                        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+
+                        while (cursor->more()){
+                            BSONObj db = cursor->nextSafe();
+                            dbs.append(db["_id"]);
+                        }
+                        dbs.doneFast();
+
+                        dbInfo = dbInfoBuilder.obj();
+                    }
+                }
+
                 // If the server is not yet draining chunks, put it in draining mode.
                 BSONObj searchDoc = BSON( "_id" << s.getName() );
                 BSONObj drainingDoc = BSON( "_id" << s.getName() << ShardFields::draining(true) );
@@ -871,6 +890,7 @@ namespace mongo {
                     result.append( "msg"   , "draining started successfully" );
                     result.append( "state" , "started" );
                     result.append( "shard" , s.getName() );
+                    result.appendElements(dbInfo);
                     conn.done();
                     return true;
                 }
@@ -879,7 +899,6 @@ namespace mongo {
                 // Check not only for chunks but also databases.
                 BSONObj shardIDDoc = BSON( "shard" << shardDoc[ "_id" ].str() );
                 long long chunkCount = conn->count( "config.chunks" , shardIDDoc );
-                BSONObj primaryDoc = BSON( "primary" << shardDoc[ "_id" ].str() );
                 long long dbCount = conn->count( "config.databases" , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
@@ -909,6 +928,7 @@ namespace mongo {
                 inner.append( "chunks" , chunkCount );
                 inner.append( "dbs" , dbCount );
                 result.append( "remaining" , inner.obj() );
+                result.appendElements(dbInfo);
 
                 conn.done();
                 return true;
