@@ -721,11 +721,13 @@ int main(int argc, char* argv[]) {
         if (params.count("cpu")) {
             cmdLine.cpu = true;
         }
-        if (params.count("noauth")) {
-            noauth = true;
-        }
         if (params.count("auth")) {
             noauth = false;
+        }
+        if (params.count("noauth") && !noauth) {
+            /* noauth is set to true by default, so we only need to check whether it's been set to false */
+            out() << "Both --auth and --noauth are specified. Only one option is allowed." << endl;
+            dbexit( EXIT_BADOPTIONS );
         }
         if (params.count("quota")) {
             cmdLine.quota = true;
