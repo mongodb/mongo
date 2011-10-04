@@ -508,6 +508,8 @@ struct __wt_insert {
  */
 #define	WT_SKIP_FIRST(ins_head)						\
 	(((ins_head) == NULL) ? NULL : (ins_head)->head[0])
+#define	WT_SKIP_LAST(ins_head)						\
+	(((ins_head) == NULL) ? NULL : (ins_head)->tail[0])
 #define	WT_SKIP_NEXT(ins)  ((ins)->next[0])
 #define	WT_SKIP_FOREACH(ins, ins_head)					\
 	for ((ins) = WT_SKIP_FIRST(ins_head);				\

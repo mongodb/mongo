@@ -22,24 +22,22 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if (inshead == NULL)
+	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
 		return (NULL);
 
 	btree = session->btree;
 
 	/* Fast-path appends. */
-	if (inshead->tail[0] != NULL) {
-		insert_key.data = WT_INSERT_KEY(inshead->tail[0]);
-		insert_key.size = WT_INSERT_KEY_SIZE(inshead->tail[0]);
-		(void)WT_BTREE_CMP(session, btree, key, &insert_key, cmp);
-		if (cmp > 0) {
-			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
-				cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
-				    &inshead->tail[i]->next[i] :
-				    &inshead->head[i];
-			cbt->compare = -cmp;
-			return (inshead->tail[0]);
-		}
+	insert_key.data = WT_INSERT_KEY(ret_ins);
+	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
+	(void)WT_BTREE_CMP(session, btree, key, &insert_key, cmp);
+	if (cmp >= 0) {
+		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--)
+			cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
+			    &inshead->tail[i]->next[i] :
+			    &inshead->head[i];
+		cbt->compare = -cmp;
+		return (ret_ins);
 	}
 
 	/*
@@ -48,7 +46,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 */
 	ret_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL) {
+		if (*ins == NULL || cmp == 0) {
 			cbt->ins_stack[i--] = ins--;
 			continue;
 		}
@@ -65,11 +63,12 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			    key, &insert_key, cmp);
 		}
 
-		if (cmp == 0)			/* Exact match: return */
-			break;
+		if (cmp == 0)
+			for (; i >= 0; i--)
+				cbt->ins_stack[i] = &ret_ins->next[i];
 		else if (cmp > 0)		/* Keep going at this level */
 			ins = &(ret_ins)->next[i];
-		else				/* Drop down a level */
+		else			/* Drop down a level */
 			cbt->ins_stack[i--] = ins--;
 	}
 

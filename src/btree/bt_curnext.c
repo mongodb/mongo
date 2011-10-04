@@ -19,7 +19,6 @@ __cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	val = &cbt->iface.value;
 
 	if (newpage) {
-		cbt->ins_entry_cnt = 1;
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		goto new_page;
 	}
@@ -27,7 +26,6 @@ __cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
-		++cbt->ins_entry_cnt;
 
 new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
 		if (cbt->btree->type == BTREE_COL_FIX) {
@@ -205,7 +203,6 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-		cbt->ins_entry_cnt = 1;
 		cbt->slot = 1;
 		goto new_insert;
 	}
@@ -217,10 +214,8 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 		 * head reference and entry count in case we switch to a cursor
 		 * previous movement.
 		 */
-		if (cbt->ins != NULL) {
-			++cbt->ins_entry_cnt;
+		if (cbt->ins != NULL)
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
-		}
 
 new_insert:	if (cbt->ins != NULL) {
 			upd = cbt->ins->upd;
@@ -246,7 +241,6 @@ new_insert:	if (cbt->ins != NULL) {
 			cbt->ins_head =
 			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot / 2 - 1);
 			cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-			cbt->ins_entry_cnt = 1;
 			goto new_insert;
 		}
 		cbt->ins_head = NULL;
@@ -269,7 +263,6 @@ new_insert:	if (cbt->ins != NULL) {
 void
 __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 {
-	WT_INSERT *ins;
 	WT_PAGE *page;
 
 	WT_UNUSED(next);
@@ -326,19 +319,6 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 		    cbt->ins_head == WT_COL_APPEND(page))
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
-
-	/*
-	 * If we're in a row-store insert list or a column-store append list,
-	 * figure out how far in, we have to track the current slot for prev
-	 * traversals.
-	 */
-	cbt->ins_entry_cnt = 0;
-	if (cbt->ins_head != NULL)
-		WT_SKIP_FOREACH(ins, cbt->ins_head) {
-			++cbt->ins_entry_cnt;
-			if (ins == cbt->ins)
-				break;
-		}
 }
 
 /*

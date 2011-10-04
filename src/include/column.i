@@ -12,18 +12,19 @@
 static inline WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
 {
-	WT_INSERT **ins;
+	WT_INSERT **ins, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if (inshead == NULL)
+	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
 		return (NULL);
 
 	/* Fast path the check for values at the end of the skiplist. */
-	if (inshead->tail[0] != NULL &&
-	    recno > WT_INSERT_RECNO(inshead->tail[0]))
+	if (recno > WT_INSERT_RECNO(ret_ins))
 		return (NULL);
+	else if (recno == WT_INSERT_RECNO(ret_ins))
+		return (ret_ins);
 
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
@@ -65,16 +66,15 @@ __col_insert_search(
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if (inshead == NULL)
+	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
 		return (NULL);
 
 	/* Fast path appends. */
-	if (inshead->tail[0] != NULL &&
-	    recno > WT_INSERT_RECNO(inshead->tail[0])) {
+	if (recno >= WT_INSERT_RECNO(ret_ins)) {
 		for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 			ins_stack[i] = (inshead->tail[i] != NULL) ?
 			    &inshead->tail[i]->next[i] : &inshead->head[i];
-		return (inshead->tail[0]);
+		return (ret_ins);
 	}
 
 	/*
@@ -92,7 +92,8 @@ __col_insert_search(
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
 		if (cmp == 0)			/* Exact match: return */
-			break;
+			for (; i >= 0; i--)
+				ins_stack[i] = &ret_ins->next[i];
 		else if (cmp > 0)		/* Keep going at this level */
 			ins = &(ret_ins)->next[i];
 		else				/* Drop down a level */

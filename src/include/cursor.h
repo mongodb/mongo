@@ -22,8 +22,8 @@ struct __wt_cursor_btree {
 	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
 
 	WT_INSERT_HEAD   *ins_head;	/* Insert chain head */
-	WT_INSERT	 *ins;		/* Insert list, skiplist stack */
-	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
+	WT_INSERT	 *ins;		/* Current insert node */
+	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];	/* Search stack. */
 
 	uint64_t recno;			/* Record number */
 	uint32_t write_gen;		/* Saved leaf page's write generation */
@@ -35,13 +35,6 @@ struct __wt_cursor_btree {
 	 *	+1 if the found key is larger than the specified key
 	 */
 	int	compare;
-
-	/*
-	 * We can't walk an insert list in reverse order, it's only linked in a
-	 * forward, sorted order.  Maintain a count of the current entry we're
-	 * on.  For each iteration, we return one entry earlier in the list.
-	 */
-	uint32_t ins_entry_cnt;		/* 1-based insert list entry count */
 
 	/*
 	 * It's relatively expensive to calculate the last record on a variable-

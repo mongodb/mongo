@@ -8,6 +8,106 @@
 #include "wt_internal.h"
 
 /*
+ * Walking backwards through skip lists.
+ *
+ * The skip list stack is an array of pointers set up by a search.  It points
+ * to the position a node should go in the skip list.  In other words, the skip
+ * list search stack always points *after* the search item (that is, into the
+ * search item's next array).
+ *
+ * Helper macros to go from a stack pointer at level i, pointing into a next
+ * array, to insert node containing that next array.
+ */
+#define	PREV_ITEM(ins_head, insp, i)					\
+	(((insp) == &(ins_head)->head[i] || (insp) == NULL) ? NULL :	\
+	    (WT_INSERT *)((char *)((insp) - (i)) - offsetof(WT_INSERT, next)))
+
+#define	PREV_INS(cbt, i)						\
+	PREV_ITEM((cbt)->ins_head, (cbt)->ins_stack[(i)], (i))
+
+/*
+ * __cursor_skip_prev --
+ *	Move back one position in a skip list stack (aka "finger").
+ */
+static inline void
+__cursor_skip_prev(WT_CURSOR_BTREE *cbt)
+{
+	WT_INSERT *current, *ins;
+	WT_ITEM key;
+	WT_SESSION_IMPL *session;
+	int i;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	/*
+	 * If the search stack does not point at the current item, fill it in
+	 * with a search.
+	 */
+	if ((current = cbt->ins) != PREV_INS(cbt, 0)) {
+		if (cbt->btree->type == BTREE_ROW) {
+			key.data = WT_INSERT_KEY(current);
+			key.size = WT_INSERT_KEY_SIZE(current);
+			cbt->ins = __wt_search_insert(session,
+			    cbt, cbt->ins_head, &key);
+		} else
+			cbt->ins = __col_insert_search(cbt->ins_head,
+			    cbt->ins_stack, WT_INSERT_RECNO(current));
+
+		/* Check that we found the expected item. */
+		WT_ASSERT(session, cbt->ins == current);
+		WT_ASSERT(session, PREV_INS(cbt, 0) == current);
+	}
+
+	/*
+	 * Find the first node up the search stack that does not move.
+	 *
+	 * The depth of the current item must be at least this level, since we
+	 * see it in that many levels of the stack.
+	 *
+	 * !!! Watch these loops carefully: they all rely on the value of i,
+	 * and the exit conditions to end up with the right values are
+	 * non-trivial.
+	 */
+	for (i = 0; i < WT_SKIP_MAXDEPTH - 1; i++)
+		if ((ins = PREV_INS(cbt, i + 1)) != current)
+			break;
+
+	/*
+	 * Find a starting point for the new search.  That is either at the
+	 * non-moving node if we found a valid node, or the beginning of the
+	 * next list down that is not the current node.
+	 *
+	 * Since it is the beginning of a list, and we know the current node is
+	 * has a skip depth at least this high, any node we find must sort
+	 * before the current node.
+	 */
+	if (ins == NULL || ins == current)
+		for (; i >= 0; i--) {
+			cbt->ins_stack[i] = NULL;
+			ins = cbt->ins_head->head[i];
+			if (ins != NULL && ins != current)
+				break;
+		}
+
+	/* Walk any remaining levels until just before the current node. */
+	while (i >= 0) {
+		WT_ASSERT(session, ins != NULL);
+		if (ins->next[i] != current)		/* Stay at this level */
+			ins = ins->next[i];
+		else {					/* Drop down a level */
+			cbt->ins_stack[i] = &ins->next[i];
+			--i;
+		}
+	}
+
+	/* If we found a previous node, the next one must be current. */
+	WT_ASSERT(session, cbt->ins_stack[0] == NULL ||
+	    *cbt->ins_stack[0] == current);
+
+	cbt->ins = PREV_INS(cbt, 0);
+}
+
+/*
  * __cursor_col_append_prev --
  *	Return the previous entry on the append list.
  */
@@ -15,28 +115,18 @@ static inline int
 __cursor_col_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BUF *val;
-	WT_INSERT *ins;
-	uint32_t i;
 
 	val = &cbt->iface.value;
 
 	if (newpage) {
-		cbt->ins_entry_cnt = 0;
-		WT_SKIP_FOREACH(ins, cbt->ins_head)
-			++cbt->ins_entry_cnt;
+		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
 		goto new_page;
 	}
 
 	for (;;) {
-		if (--cbt->ins_entry_cnt == 0) {
-			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
+		__cursor_skip_prev(cbt);
+new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
-		}
-
-new_page:	for (i = cbt->ins_entry_cnt,
-		    ins = WT_SKIP_FIRST(cbt->ins_head); i > 1; --i)
-			ins = WT_SKIP_NEXT(ins);
-		cbt->ins = ins;
 
 		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
 		if (cbt->btree->type == BTREE_COL_FIX) {
@@ -90,7 +180,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	*recnop = cbt->recno;
 
 		/* Check any insert list for a matching record. */
-		if ((ins = __col_insert_search_match(
+		if ((ins = cbt->ins = __col_insert_search_match(
 		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
 			val->data = WT_UPDATE_DATA(ins->upd);
 			val->size = 1;
@@ -149,6 +239,7 @@ new_page:	*recnop = cbt->recno;
 		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				continue;
+			cbt->ins = ins;
 			val->data = WT_UPDATE_DATA(ins->upd);
 			val->size = ins->upd->size;
 			return (0);
@@ -197,7 +288,6 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	uint32_t i;
 
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
@@ -219,31 +309,22 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		else
 			cbt->ins_head = WT_ROW_INSERT_SLOT(
 			    cbt->page, cbt->page->entries - 1);
-		cbt->ins_entry_cnt = 0;
-		WT_SKIP_FOREACH(ins, cbt->ins_head)
-			++cbt->ins_entry_cnt;
 		cbt->slot = cbt->page->entries * 2 + 1;
+		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
 		goto new_insert;
 	}
 
 	/* Move to the previous entry and return the item. */
 	for (;;) {
 		/*
-		 * Continue traversing any insert list.  Insert lists are in
-		 * forward sorted order; in a last-to-first walk we have walk
-		 * the list from the end to the beginning.  Maintain the
-		 * reference to the current insert element in case we switch
-		 * to a cursor next movement.
+		 * Continue traversing any insert list.  Maintain the reference
+		 * to the current insert element in case we switch to a cursor
+		 * next movement.
 		 */
-		if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0)
-			--cbt->ins_entry_cnt;
+		if (cbt->ins != NULL)
+			__cursor_skip_prev(cbt);
 
-new_insert:	if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0) {
-			for (i = cbt->ins_entry_cnt,
-			    ins = WT_SKIP_FIRST(cbt->ins_head); i > 1; --i)
-				ins = WT_SKIP_NEXT(ins);
-			cbt->ins = ins;
-
+new_insert:	if ((ins = cbt->ins) != NULL) {
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
@@ -267,9 +348,7 @@ new_insert:	if (cbt->ins_head != NULL && cbt->ins_entry_cnt > 0) {
 			cbt->ins_head = cbt->slot == 1 ?
 			    WT_ROW_INSERT_SMALLEST(cbt->page) :
 			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot / 2 - 1);
-			cbt->ins_entry_cnt = 0;
-			WT_SKIP_FOREACH(ins, cbt->ins_head)
-				++cbt->ins_entry_cnt;
+			cbt->ins = WT_SKIP_LAST(cbt->ins_head);
 			goto new_insert;
 		}
 		cbt->ins_head = NULL;

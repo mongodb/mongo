@@ -18,6 +18,7 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 
 	cbt->ins_head = NULL;
 	cbt->ins = NULL;
+	cbt->ins_stack[0] = NULL;
 	/* We don't bother clearing the insert stack, that's more expensive. */
 
 	cbt->recno = 0;				/* Illegal value */
