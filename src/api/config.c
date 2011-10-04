@@ -8,6 +8,20 @@
 #include "wt_internal.h"
 
 /*
+ * __config_err --
+ *	Error message and return for config string parse failures.
+ */
+static int
+__config_err(WT_CONFIG *conf, const char *msg, int err)
+{
+	__wt_err(conf->session, err,
+	    "Error parsing '%.*s' at byte %u: %s",
+	    (int)(conf->end - conf->orig), conf->orig,
+	    (u_int)(conf->cur - conf->orig), msg);
+	return ((err != 0) ? err : EINVAL);
+}
+
+/*
  * __wt_config_initn --
  *	Initialize a config handle, used to iterate through a config string of
  *	specified length.
@@ -58,6 +72,9 @@ __wt_config_subinit(
 	if (conf->top == -1)						\
 		conf->top = conf->depth;				\
 	if (conf->depth == conf->top) {					\
+		if (out->len > 0)					\
+			return __config_err(conf,			\
+			    "New value starts without a separator", 0);	\
 		out->type = (t);					\
 		out->str = (conf->cur + (i));				\
 	}								\
@@ -321,7 +338,7 @@ static int8_t goesc[256] = {
  *	Deal with special config values like true / false.
  */
 static int
-__process_value(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *value)
+__process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 {
 	char *endptr;
 
@@ -340,11 +357,9 @@ __process_value(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *value)
 	} else if (value->type == ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
-		if (errno == ERANGE) {
-			__wt_errx(session, "config value out of range: %.*s",
-			    (int)value->len, value->str);
-			return (ERANGE);
-		}
+		if (errno == ERANGE)
+			return __config_err(conf,
+			    "Number out of range", ERANGE);
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)
@@ -412,11 +427,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BAD:
-			__wt_errx(conf->session,
-			    "Unexpected character '%c' in config string "
-			    "at position %d",
-			    *conf->cur, (int)(conf->cur - conf->orig));
-			return (EINVAL);
+			return __config_err(conf, "Unexpected character", 0);
 
 		case A_DOWN:
 			--conf->depth;
@@ -436,13 +447,9 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 				 * Special case: ':' is permitted in unquoted
 				 * values.
 				 */
-				if (out == value && *conf->cur != ':') {
-					__wt_errx(conf->session,
-					    "Configuration item already "
-					    "complete at position %d",
-					    (int)(conf->cur - conf->orig));
-					return (EINVAL);
-				}
+				if (out == value && *conf->cur != ':')
+					return __config_err(conf,
+					    "Value already complete", 0);
 				out = value;
 			}
 			break;
@@ -523,14 +530,14 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
 	/* Did we find something? */
 	if (conf->depth <= conf->top && key->len > 0)
-val:		return (__process_value(conf->session, value));
+val:		return (__process_value(conf, value));
 
 	/* We're either at the end of the string or we failed to parse. */
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	__wt_errx(conf->session, "Closing brackets missing from config string");
-	return (EINVAL);
+	return __config_err(conf,
+	    "Closing brackets missing from config string", 0);
 }
 
 /*
