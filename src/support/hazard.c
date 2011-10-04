@@ -52,8 +52,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		hp->line = line;
 #endif
 		/* Publish the hazard reference before reading page's state. */
-		WT_READ_BARRIER();
-		WT_WRITE_BARRIER();
+		WT_FULL_BARRIER();
 
 		/*
 		 * Check to see if the page state is still valid (where valid

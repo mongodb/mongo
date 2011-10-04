@@ -71,12 +71,18 @@
 #elif defined(sun)
 #include <atomic.h>
 #define	WT_READ_BARRIER() do {						\
+	membar_enter();							\
+} while (0)
+#define	WT_READ_BARRIER() do {						\
 	membar_safe("#LoadLoad");					\
 } while (0)
 #define	WT_WRITE_BARRIER() do {						\
 	membar_safe("#StoreLoad");					\
 } while (0)
 #elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
+#define	WT_FULL_BARRIER() do {						\
+	asm volatile ("mfence" ::: "memory");				\
+} while (0)
 #define	WT_READ_BARRIER() do {						\
 	asm volatile ("lfence" ::: "memory");				\
 } while (0)
@@ -84,12 +90,11 @@
 	asm volatile ("sfence" ::: "memory");				\
 } while (0)
 #elif (defined(i386) || defined(__i386__)) && defined(__GNUC__)
-#define	WT_READ_BARRIER() do {						\
-	asm volatile ("lock; addl $0, %0" ::: "memory");		\
+#define	WT_FULL_BARRIER() do {						\
+	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
 } while (0);
-#define	WT_WRITE_BARRIER() do {						\
-	asm volatile ("lock; addl $0, %0" ::: "memory");		\
-} while (0)
+#define	WT_READ_BARRIER() WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER() WT_FULL_BARRIER()
 #else
 #error "No write barrier implementation for this platform"
 #endif
