@@ -20,6 +20,8 @@
 
 namespace mongo { 
 
+    using boost::thread_specific_ptr;
+
     /* thread local "value" rather than a pointer
        good for things which have copy constructors (and the copy constructor is fast enough)
        e.g.

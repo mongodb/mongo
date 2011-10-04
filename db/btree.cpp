@@ -380,7 +380,7 @@ namespace mongo {
     */
     template< class V >
     bool BucketBasics<V>::basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const Key& key, const Ordering &order) const {
-        check( this->n >= 0 && this->n < 1024 );
+        check( this->n < 1024 );
         check( keypos >= 0 && keypos <= this->n );
         int bytesNeeded = key.dataSize() + sizeof(_KeyNode);
         if ( bytesNeeded > this->emptySize ) {

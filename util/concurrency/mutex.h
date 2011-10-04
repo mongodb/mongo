@@ -182,7 +182,7 @@ namespace mongo {
                 assert( pthread_mutex_destroy(&_lock) == 0 ); 
             }
         }
-    private:
+
         void lock() { assert( pthread_mutex_lock(&_lock) == 0 ); }
         void unlock() { assert( pthread_mutex_unlock(&_lock) == 0 ); }
     public:
