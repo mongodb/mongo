@@ -436,7 +436,7 @@ namespace JsobjTests {
             void run() {
                 const long long billion = 1000*1000*1000;
 
-                long long n = 0x3333111122224444;
+                long long n = 0x3333111122224444LL;
                 {
                     double d = (double) n;
                     BSONObj a = BSON( "x" << n );
