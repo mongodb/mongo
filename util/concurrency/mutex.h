@@ -160,7 +160,7 @@ namespace mongo {
         void unlock() { 
             LeaveCriticalSection(&_cs); 
         }
-#endif;
+#endif
 
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
