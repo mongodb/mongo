@@ -267,7 +267,7 @@ namespace mongo {
             return _nodes[_master].addr;
         }
         
-        throw DBException("No suitable member found", 15899);
+        throw DBException(str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, 15899);
     }
 
     /**
