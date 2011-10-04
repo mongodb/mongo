@@ -225,7 +225,7 @@ namespace mongo {
             string s = pingThreadId( conn, processId );
 
             // Ignore if we already have a pinging thread for this process.
-            if ( _seen.count( s ) > 0 ) return "";
+            if ( _seen.count( s ) > 0 ) return s;
 
             // Check our clock skew
             try {
