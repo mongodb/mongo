@@ -267,9 +267,7 @@ namespace mongo {
             return _nodes[_master].addr;
         }
         
-        LOG(2) << "dbclient_rs getSlave no suitable member found, returning first node " << _nodes[ 0 ] << endl;
-        assert( _nodes.size() > 0 );
-        return _nodes[0].addr;
+        throw DBException("No suitable member found", 15899);
     }
 
     /**
