@@ -64,6 +64,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	*tp = conn->sessions[conn->session_cnt];
 	conn->sessions[conn->session_cnt] = NULL;
 
+	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+		--conn->app_session_cnt;
+
 	/*
 	 * Publish, making the session array entry available for re-use.  There
 	 * must be a barrier here to ensure the cleanup above completes before
