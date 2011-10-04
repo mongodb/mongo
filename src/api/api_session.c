@@ -174,7 +174,7 @@ __session_drop(
 	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
-	ret = __wt_schema_drop(session, name, config);
+	ret = __wt_schema_drop(session, name, cfg);
 err:	API_END(session);
 
 	return (force ? 0 : ret);
@@ -226,37 +226,14 @@ err:	API_END(session);
 static int
 __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 {
-	WT_BTREE_SESSION *btree_session;
 	WT_SESSION_IMPL *session;
-	const char *filename;
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	WT_UNUSED(cfg);
-
-	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:")) {
-		__wt_errx(session, "Unknown object type: %s", uri);
-		ret = EINVAL;
-		goto err;
-	}
-
-	ret = __wt_session_find_btree(session, filename,
-	    strlen(filename), cfg, WT_BTREE_EXCLUSIVE, &btree_session);
-
-	/* If the tree isn't open, there's nothing to do. */
-	if (ret == 0) {
-		session->btree = btree_session->btree;
-		ret = __wt_btree_sync(session);
-
-		/* Release the tree so other threads can use it. */
-		WT_TRET(__wt_session_release_btree(session));
-	}
-
+	ret = __wt_schema_sync(session, uri, cfg);
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -288,27 +265,9 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
 
 	SESSION_API_CALL(session, verify, config, cfg);
-	if (!WT_PREFIX_MATCH(uri, "file:")) {
-		__wt_errx(session, "Unknown object type: %s", uri);
-		ret = EINVAL;
-		goto err;
-	}
-
-	/*
-	 * Get a btree handle.
-	 *
-	 * Tell open that we're going to verify this handle, so it skips loading
-	 * metadata such as the free list, which could be corrupted.
-	 */
-	WT_ERR(__wt_session_get_btree(session, uri, uri, NULL, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
-
-	WT_TRET(__wt_verify(session, config));
-
-	WT_TRET(__wt_session_release_btree(session));
+	ret = __wt_schema_verify(session, uri, cfg);
 err:	API_END(session);
 	return (ret);
 }
@@ -347,7 +306,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_ERR(__wt_session_get_btree(session, uri, uri, NULL, cfg,
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
 
-	WT_TRET(__wt_dumpfile(session, config));
+	WT_TRET(__wt_dumpfile(session, cfg));
 
 	WT_TRET(__wt_session_release_btree(session));
 err:	API_END(session);

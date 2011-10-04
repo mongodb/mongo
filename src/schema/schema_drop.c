@@ -51,20 +51,18 @@ err:	return (ret);
 }
 
 int
-__wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *config)
+__wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_BTREE *cg;
 	WT_BUF uribuf;
 	WT_TABLE *table;
-	char *namebuf;
 	const char *fileuri, *tablename;
 	int i, ret;
 
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 	WT_CLEAR(uribuf);
 
 	tablename = uri;
-	namebuf = NULL;
 	ret = 0;
 
 	if (WT_PREFIX_MATCH(uri, "file:")) {
@@ -99,7 +97,6 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *config)
 		return (EINVAL);
 	}
 
-	__wt_free(session, namebuf);
 	__wt_buf_free(session, &uribuf);
 	return (ret);
 }

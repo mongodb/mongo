@@ -43,9 +43,9 @@ static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, uint64_t, WT_VSTUFF *);
  *	Verify a file.
  */
 int
-__wt_verify(WT_SESSION_IMPL *session, const char *config)
+__wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(config);			/* XXX: unused for now */
+	WT_UNUSED(cfg);			/* XXX: unused for now */
 
 	return (__verify_int(session, 0));
 }
@@ -55,9 +55,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *config)
  *	Dump a file in debugging mode.
  */
 int
-__wt_dumpfile(WT_SESSION_IMPL *session, const char *config)
+__wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(config);			/* XXX: unused for now */
+	WT_UNUSED(cfg);			/* XXX: unused for now */
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

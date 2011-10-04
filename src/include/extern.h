@@ -242,9 +242,9 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session,
     int key_ret);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *config);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
-extern int __wt_btree_sync(WT_SESSION_IMPL *session);
-extern int __wt_verify(WT_SESSION_IMPL *session, const char *config);
-extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *config);
+extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
@@ -406,7 +406,7 @@ extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *config);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
-    const char *config);
+    const char *cfg[]);
 extern int __wt_schema_add_table( WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_schema_find_table(WT_SESSION_IMPL *session,
     const char *name,
@@ -504,6 +504,9 @@ extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
     const char *proj_arg,
     const char *vformat,
     WT_BUF *value);
+extern int __wt_schema_sync(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[]);
 extern int __wt_schema_table_cursor(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
@@ -513,6 +516,9 @@ extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
+extern int __wt_schema_verify(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_errv(WT_SESSION_IMPL *session,
     int error,

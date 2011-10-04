@@ -12,8 +12,10 @@
  *	Sync the tree.
  */
 int
-__wt_btree_sync(WT_SESSION_IMPL *session)
+__wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_UNUSED(cfg);
+
 	/* Ask the eviction thread to flush any dirty pages. */
 	return (__wt_evict_file_serial(session, 0));
 }

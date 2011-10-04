@@ -81,7 +81,9 @@ src/schema/schema_open.c
 src/schema/schema_pack.c
 src/schema/schema_plan.c
 src/schema/schema_project.c
+src/schema/schema_sync.c
 src/schema/schema_table.c
+src/schema/schema_verify.c
 src/support/cksum.c
 src/support/err.c
 src/support/filename.c
