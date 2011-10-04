@@ -874,6 +874,10 @@ namespace mongo {
             return _o.isEmpty();
         }
 
+        bool isCleanAndEmpty() {
+            return isEmpty() && ! isDirty();
+        }
+
         string toString() const {
             return str::stream() << "Point from " << _key << " - " << _o << " dist : " << _distance << ( _exact ? " (ex)" : " (app)" );
         }
@@ -1290,7 +1294,7 @@ namespace mongo {
 
         GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj(), bool uniqueDocs = true, bool needDistance = false )
             : GeoCursorBase( g ), GeoAccumulator( g , filter, uniqueDocs, needDistance ) ,
-              _type( type ) , _filter( filter ) , _firstCall(true), _nscanned(), _nDirtied(0), _nChangedOnYield(0), _nRemovedOnYield(0), _centerPrefix(0, 0, 0) {
+              _type( type ) , _filter( filter ) , _firstCall(true), _noted( false ), _nscanned(), _nDirtied(0), _nChangedOnYield(0), _nRemovedOnYield(0), _centerPrefix(0, 0, 0) {
 
             // Set up the initial expand state
             _state = START;
@@ -1305,18 +1309,23 @@ namespace mongo {
 
         virtual bool ok() {
 
+            bool filled = false;
+
             LOG( CDEBUG ) << "Checking cursor, in state " << (int) _state << ", first call " << _firstCall <<
-                             ", empty : " << _cur.isEmpty() << ", stack : " << _stack.size() << endl;
+                             ", empty : " << _cur.isEmpty() << ", dirty : " << _cur.isDirty() << ", stack : " << _stack.size() << endl;
 
             bool first = _firstCall;
             if ( _firstCall ) {
                 fillStack( maxPointsHeuristic );
+                filled = true;
                 _firstCall = false;
             }
-            if ( ! _cur.isEmpty() || _stack.size() ) {
+            if ( ! _cur.isCleanAndEmpty() || _stack.size() ) {
                 if ( first ) {
                     ++_nscanned;
                 }
+
+                if( _noted && filled ) noteLocation();
                 return true;
             }
 
@@ -1325,14 +1334,19 @@ namespace mongo {
                 LOG( CDEBUG ) << "Refilling stack..." << endl;
 
                 fillStack( maxPointsHeuristic );
-                if ( ! _cur.isEmpty() ) {
+                filled = true;
+
+                if ( ! _cur.isCleanAndEmpty() ) {
                     if ( first ) {
                         ++_nscanned;
                     }
+
+                    if( _noted && filled ) noteLocation();
                     return true;
                 }
             }
 
+            if( _noted && filled ) noteLocation();
             return false;
         }
 
@@ -1349,12 +1363,19 @@ namespace mongo {
             if ( ! moreToDo() )
                 return false;
 
-            while ( _cur.isEmpty() && moreToDo() )
+            bool filled = false;
+            while ( _cur.isCleanAndEmpty() && moreToDo() ){
                 fillStack( maxPointsHeuristic );
-            return ! _cur.isEmpty() && ++_nscanned;
+                filled = true;
+            }
+
+            if( _noted && filled ) noteLocation();
+            return ! _cur.isCleanAndEmpty() && ++_nscanned;
         }
 
         virtual void noteLocation() {
+            _noted = true;
+
             LOG( CDEBUG ) << "Noting location with " << _stack.size() << ( _cur.isEmpty() ? "" : " + 1 " ) << " points " << endl;
 
             // Make sure we advance past the point we're at now,
@@ -1373,7 +1394,11 @@ namespace mongo {
 
             // Dirty all our queued stuff
             for( list<GeoPoint>::iterator i = _stack.begin(); i != _stack.end(); i++ ){
+
+                LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
+
                 if( i->makeDirty() ) _nDirtied++;
+                assert( i->isDirty() );
             }
 
             // Check current item
@@ -1423,7 +1448,6 @@ namespace mongo {
 
                 DiskLoc oldLoc;
                 if( i->unDirty( _spec, oldLoc ) ){
-
                     // Document is in same location
                     LOG( CDEBUG ) << "Undirtied " << oldLoc << endl;
 
@@ -1476,6 +1500,8 @@ namespace mongo {
                     fixMatches( oldLoc, _cur.loc() );
                 }
             }
+
+            _noted = false;
         }
 
         virtual Record* _current() { assert(ok()); LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
@@ -1768,7 +1794,7 @@ namespace mongo {
             if( remembered( node.recordLoc.obj() ) ) return 0;
 
             if( _uniqueDocs && ! onBounds ) {
-                // log() << "Added ind to " << _type << endl;
+                //log() << "Added ind to " << _type << endl;
                 _stack.push_front( GeoPoint( node ) );
                 found++;
             }
@@ -1798,7 +1824,7 @@ namespace mongo {
                     }
 
                     if( ! needExact || exactDocCheck( p, d ) ){
-                        // log() << "Added mult to " << _type << endl;
+                        //log() << "Added mult to " << _type << endl;
                         _stack.push_front( GeoPoint( node ) );
                         found++;
                         // If returning unique, just exit after first point is added
@@ -1807,7 +1833,7 @@ namespace mongo {
                 }
             }
 
-            while( _cur.isEmpty() && _stack.size() > 0 ){
+            while( _cur.isCleanAndEmpty() && _stack.size() > 0 ){
                 _cur = _stack.front();
                 _stack.pop_front();
             }
@@ -1860,6 +1886,7 @@ namespace mongo {
 
         GeoPoint _cur;
         bool _firstCall;
+        bool _noted;
 
         long long _nscanned;
         long long _nDirtied;
