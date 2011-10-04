@@ -86,8 +86,8 @@ namespace mongo {
          * @return 0 on success
          */
         virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false ) = 0;
-        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
-            int res = invoke( func , args , recv, timeoutMs, readOnlyArgs, readOnlyRecv );
+        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
+            int res = invoke( func , args , recv, timeoutMs, ignoreReturn, readOnlyArgs, readOnlyRecv );
             if ( res == 0 )
                 return;
             throw UserException( 9004 , (string)"invoke failed: " + getError() );

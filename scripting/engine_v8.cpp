@@ -939,7 +939,7 @@ namespace mongo {
         }
         else if ( array ) {
             // NOTE Looks like it's impossible to add interceptors to v8 arrays.
-            readOnly = false;
+            // so array itself will never be read only, but its values can be
             o = v8::Array::New();
         }
         else if ( !readOnly ) {
@@ -1131,7 +1131,7 @@ namespace mongo {
 
         }
 
-        if ( readOnly ) {
+        if ( !array && readOnly ) {
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );
         }
