@@ -546,8 +546,8 @@ namespace mongo {
                     }
                 }
                 pass++;
-                DEV
-                sleepmillis(20);
+                if (debug)
+                    sleepmillis(20);
                 else
                     sleepmillis(2);
                 continue;
