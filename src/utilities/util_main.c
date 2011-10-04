@@ -23,7 +23,7 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ch, major_v, minor_v, ret, tret;
-	char *config;
+	const char *config;
 
 	conn = NULL;
 
@@ -82,6 +82,10 @@ main(int argc, char *argv[])
 	/* Reset getopt. */
 	util_optreset = 1;
 	util_optind = 1;
+
+	/* The "create" command should pass "create" to wiredtiger_open. */
+	if (config == NULL && strcmp(command, "create") == 0)
+		config = "create";
 
 	if ((ret = wiredtiger_open(".",
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
