@@ -261,7 +261,7 @@ namespace mongo {
             }
         }
 
-        if( _master >= 0 ) { 
+        if( _master >= 0 && _nodes[_master].ok ) {
             assert( static_cast<unsigned>(_master) < _nodes.size() );
             LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
             return _nodes[_master].addr;
