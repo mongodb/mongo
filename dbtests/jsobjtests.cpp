@@ -443,8 +443,9 @@ namespace JsobjTests {
                     BSONObj b = BSON( "x" << d );
 
                     long long back = (long long) d;
+//3717
+//////                    int res = a.woCompare(b);
 
-                    int res = a.woCompare(b);
                     ASSERT( n > back );
                     //ASSERT( res > 0 );  // SERVER-3717
 
@@ -452,7 +453,8 @@ namespace JsobjTests {
 
                     KeyV1Owned A(a);
                     KeyV1Owned B(b);
-                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
+//3717
+//////                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
                     // ASSERT( res2 > 0 ); // SERVER-3717
 
                     // fixing requires an index v# change.

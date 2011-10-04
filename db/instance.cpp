@@ -871,10 +871,12 @@ namespace mongo {
             tryToOutputFatal( "shutdown failed with exception" );
         }
 
+#if defined(_DEBUG)
         try {
             mutexDebugger.programEnding();
         }
         catch (...) { }
+#endif
 
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();

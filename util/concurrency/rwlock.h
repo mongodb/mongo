@@ -22,6 +22,10 @@
 #include "../time_support.h"
 #include "rwlockimpl.h"
 
+#if defined(_DEBUG)
+#include "mutexdebugger.h"
+#endif
+
 namespace mongo {
 
     class RWLock : public RWLockBase { 
@@ -34,10 +38,14 @@ namespace mongo {
         }
         void lock() {
             RWLockBase::lock();
-            DEV mutexDebugger.entering(_name);
+#if defined(_DEBUG)
+            mutexDebugger.entering(_name);
+#endif
         }
         void unlock() {
-            DEV mutexDebugger.leaving(_name);
+#if defined(_DEBUG)            
+            mutexDebugger.leaving(_name);
+#endif
             RWLockBase::unlock();
         }
 
@@ -59,7 +67,9 @@ namespace mongo {
 
         bool lock_try( int millis = 0 ) {
             if( RWLockBase::lock_try(millis) ) {
-                DEV mutexDebugger.entering(_name);
+#if defined(_DEBUG)            
+                mutexDebugger.entering(_name);
+#endif
                 return true;
             }
             return false;
