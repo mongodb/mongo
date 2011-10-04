@@ -5,9 +5,30 @@ directory, it is read as a configuration string.  Configuration values
 specified in the config argument to the wiredtiger_open function
 override configuration values specified in the \c WiredTiger.config file.
 
-The format of the file is simple: any text between double-quotes
-(<b><tt>"</tt></b>) is left untouched, otherwise, lines are concatenated
-with comma separators and any line where the first non-space character is
-a hash mark (<b><tt>#</tt></b>) is discarded.
+The file is minimally parsed in order to build configuration strings
+for the WiredTiger configuration parser:
+<ul>
+
+<li>A backslash (<b><tt>\\</tt></b>) followed by any character other
+than a newline character leaves both characters untouched; otherwise,
+if a backslash is followed by a newline character, both the backslash
+and the newline character are discarded.
+
+<li>Any text between double-quote pairs (<b><tt>"</tt></b>) is left
+untouched, including newline and white-space characters.   Backslash
+characters escape double-quote characters: a backslash escaped
+double-quote character can neither start or end a quoted string.
+
+<li>Comments are discarded.  If the first non-white-space character
+following an unquoted and unescaped newline character is a hash mark
+(<b><tt>#</tt></b>), all characters up to the next newline character are
+discarded.  The ending newline character cannot be escaped or quoted,
+once a comment line is identified, all characters to the next newline
+are simply discarded.
+
+<li>Otherwise, all lines are concatenated and the newline characters
+replaced with commas.
+
+</ul>
 
 */

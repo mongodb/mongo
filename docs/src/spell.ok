@@ -207,6 +207,7 @@ txns
 uint
 ul
 unallocated
+unescaped
 untyped
 uri
 useconds

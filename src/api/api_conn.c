@@ -724,15 +724,43 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 	cbuf->size = len + 1;
 
 	/*
-	 * Collapse the string by replacing newlines with commas, and discarding
-	 * any lines where the first non-white-space character is a #.  The only
-	 * override is quoted strings; text in double-quotes gets copied without
-	 * change.
+	 * Collapse the file's lines into a single string: newline characters
+	 * are replaced with commas unless the newline is quoted or backslash
+	 * escaped.  Comment lines (an unescaped newline where the next non-
+	 * white-space character is a hash), are discarded.
 	 */
 	for (quoted = 0, p = t = cbuf->mem; len > 0;) {
-		if (quoted || *p == '"') {		/* Quoted strings */
+		/*
+		 * Backslash pairs pass through untouched, unless immediately
+		 * preceding a newline, in which case both the backslash and
+		 * the newline are discarded.  Backslash characters escape
+		 * quoted characters, too, that is, a backslash followed by a
+		 * quote doesn't start or end a quoted string.
+		 */
+		if (*p == '\\' && len > 1) {
+			if (p[1] != '\n') {
+				*t++ = p[0];
+				*t++ = p[1];
+			}
+			p += 2;
+			len -= 2;
+			continue;
+		}
+
+		/*
+		 * If we're in a quoted string, or starting a quoted string,
+		 * take all characters, including white-space and newlines.
+		 */
+		if (quoted || *p == '"') {
 			if (*p == '"')
 				quoted = !quoted;
+			*t++ = *p++;
+			--len;
+			continue;
+		}
+
+		/* Everything else gets taken, except for newline characters. */
+		if (*p != '\n') {
 			*t++ = *p++;
 			--len;
 			continue;
@@ -745,7 +773,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 		 * After any newline, skip to a non-white-space character; if
 		 * the next character is a hash mark, skip to the next newline.
 		 */
-		while (*p == '\n') {
+		for (;;) {
 			for (*t++ = ','; --len > 0 && isspace(*++p);)
 				;
 			if (len == 0)
@@ -757,15 +785,12 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 			if (len == 0)
 				break;
 		}
-		if (len > 0) {
-			*t++ = *p++;
-			--len;
-		}
 	}
 	*t = '\0';
 
 #if 0
 	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
+	exit (0);
 #endif
 
 	/* Check the configuration string. */
