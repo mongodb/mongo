@@ -459,7 +459,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
-		__wt_buf_init(session, &expath, 0);
+		WT_ERR(__wt_buf_init(session, &expath, 0));
 		WT_ERR(__wt_buf_sprintf(session, &expath,
 		    "%.*s", (int)skey.len, skey.str));
 		if (sval.len > 0)
