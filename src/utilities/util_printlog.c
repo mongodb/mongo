@@ -15,16 +15,12 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
-	int ch, debug, printable, ret;
-	char cursor_config[100], datasrc[100];
+	int ch, printable, ret;
+	char cursor_config[100];
 
-	debug = printable = 0;
-
-	while ((ch = util_getopt(argc, argv, "df:p")) != EOF)
+	printable = 0;
+	while ((ch = util_getopt(argc, argv, "f:p")) != EOF)
 		switch (ch) {
-		case 'd':
-			debug = 1;
-			break;
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
@@ -46,12 +42,13 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump=%s%s",
-	    printable ? "print" : "raw", debug ? ",debug" : "");
-	if ((ret = session->open_cursor(session, "log:",
+	snprintf(cursor_config, sizeof(cursor_config),
+	    printable ? "printable" : "raw");
+
+	if ((ret = session->open_cursor(session, "log",
 	    NULL, cursor_config, &cursor)) != 0) {
-		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, datasrc, wiredtiger_strerror(ret));
+		fprintf(stderr, "%s: cursor open(log) failed: %s\n",
+		    progname, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -71,8 +68,8 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	else {
-		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
-		    progname, datasrc, wiredtiger_strerror(ret));
+		fprintf(stderr, "%s: cursor get(log) failed: %s\n",
+		    progname, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -87,7 +84,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "printlog [-dp] [-f output-file]\n",
+	    "printlog [-p] [-f output-file]\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
