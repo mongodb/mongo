@@ -83,7 +83,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	/* The remaining argument is the table name. */
+	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
 	if ((name = util_name(
