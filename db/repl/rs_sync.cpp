@@ -512,7 +512,7 @@ namespace mongo {
             sleepsecs(1);
             return;
         }
-        if( sp.state.fatal() || sp.state.startup() ) {
+        if( _blockSync || sp.state.fatal() || sp.state.startup() ) {
             sleepsecs(5);
             return;
         }
@@ -582,6 +582,15 @@ namespace mongo {
     void GhostSync::starting() {
         Client::initThread("rsGhostSync");
         replLocalAuth();
+    }
+
+    void ReplSetImpl::blockSync(bool block) {
+        _blockSync = block;
+        if (_blockSync) {
+            // syncing is how we get into SECONDARY state, so we'll be stuck in
+            // RECOVERING until we unblock
+            changeState(MemberState::RS_RECOVERING);
+        }
     }
 
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {

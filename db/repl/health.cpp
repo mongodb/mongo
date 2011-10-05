@@ -415,6 +415,11 @@ namespace mongo {
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
+
+            if (m->hbinfo().authIssue) {
+                bb.append("authenticated", false);
+            }
+
             v.push_back(bb.obj());
             m = m->next();
         }
