@@ -25,6 +25,7 @@
 #include "connections.h"
 #include "../oplog.h"
 #include "../instance.h"
+#include "../../util/text.h"
 
 using namespace bson;
 
@@ -493,7 +494,7 @@ namespace mongo {
                     throw "_id must be numeric";
                 }
                 try {
-                    string s = mobj["host"].String();
+                    string s = trimWhitespace(mobj["host"].String());
                     m.h = HostAndPort(s);
                     if (!m.h.hasPort()) {
                         m.h.setPort(m.h.port());

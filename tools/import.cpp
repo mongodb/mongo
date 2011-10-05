@@ -47,17 +47,6 @@ class Import : public Tool {
     vector<string> _upsertFields;
     static const int BUF_SIZE = 1024 * 1024 * 4;
 
-    string trimWhitespace(const string& str) {
-        if (str.size() == 0) {
-            return str;
-        }
-        size_t begin = 0;
-        size_t end = str.size() - 1;
-        while (begin < str.size() && isspace(str[begin])) { ++begin; } // Finds index of first non-whitespace character
-        while (end > 0 && isspace(str[end])) { --end; } // Finds index of last non-whitespace character
-        return str.substr(begin, end - begin + 1);
-    }
-
     void csvTokenizeRow(const string& row, vector<string>& tokens) {
         bool inQuotes = false;
         bool prevWasQuote = false;

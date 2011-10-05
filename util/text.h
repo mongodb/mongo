@@ -145,4 +145,7 @@ namespace mongo {
 #endif // !defined(_WIN32)
         return ret;
     }
+
+    string trimWhitespace(const string& str);
+
 }
