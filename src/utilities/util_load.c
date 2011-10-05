@@ -28,26 +28,25 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	uint64_t insert_count;
 	int ch, eof, ret, printable;
 	const char *table_config;
-	char cursor_config[100];
 	char *name;
 
 	table_config = NULL;
 	name = NULL;
 	printable = 0;
 
-	while ((ch = util_getopt(argc, argv, "c:f:T")) != EOF)
+	while ((ch = util_getopt(argc, argv, "c:f:p")) != EOF)
 		switch (ch) {
-		case 'c':			/* command-line option */
+		case 'c':	/* command-line table configuration option */
 			table_config = util_optarg;
 			break;
-		case 'f':			/* input file */
+		case 'f':	/* input file */
 			if (freopen(util_optarg, "r", stdin) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
 				    progname, util_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
-		case 'T':
+		case 'p':
 			printable = 1;
 			break;
 		case '?':
@@ -57,33 +56,21 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	/*
-	 * Right now, we only support text input -- require the T option to
-	 * match Berkeley DB's API.
-	 */
-	if (printable == 0) {
-		fprintf(stderr,
-		    "%s: the -T option is currently required\n", progname);
-		return (EXIT_FAILURE);
-	}
-
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
 	if ((name = util_name(*argv, "table", UTIL_TABLE_OK)) == NULL)
 		return (EXIT_FAILURE);
 
+	/* Remove and re-create the table. */
 	if ((ret = session->drop(session, name, "force")) != 0)
 		goto err;
-
 	if ((ret = session->create(session, name, table_config)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config),
-	    "dump,%s", printable ? "printable" : "raw");
-
-	if ((ret = session->open_cursor(
-	    session, name, NULL, cursor_config, &cursor)) != 0) {
+	/* Open the insert cursor. */
+	if ((ret = session->open_cursor(session, name, NULL,
+	    printable ? "dump,printable" : "dump,raw", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
@@ -186,7 +173,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "load [-T] [-c configuration] [-f input-file] table\n",
+	    "load [-p] [-c table-config] [-f input-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
