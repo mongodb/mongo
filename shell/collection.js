@@ -50,6 +50,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
+    print("\tdb." + shortName + ".insert(obj)");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".remove(query)");
     print("\tdb." + shortName + ".renameCollection( newName , <dropTarget> ) renames the collection.");
