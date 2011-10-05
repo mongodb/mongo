@@ -502,6 +502,28 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
+    void OpTime::waitForDifferent(unsigned long long millis){
+        DEV dbMutex.assertAtLeastReadLocked();
+
+        if (*this != last) return; // check early
+
+        boost::xtime timeout;
+        boost::xtime_get(&timeout, TIME_UTC);
+
+        timeout.nsec += millis * 1000*1000;
+        if (timeout.nsec >= 1000*1000*1000){
+            timeout.nsec -= 1000*1000*1000;
+            timeout.sec += 1;
+        }
+
+        do {
+            dbtemprelease tmp;
+            boost::mutex::scoped_lock lk(notifyMutex());
+            if (!notifier().timed_wait(lk, timeout))
+                return; // timed out
+        } while (*this != last);
+    }
+
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
@@ -524,21 +546,15 @@ namespace mongo {
             try {
                 readlock lk;
 
-                bool skip = false;
                 if (str::startsWith(ns, "local.oplog.")){
                     if (pass == 0)
                         last = OpTime::last_inlock();
-                    else if (pass < 1000 && last == OpTime::last_inlock())
-                        skip = true; // no new oplog writes since last pass
+                    else
+                        last.waitForDifferent(1000/*ms*/);
                 }
 
-                if (skip) {
-                    msgdata = 0;
-                }
-                else {
-                    Client::Context ctx(ns);
-                    msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
-                }
+                Client::Context ctx(ns);
+                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {
                 exhaust = false;
@@ -554,9 +570,8 @@ namespace mongo {
                 }
                 else {
                     if( time(0) - start >= 4 ) {
-                        // after about 4 seconds, return.  this is a sanity check.  pass stops at 1000 normally
-                        // for DEV this helps and also if sleep is highly inaccurate on a platform.  we want to
-                        // return occasionally so slave can checkpoint.
+                        // after about 4 seconds, return. pass stops at 1000 normally.
+                        // we want to return occasionally so slave can checkpoint.
                         pass = 10000;
                     }
                 }
