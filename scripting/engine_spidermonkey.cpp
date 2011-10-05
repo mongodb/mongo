@@ -661,6 +661,8 @@ namespace mongo {
             }
             case CodeWScope: {
                 JSFunction * func = compileFunction( e.codeWScopeCode() );
+                if ( !func )
+                    return JSVAL_NULL;
 
                 BSONObj extraScope = e.codeWScopeObject();
                 if ( ! extraScope.isEmpty() ) {
