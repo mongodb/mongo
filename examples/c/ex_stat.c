@@ -30,7 +30,8 @@ print_cursor(WT_CURSOR *cursor)
 
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
+	    (ret = cursor->get_value(cursor, &pvalue, &value)) == 0)
 		printf("%s=%s\n", desc, pvalue);
 
 	return (ret == WT_NOTFOUND ? 0 : ret);
@@ -56,7 +57,7 @@ print_file_stats(WT_SESSION *session)
 	int ret;
 
 	if ((ret = session->open_cursor(session,
-	    "statistics:file:foo.wt", NULL, NULL, &cursor)) != 0)
+	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
 	return (print_cursor(cursor));
@@ -69,13 +70,13 @@ main(void)
 	WT_SESSION *session;
 	int ret;
 
-	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
-	/* Note: further error checking omitted for clarity. */
+	ret = wiredtiger_open(home, NULL, "create", &conn);
+	ret = conn->open_session(conn, NULL, NULL, &session);
+	ret = session->create(
+	    session, "table:access", "key_format=S,value_format=S");
 
 	ret = print_database_stats(session);
+
 	ret = print_file_stats(session);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
