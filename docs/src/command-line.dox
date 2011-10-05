@@ -90,16 +90,13 @@ The \c load command loads the specified table based on the input.
 See @ref dump_formats for details of the dump file formats.
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-dT] [-c config] [-f input] table</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-T] [-c config] [-f input] table</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
 
 @par <code>-c</code>
 Include a configuration string to be passed to WT_SESSION::create.
-
-@par <code>-d</code>
-Configure for debugging.
 
 @par <code>-f</code>
 By default, the \c load command reads from the standard output; the
@@ -115,13 +112,10 @@ The input is printable text, that is, the input was generated using the
 The \c printlog command outputs the database log.
 
 @subsection utility_printlog_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] printlog [-dp] [-f output]</code>
+<code>wt [-Vv] [-C config] [-h directory] printlog [-p] [-f output]</code>
 
 @subsection utility_printlog_options Options
 The following are command-specific options for the \c printlog command:
-
-@par <code>-d</code>
-Configure for debugging.
 
 @par <code>-f</code>
 By default, the \c printlog command output is written to the standard
