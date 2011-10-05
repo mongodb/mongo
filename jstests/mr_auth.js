@@ -8,10 +8,11 @@ map = function(){ emit( this.x, this.y );}
 red = function( k, vs ){ var s=0; for (var i=0; i<vs.length; i++) s+=vs[i]; return s;}
 red2 = function( k, vs ){ return 42;}
 
+ports = allocatePorts( 2 );
 
 // make sure writing is allowed when started without --auth enabled
 
-port = allocatePorts( 1 )[ 0 ];
+port = ports[ 0 ];
 dbms = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = dbms.getDB( dbName );
 t = db[ baseName ];
@@ -37,7 +38,7 @@ stopMongod( port );
 
 // In --auth mode, read-only user should not be able to output to existing collection
 
-port = allocatePorts( 1 )[ 0 ];
+port = ports[ 1 ];
 dbms = startMongodNoReset( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = dbms.getDB( dbName );
 t = db[ baseName ];
