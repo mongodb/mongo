@@ -16,7 +16,6 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	int ch, printable, ret;
-	char cursor_config[100];
 
 	printable = 0;
 	while ((ch = util_getopt(argc, argv, "f:p")) != EOF)
@@ -42,11 +41,8 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	snprintf(cursor_config, sizeof(cursor_config),
-	    printable ? "printable" : "raw");
-
 	if ((ret = session->open_cursor(session, "log",
-	    NULL, cursor_config, &cursor)) != 0) {
+	    NULL, printable ? "printable" : "raw", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(log) failed: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		goto err;
