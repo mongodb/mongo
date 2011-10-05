@@ -90,6 +90,11 @@ namespace mongo {
             return now_inlock();
         }
 
+        static OpTime last_inlock(){
+            DEV dbMutex.assertAtLeastReadLocked();
+            return last;
+        }
+
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
          64 bit "container" for these values.  While these are not really "Dates", that seems a
          better choice for now than say, Number, which is floating point.  Note the BinData type

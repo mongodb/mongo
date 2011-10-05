@@ -519,11 +519,26 @@ namespace mongo {
         int pass = 0;
         bool exhaust = false;
         QueryResult* msgdata;
+        OpTime last;
         while( 1 ) {
             try {
                 readlock lk;
-                Client::Context ctx(ns);
-                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
+
+                bool skip = false;
+                if (str::startsWith(ns, "local.oplog.")){
+                    if (pass == 0)
+                        last = OpTime::last_inlock();
+                    else if (pass < 1000 && last == OpTime::last_inlock())
+                        skip = true; // no new oplog writes since last pass
+                }
+
+                if (skip) {
+                    msgdata = 0;
+                }
+                else {
+                    Client::Context ctx(ns);
+                    msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
+                }
             }
             catch ( AssertionException& e ) {
                 exhaust = false;
