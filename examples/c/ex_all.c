@@ -283,7 +283,6 @@ int main(void)
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 
-	fprintf(stderr, "An error occurred: %s\n", wiredtiger_strerror(ret));
 	}
 
 	{
