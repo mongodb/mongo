@@ -484,13 +484,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-	if (0) {
-err:		__wt_connection_destroy(conn);
-	}
-	if (cbuf != NULL)
+	/*
+	 * Destroying the connection on error will destroy our session handle,
+	 * cleanup using the session handle first, then discard the connection.
+	 */
+err:	if (cbuf != NULL)
 		__wt_buf_free(session, cbuf);
 	__wt_buf_free(session, &expath);
 	__wt_buf_free(session, &exconfig);
+
+	if (ret != 0 && conn != NULL)
+		__wt_connection_destroy(conn);
 
 	return (ret);
 }
