@@ -90,7 +90,7 @@ The \c load command loads the specified table based on the input.
 See @ref dump_formats for details of the dump file formats.
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-T] [-c config] [-f input] table</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-p] [-c config] [-f input] table</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
@@ -102,7 +102,7 @@ Include a configuration string to be passed to WT_SESSION::create.
 By default, the \c load command reads from the standard output; the
 <code>-f</code> option reads the input from the specified file.
 
-@par <code>-T</code>
+@par <code>-p</code>
 The input is printable text, that is, the input was generated using the
 \c dump command's <code>-p</code> option.
 
