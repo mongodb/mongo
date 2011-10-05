@@ -36,8 +36,6 @@ namespace mongo {
     */
     bool ReplSetImpl::syncApply(const BSONObj &o) {
         const char *ns = o.getStringField("ns");
-        nsToDatabase(ns, db);
-
         if ( *ns == '.' || *ns == 0 ) {
             blank(o);
             return false;
@@ -157,20 +155,25 @@ namespace mongo {
                                 log() << "replSet assertion fetching missing object" << endl;
                                 throw;
                             }
-                            assert( !missingObj.isEmpty() );
-                            Client::Context ctx(ns);
-                            try {
-                                DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-                                assert( !d.isNull() );
-                            } catch(...) {
-                                log() << "replSet assertion during insert of missing object" << endl;
-                                throw;
+                            if( missingObj.isEmpty() ) {
+                                log() << "replSet missing object not found on source. presumably deleted later in oplog" << endl;
+                                log() << "replSet op: " << o.toString() << endl;
                             }
-                            // now reapply the update from above
-                            bool failed = syncApply(o);
-                            if( failed ) {
-                                log() << "replSet update still fails after adding missing object " << ns << endl;
-                                assert(false);
+                            else {
+                                Client::Context ctx(ns);
+                                try {
+                                    DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+                                    assert( !d.isNull() );
+                                } catch(...) {
+                                    log() << "replSet assertion during insert of missing object" << endl;
+                                    throw;
+                                }
+                                // now reapply the update from above
+                                bool failed = syncApply(o);
+                                if( failed ) {
+                                    log() << "replSet update still fails after adding missing object " << ns << endl;
+                                    assert(false);
+                                }
                             }
                         }
                     }

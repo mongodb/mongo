@@ -546,7 +546,7 @@ namespace mongo {
             RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
-            bool upsert = fields[3].booleanSafe();
+            bool upsert = op.getBoolField("b");
             UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false, /*logop*/ false , debug );
             if( ur.num == 0 ) {
                 if( ur.mod ) {
