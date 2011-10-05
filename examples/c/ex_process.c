@@ -23,7 +23,8 @@ int main(void)
 	WT_SESSION *session;
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(home, NULL, "create,share", &conn)) != 0)
+	if ((ret =
+	    wiredtiger_open(home, NULL, "create,multiprocess", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
