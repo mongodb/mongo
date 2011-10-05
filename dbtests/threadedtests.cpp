@@ -475,26 +475,29 @@ namespace ThreadedTests {
         virtual void subthread(int x) {
             Client::initThread("utest");
 
-            /* r = read lock 
+            /* r = get a read lock 
                R = get a read lock and we expect it to be fast
-               w = write lock
+               u = get upgradable 
+               U = get upgradable and we expect it to be fast
+               w = get a write lock
             */
             //                    /-- verify upgrade can be done instantly while in a read lock already
             //                    |  /-- verify upgrade acquisition isn't greedy
-            //                    |  | /-- verify writes aren't greedy while in upgradable
+            //                    |  | /-- verify writes aren't greedy while in upgradable (or are they?)
             //                    v  v v
             const char *what = " RURuRwR";
 
             sleepmillis(100*x);
 
             log() << x << ' ' << what[x] << " request" << endl;
-            switch( what[x] ) { 
+            char ch = what[x];
+            switch( ch ) { 
             case 'w':
                 {
                     m.lock();
-                    log() << x << " W got" << endl;
+                    log() << x << " w got" << endl;
                     sleepmillis(100);
-                    log() << x << " W unlock" << endl;
+                    log() << x << " w unlock" << endl;
                     m.unlock();
                 }
                 break;
@@ -503,8 +506,8 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     RWLock::Upgradable u(m);
-                    log() << x << " U got" << endl;
-                    if( what[x] == 'U' ) {
+                    log() << x << ' ' << ch << " got" << endl;
+                    if( ch == 'U' ) {
                         if( t.millis() > 20 ) {
                             DEV {
                                 // a _DEBUG buildbot might be slow, try to avoid false positives
@@ -516,7 +519,7 @@ namespace ThreadedTests {
                         }
                     }
                     sleepsecs(1);
-                    log() << x << " U unlock" << endl;
+                    log() << x << ' ' << ch << " unlock" << endl;
                 }
                 break;
             case 'r':
@@ -524,14 +527,14 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     m.lock_shared();
-                    log() << x << " R got " << endl;
+                    log() << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
                             log() << "warning: when in upgradable write locks are still greedy on this platform" << endl;
                         }
                     }
                     sleepmillis(200);
-                    log() << x << " R unlock" << endl;
+                    log() << x << ' ' << ch << " unlock" << endl;
                     m.unlock_shared();
                 }
                 break;
