@@ -1,6 +1,5 @@
 // MapReduce should not be able to override an existing result table if the user does not have write permission when --auth enabled. SERVER-3345
 
-port = allocatePorts( 1 )[ 0 ];
 baseName = "jstests_mr_auth";
 dbName = "test";
 out = baseName + "_out";
@@ -12,6 +11,7 @@ red2 = function( k, vs ){ return 42;}
 
 // make sure writing is allowed when started without --auth enabled
 
+port = allocatePorts( 1 )[ 0 ];
 dbms = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = dbms.getDB( dbName );
 t = db[ baseName ];
@@ -37,6 +37,7 @@ stopMongod( port );
 
 // In --auth mode, read-only user should not be able to output to existing collection
 
+port = allocatePorts( 1 )[ 0 ];
 dbms = startMongodNoReset( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = dbms.getDB( dbName );
 t = db[ baseName ];
