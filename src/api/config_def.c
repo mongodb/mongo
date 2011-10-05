@@ -257,7 +257,7 @@ __wt_confdfl_wiredtiger_open =
     "cache_size=20MB,create=false,error_prefix=,exclusive=false,extensions=,"
     "hazard_max=30,home_environment=false,home_environment_priv=false,"
     "logging=false,multiprocess=false,multithread=false,session_max=50,"
-    "verbose=";
+    "transactional=false,verbose=";
 
 const char *
 __wt_confchk_wiredtiger_open =
@@ -266,6 +266,7 @@ __wt_confchk_wiredtiger_open =
     "hazard_max=(type=int,min=15),home_environment=(type=boolean),"
     "home_environment_priv=(type=boolean),logging=(type=boolean),"
     "multiprocess=(type=boolean),multithread=(type=boolean),"
-    "session_max=(type=int,min=1),verbose=(type=list,choices=[\"allocate\","
-    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\",\"readserver\""
-    ",\"reconcile\",\"salvage\",\"write\"])";
+    "session_max=(type=int,min=1),transactional=(type=boolean),"
+    "verbose=(type=list,choices=[\"allocate\",\"evictserver\",\"fileops\","
+    "\"hazard\",\"mutex\",\"read\",\"readserver\",\"reconcile\",\"salvage\","
+    "\"write\"])";

@@ -1050,6 +1050,8 @@ struct wt_connection {
  * false}
  * @config{session_max, maximum expected number of sessions (including server
  * threads). The value must be an integer greater than or equal to 1.,\c 50}
+ * @config{transactional, support transactional semantics. The value must be a
+ * boolean flag.,\c false}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>. The value must be
  * a list\, with values chosen from the following options: \c "allocate"\, \c

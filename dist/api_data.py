@@ -313,6 +313,9 @@ methods = {
 		maximum expected number of sessions (including server
 		threads)''',
 		min='1'),
+	Config('transactional', 'false', r'''
+		support transactional semantics''',
+		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
