@@ -235,7 +235,15 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( params.count( "chunkSize" ) ) {
-        Chunk::MaxChunkSize = params["chunkSize"].as<int>() * 1024 * 1024;
+    	int csize = params["chunkSize"].as<int>();
+	
+	// validate chunksize before proceeding
+	if ( csize == 0 ) {
+		out() << "error: need a non-zero chunksize" << endl;
+		return 11;
+	}
+
+        Chunk::MaxChunkSize = csize * 1024 * 1024;
     }
 
     if ( params.count( "ipv6" ) ) {
