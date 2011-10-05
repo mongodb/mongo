@@ -1471,15 +1471,14 @@ namespace mongo {
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
         BSONObj* originalBSON = 0;
-        if (o->HasNamedLookupInterceptor()) {
+        if (o->InternalFieldCount() > 0) {
             originalBSON = unwrapBSONObj(o);
-        }
 
-        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
-                (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
-            // object was readonly, use bson as is
-            if (originalBSON)
+            if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
+                    (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
+                // object was readonly, use bson as is
                 return *originalBSON;
+            }
         }
 
         BSONObjBuilder b;

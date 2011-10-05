@@ -164,10 +164,10 @@ namespace mongo {
 
     void installDBTypes( V8Scope* scope, v8::Handle<v8::Object>& global ) {
         v8::Handle<v8::FunctionTemplate> db = scope->createV8Function(dbInit);
-        db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+        db->InstanceTemplate()->SetNamedPropertyHandler( collectionGetter, collectionSetter );
         global->Set(scope->getV8Str("DB") , db->GetFunction() );
         v8::Handle<v8::FunctionTemplate> dbCollection = scope->createV8Function(collectionInit);
-        dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+        dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionGetter, collectionSetter );
         global->Set(scope->getV8Str("DBCollection") , dbCollection->GetFunction() );
 
 
@@ -608,34 +608,44 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> collectionFallback( v8::Local<v8::String> name, const v8::AccessorInfo &info) {
+    Handle<Value> collectionSetter( Local<v8::String> name, Local<Value> value, const AccessorInfo& info ) {
+        // a collection name cannot be overwritten by a variable
+        string sname = toSTLString( name );
+        if ( sname.length() == 0 || sname[0] == '_' ) {
+            // if starts with '_' we allow overwrite
+            return Handle<Value>();
+        }
+        return value;
+    }
+
+    v8::Handle<v8::Value> collectionGetter( v8::Local<v8::String> name, const v8::AccessorInfo &info) {
         DDD( "collectionFallback [" << name << "]" );
 
+        // first look in prototype, may be a function
         v8::Handle<v8::Value> real = info.This()->GetPrototype()->ToObject()->Get( name );
         if ( !real->IsUndefined() )
             return real;
 
+        // 2nd look into real values, may be cached collection object
+        string sname = toSTLString( name );
         if (info.This()->HasRealNamedProperty(name)) {
             return info.This()->GetRealNamedProperty( name );
+        } else if ( sname.length() == 0 || sname[0] == '_' ) {
+            // if starts with '_' we dont return collection, one must use getCollection()
+            return Handle<Value>();
         }
 
-        string sname = toSTLString( name );
-        if ( sname[0] == '_' ) {
-            if ( ! ( info.This()->HasRealNamedProperty( name ) ) )
-                return v8::Undefined();
-            return info.This()->GetRealNamedPropertyInPrototypeChain( name );
-        }
-
+        // no hit, create new collection
         v8::Handle<v8::Value> getCollection = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "getCollection" ) );
         assert( getCollection->IsFunction() );
 
         v8::Function * f = (v8::Function*)(*getCollection);
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
-
         v8::Local<v8::Value> coll = f->Call( info.This() , 1 , argv );
-        // cache collection for reuse
-        info.This()->Set(name, coll);
+
+        // cache collection for reuse, dont enumerate
+        info.This()->ForceSet(name, coll, v8::DontEnum);
         return coll;
     }
 
