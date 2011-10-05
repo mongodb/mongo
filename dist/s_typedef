@@ -13,12 +13,12 @@ build() {
 
 	l=`echo ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e 's/wiredtiger.in//' -e 's/queue.h//'`
-	for i in \
-	    `egrep -h '^struct[	 ]*__.*[	 ]*{$' $l |
-	    sed -e 's/struct[	 ]*__//' -e 's/[	 ]*{$//' | sort`; do
-		upper=`echo $i | tr a-z A-Z`
-		echo "struct __$i;"
-		echo "    typedef struct __$i $upper;"
+	egrep -h '^(struct|union)[	 ]*__.*[	 ]*{$' $l | \
+	    sed -e 's/[	 ]*{$//' | sort | \
+	while read t n; do
+		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
+		echo "$t $n;"
+		echo "    typedef $t $n $upper;"
 	done
 
 	echo '/*'

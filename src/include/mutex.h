@@ -144,3 +144,111 @@ struct __wt_rwlock {
 
 	pthread_rwlock_t rwlock;	/* Read/write lock */
 };
+
+/* Compile read-write barrier */
+#define	WT_BARRIER() asm volatile("" ::: "memory")
+
+/* Pause instruction to prevent excess processor bus usage */
+#define	WT_PAUSE() asm volatile("pause\n" ::: "memory")
+
+/* Number of CPUs: some algorithms use this in heuristics */
+#define	NCPUS	4
+
+/*
+ * Spin locks:
+ *
+ * These are based on ticket locks, used for cases where fast mutual exclusion
+ * is needed (where operations done while holding the spin lock are expected to
+ * complete in a small number of instructions.
+ */
+#define	SPINLOCK_GCC 0
+#define	SPINLOCK_PTHREAD_MUTEX 1
+
+#if SPINLOCK_TYPE == SPINLOCK_TICKET
+struct __wt_spinlock_ticket {
+	short users;
+	short ticket;
+};
+
+#define	WT_SPINLOCK	WT_SPINLOCK_TICKET
+
+#define	WT_SPINLOCK_INIT(t)	do {					\
+	(t)->users = (t)->ticket = 0;				\
+} while (0)
+
+static inline void
+__wt_spin_lock(WT_SPINLOCK *t)
+{
+	short me = __sync_fetch_and_add(&t->users, 1);
+
+	while (t->ticket != me) {
+		if (me - t->ticket >= NCPUS)
+			sched_yield();
+		else
+			WT_PAUSE();
+	}
+}
+
+static inline void
+__wt_spin_unlock(WT_SPINLOCK *t)
+{
+	WT_WRITE_BARRIER();
+	(void)__sync_fetch_and_add(&t->ticket, 1);
+}
+
+#elif SPINLOCK_TYPE == SPINLOCK_GCC
+
+#define	WT_SPINLOCK	volatile int
+
+#define	WT_SPINLOCK_INIT(t)	do {					\
+	*(t) = 0;							\
+} while (0)
+
+static inline void
+__wt_spin_lock(WT_SPINLOCK *t)
+{
+	while (__sync_lock_test_and_set(t, 1))
+		while (*t)
+			WT_PAUSE();
+}
+
+static inline void
+__wt_spin_unlock(WT_SPINLOCK *t)
+{
+	__sync_lock_release(t);
+}
+
+#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
+
+#define	WT_SPINLOCK	pthread_mutex_t
+
+#define	WT_SPINLOCK_INIT(t)	do {					\
+	(void)pthread_mutex_init(t, NULL);				\
+} while (0)
+
+static inline void
+__wt_spin_lock(WT_SPINLOCK *t)
+{
+	pthread_mutex_lock(t);
+}
+
+static inline void
+__wt_spin_unlock(WT_SPINLOCK *t)
+{
+	pthread_mutex_unlock(t);
+}
+
+#elif SPINLOCK_TYPE == SPINLOCK_WT_MUTEX
+
+#define	WT_SPINLOCK	WT_MTX *
+
+#define	WT_SPINLOCK_INIT(t)						\
+	(void)__wt_mtx_alloc(session, "spinlock", 0, (t))
+
+#define	__wt_spin_lock(t)	__wt_lock(session, *(t))
+#define	__wt_spin_unlock(t)	__wt_unlock(session, *(t))
+#else
+
+#error Unknown spinlock type
+
+#endif

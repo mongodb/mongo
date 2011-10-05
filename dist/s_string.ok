@@ -27,6 +27,7 @@ CELLs
 COL's
 CONCAT
 CONFIG
+CPUs
 CURSORs
 CURSTD
 Checksum
@@ -388,6 +389,7 @@ skiplists
 slvg
 snprintf
 sp
+spinlock
 sprintf
 src
 srch
