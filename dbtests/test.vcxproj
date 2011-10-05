@@ -334,16 +334,21 @@
     <ClCompile Include="..\third_party\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader />
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_chartables.c">      
-      <PrecompiledHeader /></ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_chartables.c">
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\third_party\pcre-7.4\pcre_compile.c">
-    <PrecompiledHeader /></ClCompile>
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\third_party\pcre-7.4\pcre_config.c">
-    <PrecompiledHeader /></ClCompile>
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\third_party\pcre-7.4\pcre_dfa_exec.c">
-    <PrecompiledHeader /></ClCompile>
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\third_party\pcre-7.4\pcre_exec.c">
-    <PrecompiledHeader /></ClCompile>
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\third_party\pcre-7.4\pcre_fullinfo.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -538,10 +543,9 @@
     <ClCompile Include="..\db\client.cpp" />
     <ClCompile Include="..\db\clientcursor.cpp" />
     <ClCompile Include="..\db\cloner.cpp" />
-    <!--<ClCompile Include="..\db\commands\cloud.cpp">
-      <PrecompiledHeader></PrecompiledHeader>
-    </ClCompile>-->
-
+    <ClCompile Include="..\db\commands\cloud.cpp">
+      <PrecompiledHeader />
+    </ClCompile>
     <ClCompile Include="..\db\commands.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\cursor.cpp" />

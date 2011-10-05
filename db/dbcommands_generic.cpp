@@ -45,6 +45,7 @@
 
 namespace mongo {
 
+#if 0
     namespace cloud {
         SimpleMutex mtx("cloud");
         Guarded< vector<string>, mtx > ips;
@@ -95,6 +96,7 @@ namespace mongo {
             return true;
         }
     } cmdCloud;
+#endif
 
     class CmdBuildInfo : public Command {
     public:
@@ -373,7 +375,6 @@ namespace mongo {
             return true;
         }
     } availableQueryOptionsCmd;
-
 
     class GetLogCmd : public Command {
     public:
