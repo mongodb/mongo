@@ -26,22 +26,19 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	struct record_t record;
 	uint64_t insert_count;
-	int ch, debug, eof, ret, printable;
+	int ch, eof, ret, printable;
 	const char *table_config;
 	char cursor_config[100];
 	char *name;
 
 	table_config = NULL;
 	name = NULL;
-	debug = printable = 0;
+	printable = 0;
 
-	while ((ch = util_getopt(argc, argv, "c:df:T")) != EOF)
+	while ((ch = util_getopt(argc, argv, "c:f:T")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
 			table_config = util_optarg;
-			break;
-		case 'd':			/* command-line option */
-			debug = 1;
 			break;
 		case 'f':			/* input file */
 			if (freopen(util_optarg, "r", stdin) == NULL) {
@@ -82,8 +79,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	if ((ret = session->create(session, name, table_config)) != 0)
 		goto err;
 
-	snprintf(cursor_config, sizeof(cursor_config), "dump%s%s",
-	    printable ? ",printable" : ",raw", debug ? ",debug" : "");
+	snprintf(cursor_config, sizeof(cursor_config),
+	    "dump,%s", printable ? "printable" : "raw");
 
 	if ((ret = session->open_cursor(
 	    session, name, NULL, cursor_config, &cursor)) != 0) {
@@ -189,7 +186,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "load [-dT] [-c configuration] [-f input-file] table\n",
+	    "load [-T] [-c configuration] [-f input-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }
