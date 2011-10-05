@@ -47,6 +47,10 @@ namespace mongo {
         ~ScopedConn() {
             // conLock releases...
         }
+        void reconnect() {
+          conn()->port().shutdown();
+          connect();
+        }
 
         /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
            So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
@@ -60,9 +64,6 @@ namespace mongo {
         }
         BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
-        }
-        void setTimeout(double to) {
-            conn()->setSoTimeout(to);
         }
 
     private:
@@ -78,15 +79,36 @@ namespace mongo {
         typedef map<string,ScopedConn::X*> M;
         static M& _map;
         DBClientConnection* conn() { return &x->cc; }
+        const string _hostport;
+
+        // we should already be locked...
+        bool connect() {
+          string err;
+          if (!x->cc.connect(_hostport, err)) {
+            log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
+            return false;
+          }
+
+          // if we cannot authenticate against a member, then either its key file
+          // or our key file has to change.  if our key file has to change, we'll
+          // be rebooting. if their file has to change, they'll be rebooted so the
+          // connection created above will go dead, reconnect, and reauth.
+          if (!noauth && !x->cc.auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
+            log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
+            return false;
+          }
+
+          return true;
+        }
     };
 
-    inline ScopedConn::ScopedConn(string hostport) {
+    inline ScopedConn::ScopedConn(string hostport) : _hostport(hostport) {
         bool first = false;
         {
             scoped_lock lk(mapMutex);
-            x = _map[hostport];
+            x = _map[_hostport];
             if( x == 0 ) {
-                x = _map[hostport] = new X();
+                x = _map[_hostport] = new X();
                 first = true;
                 connLock.reset( new scoped_lock(x->z) );
             }
@@ -96,17 +118,7 @@ namespace mongo {
             return;
         }
 
-        // we already locked above...
-        string err;
-        if (!x->cc.connect(hostport, err)) {
-            log() << "couldn't connect to " << hostport << ": " << err << rsLog;
-            return;
-        }
-
-        if (!noauth && !x->cc.auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
-            log() << "could not authenticate against " << conn()->toString() << ", " << err << rsLog;
-            return;
-        }
+        connect();
     }
 
 }
