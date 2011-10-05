@@ -1194,7 +1194,11 @@ shellHelper.set = function (str) {
     param = tokens[0];
     value = tokens[1];
     
-    if( value == undefined ) value = true; 
+    if ( value == undefined ) value = true;
+    // value comes in as a string..
+    if ( value == "true" ) value = true;
+    if ( value == "false" ) value = false;
+
     if (param == "verbose") {
         _verboseShell = value;
     }

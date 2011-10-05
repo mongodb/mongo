@@ -131,6 +131,12 @@ DBQuery.prototype.objsLeftInBatch = function(){
     return ret;
 }
 
+DBQuery.prototype.readOnly = function(){
+    this._exec();
+    this._cursor.readOnly();
+    return this;
+}
+
 DBQuery.prototype.toArray = function(){
     if ( this._arr )
         return this._arr;
@@ -297,7 +303,7 @@ DBQuery.prototype.shellPrint = function(){
             print( s );
             n++;
         }
-        if (typeof _verboseShell !== 'undefined' && _verboseShell == true) {
+        if (typeof _verboseShell !== 'undefined' && _verboseShell) {
             var time = new Date().getTime() - start;
             print("Fetched " + n + " record(s) in " + time + "ms");
         }

@@ -61,6 +61,7 @@ namespace mongo {
         scope->injectV8Function("next", internalCursorNext, icproto);
         scope->injectV8Function("hasNext", internalCursorHasNext, icproto);
         scope->injectV8Function("objsLeftInBatch", internalCursorObjsLeftInBatch, icproto);
+        scope->injectV8Function("readOnly", internalCursorReadOnly, icproto);
         proto->Set( scope->getV8Str( "internalCursor" ) , ic );
 
         return mongo;
@@ -520,11 +521,11 @@ namespace mongo {
         return v8::Number::New( (double) ret );
     }
 
-//    v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args) {
-//        Local<v8::Object> cursor = args.This();
-//        cursor->Set(scope->V8STR_RO, v8::Undefined());
-//        return cursor;
-//    }
+    v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args) {
+        Local<v8::Object> cursor = args.This();
+        cursor->Set(scope->V8STR_RO, v8::Boolean::New(true));
+        return cursor;
+    }
 
     // --- DB ----
 
