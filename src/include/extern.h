@@ -438,7 +438,6 @@ extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
     WT_TABLE **tablep);
-extern int __wt_schema_dump(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,
     size_t len,
