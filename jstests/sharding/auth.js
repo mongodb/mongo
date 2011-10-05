@@ -151,7 +151,9 @@ print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
 
 assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
-assert.eq(s.getDB("test").foo.count(), num+1);
+//SERVER-3645
+//assert.eq(s.getDB("test").foo.count(), num+1);
+assert.eq(s.getDB("test").foo.itcount(), num+1);
 
 s.s.setSlaveOk();
 
