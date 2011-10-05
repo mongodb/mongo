@@ -93,29 +93,27 @@ main(int argc, char *argv[])
 			if (wts_startup(1))
 				goto err;
 
-			if (wts_read_scan())
+			if (wts_read_scan())	/* Read scan */
+				goto err;
+
+						/* Random operations */
+			if (g.c_ops != 0 && wts_ops())
+				goto err;
+
+						/* Statistics */
+			if ((g.c_ops == 0 || reps == 2) && wts_stats())
+				goto err;
+
+						/* Close, verify */
+			if (wts_teardown() || wts_verify("ops"))
 				goto err;
 
 			/*
 			 * If no operations scheduled, quit after a single
 			 * read pass.
 			 */
-			if (g.c_ops == 0) {
-				if (wts_stats())
-					goto err;
+			if (g.c_ops == 0)
 				break;
-			}
-
-			if (wts_ops())		/* Random operations */
-				goto err;
-
-						/* Statistics */
-			if (reps == 2 && wts_stats())
-				goto err;
-
-						/* Close, verify */
-			if (wts_teardown() || wts_verify("ops"))
-				goto err;
 		}
 
 		track("shutting down BDB", 0ULL);
