@@ -18,8 +18,6 @@
 #pragma once
 
 #include "../db/concurrency.h"
-#include <boost/thread/condition.hpp>
-
 
 namespace mongo {
     void exitCleanly( ExitCode code );
@@ -165,8 +163,8 @@ namespace mongo {
     private:
 
         // The following functions are to get around the need to define class-level statics in a cpp
-        static boost::condition_variable& notifier() {
-            static boost::condition_variable* holder = new boost::condition_variable();
+        static boost::condition& notifier() {
+            static boost::condition* holder = new boost::condition();
             return *holder;
         };
         static boost::mutex& notifyMutex() {
