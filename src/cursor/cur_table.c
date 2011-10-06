@@ -23,7 +23,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 	WT_BTREE *btree;						\
 	WT_CURSOR **__cp;						\
 	int __i;							\
-	WT_RET(__curtable_open_indices(ctable));			\
+	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
 		btree = ((WT_CURSOR_BTREE *)*__cp)->btree;		\
