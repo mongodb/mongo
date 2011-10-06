@@ -76,7 +76,8 @@ class Import : public Tool {
 
                 if (element == ',' && !inQuotes) {
                     if (!tokenQuoted) { // If token was quoted, it's already been added
-                        tokens.push_back(trimWhitespace(curtoken));
+                        boost::trim(curtoken);
+                        tokens.push_back(curtoken);
                     }
                     curtoken = "";
                     tokenQuoted = false;
@@ -86,7 +87,8 @@ class Import : public Tool {
             }
         }
         if (!tokenQuoted || (inQuotes && prevWasQuote)) {
-            tokens.push_back(trimWhitespace(curtoken));
+            boost::trim(curtoken);
+            tokens.push_back(curtoken);
         }
     }
 
