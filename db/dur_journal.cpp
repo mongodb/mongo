@@ -35,6 +35,7 @@
 #include "../util/checksum.h"
 #include "../util/concurrency/race.h"
 #include "../util/compress.h"
+#include "../server.h"
 
 using namespace mongoutils;
 
@@ -603,7 +604,7 @@ namespace mongo {
 
         void Journal::_rotate() {
             if( dbMutex.atLeastReadLocked() ) { 
-                log() << "info journal _rotate called insider dbMutex - ok but should be somewhat rare" << endl;
+                LOGSOME << "info journal _rotate called insider dbMutex - ok but should be somewhat rare" << endl;
             }
 
             RACECHECK;
