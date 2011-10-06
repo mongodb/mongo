@@ -15,6 +15,11 @@ for ( i = 0; i < 1000; i++ ) {
     coll.update(
             { loc : { $within : { $center : [ [ Random.rand() * 180, Random.rand() * 180 ], Random.rand() * 50 ] } } },
             { $set : { v : big } }, false, true )
-    db.getLastError();
+
+    if (testingReplication)
+        db.getLastError(2);
+    else
+        db.getLastError();
+
     if( i % 10 == 0 ) print( i );
 }
