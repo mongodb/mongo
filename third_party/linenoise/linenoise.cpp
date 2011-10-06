@@ -825,12 +825,13 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, PROMPTINFO & pi) {
                 return -1;
             }
             break;
-        case 20:    /* ctrl-t */
-            if (pos > 0 && pos < len) {
-                int aux = buf[pos-1];
-                buf[pos-1] = buf[pos];
-                buf[pos] = aux;
-                if (pos != len-1) pos++;
+        case __ctrlChar('T'):           // transpose characters like bash does
+            if (pos > 0 && len > 1) {
+                size_t leftCharPos = (pos == len) ? pos - 2 : pos - 1;
+                char aux = buf[leftCharPos];
+                buf[leftCharPos] = buf[leftCharPos+1];
+                buf[leftCharPos+1] = aux;
+                if (pos != len) pos++;
                 refreshLine(fd, pi ,buf, len, pos, cols);
             }
             break;
