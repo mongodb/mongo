@@ -70,6 +70,7 @@ allClientFiles += Glob( "mongo/util/*.c" )
 
 libs = []
 libs += env.SharedLibrary( "mongoclient" , allClientFiles )
+sharedClientLibName = str(libs[-1])
 libs += env.Library( "mongoclient" , allClientFiles )
 
 # install
@@ -90,7 +91,7 @@ env.Alias( "install" , prefix )
 
 clientTests = []
 clientEnv = env.Clone();
-clientEnv.Prepend( LIBS=["libmongoclient.a"])
+clientEnv.Prepend( LIBS=["libmongoclient.a", sharedClientLibName])
 clientEnv.Prepend( LIBPATH=["."] )
 
 # examples
