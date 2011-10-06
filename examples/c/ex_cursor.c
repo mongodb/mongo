@@ -164,17 +164,21 @@ int main(void)
 	    "columns=(id,country,population,area)");
 
 	ret = session->open_cursor(session, "table:world", NULL, NULL, &cursor);
-	ret = cursor->close(cursor, NULL);
+	if (ret == 0)
+		ret = cursor->close(cursor, NULL);
 
 	ret = session->open_cursor(session, "table:world(country,population)",
 	    NULL, NULL, &cursor);
-	ret = cursor->close(cursor, NULL);
+	if (ret == 0)
+		ret = cursor->close(cursor, NULL);
 
 	ret = session->open_cursor(session, "table:", NULL, NULL, &cursor);
-	ret = cursor->close(cursor, NULL);
+	if (ret == 0)
+		ret = cursor->close(cursor, NULL);
 
 	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
-	ret = cursor->close(cursor, NULL);
+	if (ret == 0)
+		ret = cursor->close(cursor, NULL);
 
 	/* Create a simple string table to illustrate basic operations. */
 	ret = session->create(session, "table:map",

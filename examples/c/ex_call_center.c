@@ -68,18 +68,45 @@ int main(void)
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
+	/*
+	 * Create the customers table, give names and types to the columns.
+	 * The columns will be stored in two groups: "main" and "address",
+	 * created below.
+	 */
 	ret = session->create(session, "table:customers",
 	    "key_format=r,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
-	    "colgroup.cust_address=(address),"
-	    "index.cust_phone=(phone)");
+	    "colgroups=(main,address)");
 
+	/* Create the main column group with value columns except address. */
+	ret = session->create(session, "colgroup:customers:main",
+	    "columns=(name,phone)");
+
+	/* Create the address column group with just the address. */
+	ret = session->create(session, "colgroup:customers:address",
+	    "columns=(address)");
+
+	/* Create an index on the customer table by phone number. */
+	ret = session->create(session, "index:customers:phone",
+	    "columns=(phone)");
+
+	/*
+	 * Create the calls table, give names and types to the columns.
+	 * All of the columns will be stored together, so no column groups are
+	 * declared.
+	 */
 	ret = session->create(session, "table:calls",
 	    "key_format=r,"
 	    "value_format=qrrSS,"
-	    "columns=(id,call_date,cust_id,emp_id,call_type,notes),"
-	    "index.calls_cust_date=(cust_id,call_date)");
+	    "columns=(id,call_date,cust_id,emp_id,call_type,notes)");
+
+	/*
+	 * Create an index on the calls table with a composite key of cust_id
+	 * and call_date.
+	 */
+	ret = session->create(session, "index:calls:cust_date",
+	    "columns=(cust_id,call_date)");
 
 	/* Omitted: populate the tables with some data. */
 
@@ -97,12 +124,14 @@ int main(void)
 	 * means the cursor's value format will be "rS".
 	 */
 	ret = session->open_cursor(session,
-	    "index:cust_phone(id,name)",
+	    "index:customers:phone(id,name)",
 	    NULL, NULL, &cursor);
 	cursor->set_key(cursor, "212-555-1000");
 	ret = cursor->search(cursor);
-	ret = cursor->get_value(cursor, &cust.id, &cust.name);
-	printf("Got customer record for %s\n", cust.name);
+	if (ret == 0) {
+		ret = cursor->get_value(cursor, &cust.id, &cust.name);
+		printf("Got customer record for %s\n", cust.name);
+	}
 	ret = cursor->close(cursor, NULL);
 
 	/*
@@ -119,7 +148,7 @@ int main(void)
 	 * getting 3 records.
 	 */
 	ret = session->open_cursor(session,
-	    "index:calls_cust_date(cust_id,call_type,notes)",
+	    "index:calls:cust_date(cust_id,call_type,notes)",
 	    NULL, NULL, &cursor);
 
 	/*
@@ -136,13 +165,14 @@ int main(void)
 	 * adjacent key.  If the key we find is equal or larger than the search
 	 * key, go back one.
 	 */
-	if (exact >= 0)
+	if (ret == 0 && exact >= 0)
 		ret = cursor->prev(cursor);
-	ret = cursor->get_value(cursor,
-	    &call.cust_id, &call.call_type, &call.notes);
+	if (ret == 0)
+		ret = cursor->get_value(cursor,
+		    &call.cust_id, &call.call_type, &call.notes);
 
 	count = 0;
-	while (call.cust_id == cust.id) {
+	while (ret == 0 && call.cust_id == cust.id) {
 		printf("Got call record on date %lu: type %s: %s\n",
 		    (unsigned long)call.call_date, call.call_type, call.notes);
 		if (++count == 3)

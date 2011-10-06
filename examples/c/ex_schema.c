@@ -65,8 +65,18 @@ int main(void)
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"
-	    "colgroup.population=(population),"
-	    "index.country_year=(country,year)");
+	    "colgroups=(main,population)");
+
+	/* Create the column groups to store population in its own file. */
+	ret = session->create(session, "colgroup:population:main",
+	    "columns=(country,year)");
+
+	ret = session->create(session, "colgroup:population:population",
+	    "columns=(population)");
+
+	/* Create an index with composite key (country,year). */
+	ret = session->create(session, "index:population:country_year",
+	    "columns=(country,year)");
 
 	ret = session->open_cursor(session, "table:population",
 	    NULL, NULL, &cursor);
@@ -80,7 +90,7 @@ int main(void)
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,
-	    "index:population.country_year(country,id)",
+	    "index:population:country_year(country,id)",
 	    NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {

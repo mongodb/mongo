@@ -1,0 +1,4 @@
+#!/bin/sh
+
+./ex_tpcb -i
+./ex_tpcb -n 1000
