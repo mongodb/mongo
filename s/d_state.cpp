@@ -430,7 +430,7 @@ namespace mongo {
             return checkConfigOrInit( configdb , authoritative , errmsg , result , true );
         }
         
-        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string errmsg ) {
+        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string& errmsg ) {
             if ( id.type() != jstOID ) {
                 if ( ! info->hasID() ) {
                     warning() << "bad serverID set in setShardVersion and none in info: " << id << endl;
