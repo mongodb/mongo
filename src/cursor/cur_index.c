@@ -411,8 +411,10 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
-	    (idxname = strchr(tablename, ':')) == NULL)
+	    (idxname = strchr(tablename, ':')) == NULL) {
+		__wt_errx(session, "Invalid cursor URI: '%s'", uri);
 		return (EINVAL);
+	}
 	namesize = (size_t)(idxname - tablename);
 	++idxname;
 
