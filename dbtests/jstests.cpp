@@ -531,7 +531,7 @@ namespace JSTests {
             BSONObj out = s->getObject( "a" );
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
 
-            ASSERT( s->exec( "printjson( a ); b = {b:a.a}", "foo", false, true, false ) );
+            ASSERT( s->exec( "b = {b:a.a}", "foo", false, true, false ) );
             out = s->getObject( "b" );
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
             if( val != out.firstElement().numberLong() ) {
@@ -604,6 +604,52 @@ namespace JSTests {
             ASSERT( s->exec( (string)"y = " + outString , "foo2" , false , true , false ) );
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( in , out );
+        }
+    };
+
+    class NumberLongUnderLimit {
+    public:
+        void run() {
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            s->localConnect( "blah" );
+            BSONObjBuilder b;
+            // limit is 2^53
+            long long val = (long long)( 9007199254740991ULL );
+            b.append( "a", val );
+            BSONObj in = b.obj();
+            s->setObject( "a", in );
+            BSONObj out = s->getObject( "a" );
+            ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
+
+            ASSERT( s->exec( "b = {b:a.a}", "foo", false, true, false ) );
+            out = s->getObject( "b" );
+            ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
+            if( val != out.firstElement().numberLong() ) {
+                cout << val << endl;
+                cout << out.firstElement().numberLong() << endl;
+                cout << out.toString() << endl;
+                ASSERT_EQUALS( val, out.firstElement().numberLong() );
+            }
+
+            ASSERT( s->exec( "c = {c:a.a.toString()}", "foo", false, true, false ) );
+            out = s->getObject( "c" );
+            stringstream ss;
+            ss << "NumberLong(\"" << val << "\")";
+            ASSERT_EQUALS( ss.str(), out.firstElement().valuestr() );
+
+            ASSERT( s->exec( "d = {d:a.a.toNumber()}", "foo", false, true, false ) );
+            out = s->getObject( "d" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT_EQUALS( double( val ), out.firstElement().number() );
+
+            ASSERT( s->exec( "e = {e:a.a.floatApprox}", "foo", false, true, false ) );
+            out = s->getObject( "e" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT_EQUALS( double( val ), out.firstElement().number() );
+
+            ASSERT( s->exec( "f = {f:a.a.top}", "foo", false, true, false ) );
+            out = s->getObject( "f" );
+            ASSERT( Undefined == out.firstElement().type() );
         }
     };
 

@@ -952,7 +952,8 @@ namespace mongo {
                     return v8::ThrowException( v8::String::New( "could not convert string to long long" ) );
                 }
                 unsigned long long val = n;
-                if ( (long long)val == (long long)(double)(long long)(val) ) {
+                // values above 2^53 are not accurately represented in JS
+                if ( (long long)val == (long long)(double)(long long)(val) && val < 9007199254740992ULL ) {
                     it->Set( scope->getV8Str( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
                 }
                 else {

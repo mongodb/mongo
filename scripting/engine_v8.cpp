@@ -1082,7 +1082,8 @@ namespace mongo {
                 unsigned long long val = f.numberLong();
                 v8::Function* numberLong = getNamedCons( "NumberLong" );
                 double floatApprox = (double)(long long)val;
-                if ( (long long)val == (long long)floatApprox ) {
+                // values above 2^53 are not accurately represented in JS
+                if ( (long long)val == (long long)floatApprox && val < 9007199254740992ULL ) {
                     v8::Handle<v8::Value> argv[1];
                     argv[0] = v8::Number::New( floatApprox );
                     o->Set( name, numberLong->NewInstance( 1, argv ) );
@@ -1265,7 +1266,8 @@ namespace mongo {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
             unsigned long long val = f.numberLong();
             v8::Function* numberLong = getNamedCons( "NumberLong" );
-            if ( (long long)val == (long long)(double)(long long)(val) ) {
+            // values above 2^53 are not accurately represented in JS
+            if ( (long long)val == (long long)(double)(long long)(val) && val < 9007199254740992ULL ) {
                 v8::Handle<v8::Value> argv[1];
                 argv[0] = v8::Number::New( (double)(long long)( val ) );
                 return numberLong->NewInstance( 1, argv );
