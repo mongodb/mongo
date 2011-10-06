@@ -130,7 +130,9 @@ doTest = function( signal ) {
   assert.soon(function() {
           var z = conn.getDB(name).foo.findOne({_id:124});
           return z != null && z.x == "foo"
-      });
+      },
+      undefined,
+      60000 );
   
   
   replTest.stopSet();  
