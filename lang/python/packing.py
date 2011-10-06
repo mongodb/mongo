@@ -46,6 +46,12 @@ def unpack(fmt, s):
 			if f == 'S' and not havesize:
 				size += 1
 			s = s[size:]
+		elif f in 't':
+			# bit type, size is number of bits
+			if not havesize:
+				size = 1
+			result.append(ord(s[0:1]))
+			s = s[1:]
 		else:
 			# integral type
 			if not havesize:
@@ -92,6 +98,18 @@ def pack(fmt, *values):
 				result += '\0'
 			elif size > l:
 				result += '\0' * (size - l)
+			i += 1
+		elif f in 't':
+			# bit type, size is number of bits
+			if not havesize:
+				size = 1
+                        if size > 8:
+				raise ValueError("bit count cannot be greater than 8 for 't' encoding")
+			mask = (1 << size) - 1
+			val = values[i]
+                        if (mask & val) != val:
+				raise ValueError("value out of range for 't' encoding")
+			result += chr(val)
 			i += 1
 		else:
 			# integral type

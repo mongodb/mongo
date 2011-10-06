@@ -24,7 +24,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
     scenarios = [
         ('row', dict(tablekind='row')),
         ('col', dict(tablekind='col')),
-        #('fix', dict(tablekind='fix'))
+        ('fix', dict(tablekind='fix'))
         ]
 
     def config_string(self):
@@ -140,8 +140,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertRaises(WiredTigerError, cursor.get_value)
 
         for i in range(0, self.nentries):
-            cursor.set_key('key' + str(i))
-            cursor.set_value('value' + str(i))
+            cursor.set_key(self.genkey(i))
+            cursor.set_value(self.genvalue(i))
             cursor.insert()
 
         # Don't use the builtin 'for ... in cursor',
