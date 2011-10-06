@@ -364,6 +364,7 @@ namespace mongo {
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
         V8STR_RO = getV8Str( "_ro" );
         V8STR_MODIFIED = getV8Str( "_mod" );
+        V8STR_FULLNAME = getV8Str( "_fullName" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);

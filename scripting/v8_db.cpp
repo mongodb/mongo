@@ -550,7 +550,7 @@ namespace mongo {
         args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
         args.This()->Set( scope->getV8Str( "_db" ) , args[1] );
         args.This()->Set( scope->getV8Str( "_shortName" ) , args[2] );
-        args.This()->Set( scope->getV8Str( "_fullName" ) , args[3] );
+        args.This()->Set( scope->V8STR_FULLNAME , args[3] );
         
         if ( haveLocalShardingInfo( toSTLString( args[3] ) ) )
             return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
@@ -618,6 +618,7 @@ namespace mongo {
             // if starts with '_' we allow overwrite
             return Handle<Value>();
         }
+        // dont set
         return value;
     }
 
@@ -632,20 +633,33 @@ namespace mongo {
         // 2nd look into real values, may be cached collection object
         string sname = toSTLString( name );
         if (info.This()->HasRealNamedProperty(name)) {
-            return info.This()->GetRealNamedProperty( name );
+            v8::Local<v8::Value> prop = info.This()->GetRealNamedProperty( name );
+            if (prop->IsObject() && prop->ToObject()->HasRealNamedProperty(v8::String::New("_fullName"))) {
+                // need to check every time that the collection did not get sharded
+                if ( haveLocalShardingInfo( toSTLString( prop->ToObject()->GetRealNamedProperty(v8::String::New("_fullName")) ) ) )
+                    return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
+            }
+            return prop;
         } else if ( sname.length() == 0 || sname[0] == '_' ) {
             // if starts with '_' we dont return collection, one must use getCollection()
-            return Handle<Value>();
+            return v8::Undefined();
         }
 
         // no hit, create new collection
         v8::Handle<v8::Value> getCollection = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "getCollection" ) );
         assert( getCollection->IsFunction() );
 
+        TryCatch tryCatch;
         v8::Function * f = (v8::Function*)(*getCollection);
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
         v8::Local<v8::Value> coll = f->Call( info.This() , 1 , argv );
+        if (coll.IsEmpty()) {
+            if (tryCatch.HasCaught()) {
+                return v8::ThrowException( tryCatch.Exception() );
+            }
+            return Handle<Value>();
+        }
 
         // cache collection for reuse, dont enumerate
         info.This()->ForceSet(name, coll, v8::DontEnum);
