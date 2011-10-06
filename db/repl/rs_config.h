@@ -76,7 +76,7 @@ namespace mongo {
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
                 RACECHECK
-                for (set<TagSubgroup*>::iterator it = groups().begin(); it != groups().end(); it++) {
+                for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
                     ((TagSubgroup*)(*it))->updateLast(last);
                 }
             }
