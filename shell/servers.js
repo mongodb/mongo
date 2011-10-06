@@ -819,6 +819,20 @@ ShardingTest.prototype.setBalancer = function( balancer ){
     }
 }
 
+ShardingTest.prototype.stopBalancer = function( timeout, interval ) {
+    this.setBalancer( false )
+    var temp = db; db = this.config
+    sh.waitForBalancer( false, timeout, interval )
+    db = temp
+}
+
+ShardingTest.prototype.startBalancer = function( timeout, interval ) {
+    this.setBalancer( true )
+    var temp = db; db = this.config
+    sh.waitForBalancer( true, timeout, interval )
+    db = temp
+}
+
 /**
  * Run a mongod process.
  *

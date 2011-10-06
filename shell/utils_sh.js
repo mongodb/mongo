@@ -112,3 +112,32 @@ sh.isBalancerRunning = function() {
     var x = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
     return x.state > 0;
 }
+
+sh.stopBalancer = function( timeout, interval ) {
+    sh.setBalancerState( false )
+    sh.waitForBalancer( false, timeout, interval )
+}
+
+sh.startBalancer = function( timeout, interval ) {
+    sh.setBalancerState( true )
+    sh.waitForBalancer( true, timeout, interval )
+}
+
+sh.waitForBalancer = function( onOrNot, timeout, interval ){
+    
+    // Can also wait for particular balancer state
+    var state = null
+    if( ! onOrNot ) state = 0
+    else if( onOrNot == true ) state = 2
+    else state = onOrNot
+    
+    assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
+                             return ( lock == null && state == 0 ) || ( lock != null && lock.state == state ) 
+                 },
+                 "waited too long for balancer to " + ( state > 0 ? "start" : "stop" ) + " [ state : " + state + "]",
+                 timeout,
+                 interval
+    )
+    
+}
+

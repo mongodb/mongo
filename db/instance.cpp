@@ -54,7 +54,7 @@ namespace mongo {
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
 
     int nloggedsome = 0;
-#define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
+#define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
     string dbExecCommand;
 
@@ -181,7 +181,7 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ok = false;
             op.debug().exceptionInfo = e.getInfo();
-            LOGSOME {
+            LOGWITHRATELIMIT {
                 log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
                 if( q.ntoskip || q.ntoreturn )
@@ -502,7 +502,7 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    void OpTime::waitForDifferent(unsigned long long millis){
+    void OpTime::waitForDifferent(unsigned millis){
         DEV dbMutex.assertAtLeastReadLocked();
 
         if (*this != last) return; // check early

@@ -16,6 +16,7 @@ types =  [
     ]
 
 s = new ShardingTest( "key_many" , 2 );
+s.setBalancer( false )
 
 s.adminCommand( { enablesharding : "test" } )
 db = s.getDB( "test" );

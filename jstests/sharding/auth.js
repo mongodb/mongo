@@ -156,6 +156,10 @@ assert.eq(s.getDB("test").foo.find().itcount(), num+1);
 
 s.s.setSlaveOk();
 
+// We're only sure we aren't duplicating documents iff there's no balancing going on here
+// This call also waits for any ongoing balancing to stop
+sh.stopBalancer()
+
 var cursor = s.getDB("test").foo.find({x:{$lt : 500}});
 
 var count = 0;

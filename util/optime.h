@@ -102,7 +102,7 @@ namespace mongo {
         // Waits for global OpTime to be different from *this
         // Must be atLeastReadLocked
         // Defined in instance.cpp (only current user) as it needs dbtemprelease
-        void waitForDifferent(unsigned long long millis);
+        void waitForDifferent(unsigned millis);
 
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
          64 bit "container" for these values.  While these are not really "Dates", that seems a

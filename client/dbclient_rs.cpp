@@ -260,14 +260,12 @@ namespace mongo {
                 LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
             }
         }
+        uassert(15899, str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, _master >= 0 && _nodes[_master].ok);
 
-        if( _master >= 0 ) { 
-            assert( static_cast<unsigned>(_master) < _nodes.size() );
-            LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
-            return _nodes[_master].addr;
-        }
-        
-        throw DBException(str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, 15899);
+        // Fall back to primary
+        assert( static_cast<unsigned>(_master) < _nodes.size() );
+        LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
+        return _nodes[_master].addr;
     }
 
     /**
