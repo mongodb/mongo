@@ -18,6 +18,8 @@
 #pragma once
 
 #include "../db/concurrency.h"
+#include <boost/thread/condition.hpp>
+
 
 namespace mongo {
     void exitCleanly( ExitCode code );
