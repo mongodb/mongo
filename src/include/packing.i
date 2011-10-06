@@ -120,6 +120,8 @@ next:	if (pack->cur == pack->end)
 
 #define	WT_PACK_GET(session, pv, ap) do {				\
 	switch (pv.type) {						\
+	case 'x':                                                       \
+		break;							\
 	case 's':							\
 	case 'S':							\
 		pv.u.s = va_arg(ap, const char *);			\
@@ -379,6 +381,8 @@ __unpack_read(WT_SESSION_IMPL *session,
 
 #define	WT_UNPACK_PUT(session, pv, ap) do {				\
 	switch (pv.type) {						\
+	case 'x':                                                       \
+		break;							\
 	case 's':							\
 	case 'S':							\
 		*va_arg(ap, const char **) = pv.u.s;			\
