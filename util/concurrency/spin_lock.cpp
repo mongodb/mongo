@@ -45,12 +45,7 @@ namespace mongo {
 #if defined(_WIN32)
         EnterCriticalSection(&_cs);
 #elif defined(__USE_XOPEN2K)
-        while (pthread_spin_trylock( &_lock ) != 0) {
-            struct timespec t;
-            t.tv_sec = 0;
-            t.tv_nsec = 1000*1000;
-            nanosleep(&t, NULL);
-        }
+        pthread_spin_lock( &_lock );
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         // fast path
         if (!_locked && !__sync_lock_test_and_set(&_locked, true)) {
