@@ -96,10 +96,6 @@
 #define write _write
 #define STDIN_FILENO 0
 
-static HANDLE console_in, console_out;
-static DWORD oldMode;
-
-
 #else /* _WIN32 */
 
 #include <termios.h>
@@ -113,15 +109,40 @@ static DWORD oldMode;
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-static struct termios orig_termios; /* in order to restore at exit */
 #endif /* _WIN32 */
 
 #include "linenoise.h"
 
+    typedef struct tag_PROMPTINFO {
+        char *          promptText;
+        int             promptChars;
+        int             promptExtraLines;
+        int             promptIndentation;
+        int             promptLastLinePosition;
+#ifdef _WIN32
+        size_t          promptPreviousInputLen;
+        size_t          promptScreenBufferRow;
+#else
+        size_t          promptCursorRowOffset;
+#endif
+    } PROMPTINFO;
+
 #define LINENOISE_DEFAULT_HISTORY_MAX_LEN 100
 #define LINENOISE_MAX_LINE 4096
+
+// make control-characters more readable
+#define __ctrlChar(upperCaseASCII) (upperCaseASCII - 0x40)
+
 static const char *unsupported_term[] = {"dumb","cons25",NULL};
 static linenoiseCompletionCallback *completionCallback = NULL;
+
+#ifdef _WIN32
+static HANDLE console_in, console_out;
+static DWORD oldMode;
+static WORD oldDisplayAttribute;
+#else
+static struct termios orig_termios; /* in order to restore at exit */
+#endif
 
 static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
@@ -160,7 +181,7 @@ static int enableRawMode(int fd) {
         console_out = GetStdHandle(STD_OUTPUT_HANDLE);
 
         GetConsoleMode(console_in, &oldMode);
-        SetConsoleMode(console_in, oldMode & ~(ENABLE_LINE_INPUT | ENABLE_LINE_INPUT));
+        SetConsoleMode(console_in, oldMode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
     }
     return 0;
 #else
@@ -178,7 +199,8 @@ static int enableRawMode(int fd) {
      * no start/stop output control. */
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     /* output modes - disable post processing */
-    raw.c_oflag &= ~(OPOST);
+    // this is wrong, we don't want raw output, it turns newlines into straight linefeeds
+    //raw.c_oflag &= ~(OPOST);
     /* control modes - set 8 bit chars */
     raw.c_cflag |= (CS8);
     /* local modes - choing off, canonical off, no extended functions,
@@ -230,6 +252,7 @@ static int getColumns(void) {
 #endif
 }
 
+#if 0 // currently unused, leave it here for now 2011-10-05
 #ifdef _WIN32
 static void output(const char* str, size_t len, int x, int y)
 {
@@ -238,86 +261,213 @@ static void output(const char* str, size_t len, int x, int y)
     WriteConsoleOutputCharacterA(console_out, str, len, pos, &count);
 }
 #endif
+#endif
 
-static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
-    size_t plen = strlen(prompt);
-    
-    while((plen+pos) >= cols) {
-        buf++;
-        len--;
-        pos--;
-    }
-    while (plen+len > cols) {
-        len--;
-    }
-
+static void setDisplayAttribute(int fd, bool enhancedDisplay) {
 #ifdef _WIN32
-    CONSOLE_SCREEN_BUFFER_INFO inf = { 0 };
-    GetConsoleScreenBufferInfo(console_out, &inf);
-    output(prompt, plen, 0, inf.dwCursorPosition.Y);
-    output(buf, len, plen, inf.dwCursorPosition.Y);
-    if (plen + len < (size_t)inf.dwSize.X) {
-        /* Blank to EOL */
-        char* tmp = (char*)malloc(inf.dwSize.X - (plen + len));
-        memset(tmp, ' ', inf.dwSize.X - (plen + len));
-        output(tmp, inf.dwSize.X - (plen + len), len + plen, inf.dwCursorPosition.Y);
-        free(tmp);
+    if (enhancedDisplay) {
+        CONSOLE_SCREEN_BUFFER_INFO inf;
+        GetConsoleScreenBufferInfo(console_out, &inf);
+        oldDisplayAttribute = inf.wAttributes;
+        BYTE oldLowByte = oldDisplayAttribute & 0xFF;
+        BYTE newLowByte;
+        switch (oldLowByte) {
+        case 0x07:
+            //newLowByte = FOREGROUND_BLUE;                         // even dimmer
+            //newLowByte = FOREGROUND_BLUE | FOREGROUND_INTENSITY;  // too dim
+            newLowByte = FOREGROUND_BLUE | FOREGROUND_GREEN;        // most similar to xterm appearance
+            break;
+        case 0x70:
+            newLowByte = BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+            break;
+        default:
+            newLowByte = oldLowByte ^ 0xFF;     // default to inverse video
+            break;
+        }
+        inf.wAttributes = (inf.wAttributes & 0xFF00) | newLowByte;
+        SetConsoleTextAttribute(console_out, inf.wAttributes);
+    } else {
+        SetConsoleTextAttribute(console_out, oldDisplayAttribute);
     }
-    inf.dwCursorPosition.X = (SHORT)(pos + plen);
-    SetConsoleCursorPosition(console_out, inf.dwCursorPosition);
 #else
-    {
-        char seq[64];
-        int highlight = -1;
+    if (enhancedDisplay) {
+        if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
+    } else {
+        if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
+    }
+#endif
+}
 
-        if (pos < len) {
-            /* this scans for a brace matching buf[pos] to highlight */
-            int scanDirection = 0;
-            if (strchr("}])", buf[pos]))
-                scanDirection = -1; /* backwards */
-            else if (strchr("{[(", buf[pos]))
-                scanDirection = 1; /* forwards */
+static void refreshLine(int fd, PROMPTINFO & pi, char *buf, size_t len, size_t pos, size_t cols) {
 
-            if (scanDirection) {
-                int unmatched = scanDirection;
-                int i;
-                for(i = pos + scanDirection; i >= 0 && i < (int)len; i += scanDirection){
-                    /* TODO: the right thing when inside a string */
-                    if (strchr("}])", buf[i]))
-                        unmatched--;
-                    else if (strchr("{[(", buf[i]))
-                        unmatched++;
+    int highlight = -1;
+    if (pos < len) {
+        /* this scans for a brace matching buf[pos] to highlight */
+        int scanDirection = 0;
+        if (strchr("}])", buf[pos]))
+            scanDirection = -1; /* backwards */
+        else if (strchr("{[(", buf[pos]))
+            scanDirection = 1; /* forwards */
 
-                    if (unmatched == 0) {
-                        highlight = i;
-                        break;
-                    }
+        if (scanDirection) {
+            int unmatched = scanDirection;
+            int i;
+            for(i = pos + scanDirection; i >= 0 && i < (int)len; i += scanDirection){
+                /* TODO: the right thing when inside a string */
+                if (strchr("}])", buf[i]))
+                    unmatched--;
+                else if (strchr("{[(", buf[i]))
+                    unmatched++;
+
+                if (unmatched == 0) {
+                    highlight = i;
+                    break;
                 }
             }
         }
+    }
 
-        /* Cursor to left edge */
-        snprintf(seq,64,"\x1b[1G");
+    // see how many lines the display of the input buffer will require given
+    // our starting prompt indentation
+    size_t x = pi.promptIndentation;
+    size_t y;
+    size_t xLastPosition = x;
+    size_t addedLines = 0;
+    size_t yLastPosition = addedLines;
+    size_t charsRemaining = len;
+    while (charsRemaining > 0) {
+        int charsThisRow = (x + charsRemaining < cols) ? charsRemaining : cols - x;
+        xLastPosition = x + charsThisRow;
+        yLastPosition = addedLines;
+        charsRemaining -= charsThisRow;
+        x = 0;
+        addedLines++;
+    }
+    if (xLastPosition == cols) {    // have to special-case line wrap
+        xLastPosition = 0;
+        yLastPosition++;
+    }
+
+#ifdef _WIN32
+    // scroll the screen buffer if what we're about to display won't fit
+    CONSOLE_SCREEN_BUFFER_INFO inf;
+    GetConsoleScreenBufferInfo(console_out, &inf);
+    y = pi.promptScreenBufferRow + pi.promptExtraLines;
+    int scrollLines = 1 + yLastPosition + y - inf.dwSize.Y;
+    if (scrollLines > 0) {
+        SMALL_RECT sr = { 0, scrollLines, inf.dwSize.X - 1, inf.dwSize.Y - 1 };
+        COORD coord = { 0 };
+        CHAR_INFO charInfo;
+        charInfo.Char.AsciiChar = ' ';
+        charInfo.Attributes = inf.wAttributes;
+        BOOL bRet = ScrollConsoleScreenBufferA(console_out, &sr, NULL, coord, &charInfo);
+        y -= scrollLines;
+        pi.promptScreenBufferRow -= scrollLines;
+    }
+
+    // display the input buffer
+    COORD coord2 = {pi.promptIndentation, y};
+    SetConsoleCursorPosition(console_out, coord2);
+    if (highlight == -1) {
+        if (write(1,buf,len) == -1) return;
+    } else {
+        if (write(1,buf,highlight) == -1) return;
+        setDisplayAttribute(1, true); /* bright blue (visible with both B&W bg) */
+        if (write(1,&buf[highlight],1) == -1) return;
+        setDisplayAttribute(1, false);
+        if (write(1,buf+highlight+1,len-highlight-1) == -1) return;
+    }
+#else
+    size_t rowOffsetToEndOfInput = yLastPosition;
+#endif
+
+#ifdef _WIN32
+    // compute the position of the end of the user input
+    charsRemaining = len;
+    xLastPosition = x = pi.promptIndentation;
+    yLastPosition = y;
+    while (charsRemaining > 0) {
+        int charsThisRow = (x + charsRemaining < cols) ? charsRemaining : cols - x;
+        xLastPosition = x + charsThisRow;
+        yLastPosition = y;
+        charsRemaining -= charsThisRow;
+        x = 0;
+        y++;
+    }
+    if (xLastPosition == cols) {    // have to special-case line wrap
+        xLastPosition = 0;
+        yLastPosition++;
+    }
+
+    // clear to end of previous input line
+    int eraseChars = pi.promptPreviousInputLen - len;
+    if (eraseChars > 0) {
+        COORD coord = {xLastPosition, yLastPosition};
+        DWORD count;
+        FillConsoleOutputCharacterA(console_out, ' ', eraseChars, coord, &count);
+    }
+    if (len > pi.promptPreviousInputLen) {
+        pi.promptPreviousInputLen = len;
+    }
+#endif
+
+    // position cursor
+    xLastPosition = x = pi.promptIndentation;
+    yLastPosition = y =  0;
+    while (pos > 0) {
+        int charsThisRow = (x + pos < cols) ? pos : cols - x;
+        xLastPosition = x + charsThisRow;
+        yLastPosition = y;
+        pos -= charsThisRow;
+        x = 0;
+        y++;
+    }
+    if (xLastPosition == cols) {    // have to special-case line wrap
+        xLastPosition = 0;
+        yLastPosition++;
+    }
+
+#ifdef _WIN32
+    yLastPosition += pi.promptScreenBufferRow + pi.promptExtraLines;
+    COORD coord = {xLastPosition, yLastPosition};
+    SetConsoleCursorPosition(console_out, coord);
+#endif
+
+    // non-Windows for the rest of this routine
+#ifndef _WIN32
+    {
+        char seq[64];
+        int cursorRowMovement = (int)pi.promptCursorRowOffset - (int)pi.promptExtraLines;
+        if (cursorRowMovement > 0) {
+            // move the cursor up as required
+            snprintf(seq, sizeof seq, "\x1b[%dA", cursorRowMovement);
+            if (write(fd,seq,strlen(seq)) == -1) return;
+        }
+        // position at the end of the prompt, clear to end of screen
+        snprintf(seq, sizeof seq, "\x1b[%dG\x1b[J", pi.promptIndentation + 1);
         if (write(fd,seq,strlen(seq)) == -1) return;
-        /* Write the prompt and the current buffer content */
-        if (write(fd,prompt,strlen(prompt)) == -1) return;
 
         if (highlight == -1) {
             if (write(fd,buf,len) == -1) return;
         } else {
             if (write(fd,buf,highlight) == -1) return;
-            if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
+            setDisplayAttribute(fd, true);
             if (write(fd,&buf[highlight],1) == -1) return;
-            if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
+            setDisplayAttribute(fd, false);
             if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
         }
 
-        /* Erase to right */
-        snprintf(seq,64,"\x1b[0K");
-        if (write(fd,seq,strlen(seq)) == -1) return;
         /* Move cursor to original position. */
-        snprintf(seq,64,"\x1b[1G\x1b[%dC", (int)(pos+plen));
+        cursorRowMovement = (int)rowOffsetToEndOfInput - (int)yLastPosition;
+        if (cursorRowMovement > 0) {
+            // move the cursor up as required
+            snprintf(seq, sizeof seq, "\x1b[%dA", cursorRowMovement);
+            if (write(fd,seq,strlen(seq)) == -1) return;
+        }
+        // position the cursor within the line
+        snprintf(seq, sizeof seq, "\x1b[%dG", xLastPosition + 1);
         if (write(fd,seq,strlen(seq)) == -1) return;
+        pi.promptCursorRowOffset = pi.promptExtraLines + yLastPosition;
     }
 #endif
 }
@@ -331,21 +481,25 @@ static char linenoiseReadChar(int fd){
     DWORD count;
     do {
         ReadConsoleInputA(console_in, &rec, 1, &count);
-    } while (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown);
-
-    if (rec.Event.KeyEvent.uChar.AsciiChar == 0) {
-        /* handle keys that aren't converted to ASCII */
-        switch (rec.Event.KeyEvent.wVirtualKeyCode) {
-            case VK_LEFT: return 2; /* ctrl-b */
-            case VK_RIGHT: return 6; /* ctrl-f */
-            case VK_UP: return 16; /* ctrl-p */
-            case VK_DOWN: return 14; /* ctrl-n */
-            case VK_DELETE: return 127; /* ascii DEL byte */
-            case VK_HOME: return 1; /* ctrl-a */
-            case VK_END: return 5; /* ctrl-e */
-            default: return -1;
+        if (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown) {
+            continue;
         }
-    }
+        if (rec.Event.KeyEvent.uChar.AsciiChar == 0) {
+            /* handle keys that aren't converted to ASCII */
+            switch (rec.Event.KeyEvent.wVirtualKeyCode) {
+                case VK_LEFT:   return __ctrlChar('B');  // EMACS character (B)ack
+                case VK_RIGHT:  return __ctrlChar('F');  // EMACS character (F)orward
+                case VK_UP:     return __ctrlChar('P');  // EMACS (P)revious line
+                case VK_DOWN:   return __ctrlChar('N');  // EMACS (N)ext line
+                case VK_DELETE: return 127;              // ASCII DEL byte
+                case VK_HOME:   return __ctrlChar('A');  // EMACS beginning-of-line
+                case VK_END:    return __ctrlChar('E');  // EMACS (E)nd-of-line
+                default: continue;                       // in raw mode, ReadConsoleInput shows shift, ctrl ...
+            }                                            //  ... ignore them
+        } else {
+            break;
+        }
+    } while (true);
     return rec.Event.KeyEvent.uChar.AsciiChar;
 #else
     char c;
@@ -448,7 +602,7 @@ static void freeCompletions(linenoiseCompletions *lc) {
         free(lc->cvec);
 }
 
-static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, size_t *len, size_t *pos, size_t cols) {
+static int completeLine(int fd, PROMPTINFO & pi, char *buf, size_t buflen, size_t *len, size_t *pos, size_t cols) {
     linenoiseCompletions lc = { 0, NULL };
     int nwritten;
     char c = 0;
@@ -464,9 +618,9 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
             /* Show completion or original buffer */
             if (i < lc.len) {
                 clen = strlen(lc.cvec[i]);
-                refreshLine(fd,prompt,lc.cvec[i],clen,clen,cols);
+                refreshLine(fd, pi, lc.cvec[i], clen, clen, cols);
             } else {
-                refreshLine(fd,prompt,buf,*len,*pos,cols);
+                refreshLine(fd, pi, buf, *len, *pos, cols);
             }
 
             do {
@@ -484,7 +638,7 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
                 case 27: /* escape */
                     /* Re-show original buffer */
                     if (i < lc.len) {
-                        refreshLine(fd,prompt,buf,*len,*pos,cols);
+                        refreshLine(fd, pi, buf, *len, *pos, cols);
                     }
                     stop = 1;
                     break;
@@ -504,26 +658,97 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
     return c; /* Return last read character */
 }
 
-void linenoiseClearScreen(void) {
-#ifdef _WIN32
-    COORD coord = {0, 0};
-    CONSOLE_SCREEN_BUFFER_INFO inf;
-    DWORD count;
-    DWORD size;
+static void linenoiseClearScreen(int fd, PROMPTINFO & pi, char *buf, size_t len, size_t pos, size_t cols) {
 
+#ifdef _WIN32
+#if 1
+    // game plan -- if possible, we would like to simply move the console's window
+    // into the screen buffer, which has the desired visual effect and preserves
+    // all scrollback memory.  we can't do that if the window size is equal to the
+    // screen buffer size, and we need to be careful when scrolling to never let
+    // the existing console window become invalid
+    CONSOLE_SCREEN_BUFFER_INFO inf;
     GetConsoleScreenBufferInfo(console_out, &inf);
-    size = inf.dwSize.X * inf.dwSize.Y;
-    FillConsoleOutputCharacterA(console_out, ' ', size, coord, &count );
-    SetConsoleCursorPosition(console_out, coord); 
+    int windowHeight = inf.srWindow.Bottom - inf.srWindow.Top;
+    if (windowHeight == inf.dwSize.Y - 1) {
+        // we can't scroll, so just clear the window, move the cursor and redraw
+        COORD coord = {0, 0};
+        SetConsoleCursorPosition(console_out, coord);
+        DWORD count;
+        FillConsoleOutputCharacterA(console_out, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count);
+        pi.promptScreenBufferRow = 0;
+        if (write(1, pi.promptText, pi.promptChars) == -1) return;
+        refreshLine(fd, pi, buf, len, pos, cols);
+    } else {
+        // scroll the screen buffer and/or the console window to position the prompt
+        // at the top of the window
+        int linesPromptToEnd = inf.dwSize.Y - pi.promptScreenBufferRow;
+        int scrollLines = 1 + windowHeight - linesPromptToEnd;
+        if (scrollLines > 0) {
+            // there aren't enough rows in the screen buffer to just slide the window,
+            // so scroll the screen buffer first to create new empty space at the end.
+            // we can't scroll the screen buffer in such a way that the window into the
+            // buffer becomes invalid, which can happen if scrollLines > windowHeight
+            SMALL_RECT sr = { 0, scrollLines, inf.dwSize.X - 1, inf.dwSize.Y - 1 };
+            COORD coord = { 0 };
+            CHAR_INFO charInfo;
+            charInfo.Char.AsciiChar = ' ';
+            charInfo.Attributes = inf.wAttributes;
+            //int scrollsLeftToDo = scrollLines;
+            //while (scrollsLeftToDo > 0) {
+            //    int thisScroll = (scrollsLeftToDo < windowHeight) ? scrollsLeftToDo : windowHeight;
+            //}
+            ScrollConsoleScreenBufferA(console_out, &sr, NULL, coord, &charInfo);
+            pi.promptScreenBufferRow -= scrollLines;
+            inf.dwCursorPosition.Y -= scrollLines;
+            SetConsoleCursorPosition(console_out, inf.dwCursorPosition);
+        }
+        if ( (int)pi.promptScreenBufferRow > inf.srWindow.Top ) {
+            // scroll the window to position the prompt at the top
+            inf.srWindow.Top = pi.promptScreenBufferRow;
+            inf.srWindow.Bottom = inf.srWindow.Top + windowHeight;
+            SetConsoleWindowInfo(console_out, TRUE, &inf.srWindow);
+        }
+    }
+#else
+    // scroll the screen buffer and/or the console window to position the prompt
+    // at the top of the window
+    CONSOLE_SCREEN_BUFFER_INFO inf;
+    GetConsoleScreenBufferInfo(console_out, &inf);
+    int windowHeight = inf.srWindow.Bottom - inf.srWindow.Top;
+    int linesPromptToEnd = inf.dwSize.Y - pi.promptScreenBufferRow;
+    int scrollLines = 1 + windowHeight - linesPromptToEnd;
+    if (scrollLines > 0) {
+        // there aren't enough rows in the screen buffer to just slide the window,
+        // so scroll the screen buffer first to create new empty space at the end
+        SMALL_RECT sr = { 0, scrollLines, inf.dwSize.X - 1, inf.dwSize.Y - 1 };
+        COORD coord = { 0 };
+        CHAR_INFO charInfo;
+        charInfo.Char.AsciiChar = ' ';
+        charInfo.Attributes = inf.wAttributes;
+        ScrollConsoleScreenBufferA(console_out, &sr, NULL, coord, &charInfo);
+        pi.promptScreenBufferRow -= scrollLines;
+        inf.dwCursorPosition.Y -= scrollLines;
+        SetConsoleCursorPosition(console_out, inf.dwCursorPosition);
+    }
+    if ( (int)pi.promptScreenBufferRow > inf.srWindow.Top ) {
+        // scroll the window to position the prompt at the top
+        inf.srWindow.Top = pi.promptScreenBufferRow;
+        inf.srWindow.Bottom = inf.srWindow.Top + windowHeight;
+        SetConsoleWindowInfo(console_out, TRUE, &inf.srWindow);
+    }
+#endif // if 0/1
 #else
     if (write(1,"\x1b[H\x1b[2J",7) <= 0) {
         /* nothing to do, just to avoid warning. */
     }
+    if (write(1, pi.promptText, pi.promptChars) == -1) return;
+    pi.promptCursorRowOffset = pi.promptExtraLines;
+    refreshLine(fd, pi, buf, len, pos, cols);
 #endif
 }
 
-static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt) {
-    size_t plen = strlen(prompt);
+static int linenoisePrompt(int fd, char *buf, size_t buflen, PROMPTINFO & pi) {
     size_t pos = 0;
     size_t len = 0;
     size_t cols = getColumns();
@@ -537,14 +762,23 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
      * initially is just an empty string. */
     linenoiseHistoryAdd("");
     history_index = history_len-1;
-    
-    if (write(1,prompt,plen) == -1) return -1;
+
+    if (write(1, pi.promptText, pi.promptChars) == -1) return -1;
+#ifdef _WIN32
+    // see where we are in the screen buffer so we can refresh correctly
+    CONSOLE_SCREEN_BUFFER_INFO inf;
+    GetConsoleScreenBufferInfo(console_out, &inf);
+    pi.promptScreenBufferRow = inf.dwCursorPosition.Y - pi.promptExtraLines;
+#else
+    // the cursor starts out at the end of the prompt
+    pi.promptCursorRowOffset = pi.promptExtraLines;
+#endif
     while(1) {
         char c = linenoiseReadChar(fd);
 
         if (c == 0) return len;
         if (c == (char)-1) {
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            refreshLine(fd, pi, buf, len, pos, cols);
             continue;
         }
 
@@ -555,7 +789,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             /* ignore tabs used for indentation */
             if (pos == 0) continue;
 
-            c = completeLine(fd,prompt,buf,buflen,&len,&pos,cols);
+            c = completeLine(fd, pi, buf, buflen, &len, &pos, cols);
             /* Return on errors */
             if (c < 0) return len;
             /* Read next character when 0 */
@@ -576,7 +810,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 memmove(buf+pos,buf+pos+1,len-pos-1);
                 len--;
                 buf[len] = '\0';
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd,pi,buf,len,pos,cols);
             }
             break;
         case 8:     /* backspace or ctrl-h */
@@ -585,7 +819,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 pos--;
                 len--;
                 buf[len] = '\0';
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi, buf, len, pos, cols);
             }
             break;
         case 4:     /* ctrl-d, remove char at right of cursor */
@@ -593,7 +827,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 memmove(buf+pos,buf+pos+1,len-pos);
                 len--;
                 buf[len] = '\0';
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi, buf, len, pos, cols);
             } else if (len == 0) {
                 history_len--;
                 free(history[history_len]);
@@ -606,20 +840,20 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 buf[pos-1] = buf[pos];
                 buf[pos] = aux;
                 if (pos != len-1) pos++;
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi ,buf, len, pos, cols);
             }
             break;
         case 2:     /* ctrl-b */ /* left arrow */
             if (pos > 0) {
                 pos--;
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi, buf, len, pos, cols);
             }
             break;
         case 6:     /* ctrl-f */
             /* right arrow */
             if (pos != len) {
                 pos++;
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi ,buf, len, pos, cols);
             }
             break;
         case 16:    /* ctrl-p */
@@ -642,7 +876,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 strncpy(buf,history[history_index],buflen);
                 buf[buflen] = '\0';
                 len = pos = strlen(buf);
-                refreshLine(fd,prompt,buf,len,pos,cols);
+                refreshLine(fd, pi, buf, len, pos, cols);
             }
             break;
         case 27:    /* escape sequence */
@@ -654,12 +888,17 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     pos++;
                     len++;
                     buf[len] = '\0';
-                    if (plen+len < cols) {
+                    if ( (pi.promptIndentation + len) < cols) {
+#ifdef _WIN32
+                        if (len > pi.promptPreviousInputLen) {
+                            pi.promptPreviousInputLen = len;
+                        }
+#endif
                         /* Avoid a full update of the line in the
                          * trivial case. */
                         if (write(1,&c,1) == -1) return -1;
                     } else {
-                        refreshLine(fd,prompt,buf,len,pos,cols);
+                        refreshLine(fd, pi, buf, len, pos, cols);
                     }
                 } else {
                     memmove(buf+pos+1,buf+pos,len-pos);
@@ -667,37 +906,37 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     len++;
                     pos++;
                     buf[len] = '\0';
-                    refreshLine(fd,prompt,buf,len,pos,cols);
+                    refreshLine(fd, pi, buf, len, pos, cols);
                 }
             }
             break;
         case 21: /* Ctrl+u, delete the whole line. */
             buf[0] = '\0';
             pos = len = 0;
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            refreshLine(fd, pi, buf, len, pos, cols);
             break;
         case 11: /* Ctrl+k, delete from current to end of line. */
             buf[pos] = '\0';
             len = pos;
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            refreshLine(fd, pi, buf, len, pos, cols);
             break;
         case 1: /* Ctrl+a, go to the start of the line */
             pos = 0;
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            refreshLine(fd, pi ,buf, len, pos, cols);
             break;
         case 5: /* ctrl+e, go to the end of the line */
             pos = len;
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            refreshLine(fd, pi, buf, len, pos, cols);
             break;
         case 12: /* ctrl+l, clear screen */
-            linenoiseClearScreen();
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            linenoiseClearScreen(fd, pi, buf, len, pos, cols);
+            break;
         }
     }
     return len;
 }
 
-static int linenoiseRaw(char *buf, size_t buflen, const char *prompt) {
+static int linenoiseRaw(char *buf, size_t buflen, PROMPTINFO & pi) {
     int fd = STDIN_FILENO;
     int count;
 
@@ -714,7 +953,7 @@ static int linenoiseRaw(char *buf, size_t buflen, const char *prompt) {
         }
     } else {
         if (enableRawMode(fd) == -1) return -1;
-        count = linenoisePrompt(fd, buf, buflen, prompt);
+        count = linenoisePrompt(fd, buf, buflen, pi);
         disableRawMode(fd);
         printf("\n");
     }
@@ -725,21 +964,71 @@ char *linenoise(const char *prompt) {
     char buf[LINENOISE_MAX_LINE];
     int count;
 
+    PROMPTINFO pi;
+    pi.promptText = strdup(prompt);
+
+    // strip evil characters from the prompt -- we do allow newline
+    unsigned char * pIn = reinterpret_cast<unsigned char *>(pi.promptText);
+    unsigned char * pOut = pIn;
+    while (*pIn) {
+        unsigned char c = *pIn;
+        if ('\n' == c || c >= ' ' ) {
+            *pOut = c;
+            pOut++;
+        }
+        pIn++;
+    }
+    *pOut = 0;
+    pi.promptChars = strlen(pi.promptText);
+    pi.promptExtraLines = 0;
+    pi.promptLastLinePosition = 0;
+#ifdef _WIN32
+    pi.promptPreviousInputLen = 0;
+#endif
+    size_t x = 0;
+    size_t cols = getColumns();
+    // cols is 0 in certain circumstances like inside debugger, which creates further issues
+    cols = cols > 0 ? cols : 80;
+    for (int i = 0; i < pi.promptChars; ++i) {
+        char c = pi.promptText[i];
+        if ('\n' == c) {
+            x = 0;
+            pi.promptExtraLines++;
+            pi.promptLastLinePosition = i + 1;
+        } else {
+            x++;
+            if (x >= cols) {
+                x = 0;
+                pi.promptExtraLines++;
+                pi.promptLastLinePosition = i + 1;
+            }
+        }
+    }
+    pi.promptIndentation = pi.promptChars - pi.promptLastLinePosition;
+
     if (isUnsupportedTerm()) {
         size_t len;
 
-        printf("%s",prompt);
+        printf("%s", pi.promptText);
         fflush(stdout);
-        if (fgets(buf,LINENOISE_MAX_LINE,stdin) == NULL) return NULL;
+        if (fgets(buf, LINENOISE_MAX_LINE, stdin) == NULL) {
+            free(pi.promptText);
+            return NULL;
+        }
         len = strlen(buf);
         while(len && (buf[len-1] == '\n' || buf[len-1] == '\r')) {
             len--;
             buf[len] = '\0';
         }
+        free(pi.promptText);
         return strdup(buf);
     } else {
-        count = linenoiseRaw(buf,LINENOISE_MAX_LINE,prompt);
-        if (count == -1) return NULL;
+        count = linenoiseRaw(buf, LINENOISE_MAX_LINE, pi);
+        if (count == -1) {
+            free(pi.promptText);
+            return NULL;
+        }
+        free(pi.promptText);
         return strdup(buf);
     }
 }
