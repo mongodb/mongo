@@ -190,7 +190,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	const uint8_t *vp, *vend;
 	size_t len;
 	uint32_t arg, offset;
-	int skip;
+	int is_recno, skip;
 
 	WT_RET(__pack_init(session, &vpack, vformat));
 	vp = (uint8_t *)value->data;
@@ -217,6 +217,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			skip = 0;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
+			is_recno = (strcmp(c->key_format, "r") == 0);
 			buf = &c->key;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
@@ -228,6 +229,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				continue;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
+			is_recno = 0;
 			buf = &c->value;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
@@ -269,6 +271,12 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			case WT_PROJ_REUSE:
 				if (skip)
 					break;
+
+				if (is_recno) {
+					c->recno = pv.u.u;
+					break;
+				}
+
 				/*
 				 * There is subtlety here: the value format
 				 * may not exactly match the cursor's format.
@@ -319,6 +327,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	uint8_t *p, *end, *vp;
 	size_t len;
 	uint32_t arg;
+	int is_recno;
 
 	WT_RET(__wt_buf_init(session, value, 0));
 	WT_RET(__pack_init(session, &vpack, vformat));
@@ -330,6 +339,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 		case WT_PROJ_KEY:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->key_format));
+			is_recno = (strcmp(c->key_format, "r") == 0);
 			buf = &c->key;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
@@ -338,6 +348,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 		case WT_PROJ_VALUE:
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
+			is_recno = 0;
 			buf = &c->value;
 			p = (uint8_t *)buf->data;
 			end = p + buf->size;
@@ -353,8 +364,12 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
 				WT_RET(__pack_next(&pack, &pv));
-				WT_RET(__unpack_read(session, &pv,
-				    (const uint8_t **)&p, (size_t)(end - p)));
+				if (is_recno)
+					pv.u.u = c->recno;
+				else
+					WT_RET(__unpack_read(session, &pv,
+					    (const uint8_t **)&p,
+					    (size_t)(end - p)));
 				if (*proj == WT_PROJ_SKIP)
 					break;
 
