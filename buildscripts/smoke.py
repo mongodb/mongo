@@ -471,6 +471,9 @@ def main():
     parser.add_option('--nopreallocj', dest='no_preallocj', default=False,
                       action="store_true",
                       help='Do not preallocate journal files in tests')
+    parser.add_option('--ignore', dest='ignore_files', default=None,
+		      help='Pattern of files to ignore in tests')    
+
     global tests
     (options, tests) = parser.parse_args()
 
@@ -507,6 +510,10 @@ def main():
         tests = expand_suites(tests)
     elif options.mode == 'files':
         tests = [(os.path.abspath(test), True) for test in tests]
+
+    if options.ignore_files != None :
+        ignore_patt = re.compile( options.ignore_files )
+        tests = filter( lambda x : ignore_patt.search( x[0] ) == None, tests )
 
     if not tests:
         raise Exception( "no tests specified" )
