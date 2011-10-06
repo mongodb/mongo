@@ -101,7 +101,7 @@ static void edit(const string& var){
         return;
     }
 
-    for (const char* p=var.data(); *p ; p++){
+    for (const char* p=var.c_str(); *p ; p++){
         if (! (isalnum(*p) || *p == '_' || *p == '.')){
             cout << "can only edit variable or property" << endl;
             return;
