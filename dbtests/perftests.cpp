@@ -505,7 +505,19 @@ namespace PerfTests {
             mongo::scoped_spinlock lk(s);
         }
     };    
-
+    int cas;
+    class casspeed : public B { 
+    public:
+        string name() { return "compareandswap"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+#ifdef __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
+#define RUNCOMPARESWAP 1
+            __sync_bool_compare_and_swap(&cas, 0, 0);
+#endif
+        }
+    };    
     class rlock : public B { 
     public:
         string name() { return "rlock"; }
@@ -947,6 +959,9 @@ namespace PerfTests {
                 add< mutexspeed >();
                 add< simplemutexspeed >();
                 add< spinlockspeed >();
+#ifdef RUNCOMPARESWAP
+                add< casspeed >();
+#endif
                 add< CTM >();
                 add< KeyTest >();
                 add< Bldr >();

@@ -3324,6 +3324,7 @@ const StringData _jscode_raw_collection =
 "print(\"\\tdb.\" + shortName + \".getDB() get DB object associated with collection\");\n" 
 "print(\"\\tdb.\" + shortName + \".getIndexes()\");\n" 
 "print(\"\\tdb.\" + shortName + \".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )\");\n" 
+"print(\"\\tdb.\" + shortName + \".insert(obj)\");\n" 
 "print(\"\\tdb.\" + shortName + \".mapReduce( mapFunction , reduceFunction , <optional params> )\");\n" 
 "print(\"\\tdb.\" + shortName + \".remove(query)\");\n" 
 "print(\"\\tdb.\" + shortName + \".renameCollection( newName , <dropTarget> ) renames the collection.\");\n" 
