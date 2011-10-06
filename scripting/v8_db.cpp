@@ -329,7 +329,10 @@ namespace mongo {
                     return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( scope->getV8Str( "internalCursor" ) ) ) );
-            assert( cons );
+            if ( !cons ) {
+                // may get here in case of thread termination
+                return v8::ThrowException( v8::String::New( "Could not create a cursor" ) );
+            }
 
             Persistent<v8::Object> c = Persistent<v8::Object>::New( cons->NewInstance() );
             c.MakeWeak( cursor.get() , destroyCursor );
