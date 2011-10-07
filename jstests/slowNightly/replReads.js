@@ -43,6 +43,8 @@ function testReadLoadBalancing(numReplicas) {
         assert.soon( function(){ return secondaries[i].getDB("test").foo.count() > 0; } )
         secondaries[i].getDB('test').setProfilingLevel(2)
     }
+    // Primary may change with reconfig
+    primary.getDB('test').setProfilingLevel(2)
 
     for (var i = 0; i < secondaries.length * 10; i++) {
         conn = new Mongo(s._mongos[0].host)
@@ -81,7 +83,10 @@ function testReadLoadBalancing(numReplicas) {
             return false;
         } , "one slave not ok" , 180000 , 5000
     );
-
+    
+    // Secondaries may change here
+    secondaries = s._rs[0].test.liveNodes.slaves
+    
     for (var i = 0; i < secondaries.length * 10; i++) {
         conn = new Mongo(s._mongos[0].host)
         conn.setSlaveOk()
@@ -95,7 +100,7 @@ function testReadLoadBalancing(numReplicas) {
     }
 
     counts = counts.sort();
-    assert.eq( 20 , counts[1] - counts[0] , "counts wrong: " + tojson( counts ) );
+    assert.eq( 20 , Math.abs( counts[1] - counts[0] ), "counts wrong: " + tojson( counts ) );
 
     s.stop()
 }
