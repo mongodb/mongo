@@ -585,6 +585,11 @@ namespace mongo {
 
     JSBool dbpointer_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &dbpointer_class , 0 ) ) {
+            obj = JS_NewObject( cx , &dbpointer_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "dbpointer_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
 
@@ -617,6 +622,11 @@ namespace mongo {
 
     JSBool dbref_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &dbref_class , 0 ) ) {
+            obj = JS_NewObject( cx , &dbref_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "dbref_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
             JSObject * o = JS_NewObject( cx , NULL , NULL, NULL );
@@ -716,6 +726,11 @@ zzz
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &bindata_class , 0 ) ) {
+            obj = JS_NewObject( cx , &bindata_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "bindata_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
 
