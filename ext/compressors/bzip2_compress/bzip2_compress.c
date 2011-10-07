@@ -39,7 +39,7 @@ wiredtiger_extension_init(
 {
 	WT_CONNECTION *conn;
 
-        __UNUSED(config);
+	__UNUSED(config);
 
 	wt_api = api;
 	conn = session->connection;

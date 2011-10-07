@@ -39,15 +39,15 @@ nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	__UNUSED(session);
 
 	*compression_failed = 0;
-        if (dest->size < source->size) {
+	if (dest->size < source->size) {
 		*compression_failed = 1;
-                return (0);
-        }
+		return (0);
+	}
 
-        memcpy((void *)dest->data, source->data, source->size);
-        dest->size = source->size;
+	memcpy((void *)dest->data, source->data, source->size);
+	dest->size = source->size;
 
-        return (0);
+	return (0);
 }
 
 static int
@@ -57,11 +57,11 @@ nop_decompress(WT_COMPRESSOR *compressor,
 	__UNUSED(compressor);
 	__UNUSED(session);
 
-        if (dest->size < source->size)
-                return (ENOMEM);
+	if (dest->size < source->size)
+		return (ENOMEM);
 
-        memcpy((void *)dest->data, source->data, source->size);
-        dest->size = source->size;
-        return (0);
+	memcpy((void *)dest->data, source->data, source->size);
+	dest->size = source->size;
+	return (0);
 }
 /* End implementation of WT_COMPRESSOR. */

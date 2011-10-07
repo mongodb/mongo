@@ -81,9 +81,9 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	record.key_memsize = record.value_memsize = 0;
 
 	for (eof = 0; (ret = bulk_read(&record, &eof)) == 0 && !eof;) {
-                /* Report on progress every 100 inserts. */
-                if (verbose && ++insert_count % 100 == 0) {
-                        printf("\r\t%s: %" PRIu64, name, insert_count);
+		/* Report on progress every 100 inserts. */
+		if (verbose && ++insert_count % 100 == 0) {
+			printf("\r\t%s: %" PRIu64, name, insert_count);
 			fflush(stdout);
 		}
 	
