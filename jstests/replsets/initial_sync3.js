@@ -100,6 +100,8 @@ rs2.partition(0, 2);
 master.getDB("foo").bar.baz.insert({x:1});
 rs2.awaitReplication();
 
+master = rs2.getMaster();
+
 master.getDB("foo").bar.baz.insert({x:2});
 var x = master.getDB("foo").runCommand({getLastError : 1, w : 3, wtimeout : 5000});
 printjson(x);
