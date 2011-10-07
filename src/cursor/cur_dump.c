@@ -24,11 +24,6 @@ __raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if (from->size == 0) {
-		to->size = 0;
-		return (0);
-	}
-
 	/*
 	 * In the worst case, every character takes up 3 spaces, plus a
 	 * trailing nul byte.
