@@ -2268,7 +2268,7 @@ const StringData _jscode_raw_db =
 "print(\"\\tdb.version() current version of the server\");\n" 
 "print(\"\\tdb.getMongo().setSlaveOk() allow queries on a replication slave server\");\n" 
 "print(\"\\tdb.fsyncLock() flush data to disk and lock server for backups\");\n" 
-"print(\"\\tdb.fsyncUnock() unlocks server following a db.fsyncLock()\");\n" 
+"print(\"\\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()\");\n" 
 "\n" 
 "return __magicNoPrint;\n" 
 "}\n" 

@@ -1408,7 +1408,7 @@ namespace mongo {
             else if ( value->ToObject()->GetPrototype()->IsObject() &&
                       value->ToObject()->GetPrototype()->ToObject()->HasRealNamedProperty( V8STR_ISOBJECTID ) ) {
                 OID oid;
-                oid.init( toSTLString( value ) );
+                oid.init( toSTLString( value->ToObject()->Get(getV8Str("str")) ) );
                 b.appendOID( sname , &oid );
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERLONG ).IsEmpty() ) {
