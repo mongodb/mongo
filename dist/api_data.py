@@ -176,18 +176,18 @@ methods = {
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads''',
 		type='boolean'),
-	Config('dump', 'false', r'''
-		configure the cursor for dump format inputs and outputs''',
-		type='boolean'),
+	Config('dump', '', r'''
+		configure the cursor for dump format inputs and outputs:
+		"hex" selects a simple hexadecimal format, "print"
+		selects a format where only non-printing characters are
+		hexadecimal encoded''',
+		choices=['hex', 'print']),
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor.
 		Ignored for transactional cursors''',
 		choices=['snapshot', 'read-committed', 'read-uncommitted']),
 	Config('overwrite', 'false', r'''
 		if an existing key is inserted, overwrite the existing value''',
-		type='boolean'),
-	Config('printable', 'false', r'''
-		for dump cursors, pass through printable bytes unmodified''',
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if

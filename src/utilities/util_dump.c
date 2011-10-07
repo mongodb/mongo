@@ -11,9 +11,71 @@
 static int usage(void);
 
 static inline int
-next(WT_CURSOR *cursor)
+next_col(WT_CURSOR *cursor)
 {
-	WT_ITEM key, value;
+	const char *value;
+	int ret;
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		printf("%s\n", value);
+	}
+	return (ret);
+}
+
+static inline int
+prev_col(WT_CURSOR *cursor)
+{
+	const char *value;
+	int ret;
+
+	while ((ret = cursor->prev(cursor)) == 0) {
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		printf("%s\n", value);
+	}
+	return (ret);
+}
+
+static inline int
+next_col_recno(WT_CURSOR *cursor)
+{
+	uint64_t recno;
+	const char *value;
+	int ret;
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		if ((ret = cursor->get_key(cursor, &recno)) != 0)
+			return (ret);
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		printf("%" PRIu64 "\n%s\n", recno, value);
+	}
+	return (ret);
+}
+
+static inline int
+prev_col_recno(WT_CURSOR *cursor)
+{
+	uint64_t recno;
+	const char *value;
+	int ret;
+
+	while ((ret = cursor->prev(cursor)) == 0) {
+		if ((ret = cursor->get_key(cursor, &recno)) != 0)
+			return (ret);
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (ret);
+		printf("%" PRIu64 "\n%s\n", recno, value);
+	}
+	return (ret);
+}
+
+static inline int
+next_row(WT_CURSOR *cursor)
+{
+	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -21,20 +83,15 @@ next(WT_CURSOR *cursor)
 			return (ret);
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		if ((key.size != 0 && (
-		    fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1)) ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1)
-			return (errno);
+		printf("%s\n%s\n", key, value);
 	}
 	return (ret);
 }
 
 static inline int
-prev(WT_CURSOR *cursor)
+prev_row(WT_CURSOR *cursor)
 {
-	WT_ITEM key, value;
+	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->prev(cursor)) == 0) {
@@ -42,13 +99,129 @@ prev(WT_CURSOR *cursor)
 			return (ret);
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		if ((key.size != 0 && (
-		    fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1)) ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1)
-			return (errno);
+		printf("%s\n%s\n", key, value);
 	}
+	return (ret);
+}
+
+/*
+ * schema --
+ *	Dump the schema for the table.
+ */
+static int
+schema(WT_SESSION *session, const char *name)
+{
+	struct {
+		char *key;			/* Schema key */
+		char *value;			/* Schema value */
+	} *list;
+	WT_CURSOR *cursor;
+	const char *key, *value;
+	int i, elem, list_elem, ret, tret;
+	char *buf, *p, *t;
+
+	ret = 0;
+
+	/* Open the schema file. */
+	if ((ret = session->open_cursor(
+	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0)
+		return (ret);
+
+	/*
+	 * XXX
+	 * We're walking the entire schema file: I'd rather call the search_near
+	 * function, but it doesn't guarantee less-than-or-equal-to semantics so
+	 * the loop is hard to write.
+	 */
+	list = NULL;
+	elem = list_elem = 0;
+	for (; (ret = cursor->next(cursor)) == 0; free(buf)) {
+		/* Get the key and duplicate it, we want to overwrite it. */
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			goto err;
+		if ((buf = strdup(key)) == NULL)
+			goto err;
+			
+		/* Check for the dump table's column groups or indices. */
+		if ((p = strchr(buf, ':')) == NULL)
+			continue;
+		*p++ = '\0';
+		if (strcmp(buf, "index") != 0 && strcmp(buf, "colgroup") != 0)
+			continue;
+		if ((t = strchr(p, ':')) == NULL)
+			continue;
+		*t++ = '\0';
+		if (strcmp(p, name) != 0)
+			continue;
+
+		/* Found one, save it for review. */
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			goto err;
+		if (elem == list_elem && (list = realloc(list,
+		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
+			goto err;
+		if ((list[elem].key = strdup(key)) == NULL)
+			goto err;
+		if ((list[elem].value = strdup(value)) == NULL)
+			goto err;
+		++elem;
+	}
+	if (ret != WT_NOTFOUND)
+		goto err;
+	ret = 0;
+
+	/*
+	 * Dump out the schema information.
+	 *
+	 * 1) Dump the table's information (requires a lookup)
+	 * 2) Dump the column group and index key/value pairs
+	 * 3) Dump the underlying file information (requires a lookup)
+	 */
+	if ((buf = malloc(strlen("table:") + strlen(name) + 10)) == NULL)
+		goto err;
+	strcpy(buf, "table:");
+	strcpy(buf + strlen("table:"), name);
+	cursor->set_key(cursor, buf);
+	if ((ret = cursor->search(cursor)) != 0) {
+		fprintf(stderr,
+		    "Unable to find schema reference for table %s\n", name);
+		goto err;
+	}
+	if ((ret = cursor->get_key(cursor, &key)) != 0)
+		goto err;
+	if ((ret = cursor->get_value(cursor, &value)) != 0)
+		goto err;
+	printf(" %s\n %s\n", key, value);
+
+	for (i = 0; i < elem; ++i) {
+		printf(" %s\n %s\n", list[i].key, list[i].value);
+
+		if ((p = strstr(list[i].value, "filename=")) != NULL) {
+			if ((t = strchr(p, ',')) != NULL)
+				*t = '\0';
+			p += strlen("filename=");
+			p -= strlen("file:");
+			memcpy(p, "file:", strlen("file:"));
+			cursor->set_key(cursor, p);
+			if ((ret = cursor->search(cursor)) != 0) {
+				fprintf(stderr,
+				    "Unable to find schema reference for "
+				    "underlying file %s\n", p);
+				goto err;
+			}
+			if ((ret = cursor->get_key(cursor, &key)) != 0)
+				goto err;
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				goto err;
+			printf(" %s\n %s\n", key, value);
+		}
+	}
+
+err:	if (cursor != NULL &&
+	    (tret = cursor->close(cursor, NULL)) != 0 && ret == 0)
+		ret = tret;
+
+	/* Leak the memory, I don't care. */
 	return (ret);
 }
 
@@ -56,12 +229,14 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	int ch, printable, ret, reverse;
+	int ch, dump_recno, ret, reverse;
+	const char *fmt;
 	char *name;
 
+	dump_recno = reverse = 0;
 	name = NULL;
-	printable = reverse = 0;
-	while ((ch = util_getopt(argc, argv, "f:pr")) != EOF)
+	fmt = "dump=print";
+	while ((ch = util_getopt(argc, argv, "f:kxr")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL) {
@@ -70,8 +245,11 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 				return (EXIT_FAILURE);
 			}
 			break;
-		case 'p':
-			printable = 1;
+		case 'k':
+			dump_recno = 1;
+			break;
+		case 'x':
+			fmt = "dump=hex";
 			break;
 		case 'r':
 			reverse = 1;
@@ -88,16 +266,48 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		return (usage());
 	if ((name = util_name(
 	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
-		return (EXIT_FAILURE);
+		goto err;
 
-	if ((ret = session->open_cursor(session, name, NULL,
-	    printable ? "dump,printable" : "dump,raw", &cursor)) != 0) {
+	if (strncmp(name, "table:", strlen("table:")) == 0) {
+		dump_recno = 1;
+
+		printf("WiredTiger Dump %s\n",
+		    wiredtiger_version(NULL, NULL, NULL));
+		printf("Header\n");
+		if ((ret = schema(session, *argv)) != 0)
+			goto err;
+		printf("Data\n");
+	}
+
+	if ((ret =
+	    session->open_cursor(session, name, NULL, fmt, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
 
-	ret = reverse ? prev(cursor) : next(cursor);
+	/*
+	 * Looking inside the cursor at the key format feels sleazy, but I can't
+	 * think of any reason I'm not allowed to do that.
+	 */
+	if (cursor->key_format[0] == 'r' && cursor->key_format[1] == '\0') {
+		if (dump_recno) {
+			if (reverse)
+				ret = prev_col_recno(cursor);
+			else
+				ret = next_col_recno(cursor);
+		} else {
+			if (reverse)
+				ret = prev_col(cursor);
+			else
+				ret = next_col(cursor);
+		}
+	} else
+		if (reverse)
+			ret = prev_row(cursor);
+		else
+			ret = next_row(cursor);
+
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	else {
@@ -121,7 +331,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-pr] [-f output-file] table\n",
+	    "dump [-krx] [-f output-file] table\n",
 	    progname, usage_prefix);
 	return (EXIT_FAILURE);
 }

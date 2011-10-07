@@ -48,7 +48,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-pr] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-krx] [-f output] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -57,12 +57,16 @@ The following are command-specific options for the \c dump command:
 By default, the \c dump command output is written to the standard output;
 the <code>-f</code> option re-directs the output to the specified file.
 
-@par <code>-p</code>
-Use a printable format, so that ASCII strings are included without
-translation in the dump.
+@par <code>-k</code>
+By default, when dumping a column-store file, record numbers are not included
+in the output; the <code>-k</code> option causes record numbers to be included.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
+
+@par <code>-x</code>
+Dump all characters in a hexadecimal encoding (the default is to leave
+printable characters unencoded).
 
 
 @section utility_dumpfile wt dumpfile: dump the file in a debugging format

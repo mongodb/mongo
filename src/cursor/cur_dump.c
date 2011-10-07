@@ -8,41 +8,63 @@
 #include "wt_internal.h"
 
 /*
- * __convert_to_dump --
- *	We have a scratch buffer where the data item contains a raw value,
- *	convert it to a dumpable string.
+ * __raw_to_dump --
+ *	We have a buffer where the data item contains a raw value, convert it
+ * to a printable string.
  */
 static int
-__convert_to_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
+__raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
 {
 	static const u_char hex[] = "0123456789abcdef";
+	WT_SESSION_IMPL *session;
 	WT_BUF *tmp;
 	uint32_t i, size;
 	const uint8_t *p;
 	uint8_t *t;
 
-	if (buf->size == 0)
-		return (0);
+	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_RET(__wt_scr_alloc(session, buf->size * 3, &tmp));
-	for (p = buf->data,
-	    i = buf->size, t = tmp->mem, size = 0; i > 0; --i, ++p)
-		if (isprint((int)*p)) {
-			if (*p == '\\') {
-				*t++ = '\\';
-				++size;
-			}
-			*t++ = *p;
-			++size;
-		} else {
+	if (from->size == 0) {
+		to->size = 0;
+		return (0);
+	}
+
+	/*
+	 * In the worst case, every character takes up 3 spaces, plus a
+	 * trailing nul byte.
+	 */
+	WT_RET(__wt_scr_alloc(session, from->size * 3 + 10, &tmp));
+
+	p = from->data;
+	t = tmp->mem;
+	size = 0;
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_HEX))
+		for (i = from->size; i > 0; --i, ++p) {
 			*t++ = '\\';
 			*t++ = hex[(*p & 0xf0) >> 4];
 			*t++ = hex[*p & 0x0f];
 			size += 3;
 		}
+	else
+		for (i = from->size; i > 0; --i, ++p)
+			if (isprint((int)*p)) {
+				if (*p == '\\') {
+					*t++ = '\\';
+					++size;
+				}
+				*t++ = *p;
+				++size;
+			} else {
+				*t++ = '\\';
+				*t++ = hex[(*p & 0xf0) >> 4];
+				*t++ = hex[*p & 0x0f];
+				size += 3;
+			}
+	*t++ = '\0';
+	++size;
 	tmp->size = size;
 
-	__wt_buf_swap(buf, tmp);
+	__wt_buf_swap(to, tmp);
 	__wt_scr_free(&tmp);
 
 	return (0);
@@ -127,22 +149,39 @@ __convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
+	WT_ITEM item;
 	WT_SESSION_IMPL *session;
-	WT_ITEM *key;
+	int key_recno, ret;
+	uint64_t recno;
 	va_list ap;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
 
-	if (F_ISSET(cursor, WT_CURSTD_PRINT))
-		WT_ERR(__convert_to_dump(session, &cursor->key));
+	key_recno =
+	    cursor->key_format[0] == 'r' &&
+	    cursor->key_format[1] == '\0' ? 1 : 0;
 
-	va_start(ap, cursor);
-	key = va_arg(ap, WT_ITEM *);
-	key->data = cursor->key.data;
-	key->size = cursor->key.size;
-	va_end(ap);
+	if (!key_recno || F_ISSET(cursor, WT_CURSTD_RAW)) {
+		if (F_ISSET(cursor, WT_CURSTD_TABLE))
+			WT_ERR(__wt_curtable_get_key(cursor, &item));
+		else
+			WT_ERR(__wt_cursor_get_key(cursor, &item));
+
+		WT_ERR(__raw_to_dump(cursor, &item, &cursor->key));
+
+		va_start(ap, cursor);
+		*va_arg(ap, const char **) = cursor->key.data;
+		va_end(ap);
+	} else {
+		if (F_ISSET(cursor, WT_CURSTD_TABLE))
+			WT_ERR(__wt_curtable_get_key(cursor, &recno));
+		else
+			WT_ERR(__wt_cursor_get_key(cursor, &recno));
+
+		va_start(ap, cursor);
+		*va_arg(ap, uint64_t *) = recno;
+		va_end(ap);
+	}
 
 err:	API_END(session);
 	return (ret);
@@ -155,20 +194,22 @@ err:	API_END(session);
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
+	WT_ITEM item;
 	WT_SESSION_IMPL *session;
-	WT_ITEM *value;
 	va_list ap;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
 
-	if (F_ISSET(cursor, WT_CURSTD_PRINT))
-		WT_ERR(__convert_to_dump(session, &cursor->value));
+	if (F_ISSET(cursor, WT_CURSTD_TABLE))
+		WT_ERR(__wt_curtable_get_value(cursor, &item));
+	else
+		WT_ERR(__wt_cursor_get_value(cursor, &item));
+
+	WT_ERR(__raw_to_dump(cursor, &item, &cursor->value));
+
 	va_start(ap, cursor);
-	value = va_arg(ap, WT_ITEM *);
-	value->data = cursor->value.data;
-	value->size = cursor->value.size;
+	*va_arg(ap, const char **) = cursor->value.data;
 	va_end(ap);
 
 err:	API_END(session);
@@ -234,13 +275,10 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
  *	initialize a dump cursor.
  */
 void
-__wt_curdump_init(WT_CURSOR *cursor, int printable)
+__wt_curdump_init(WT_CURSOR *cursor)
 {
 	cursor->get_key = __curdump_get_key;
 	cursor->get_value = __curdump_get_value;
 	cursor->set_key = __curdump_set_key;
 	cursor->set_value = __curdump_set_value;
-
-	if (printable)
-		F_SET(cursor, WT_CURSTD_PRINT);
 }

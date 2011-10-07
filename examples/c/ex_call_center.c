@@ -80,16 +80,16 @@ int main(void)
 	    "colgroups=(main,address)");
 
 	/* Create the main column group with value columns except address. */
-	ret = session->create(session, "colgroup:customers:main",
-	    "columns=(name,phone)");
+	ret = session->create(session,
+	    "colgroup:customers:main", "columns=(name,phone)");
 
 	/* Create the address column group with just the address. */
-	ret = session->create(session, "colgroup:customers:address",
-	    "columns=(address)");
+	ret = session->create(session,
+	    "colgroup:customers:address", "columns=(address)");
 
 	/* Create an index on the customer table by phone number. */
-	ret = session->create(session, "index:customers:phone",
-	    "columns=(phone)");
+	ret = session->create(session,
+	    "index:customers:phone", "columns=(phone)");
 
 	/*
 	 * Create the calls table, give names and types to the columns.
@@ -108,7 +108,18 @@ int main(void)
 	ret = session->create(session, "index:calls:cust_date",
 	    "columns=(cust_id,call_date)");
 
-	/* Omitted: populate the tables with some data. */
+	/* Populate the tables with some data. */
+	ret = session->open_cursor(
+	    session, "table:customers", NULL, NULL, &cursor);
+
+	cursor->set_value(cursor,
+	    "Professor Oak", "LeafGreen Avenue", "123-456-7890");
+	ret = cursor->insert(cursor);
+
+	cursor->set_value(cursor, "Lorelei", "Sevii Islands", "098-765-4321");
+	ret = cursor->insert(cursor);
+
+	ret = cursor->close(cursor, NULL);
 
 	/*
 	 * First query: a call arrives.  In SQL:

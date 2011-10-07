@@ -34,6 +34,7 @@ if test $dump_bdb -eq 1; then
 			-e '/DATA=END/d' \
 			-e 's/^ //' > __bdb_dump
 	else
+		# Discard record numbers from the output.
 		$bdb/db_dump -p __bdb |
 		    sed -e '1,/HEADER=END/d' \
 			-e '/DATA=END/d' \
@@ -52,6 +53,6 @@ if test -e $bzext ; then
 fi
 config='extensions=['$ext']'
 
-$build_top/wt -C "$config" dump -p file:__wt > __wt_dump
+$build_top/wt -C "$config" dump file:__wt > __wt_dump
 cmp __wt_dump __bdb_dump > /dev/null
 exit $?

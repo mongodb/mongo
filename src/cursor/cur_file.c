@@ -250,7 +250,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
 	size_t csize;
-	int bulk, dump, printable, raw, ret;
+	int bulk, ret;
 
 	cbt = NULL;
 	ret = 0;
@@ -260,12 +260,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_config_gets(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
-	dump = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, cfg, "printable", &cval));
-	printable = (cval.val != 0);
-	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
-	raw = (cval.val != 0);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -279,9 +273,17 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cbt->btree = session->btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
-	if (dump)
-		__wt_curdump_init(cursor, printable);
-	if (raw)
+
+	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
+	if (cval.len != 0) {
+		__wt_curdump_init(cursor);
+		F_SET(cursor,
+		    strncmp(cval.str, "print", cval.len) == 0 ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+	}
+
+	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
+	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 
 	WT_ERR(__wt_config_gets(session, cfg, "overwrite", &cval));

@@ -175,6 +175,7 @@ ret
 ro
 rpc
 rwlock
+rx
 sHQ
 scanf
 schemas
@@ -207,6 +208,7 @@ txns
 uint
 ul
 unallocated
+unencoded
 unescaped
 untyped
 uri

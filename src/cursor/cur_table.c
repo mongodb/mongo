@@ -36,40 +36,33 @@ static int __curtable_update(WT_CURSOR *cursor);
 } while (0)
 
 /*
- * __curtable_get_key --
+ * __wt_curtable_get_key --
  *	WT_CURSOR->get_key implementation for tables.
  */
-static int
-__curtable_get_key(WT_CURSOR *cursor, ...)
+int
+__wt_curtable_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
-	WT_SESSION_IMPL *session;
-	const char *fmt;
 	va_list ap;
 	int ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	primary = *ctable->cg_cursors;
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	WT_CURSOR_NEEDKEY(primary);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	ret = __wt_struct_unpackv(session,
-	    primary->key.data, primary->key.size, fmt, ap);
+	ret = __wt_cursor_get_keyv(primary, ap);
 	va_end(ap);
 
-err:	API_END(session);
 	return (ret);
 }
 
 /*
- * __curtable_get_value --
+ * __wt_curtable_get_value --
  *	WT_CURSOR->get_value implementation for tables.
  */
-static int
-__curtable_get_value(WT_CURSOR *cursor, ...)
+int
+__wt_curtable_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
@@ -84,7 +77,8 @@ __curtable_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)) {
 		ret = __wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
@@ -561,8 +555,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__curtable_get_key,
-		__curtable_get_value,
+		__wt_curtable_get_key,
+		__wt_curtable_get_value,
 		__curtable_set_key,
 		__curtable_set_value,
 		__curtable_first,
@@ -636,6 +630,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
+	F_SET(cursor, WT_CURSTD_TABLE);
+
 	ctable->table = table;
 	ctable->plan = table->plan;
 
@@ -649,6 +645,18 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		    columns, strlen(columns), 0, &plan));
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
+
+	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
+	if (cval.len != 0) {
+		__wt_curdump_init(cursor);
+		F_SET(cursor,
+		    strncmp(cval.str, "print", cval.len) == 0 ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+	}
+
+	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_RAW);
 
 	WT_ERR(__wt_config_gets(session, cfg, "overwrite", &cval));
 	if (cval.val != 0)

@@ -8,22 +8,36 @@
 #include "wt_internal.h"
 
 /*
- * __cursor_get_key --
+ * __wt_cursor_get_key --
  *	WT_CURSOR->get_key default implementation.
  */
-static int
-__cursor_get_key(WT_CURSOR *cursor, ...)
+int
+__wt_cursor_get_key(WT_CURSOR *cursor, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, cursor);
+	ret = __wt_cursor_get_keyv(cursor, ap);
+	va_end(ap);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_get_keyv --
+ *	WT_CURSOR->get_key worker function.
+ */
+int
+__wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
 {
 	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
-	va_list ap;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 
-	va_start(ap, cursor);
 	fmt = cursor->key_format;
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
 		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -32,28 +46,27 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 			key->size = (uint32_t)
 			    __wt_struct_size(session, "q", cursor->recno);
 			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
-			    sizeof(cursor->raw_recno_buf),
-			    "q", cursor->recno);
+			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
-		if (F_ISSET(cursor, WT_CURSTD_RAW))
+		if (F_ISSET(cursor,
+		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
 			fmt = "u";
-		ret = __wt_struct_unpackv(session,
-		    cursor->key.data, cursor->key.size, fmt, ap);
+		ret = __wt_struct_unpackv(
+		    session, cursor->key.data, cursor->key.size, fmt, ap);
 	}
-	va_end(ap);
 
 err:	API_END(session);
 	return (ret);
 }
 
 /*
- * __cursor_get_value --
+ * __wt_cursor_get_value --
  *	WT_CURSOR->get_value default implementation.
  */
-static int
-__cursor_get_value(WT_CURSOR *cursor, ...)
+int
+__wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_SESSION_IMPL *session;
 	const char *fmt;
@@ -64,7 +77,9 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
+	fmt = F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
+	    "u" : cursor->value_format;
 	ret = __wt_struct_unpackv(session,
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
@@ -257,9 +272,9 @@ __wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *cfg[])
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	if (cursor->get_key == NULL)
-		cursor->get_key = __cursor_get_key;
+		cursor->get_key = __wt_cursor_get_key;
 	if (cursor->get_value == NULL)
-		cursor->get_value = __cursor_get_value;
+		cursor->get_value = __wt_cursor_get_value;
 	if (cursor->set_key == NULL)
 		cursor->set_key = __cursor_set_key;
 	if (cursor->set_value == NULL)
