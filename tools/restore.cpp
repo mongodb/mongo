@@ -40,6 +40,7 @@ public:
 
     bool _drop;
     bool _keepIndexVersion;
+    int _w;
     string _curns;
     string _curdb;
     set<string> _users; // For restoring users with --drop
@@ -49,6 +50,7 @@ public:
         ("drop" , "drop each collection before import" )
         ("oplogReplay" , "replay oplog for point-in-time restore")
         ("keepIndexVersion" , "don't upgrade indexes to newest version")
+        ("w" , po::value<int>()->default_value(1) , "minimum number of replicas per write" )
         ;
         add_hidden_options()
         ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
@@ -72,6 +74,7 @@ public:
 
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
+        _w = getParam( "w" , 1 );
 
         bool doOplog = hasParam( "oplogReplay" );
         if (doOplog) {
@@ -111,6 +114,8 @@ public:
          * .bson file, or a single .bson file itself (a collection).
          */
         drillDown(root, _db != "", _coll != "", true);
+
+        // should this happen for oplog replay as well?
         conn().getLastError();
 
         if (doOplog) {
@@ -251,6 +256,9 @@ public:
             BSONObj cmd = BSON( "applyOps" << BSON_ARRAY( obj ) );
             BSONObj out;
             conn().runCommand(db, cmd, out);
+
+            // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
+            conn().getLastError(false, false, _w);
         }
         else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
             /* Index construction is slightly special: when restoring
@@ -275,11 +283,18 @@ public:
             BSONObj o = bo.obj();
             log(0) << o << endl;
             conn().insert( _curns ,  o );
-            BSONObj err = conn().getLastErrorDetailed();
+            BSONObj err = conn().getLastErrorDetailed(false, false, _w);
+
             if ( ! ( err["err"].isNull() ) ) {
-                cerr << "Error creating index " << o["ns"].String();
-                cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
-                cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                if (err["err"].String() == "norepl" && _w > 1) {
+                    cerr << "Cannot specify write concern for non-replicas" << endl;
+                }
+                else {
+                        cerr << "Error creating index " << o["ns"].String();
+                        cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
+                        cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                }
+
                 ::abort();
             }
         }
@@ -291,6 +306,9 @@ public:
             _users.erase(obj["user"].String());
         } else {
             conn().insert( _curns , obj );
+
+            // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
+            conn().getLastErrorDetailed(false, false, _w);
         }
     }
 
