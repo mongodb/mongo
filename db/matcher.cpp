@@ -340,6 +340,28 @@ namespace mongo {
 
         return false;
     }
+
+    // $where: function()...
+    NOINLINE_DECL void Matcher::parseWhere( const BSONElement &e ) { 
+        uassert(0 , "$where expression has an unexpected type", e.type() == String || e.type() == CodeWScope || e.type() == Code );
+        uassert( 10066 , "$where may only appear once in query", _where == 0 );
+        uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
+        massert( 13089 , "no current client needed for $where" , haveClient() );
+        _where = new Where();
+        _where->scope = globalScriptEngine->getPooledScope( cc().ns() );
+        _where->scope->localConnect( cc().database()->name.c_str() );
+            
+        if ( e.type() == CodeWScope ) {
+            _where->setFunc( e.codeWScopeCode() );
+            _where->jsScope = new BSONObj( e.codeWScopeScopeData() );
+        }
+        else {
+            const char *code = e.valuestr();
+            _where->setFunc(code);
+        }
+            
+        _where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
+    }
     
     void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
         
@@ -348,30 +370,12 @@ namespace mongo {
         if ( parseClause( e ) ) {
             return;   
         }
-        
-        if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
-            // $where: function()...
-            uassert( 10066 , "$where may only appear once in query", _where == 0 );
-            uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
-            massert( 13089 , "no current client needed for $where" , haveClient() );
-            _where = new Where();
-            _where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-            _where->scope->localConnect( cc().database()->name.c_str() );
-            
-            if ( e.type() == CodeWScope ) {
-                _where->setFunc( e.codeWScopeCode() );
-                _where->jsScope = new BSONObj( e.codeWScopeScopeData() );
-            }
-            else {
-                const char *code = e.valuestr();
-                _where->setFunc(code);
-            }
-            
-            _where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
-            
+
+        if ( strcmp(e.fieldName(), "$where")==0 ) {
+            parseWhere(e);
             return;
         }
-        
+
         if ( e.type() == RegEx ) {
             addRegex( e.fieldName(), e.regex(), e.regexFlags() );
             return;

@@ -190,6 +190,7 @@ namespace mongo {
         bool parseClause( const BSONElement &e );
         void parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers );
 
+        void parseWhere( const BSONElement &e );
         void parseMatchExpressionElement( const BSONElement &e, bool nested );
         
         Where *_where;                    // set if query uses $where
