@@ -296,16 +296,31 @@ namespace mongo {
         return b.obj();
     }
 
-    const BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
-
-    BSONObj DBClientWithCommands::getLastErrorDetailed() {
+    BSONObj DBClientWithCommands::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
         BSONObj info;
-        runCommand("admin", getlasterrorcmdobj, info);
+        BSONObjBuilder b;
+        b.append( "getlasterror", 1 );
+
+        if ( fsync )
+            b.append( "fsync", 1 );
+        if ( j )
+            b.append( "j", 1 );
+        if ( wtimeout > 0 )
+            b.append( "wtimeout", wtimeout );
+
+        // only affects request when greater than one node
+        if ( w >= 1 )
+            b.append( "w", w );
+        else if ( w == -1 )
+            b.append( "w", "majority" );
+
+        runCommand("admin", b.obj(), info);
+
         return info;
     }
 
-    string DBClientWithCommands::getLastError() {
-        BSONObj info = getLastErrorDetailed();
+    string DBClientWithCommands::getLastError(bool fsync, bool j, int w, int wtimeout) {
+        BSONObj info = getLastErrorDetailed(fsync, j, w, wtimeout);
         return getLastErrorString( info );
     }
 

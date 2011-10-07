@@ -472,12 +472,15 @@ namespace mongo {
         /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return error message text, or empty string if no error.
         */
-        string getLastError();
+        string getLastError(bool fsync = false, bool j = false, int w = 1, int wtimeout = 0);
 
         /** Get error result from the last write operation (insert/update/delete) on this connection.
             @return full error object.
+
+            If "w" is -1, wait for propagation to majority of nodes.
+            If "wtimeout" is 0, the operation will block indefinitely if needed.
         */
-        virtual BSONObj getLastErrorDetailed();
+        virtual BSONObj getLastErrorDetailed(bool fsync = false, bool j = false, int w = 1, int wtimeout = 0);
 
         /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 
             If all you need is the string, just call getLastError() instead.
