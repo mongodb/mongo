@@ -323,6 +323,8 @@ namespace mongo {
                 temp.append( "lockType" , c->locktype() );
                 temp.append( "slaveOk" , c->slaveOk() );
                 temp.append( "adminOnly" , c->adminOnly() );
+                //optionally indicates that the command can be forced to run on a slave/secondary
+                if ( c->slaveOverrideOk() ) temp.append( "slaveOverrideOk" , c->slaveOverrideOk() );
                 temp.done();
             }
             b.done();

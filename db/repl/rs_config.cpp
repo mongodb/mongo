@@ -26,6 +26,7 @@
 #include "../oplog.h"
 #include "../instance.h"
 #include "../../util/text.h"
+#include <boost/algorithm/string.hpp>
 
 using namespace bson;
 
@@ -494,7 +495,8 @@ namespace mongo {
                     throw "_id must be numeric";
                 }
                 try {
-                    string s = trimWhitespace(mobj["host"].String());
+                    string s = mobj["host"].String();
+                    boost::trim(s);
                     m.h = HostAndPort(s);
                     if (!m.h.hasPort()) {
                         m.h.setPort(m.h.port());

@@ -201,11 +201,11 @@ namespace mongo {
 
     }
 
+    const bool blockSupported = ProcessInfo::blockCheckSupported();
+
     bool Record::likelyInPhysicalMemory() {
         if ( ! MemoryTrackingEnabled )
             return true;
-
-        static bool blockSupported = ProcessInfo::blockCheckSupported();
 
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;

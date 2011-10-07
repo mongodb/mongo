@@ -41,17 +41,6 @@ namespace mongo {
 
     }
 
-    string trimWhitespace(const string& str) {
-        if (str.size() == 0) {
-            return str;
-        }
-        size_t begin = 0;
-        size_t end = str.size() - 1;
-        while (begin < str.size() && isspace(str[begin])) { ++begin; } // Finds index of first non-whitespace character
-        while (end > 0 && isspace(str[end])) { --end; } // Finds index of last non-whitespace character
-        return str.substr(begin, end - begin + 1);
-    }
-
     bool isValidUTF8(const char *s) {
         int left = 0; // how many bytes are left in the current codepoint
         while (*s) {

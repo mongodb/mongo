@@ -151,6 +151,7 @@ namespace mongo {
         Handle<v8::String> V8STR_WRAPPER;
         Handle<v8::String> V8STR_RO;
         Handle<v8::String> V8STR_MODIFIED;
+        Handle<v8::String> V8STR_FULLNAME;
 
     private:
         void _startCall();

@@ -40,6 +40,16 @@ namespace mongo {
 
 #define DDD(x)
 
+    static v8::Handle<v8::Value> newInstance( v8::Function* f, const v8::Arguments& args ) {
+        // need to translate arguments into an array
+        int argc = args.Length();
+        scoped_array< Handle<Value> > argv( new Handle<Value>[argc] );
+        for (int i = 0; i < argc; ++i) {
+            argv[i] = args[i];
+        }
+        return f->NewInstance(argc, argv.get());
+    }
+
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( V8Scope* scope, bool local ) {
         v8::Handle<v8::FunctionTemplate> mongo;
         if ( local ) {
@@ -99,31 +109,16 @@ namespace mongo {
 
     v8::Handle<v8::FunctionTemplate> getUUIDFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(uuidInit);
-        templ->InstanceTemplate()->SetInternalFieldCount(1);
-        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
-        scope->injectV8Function("toString", binDataToString, proto);
-        scope->injectV8Function("base64", binDataToBase64, proto);
-        scope->injectV8Function("hex", binDataToHex, proto);
         return templ;
     }
 
     v8::Handle<v8::FunctionTemplate> getMD5FunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(md5Init);
-        templ->InstanceTemplate()->SetInternalFieldCount(1);
-        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
-        scope->injectV8Function("toString", binDataToString, proto);
-        scope->injectV8Function("base64", binDataToBase64, proto);
-        scope->injectV8Function("hex", binDataToHex, proto);
         return templ;
     }
 
     v8::Handle<v8::FunctionTemplate> getHexDataFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> templ = scope->createV8Function(hexDataInit);
-        templ->InstanceTemplate()->SetInternalFieldCount(1);
-        v8::Local<v8::Template> proto = templ->PrototypeTemplate();
-        scope->injectV8Function("toString", binDataToString, proto);
-        scope->injectV8Function("base64", binDataToBase64, proto);
-        scope->injectV8Function("hex", binDataToHex, proto);
         return templ;
     }
 
@@ -550,7 +545,7 @@ namespace mongo {
         args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
         args.This()->Set( scope->getV8Str( "_db" ) , args[1] );
         args.This()->Set( scope->getV8Str( "_shortName" ) , args[2] );
-        args.This()->Set( scope->getV8Str( "_fullName" ) , args[3] );
+        args.This()->Set( scope->V8STR_FULLNAME , args[3] );
         
         if ( haveLocalShardingInfo( toSTLString( args[3] ) ) )
             return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
@@ -618,6 +613,7 @@ namespace mongo {
             // if starts with '_' we allow overwrite
             return Handle<Value>();
         }
+        // dont set
         return value;
     }
 
@@ -632,20 +628,33 @@ namespace mongo {
         // 2nd look into real values, may be cached collection object
         string sname = toSTLString( name );
         if (info.This()->HasRealNamedProperty(name)) {
-            return info.This()->GetRealNamedProperty( name );
+            v8::Local<v8::Value> prop = info.This()->GetRealNamedProperty( name );
+            if (prop->IsObject() && prop->ToObject()->HasRealNamedProperty(v8::String::New("_fullName"))) {
+                // need to check every time that the collection did not get sharded
+                if ( haveLocalShardingInfo( toSTLString( prop->ToObject()->GetRealNamedProperty(v8::String::New("_fullName")) ) ) )
+                    return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
+            }
+            return prop;
         } else if ( sname.length() == 0 || sname[0] == '_' ) {
             // if starts with '_' we dont return collection, one must use getCollection()
-            return Handle<Value>();
+            return v8::Undefined();
         }
 
         // no hit, create new collection
         v8::Handle<v8::Value> getCollection = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "getCollection" ) );
         assert( getCollection->IsFunction() );
 
+        TryCatch tryCatch;
         v8::Function * f = (v8::Function*)(*getCollection);
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
         v8::Local<v8::Value> coll = f->Call( info.This() , 1 , argv );
+        if (coll.IsEmpty()) {
+            if (tryCatch.HasCaught()) {
+                return v8::ThrowException( tryCatch.Exception() );
+            }
+            return Handle<Value>();
+        }
 
         // cache collection for reuse, dont enumerate
         info.This()->ForceSet(name, coll, v8::DontEnum);
@@ -665,10 +674,9 @@ namespace mongo {
 
     v8::Handle<v8::Value> objectIdInit( V8Scope* scope, const v8::Arguments& args ) {
         v8::Handle<v8::Object> it = args.This();
-
         if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
             v8::Function * f = scope->getObjectIdCons();
-            it = f->NewInstance();
+            return newInstance(f, args);
         }
 
         OID oid;
@@ -694,16 +702,14 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> dbRefInit( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function * f = scope->getNamedCons( "DBRef" );
+            return newInstance(f, args);
+        }
 
         if (args.Length() != 2 && args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "DBRef needs 2 arguments" ) );
-        }
-
-        v8::Handle<v8::Object> it = args.This();
-
-        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = scope->getNamedCons( "DBRef" );
-            it = f->NewInstance();
         }
 
         if ( args.Length() == 2 ) {
@@ -715,16 +721,14 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> dbPointerInit( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function * f = scope->getNamedCons( "DBPointer" );
+            return newInstance(f, args);
+        }
 
         if (args.Length() != 2) {
             return v8::ThrowException( v8::String::New( "DBPointer needs 2 arguments" ) );
-        }
-
-        v8::Handle<v8::Object> it = args.This();
-
-        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = scope->getNamedCons( "DBPointer" );
-            it = f->NewInstance();
         }
 
         it->Set( scope->getV8Str( "ns" ) , args[0] );
@@ -735,8 +739,11 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> dbTimestampInit( V8Scope* scope, const v8::Arguments& args ) {
-
         v8::Handle<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function * f = scope->getNamedCons( "Timestamp" );
+            return newInstance(f, args);
+        }
 
         if ( args.Length() == 0 ) {
             it->Set( scope->getV8Str( "t" ) , v8::Number::New( 0 ) );
@@ -758,6 +765,10 @@ namespace mongo {
 
     v8::Handle<v8::Value> binDataInit( V8Scope* scope, const v8::Arguments& args ) {
         v8::Local<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function* f = scope->getNamedCons( "BinData" );
+            return newInstance(f, args);
+        }
 
         Handle<Value> type;
         Handle<Value> len;
@@ -765,12 +776,6 @@ namespace mongo {
         char* data;
         if (args.Length() == 3) {
             // 3 args: len, type, data
-
-            if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-                v8::Function* f = scope->getNamedCons( "BinData" );
-                it = f->NewInstance();
-            }
-
             len = args[0];
             rlen = len->IntegerValue();
             type = args[1];
@@ -781,12 +786,6 @@ namespace mongo {
         }
         else if ( args.Length() == 2 ) {
             // 2 args: type, base64 string
-
-            if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-                v8::Function* f = scope->getNamedCons( "BinData" );
-                it = f->NewInstance();
-            }
-
             type = args[0];
             v8::String::Utf8Value utf( args[ 1 ] );
             string decoded = base64::decode( *utf );
@@ -796,8 +795,10 @@ namespace mongo {
             memcpy(data, tmp, rlen);
             len = v8::Number::New(rlen);
 //            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
-        }
-        else {
+        } else if (args.Length() == 0) {
+            // this is called by subclasses that will fill properties
+            return it;
+        } else {
             return v8::ThrowException( v8::String::New( "BinData needs 2 or 3 arguments" ) );
         }
 
@@ -873,18 +874,10 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "UUIS string must have 32 characters" ) );
         }
 
-        return hexToBinData(scope, args.This(), bdtUUID, *utf);
+        v8::Function * f = scope->getNamedCons("BinData");
+        Local<v8::Object> it = f->NewInstance();
+        return hexToBinData(scope, it, bdtUUID, *utf);
     }
-
-//    v8::Handle<v8::Value> uuidToString( V8Scope* scope, const v8::Arguments& args ) {
-//        v8::Handle<v8::Object> it = args.This();
-//        Local<External> c = External::Cast( *(it->GetInternalField( 0 )) );
-//        char* data = (char*)(c->Value());
-//
-//        stringstream ss;
-//        ss << "UUID(\"" << toHex(data, 16) << "\")";
-//        return v8::String::New( ss.str().c_str() );
-//    }
 
     v8::Handle<v8::Value> md5Init( V8Scope* scope, const v8::Arguments& args ) {
         if (args.Length() != 1) {
@@ -895,7 +888,9 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "MD5 string must have 32 characters" ) );
         }
 
-        return hexToBinData(scope, args.This(), MD5Type, *utf);
+        v8::Function * f = scope->getNamedCons("BinData");
+        Local<v8::Object> it = f->NewInstance();
+        return hexToBinData(scope, it, MD5Type, *utf);
     }
 
     v8::Handle<v8::Value> hexDataInit( V8Scope* scope, const v8::Arguments& args ) {
@@ -903,20 +898,20 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "HexData needs 2 arguments" ) );
         }
         v8::String::Utf8Value utf( args[ 1 ] );
-        return hexToBinData(scope, args.This(), args[0]->IntegerValue(), *utf);
+        v8::Function * f = scope->getNamedCons("BinData");
+        Local<v8::Object> it = f->NewInstance();
+        return hexToBinData(scope, it, args[0]->IntegerValue(), *utf);
     }
 
     v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function * f = scope->getNamedCons( "NumberLong" );
+            return newInstance(f, args);
+        }
 
         if (args.Length() != 0 && args.Length() != 1 && args.Length() != 3) {
             return v8::ThrowException( v8::String::New( "NumberLong needs 0, 1 or 3 arguments" ) );
-        }
-
-        v8::Handle<v8::Object> it = args.This();
-
-        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = scope->getNamedCons( "NumberLong" );
-            it = f->NewInstance();
         }
 
         if ( args.Length() == 0 ) {
@@ -938,7 +933,8 @@ namespace mongo {
                     return v8::ThrowException( v8::String::New( "could not convert string to long long" ) );
                 }
                 unsigned long long val = n;
-                if ( (long long)val == (long long)(double)(long long)(val) ) {
+                // values above 2^53 are not accurately represented in JS
+                if ( (long long)val == (long long)(double)(long long)(val) && val < 9007199254740992ULL ) {
                     it->Set( scope->getV8Str( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
                 }
                 else {
@@ -994,16 +990,14 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> numberIntInit( V8Scope* scope, const v8::Arguments& args ) {
+        v8::Handle<v8::Object> it = args.This();
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
+            v8::Function * f = scope->getNamedCons( "NumberInt" );
+            return newInstance(f, args);
+        }
 
         if (args.Length() != 0 && args.Length() != 1) {
             return v8::ThrowException( v8::String::New( "NumberInt needs 0, 1 argument" ) );
-        }
-
-        v8::Handle<v8::Object> it = args.This();
-
-        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = scope->getNamedCons( "NumberInt" );
-            it = f->NewInstance();
         }
 
         if ( args.Length() == 0 ) {

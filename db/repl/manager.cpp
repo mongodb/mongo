@@ -235,9 +235,11 @@ namespace mongo {
                 return;
             }
 
-            if( !rs->iAmPotentiallyHot() ) // if not we never try to be primary
+            if( !rs->iAmPotentiallyHot() ) { // if not we never try to be primary
+                OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself" << endl;
                 return;
-            
+            }
+
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) {
                 static time_t last;

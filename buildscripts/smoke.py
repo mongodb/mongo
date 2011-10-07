@@ -328,6 +328,9 @@ def run_tests(tests):
                 try:
                     runTest(test)
                     winners.append(test)
+
+                    if small_oplog:
+                        master.wait_for_repl()
                 except TestFailure, f:
                     try:
                         print f

@@ -74,7 +74,7 @@ namespace mongo {
         RWLockBase() {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
-        ~RWLock() {
+        ~RWLockBase() {
             if ( ! StaticObserver::_destroyingStatics ) {
                 wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
