@@ -348,7 +348,7 @@ DB.prototype.help = function() {
     print("\tdb.version() current version of the server");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
-    print("\tdb.fsyncUnock() unlocks server following a db.fsyncLock()");
+    print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
 
     return __magicNoPrint;
 }
