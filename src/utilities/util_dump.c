@@ -191,10 +191,10 @@ schema(WT_SESSION *session, const char *name)
 		goto err;
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		goto err;
-	printf(" %s\n %s\n", key, value);
+	printf("%s\n%s\n", key, value);
 
 	for (i = 0; i < elem; ++i) {
-		printf(" %s\n %s\n", list[i].key, list[i].value);
+		printf("%s\n%s\n", list[i].key, list[i].value);
 
 		if ((p = strstr(list[i].value, "filename=")) != NULL) {
 			if ((t = strchr(p, ',')) != NULL)
@@ -213,7 +213,7 @@ schema(WT_SESSION *session, const char *name)
 				goto err;
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
 				goto err;
-			printf(" %s\n %s\n", key, value);
+			printf("%s\n%s\n", key, value);
 		}
 	}
 
