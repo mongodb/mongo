@@ -59,15 +59,16 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
-	const char *ext;
+	const char *ext1, *ext2;
 	char config[256];
 
 	/* If the bzip2 compression module has been built, use it. */
-	ext = "../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so";
-	if (access(ext, R_OK) != 0) {
-		ext = "";
+	ext1 = "../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so";
+	if (access(ext1, R_OK) != 0) {
+		ext1 = "";
 		g.c_bzip = 0;
 	}
+	ext2 = "../../ext/collators/reverse/.libs/reverse_collator.so";
 
 	/*
 	 * Open configuration -- put command line configuration options at the
@@ -75,9 +76,8 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\"../../ext/collators/reverse/.libs/reverse_collator.so\","
-            "\"%s\"],%s,%s",
-	    g.progname, g.c_cache, ext,
+	    "extensions=[\"%s\",\"%s\"],%s,%s",
+	    g.progname, g.c_cache, ext1, ext2,
 	    g.c_multithread ? "multithread" : "",
 	    g.config_open == NULL ? "" : g.config_open);
 
