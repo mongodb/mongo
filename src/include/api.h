@@ -16,15 +16,20 @@ struct __wt_process {
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
 };
 
+/*******************************************
+ * Implementation of WT_SESSION
+ *******************************************/
+/*
+ * WT_BTREE_SESSION --
+ *      Per-session cache of btree handles to avoid synchronization when
+ *      opening cursors.
+ */
 struct __wt_btree_session {
 	WT_BTREE *btree;
 
 	TAILQ_ENTRY(__wt_btree_session) q;
 };
 
-/*******************************************
- * Implementation of WT_SESSION
- *******************************************/
 /*
  * WT_SESSION_BUFFER --
  *	A structure to accumulate file changes on a per-thread basis.
@@ -38,6 +43,10 @@ struct __wt_session_buffer {
 	uint32_t out;			/* Buffer chunks not in use */
 };
 
+/*
+ * WT_HAZARD --
+ *	A hazard reference.
+ */
 struct __wt_hazard {
 	WT_PAGE *page;			/* Page address */
 #ifdef HAVE_DIAGNOSTIC
@@ -99,6 +108,29 @@ struct __wt_session_impl {
 	uint32_t update_alloc_size;	/* Allocation size */
 
 	uint32_t flags;
+};
+
+/*******************************************
+ * Implementation of WT_CONNECTION
+ *******************************************/
+/*
+ * WT_NAMED_COLLATOR --
+ *	A collator list entry
+ */
+struct __wt_named_collator {
+	const char *name;		/* Name of collator */
+	WT_COLLATOR *collator;	        /* User supplied object */
+	TAILQ_ENTRY(__wt_named_collator) q;	/* Linked list of collators */
+};
+
+/*
+ * WT_NAMED_COMPRESSOR --
+ *	A compressor list entry
+ */
+struct __wt_named_compressor {
+	const char *name;		/* Name of compressor */
+	WT_COMPRESSOR *compressor;	/* User supplied callbacks */
+	TAILQ_ENTRY(__wt_named_compressor) q;	/* Linked list of compressors */
 };
 
 /*
@@ -171,6 +203,9 @@ struct __wt_connection_impl {
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
+
+					/* Locked: collator list */
+	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
 
 					/* Locked: compressor list */
 	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor) compqh;

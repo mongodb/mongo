@@ -118,17 +118,24 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COLLATOR *ncoll;
 	WT_SESSION_IMPL *session;
 	int ret;
-
-	WT_UNUSED(name);
-	WT_UNUSED(collator);
-	ret = ENOTSUP;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_calloc_def(session, 1, &ncoll));
+	WT_ERR(__wt_strdup(session, name, &ncoll->name));
+	ncoll->collator = collator;
+
+	__wt_lock(session, conn->mtx);
+	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
+	__wt_unlock(session, conn->mtx);
+	ncoll = NULL;
 err:	API_END(session);
+	__wt_free(session, ncoll);
 
 	return (ret);
 }
@@ -167,41 +174,43 @@ err:	API_END(session);
 }
 
 /*
+ * __conn_remove_collator --
+ *	remove collator added by WT_CONNECTION->add_collator,
+ *	only used internally.
+ */
+static void
+__conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
+{
+	WT_SESSION_IMPL *session;
+
+	session = &conn->default_session;
+
+	/* Remove from the connection's list. */
+	TAILQ_REMOVE(&conn->collqh, ncoll, q);
+
+	/* Free associated memory */
+	__wt_free(session, ncoll->name);
+	__wt_free(session, ncoll);
+}
+
+/*
  * __conn_remove_compressor --
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
  */
-static int
-__conn_remove_compressor(WT_CONNECTION *wt_conn, WT_COMPRESSOR *compressor)
+static void
+__conn_remove_compressor(WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
-	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
 
-	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session = &conn->default_session;
 
 	/* Remove from the connection's list. */
-	__wt_lock(session, conn->mtx);
-	TAILQ_FOREACH(ncomp, &conn->compqh, q) {
-		if (ncomp->compressor == compressor)
-			break;
-	}
-	if (ncomp != NULL)
-		TAILQ_REMOVE(&conn->compqh, ncomp, q);
-	__wt_unlock(session, conn->mtx);
+	TAILQ_REMOVE(&conn->compqh, ncomp, q);
 
 	/* Free associated memory */
-	if (ncomp != NULL) {
-		__wt_free(session, ncomp->name);
-		__wt_free(session, ncomp);
-		ret = 0;
-	}
-	else
-		ret = ENOENT;
-
-	return ret;
+	__wt_free(session, ncomp->name);
+	__wt_free(session, ncomp);
 }
 
 /*
@@ -254,6 +263,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *s, *session, **tp;
 	WT_SESSION *wt_session;
+	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	int ret;
 
@@ -278,9 +288,13 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			++tp;
 	}
 
+	/* Free memory for collators */
+	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
+		__conn_remove_collator(conn, ncoll);
+
 	/* Free memory for compressors */
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__conn_remove_compressor(wt_conn, ncomp->compressor));
+		__conn_remove_compressor(conn, ncomp);
 
 	WT_TRET(__wt_connection_close(conn));
 	/* We no longer have a session, don't try to update it. */

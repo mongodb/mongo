@@ -523,6 +523,9 @@ struct wt_session {
 	 * must appear in at least one column group.  Each column group must be
 	 * created with a separate call to WT_SESSION::create. The value must be
 	 * a string.,empty}
+	 * @config{collator,             configure custom collation for keys.
+	 * Value must be a collator                 created with
+	 * WT_CONNECTION::add_collator. The value must be a string.,empty}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  For tables\, the number of
 	 * entries must match the total number of values in \c key_format and \c
@@ -1224,13 +1227,10 @@ struct wt_collator {
 	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
 	 * 	0 if <code>key1 == key2</code>,
 	 * 	1 if <code>key1 > key2</code>.
-	 * @param[out] minprefix set to the minimum number of bytes
-	 * 	required to distinguish between the two items.
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
-	    const WT_ITEM *key1, const WT_ITEM *key2,
-	    int *cmp, uint32_t *minprefix);
+	    const WT_ITEM *key1, const WT_ITEM *key2, int *cmp);
 };
 
 /*!

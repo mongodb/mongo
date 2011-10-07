@@ -30,16 +30,6 @@ struct __wt_salvage_cookie {
 };
 
 /*
- * WT_NAMED_COMPRESSOR --
- *	A compressor list entry
- */
-typedef struct __wt_named_compressor {
-	TAILQ_ENTRY(__wt_named_compressor) q;	/* Linked list of compressors */
-	const char *name;		/* Name of compressor */
-	WT_COMPRESSOR *compressor;	/* User supplied callbacks */
-} WT_NAMED_COMPRESSOR;
-
-/*
  * Split page size calculation -- we don't want to repeatedly split every time
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */

@@ -76,7 +76,7 @@ __wt_confchk_cursor_close =
 
 const char *
 __wt_confdfl_file_meta =
-    "allocation_size=512B,block_compressor=,columns=,huffman_key=,"
+    "allocation_size=512B,block_compressor=,collator=,columns=,huffman_key=,"
     "huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
     "internal_overflow_size=64B,key_format=u,key_gap=10,leaf_node_max=1MB,"
     "leaf_overflow_size=470B,prefix_compression=true,split_pct=75,type=btree,"
@@ -85,7 +85,7 @@ __wt_confdfl_file_meta =
 const char *
 __wt_confchk_file_meta =
     "allocation_size=(type=int,min=512B,max=128MB),block_compressor=(),"
-    "columns=(type=list),huffman_key=(),huffman_value=(),"
+    "collator=(),columns=(type=list),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
     "min=512B,max=512MB),internal_overflow_size=(type=int,min=40B),"
     "key_format=(type=format),key_gap=(type=int,min=0),"
@@ -140,8 +140,8 @@ __wt_confchk_session_commit_transaction =
 
 const char *
 __wt_confdfl_session_create =
-    "allocation_size=512B,block_compressor=,colgroups=,columns=,columns=,"
-    "exclusive=false,filename=,huffman_key=,huffman_value=,"
+    "allocation_size=512B,block_compressor=,colgroups=,collator=,columns=,"
+    "columns=,exclusive=false,filename=,huffman_key=,huffman_value=,"
     "internal_key_truncate=true,internal_node_max=2KB,"
     "internal_overflow_size=64B,key_format=u,key_format=u,key_gap=10,"
     "leaf_node_max=1MB,leaf_overflow_size=470B,prefix_compression=true,"
@@ -150,7 +150,7 @@ __wt_confdfl_session_create =
 const char *
 __wt_confchk_session_create =
     "allocation_size=(type=int,min=512B,max=128MB),block_compressor=(),"
-    "colgroups=(),columns=(type=list),columns=(type=list),"
+    "colgroups=(),collator=(),columns=(type=list),columns=(type=list),"
     "exclusive=(type=boolean),filename=(),huffman_key=(),huffman_value=(),"
     "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
     "min=512B,max=512MB),internal_overflow_size=(type=int,min=40B),"

@@ -21,6 +21,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->btqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
+	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 
 	/* Statistics. */

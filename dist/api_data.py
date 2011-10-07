@@ -72,6 +72,9 @@ file_meta = format_meta + [
 		configure a compressor for file blocks.  Permitted values
 		are empty (off) or \c "<name>".  See @ref compressors for
 		more details'''),
+	Config('collator', '', r'''
+	    configure custom collation for keys.  Value must be a collator
+		created with WT_CONNECTION::add_collator'''),
 	Config('huffman_key', '', r'''
 		configure Huffman encoding for keys.  Permitted values are
 		empty (off), \c "english" or \c "<filename>".  See @ref huffman

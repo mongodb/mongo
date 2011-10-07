@@ -176,6 +176,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
 	int fixed;
@@ -200,6 +201,22 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
+		WT_RET(__wt_config_getones(
+		    session, btree->config, "collator", &cval));
+		if (cval.len > 0) {
+			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
+				if (strncmp(
+				    ncoll->name, cval.str, cval.len) == 0) {
+					btree->collator = ncoll->collator;
+					break;
+				}
+			}
+			if (btree->collator == NULL) {
+				__wt_errx(session, "unknown collator '%.*s'",
+				    (int)cval.len, cval.str);
+				return (EINVAL);
+			}
+		}
 		WT_RET(__wt_config_getones(
 		    session, btree->config, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;

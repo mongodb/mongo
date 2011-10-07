@@ -148,7 +148,7 @@ add_cursor_type(WT_CONNECTION *conn)
 /* Implementation of WT_COLLATOR for WT_CONNECTION::add_collator. */
 static int
 my_compare(WT_COLLATOR *collator, WT_SESSION *session,
-    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp, uint32_t *minprefix)
+    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp)
 {
 	const char *p1, *p2;
 
@@ -162,7 +162,6 @@ my_compare(WT_COLLATOR *collator, WT_SESSION *session,
 		p1++, p2++;
 
 	*cmp = (int)*p2 - (int)*p1;
-	*minprefix = (uint32_t)(p1 - (const char *)value1->data);
 	return (0);
 }
 /* End implementation of WT_COLLATOR. */
