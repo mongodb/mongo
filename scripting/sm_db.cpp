@@ -571,16 +571,6 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
-    JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        return (JSBool) (*rval = c.getProperty( obj , "str" ));
-    }
-
-    JSFunctionSpec object_id_functions[] = {
-        { "toString" , object_id_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { 0 }
-    };
-
     // dbpointer
 
     JSBool dbpointer_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
@@ -903,7 +893,6 @@ zzz
         return JS_TRUE;
     }
 
-
     JSClass numberlong_class = {
         "NumberLong" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -1033,19 +1022,10 @@ zzz
         return *rval = c.toval( ret.c_str() );
     }
 
-    JSBool numberint_tojson(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int val = c.toNumberInt( obj );
-        string ret = str::stream() << val;
-        return *rval = c.toval( ret.c_str() );
-    }
-
-
     JSFunctionSpec numberint_functions[] = {
         { "valueOf" , numberint_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toNumber" , numberint_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toString" , numberint_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "tojson" , numberint_tojson , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
 
@@ -1144,7 +1124,7 @@ zzz
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , object_id_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
