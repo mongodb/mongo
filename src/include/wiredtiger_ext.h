@@ -47,4 +47,3 @@ extern WT_EXTENSION_API	*wt_api;
 }
 #endif
 #endif /* __WIREDTIGER_EXT_H_ */
-

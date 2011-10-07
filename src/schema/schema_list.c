@@ -98,4 +98,3 @@ __wt_schema_close_tables(WT_SESSION_IMPL *session)
 
 	return (ret);
 }
-

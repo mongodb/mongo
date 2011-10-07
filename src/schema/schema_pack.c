@@ -177,4 +177,3 @@ __wt_struct_unpack(WT_SESSION_IMPL *session,
 
 	return (ret);
 }
-

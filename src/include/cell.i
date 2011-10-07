@@ -362,4 +362,3 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
 	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
 }
-

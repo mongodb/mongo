@@ -659,4 +659,3 @@ __wt_config_subgets(WT_SESSION_IMPL *session,
 
 	return (__wt_config_subgetraw(session, cfg, &key_item, value));
 }
-

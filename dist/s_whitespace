@@ -8,6 +8,8 @@ inc=`cd .. && echo src/include/*.[hi] src/include/*.in dist/*.py dist/s_*`
 (
 for f in `sed -e '/^[a-z]/! d' filelist` $inc; do
 	f="../$f"
-	sed -e 's/[	 ][	 ]*$//' < $f | cat -s > $t
+	sed -e 's/[	 ][	 ]*$//' \
+	    -e '/^$/N' \
+	    -e '/\n$/D' < $f > $t
 	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
 done)

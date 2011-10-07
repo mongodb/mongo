@@ -681,4 +681,3 @@ err:		__wt_free(session, ctable);
 
 	return (ret);
 }
-
