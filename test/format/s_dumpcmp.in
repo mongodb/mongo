@@ -45,12 +45,12 @@ if test $dump_bdb -eq 1; then
 	fi
 fi
 
+ext='"../../ext/collators/reverse/.libs/reverse_collator.so"'
 bzext="../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so"
 if test -e $bzext ; then
-	config='extensions=["'$bzext'"]'
-else
-	config=
+        ext="$ext,\"$bzext\""
 fi
+config='extensions=['$ext']'
 
 $build_top/wt -C "$config" dump -p file:__wt > __wt_dump
 cmp __wt_dump __bdb_dump > /dev/null

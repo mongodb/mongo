@@ -7,7 +7,7 @@ t_SOURCES = config.h format.h bdb.c config.c t.c util.c wts.c
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
 t_LDFLAGS = -static
 
-s_dumpcmp:
+s_dumpcmp: $(srcdir)/s_dumpcmp.in
 	cp $(srcdir)/s_dumpcmp.in $@
 
 backup:

@@ -96,6 +96,10 @@ static CONFIG c[] = {
 	  "percent duplicate values in variable-len column-store files",
 	  C_VAR, 0, 0, 90, &g.c_repeat_data_pct },
 
+	{ "reverse",
+	  "collate in reverse order",			/* 10% */
+	  0, C_BOOL, 10, 0, &g.c_reverse },
+
 	{ "rows",
 	  "the number of rows to create",
 	  0, 0, 10, M(1), &g.c_rows },

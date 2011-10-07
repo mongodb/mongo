@@ -8,6 +8,20 @@
 #define	BDB	1			/* Berkeley DB header files */
 #include "format.h"
 
+static int
+bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
+{
+        int cmp;
+        size_t len;
+
+        UNUSED(dbp);
+
+        len = (k1->size < k2->size) ? k1->size : k2->size;
+	if ((cmp = memcmp(k2->data, k1->data, len)) == 0)
+	        cmp = ((int)k1->size - (int)k2->size);
+        return (cmp);
+}
+
 void
 bdb_startup(void)
 {
@@ -26,6 +40,9 @@ bdb_startup(void)
 	    0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
+
+        if (g.c_file_type == ROW && g.c_reverse)
+                db->set_bt_compare(db, bdb_compare_reverse);
 
 	assert(db->open(db, NULL, "__bdb", NULL, DB_BTREE, DB_CREATE, 0) == 0);
 	g.bdb = db;

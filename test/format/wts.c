@@ -47,7 +47,6 @@ handle_progress(WT_EVENT_HANDLER *handler,
 	return (0);
 }
 
-
 static WT_EVENT_HANDLER event_handler = {
 	NULL,
 	handle_message,
@@ -64,7 +63,7 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	char config[256];
 
 	/* If the bzip2 compression module has been built, use it. */
-	ext = "../../ext/compressors/bzip2_compress/bzip2_compress.so";
+	ext = "../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so";
 	if (access(ext, R_OK) != 0) {
 		ext = "";
 		g.c_bzip = 0;
@@ -76,7 +75,8 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\"%s\"],%s,%s",
+	    "extensions=[\"../../ext/collators/reverse/.libs/reverse_collator.so\","
+            "\"%s\"],%s,%s",
 	    g.progname, g.c_cache, ext,
 	    g.c_multithread ? "multithread" : "",
 	    g.config_open == NULL ? "" : g.config_open);
@@ -157,6 +157,9 @@ wts_startup(int open_cursors)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
+                if (g.c_reverse)
+			p += snprintf(p, (size_t)(end - p),
+			    ",collator=reverse");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
@@ -257,8 +260,13 @@ wts_bulk_load(void)
 
 	session = g.wts_session;
 
-	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, "bulk", &cursor)) != 0) {
+        /*
+         * Avoid bulk load with a custom collator, because the order of
+         * insertion will not match the collation order.
+         */
+	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
+            (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
+            &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);

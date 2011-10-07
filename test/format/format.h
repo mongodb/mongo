@@ -77,6 +77,7 @@ typedef struct {
 	uint32_t c_multithread;
 	uint32_t c_ops;
 	uint32_t c_repeat_data_pct;
+	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
 	uint32_t c_value_max;
