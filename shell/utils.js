@@ -610,7 +610,9 @@ else {
 
 if ( typeof( BinData ) != "undefined" ){
     BinData.prototype.tojson = function () {
-        //return "BinData type: " + this.type + " len: " + this.len;
+        if (this.type == 3) {
+             return "UUID('" + this.hex() + "')"
+        }
         return this.toString();
     }
     
