@@ -42,7 +42,7 @@ bdb_startup(void)
 	assert(db_create(&db, dbenv, 0) == 0);
 
         if (g.c_file_type == ROW && g.c_reverse)
-                db->set_bt_compare(db, bdb_compare_reverse);
+                assert(db->set_bt_compare(db, bdb_compare_reverse) == 0);
 
 	assert(db->open(db, NULL, "__bdb", NULL, DB_BTREE, DB_CREATE, 0) == 0);
 	g.bdb = db;
