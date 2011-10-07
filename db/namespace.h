@@ -582,8 +582,6 @@ namespace mongo {
        if you will: at least the core parts.  (Additional info in system.* collections.)
     */
     class NamespaceIndex {
-        friend class NamespaceCursor;
-
     public:
         NamespaceIndex(const string &dir, const string &database) :
             ht( 0 ), dir_( dir ), database_( database ) {}
