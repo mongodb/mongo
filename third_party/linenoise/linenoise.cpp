@@ -1056,6 +1056,15 @@ int linenoiseHistoryAdd(const char *line) {
         memmove(history,history+1,sizeof(char*)*(history_max_len-1));
         history_len--;
     }
+
+    // convert newlines in multi-line code fragments to spaces before storing
+    char * p = linecopy;
+    while (*p) {
+        if ('\n' == *p) {
+            *p = ' ';
+        }
+        p++;
+    }
     history[history_len] = linecopy;
     history_len++;
     return 1;
