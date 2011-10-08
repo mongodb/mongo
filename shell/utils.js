@@ -564,6 +564,10 @@ ObjectId.prototype.equals = function( other){
     return this.str == other.str;
 }
 
+ObjectId.isValid = function( value ){
+    return /^[0-9a-fA-F]{24}$/.test(value);
+}
+
 if ( typeof( DBPointer ) != "undefined" ){
     DBPointer.prototype.fetch = function(){
         assert( this.ns , "need a ns" );
