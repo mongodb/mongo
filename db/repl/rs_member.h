@@ -96,7 +96,7 @@ namespace mongo {
         bool changed(const HeartbeatInfo& old) const;
     };
 
-    inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) {
+    inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id), authIssue(false) {
         hbstate = MemberState::RS_UNKNOWN;
         health = -1.0;
         downSince = 0;
