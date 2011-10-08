@@ -61,8 +61,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	if (strncmp(name, "table:", strlen("table:")) == 0) {
 		if (append || read_recno) {
 			fprintf(stderr,
-			    "%s: the -a and -R options only apply when loading "
-			    "single files",
+			    "%s: the -a and -R options to the load command do "
+			    "not apply to loading tables",
 			    progname);
 			return (1);
 		}
@@ -72,8 +72,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	} else {
 		if (append && table_config != NULL) {
 			fprintf(stderr,
-			    "%s: the -a option causes the -c option to be "
-			    "ignored",
+			    "%s: the -a option to the load command causes the "
+			    "-c option to be ignored",
 			    progname);
 			return (1);
 		}
