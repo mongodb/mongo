@@ -107,8 +107,8 @@ DBCollection.prototype._massageObject = function( q ){
         return q;
 
     if ( type == "string" ){
-        if ( q.length == 24 )
-            return { _id : q };
+        if ( ObjectId.isValid( q ) )
+            return { _id : new ObjectId(q) };
 
         return { $where : q };
     }

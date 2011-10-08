@@ -28,3 +28,5 @@ assert( t.findOne( id , { a : 1 } ).a , "H" );
 assert( ! t.findOne( id , { a : 1 } ).b , "I" );
 
 assert(t.validate().valid,"not valid");
+
+assert( t.findOne( id.valueOf() ) , "J" );
