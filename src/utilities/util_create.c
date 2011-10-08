@@ -47,5 +47,5 @@ usage(void)
 	    "usage: %s%s "
 	    "create [-c configuration] uri\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

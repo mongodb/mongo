@@ -24,7 +24,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
 				    progname, util_optarg, strerror(errno));
-				return (EXIT_FAILURE);
+				return (1);
 			}
 			break;
 		case 'p':
@@ -82,5 +82,5 @@ usage(void)
 	    "usage: %s%s "
 	    "printlog [-p] [-f output-file]\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

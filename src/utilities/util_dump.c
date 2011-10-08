@@ -173,30 +173,28 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	int ch, dump_key, ret, reverse;
-	const char *fmt;
+	int ch, dump_recno, hex, ret, reverse;
 	char *name;
 
-	dump_key = reverse = 0;
+	dump_recno = hex = reverse = 0;
 	name = NULL;
-	fmt = "dump=print";
-	while ((ch = util_getopt(argc, argv, "f:kxr")) != EOF)
+	while ((ch = util_getopt(argc, argv, "f:Rrx")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
 				    progname, util_optarg, strerror(errno));
-				return (EXIT_FAILURE);
+				return (1);
 			}
 			break;
-		case 'k':
-			dump_key = 1;
-			break;
-		case 'x':
-			fmt = "dump=hex";
+		case 'R':
+			dump_recno = 1;
 			break;
 		case 'r':
 			reverse = 1;
+			break;
+		case 'x':
+			hex = 1;
 			break;
 		case '?':
 		default:
@@ -208,8 +206,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(
-	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((name =
+	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		goto err;
 
 	if (strncmp(name, "table:", strlen("table:")) == 0) {
@@ -218,13 +216,14 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		printf("WiredTiger Dump %s\n",
 		    wiredtiger_version(NULL, NULL, NULL));
 		printf("Header\n");
+		printf("Format=%s\n", hex ? "hex" : "print");
 		if ((ret = schema(session, *argv)) != 0)
 			goto err;
 		printf("Data\n");
 	}
 
-	if ((ret =
-	    session->open_cursor(session, name, NULL, fmt, &cursor)) != 0) {
+	if ((ret = session->open_cursor(session,
+	    name, NULL, hex ? "dump=hex" : "dump=print", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
@@ -261,7 +260,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-krx] [-f output-file] table\n",
+	    "dump [-Rrx] [-f output-file] uri\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

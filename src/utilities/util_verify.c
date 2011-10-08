@@ -31,7 +31,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		return (usage());
 	if ((name = util_name(
 	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
-		return (EXIT_FAILURE);
+		return (1);
 
 	if ((ret = session->verify(session, name, NULL)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
@@ -58,5 +58,5 @@ usage(void)
 	    "usage: %s%s "
 	    "verify file\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

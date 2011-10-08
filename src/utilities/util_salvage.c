@@ -35,7 +35,7 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 	if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
-		return (EXIT_FAILURE);
+		return (1);
 
 	if ((ret = session->salvage(session, name, force)) != 0) {
 		fprintf(stderr, "%s: salvage(%s): %s\n",
@@ -62,5 +62,5 @@ usage(void)
 	    "usage: %s%s "
 	    "salvage [-F] file\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

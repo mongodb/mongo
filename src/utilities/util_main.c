@@ -83,8 +83,9 @@ main(int argc, char *argv[])
 	util_optreset = 1;
 	util_optind = 1;
 
-	/* The "create" command should pass "create" to wiredtiger_open. */
-	if (config == NULL && strcmp(command, "create") == 0)
+	/* The "create" and "load" commands can create the database. */
+	if (config == NULL &&
+	    (strcmp(command, "create") == 0 || strcmp(command, "load") == 0))
 		config = "create";
 
 	if ((ret = wiredtiger_open(".",

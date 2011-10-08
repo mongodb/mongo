@@ -23,7 +23,7 @@ util_dumpfile(WT_SESSION *session, int argc, char *argv[])
 			if (freopen(util_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: %s\n",
 				    progname, util_optarg, strerror(errno));
-				return (EXIT_FAILURE);
+				return (1);
 			}
 			break;
 		case '?':
@@ -37,7 +37,7 @@ util_dumpfile(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 	if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
-		return (EXIT_FAILURE);
+		return (1);
 
 	if ((ret = session->dumpfile(session, name, NULL)) != 0) {
 		fprintf(stderr, "%s: dumpfile(%s): %s\n",
@@ -64,5 +64,5 @@ usage(void)
 	    "usage: %s%s "
 	    "dumpfile [-f output-file] file\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }

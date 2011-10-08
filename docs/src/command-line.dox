@@ -48,18 +48,18 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-krx] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-Rrx] [-f output] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
 
 @par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
-the <code>-f</code> option re-directs the output to the specified file.
+the \c -f option re-directs the output to the specified file.
 
-@par <code>-k</code>
+@par <code>-R</code>
 By default, when dumping a column-store file, record numbers are not included
-in the output; the <code>-k</code> option causes record numbers to be included.
+in the output; the \c -R option causes record numbers to be included.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
@@ -83,32 +83,46 @@ The following are command-specific options for the \c dumpfile command:
 
 @par <code>-f</code>
 By default, the \c dumpfile command output is written to the standard
-output; the <code>-f</code> option re-directs the output to the specified
+output; the \c -f option re-directs the output to the specified
 file.
 
 
-@section utility_load wt load: import a table from a text dump
+@section utility_load wt load: load data into a file or table
 
-The \c load command loads the specified table based on the input.
-
-See @ref dump_formats for details of the dump file formats.
+The \c load command loads data into the specified file or table.  In the
+case of loading data into a table, the input data must be the output of
+the \c dump command.  See @ref dump_formats for details of the dump file
+formats.
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-p] [-c config] [-f input] table</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-aR] [-c config] [-f input] uri</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
 
+@par <code>-a</code>
+By default the specified file or table or removed and re-created.  If
+the \c -a option is specified, the input is added to an existing file.
+(The \c -a option only makes sense when adding input to a file, not a
+table.)  Already existing items may be overwritten, that is, the \c -a
+option supports both appending new data and updating old data.
+
 @par <code>-c</code>
-Include a configuration string to be passed to WT_SESSION::create.
+Include a configuration string to be passed to WT_SESSION::create when
+the file or table is re-created.  (The \c -c option may not be specified
+with the \c -a option, because the \c -a option does not remove and
+re-create the file.)
 
 @par <code>-f</code>
-By default, the \c load command reads from the standard output; the
-<code>-f</code> option reads the input from the specified file.
+By default, the \c load command reads from the standard input; the \c
+-f option reads the input from the specified file.
 
-@par <code>-p</code>
-The input is printable text, that is, the input was generated using the
-\c dump command's <code>-p</code> option.
+@par <code>-R</code>
+By default, when loading rows into a column-store file, new record
+numbers are assigned sequentially as the rows are read.  The \c -R
+option specifies the input file lines are in pairs, first a record
+number line and then a value line, allowing specific records to be
+loaded.
 
 
 @section utility_printlog wt printlog: output the database log
@@ -123,8 +137,7 @@ The following are command-specific options for the \c printlog command:
 
 @par <code>-f</code>
 By default, the \c printlog command output is written to the standard
-output; the <code>-f</code> option re-directs the output to the specified
-file.
+output; the \c -f option re-directs the output to the specified file.
 
 @par <code>-p</code>
 Display the log in a printable format.

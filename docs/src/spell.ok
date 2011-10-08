@@ -11,10 +11,12 @@ EB
 EmpId
 MVCC's
 RepMgr
+Rrx
 TimesTen's
 Vv
 WiredTiger
 WiredTiger's
+aR
 ack'ed
 api
 apiflags
@@ -102,7 +104,6 @@ keyexist
 keyfmt
 keyname
 keyvalue
-krx
 lastname
 len
 li

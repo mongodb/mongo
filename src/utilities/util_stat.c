@@ -45,7 +45,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		break;
 	case 1:
 		if ((objname = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
-			return (EXIT_FAILURE);
+			return (1);
 		objname_free = 1;
 		break;
 	default:
@@ -55,7 +55,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	urilen = strlen("statistics:") + strlen(objname) + 1;
 	if ((uri = calloc(urilen, 1)) == NULL) {
 		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
-		return (EXIT_FAILURE);
+		return (1);
 	}
 	snprintf(uri, urilen, "statistics:%s", objname);
 
@@ -123,5 +123,5 @@ usage(void)
 	    "usage: %s%s "
 	    "stat [-p prefix] [file]\n",
 	    progname, usage_prefix);
-	return (EXIT_FAILURE);
+	return (1);
 }
