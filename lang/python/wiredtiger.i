@@ -26,6 +26,9 @@ from packing import pack, unpack
         $1 = &temp;
 }
 
+/* Convert 'int *' to an output arg in search_near */
+%apply int *OUTPUT { int *exactp };
+
 /* Event handlers are not supported in Python. */
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * { $1 = NULL; }
 
