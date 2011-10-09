@@ -106,18 +106,18 @@ namespace mongo {
         return ret;
     }
 
-    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
-        list<string> * l = (list<string>*)extra;
+    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , list<string>* l ) {
         if ( ! k.hasDollarSign() || k == "local.oplog.$main" ) {
             // we call out local.oplog.$main specifically as its the only "normal"
             // collection that has a $, so we make sure it gets added
-            l->push_back( (string)k );
+            l->push_back( k.toString() );
         }
     }
 
     void NamespaceIndex::getCollectionNamespaces( list<string>* tofill ) const {
         if ( _ht.get() )
-            _ht->iterAll( namespaceGetNamespacesCallback , (void*)tofill );
+            _ht->iterAll( stdx::bind( namespaceGetNamespacesCallback,
+                                      stdx::placeholders::_1, stdx::placeholders::_2, tofill) );
     }
 
     void NamespaceIndex::maybeMkdir() const {
