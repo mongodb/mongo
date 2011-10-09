@@ -423,6 +423,8 @@ namespace mongo {
             int rowCount = getParam( "rowcount" , 0 );
             int rowNum = 0;
 
+            auth();
+
             BSONObj prev = stats();
             if ( prev.isEmpty() )
                 return -1;
