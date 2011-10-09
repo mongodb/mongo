@@ -47,25 +47,25 @@ namespace mongo {
 
     class DiagStr {
         string _s;
-        static mutex m;
+        static SimpleMutex m;
     public:
         DiagStr(const DiagStr& r) : _s(r.get()) { }
         DiagStr() { }
         bool empty() const { 
-            mutex::scoped_lock lk(m);
+            SimpleMutex::scoped_lock lk(m);
             return _s.empty();
         }
         string get() const { 
-            mutex::scoped_lock lk(m);
+            SimpleMutex::scoped_lock lk(m);
             return _s;
         }
 
         void set(const char *s) {
-            mutex::scoped_lock lk(m);
+            SimpleMutex::scoped_lock lk(m);
             _s = s;
         }
         void set(const string& s) { 
-            mutex::scoped_lock lk(m);
+            SimpleMutex::scoped_lock lk(m);
             _s = s;
         }
         operator string() const { return get(); }
@@ -75,6 +75,8 @@ namespace mongo {
             _s = rhs.get();
         }
     };
+
+#if 0 // not including in 2.0
 
     /** Thread safe map.  
         Be careful not to use this too much or it could make things slow;
@@ -125,5 +127,5 @@ namespace mongo {
             V& operator[](const K& k) { return r[k]; }
         };
     };
-
+#endif
 }
