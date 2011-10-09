@@ -204,17 +204,13 @@ namespace mongo {
             ht->iterAll(namespaceOnLoadCallback);
     }
 
-    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
-        list<string> * l = (list<string>*)extra;
+    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , list<string> * l ) {
         if ( ! k.hasDollarSign() )
             l->push_back( (string)k );
     }
-    void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
-        assert( onlyCollections ); // TODO: need to implement this
-        //                                  need boost::bind or something to make this less ugly
-
+    void NamespaceIndex::getNamespaces( list<string>& tofill ) const {
         if ( ht )
-            ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
+            ht->iterAll( boost::bind(namespaceGetNamespacesCallback , _1, _2, &tofill) );
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
