@@ -85,7 +85,7 @@ for ( iter=0; iter<5; iter++ ){
         gotAGoodOne = true; 
         assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
         // make sure it's sharded and split
-        assert( config.chunks.count({ns: db.mrShardedOut._fullName}) > 1, "didnt split");
+        assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
     }
     catch ( e ){
         if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
