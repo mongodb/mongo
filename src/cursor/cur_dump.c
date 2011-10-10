@@ -35,10 +35,9 @@ __raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
 	size = 0;
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_HEX))
 		for (i = from->size; i > 0; --i, ++p) {
-			*t++ = '\\';
 			*t++ = hex[(*p & 0xf0) >> 4];
 			*t++ = hex[*p & 0x0f];
-			size += 3;
+			size += 2;
 		}
 	else
 		for (i = from->size; i > 0; --i, ++p)
