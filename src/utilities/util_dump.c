@@ -215,8 +215,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 
 		printf("WiredTiger Dump %s\n",
 		    wiredtiger_version(NULL, NULL, NULL));
-		printf("Header\n");
 		printf("Format=%s\n", hex ? "hex" : "print");
+		printf("Header\n");
 		if ((ret = schema(session, *argv)) != 0)
 			goto err;
 		printf("Data\n");
