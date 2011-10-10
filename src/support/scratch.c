@@ -171,7 +171,42 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
  *	Grow a buffer to accommodate a formatted string.
  */
 int
-__wt_buf_sprintf(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+__wt_buf_sprintf(
+    WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	va_list ap;
+	size_t len;
+
+	for (;;) {
+		va_start(ap, fmt);
+		len =
+		    (size_t)vsnprintf(buf->mem, (size_t)buf->memsize, fmt, ap);
+		va_end(ap);
+
+		/* Check if there was enough space. */
+		if (len < buf->memsize) {
+			buf->data = buf->mem;
+			buf->size = WT_STORE_SIZE(len);
+			return (0);
+		}
+
+		/*
+		 * If not, double the size of the buffer: we're dealing with
+		 * strings, and we don't expect these numbers to get huge.
+		 */
+		WT_RET(__wt_buf_grow(
+		    session, buf, WT_MAX(len + 1, buf->memsize * 2)));
+	}
+}
+
+/*
+ * __wt_buf_sprintf_append --
+ *	Grow a buffer to append a formatted string.
+ */
+int
+__wt_buf_sprintf_append(
+    WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;

@@ -208,8 +208,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CLEAR(cols);
 	cursor_key_cols = 0;
 	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
-		WT_ERR(__wt_buf_sprintf(session, &cols, "%.*s,",
-		    (int)ckey.len, ckey.str));
+		WT_ERR(__wt_buf_sprintf_append(
+		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
 		++cursor_key_cols;
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
@@ -229,8 +229,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 		 */
 		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
 			continue;
-		WT_ERR(__wt_buf_sprintf(session, &cols, "%.*s,",
-		    (int)ckey.len, ckey.str));
+		WT_ERR(__wt_buf_sprintf_append(
+		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;

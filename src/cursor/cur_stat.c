@@ -17,7 +17,6 @@ static int __curstat_prev(WT_CURSOR *cursor);
 static int
 __curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_BUF *buf)
 {
-	WT_RET(__wt_buf_init(session, buf, 64));
 	if (v >= WT_BILLION)
 		WT_RET(__wt_buf_sprintf(session, buf,
 		    "%" PRIu64 "B (%" PRIu64 ")", v / WT_BILLION, v));

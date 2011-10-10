@@ -102,8 +102,8 @@ __create_colgroup(
 
 	/* Add the filename to the colgroup config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_ERR(__wt_buf_sprintf(session, &namebuf,
-		    "%.*s", (int)cval.len, cval.str));
+		WT_ERR(__wt_buf_sprintf(
+		    session, &namebuf, "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
 	} else {
 		if (cgname == NULL)
@@ -120,11 +120,11 @@ __create_colgroup(
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 
 	/* Calculate the key/value formats -- these go into the file config. */
-	WT_ERR(__wt_buf_sprintf(session, &fmt, "key_format=%s",
-	    table->key_format));
+	WT_ERR(__wt_buf_sprintf(
+	    session, &fmt, "key_format=%s", table->key_format));
 	if (cgname == NULL)
-		WT_ERR(__wt_buf_sprintf(session, &fmt, ",value_format=%s",
-		    table->value_format));
+		WT_ERR(__wt_buf_sprintf_append
+		    (session, &fmt, ",value_format=%s", table->value_format));
 	else {
 		if (__wt_config_getones(session,
 		    config, "columns", &cval) != 0) {
@@ -132,7 +132,8 @@ __create_colgroup(
 			    "No 'columns' configuration for '%s'", name);
 			WT_ERR(EINVAL);
 		}
-		WT_ERR(__wt_buf_sprintf(session, &fmt, ",value_format="));
+		WT_ERR(
+		    __wt_buf_sprintf_append(session, &fmt, ",value_format="));
 		WT_ERR(__wt_struct_reformat(session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
@@ -196,8 +197,8 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	/* Add the filename to the index config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_ERR(__wt_buf_sprintf(session, &namebuf,
-		    "%.*s", (int)cval.len, cval.str));
+		WT_ERR(__wt_buf_sprintf(session,
+		    &namebuf, "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
 	} else {
 		WT_ERR(__wt_buf_sprintf(session, &namebuf,
@@ -233,8 +234,8 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 		 */
 		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
 			continue;
-		WT_ERR(__wt_buf_sprintf(session, &extra_cols, "%.*s,",
-		    (int)ckey.len, ckey.str));
+		WT_ERR(__wt_buf_sprintf(
+		    session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;

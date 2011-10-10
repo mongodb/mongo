@@ -612,7 +612,13 @@ extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
     uint32_t *sizep);
 extern void __wt_buf_swap(WT_BUF *a, WT_BUF *b);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
-extern int __wt_buf_sprintf(WT_SESSION_IMPL *session,
+extern int __wt_buf_sprintf( WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
+    3,
+    4)));
+extern int __wt_buf_sprintf_append( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
