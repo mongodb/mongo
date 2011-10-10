@@ -153,7 +153,7 @@ namespace mongo {
 
     class DBTopStatus : public WebStatusPlugin {
     public:
-        DBTopStatus() : WebStatusPlugin( "dbtop" , 50 , "(occurences|percent of elapsed)" ) {}
+        DBTopStatus() : WebStatusPlugin( "dbtop" , 50 , "(occurrences|percent of elapsed)" ) {}
 
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ) {
             ss << "<td>";
