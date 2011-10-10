@@ -82,6 +82,12 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					return (EINVAL);
 				}
 			} else if (strncmp(ck.str, "choices", ck.len) == 0) {
+				if (v.len == 0) {
+					__wt_errx(session,
+					    "Key '%.*s' requires a value",
+					    (int)k.len, k.str);
+					return (EINVAL);
+				}
 				if (v.type == ITEM_STRUCT) {
 					/*
 					 * Handle the 'verbose' case of a list
