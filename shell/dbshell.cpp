@@ -870,8 +870,15 @@ int _main(int argc, char* argv[]) {
             bool wascmd = false;
             {
                 string cmd = line;
-                if ( cmd.find( " " ) > 0 )
+                //FIX: in case space not found find will return string::npos
+                if ( cmd.find( " " ) != string::npos ) {
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
+                }
+                else {
+                    //in case of space is not found, look for new line to split command with arguments
+                    if ( cmd.find( "\n" ) != string::npos )
+                       cmd = cmd.substr( 0 , cmd.find( "\n" ) );
+                }
 
                 if ( cmd.find( "\"" ) == string::npos ) {
                     try {
@@ -899,7 +906,8 @@ int _main(int argc, char* argv[]) {
                 }
             }
 
-            shellHistoryAdd( line );
+            //code has complete command which needs to be persisted in history
+            shellHistoryAdd( code.c_str() );
         }
 
         shellHistoryDone();
