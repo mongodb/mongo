@@ -99,7 +99,7 @@ err:		ret = 1;
 static int
 load_table(WT_SESSION *session)
 {
-	char **list, **p;
+	char **list, **p, *tmp;
 	int hex, ret;
 
 	if ((ret = read_schema(&list, &hex)) != 0)
@@ -117,36 +117,22 @@ load_table(WT_SESSION *session)
 		return (1);
 	}
 
-#if 0
-	WT_CURSOR *cursor;
-	/* Open the schema file. */
-	if ((ret = session->open_cursor(
-	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0)
-		return (ret);
-
 	/*
-	 * We have removed the table, but it's possible there remain files with
-	 * the same names as files associated with the imported table.  Check
-	 * to make sure we don't have a file name collision, that would result
-	 * in corruption of the schema file.
+	 * Make sure the table key/value pair comes first, then we can just
+	 * run through the array in order.  (We already checked that we had
+	 * a multiple of 2 entries, so this is safe.)
 	 */
-	for (p = list; *p != NULL; ++p)
-		if (strncmp(*p, "file:", strlen("file:")) == 0) {
-			cursor->set_key(cursor, *p);
-			if ((ret = cursor->search(cursor)) != 0)
-				continue;
-			fprintf(stderr,
-			    "%s: imported table file name %s matches existing "
-			    "schema file name\n",
-			    progname, *p);
+	if (p != list) {
+		tmp = list[0]; list[0] = p[0]; p[0] = tmp;
+		tmp = list[1]; list[1] = p[1]; p[1] = tmp;
+	}
+	for (p = list; *p != NULL; p += 2) {
+		if ((ret = session->create(session, p[0], p[1])) != 0) {
+			fprintf(stderr, "%s: session.create: %s: %s\n",
+			    progname, p[0], wiredtiger_strerror(errno));
 			return (1);
 		}
-
-	for (p = list; *p != NULL; ++p)
-		printf("{%s}\n", *p);
-#endif
-
-	fprintf(stderr, "TABLE\n");
+	}
 	return (0);
 }
 
@@ -203,6 +189,10 @@ read_schema(char ***listp, int *hexp)
 	}
 	list[entry] = NULL;
 	*listp = list;
+
+	/* The lines are supposed to be in pairs. */
+	if (entry / 2 == 0)
+		return (format());
 
 	/* Leak the memory, I don't care. */
 	return (0);

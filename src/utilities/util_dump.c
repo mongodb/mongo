@@ -62,7 +62,7 @@ schema(WT_SESSION *session, const char *name)
 	WT_CURSOR *cursor;
 	const char *key, *value;
 	int i, elem, list_elem, ret, tret;
-	char *buf, *p, *t;
+	char *append, *buf, *filename, *p, *t;
 
 	ret = 0;
 
@@ -115,11 +115,8 @@ schema(WT_SESSION *session, const char *name)
 	ret = 0;
 
 	/*
-	 * Dump out the schema information.
-	 *
-	 * 1) Dump the table's information (requires a lookup)
-	 * 2) Dump the column group and index key/value pairs
-	 * 3) Dump the underlying file information (requires a lookup)
+	 * Dump out the schema information: first, dump the table's information
+	 * (requires a lookup).
 	 */
 	if ((buf = malloc(strlen("table:") + strlen(name) + 10)) == NULL)
 		goto err;
@@ -128,7 +125,8 @@ schema(WT_SESSION *session, const char *name)
 	cursor->set_key(cursor, buf);
 	if ((ret = cursor->search(cursor)) != 0) {
 		fprintf(stderr,
-		    "Unable to find schema reference for table %s\n", name);
+		    "%s: unable to find schema reference for table %s\n",
+		    progname, name);
 		goto err;
 	}
 	if ((ret = cursor->get_key(cursor, &key)) != 0)
@@ -137,28 +135,49 @@ schema(WT_SESSION *session, const char *name)
 		goto err;
 	printf("%s\n%s\n", key, value);
 
+	/*
+	 * Second, dump the column group and index key/value pairs: for each
+	 * one, look up the related file information and append it to the base
+	 * record.
+	 */
 	for (i = 0; i < elem; ++i) {
-		printf("%s\n%s\n", list[i].key, list[i].value);
-
-		if ((p = strstr(list[i].value, "filename=")) != NULL) {
-			if ((t = strchr(p, ',')) != NULL)
-				*t = '\0';
-			p += strlen("filename=");
-			p -= strlen("file:");
-			memcpy(p, "file:", strlen("file:"));
-			cursor->set_key(cursor, p);
-			if ((ret = cursor->search(cursor)) != 0) {
-				fprintf(stderr,
-				    "Unable to find schema reference for "
-				    "underlying file %s\n", p);
-				goto err;
-			}
-			if ((ret = cursor->get_key(cursor, &key)) != 0)
-				goto err;
-			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				goto err;
-			printf("%s\n%s\n", key, value);
+		if ((filename = strstr(list[i].value, "filename=")) == NULL) {
+			fprintf(stderr,
+			    "%s: %s: has no underlying file configuration\n",
+			    progname, list[i].key);
+			goto err;
 		}
+
+		/*
+		 * Nul-terminate the filename if necessary, create the file
+		 * URI, then look it up.
+		 */
+		if ((append = strchr(filename, ',')) != NULL)
+			*append = '\0';
+		p = filename + strlen("filename=");
+		p -= strlen("file:");
+		memcpy(p, "file:", strlen("file:"));
+		cursor->set_key(cursor, p);
+		if ((ret = cursor->search(cursor)) != 0) {
+			fprintf(stderr,
+			    "%s: %s: unable to find schema reference for the "
+			    "underlying file %s\n",
+			    progname, list[i].key, p);
+			goto err;
+		}
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			goto err;
+
+		/*
+		 * The dumped configuration string is the original key plus the
+		 * file's configuration.   Discard the file name, a new one is
+		 * chosen during the load process.
+		 */
+		*filename = '\0';
+		printf("%s\n%s,%s%s%s\n",
+		    list[i].key, list[i].value,
+		    append == NULL ? "" : append + 1,
+		    append == NULL ? "" : ",", value);
 	}
 
 err:	if (cursor != NULL &&
