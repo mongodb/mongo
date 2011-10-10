@@ -126,13 +126,13 @@ load_table(WT_SESSION *session)
 		tmp = list[0]; list[0] = p[0]; p[0] = tmp;
 		tmp = list[1]; list[1] = p[1]; p[1] = tmp;
 	}
-	for (p = list; *p != NULL; p += 2) {
+	for (p = list; *p != NULL; p += 2)
 		if ((ret = session->create(session, p[0], p[1])) != 0) {
 			fprintf(stderr, "%s: session.create: %s: %s\n",
 			    progname, p[0], wiredtiger_strerror(errno));
 			return (1);
 		}
-	}
+
 	return (0);
 }
 
