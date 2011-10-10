@@ -8,10 +8,13 @@
 #include "wiredtiger.h"
 #include "util.h"
 
+static int format(void);
 static int load_col(WT_CURSOR *, const char *, int);
 static int load_file(WT_SESSION *, const char *, const char *, int, int);
 static int load_row(WT_CURSOR *, const char *);
+static int load_table(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
+static int read_schema(char ***, int *);
 static int str2recno(const char *, uint64_t *);
 static int usage(void);
 
@@ -19,11 +22,11 @@ int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int append, ch, ret, read_recno;
-	const char *table_config;
+	const char *config;
 	char *name;
 
 	append = read_recno = ret = 0;
-	table_config = NULL;
+	config = NULL;
 	name = NULL;
 
 	while ((ch = util_getopt(argc, argv, "ac:f:R")) != EOF)
@@ -32,7 +35,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			append = 1;
 			break;
 		case 'c':	/* command-line table configuration option */
-			table_config = util_optarg;
+			config = util_optarg;
 			break;
 		case 'f':	/* input file */
 			if (freopen(util_optarg, "r", stdin) == NULL) {
@@ -51,34 +54,32 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	/* The remaining argument is the uri. */
-	if (argc != 1)
-		return (usage());
-	if ((name =
-	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
-		goto err;
-
-	if (strncmp(name, "table:", strlen("table:")) == 0) {
-		if (append || read_recno) {
+	/*
+	 * If we have another argument, the user is loading a single file or
+	 * table, otherwise, we're reading a WiredTiger dump.
+	 */
+	if (argc == 0) {
+		if (append || config != NULL || read_recno) {
 			fprintf(stderr,
-			    "%s: the -a and -R options to the load command do "
-			    "not apply to loading tables",
+			    "%s: the -a, -c and  -R options to the load "
+			    "command do not apply when loading WiredTiger "
+			    "dumps\n",
 			    progname);
 			return (1);
 		}
-		read_recno = 1;
-		fprintf(stderr, "TABLE\n");
-		exit (1);
+		ret = load_table(session);
 	} else {
-		if (append && table_config != NULL) {
+		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
+			goto err;
+
+		if (append && config != NULL) {
 			fprintf(stderr,
 			    "%s: the -a option to the load command causes the "
-			    "-c option to be ignored",
+			    "-c option to be ignored\n",
 			    progname);
 			return (1);
 		}
-		if (load_file(session, name, table_config, read_recno, append))
-			goto err;
+		ret = load_file(session, name, config, read_recno, append);
 	}
 
 	if (0) {
@@ -92,12 +93,143 @@ err:		ret = 1;
 }
 
 /*
+ * load_table --
+ *	Load a table.
+ */
+static int
+load_table(WT_SESSION *session)
+{
+	char **list, **p;
+	int hex, ret;
+
+	if ((ret = read_schema(&list, &hex)) != 0)
+		return (ret);
+
+	/* Find the table name, and remove it from the database. */
+	for (p = list; *p != NULL; ++p)
+		if (strncmp(*p, "table:", strlen("table:")) == 0)
+			break;
+	if (*p == NULL)
+		return (format());
+	if ((ret = session->drop(session, *p, "force")) != 0) {
+		fprintf(stderr, "%s: session.drop: %s: %s\n", 
+		    progname, *p, wiredtiger_strerror(ret));
+		return (1);
+	}
+
+#if 0
+	WT_CURSOR *cursor;
+	/* Open the schema file. */
+	if ((ret = session->open_cursor(
+	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0)
+		return (ret);
+
+	/*
+	 * We have removed the table, but it's possible there remain files with
+	 * the same names as files associated with the imported table.  Check
+	 * to make sure we don't have a file name collision, that would result
+	 * in corruption of the schema file.
+	 */
+	for (p = list; *p != NULL; ++p)
+		if (strncmp(*p, "file:", strlen("file:")) == 0) {
+			cursor->set_key(cursor, *p);
+			if ((ret = cursor->search(cursor)) != 0)
+				continue;
+			fprintf(stderr,
+			    "%s: imported table file name %s matches existing "
+			    "schema file name\n",
+			    progname, *p);
+			return (1);
+		}
+
+	for (p = list; *p != NULL; ++p)
+		printf("{%s}\n", *p);
+#endif
+
+	fprintf(stderr, "TABLE\n");
+	return (0);
+}
+
+/*
+ * read_schema --
+ *	Read the schema lines and do some basic validation.
+ */
+static int
+read_schema(char ***listp, int *hexp)
+{
+	int entry, max_entry;
+	const char *s;
+	char *p, **list, buf[4 * 1024];
+
+	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
+	if (fgets(buf, sizeof(buf), stdin) == NULL)
+		return (format());
+	s = "WiredTiger Dump ";
+	if (strncmp(buf, s, strlen(s)) != 0)
+		return (format());
+
+	/* Header line #2: "Format={hex,print}\n". */
+	if (fgets(buf, sizeof(buf), stdin) == NULL)
+		return (format());
+	if (strcmp(buf, "Format=print\n") != 0) {
+		if (strcmp(buf, "Format=hex\n") != 0)
+			return (format());
+		*hexp = 1;
+	}
+
+	/* Header line #3: "Header\n". */
+	if (fgets(buf, sizeof(buf), stdin) == NULL)
+		return (format());
+	if (strcmp(buf, "Header\n") != 0)
+		return (format());
+
+	/* Now, read in lines until we get to the end of the headers. */
+	for (entry = max_entry = 0, list = NULL;; ++entry) {
+		if (fgets(buf, sizeof(buf), stdin) == NULL)
+			return (format());
+		if (strcmp(buf, "Data\n") == 0)
+			break;
+
+		/* Grow the array of header lines as necessary. */
+		if ((max_entry == 0 || entry == max_entry - 1) &&
+		    (list = realloc(list,
+		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
+			goto err;
+		if ((list[entry] = strdup(buf)) == NULL)
+			goto err;
+		if ((p = strchr(list[entry], '\n')) == NULL)
+			return (format());
+		*p = '\0';
+	}
+	list[entry] = NULL;
+	*listp = list;
+
+	/* Leak the memory, I don't care. */
+	return (0);
+
+err:	fprintf(stderr, "%s: %s\n", progname, wiredtiger_strerror(errno));
+	return (1);
+}
+
+/*
+ * format --
+ *	The input doesn't match the dump format.
+ */
+static int
+format(void)
+{
+	fprintf(stderr,
+	    "%s: input does not match WiredTiger dump format\n", progname);
+	return (1);
+}
+
+/*
  * load_file --
  *	Load a single file.
  */
 static int
 load_file(WT_SESSION *session,
-    const char *name, const char *table_config, int read_recno, int append)
+    const char *name, const char *config, int read_recno, int append)
 {
 	WT_CURSOR *cursor;
 	int ret;
@@ -110,7 +242,7 @@ load_file(WT_SESSION *session,
 			    progname, name, wiredtiger_strerror(ret));
 			return (1);
 		}
-		if ((ret = session->create(session, name, table_config)) != 0) {
+		if ((ret = session->create(session, name, config)) != 0) {
 			fprintf(stderr, "%s: session.create: %s: %s\n", 
 			    progname, name, wiredtiger_strerror(ret));
 			return (1);
@@ -132,8 +264,8 @@ load_file(WT_SESSION *session,
 	 */
 	fmt = "key_format=r";
 	if (read_recno ||
-	    (table_config != NULL &&
-	    (p = strstr(table_config, fmt)) != NULL &&
+	    (config != NULL &&
+	    (p = strstr(config, fmt)) != NULL &&
 	    (p[strlen(fmt)] == '\0' || p[strlen(fmt)] == ',')))
 		return (load_col(cursor, name, read_recno));
 
