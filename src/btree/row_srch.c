@@ -12,8 +12,8 @@
  *	Search a row-store slot's insert list, creating a skiplist stack as we
  * go.
  */
-static inline WT_INSERT *
-__search_insert(WT_SESSION_IMPL *session,
+WT_INSERT *
+__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *key)
 {
 	WT_BTREE *btree;
@@ -240,10 +240,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 
 	/*
-	 * Search the insert list for a match; __search_insert sets the return
-	 * insert information appropriately.
+	 * Search the insert list for a match; __wt_search_insert sets the
+	 * return insert information appropriately.
 	 */
-	cbt->ins = __search_insert(session, cbt, cbt->ins_head, key);
+	cbt->ins = __wt_search_insert(session, cbt, cbt->ins_head, key);
 	return (0);
 
 err:	__wt_page_release(session, page);
