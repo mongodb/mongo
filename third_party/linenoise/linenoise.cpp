@@ -601,12 +601,35 @@ static void freeCompletions(linenoiseCompletions *lc) {
         free(lc->cvec);
 }
 
+// break characters that may precede items to be completed
+static const char breakChars[] = " =+-/\\*?\"'`&<>;|@{([])}";
+
 static int completeLine(int fd, PROMPTINFO & pi, char *buf, size_t buflen, size_t *len, size_t *pos, size_t cols) {
     linenoiseCompletions lc = { 0, NULL };
-    int nwritten;
     char c = 0;
 
-    completionCallback(buf,&lc);
+    // completionCallback() expects a parsable entity, so find the previous break character and extract
+    // a copy to parse.  we also handle the case where tab is hit while not at end-of-line.
+    int startIndex = *pos;
+    while (--startIndex >= 0) {
+        if (strchr(breakChars, buf[startIndex])) {
+            break;
+        }
+    }
+    ++startIndex;
+    size_t itemLength = *pos - startIndex;
+    char * parseItem = (char *)malloc(itemLength + 1);
+    int i = 0;
+    for (; i < itemLength; ++i) {
+        parseItem[i] = buf[startIndex+i];
+    }
+    parseItem[i] = 0;
+
+    // get a list of completions
+    completionCallback(parseItem, &lc);
+    free(parseItem);
+    size_t displayLength = 0;
+    char * displayText = 0;
     if (lc.len == 0) {
         beep();
     } else {
@@ -617,7 +640,16 @@ static int completeLine(int fd, PROMPTINFO & pi, char *buf, size_t buflen, size_
             /* Show completion or original buffer */
             if (i < lc.len) {
                 clen = strlen(lc.cvec[i]);
-                refreshLine(fd, pi, lc.cvec[i], clen, clen, cols);
+                displayLength = *len + clen - itemLength;
+                displayText = (char *)malloc(displayLength + 1);
+                int j = 0;
+                for (; j < startIndex; ++j)
+                    displayText[j] = buf[j];
+                strcpy(&displayText[j], lc.cvec[i]);
+                strcpy(&displayText[j+clen], &buf[*pos]);
+                displayText[displayLength] = 0;
+                refreshLine(fd, pi, displayText, displayLength, startIndex + clen, cols);
+                free(displayText);
             } else {
                 refreshLine(fd, pi, buf, *len, *pos, cols);
             }
@@ -644,8 +676,20 @@ static int completeLine(int fd, PROMPTINFO & pi, char *buf, size_t buflen, size_
                 default:
                     /* Update buffer and return */
                     if (i < lc.len) {
-                        nwritten = snprintf(buf,buflen,"%s",lc.cvec[i]);
-                        *len = *pos = nwritten;
+                        clen = strlen(lc.cvec[i]);
+                        displayLength = *len + clen - itemLength;
+                        displayText = (char *)malloc(displayLength + 1);
+                        int j = 0;
+                        for (; j < startIndex; ++j)
+                            displayText[j] = buf[j];
+                        strcpy(&displayText[j], lc.cvec[i]);
+                        strcpy(&displayText[j+clen], &buf[*pos]);
+                        displayText[displayLength] = 0;
+                        //refreshLine(fd, pi, displayText, displayLength, startIndex + clen, cols);
+                        strcpy(buf, displayText);
+                        free(displayText);
+                        *pos = startIndex + clen;
+                        *len = displayLength;
                     }
                     stop = 1;
                     break;
