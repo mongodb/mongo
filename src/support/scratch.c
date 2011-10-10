@@ -167,12 +167,11 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
 }
 
 /*
- * __wt_buf_sprintf --
+ * __wt_buf_fmt --
  *	Grow a buffer to accommodate a formatted string.
  */
 int
-__wt_buf_sprintf(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+__wt_buf_fmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
@@ -201,12 +200,11 @@ __wt_buf_sprintf(
 }
 
 /*
- * __wt_buf_sprintf_append --
+ * __wt_buf_catfmt --
  *	Grow a buffer to append a formatted string.
  */
 int
-__wt_buf_sprintf_append(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+__wt_buf_catfmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;

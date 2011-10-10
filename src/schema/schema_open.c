@@ -69,9 +69,8 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 
 	/* Get the filename from the schema table. */
 	WT_ERR(__wt_config_getones(session, objconf, "filename", &cval));
-	WT_ERR(__wt_buf_init(session, &uribuf, 0));
-	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
-	    (int)cval.len, cval.str));
+	WT_ERR(__wt_buf_fmt(
+	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf.data;
 
 	/* !!! Close the schema cursor first, this overwrites session->btree. */
@@ -175,9 +174,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	/* Get the filename from the index config. */
 	WT_ERR(__wt_config_getones(session, idxconf, "filename", &cval));
-	WT_ERR(__wt_buf_init(session, &uribuf, 0));
-	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%.*s",
-	    (int)cval.len, cval.str));
+	WT_ERR(__wt_buf_fmt(
+	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf.data;
 
 	ret = __wt_session_get_btree(session, uri, fileuri,
@@ -208,7 +206,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CLEAR(cols);
 	cursor_key_cols = 0;
 	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
-		WT_ERR(__wt_buf_sprintf_append(
+		WT_ERR(__wt_buf_catfmt(
 		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
 		++cursor_key_cols;
 	}
@@ -229,7 +227,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 		 */
 		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
 			continue;
-		WT_ERR(__wt_buf_sprintf_append(
+		WT_ERR(__wt_buf_catfmt(
 		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)

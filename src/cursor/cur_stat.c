@@ -18,13 +18,13 @@ static int
 __curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_BUF *buf)
 {
 	if (v >= WT_BILLION)
-		WT_RET(__wt_buf_sprintf(session, buf,
+		WT_RET(__wt_buf_fmt(session, buf,
 		    "%" PRIu64 "B (%" PRIu64 ")", v / WT_BILLION, v));
 	else if (v >= WT_MILLION)
-		WT_RET(__wt_buf_sprintf(session, buf,
+		WT_RET(__wt_buf_fmt(session, buf,
 		    "%" PRIu64 "M (%" PRIu64 ")", v / WT_MILLION, v));
 	else
-		WT_RET(__wt_buf_sprintf(session, buf, "%" PRIu64, v));
+		WT_RET(__wt_buf_fmt(session, buf, "%" PRIu64, v));
 
 	return (0);
 }

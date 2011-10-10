@@ -102,15 +102,15 @@ __create_colgroup(
 
 	/* Add the filename to the colgroup config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_ERR(__wt_buf_sprintf(
+		WT_ERR(__wt_buf_fmt(
 		    session, &namebuf, "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
 	} else {
 		if (cgname == NULL)
-			WT_ERR(__wt_buf_sprintf(session, &namebuf,
+			WT_ERR(__wt_buf_fmt(session, &namebuf,
 			    "filename=%.*s.wt", (int)tlen, tablename));
 		else
-			WT_ERR(__wt_buf_sprintf(session, &namebuf,
+			WT_ERR(__wt_buf_fmt(session, &namebuf,
 			    "filename=%.*s_%s.wt", (int)tlen, tablename,
 			    cgname));
 		*cfgp++ = filename = namebuf.data;
@@ -120,10 +120,9 @@ __create_colgroup(
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 
 	/* Calculate the key/value formats -- these go into the file config. */
-	WT_ERR(__wt_buf_sprintf(
-	    session, &fmt, "key_format=%s", table->key_format));
+	WT_ERR(__wt_buf_fmt(session, &fmt, "key_format=%s", table->key_format));
 	if (cgname == NULL)
-		WT_ERR(__wt_buf_sprintf_append
+		WT_ERR(__wt_buf_catfmt
 		    (session, &fmt, ",value_format=%s", table->value_format));
 	else {
 		if (__wt_config_getones(session,
@@ -132,15 +131,14 @@ __create_colgroup(
 			    "No 'columns' configuration for '%s'", name);
 			WT_ERR(EINVAL);
 		}
-		WT_ERR(
-		    __wt_buf_sprintf_append(session, &fmt, ",value_format="));
+		WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format="));
 		WT_ERR(__wt_struct_reformat(session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%s", filename));
+	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
 	WT_ERR(__create_file(session, name, fileuri, fileconf));
@@ -197,11 +195,11 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	/* Add the filename to the index config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_ERR(__wt_buf_sprintf(session,
+		WT_ERR(__wt_buf_fmt(session,
 		    &namebuf, "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
 	} else {
-		WT_ERR(__wt_buf_sprintf(session, &namebuf,
+		WT_ERR(__wt_buf_fmt(session, &namebuf,
 		    "filename=%.*s_%s.wti", (int)tlen, tablename, idxname));
 		cfg[2] = filename = namebuf.data;
 		(void)WT_PREFIX_SKIP(filename, "filename=");
@@ -234,19 +232,19 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 		 */
 		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
 			continue;
-		WT_ERR(__wt_buf_sprintf(
+		WT_ERR(__wt_buf_fmt(
 		    session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
 	/* Index values are empty: all columns are packed into the index key. */
-	WT_ERR(__wt_buf_sprintf(session, &fmt, "value_format=,key_format="));
+	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
 	WT_ERR(__wt_struct_reformat(session, table,
 	     icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
-	WT_ERR(__wt_buf_sprintf(session, &uribuf, "file:%s", filename));
+	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
 	WT_ERR(__create_file(session, name, fileuri, fileconf));

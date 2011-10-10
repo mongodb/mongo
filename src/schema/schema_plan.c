@@ -161,7 +161,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			    current_coltype != coltype) {
 				WT_ASSERT(session, !value_only ||
 				    coltype == WT_PROJ_VALUE);
-				WT_RET(__wt_buf_sprintf_append(
+				WT_RET(__wt_buf_catfmt(
 				    session, plan, "%d%c", cg, coltype));
 
 				/*
@@ -175,9 +175,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			/* Now move to the column we want. */
 			if (current_col < col) {
 				if (col - current_col > 1)
-					WT_RET(__wt_buf_sprintf_append(session,
+					WT_RET(__wt_buf_catfmt(session,
 					    plan, "%d", col - current_col));
-				WT_RET(__wt_buf_sprintf_append(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_SKIP));
 			}
 			/*
@@ -187,14 +187,14 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			 * a "reuse" operation to avoid making another copy.
 			 */
 			if (!have_it) {
-				WT_RET(__wt_buf_sprintf_append(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_NEXT));
 
 				start_cg = cg;
 				start_col = col;
 				have_it = 1;
 			} else
-				WT_RET(__wt_buf_sprintf_append(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_REUSE));
 			current_col = col + 1;
 		}
@@ -293,11 +293,10 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 			pv.type = 'u';
 
 		if (pv.havesize)
-			WT_RET(__wt_buf_sprintf_append(
+			WT_RET(__wt_buf_catfmt(
 			    session, format, "%d%c", (int)pv.size, pv.type));
 		else
-			WT_RET(__wt_buf_sprintf_append(
-			    session, format, "%c", pv.type));
+			WT_RET(__wt_buf_catfmt(session, format, "%c", pv.type));
 	} while (have_next);
 
 	return (0);
@@ -318,11 +317,10 @@ __wt_struct_truncate(WT_SESSION_IMPL *session,
 	while (ncols-- > 0) {
 		WT_RET(__pack_next(&pack, &pv));
 		if (pv.havesize)
-			WT_RET(__wt_buf_sprintf_append(
+			WT_RET(__wt_buf_catfmt(
 			    session, format, "%d%c", (int)pv.size, pv.type));
 		else
-			WT_RET(__wt_buf_sprintf_append(
-			    session, format, "%c", pv.type));
+			WT_RET(__wt_buf_catfmt(session, format, "%c", pv.type));
 	}
 
 	return (0);

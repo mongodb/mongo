@@ -162,6 +162,7 @@ buf
 builtin
 bytelock
 calloc
+catfmt
 cfg
 checkfrag
 checksum

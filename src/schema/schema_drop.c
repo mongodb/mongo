@@ -116,7 +116,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri)
 			    key);
 			WT_ERR(EINVAL);
 		}
-		WT_ERR(__wt_buf_sprintf(
+		WT_ERR(__wt_buf_fmt(
 		    session, tmp, "file:%s", value + strlen("filename=")));
 		WT_ERR(__drop_file(session, tmp->data));
 
