@@ -617,7 +617,7 @@ static int completeLine(int fd, PROMPTINFO & pi, char *buf, size_t buflen, size_
         }
     }
     ++startIndex;
-    size_t itemLength = *pos - startIndex;
+    int itemLength = *pos - startIndex;
     char * parseItem = (char *)malloc(itemLength + 1);
     int i = 0;
     for (; i < itemLength; ++i) {
