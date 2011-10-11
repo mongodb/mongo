@@ -72,6 +72,277 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
+
+MongoRunner = function(){}
+    
+MongoRunner.dataDir = "/data/db"
+MongoRunner.dataPath = "/data/db/"
+MongoRunner.usedPortMap = {}
+MongoRunner.logicalOptions = { runId : true,
+                               pathOpts : true, 
+                               remember : true,
+                               noRemember : true,
+                               appendOptions : true,
+                               restart : true,
+                               noCleanData : true,
+                               cleanData : true,
+                               forceLock : true,
+                               useLogFiles : true,
+                               useHostName : true,
+                               useHostname : true }
+
+MongoRunner.toRealPath = function( path, pathOpts ){
+    
+    // Replace all $pathOptions with actual values
+    pathOpts = pathOpts || {}
+    path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
+    path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
+    for( key in pathOpts ){
+        path = path.replace( RegExp( "\\$" + key, "g" ), pathOpts[ key ] )
+    }
+    
+    // Relative path
+    if( ! path.startsWith( "/" ) ){
+        if( path != "" && ! path.endsWith( "/" ) )
+            path += "/"
+                
+        path = MongoRunner.dataPath + path
+    }
+    
+    return path
+    
+}
+
+MongoRunner.toRealDir = function( path, pathOpts ){
+    
+    path = MongoRunner.toRealPath( path, pathOpts )
+    
+    if( path.endsWith( "/" ) )
+        path = path.substring( 0, path.length - 1 )
+        
+    return path
+}
+
+MongoRunner.toRealFile = MongoRunner.toRealDir
+
+MongoRunner.nextOpenPort = function(){
+
+    var i = 0;
+    while( __usedPortMap[ "" + ( 27000 + i ) ] ) i++;
+    return 27000 + i
+
+}
+
+MongoRunner.arrOptions = function( binaryName , args ){
+
+    var fullArgs = [ binaryName ]
+
+    if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
+
+        var o = isObject( args ) ? args : args[0]
+        for ( var k in o ){
+            
+            if( ! o.hasOwnProperty(k) || k in MongoRunner.logicalOptions ) continue
+            
+            if ( ( k == "v" || k == "verbose" ) && isNumber( o[k] ) ){
+                var n = o[k]
+                if ( n > 0 ){
+                    if ( n > 10 ) n = 10
+                    var temp = "-"
+                    while ( n-- > 0 ) temp += "v"
+                    fullArgs.push( temp )
+                }
+            }
+            else {
+                if( o[k] == undefined || o[k] == null ) continue
+                fullArgs.push( "--" + k )
+                if ( o[k] != "" )
+                    fullArgs.push( "" + o[k] ) 
+            }
+        } 
+    }
+    else {
+        for ( var i=0; i<args.length; i++ )
+            fullArgs.push( args[i] )
+    }
+
+    return fullArgs
+}
+
+MongoRunner.arrToOpts = function( arr ){
+        
+    var opts = {}
+    for( var i = 1; i < arr.length; i++ ){
+        if( arr[i].startsWith( "-" ) ){
+            var opt = arr[i].replace( /^-/, "" ).replace( /^-/, "" )
+            
+            if( arr.length > i + 1 && ! arr[ i + 1 ].startsWith( "-" ) ){
+                opts[ opt ] = arr[ i + 1 ]
+                i++
+            }
+            else{
+                opts[ opt ] = ""
+            }
+            
+            if( opt.replace( /v/g, "" ) == "" ){
+                opts[ "verbose" ] = opt.length
+            }
+        }
+    }
+    
+    return opts
+}
+
+MongoRunner.savedOptions = {}
+
+MongoRunner.mongoOptions = function( opts ){
+    
+    // Initialize and create a copy of the opts
+    opts = Object.merge( opts || {}, {} )
+    
+    if( ! opts.restart ) opts.restart = false
+    
+    // RunId can come from a number of places
+    if( isObject( opts.restart ) ){
+        opts.runId = opts.restart
+        opts.restart = true
+    }
+    
+    if( isObject( opts.remember ) ){
+        opts.runId = opts.remember
+        opts.remember = true
+    }
+    
+    if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
+    
+    // Create a new runId
+    opts.runId = opts.runId || ObjectId()
+    
+    var shouldRemember = ( ! opts.restart && ! opts.noRemember ) || ( opts.restart && opts.appendOptions )
+    
+    if ( shouldRemember ){
+        MongoRunner.savedOptions[ opts.runId ] = Object.merge( opts, {} )
+    }
+    
+    opts.port = opts.port || nextOpenPort
+    opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
+    
+    return opts
+}
+
+MongoRunner.mongodOptions = function( opts ){
+    
+    opts = MongoRunner.mongoOptions( opts )
+    
+    opts.dbpath = MongoRunner.toRealDir( opts.dbpath || "$dataDir/mongod-$port",
+                                         opts.pathOpts )
+                                         
+    opts.pathOpts = Object.merge( opts.pathOpts, { dbpath : opts.dbpath } )
+    
+    if( ! opts.logFile && opts.useLogFiles ){
+        opts.logFile = opts.dbpath + "/mongod.log"
+    }
+    else if( opts.logFile ){
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+    }
+    
+    if( jsTestOptions().noJournalPrealloc )
+        opts.nopreallocj = ""
+            
+    if( jsTestOptions().noJournal )
+        opts.nojournal = ""
+            
+    return opts
+}
+
+MongoRunner.mongosOptions = function( opts ){
+    
+    opts = MongoRunner.mongoOptions( opts )
+    
+    opts.pathOpts = Object.merge( opts.pathOpts, 
+                                { configdb : opts.configdb.replace( /:|,/g, "-" ) } )
+    
+    if( ! opts.logFile && opts.useLogFiles ){
+        opts.logFile = MongoRunner.toRealFile( "$dataDir/mongos-$configdb-$port.log",
+                                               opts.pathOpts )
+    }
+    else if( opts.logFile ){
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+    }
+    
+    return opts
+}
+
+MongoRunner.runMongod = function( opts ){
+    
+    var useHostName = false
+    var runId = null
+    if( isObject( opts ) ) {
+        
+        opts = MongoRunner.mongodOptions( opts )
+        
+        useHostName = opts.useHostName || opts.useHostname
+        runId = opts.runId
+        
+        if( opts.forceLock ) removeFile( opts.dbpath + "/mongod.lock" )
+        if( opts.cleanData || ( ! opts.restart && ! opts.noCleanData ) ) resetDbpath( opts.dbpath )
+        
+        opts = MongoRunner.arrOptions( "mongod", opts )
+    }
+    
+    var mongod = startMongoProgram.apply( null, opts )
+    mongod.commandLine = MongoRunner.arrToOpts( opts )
+    mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port
+    mongod.host = mongod.name
+    mongod.port = parseInt( mongod.commandLine.port )
+    mongod.runId = runId || ObjectId()
+    mongod.savedOptions = MongoRunner.savedOptions[ mongod.runId ]
+    
+    return mongod
+}
+
+MongoRunner.runMongos = function( opts ){
+    
+    var useHostName = false
+    var runId = null
+    if( isObject( opts ) ) {
+        
+        opts = MongoRunner.mongosOptions( opts )
+        
+        useHostName = opts.useHostName || opts.useHostname
+        runId = opts.runId
+        
+        opts = MongoRunner.arrOptions( "mongos", opts )
+    }
+    
+    var mongos = startMongoProgram.apply( null, opts )
+    mongos.commandLine = MongoRunner.arrToOpts( opts )
+    mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port
+    mongos.host = mongos.name
+    mongos.port = parseInt( mongos.commandLine.port ) 
+    mongos.runId = runId || ObjectId()
+    mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ]
+    
+    return mongos
+}
+
+MongoRunner.stopMongod = function( port, signal ){
+    
+    signal = signal || 15
+    
+    if( port.port )
+        port = parseInt( port.port )
+    
+    if( port instanceof ObjectId ){
+        var opts = MongoRunner.savedOptions( port )
+        if( opts ) port = parseInt( opts.port )
+    }
+        
+    return stopMongod( parseInt( port ), parseInt( signal ) )
+}
+
+MongoRunner.stopMongos = MongoRunner.stopMongod
+
 __nextPort = 27000;
 startMongodTest = function (port, dirname, restart, extraOptions ) {
     if (!port)
