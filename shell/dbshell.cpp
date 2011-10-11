@@ -189,7 +189,7 @@ static void edit(const string& var){
 void shellHistoryInit() {
 #ifdef USE_LINENOISE
     stringstream ss;
-    char * h = getenv( "HOME" );
+    const char * h = shellUtils::getUserDir();
     if ( h )
         ss << h << "/";
     ss << ".dbshell";
