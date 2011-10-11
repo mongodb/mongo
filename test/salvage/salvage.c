@@ -581,7 +581,7 @@ process(void)
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	WT_ITEM key, value;
+	const char *key, *value;
 	WT_SESSION *session;
 	char config[100];
 
@@ -608,16 +608,16 @@ process(void)
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->create(session, "file:" SLVG, NULL) == 0);
 	assert(session->open_cursor(
-	    session, "file:" SLVG, NULL, "dump,printable", &cursor) == 0);
+	    session, "file:" SLVG, NULL, "dump=print", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
-		assert(cursor->get_key(cursor, &key) == 0);
-		if (key.size != 0) {
-			assert(fwrite(key.data, 1, key.size, fp) == key.size);
-			assert(fwrite("\n", 1, 1, fp) == 1);
+		if (page_type == WT_PAGE_ROW_LEAF) {
+			assert(cursor->get_key(cursor, &key) == 0);
+			assert(fputs(key, fp) >= 0);
+			assert(fputc('\n', fp) >= 0);
 		}
 		assert(cursor->get_value(cursor, &value) == 0);
-		assert(fwrite(value.data, 1, value.size, fp) == value.size);
-		assert(fwrite("\n", 1, 1, fp) == 1);
+		assert(fputs(value, fp) >= 0);
+		assert(fputc('\n', fp) >= 0);
 	}
 	assert(conn->close(conn, 0) == 0);
 	assert(fclose(fp) == 0);
