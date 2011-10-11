@@ -1389,6 +1389,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     
     for ( var k in extra ){
         var v = extra[k];
+        if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
         if ( v != null )
             a.push( v );                    
@@ -1693,7 +1694,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
     
     for ( var k in extra ){
-        var v = extra[k];        
+        var v = extra[k];
+        if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
         if ( v != null ){
             if( v.replace ){
@@ -2067,7 +2069,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
         printjson(options)
                 
     var o = this.getOptions( n , options , restart && ! startClean );
-
+    
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
     print("ReplSetTest " + o );
     
