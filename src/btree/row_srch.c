@@ -8,16 +8,15 @@
 #include "wt_internal.h"
 
 /*
- * __search_insert --
- *	Search a row-store slot's insert list, creating a skiplist stack as we
- * go.
+ * __wt_search_insert --
+ *	Search a row-store insert list, creating a skiplist stack as we go.
  */
 WT_INSERT *
 __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *key)
 {
 	WT_BTREE *btree;
-	WT_INSERT **ins, *ret_ins;
+	WT_INSERT **insp, *ret_ins;
 	WT_ITEM insert_key;
 	int cmp, i;
 
@@ -45,9 +44,9 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	ret_ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL || cmp == 0) {
-			cbt->ins_stack[i--] = ins--;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+		if (*insp == NULL) {
+			cbt->ins_stack[i--] = insp--;
 			continue;
 		}
 
@@ -55,21 +54,21 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		 * Comparisons may be repeated as we drop down skiplist levels;
 		 * don't repeat comparisons, they might be expensive.
 		 */
-		if (ret_ins != *ins) {
-			ret_ins = *ins;
+		if (ret_ins != *insp) {
+			ret_ins = *insp;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
 			(void)WT_BTREE_CMP(session, btree,
 			    key, &insert_key, cmp);
 		}
 
-		if (cmp == 0)
+		if (cmp > 0)		/* Keep going at this level */
+			insp = &ret_ins->next[i];
+		else if (cmp == 0)
 			for (; i >= 0; i--)
 				cbt->ins_stack[i] = &ret_ins->next[i];
-		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(ret_ins)->next[i];
 		else			/* Drop down a level */
-			cbt->ins_stack[i--] = ins--;
+			cbt->ins_stack[i--] = insp--;
 	}
 
 	/*

@@ -12,7 +12,7 @@
 static inline WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
 {
-	WT_INSERT **ins, *ret_ins;
+	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
@@ -30,23 +30,23 @@ __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+		if (*insp == NULL) {
 			--i;
-			--ins;
+			--insp;
 			continue;
 		}
 
-		ins_recno = WT_INSERT_RECNO(*ins);
+		ins_recno = WT_INSERT_RECNO(*insp);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
 		if (cmp == 0)			/* Exact match: return */
-			return (*ins);
+			return (*insp);
 		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(*ins)->next[i];
+			insp = &(*insp)->next[i];
 		else {				/* Drop down a level */
 			--i;
-			--ins;
+			--insp;
 		}
 	}
 
@@ -61,7 +61,7 @@ static inline WT_INSERT *
 __col_insert_search(
     WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
 {
-	WT_INSERT **ins, *ret_ins;
+	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
@@ -81,23 +81,23 @@ __col_insert_search(
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, ins = &inshead->head[i]; i >= 0; ) {
-		if (*ins == NULL) {
-			ins_stack[i--] = ins--;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+		if (*insp == NULL) {
+			ins_stack[i--] = insp--;
 			continue;
 		}
 
-		ret_ins = *ins;
+		ret_ins = *insp;
 		ins_recno = WT_INSERT_RECNO(ret_ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
-		if (cmp == 0)			/* Exact match: return */
+		if (cmp > 0)			/* Keep going at this level */
+			insp = &(*insp)->next[i];
+		else if (cmp == 0)		/* Exact match: return */
 			for (; i >= 0; i--)
 				ins_stack[i] = &ret_ins->next[i];
-		else if (cmp > 0)		/* Keep going at this level */
-			ins = &(ret_ins)->next[i];
 		else				/* Drop down a level */
-			ins_stack[i--] = ins--;
+			ins_stack[i--] = insp--;
 	}
 	return (ret_ins);
 }
