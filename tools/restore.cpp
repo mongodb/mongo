@@ -258,7 +258,7 @@ public:
             conn().runCommand(db, cmd, out);
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( w > 1 ) {
+            if ( _w > 1 ) {
                 conn().getLastError(false, false, _w);
             }
         }
