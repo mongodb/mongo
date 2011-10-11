@@ -320,7 +320,7 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
-extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap);
+extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 extern void __wt_cursor_init(WT_CURSOR *cursor,

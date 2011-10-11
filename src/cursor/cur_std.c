@@ -18,7 +18,7 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 	int ret;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(cursor, ap);
+	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -28,7 +28,7 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
  *	WT_CURSOR->get_key worker function.
  */
 int
-__wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
+__wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 {
 	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
@@ -39,7 +39,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (WT_CURSOR_RECNO(cursor)) {
-		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		if (LF_ISSET(WT_CURSTD_RAW)) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->raw_recno_buf;
 			key->size = (uint32_t)
@@ -50,7 +50,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
 		fmt = cursor->key_format;
-		if (F_ISSET(cursor,
+		if (LF_ISSET(
 		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
 			fmt = "u";
 		ret = __wt_struct_unpackv(

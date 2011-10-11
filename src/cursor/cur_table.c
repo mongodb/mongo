@@ -51,7 +51,7 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 	primary = *ctable->cg_cursors;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(primary, ap);
+	ret = __wt_cursor_get_keyv(primary, cursor->flags, ap);
 	va_end(ap);
 
 	return (ret);
@@ -213,7 +213,7 @@ __curtable_first(WT_CURSOR *cursor)
 	int ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	CURSOR_API_CALL(cursor, session, first, NULL);
 	APPLY_CG(ctable, first);
 err:	API_END(session);
 
