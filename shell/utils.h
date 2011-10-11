@@ -42,5 +42,7 @@ namespace mongo {
 
         void initScope( Scope &scope );
         void onConnect( DBClientWithCommands &c );
+
+        const char* getUserDir();
     }
 }
