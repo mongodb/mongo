@@ -101,7 +101,7 @@ static DWORD oldMode;
 
 
 #else /* _WIN32 */
-
+#include <signal.h>
 #include <termios.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -571,6 +571,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 3:     /* ctrl-c */
             errno = EAGAIN;
             return -1;
+        case 26:     /* ctrl-z */
+            return -2;
         case 127:   /* delete */
             if (len > 0 && pos < len) {
                 memmove(buf+pos,buf+pos+1,len-pos-1);
@@ -739,7 +741,15 @@ char *linenoise(const char *prompt) {
         return strdup(buf);
     } else {
         count = linenoiseRaw(buf,LINENOISE_MAX_LINE,prompt);
-        if (count == -1) return NULL;
+        if (count == -1) {
+            return NULL;
+        }
+#ifdef _WIN32
+#else
+        else if (count == -2) {
+            raise(SIGSTOP);
+        }
+#endif
         return strdup(buf);
     }
 }
