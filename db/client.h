@@ -131,6 +131,16 @@ namespace mongo {
 
         friend class CurOp;
 
+        unsigned _sometimes;
+
+    public:
+        /** the concept here is the same as MONGO_SOMETIMES.  however that 
+            macro uses a static that will be shared by all threads, and each 
+            time incremented it might eject that line from the other cpu caches (?),
+            so idea is that this is better.
+            */
+        bool sometimes(unsigned howOften) { return ++_sometimes % howOften == 0; }
+
     public:
 
         /* set _god=true temporarily, safely */
@@ -214,8 +224,7 @@ namespace mongo {
 
         }; // class Client::Context
 
-
-    };
+    }; // class Client
 
     /** get the Client object for this thread. */
     inline Client& cc() {

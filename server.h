@@ -6,8 +6,6 @@
     Over time we should move more here, and more out of pch.h.  And get rid of pch.h at some point.
 */
 
-// todo is there a boost  thign for this already?
-
 #pragma once
 
 #include "bson/inline_decls.h"

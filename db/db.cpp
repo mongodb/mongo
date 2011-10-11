@@ -393,7 +393,7 @@ namespace mongo {
 
     const char * jsInterruptCallback() {
         // should be safe to interrupt in js code, even if we have a write lock
-        return killCurrentOp.checkForInterruptNoAssert( false );
+        return killCurrentOp.checkForInterruptNoAssert();
     }
 
     unsigned jsGetInterruptSpecCallback() {

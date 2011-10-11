@@ -191,7 +191,7 @@ namespace mongo {
          */
         bool yieldSometimes( RecordNeeds need, bool *yielded = 0 );
 
-        static int yieldSuggest();
+        static int suggestYieldMicros();
         static void staticYield( int micros , const StringData& ns , Record * rec );
 
         struct YieldData { CursorId _id; bool _doingDeletes; };

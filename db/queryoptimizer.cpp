@@ -661,10 +661,10 @@ doneCheckOrder:
         if ( ! _plans._mayYield ) 
             return;
         
-        if ( ! _plans._yieldSometimesTracker.ping() ) 
+        if ( ! _plans._yieldSometimesTracker.intervalHasElapsed() ) 
             return;
         
-        int micros = ClientCursor::yieldSuggest();
+        int micros = ClientCursor::suggestYieldMicros();
         if ( micros <= 0 ) 
             return;
         
