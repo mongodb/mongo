@@ -220,6 +220,7 @@ namespace mongo {
         // make sure its valid
 
         bool wasFound = false;
+        bool wasMaster = false;
 
         // This is always true, since checked in port()
         assert( prev.port() >= 0 );
@@ -234,12 +235,15 @@ namespace mongo {
                 if ( _nodes[i].okForSecondaryQueries() )
                     return prev;
 
+                wasMaster = _nodes[i].ok && ! _nodes[i].secondary;
+
                 break;
             }
         }
         
         if( prev.host().size() ){
-            if( wasFound ){ LOG(1) << "slave '" << prev << "' is no longer ok to use" << endl; }
+            if( wasFound ){ LOG(1) << "slave '" << prev << ( wasMaster ? "' is master node, trying to find another node" :
+                                                                         "' is no longer ok to use" ) << endl; }
             else{ LOG(1) << "slave '" << prev << "' was not found in the replica set" << endl; }
         }
         else LOG(1) << "slave '" << prev << "' is not initialized or invalid" << endl;
