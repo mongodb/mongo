@@ -123,13 +123,14 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
+		fmt = cursor->key_format;
 		if (F_ISSET(cursor, WT_CURSTD_RAW))
 			fmt = "u";
-		if (fmt[0] == 'S' && fmt[1] == '\0') {
+		if (strcmp(fmt, "S") == 0) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;
 			cursor->key.data = (void *)str;
-		} else if (fmt[0] == 'u' && fmt[1] == '\0') {
+		} else if (strcmp(fmt, "u") == 0) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = (void *)item->data;
@@ -185,11 +186,11 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
 	/* Fast path some common cases: single strings or byte arrays. */
-	if (fmt[0] == 'S' && fmt[1] == '\0') {
+	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->value.data = str;
-	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
+	} else if (strcmp(fmt, "u") == 0) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
