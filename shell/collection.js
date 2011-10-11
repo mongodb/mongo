@@ -91,7 +91,7 @@ DBCollection.prototype._dbCommand = function( cmd , params ){
 
 DBCollection.prototype.runCommand = DBCollection.prototype._dbCommand;
 
-DBCollection.prototype._massageObject = function( q ){
+DBCollection.prototype._massageObject = function( q, skipIdTransform ){
     if ( ! q )
         return {};
 
@@ -104,11 +104,11 @@ DBCollection.prototype._massageObject = function( q ){
         return { _id : q };
 
     if ( type == "object" )
-        return q;
+        return skipIdTransform ? q : this._implicitObjectIdTransform( q );
 
     if ( type == "string" ){
-        if ( q.length == 24 )
-            return { _id : q };
+        if ( ObjectId.isValid( q ) )
+            return { _id : new ObjectId(q) };
 
         return { $where : q };
     }
@@ -117,6 +117,23 @@ DBCollection.prototype._massageObject = function( q ){
 
 }
 
+DBCollection.prototype._implicitObjectIdTransform = function(q) {
+    for ( var key in q ) {
+        if ( !q.hasOwnProperty( key ) ) { continue; }
+    
+        var value = q[key];
+        if (value == null) { continue; }
+        
+        var type = typeof(value);
+        if ( type == "object" && !value.isObjectId ) {
+            q[key] = this._implicitObjectIdTransform(value)
+        } 
+        else if ( type == "string" && ObjectId.isValid(value)) {
+          q[key] = new ObjectId(value);
+        }
+    }
+    return q;
+}
 
 DBCollection.prototype._validateObject = function( o ){
     if ( o._ensureSpecial && o._checkModify )
@@ -143,13 +160,13 @@ DBCollection.prototype._validateForStorage = function( o ){
 };
 
 
-DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
+DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options, skipIdTransform ){
     return new DBQuery( this._mongo , this._db , this ,
-                        this._fullName , this._massageObject( query ) , fields , limit , skip , batchSize , options || this.getQueryOptions() );
+                        this._fullName , this._massageObject( query, skipIdTransform ) , fields , limit , skip , batchSize , options || this.getQueryOptions() );
 }
 
-DBCollection.prototype.findOne = function( query , fields, options ){
-    var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , 
+DBCollection.prototype.findOne = function( query , fields, options, skipIdTransform ){
+    var cursor = this._mongo.find( this._fullName , this._massageObject( query, skipIdTransform ) || {} , fields , 
         -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , options || this.getQueryOptions() /* options */ );
     if ( ! cursor.hasNext() )
         return null;
