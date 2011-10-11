@@ -85,7 +85,6 @@ namespace mongo {
 
             bool html = false;
 
-
             stringstream ss;
 
             if ( method == "GET" ) {
@@ -254,28 +253,23 @@ namespace mongo {
 
     class LowLevelMongodStatus : public WebStatusPlugin {
     public:
-        LowLevelMongodStatus() : WebStatusPlugin( "low level" , 5 , "requires read lock" ) {}
+        LowLevelMongodStatus() : WebStatusPlugin( "overview" , 5 , "(only reported if can acquire read lock quickly)" ) {}
 
         virtual void init() {}
 
         void _gotLock( int millis , stringstream& ss ) {
             ss << "<pre>\n";
             ss << "time to get readlock: " << millis << "ms\n";
-
             ss << "# databases: " << dbHolder.size() << '\n';
-
-            if( ClientCursor::numCursors()>500 )
-                ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
-
-            ss << "\nreplication: ";
+            ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
+            ss << "replication: ";
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
-                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine._replSet << '\n';
+                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine._replSet;
             }
             if ( replAllDead )
-                ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-
+                ss << "\n<b>replication replAllDead=" << replAllDead << "</b>\n";
             else {
                 ss << "\nmaster: " << replSettings.master << '\n';
                 ss << "slave:  " << replSettings.slave << '\n';
