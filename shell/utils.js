@@ -316,6 +316,14 @@ String.prototype.rtrim = function() {
     return this.replace(/\s+$/,"");
 }
 
+String.prototype.startsWith = function (str){
+    return this.indexOf(str) == 0
+}
+
+String.prototype.endsWith = function (str){
+    return new RegExp( str + "$" ).test( this )
+}
+
 Number.prototype.zeroPad = function(width) {
     var str = this + '';
     while (str.length < width)
