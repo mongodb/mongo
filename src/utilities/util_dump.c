@@ -20,11 +20,13 @@ dump_forward(WT_CURSOR *cursor, int dump_key)
 		if (dump_key) {
 			if ((ret = cursor->get_key(cursor, &key)) != 0)
 				return (ret);
-			puts(key);
+			if (puts(key) == EOF)
+				return (errno);
 		}
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		puts(value);
+		if (puts(value) == EOF)
+			return (errno);
 	}
 	return (ret);
 }
@@ -39,11 +41,13 @@ dump_reverse(WT_CURSOR *cursor, int dump_key)
 		if (dump_key) {
 			if ((ret = cursor->get_key(cursor, &key)) != 0)
 				return (ret);
-			puts(key);
+			if (puts(key) == EOF)
+				return (errno);
 		}
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		puts(value);
+		if (puts(value) == EOF)
+			return (errno);
 	}
 	return (ret);
 }
@@ -259,7 +263,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	else {
-		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
+		fprintf(stderr, "%s: %s: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
