@@ -192,10 +192,10 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	int ch, dump_recno, hex, ret, reverse;
+	int ch, dump_key, hex, ret, reverse;
 	char *name;
 
-	dump_recno = hex = reverse = 0;
+	dump_key = hex = reverse = 0;
 	name = NULL;
 	while ((ch = util_getopt(argc, argv, "f:Rrx")) != EOF)
 		switch (ch) {
@@ -207,7 +207,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			}
 			break;
 		case 'R':
-			dump_recno = 1;
+			dump_key = 1;
 			break;
 		case 'r':
 			reverse = 1;
