@@ -99,41 +99,75 @@ err:		ret = 1;
 static int
 load_table(WT_SESSION *session)
 {
-	char **list, **p, *tmp;
-	int hex, ret;
+	WT_CURSOR *cursor;
+	int hex, ret, tret;
+	const char *fmt;
+	char **entry, **list, *name, *p;
 
 	if ((ret = read_schema(&list, &hex)) != 0)
 		return (ret);
 
 	/* Find the table name, and remove it from the database. */
-	for (p = list; *p != NULL; ++p)
-		if (strncmp(*p, "table:", strlen("table:")) == 0)
+	for (entry = list; *entry != NULL; ++entry)
+		if (strncmp(*entry, "table:", strlen("table:")) == 0)
 			break;
-	if (*p == NULL)
+	if (*entry == NULL)
 		return (format());
-	if ((ret = session->drop(session, *p, "force")) != 0) {
+	if ((ret = session->drop(session, *entry, "force")) != 0) {
 		fprintf(stderr, "%s: session.drop: %s: %s\n", 
-		    progname, *p, wiredtiger_strerror(ret));
+		    progname, *entry, wiredtiger_strerror(ret));
 		return (1);
 	}
+	name = *entry;
 
 	/*
 	 * Make sure the table key/value pair comes first, then we can just
 	 * run through the array in order.  (We already checked that we had
 	 * a multiple of 2 entries, so this is safe.)
 	 */
-	if (p != list) {
-		tmp = list[0]; list[0] = p[0]; p[0] = tmp;
-		tmp = list[1]; list[1] = p[1]; p[1] = tmp;
+	if (entry != list) {
+		p = list[0]; list[0] = entry[0]; entry[0] = p;
+		p = list[1]; list[1] = entry[1]; entry[1] = p;
 	}
-	for (p = list; *p != NULL; p += 2)
-		if ((ret = session->create(session, p[0], p[1])) != 0) {
+	for (entry = list; *entry != NULL; entry += 2)
+		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
 			fprintf(stderr, "%s: session.create: %s: %s\n",
-			    progname, p[0], wiredtiger_strerror(errno));
+			    progname, entry[0], wiredtiger_strerror(errno));
 			return (1);
 		}
 
-	return (0);
+	/* Open the insert cursor. */
+	if ((ret = session->open_cursor(session, name, NULL, hex ?
+	    "dump=hex,overwrite" : "dump=print,overwrite", &cursor)) != 0) {
+		fprintf(stderr, "%s: session.open: %s: %s\n", 
+		    progname, name, wiredtiger_strerror(ret));
+		return (1);
+	}
+
+	/* Find out if we're loading a table with record number primary keys. */
+	fmt = "key_format=r";
+	if ((p = strstr(list[1], fmt)) != NULL &&
+	    (p[strlen(fmt)] == '\0' || p[strlen(fmt)] == ','))
+		ret = load_col(cursor, name, 1);
+	else
+		ret = load_row(cursor, name);
+
+	/*
+	 * Technically, we don't have to close the cursor because the session
+	 * handle will do it for us, but I'd like to see the flush to disk and
+	 * the close succeed, it's better to fail early when loading files.
+	 */
+	if ((tret = cursor->close(cursor, NULL)) != 0) {
+		fprintf(stderr, "%s: cursor.close: %s: %s\n", 
+		    progname, name, wiredtiger_strerror(ret));
+		if (ret == 0)
+			ret = tret;
+	}
+	if (ret == 0 && (ret = session->sync(session, name, NULL)) != 0)
+		fprintf(stderr, "%s: session.sync: %s: %s\n", 
+		    progname, name, wiredtiger_strerror(ret));
+		
+	return (ret);
 }
 
 /*
@@ -143,37 +177,40 @@ load_table(WT_SESSION *session)
 static int
 read_schema(char ***listp, int *hexp)
 {
-	int entry, max_entry;
+	WT_BUF l;
+	int entry, eof, max_entry;
 	const char *s;
-	char *p, **list, buf[4 * 1024];
+	char **list;
+
+	memset(&l, 0, sizeof(l));
 
 	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
-	if (fgets(buf, sizeof(buf), stdin) == NULL)
-		return (format());
+	if (read_line(&l, 0, &eof))
+		return (1);
 	s = "WiredTiger Dump ";
-	if (strncmp(buf, s, strlen(s)) != 0)
+	if (strncmp(l.data, s, strlen(s)) != 0)
 		return (format());
 
-	/* Header line #2: "Format={hex,print}\n". */
-	if (fgets(buf, sizeof(buf), stdin) == NULL)
-		return (format());
-	if (strcmp(buf, "Format=print\n") != 0) {
-		if (strcmp(buf, "Format=hex\n") != 0)
+	/* Header line #2: "Format={hex,print}". */
+	if (read_line(&l, 0, &eof))
+		return (1);
+	if (strcmp(l.data, "Format=print") != 0) {
+		if (strcmp(l.data, "Format=hex") != 0)
 			return (format());
 		*hexp = 1;
 	}
 
-	/* Header line #3: "Header\n". */
-	if (fgets(buf, sizeof(buf), stdin) == NULL)
-		return (format());
-	if (strcmp(buf, "Header\n") != 0)
+	/* Header line #3: "Header". */
+	if (read_line(&l, 0, &eof))
+		return (1);
+	if (strcmp(l.data, "Header") != 0)
 		return (format());
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
-		if (fgets(buf, sizeof(buf), stdin) == NULL)
-			return (format());
-		if (strcmp(buf, "Data\n") == 0)
+		if (read_line(&l, 0, &eof))
+			return (1);
+		if (strcmp(l.data, "Data") == 0)
 			break;
 
 		/* Grow the array of header lines as necessary. */
@@ -181,11 +218,8 @@ read_schema(char ***listp, int *hexp)
 		    (list = realloc(list,
 		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
 			goto err;
-		if ((list[entry] = strdup(buf)) == NULL)
+		if ((list[entry] = strdup(l.data)) == NULL)
 			goto err;
-		if ((p = strchr(list[entry], '\n')) == NULL)
-			return (format());
-		*p = '\0';
 	}
 	list[entry] = NULL;
 	*listp = list;
@@ -222,7 +256,7 @@ load_file(WT_SESSION *session,
     const char *name, const char *config, int read_recno, int append)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	int ret, tret;
 	const char *fmt, *p;
 
 	/* Optionally remove and re-create the file. */
@@ -257,14 +291,31 @@ load_file(WT_SESSION *session,
 	    (config != NULL &&
 	    (p = strstr(config, fmt)) != NULL &&
 	    (p[strlen(fmt)] == '\0' || p[strlen(fmt)] == ',')))
-		return (load_col(cursor, name, read_recno));
+		ret = load_col(cursor, name, read_recno);
+	else
+		ret = load_row(cursor, name);
 
-	return (load_row(cursor, name));
+	/*
+	 * Technically, we don't have to close the cursor because the session
+	 * handle will do it for us, but I'd like to see the flush to disk and
+	 * the close succeed, it's better to fail early when loading files.
+	 */
+	if ((tret = cursor->close(cursor, NULL)) != 0) {
+		fprintf(stderr, "%s: cursor.close: %s: %s\n", 
+		    progname, name, wiredtiger_strerror(ret));
+		if (ret == 0)
+			ret = tret;
+	}
+	if (ret == 0 && (ret = session->sync(session, name, NULL)) != 0)
+		fprintf(stderr, "%s: session.sync: %s: %s\n", 
+		    progname, name, wiredtiger_strerror(ret));
+		
+	return (ret);
 }
 
 /*
  * load_col --
- *	Load a single column-store file.
+ *	Load a file/table with a record number key.
  */
 static int
 load_col(WT_CURSOR *cursor, const char *name, int read_recno)
@@ -317,7 +368,7 @@ load_col(WT_CURSOR *cursor, const char *name, int read_recno)
 
 /*
  * load_row --
- *	Load a single row-store file.
+ *	Load a file/table with a variable-length byte-string key.
  */
 static int
 load_row(WT_CURSOR *cursor, const char *name)
@@ -362,7 +413,7 @@ load_row(WT_CURSOR *cursor, const char *name)
 
 /*
  * read_line --
- *	Read a line from stdin into a WT_ITEM.
+ *	Read a line from stdin into a WT_BUF.
  */
 static int
 read_line(WT_BUF *l, int eof_expected, int *eofp)
