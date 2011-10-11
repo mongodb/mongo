@@ -20,7 +20,7 @@ __wt_filename(WT_SESSION_IMPL *session, const char *name, const char **path)
 	conn = S2C(session);
 
 	WT_CLEAR(tmp);
-	WT_RET(__wt_buf_sprintf(session, &tmp, "%s/%s", conn->home, name));
+	WT_RET(__wt_buf_fmt(session, &tmp, "%s/%s", conn->home, name));
 	*path = __wt_buf_steal(session, &tmp, NULL);
 	return (0);
 }

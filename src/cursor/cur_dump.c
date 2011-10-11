@@ -167,8 +167,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 			WT_ERR(__wt_cursor_get_key(cursor, &recno));
 
 		__wt_buf_init(session, &cursor->key, 0);
-		WT_ERR(__wt_buf_sprintf(session, &cursor->key,
-		    "%" PRIu64, recno));
+		WT_ERR(__wt_buf_fmt(session, &cursor->key, "%" PRIu64, recno));
 	}
 
 	va_start(ap, cursor);
