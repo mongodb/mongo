@@ -258,7 +258,9 @@ public:
             conn().runCommand(db, cmd, out);
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
-            conn().getLastError(false, false, _w);
+            if ( w > 1 ) {
+                conn().getLastError(false, false, _w);
+            }
         }
         else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
             /* Index construction is slightly special: when restoring
@@ -308,7 +310,9 @@ public:
             conn().insert( _curns , obj );
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
-            conn().getLastErrorDetailed(false, false, _w);
+            if ( _w > 1 ) {
+                conn().getLastErrorDetailed(false, false, _w);
+            }
         }
     }
 
