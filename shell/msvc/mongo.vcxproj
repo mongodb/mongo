@@ -41,10 +41,10 @@
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>\boost\lib\vs2010_32\;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSdkDir)lib;$(FrameworkSDKDir)\lib</LibraryPath>
     <ExecutablePath>$(VCInstallDir)bin;$(WindowsSdkDir)bin\NETFX 4.0 Tools;$(WindowsSdkDir)bin;$(VSInstallDir)Common7\Tools\bin;$(VSInstallDir)Common7\tools;$(VSInstallDir)Common7\ide;$(ProgramFiles)\HTML Help Workshop;$(FrameworkSDKDir)\bin;$(MSBuildToolsPath32);$(VSInstallDir);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
-    <IncludePath>..\..\..\readline\include;..\..\..\js\src\;..\..\pcre-7.4;..\..\;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSdkDir)include;$(FrameworkSDKDir)\include</IncludePath>
+    <IncludePath>..\..\..\readline\include;..\..\..\js\src\;..\..\third_party/pcre-7.4;..\..\;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSdkDir)include;$(FrameworkSDKDir)\include</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>..\..\..\readline\include;..\..\..\js\src\;..\..\pcre-7.4;..\..\;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSdkDir)include;$(FrameworkSDKDir)\include</IncludePath>
+    <IncludePath>..\..\..\readline\include;..\..\..\js\src\;..\..\third_party/pcre-7.4;..\..\;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSdkDir)include;$(FrameworkSDKDir)\include</IncludePath>
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>\boost\lib\vs2010_32\;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSdkDir)lib;$(FrameworkSDKDir)\lib</LibraryPath>
   </PropertyGroup>
@@ -53,7 +53,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>XP_WIN;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>\boost\</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
@@ -71,7 +71,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>USE_READLINE;XP_WIN;PCRE_STATIC;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_READLINE;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>\boost\</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -95,21 +95,21 @@
     <ClCompile Include="..\..\db\commands.cpp" />
     <ClCompile Include="..\..\db\lasterror.cpp" />
     <ClCompile Include="..\..\db\nonce.cpp" />
-    <ClCompile Include="..\..\pcre-7.4\pcrecpp.cc">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_compile.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_compile.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_config.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_config.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_chartables.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_chartables.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_stringpiece.cc">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_stringpiece.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -119,6 +119,8 @@
     <ClCompile Include="..\..\s\shardconnection.cpp" />
     <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_CRT_SECURE_NO_WARNINGS;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">_CRT_SECURE_NO_WARNINGS;USE_READLINE;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\util\background.cpp" />
     <ClCompile Include="..\..\util\concurrency\spin_lock.cpp" />
@@ -129,6 +131,7 @@
     <ClCompile Include="..\..\util\net\message_port.cpp" />
     <ClCompile Include="..\..\util\net\sock.cpp" />
     <ClCompile Include="..\..\util\password.cpp" />
+    <ClCompile Include="..\..\util\ramlog.cpp" />
     <ClCompile Include="..\..\util\text.cpp" />
     <ClCompile Include="..\..\util\mmap_win.cpp" />
     <ClCompile Include="..\..\util\processinfo_win32.cpp" />
@@ -139,70 +142,70 @@
     </ClCompile>
     <ClCompile Include="..\..\util\base64.cpp" />
     <ClCompile Include="..\..\util\debug_util.cpp" />
-    <ClCompile Include="..\..\pcre-7.4\pcre_dfa_exec.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_dfa_exec.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_exec.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_exec.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_fullinfo.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_fullinfo.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_get.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_get.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_globals.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_globals.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_info.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_info.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_maketables.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_maketables.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_newline.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_newline.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_ord2utf8.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_ord2utf8.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_refcount.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_refcount.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_study.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_study.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_tables.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_tables.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_try_flipped.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_try_flipped.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_ucp_searchfuncs.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_ucp_searchfuncs.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_valid_utf8.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_valid_utf8.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_version.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_version.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\pcre-7.4\pcre_xclass.c">
+    <ClCompile Include="..\..\third_party/pcre-7.4\pcre_xclass.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
