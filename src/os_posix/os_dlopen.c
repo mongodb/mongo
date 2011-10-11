@@ -65,10 +65,19 @@ __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 
 	ret = 0;
 
+	/*
+	 * FreeBSD dies inside __cxa_finalize when closing handles.
+	 *
+	 * For now, just skip the dlclose: this may leak some resources until
+	 * the process exits, but that is preferable to hard-to-debug crashes
+	 * during exit.
+	 */
+#ifndef __FreeBSD__
 	if (dlclose(dlh->handle) != 0) {
 		__wt_err(session, errno, "dlclose: %s", dlerror());
 		ret = WT_ERROR;
 	}
+#endif
 
 	__wt_free(session, dlh->name);
 	__wt_free(session, dlh);
