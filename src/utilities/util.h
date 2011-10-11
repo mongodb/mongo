@@ -38,12 +38,13 @@ extern int   util_optreset;		/* reset getopt */
 extern char *util_optarg;		/* argument associated with option */
 
 int	 util_create(WT_SESSION *, int, char *[]);
+int	 util_drop(WT_SESSION *, int, char *[]);
 int	 util_dump(WT_SESSION *, int, char *[]);
 int	 util_dumpfile(WT_SESSION *, int, char *[]);
+int	 util_getopt(int, char * const *, const char *);
 int	 util_load(WT_SESSION *, int, char *[]);
+char	*util_name(const char *, const char *, u_int);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
 int	 util_verify(WT_SESSION *, int, char *[]);
-int	 util_getopt(int, char * const *, const char *);
-char	*util_name(const char *, const char *, u_int);

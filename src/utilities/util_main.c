@@ -102,7 +102,9 @@ main(int argc, char *argv[])
 			ret = usage();
 		break;
 	case 'd':
-		if (strcmp(command, "dump") == 0)
+		if (strcmp(command, "drop") == 0)
+			ret = util_drop(session, argc, argv);
+		else if (strcmp(command, "dump") == 0)
 			ret = util_dump(session, argc, argv);
 		else if (strcmp(command, "dumpfile") == 0)
 			ret = util_dumpfile(session, argc, argv);
@@ -161,6 +163,7 @@ usage(void)
 	fprintf(stderr,
 	    "commands:\n"
 	    "\tcreate\t  create an object\n"
+	    "\tdrop\t  drop a table\n"
 	    "\tdump\t  dump a table\n"
 	    "\tdumpfile  dump a physical file in debugging format\n"
 	    "\tload\t  load a table\n"

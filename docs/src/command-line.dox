@@ -40,6 +40,18 @@ The following are command-specific options for the \c create command:
 Include a configuration string to be passed to WT_SESSION::create.
 
 
+@section utility_drop wt drop: drop a table or file
+
+The \c drop command drops the specified \c uri.  It is equivalent to a
+call to WT_SESSION::drop with the "force" configuration argument.
+
+@subsection utility_drop_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] drop uri</code>
+
+@subsection utility_drop_options Options
+There are no command-specific options for the \c drop command.
+
+
 @section utility_dump wt dump: export data in a text format
 
 The \c dump command outputs the specified table in a portable format

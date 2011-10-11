@@ -7,12 +7,19 @@ lib_LTLIBRARIES = libwiredtiger.la
 LDADD = $(lib_LTLIBRARIES)
 
 bin_PROGRAMS = wt
-wt_SOURCES = src/utilities/util_create.c src/utilities/util_dump.c \
-	src/utilities/util_dumpfile.c src/utilities/util_getopt.c \
-	src/utilities/util_load.c src/utilities/util_main.c \
-	src/utilities/util_printlog.c src/utilities/util_salvage.c \
-	src/utilities/util_stat.c src/utilities/util_verify.c \
-	src/utilities/util_verbose.c
+wt_SOURCES =\
+	src/utilities/util_create.c \
+	src/utilities/util_drop.c \
+	src/utilities/util_dump.c \
+	src/utilities/util_dumpfile.c \
+	src/utilities/util_getopt.c \
+	src/utilities/util_load.c \
+	src/utilities/util_main.c \
+	src/utilities/util_printlog.c \
+	src/utilities/util_salvage.c \
+	src/utilities/util_stat.c \
+	src/utilities/util_verbose.c \
+	src/utilities/util_verify.c
 
 include_HEADERS= wiredtiger.h
 INCLUDES = -I$(srcdir)/src/include
