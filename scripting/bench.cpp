@@ -650,7 +650,7 @@ namespace mongo {
         // Get new BenchRunner object
         BenchRunner* runner = BenchRunner::get( args );
 
-        sleepsecs( runner->config.seconds );
+        sleepsecs( static_cast<int>( runner->config.seconds ) );
 
         return BenchRunner::finish( runner );
 
