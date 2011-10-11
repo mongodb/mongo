@@ -813,7 +813,7 @@ ShardingTest.prototype.stop = function(){
     }
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){
-            this._rs[i].test.stopSet( 15 );
+            if( this._rs[i] ) this._rs[i].test.stopSet( 15 );
         }
     }
     if ( this._alldbpaths ){
