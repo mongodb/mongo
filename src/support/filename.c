@@ -12,18 +12,15 @@
  *	Build a filename in a scratch buffer.
  */
 int
-__wt_filename(WT_SESSION_IMPL *session, const char *name, WT_BUF **retp)
+__wt_filename(WT_SESSION_IMPL *session, const char *name, const char **path)
 {
-	WT_BUF *tmp;
+	WT_BUF tmp;
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 
-	WT_RET(__wt_scr_alloc(
-	    session, (uint32_t)(strlen(conn->home) + strlen(name) + 2), &tmp));
-	(void)snprintf(tmp->mem, tmp->memsize, "%s/%s", conn->home, name);
-	tmp->size = (uint32_t)strlen(tmp->data);
-
-	*retp = tmp;
+	WT_CLEAR(tmp);
+	WT_RET(__wt_buf_sprintf(session, &tmp, "%s/%s", conn->home, name));
+	*path = __wt_buf_steal(session, &tmp, NULL);
 	return (0);
 }

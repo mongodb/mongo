@@ -564,7 +564,7 @@ extern int __wt_file_format(WT_SESSION_IMPL *session);
 extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,
-    WT_BUF **retp);
+    const char **path);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);

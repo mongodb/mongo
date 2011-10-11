@@ -14,16 +14,15 @@
 int
 __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
 {
-	WT_BUF *tmp;
+	const char *path;
 	struct stat sb;
 	int ret;
 
-	WT_RET(__wt_filename(session, name, &tmp));
-	name = tmp->data;
+	WT_RET(__wt_filename(session, name, &path));
 
-	SYSCALL_RETRY(stat(name, &sb), ret);
+	SYSCALL_RETRY(stat(path, &sb), ret);
 
-	__wt_scr_free(&tmp);
+	__wt_free(session, path);
 
 	if (ret == 0) {
 		*existp = 1;

@@ -15,7 +15,7 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
-	WT_BUF *tmp;
+	const char *path;
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
 	int f, fd, matched, ret;
@@ -42,8 +42,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (matched)
 		return (0);
 
-	WT_RET(__wt_filename(session, name, &tmp));
-	name = tmp->data;
+	WT_RET(__wt_filename(session, name, &path));
 
 	f = O_RDWR;
 #ifdef O_BINARY
@@ -54,7 +53,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		f |= O_CREAT;
 
 	for (;;) {
-		if ((fd = open(name, f, mode)) != -1)
+		if ((fd = open(path, f, mode)) != -1)
 			break;
 
 		switch (errno) {
@@ -110,7 +109,7 @@ err:		if (fh != NULL) {
 			(void)close(fd);
 	}
 
-	__wt_scr_free(&tmp);
+	__wt_free(session, path);
 	return (ret);
 }
 
