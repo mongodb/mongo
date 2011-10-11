@@ -1062,7 +1062,9 @@ jsTestLog = function(msg){
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
-        if (__callLastError) {
+        // Make sure that we have a db var before we use it
+        // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
+        if (__callLastError && typeof( db ) != "undefined" && db.getMongo ) {
             __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
             var err = db.getLastError(1);
