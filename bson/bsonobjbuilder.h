@@ -758,6 +758,7 @@ namespace mongo {
         }
 
         int len() const { return _b.len(); }
+        int arrSize() const { return _i; }
 
     private:
         void fill( const StringData& name ) {

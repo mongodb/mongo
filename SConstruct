@@ -759,6 +759,7 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+moduleFiles = {}
 for x in os.listdir( "third_party" ):
     if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
         continue
@@ -768,7 +769,7 @@ for x in os.listdir( "third_party" ):
 
 
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles }
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
     
     options_topass["windows"] = windows
     options_topass["nix"] = nix
@@ -1168,7 +1169,7 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
-    mongo = shellEnv.Program( "mongo" , coreShellFiles )
+    mongo = shellEnv.Program( "mongo" , moduleFiles["pcre"] + coreShellFiles )
 
 
 #  ---- RUNNING TESTS ----
