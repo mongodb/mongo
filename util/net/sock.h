@@ -212,6 +212,8 @@ namespace mongo {
         
         void setTimeout( double secs );
 
+        bool stillConnected();
+
 #ifdef MONGO_SSL
         /** secures inline */
         void secure( SSLManager * ssl );
@@ -226,8 +228,11 @@ namespace mongo {
         
     private:
         void _init();
+
         /** raw send, same semantics as ::send */
+    public:
         int _send( const char * data , int len );
+    private:
         
         /** sends dumbly, just each buffer at a time */
         void _send( const vector< pair< char *, int > > &data, const char *context );

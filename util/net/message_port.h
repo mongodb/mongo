@@ -37,7 +37,7 @@ namespace mongo {
         virtual HostAndPort remote() const = 0;
         virtual unsigned remotePort() const = 0;
 
-    private:
+        virtual void assertStillConnected() = 0;
 
     public:
         // TODO make this private with some helpers
@@ -88,6 +88,7 @@ namespace mongo {
         unsigned remotePort() const { return Socket::remotePort(); }
         virtual HostAndPort remote() const;
 
+        void assertStillConnected();
 
     private:
         

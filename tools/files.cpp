@@ -48,6 +48,7 @@ public:
     }
 
     virtual void printExtraHelp( ostream & out ) {
+        out << "Browse and modify a GridFS filesystem.\n" << endl;
         out << "usage: " << _name << " [options] command [gridfs filename]" << endl;
         out << "command:" << endl;
         out << "  one of (list|search|put|get)" << endl;

@@ -1167,7 +1167,7 @@ namespace mongo {
                 if( tot > 1000 ) {
                     static int n;
                     DEV if( n++ == 0 ) 
-                        log() << "warning already writable too often" << endl;
+                        log() << "warning upgradeToWritable: already in writable too often" << endl;
                 }
             }
         }

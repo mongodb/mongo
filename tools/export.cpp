@@ -45,6 +45,10 @@ public:
         _usesstdout = false;
     }
 
+    virtual void printExtraHelp( ostream & out ) {
+        out << "Export MongoDB data to CSV, TSV or JSON files.\n" << endl;
+    }
+
     // Turn every double quote character into two double quote characters
     // If hasSurroundingQuotes is true, doesn't escape the first and last
     // characters of the string, if it's false, add a double quote character

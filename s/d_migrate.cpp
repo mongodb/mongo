@@ -488,7 +488,7 @@ namespace mongo {
                 scoped_spinlock lk( _trackerLocks );
                 set<DiskLoc>::iterator i = _cloneLocs.begin();
                 for ( ; i!=_cloneLocs.end(); ++i ) {
-                    if (tracker.ping()) // should I yield?
+                    if (tracker.intervalHasElapsed()) // should I yield?
                         break;
 
                     DiskLoc dl = *i;

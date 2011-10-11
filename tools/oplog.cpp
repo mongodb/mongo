@@ -43,6 +43,10 @@ public:
         ;
     }
 
+    virtual void printExtraHelp(ostream& out) {
+        out << "Pull and replay a remote MongoDB oplog.\n" << endl;
+    }
+
     int run() {
 
         if ( ! hasParam( "from" ) ) {

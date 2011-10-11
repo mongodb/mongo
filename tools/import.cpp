@@ -273,6 +273,10 @@ public:
         _jsonArray = false;
     }
 
+    virtual void printExtraHelp( ostream & out ) {
+        out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
+    }
+
     int run() {
         string filename = getParam( "file" );
         long long fileSize = 0;

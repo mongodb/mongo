@@ -42,6 +42,10 @@ namespace mongo {
 
             _autoreconnect = true;
         }
+
+        virtual void printExtraHelp( ostream & out ) {
+            out << "View live MongoDB collection statistics.\n" << endl;
+        }
         
         BSONObj getData() {
             BSONObj out;

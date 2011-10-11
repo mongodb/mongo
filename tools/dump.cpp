@@ -47,6 +47,10 @@ public:
         ;
     }
 
+    virtual void printExtraHelp(ostream& out) {
+        out << "Export MongoDB data to BSON files.\n" << endl;
+    }
+
     // This is a functor that writes a BSONObj to a file
     struct Writer {
         Writer(FILE* out, ProgressMeter* m) :_out(out), _m(m) {}
