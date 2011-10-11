@@ -317,73 +317,117 @@ namespace mongo {
     ExpressionAdd::~ExpressionAdd() {
     }
 
+    intrusive_ptr<Expression> ExpressionAdd::optimize() {
+	intrusive_ptr<Expression> pE(ExpressionNary::optimize());
+	ExpressionAdd *pA = dynamic_cast<ExpressionAdd *>(pE.get());
+	if (pA) {
+	    /* don't create a circular reference */
+	    if (pA != this)
+		pA->pAdd = this;
+	}
+
+	return pE;
+    }
+
     intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
         intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
     ExpressionAdd::ExpressionAdd():
-        ExpressionNary() {
+        ExpressionNary(),
+        useOriginal(false) {
     }
 
     intrusive_ptr<const Value> ExpressionAdd::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        /*
-          We'll try to return the narrowest possible result value.  To do that
-          without creating intermediate Values, do the arithmetic for double
-          and integral types in parallel, tracking the current narrowest
-          type.
-         */
         unsigned stringCount = 0;
+	unsigned nonConstStringCount = 0;
         unsigned dateCount = 0;
         const size_t n = vpOperand.size();
+	vector<intrusive_ptr<const Value> > vpValue; /* evaluated operands */
+
+	/* use the original, if we've been told to do so */
+	if (useOriginal) {
+	    return pAdd->evaluate(pDocument);
+	}
 
         for (size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-            if (pValue->getType() == String)
+            intrusive_ptr<const Value> pValue(
+		vpOperand[i]->evaluate(pDocument));
+	    vpValue.push_back(pValue);
+
+	    BSONType valueType = pValue->getType();
+            if (valueType == String) {
                 ++stringCount;
-            if (pValue->getType() == Date) {
+		if (!dynamic_cast<ExpressionConstant *>(vpOperand[i].get()))
+		    ++nonConstStringCount;
+	    }
+            else if (valueType == Date)
                 ++dateCount;
-            }
         }
+
         /* 
-        We don't allow adding two dates because it doesn't make sense especially
-        since they are in epoch time. However, if there is a string present then
-        we would be appending the dates to a string so having many would not be 
-        not a problem.
+	   We don't allow adding two dates because it doesn't make sense
+	   especially since they are in epoch time. However, if there is a
+	   string present then we would be appending the dates to a string so
+	   having many would not be not a problem.
         */
-        if ((dateCount > 1) && !stringCount){
+        if ((dateCount > 1) && !stringCount) {
             assert(false); // CW TODO user error: can't add two dates
             return Value::getNull();
         }
-            
-        
+
+	/*
+	  If there are non-constant strings, and we've got a copy of the
+	  original, then use that from this point forward.  This is necessary
+	  to keep the order of strings the same for string concatenation;
+	  constant-folding would violate the order preservation.
+
+	  This is a one-way conversion we do if we see one of these.  It is
+	  possible that these could vary from document to document, but any
+	  sane schema probably isn't going to do that, so once we see a string,
+	  we can probably assume they're going to be strings all the way down.
+	 */
+	if (nonConstStringCount && pAdd.get()) {
+	    useOriginal = true;
+	    return pAdd->evaluate(pDocument);
+	}
+
         if (stringCount) {
             stringstream stringTotal;
             for (size_t i = 0; i < n; ++i) {
-                intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                intrusive_ptr<const Value> pValue(vpValue[i]);
                 stringTotal << pValue->coerceToString();
             }
+
             return Value::createString(stringTotal.str());
         }
 
         if (dateCount) {
             long long dateTotal = 0;
             for (size_t i = 0; i < n; ++i) {
-                intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+                intrusive_ptr<const Value> pValue(vpValue[i]);
                 if (pValue->getType() == Date) 
                     dateTotal += pValue->coerceToDate();
                 else 
                     dateTotal += pValue->coerceToDouble()*24*60*60*1000;
             }
+
             return Value::createDate(Date_t(dateTotal));
         }
 
+        /*
+          We'll try to return the narrowest possible result value.  To do that
+          without creating intermediate Values, do the arithmetic for double
+          and integral types in parallel, tracking the current narrowest
+          type.
+         */
         double doubleTotal = 0;
         long long longTotal = 0;
         BSONType totalType = NumberInt;
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            intrusive_ptr<const Value> pValue(vpValue[i]);
 
             totalType = Value::getWidestNumeric(totalType, pValue->getType());
             doubleTotal += pValue->coerceToDouble();
@@ -2010,7 +2054,8 @@ namespace mongo {
     }
 
     intrusive_ptr<Expression> ExpressionNary::optimize() {
-	size_t nConst = 0; // count of constant operands
+	unsigned constCount = 0; // count of constant operands
+	unsigned stringCount = 0; // count of constant string operands
 	const size_t n = vpOperand.size();
 	for(size_t i = 0; i < n; ++i) {
 	    intrusive_ptr<Expression> pNew(vpOperand[i]->optimize());
@@ -2019,8 +2064,13 @@ namespace mongo {
 	    vpOperand[i] = pNew;
 
 	    /* check to see if the result was a constant */
-	    if (dynamic_cast<ExpressionConstant *>(pNew.get()))
-		++nConst;
+	    const ExpressionConstant *pConst =
+		dynamic_cast<ExpressionConstant *>(pNew.get());
+	    if (pConst) {
+		++constCount;
+		if (pConst->getValue()->getType() == String)
+		    ++stringCount;
+	    }
 	}
 
 	/*
@@ -2029,7 +2079,7 @@ namespace mongo {
 	  expression over a NULL Document because evaluating the
 	  ExpressionConstant never refers to the argument Document.
 	*/
-	if (nConst == n) {
+	if (constCount == n) {
 	    intrusive_ptr<const Value> pResult(
 		evaluate(intrusive_ptr<Document>()));
 	    intrusive_ptr<Expression> pReplacement(
@@ -2037,6 +2087,22 @@ namespace mongo {
 	    return pReplacement;
 	}
 
+	/*
+	  If there are any strings, we can't re-arrange anything, so stop
+	  now.
+
+	  LATER:  we could concatenate adjacent strings as a special case.
+	 */
+	if (stringCount)
+	    return intrusive_ptr<Expression>(this);
+
+	/*
+	  If there's no more than one constant, then we can't do any
+	  constant folding, so don't bother going any further.
+	 */
+	if (constCount <= 1)
+	    return intrusive_ptr<Expression>(this);
+	    
 	/*
 	  If the operator isn't commutative or associative, there's nothing
 	  more we can do.  We test that by seeing if we can get a factory;
