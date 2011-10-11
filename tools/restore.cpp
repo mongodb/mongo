@@ -60,6 +60,7 @@ public:
     }
 
     virtual void printExtraHelp(ostream& out) {
+        out << "Import BSON files into MongoDB.\n" << endl;
         out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
     }
 

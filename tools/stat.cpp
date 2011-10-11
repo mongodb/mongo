@@ -55,6 +55,7 @@ namespace mongo {
         }
 
         virtual void printExtraHelp( ostream & out ) {
+            out << "View live MongoDB performance statistics.\n" << endl;
             out << "usage: " << _name << " [options] [sleep time]" << endl;
             out << "sleep time: time to wait (in seconds) between calls" << endl;
         }
