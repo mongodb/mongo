@@ -52,11 +52,19 @@ namespace mongo {
 
         bool haveCursor() { return cursor.get() != 0; }
 
+        /** this is ok but commented out as when used one should consider if QueryOption_OplogReplay
+           is needed; if not fine, but if so, need to change.
+        *//*
         void query(const char *ns, const BSONObj& query) {
             assert( !haveCursor() );
             cursor.reset( _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk).release() );
-        }
+        }*/
 
+        /** this can be used; it is commented out as it does not indicate
+            QueryOption_OplogReplay and that is likely important.  could be uncommented
+            just need to add that.
+            */
+        /*
         void queryGTE(const char *ns, OpTime t) {
             BSONObjBuilder q;
             q.appendDate("$gte", t.asDate());
@@ -64,6 +72,7 @@ namespace mongo {
             q2.append("ts", q.done());
             query(ns, q2.done());
         }
+        */
 
         void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0) {
             assert( !haveCursor() );

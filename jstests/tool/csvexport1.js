@@ -27,7 +27,7 @@ assert.soon ( 3 + " == c.count()", "after import");
 
 // Note: Exporting and Importing to/from CSV is not designed to be round-trippable
 expected = []
-expected.push({ a : 1, b : "ObjectID(" + objId.toString() + ")", c : "[ 1, 2, 3 ]", d : "{ \"a\" : \"hello\", \"b\" : \"world\" }", e : "-"})
+expected.push({ a : 1, b : "ObjectID(" + objId.valueOf() + ")", c : "[ 1, 2, 3 ]", d : "{ \"a\" : \"hello\", \"b\" : \"world\" }", e : "-"})
 expected.push({ a : -2.0, b : "", c : "$MinKey", d : "Then he said, \"Hello World!\"", e : 3})
 expected.push({ a : "D76DF8", b : "2009-08-27T00:00:00Z", c : "{ \"t\" : 1000 , \"i\" : 9876 }", d : "/foo*\\\"bar\\\"/i", e : tojson(function foo() { print("Hello World!"); })})
 

@@ -19,7 +19,7 @@
 #include "processinfo.h"
 #include <iostream>
 #include <psapi.h>
-
+#include "../bson/bsonobjbuilder.h"
 using namespace std;
 
 int getpid() {
@@ -57,7 +57,20 @@ namespace mongo {
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
-    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
+        MEMORYSTATUSEX mse;
+        mse.dwLength = sizeof(mse);
+        PROCESS_MEMORY_COUNTERS pmc;
+        if( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) ) {
+            info.append("page_faults", static_cast<int>(pmc.PageFaultCount));
+            info.append("usagePageFileMB", static_cast<int>(pmc.PagefileUsage / 1024 / 1024));
+        }
+        if( GlobalMemoryStatusEx( &mse ) ) {
+            info.append("totalPageFileMB", static_cast<int>(mse.ullTotalPageFile / 1024 / 1024));
+            info.append("availPageFileMB", static_cast<int>(mse.ullAvailPageFile / 1024 / 1024));
+            info.append("ramMB", static_cast<int>(mse.ullTotalPhys / 1024 / 1024));
+        }
+    }
 
     bool ProcessInfo::blockCheckSupported() {
         return false;

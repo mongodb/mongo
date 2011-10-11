@@ -305,14 +305,15 @@ namespace mongo {
             b.append( "fsync", 1 );
         if ( j )
             b.append( "j", 1 );
-        if ( wtimeout > 0 )
-            b.append( "wtimeout", wtimeout );
 
         // only affects request when greater than one node
         if ( w >= 1 )
             b.append( "w", w );
         else if ( w == -1 )
             b.append( "w", "majority" );
+
+        if ( wtimeout > 0 )
+            b.append( "wtimeout", wtimeout );
 
         runCommand("admin", b.obj(), info);
 

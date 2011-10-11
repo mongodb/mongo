@@ -213,6 +213,7 @@ namespace mongo {
                 
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
+                    log() << "replSet requerying oplog after cursor not found condition, ts: " << ts.toStringPretty() << endl;
                     r.resetCursor();
                     r.tailingQueryGTE(rsoplog, ts);
                     if( r.haveCursor() ) {

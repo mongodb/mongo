@@ -231,6 +231,7 @@ namespace mongo {
                     ChunkPtr c = manager->findChunk( o );
                     LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                     insert( c->getShard() , ns , o , flags, safe);
+                    c->splitIfShould( o.objsize() );
                     break;
                 }
                 catch ( StaleConfigException& e ) {

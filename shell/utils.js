@@ -543,17 +543,21 @@ if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
 ObjectId.prototype.toString = function(){
-    return this.str;
+    return "ObjectId(" + tojson(this.str) + ")";
 }
 
 ObjectId.prototype.tojson = function(){
-    return "ObjectId(\"" + this.str + "\")";
+    return this.toString();
+}
+
+ObjectId.prototype.valueOf = function(){
+    return this.str;
 }
 
 ObjectId.prototype.isObjectId = true;
 
 ObjectId.prototype.getTimestamp = function(){
-    return new Date(parseInt(this.toString().slice(0,8), 16)*1000);
+    return new Date(parseInt(this.valueOf().slice(0,8), 16)*1000);
 }
 
 ObjectId.prototype.equals = function( other){
@@ -569,15 +573,19 @@ if ( typeof( DBPointer ) != "undefined" ){
     }
     
     DBPointer.prototype.tojson = function(indent){
-        return tojson({"ns" : this.ns, "id" : this.id}, indent);
+        return this.toString();
     }
 
     DBPointer.prototype.getCollection = function(){
         return this.ns;
     }
     
-    DBPointer.prototype.toString = function(){
-        return "DBPointer " + this.ns + ":" + this.id;
+    DBPointer.prototype.getId = function(){
+        return this.id;
+    }
+ 
+     DBPointer.prototype.toString = function(){
+        return "DBPointer(" + tojson(this.ns) + ", " + tojson(this.id) + ")";
     }
 }
 else {
@@ -593,24 +601,52 @@ if ( typeof( DBRef ) != "undefined" ){
     }
     
     DBRef.prototype.tojson = function(indent){
-        return tojson({"$ref" : this.$ref, "$id" : this.$id}, indent);
+        return this.toString();
     }
 
     DBRef.prototype.getCollection = function(){
         return this.$ref;
     }
     
+    DBRef.prototype.getRef = function(){
+        return this.$ref;
+    }
+
+    DBRef.prototype.getId = function(){
+        return this.$id;
+    }
+
     DBRef.prototype.toString = function(){
-        return this.tojson();
+        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + ")";
     }
 }
 else {
     print( "warning: no DBRef" );
 }
 
+if ( typeof( Timestamp ) != "undefined" ){
+    Timestamp.prototype.tojson = function () {
+        return this.toString();
+    }
+
+    Timestamp.prototype.getTime = function () {
+        return this.t;
+    }
+
+    Timestamp.prototype.getInc = function () {
+        return this.i;
+    }
+
+    Timestamp.prototype.toString = function () {
+        return "Timestamp(" + this.t + ", " + this.i + ")";
+    }
+}
+else {
+    print( "warning: no Timestamp class" );
+}
+
 if ( typeof( BinData ) != "undefined" ){
     BinData.prototype.tojson = function () {
-        //return "BinData type: " + this.type + " len: " + this.len;
         return this.toString();
     }
     
@@ -620,17 +656,11 @@ if ( typeof( BinData ) != "undefined" ){
     
     BinData.prototype.length = function () {
         return this.len;
-    }    
+    } 
 }
 else {
     print( "warning: no BinData class" );
 }
-
-/*if ( typeof( UUID ) != "undefined" ){
-    UUID.prototype.tojson = function () {
-        return this.toString();
-    }
-}*/
 
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );

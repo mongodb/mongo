@@ -135,10 +135,10 @@ namespace mongo {
         throw UserException( 8001 , (string)"SyncClusterConnection write op failed: " + err.str() );
     }
 
-    BSONObj SyncClusterConnection::getLastErrorDetailed() {
+    BSONObj SyncClusterConnection::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
         if ( _lastErrors.size() )
             return _lastErrors[0];
-        return DBClientBase::getLastErrorDetailed();
+        return DBClientBase::getLastErrorDetailed(fsync,j,w,wtimeout);
     }
 
     void SyncClusterConnection::_connect( string host ) {
