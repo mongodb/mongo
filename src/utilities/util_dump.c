@@ -11,95 +11,39 @@
 static int usage(void);
 
 static inline int
-next_col(WT_CURSOR *cursor)
-{
-	const char *value;
-	int ret;
-
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		printf("%s\n", value);
-	}
-	return (ret);
-}
-
-static inline int
-prev_col(WT_CURSOR *cursor)
-{
-	const char *value;
-	int ret;
-
-	while ((ret = cursor->prev(cursor)) == 0) {
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		printf("%s\n", value);
-	}
-	return (ret);
-}
-
-static inline int
-next_col_recno(WT_CURSOR *cursor)
-{
-	uint64_t recno;
-	const char *value;
-	int ret;
-
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &recno)) != 0)
-			return (ret);
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		printf("%" PRIu64 "\n%s\n", recno, value);
-	}
-	return (ret);
-}
-
-static inline int
-prev_col_recno(WT_CURSOR *cursor)
-{
-	uint64_t recno;
-	const char *value;
-	int ret;
-
-	while ((ret = cursor->prev(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &recno)) != 0)
-			return (ret);
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		printf("%" PRIu64 "\n%s\n", recno, value);
-	}
-	return (ret);
-}
-
-static inline int
-next_row(WT_CURSOR *cursor)
+dump_forward(WT_CURSOR *cursor, int dump_key)
 {
 	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (ret);
+		if (dump_key) {
+			if ((ret = cursor->get_key(cursor, &key)) != 0)
+				return (ret);
+			puts(key);
+		}
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		printf("%s\n%s\n", key, value);
+		puts(value);
 	}
 	return (ret);
 }
 
 static inline int
-prev_row(WT_CURSOR *cursor)
+dump_reverse(WT_CURSOR *cursor, int dump_key)
 {
 	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->prev(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (ret);
+		if (dump_key) {
+			if ((ret = cursor->get_key(cursor, &key)) != 0)
+				return (ret);
+			puts(key);
+		}
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (ret);
-		printf("%s\n%s\n", key, value);
+		puts(value);
 	}
 	return (ret);
 }
@@ -229,11 +173,11 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	int ch, dump_recno, ret, reverse;
+	int ch, dump_key, ret, reverse;
 	const char *fmt;
 	char *name;
 
-	dump_recno = reverse = 0;
+	dump_key = reverse = 0;
 	name = NULL;
 	fmt = "dump=print";
 	while ((ch = util_getopt(argc, argv, "f:kxr")) != EOF)
@@ -246,7 +190,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			}
 			break;
 		case 'k':
-			dump_recno = 1;
+			dump_key = 1;
 			break;
 		case 'x':
 			fmt = "dump=hex";
@@ -269,7 +213,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 
 	if (strncmp(name, "table:", strlen("table:")) == 0) {
-		dump_recno = 1;
+		dump_key = 1;
 
 		printf("WiredTiger Dump %s\n",
 		    wiredtiger_version(NULL, NULL, NULL));
@@ -286,27 +230,13 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-	/*
-	 * Looking inside the cursor at the key format feels sleazy, but I can't
-	 * think of any reason I'm not allowed to do that.
-	 */
-	if (cursor->key_format[0] == 'r' && cursor->key_format[1] == '\0') {
-		if (dump_recno) {
-			if (reverse)
-				ret = prev_col_recno(cursor);
-			else
-				ret = next_col_recno(cursor);
-		} else {
-			if (reverse)
-				ret = prev_col(cursor);
-			else
-				ret = next_col(cursor);
-		}
-	} else
-		if (reverse)
-			ret = prev_row(cursor);
-		else
-			ret = next_row(cursor);
+	if (strcmp(cursor->key_format, "r") != 0)
+		dump_key = 1;
+
+	if (reverse)
+		ret = dump_reverse(cursor, dump_key);
+	else
+		ret = dump_forward(cursor, dump_key);
 
 	if (ret == WT_NOTFOUND)
 		ret = 0;

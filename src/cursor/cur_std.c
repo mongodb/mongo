@@ -38,8 +38,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 
-	fmt = cursor->key_format;
-	if (fmt[0] == 'r' && fmt[1] == '\0') {
+	if (WT_CURSOR_RECNO(cursor)) {
 		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->raw_recno_buf;
@@ -50,6 +49,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, va_list ap)
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
+		fmt = cursor->key_format;
 		if (F_ISSET(cursor,
 		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
 			fmt = "u";
@@ -107,8 +107,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	/* Fast path some common cases: single strings or byte arrays. */
-	fmt = cursor->key_format;
-	if (fmt[0] == 'r' && fmt[1] == '\0') {
+	if (WT_CURSOR_RECNO(cursor)) {
 		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 			item = va_arg(ap, WT_ITEM *);
 			WT_ERR(__wt_struct_unpack(session,

@@ -144,7 +144,7 @@ __convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM item;
+	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
 	int key_recno, ret;
 	uint64_t recno;
@@ -152,9 +152,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
-	key_recno =
-	    cursor->key_format[0] == 'r' &&
-	    cursor->key_format[1] == '\0' ? 1 : 0;
+	key_recno = (strcmp(cursor->key_format, "r") == 0);
 
 	if (!key_recno || F_ISSET(cursor, WT_CURSTD_RAW)) {
 		if (F_ISSET(cursor, WT_CURSTD_TABLE))
@@ -163,20 +161,25 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 			WT_ERR(__wt_cursor_get_key(cursor, &item));
 
 		WT_ERR(__raw_to_dump(cursor, &item, &cursor->key));
-
-		va_start(ap, cursor);
-		*va_arg(ap, const char **) = cursor->key.data;
-		va_end(ap);
 	} else {
 		if (F_ISSET(cursor, WT_CURSTD_TABLE))
 			WT_ERR(__wt_curtable_get_key(cursor, &recno));
 		else
 			WT_ERR(__wt_cursor_get_key(cursor, &recno));
 
-		va_start(ap, cursor);
-		*va_arg(ap, uint64_t *) = recno;
-		va_end(ap);
+		__wt_buf_init(session, &cursor->key, 0);
+		WT_ERR(__wt_buf_sprintf(session, &cursor->key,
+		    "%" PRIu64, recno));
 	}
+
+	va_start(ap, cursor);
+	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		itemp = va_arg(ap, WT_ITEM *);
+		itemp->data = cursor->key.data;
+		itemp->size = cursor->key.size;
+	} else
+		*va_arg(ap, const char **) = cursor->key.data;
+	va_end(ap);
 
 err:	API_END(session);
 	return (ret);
@@ -189,7 +192,7 @@ err:	API_END(session);
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM item;
+	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
@@ -204,7 +207,12 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	WT_ERR(__raw_to_dump(cursor, &item, &cursor->value));
 
 	va_start(ap, cursor);
-	*va_arg(ap, const char **) = cursor->value.data;
+	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		itemp = va_arg(ap, WT_ITEM *);
+		itemp->data = cursor->value.data;
+		itemp->size = cursor->value.size;
+	} else
+		*va_arg(ap, const char **) = cursor->value.data;
 	va_end(ap);
 
 err:	API_END(session);
