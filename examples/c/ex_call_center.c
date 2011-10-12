@@ -74,7 +74,7 @@ int main(void)
 	 * created below.
 	 */
 	ret = session->create(session, "table:customers",
-	    "key_format=r,"
+	    "key_format=S,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
 	    "colgroups=(main,address)");
@@ -108,14 +108,16 @@ int main(void)
 	ret = session->create(session, "index:calls:cust_date",
 	    "columns=(cust_id,call_date)");
 
-	/* Populate the tables with some data. */
+	/* Populate the customers table with some data. */
 	ret = session->open_cursor(
 	    session, "table:customers", NULL, NULL, &cursor);
 
+	cursor->set_key(cursor, "customer #1");
 	cursor->set_value(cursor,
 	    "Professor Oak", "LeafGreen Avenue", "123-456-7890");
 	ret = cursor->insert(cursor);
 
+	cursor->set_key(cursor, "customer #2");
 	cursor->set_value(cursor, "Lorelei", "Sevii Islands", "098-765-4321");
 	ret = cursor->insert(cursor);
 
