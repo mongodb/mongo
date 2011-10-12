@@ -509,7 +509,7 @@ Array.stdDev = function( arr ){
 
 if( typeof Array.isArray != "function" ){
     Array.isArray = function( arr ){
-        return arr.constructor == Array
+        return arr != undefined && arr.constructor == Array
     }
 }
 
