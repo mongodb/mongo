@@ -449,6 +449,16 @@ namespace mongo {
 	return ExpressionAdd::create;
     }
 
+    void ExpressionAdd::toBson(
+	BSONObjBuilder *pBuilder, const char *pOpName, unsigned depth) const {
+
+	if (pAdd)
+	    pAdd->toBson(pBuilder, pOpName, depth);
+	else
+	    ExpressionNary::toBson(pBuilder, pOpName, depth);
+    }
+
+
     /* ------------------------- ExpressionAnd ----------------------------- */
 
     ExpressionAnd::~ExpressionAnd() {

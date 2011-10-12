@@ -252,7 +252,6 @@ namespace mongo {
 
         vector<intrusive_ptr<Expression> > vpOperand;
 
-    private:
 	/*
 	  Add the expression to the builder.
 
@@ -263,8 +262,8 @@ namespace mongo {
 	  @params pBuilder the (blank) builder to add the expression to
 	  @params pOpName the name of the operator
 	 */
-	void toBson(BSONObjBuilder *pBuilder, const char *pOpName,
-		    unsigned depth) const;
+	virtual void toBson(BSONObjBuilder *pBuilder,
+			    const char *pOpName, unsigned depth) const;
     };
 
 
@@ -287,6 +286,11 @@ namespace mongo {
           @returns addition expression
          */
         static intrusive_ptr<ExpressionNary> create();
+
+    protected:
+	// virtuals from ExpressionNary
+	virtual void toBson(BSONObjBuilder *pBuilder,
+			    const char *pOpName, unsigned depth) const;
 
     private:
         ExpressionAdd();

@@ -1114,8 +1114,39 @@ var p19result = [
 assert(arrayEq(p19.result, p19result), 'p19 failed');
 
 
+db.vartype.drop();
+db.vartype.save({ x : 17, y : "foo"});
 
+// just passing through fields
+var p20 = db.runCommand(
+{ aggregate : "vartype", pipeline : [
+    { $project : {
+	all_numbers : { $add:[1, "$x", 2, "$x"] },
+	string_fields : { $add:[3, "$y", 4, "$y"] },
+	number_fields : { $add:["a", "$x", "b", "$x"] },
+	all_strings : { $add:["c", "$y", "d", "$y"] },
+	potpourri_1 : { $add:[5, "$y", "e", "$x"] },
+	potpourri_2 : { $add:[6, "$x", "f", "$y"] },
+	potpourri_3 : { $add:["g", "$y", 7, "$x"] },
+	potpourri_4 : { $add:["h", "$x", 8, "$y"] },
+	_id: 0
+    }}
+]});
 
+var p20result = [
+    {
+        "all_numbers" : 37,
+        "string_fields" : "3foo4foo",
+        "number_fields" : "a17b17",
+        "all_strings" : "cfoodfoo",
+        "potpourri_1" : "5fooe17",
+        "potpourri_2" : "617ffoo",
+        "potpourri_3" : "gfoo717",
+        "potpourri_4" : "h178foo"
+    }
+];
+
+assert(arrayEq(p20.result, p20result), 'p20 failed');
 
 
 // simple matching
