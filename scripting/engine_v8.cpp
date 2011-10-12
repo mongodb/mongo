@@ -1431,7 +1431,8 @@ namespace mongo {
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_DBPTR ).IsEmpty() ) {
                 OID oid;
-                oid.init( toSTLString( value->ToObject()->Get( getV8Str( "id" ) ) ) );
+                Local<Value> theid = value->ToObject()->Get( getV8Str( "id" ) );
+                oid.init( toSTLString( theid->ToObject()->Get(getV8Str("str")) ) );
                 string ns = toSTLString( value->ToObject()->Get( getV8Str( "ns" ) ) );
                 b.appendDBRef( sname, ns, oid );
             }
