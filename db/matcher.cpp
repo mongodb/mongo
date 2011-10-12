@@ -371,13 +371,14 @@ namespace mongo {
             return;   
         }
 
-        if ( strcmp(e.fieldName(), "$where")==0 ) {
+        const char *fn = e.fieldName();
+        if ( str::equals(fn, "$where") ) {
             parseWhere(e);
             return;
         }
 
         if ( e.type() == RegEx ) {
-            addRegex( e.fieldName(), e.regex(), e.regexFlags() );
+            addRegex( fn, e.regex(), e.regexFlags() );
             return;
         }
         
@@ -440,10 +441,12 @@ namespace mongo {
         if ( e.type() == Array ) {
             _hasArray = true;
         }
-        else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
-            uassert( 14844, "$atomic specifier must be a top level field", !nested );
-            _atomic = e.trueValue();
-            return;
+        else if( *fn == '$' ) {
+            if( str::equals(fn, "$atomic") || str::equals(fn, "$isolated") ) {
+                uassert( 14844, "$atomic specifier must be a top level field", !nested );
+                _atomic = e.trueValue();
+                return;
+            }
         }
         
         // normal, simple case e.g. { a : "foo" }
