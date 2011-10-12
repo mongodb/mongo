@@ -117,7 +117,9 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
+	fmt = F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
+	    "u" : cursor->key_format;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (strcmp(fmt, "r") == 0) {
 		cursor->recno = va_arg(ap, uint64_t);
