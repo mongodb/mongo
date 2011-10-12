@@ -12,7 +12,6 @@ static int cursor_err(const char *, const char *, int);
 static int schema(WT_SESSION *, const char *);
 static int schema_file(WT_CURSOR *, const char *);
 static int schema_table(WT_CURSOR *, const char *);
-static int sys_err(void);
 static int usage(void);
 
 static inline int
@@ -27,7 +26,7 @@ dump_forward(WT_CURSOR *cursor, const char *name)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (cursor_err(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
-			return (sys_err());
+			return (util_syserr());
 	}
 	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "next", ret));
 }
@@ -44,7 +43,7 @@ dump_reverse(WT_CURSOR *cursor, const char *name)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (cursor_err(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
-			return (sys_err());
+			return (util_syserr());
 	}
 	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "prev", ret));
 }
@@ -179,7 +178,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			return (cursor_err(uri, "get_key", ret));
 		if ((buf = strdup(key)) == NULL)
-			return (sys_err());
+			return (util_syserr());
 			
 		/* Check for the dump table's column groups or indices. */
 		if ((p = strchr(buf, ':')) == NULL)
@@ -198,11 +197,11 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 			return (cursor_err(uri, "get_value", ret));
 		if (elem == list_elem && (list = realloc(list,
 		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
-			return (sys_err());
+			return (util_syserr());
 		if ((list[elem].key = strdup(key)) == NULL)
-			return (sys_err());
+			return (util_syserr());
 		if ((list[elem].value = strdup(value)) == NULL)
-			return (sys_err());
+			return (util_syserr());
 		++elem;
 	}
 	if (ret != WT_NOTFOUND)
@@ -300,13 +299,6 @@ cursor_err(const char *name, const char *op, int ret)
 {
 	fprintf(stderr, "%s: %s: cursor.%s: %s\n",
 	    progname, name, op, wiredtiger_strerror(ret));
-	return (1);
-}
-
-static int
-sys_err(void)
-{
-	fprintf(stderr, "%s: %s\n", progname, wiredtiger_strerror(errno));
 	return (1);
 }
 

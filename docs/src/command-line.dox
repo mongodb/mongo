@@ -98,14 +98,15 @@ file.
 @section utility_load wt load: load data into a file or table
 
 The \c load command reads the standard input for data and loads it into
-the specified file or table.  The data should be the format produced by
-the \c dump command; see @ref dump_formats for details.
+a file or table, creating the file or table if it does not yet exist.
+The data should be the format produced by the \c dump command; see @ref
+dump_formats for details.
 
-Data already existing in the file or table will be overwritten by the
-new data (use the \c -s option for a "safe" load).
+If the file or table already exists, data in the file or table may be
+overwritten by the new data (use the \c -s option for a "safe" load).
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-as] [-c config] [-f input] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-as] [-f input] [-n name] [uri configuration ...]</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
@@ -116,18 +117,24 @@ ignored and the data is appended to the object and assigned new record
 number keys.  The \c -a option is only applicable when loading an object
 where the primary key is a record number.
 
-@par <code>-c</code>
-Include a configuration string to be passed to WT_SESSION::create when
-the object is re-created.
-
 @par <code>-f</code>
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
+
+@par <code>-n</code>
+By default, the \c load command uses the file or table name taken from
+the input; the \c -n option specifies a new name to be used instead.
 
 @par <code>-s</code>
 By default, input data overwrites existing data where the key/value pair
 already exists in the object; the \c -s option causes any attempt to
 overwrite data to fail.
+
+Additionally, \c uri and \c configuration pairs may be specified to the
+\c load command.  Each of these pairs may be used to modify the
+configuration of an object in the file or table.  For each of the pairs,
+the configuration string will be appended to the WT_SESSION::create call
+for the object matching the uri.
 
 
 @section utility_printlog wt printlog: output the database log

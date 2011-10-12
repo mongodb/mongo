@@ -47,4 +47,5 @@ char	*util_name(const char *, const char *, u_int);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
+int	 util_syserr(void);
 int	 util_verify(WT_SESSION *, int, char *[]);

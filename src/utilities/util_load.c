@@ -13,29 +13,23 @@ static int load_data(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
 static int read_schema(char ***, int *);
+static int schema_update(char **);
 static int usage(void);
 
-static int append;		/* Append (ignore record number keys). */
-static int safe;		/* Safe (don't overwrite existing data). */
+static int	append;		/* -a append (ignore record number keys) */
+static int	safe;		/* -s safe (don't overwrite existing data) */
+static char    *cmdname;	/* -n name (object's name, or rename) */
+static char   **cmdconfig;	/* configuration pairs */
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch, ret;
-	const char *config;
-	char *name;
+	int ch;
 
-	ret = 0;
-	config = NULL;
-	name = NULL;
-
-	while ((ch = util_getopt(argc, argv, "ac:f:s")) != EOF)
+	while ((ch = util_getopt(argc, argv, "af:n:s")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
-			break;
-		case 'c':	/* command-line table configuration option */
-			config = util_optarg;
 			break;
 		case 'f':	/* input file */
 			if (freopen(util_optarg, "r", stdin) == NULL) {
@@ -43,6 +37,9 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 				    progname, util_optarg, strerror(errno));
 				return (1);
 			}
+			break;
+		case 'n':	/* -n name (object's name, or rename) */
+			cmdname = util_optarg;
 			break;
 		case 's':	/* safe (don't overwrite existing data) */
 			safe = 1;
@@ -54,33 +51,14 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	ret = load_dump(session);
-
-#if 0
-	} else {
-		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
-			goto err;
-
-		if (append && config != NULL) {
-			fprintf(stderr,
-			    "%s: the -a option to the load command causes the "
-			    "-c option to be ignored\n",
-			    progname);
-			return (1);
-		}
-static int load_file(WT_SESSION *, const char *, const char *, int, int);
-		ret = load_file(session, name, config, read_recno, append);
-	}
-	if (0) {
-err:		ret = 1;
+	/* The remaining arguments are configuration uri/string pairs. */
+	if (argc != 0) {
+		if (argc % 2 != 0)
+			return (usage());
+		cmdconfig = argv;
 	}
 
-#endif
-
-	if (name != NULL)
-		free(name);
-
-	return (ret);
+	return (load_dump(session));
 }
 
 /*
@@ -92,8 +70,9 @@ load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	int hex, ret, tret;
-	char **entry, **list, *p, *uri, config[64];
+	char **entry, **list, *p, *uri, curconfig[64];
 
+	/* Read the schema file. */
 	if ((ret = read_schema(&list, &hex)) != 0)
 		return (ret);
 
@@ -125,20 +104,24 @@ load_dump(WT_SESSION *session)
 		p = list[0]; list[0] = entry[0]; entry[0] = p;
 		p = list[1]; list[1] = entry[1]; entry[1] = p;
 	}
-	uri = list[0];
 
+	/* Update the schema based on any command-line configuration. */
+	if ((ret = schema_update(list)) != 0)
+		return (ret);
+
+	uri = list[0];
 	for (entry = list; *entry != NULL; entry += 2)
 		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
 			fprintf(stderr, "%s: session.create: %s: %s\n",
-			    progname, entry[0], wiredtiger_strerror(errno));
+			    progname, entry[0], wiredtiger_strerror(ret));
 			return (1);
 		}
 
 	/* Open the insert cursor. */
-	(void)snprintf(config, sizeof(config),
+	(void)snprintf(curconfig, sizeof(curconfig),
 	    "dump=%s,%s", hex ? "hex" : "print", safe ? "" : "overwrite");
-	if ((ret =
-	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {
+	if ((ret = session->open_cursor(
+	    session, uri, NULL, curconfig, &cursor)) != 0) {
 		fprintf(stderr, "%s: session.open: %s: %s\n", 
 		    progname, uri, wiredtiger_strerror(ret));
 		return (1);
@@ -223,9 +206,9 @@ read_schema(char ***listp, int *hexp)
 		if ((max_entry == 0 || entry == max_entry - 1) &&
 		    (list = realloc(list,
 		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
-			goto err;
+			return (util_syserr());
 		if ((list[entry] = strdup(l.data)) == NULL)
-			goto err;
+			return (util_syserr());
 	}
 	list[entry] = NULL;
 	*listp = list;
@@ -236,9 +219,81 @@ read_schema(char ***listp, int *hexp)
 
 	/* Leak the memory, I don't care. */
 	return (0);
+}
 
-err:	fprintf(stderr, "%s: %s\n", progname, wiredtiger_strerror(errno));
-	return (1);
+/*
+ * schema_update --
+ *	Reconcile and update the command line configuration against the
+ * schema we found.
+ */
+static int
+schema_update(char **list)
+{
+	size_t len;
+	int found;
+	char *buf, **p, *sep, **t;
+
+#define MATCH(s, tag)                                           	\
+	(strncmp(s, tag, strlen(tag)) == 0)
+
+	/*
+	 * If the object has been renamed, replace all of the column group,
+	 * index, file and table names with the new name.
+	 */
+	if (cmdname != NULL)
+		for (t = list; *t != NULL; t += 2) {
+			if (!MATCH(*t, "colgroup:") &&
+			    !MATCH(*t, "file:") &&
+			    !MATCH(*t, "index:") &&
+			    !MATCH(*t, "table:"))
+				continue;
+
+			/* Allocate room. */
+			len = strlen(*t) + strlen(cmdname) + 10;
+			if ((buf = malloc(len)) == NULL)
+				return (util_syserr());
+
+			/*
+			 * Find the separating colon characters, but not the
+			 * trailing one may not be there.
+			 */
+			sep = strchr(*t, ':');
+			*sep = '\0';
+			sep = strchr(sep + 1, ':');
+			snprintf(buf, len, "%s:%s%s",
+			    *t, cmdname, sep == NULL ? "" : sep);
+			*t = buf;
+		}
+
+	/*
+	 * If there were command-line configuration pairs, walk the list of
+	 * command-line URIs and find a matching dump URI.  For each match,
+	 * append the command-line configuration to the dump configuration.
+	 * It is an error if a command-line URI doesn't find a match, that's
+	 * likely a mistake.
+	 */
+	for (p = cmdconfig; cmdconfig != NULL && *p != NULL; p += 2) {
+		found = 0;
+		for (t = list; *t != NULL; t += 2)
+			if (strncmp(*p, t[0], strlen(*p)) == 0) {
+				found = 1;
+				len = strlen(p[1]) + strlen(t[1]) + 10;
+				if ((buf = malloc(len)) == NULL)
+					return (util_syserr());
+				snprintf(buf, len, "%s,%s", t[1], p[1]);
+				t[1] = buf;
+			}
+		if (!found) {
+			fprintf(stderr,
+			    "%s: the command line object name %s was not "
+			    "matched by any loaded object name",
+			    progname, *p);
+			return (1);
+		}
+	}
+
+	/* Leak the memory, I don't care. */
+	return (0);
 }
 
 /*
@@ -403,11 +458,8 @@ read_line(WT_BUF *l, int eof_expected, int *eofp)
 		 */
 		if (l->memsize == 0 || len >= l->memsize - 1) {
 			if ((l->mem =
-			    realloc(l->mem, l->memsize + 1024)) == NULL) {
-				fprintf(stderr, "%s: %s\n",
-				    progname, wiredtiger_strerror(errno));
-				return (1);
-			}
+			    realloc(l->mem, l->memsize + 1024)) == NULL)
+				return (util_syserr());
 			l->memsize += 1024;
 		}
 		((uint8_t *)l->mem)[len] = (uint8_t)ch;
@@ -425,7 +477,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "load [-aR] [-c table-config] [-f input-file] uri\n",
+	    "load [-as] [-f input-file] [-n name] [object configuration ...]\n",
 	    progname, usage_prefix);
 	return (1);
 }
