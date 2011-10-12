@@ -395,10 +395,12 @@ stbar
 stdarg
 stderr
 stdout
+str
 strdup
 strerror
 stringin
 strndup
+strtouq
 struct
 structs
 subgetraw
