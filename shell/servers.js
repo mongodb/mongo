@@ -72,6 +72,277 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
+
+MongoRunner = function(){}
+    
+MongoRunner.dataDir = "/data/db"
+MongoRunner.dataPath = "/data/db/"
+MongoRunner.usedPortMap = {}
+MongoRunner.logicalOptions = { runId : true,
+                               pathOpts : true, 
+                               remember : true,
+                               noRemember : true,
+                               appendOptions : true,
+                               restart : true,
+                               noCleanData : true,
+                               cleanData : true,
+                               forceLock : true,
+                               useLogFiles : true,
+                               useHostName : true,
+                               useHostname : true }
+
+MongoRunner.toRealPath = function( path, pathOpts ){
+    
+    // Replace all $pathOptions with actual values
+    pathOpts = pathOpts || {}
+    path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
+    path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
+    for( key in pathOpts ){
+        path = path.replace( RegExp( "\\$" + key, "g" ), pathOpts[ key ] )
+    }
+    
+    // Relative path
+    if( ! path.startsWith( "/" ) ){
+        if( path != "" && ! path.endsWith( "/" ) )
+            path += "/"
+                
+        path = MongoRunner.dataPath + path
+    }
+    
+    return path
+    
+}
+
+MongoRunner.toRealDir = function( path, pathOpts ){
+    
+    path = MongoRunner.toRealPath( path, pathOpts )
+    
+    if( path.endsWith( "/" ) )
+        path = path.substring( 0, path.length - 1 )
+        
+    return path
+}
+
+MongoRunner.toRealFile = MongoRunner.toRealDir
+
+MongoRunner.nextOpenPort = function(){
+
+    var i = 0;
+    while( __usedPortMap[ "" + ( 27000 + i ) ] ) i++;
+    return 27000 + i
+
+}
+
+MongoRunner.arrOptions = function( binaryName , args ){
+
+    var fullArgs = [ binaryName ]
+
+    if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
+
+        var o = isObject( args ) ? args : args[0]
+        for ( var k in o ){
+            
+            if( ! o.hasOwnProperty(k) || k in MongoRunner.logicalOptions ) continue
+            
+            if ( ( k == "v" || k == "verbose" ) && isNumber( o[k] ) ){
+                var n = o[k]
+                if ( n > 0 ){
+                    if ( n > 10 ) n = 10
+                    var temp = "-"
+                    while ( n-- > 0 ) temp += "v"
+                    fullArgs.push( temp )
+                }
+            }
+            else {
+                if( o[k] == undefined || o[k] == null ) continue
+                fullArgs.push( "--" + k )
+                if ( o[k] != "" )
+                    fullArgs.push( "" + o[k] ) 
+            }
+        } 
+    }
+    else {
+        for ( var i=0; i<args.length; i++ )
+            fullArgs.push( args[i] )
+    }
+
+    return fullArgs
+}
+
+MongoRunner.arrToOpts = function( arr ){
+        
+    var opts = {}
+    for( var i = 1; i < arr.length; i++ ){
+        if( arr[i].startsWith( "-" ) ){
+            var opt = arr[i].replace( /^-/, "" ).replace( /^-/, "" )
+            
+            if( arr.length > i + 1 && ! arr[ i + 1 ].startsWith( "-" ) ){
+                opts[ opt ] = arr[ i + 1 ]
+                i++
+            }
+            else{
+                opts[ opt ] = ""
+            }
+            
+            if( opt.replace( /v/g, "" ) == "" ){
+                opts[ "verbose" ] = opt.length
+            }
+        }
+    }
+    
+    return opts
+}
+
+MongoRunner.savedOptions = {}
+
+MongoRunner.mongoOptions = function( opts ){
+    
+    // Initialize and create a copy of the opts
+    opts = Object.merge( opts || {}, {} )
+    
+    if( ! opts.restart ) opts.restart = false
+    
+    // RunId can come from a number of places
+    if( isObject( opts.restart ) ){
+        opts.runId = opts.restart
+        opts.restart = true
+    }
+    
+    if( isObject( opts.remember ) ){
+        opts.runId = opts.remember
+        opts.remember = true
+    }
+    
+    if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
+    
+    // Create a new runId
+    opts.runId = opts.runId || ObjectId()
+    
+    var shouldRemember = ( ! opts.restart && ! opts.noRemember ) || ( opts.restart && opts.appendOptions )
+    
+    if ( shouldRemember ){
+        MongoRunner.savedOptions[ opts.runId ] = Object.merge( opts, {} )
+    }
+    
+    opts.port = opts.port || nextOpenPort
+    opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
+    
+    return opts
+}
+
+MongoRunner.mongodOptions = function( opts ){
+    
+    opts = MongoRunner.mongoOptions( opts )
+    
+    opts.dbpath = MongoRunner.toRealDir( opts.dbpath || "$dataDir/mongod-$port",
+                                         opts.pathOpts )
+                                         
+    opts.pathOpts = Object.merge( opts.pathOpts, { dbpath : opts.dbpath } )
+    
+    if( ! opts.logFile && opts.useLogFiles ){
+        opts.logFile = opts.dbpath + "/mongod.log"
+    }
+    else if( opts.logFile ){
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+    }
+    
+    if( jsTestOptions().noJournalPrealloc )
+        opts.nopreallocj = ""
+            
+    if( jsTestOptions().noJournal )
+        opts.nojournal = ""
+            
+    return opts
+}
+
+MongoRunner.mongosOptions = function( opts ){
+    
+    opts = MongoRunner.mongoOptions( opts )
+    
+    opts.pathOpts = Object.merge( opts.pathOpts, 
+                                { configdb : opts.configdb.replace( /:|,/g, "-" ) } )
+    
+    if( ! opts.logFile && opts.useLogFiles ){
+        opts.logFile = MongoRunner.toRealFile( "$dataDir/mongos-$configdb-$port.log",
+                                               opts.pathOpts )
+    }
+    else if( opts.logFile ){
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+    }
+    
+    return opts
+}
+
+MongoRunner.runMongod = function( opts ){
+    
+    var useHostName = false
+    var runId = null
+    if( isObject( opts ) ) {
+        
+        opts = MongoRunner.mongodOptions( opts )
+        
+        useHostName = opts.useHostName || opts.useHostname
+        runId = opts.runId
+        
+        if( opts.forceLock ) removeFile( opts.dbpath + "/mongod.lock" )
+        if( opts.cleanData || ( ! opts.restart && ! opts.noCleanData ) ) resetDbpath( opts.dbpath )
+        
+        opts = MongoRunner.arrOptions( "mongod", opts )
+    }
+    
+    var mongod = startMongoProgram.apply( null, opts )
+    mongod.commandLine = MongoRunner.arrToOpts( opts )
+    mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port
+    mongod.host = mongod.name
+    mongod.port = parseInt( mongod.commandLine.port )
+    mongod.runId = runId || ObjectId()
+    mongod.savedOptions = MongoRunner.savedOptions[ mongod.runId ]
+    
+    return mongod
+}
+
+MongoRunner.runMongos = function( opts ){
+    
+    var useHostName = false
+    var runId = null
+    if( isObject( opts ) ) {
+        
+        opts = MongoRunner.mongosOptions( opts )
+        
+        useHostName = opts.useHostName || opts.useHostname
+        runId = opts.runId
+        
+        opts = MongoRunner.arrOptions( "mongos", opts )
+    }
+    
+    var mongos = startMongoProgram.apply( null, opts )
+    mongos.commandLine = MongoRunner.arrToOpts( opts )
+    mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port
+    mongos.host = mongos.name
+    mongos.port = parseInt( mongos.commandLine.port ) 
+    mongos.runId = runId || ObjectId()
+    mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ]
+    
+    return mongos
+}
+
+MongoRunner.stopMongod = function( port, signal ){
+    
+    signal = signal || 15
+    
+    if( port.port )
+        port = parseInt( port.port )
+    
+    if( port instanceof ObjectId ){
+        var opts = MongoRunner.savedOptions( port )
+        if( opts ) port = parseInt( opts.port )
+    }
+        
+    return stopMongod( parseInt( port ), parseInt( signal ) )
+}
+
+MongoRunner.stopMongos = MongoRunner.stopMongod
+
 __nextPort = 27000;
 startMongodTest = function (port, dirname, restart, extraOptions ) {
     if (!port)
@@ -183,112 +454,227 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     
     // Check if testName is an object, if so, pull params from there
     var keyFile = undefined
-    if( testName && ! testName.charAt ){
-        var params = testName
+    otherParams = Object.merge( otherParams || {}, {} )
+    otherParams.extraOptions = otherParams.extraOptions || {}
+    
+    if( isObject( testName ) ){
+        
+        var params = Object.merge( testName, {} )
+        
         testName = params.name || "test"
+        
+        otherParams = Object.merge( params.other || {}, {} )
+        otherParams.extraOptions = otherParams.extraOptions || {}
+        
         numShards = params.shards || 2
         verboseLevel = params.verbose || 0
         numMongos = params.mongos || 1
-        otherParams = params.other || {}
-        keyFile = params.keyFile || otherParams.keyFile
+        
+        keyFile = params.keyFile || otherParams.keyFile || otherParams.extraOptions.keyFile
+        otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
+        otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
+        
+        // Allow specifying options like :
+        // { mongos : [ { noprealloc : "" } ], config : [ { smallfiles : "" } ], shards : { rs : true, d : true } } 
+        if( isObject( numShards ) ){
+            var len = 0
+            for( var i in numShards ){
+                otherParams[ "" + i + len ] = numShards[i]
+                len++
+            }
+            numShards = len
+        }
+        
+        if( isObject( numMongos ) ){
+            var len = 0
+            for( var i in numMongos ){
+                otherParams[ "" + i + len ] = numMongos[i]
+                len++
+            }
+            numMongos = len
+        }
+        else if( Array.isArray( numMongos ) ){
+            for( var i = 0; i < numMongos.length; i++ )
+                otherParams[ "m" + i ] = numMongos[i]
+            numMongos = numMongos.length
+        }
+        
+        if( isObject( params.config ) ){
+            var len = 0
+            for( var i in params.config ){
+                otherParams[ "" + i + len ] = params.config[i]
+                len++
+            }
+            
+            // If we're specifying explicit config options, we need separate config servers
+            otherParams.separateConfig = true
+            if( len == 3 ) otherParams.sync = true
+            else otherParams.sync = false
+        }
+        else if( Array.isArray( params.config ) ){
+            for( var i = 0; i < params.config.length; i++ )
+                otherParams[ "c" + i ] = params.config[i]
+            
+            // If we're specifying explicit config options, we need separate config servers
+            otherParams.separateConfig = true
+            if( params.config.length == 3 ) otherParams.sync = true
+            else otherParams.sync = false
+        }
+    }
+    else {
+        // Handle legacy stuff
+        keyFile = otherParams.extraOptions.keyFile
+    }
+
+    this._testName = testName
+    
+    var pathOpts = this.pathOpts = { testName : testName }
+
+    if( otherParams.rs ){
+        otherParams.separateConfig = true
+        otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname
     }
     
-    this._testName = testName;
-
-    if ( ! otherParams )
-        otherParams = {}
-    this._connections = [];
-    
-    if ( otherParams.sync && numShards < 3 )
-        throw "if you want sync, you need at least 3 servers";
-
     var localhost = otherParams.useHostname ? getHostName() : "localhost";
 
     this._alldbpaths = []
-    
-    if ( otherParams.rs ){
-        localhost = getHostName();
-        // start replica sets
-        this._rs = []
-        for ( var i=0; i<numShards; i++){
+    this._connections = []
+    this._shardServers = this._connections
+    this._rs = []
+    this._rsObjects = []
+        
+    for ( var i = 0; i < numShards; i++ ) {
+        if( otherParams.rs || otherParams["rs" + i] ){
+            
+            otherParams.separateConfig = true
+            
             var setName = testName + "-rs" + i;
             
-            var rsDefaults = { oplogSize : 40, nodes : 3 }
-            var rsParams = otherParams["rs" + i]
+            rsDefaults = { useHostname : otherParams.useHostname,
+                           oplogSize : 40,
+                           nodes : 3,
+                           pathOpts : Object.merge( pathOpts, { shard : i } ) }
             
-            for( var param in rsParams ){
-                rsDefaults[param] = rsParams[param]
-            }
-
+            rsDefaults = Object.merge( rsDefaults, otherParams.rs )
+            rsDefaults = Object.merge( rsDefaults, otherParams.rsOptions )
+            rsDefaults = Object.merge( rsDefaults, otherParams["rs" + i] )
+            
             var numReplicas = rsDefaults.nodes || otherParams.numReplicas || 3
-            delete rsDefaults.nodes 
+            delete rsDefaults.nodes
+            
+            print( "Replica set test!" )
             
             var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), keyFile : keyFile } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
             
-        }
-
-        for ( var i=0; i<numShards; i++){
-            var rs = this._rs[i].test;
-            rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
-            rs.awaitReplication();
-	    var xxx = new Mongo( rs.getURL() );
-	    xxx.name = rs.getURL();
-            this._connections.push( xxx );
-        }
-        
-        this._configServers = []
-        for ( var i=0; i<3; i++ ){            
-            var options = otherParams.extraOptions
-            if( keyFile ) options["keyFile"] = keyFile
-            var conn = startMongodTest( 30000 + i , testName + "-config" + i, false, options );
-            this._alldbpaths.push( testName + "-config" + i )
-            this._configServers.push( conn );
-        }
-
-        this._configDB = localhost + ":30000," + localhost + ":30001," + localhost + ":30002";
-        this._configConnection = new Mongo( this._configDB );
-        if (!otherParams.noChunkSize) {
-            this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
-        }
-    }
-    else {
-        for ( var i=0; i<numShards; i++){
-            var options = { useHostname : otherParams.useHostname }
-            if( keyFile ) options["keyFile"] = keyFile
-            var conn = startMongodTest( 30000 + i , testName + i, 0, options );
-            this._alldbpaths.push( testName +i )
-            this._connections.push( conn );
-        }
-
-        if ( otherParams.sync ){
-            this._configDB = localhost+":30000,"+localhost+":30001,"+localhost+":30002";
-            this._configConnection = new Mongo( this._configDB );
-            this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
+            this._rsObjects[i] = rs
+            
+            this._alldbpaths.push( null )
+            this._connections.push( null )
         }
         else {
-            this._configDB = localhost + ":30000";
-            this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+            var options = { useHostname : otherParams.useHostname,
+                            port : 30000 + i,
+                            pathOpts : Object.merge( pathOpts, { shard : i } ),
+                            dbpath : "$testName$shard",
+                            keyFile : keyFile
+                          }
+            
+            options = Object.merge( options, otherParams.shardOptions )
+            options = Object.merge( options, otherParams["d" + i] )
+            
+            var conn = MongoRunner.runMongod( options );
+            
+            this._alldbpaths.push( testName +i )
+            this._connections.push( conn );
+            this["shard" + i] = conn
+            
+            this._rs[i] = null
+            this._rsObjects[i] = null
         }
     }
+        
+    // Do replication on replica sets if required
+    for ( var i = 0; i < numShards; i++ ){
+        if( ! otherParams.rs && ! otherParams["rs" + i] ) continue
+        
+        var rs = this._rs[i].test;
+        
+        rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
+        rs.awaitReplication();
+        
+        var rsConn = new Mongo( rs.getURL() );
+        rsConn.name = rs.getURL();
+        this._connections[i] = rsConn
+        this["shard" + i] = rsConn
+    }
     
-    this._mongos = [];
-    var startMongosPort = 31000;
-    for ( var i=0; i<(numMongos||1); i++ ){
-        var myPort =  startMongosPort - i;
-        print("ShardingTest config: "+this._configDB);
-        var opts = { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB };
-        if( keyFile ) opts["keyFile"] = keyFile
-        for (var j in otherParams.extraOptions) {
-            opts[j] = otherParams.extraOptions[j];
+    
+    this._configServers = []
+    this._configNames = []
+    
+    if ( otherParams.sync && ! otherParams.separateConfig && numShards < 3 )
+        throw "if you want sync, you need at least 3 servers";
+    
+    for ( var i = 0; i < ( otherParams.sync ? 3 : 1 ) ; i++ ) {
+        
+        var conn = null
+        
+        if( otherParams.separateConfig ){
+            
+            var options = { useHostname : otherParams.useHostname, 
+                            port : 40000 + i,
+                            pathOpts : Object.merge( pathOpts, { config : i } ),
+                            dbpath : "$testName-config$config",
+                            keyFile : keyFile
+                          }
+            
+            options = Object.merge( options, otherParams.configOptions )
+            options = Object.merge( options, otherParams["c" + i] )
+                        
+            var conn = MongoRunner.runMongod( options )
+            
+            // TODO:  Needed?
+            this._alldbpaths.push( testName + "-config" + i )
         }
-        var conn = startMongos( opts );
-        conn.name = localhost + ":" + myPort;
+        else{
+            conn = this["shard" + i]
+        }
+        
+        this._configServers.push( conn );
+        this._configNames.push( conn.name )
+        this["config" + i] = conn
+    }
+    
+    printjson( this._configDB = this._configNames.join( "," ) )
+    this._configConnection = new Mongo( this._configDB )
+    if ( ! otherParams.noChunkSize ) {
+        this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || otherParams.chunkSize || 50 } )
+    }
+
+    print( "ShardingTest " + this._testName + " :\n" + tojson( { config : this._configDB, shards : this._connections } ) );
+    
+    this._mongos = []
+    this._mongoses = this._mongos
+    for ( var i = 0; i < ( ( numMongos == 0 ? -1 : numMongos ) || 1 ); i++ ){
+        
+        var options = { useHostname : otherParams.useHostname, 
+                        port : 31000 - i - 1,
+                        pathOpts : Object.merge( pathOpts, { mongos : i } ),
+                        configdb : this._configDB,
+                        verbose : verboseLevel || 0,
+                        keyFile : keyFile
+                      }
+
+        options = Object.merge( options, otherParams.mongosOptions )
+        options = Object.merge( options, otherParams.extraOptions )
+        options = Object.merge( options, otherParams["m" + i] )
+        
+        var conn = MongoRunner.runMongos( options )
+
         this._mongos.push( conn );
-        if ( i == 0 ) {
-            this.s = conn;
-        }
+        if ( i == 0 ) this.s = conn
         this["s" + i] = conn
     }
 
@@ -296,6 +682,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     this.config = this.s.getDB( "config" );
 
     if ( ! otherParams.manualAddShard ){
+        this._shardNames = []
+        var shardNames = this._shardNames
         this._connections.forEach(
             function(z){
                 var n = z.name;
@@ -304,9 +692,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                     if ( ! n )
                         n = z;
                 }
-                print( "ShardingTest going to add shard: " + n )
+                print( "ShardingTest " + this._testName + " going to add shard : " + n )
                 x = admin.runCommand( { addshard : n } );
                 printjson( x )
+                shardNames.push( x.shardAdded )
             }
         );
     }
@@ -424,7 +813,7 @@ ShardingTest.prototype.stop = function(){
     }
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){
-            this._rs[i].test.stopSet( 15 );
+            if( this._rs[i] ) this._rs[i].test.stopSet( 15 );
         }
     }
     if ( this._alldbpaths ){
@@ -520,7 +909,7 @@ printShardingStatus = function( configDB , verbose ){
     
     var version = configDB.getCollection( "version" ).findOne();
     if ( version == null ){
-        print( "printShardingStatus: not a shard db!" );
+        print( "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a mongos from the shell and not to a mongod." );
         return;
     }
     
@@ -560,7 +949,8 @@ printShardingStatus = function( configDB , verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
-                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) + " " +
+                                                ( chunk.jumbo ? "jumbo " : "" ) );
                                     }
                                 );
                             }
@@ -760,8 +1150,8 @@ ShardingTest.prototype.isSharded = function( collName ){
 
 ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
     
-    split = split || key;
-    move = move || split;
+    split = ( split != false ? ( split || key ) : split )
+    move = ( split != false && move != false ? ( move || split ) : false )
     
     if( collName.getDB )
         dbName = "" + collName.getDB()
@@ -782,12 +1172,16 @@ ShardingTest.prototype.shardGo = function( collName , key , split , move , dbNam
         assert( false )
     }
     
+    if( split == false ) return
+    
     result = this.s.adminCommand( { split : c , middle : split } );
     if( ! result.ok ){
         printjson( result )
         assert( false )
     }
         
+    if( move == false ) return
+    
     var result = null
     for( var i = 0; i < 5; i++ ){
         result = this.s.adminCommand( { movechunk : c , find : move , to : this.getOther( this.getServer( dbName ) ).name } );
@@ -808,6 +1202,28 @@ ShardingTest.prototype.setBalancer = function( balancer ){
     else if( balancer == false ){
         this.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true )
     }
+}
+
+ShardingTest.prototype.stopBalancer = function( timeout, interval ) {
+    this.setBalancer( false )
+    
+    if( typeof db == "undefined" ) db = undefined
+    var oldDB = db
+    
+    db = this.config
+    sh.waitForBalancer( false, timeout, interval )
+    db = oldDB
+}
+
+ShardingTest.prototype.startBalancer = function( timeout, interval ) {
+    this.setBalancer( true )
+    
+    if( typeof db == "undefined" ) db = undefined
+    var oldDB = db
+    
+    db = this.config
+    sh.waitForBalancer( true, timeout, interval )
+    db = oldDB
 }
 
 /**
@@ -973,6 +1389,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     
     for ( var k in extra ){
         var v = extra[k];
+        if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
         if ( v != null )
             a.push( v );                    
@@ -1277,7 +1694,8 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
     
     for ( var k in extra ){
-        var v = extra[k];        
+        var v = extra[k];
+        if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
         if ( v != null ){
             if( v.replace ){
@@ -1651,7 +2069,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
         printjson(options)
                 
     var o = this.getOptions( n , options , restart && ! startClean );
-
+    
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
     print("ReplSetTest " + o );
     
@@ -1854,7 +2272,11 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             printjson( status )
             lastTime = new Date().getTime()
         }
-        
+
+        if (typeof status.members == 'undefined') {
+            return false;
+        }
+
         for( var i = 0; i < status.members.length; i++ ){
             if( status.members[i].name == node.host ){
                 for( var j = 0; j < states.length; j++ ){

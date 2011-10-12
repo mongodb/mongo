@@ -29,6 +29,9 @@
 #include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
+#include "../util/concurrency/threadlocal.h"
+#include "../db/client_common.h"
+#include "../util/net/message_port.h"
 
 namespace mongo {
 
@@ -40,12 +43,12 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
 
-    extern boost::thread_specific_ptr<Client> currentClient;
+    TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
 
     /** the database's concept of an outside "client" */
-    class Client : boost::noncopyable {
+    class Client : public ClientBasic {
     public:
         class Context;
 
@@ -59,6 +62,12 @@ namespace mongo {
            call this when your thread starts.
         */
         static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
+
+        static void initThreadIfNotAlready(const char *desc) { 
+            if( currentClient.get() )
+                return;
+            initThread(desc);
+        }
 
         ~Client();
 
@@ -85,8 +94,11 @@ namespace mongo {
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
         const char *desc() const { return _desc; }
-        void setLastOp( ReplTime op ) { _lastOp = op; }
-        ReplTime getLastOp() const { return _lastOp; }
+        void setLastOp( OpTime op ) { _lastOp = op; }
+        OpTime getLastOp() const { return _lastOp; }
+
+        /** caution -- use Context class instead */
+        void setContext(Context *c) { _context = c; }
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;
@@ -94,6 +106,8 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         string toString() const;
         void gotHandshake( const BSONObj& o );
+        bool hasRemote() const { return _mp; }
+        HostAndPort getRemote() const { assert( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
@@ -108,7 +122,7 @@ namespace mongo {
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
-        ReplTime _lastOp;
+        OpTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
@@ -116,6 +130,16 @@ namespace mongo {
         Client(const char *desc, AbstractMessagingPort *p = 0);
 
         friend class CurOp;
+
+        unsigned _sometimes;
+
+    public:
+        /** the concept here is the same as MONGO_SOMETIMES.  however that 
+            macro uses a static that will be shared by all threads, and each 
+            time incremented it might eject that line from the other cpu caches (?),
+            so idea is that this is better.
+            */
+        bool sometimes(unsigned howOften) { return ++_sometimes % howOften == 0; }
 
     public:
 
@@ -200,8 +224,7 @@ namespace mongo {
 
         }; // class Client::Context
 
-
-    };
+    }; // class Client
 
     /** get the Client object for this thread. */
     inline Client& cc() {

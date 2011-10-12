@@ -900,7 +900,7 @@ namespace mongo {
             }
         }
     }
-
+//zzz
     /* unindex all keys in all indexes for this record. */
     static void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         BSONObj obj(todelete);
@@ -1119,8 +1119,127 @@ namespace mongo {
         return sz;
     }
 
+    /* step one of adding keys to index idxNo for a new record 
+       @return true means done.  false means multikey involved and more work to do
+    */
+    static void _addKeysToIndexStepOneOfTwo(BSONObjSet & /*out*/keys, NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, IndexDetails& idx) {
+        idx.getKeysFromObject(obj, keys);
+        if( keys.empty() )
+            return;
+        bool dupsAllowed = !idx.unique();
+        BSONObj order = idx.keyPattern();
+        IndexInterface& ii = idx.idxInterface();
+        Ordering ordering = Ordering::make(order);
+
+        assert( !recordLoc.isNull() );
+
+        try {
+            // we can't do the two step method with multi keys as insertion of one key changes the indexes 
+            // structure.  however we can do the first key of the set so we go ahead and do that FWIW
+            ii.phasedQueueItemToInsert(idxNo, idx.head, recordLoc, *keys.begin(), ordering, idx, dupsAllowed);
+        }
+        catch (AssertionException& e) {
+            if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
+                DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+            }
+            else {
+                throw;
+            }
+        }
+    }
+
+    namespace dur { 
+        extern unsigned notesThisLock;
+    }
+
+    void upgradeToWritable(bool shouldBeUnlocked) {
+        // todo upgrade!
+        DEV {
+            // verify we haven't written yet (usually)
+
+            // test binary does special things so this would assert there so don't check there
+            if( shouldBeUnlocked && !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
+                static unsigned long long zeroes;
+                static unsigned long long tot;
+                tot++;
+                if( dur::notesThisLock == 0 )
+                    zeroes++;
+                if( tot > 1000 ) {
+                    static int n;
+                    DEV if( n++ == 0 ) 
+                        log() << "warning upgradeToWritable: already in writable too often" << endl;
+                }
+            }
+        }
+    }
+
+    /** add index keys for a newly inserted record 
+        done in two steps/phases to defer write lock portion
+    */
+    static void indexRecordUsingTwoSteps(NamespaceDetails *d, BSONObj obj, DiskLoc loc, bool shouldBeUnlocked) {
+        vector<int> multi;
+        vector<BSONObjSet> multiKeys;
+
+        IndexInterface::phasedBegin();
+
+        int n = d->nIndexesBeingBuilt();
+        {
+            BSONObjSet keys;
+            for ( int i = 0; i < n; i++ ) {
+                IndexDetails& idx = d->idx(i);
+                // this call throws on unique constraint violation.  we haven't done any writes yet so that is fine.
+                _addKeysToIndexStepOneOfTwo(/*out*/keys, d, i, obj, loc, idx);
+                if( keys.size() > 1 ) {
+                    multi.push_back(i);
+                    multiKeys.push_back(BSONObjSet());
+                    multiKeys[multiKeys.size()-1].swap(keys);
+                }
+                keys.clear();
+            }
+        }
+
+        // update lock to writable here.  TODO
+        
+        upgradeToWritable(shouldBeUnlocked);
+
+        IndexInterface::phasedFinish(); // step 2
+
+        // now finish adding multikeys
+        for( unsigned j = 0; j < multi.size(); j++ ) {
+            unsigned i = multi[j];
+            BSONObjSet& keys = multiKeys[j];
+            IndexDetails& idx = d->idx(i);
+            IndexInterface& ii = idx.idxInterface();
+            Ordering ordering = Ordering::make(idx.keyPattern());
+            d->setIndexIsMultikey(i);   
+            for( BSONObjSet::iterator k = ++keys.begin()/*skip 1*/; k != keys.end(); k++ ) {
+                try {
+                    ii.bt_insert(idx.head, loc, *k, ordering, !idx.unique(), idx);
+                } catch (AssertionException& e) {
+                    if( e.getCode() == 10287 && (int) i == d->nIndexes ) {
+                        DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+                    }
+                    else {
+                        /* roll back previously added index entries
+                           note must do self index as it is multikey and could require some cleanup itself
+                        */
+                        for( int j = 0; j < n; j++ ) {
+                            try {
+                                _unindexRecord(d->idx(j), obj, loc, false);
+                            }
+                            catch(...) {
+                                log(3) << "unindex fails on rollback after unique key constraint prevented insert\n";
+                            }
+                        }
+                        throw;
+                    }
+                }
+            }
+        }
+    }
+
     /* add keys to index idxNo for a new record */
-    static inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
+    static void addKeysToIndex(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->idx(idxNo);
         BSONObjSet keys;
         idx.getKeysFromObject(obj, keys);
@@ -1147,7 +1266,7 @@ namespace mongo {
                     // dup key exception, presumably.
                     throw;
                 }
-                problem() << " caught assertion _indexRecord " << idx.indexNamespace() << " " << obj["_id"] << endl;
+                problem() << " caught assertion addKeysToIndex " << idx.indexNamespace() << " " << obj["_id"] << endl;
             }
         }
     }
@@ -1326,10 +1445,10 @@ namespace mongo {
                     {
                         if ( !dupsAllowed && dropDups ) {
                             LastError::Disabled led( lastError.get() );
-                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                            addKeysToIndex(d, idxNo, js, cc->currLoc(), dupsAllowed);
                         }
                         else {
-                            _indexRecord(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                            addKeysToIndex(d, idxNo, js, cc->currLoc(), dupsAllowed);
                         }
                     }
                     cc->advance();
@@ -1469,12 +1588,13 @@ namespace mongo {
     }
 
     /* add keys to indexes for a new record */
-    static void indexRecord(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
+#if 0
+    static void oldIndexRecord__notused(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
         int n = d->nIndexesBeingBuilt();
         for ( int i = 0; i < n; i++ ) {
             try {
                 bool unique = d->idx(i).unique();
-                _indexRecord(d, i, obj, loc, /*dupsAllowed*/!unique);
+                addKeysToIndex(d, i, obj, loc, /*dupsAllowed*/!unique);
             }
             catch( DBException& ) {
                 /* try to roll back previously added index entries
@@ -1493,6 +1613,7 @@ namespace mongo {
             }
         }
     }
+#endif
 
     extern BSONObj id_obj; // { _id : 1 }
 
@@ -1730,7 +1851,6 @@ namespace mongo {
               if using.
     */
 
-
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, bool mayAddIndex, bool *addedID) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
@@ -1746,7 +1866,6 @@ namespace mongo {
         if ( d == 0 ) {
             d = insert_newNamespace(ns, len, god);
         }
-        d->paddingFits();
 
         NamespaceDetails *tableToIndex = 0;
 
@@ -1801,11 +1920,45 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+        bool earlyIndex = true;
+        DiskLoc loc;
+        if( addID || tableToIndex || d->capped ) {
+            // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
+            earlyIndex = false;
+            loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+        }
+        else {
+            loc = d->allocWillBeAt(ns, lenWHdr);
+            if( loc.isNull() ) {
+                // need to get a new extent so we have to do the true alloc now (not common case)
+                earlyIndex = false;
+                loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+            }
+        }
         if ( loc.isNull() ) {
             log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
             assert(d->capped);
             return DiskLoc();
+        }
+
+        if( earlyIndex ) { 
+            // add record to indexes using two step method so we can do the reading outside a write lock
+            if ( d->nIndexes ) {
+                assert( obuf );
+                BSONObj obj((const char *) obuf);
+                try {
+                    indexRecordUsingTwoSteps(d, obj, loc, true);
+                }
+                catch( AssertionException& ) {
+                    // should be a dup key error on _id index
+                    dassert( !tableToIndex && !d->capped );
+                    // no need to delete/rollback the record as it was not added yet
+                    throw;
+                }
+            }
+            // really allocate now
+            DiskLoc real = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+            assert( real == loc );
         }
 
         Record *r = loc.rec();
@@ -1842,10 +1995,14 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if ( d->nIndexes ) {
+        if ( !earlyIndex && d->nIndexes ) {
             try {
                 BSONObj obj(r->data);
-                indexRecord(d, obj, loc);
+                // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
+                // but twosteps handles dup key errors more efficiently.
+                //oldIndexRecord(d, obj, loc);
+                indexRecordUsingTwoSteps(d, obj, loc, false);
+
             }
             catch( AssertionException& e ) {
                 // should be a dup key error on _id index
@@ -1863,6 +2020,8 @@ namespace mongo {
                 }
             }
         }
+
+        d->paddingFits();
 
         return loc;
     }
@@ -2086,7 +2245,7 @@ namespace mongo {
 
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
-                                "backup" : "$tmp" );
+                                "backup" : "_tmp" );
         BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
         string reservedPathString = reservedPath.native_directory_string();
 
@@ -2097,7 +2256,7 @@ namespace mongo {
             assert( ctx.justCreated() );
 
             res = cloneFrom(localhost.c_str(), errmsg, dbName,
-                            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false,
+                            /*logForReplication=*/false, /*slaveOk*/false, /*replauth*/false,
                             /*snapshot*/false, /*mayYield*/false, /*mayBeInterrupted*/true);
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }

@@ -814,6 +814,7 @@ namespace mongo {
 
                 const char * fieldName = f.fieldName();
 
+                uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
                 uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
                 uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
                 uassert( 10150 ,  "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
@@ -1123,6 +1124,7 @@ namespace mongo {
 
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get_w(ns);
+        bool autoDedup = c->autoDedup();
 
         if( c->ok() ) {
             set<DiskLoc> seenObjects;
@@ -1183,7 +1185,7 @@ namespace mongo {
                 DiskLoc loc = c->currLoc();
 
                 // TODO Maybe this is unnecessary since we have seenObjects
-                if ( c->getsetdup( loc ) ) {
+                if ( c->getsetdup( loc ) && autoDedup ) {
                     c->advance();
                     continue;
                 }
@@ -1217,7 +1219,7 @@ namespace mongo {
 
                     if ( multi ) {
                         c->advance(); // go to next record in case this one moves
-                        if ( seenObjects.count( loc ) )
+                        if ( autoDedup && seenObjects.count( loc ) )
                             continue;
                     }
 
@@ -1254,6 +1256,8 @@ namespace mongo {
                         if ( modsIsIndexed ) {
                             seenObjects.insert( loc );
                         }
+
+                        d->paddingFits();
                     }
                     else {
                         if ( rs )
@@ -1262,7 +1266,8 @@ namespace mongo {
                         BSONObj newObj = mss->createNewFromMods();
                         checkTooLarge(newObj);
                         DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
-                        if ( newLoc != loc || modsIsIndexed ) {
+                        if ( newLoc != loc || modsIsIndexed ){
+                            // log() << "Moved obj " << newLoc.obj()["_id"] << " from " << loc << " to " << newLoc << endl;
                             // object moved, need to make sure we don' get again
                             seenObjects.insert( newLoc );
                         }
@@ -1354,7 +1359,8 @@ namespace mongo {
                 logOp( "i", ns, no );
             return UpdateResult( 0 , 0 , 1 , no );
         }
-        return UpdateResult( 0 , 0 , 0 );
+
+        return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {

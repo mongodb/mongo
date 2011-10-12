@@ -17,16 +17,17 @@
 
 #pragma once
 
-#include "../pch.h"
+//#include "../pch.h"
 #include "jsobj.h"
-#include "../util/timer.h"
-#include "../client/dbclient.h"
+//#include "../util/timer.h"
+//#include "../client/dbclient.h"
 
 namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
     class Client;
+    class Timer;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
@@ -63,7 +64,8 @@ namespace mongo {
         void htmlHelp(stringstream&) const;
 
         /* Like adminOnly, but even stricter: we must either be authenticated for admin db,
-           or, if running without auth, on the local interface.
+           or, if running without auth, on the local interface.  Used for things which 
+           are so major that remote invocation may not make sense (e.g., shutdownServer).
 
            When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
         */
@@ -75,7 +77,7 @@ namespace mongo {
         virtual bool slaveOk() const = 0;
 
         /* Return true if the client force a command to be run on a slave by
-           turning on the 'slaveok' option in the command query.
+           turning on the 'slaveOk' option in the command query.
         */
         virtual bool slaveOverrideOk() {
             return false;

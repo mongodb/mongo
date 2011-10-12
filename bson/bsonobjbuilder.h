@@ -635,6 +635,10 @@ namespace mongo {
             return *this;
         }
 
+        BSONObjBuilder& operator<<( const BSONElement& e ){
+            append( e );
+            return *this;
+        }
 
         /** @return true if we are using our own bufbuilder, and not an alternate that was given to us in our constructor */
         bool owned() const { return &_b == &_buf; }
@@ -754,6 +758,7 @@ namespace mongo {
         }
 
         int len() const { return _b.len(); }
+        int arrSize() const { return _i; }
 
     private:
         void fill( const StringData& name ) {

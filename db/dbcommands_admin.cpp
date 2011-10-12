@@ -35,6 +35,7 @@
 #include "../util/alignedbuilder.h"
 #include "../util/paths.h"
 #include "../scripting/engine.h"
+#include "../util/timer.h"
 
 namespace mongo {
 

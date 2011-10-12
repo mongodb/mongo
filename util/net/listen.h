@@ -83,7 +83,7 @@ namespace mongo {
         /**
          * @return true iff everything went ok
          */
-        bool _setupSockets( const vector<SockAddr>& mine , vector<int>& socks );
+        bool _setupSockets( const vector<SockAddr>& mine , vector<SOCKET>& socks );
         
         void _logListen( int port , bool ssl );
 
@@ -108,7 +108,7 @@ namespace mongo {
          * call this for every iteration
          * returns true if one of the triggers has gone off
          */
-        bool ping() {
+        bool intervalHasElapsed() {
             if ( ( ++_pings % _h ) == 0 ) {
                 _last = Listener::getElapsedTimeMillis();
                 return true;
@@ -124,8 +124,8 @@ namespace mongo {
         }
 
     private:
-        int _h;
-        int _ms;
+        const int _h;
+        const int _ms;
 
         unsigned long long _pings;
 

@@ -1,4 +1,3 @@
-
 adminUser = {
     db : "admin",
     username : "foo",
@@ -116,12 +115,9 @@ printjson(e);
 
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
-result = s.getDB("test").runCommand({getLastError : 1});
-assert.eq(result.err, "unauthorized");
-
-logout(adminUser);
 
 login(testUser);
+assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});
@@ -154,9 +150,18 @@ print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
 
 assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
-assert.eq(s.getDB("test").foo.count(), num+1);
+//SERVER-3645
+//assert.eq(s.getDB("test").foo.count(), num+1);
+assert.eq(s.getDB("test").foo.find().itcount(), num+1);
 
+//SERVER-4031
+/*
 s.s.setSlaveOk();
+
+// We're only sure we aren't duplicating documents iff there's no balancing going on here
+// This call also waits for any ongoing balancing to stop
+s.stopBalancer()
+*/
 
 var cursor = s.getDB("test").foo.find({x:{$lt : 500}});
 

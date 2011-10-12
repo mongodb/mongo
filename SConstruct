@@ -327,7 +327,7 @@ if has_option( "full" ):
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
+commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
                  "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
@@ -382,17 +382,20 @@ serverOnlyFiles += [
     "db/commands/distinct.cpp",
     "db/commands/find_and_modify.cpp",
     "db/commands/group.cpp",
-    "db/commands/isself.cpp",
     "db/commands/mr.cpp",
     "db/commands/pipeline_command.cpp",
     "db/commands/document_source_cursor.cpp" ]
+#    "db/commands/isself.cpp",
+#serverOnlyFiles += [ "db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
+
+serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
 # but the pipeline command works everywhere
 coreServerFiles += [ "db/commands/pipeline.cpp" ]
 coreServerFiles += Glob("db/pipeline/*.cpp")
 
 coreServerFiles += Glob( "db/stats/*.cpp" )
-serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+coreServerFiles += [ "db/commands/isself.cpp", "db/security_common.cpp", "db/security_commands.cpp" ]
 
 scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
 
@@ -687,7 +690,7 @@ if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
-        env.Append( CPPFLAGS=" -Werror " )
+        env.Append( CPPFLAGS=" -Werror -pipe " )
         if not has_option('clang'): 
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
@@ -771,6 +774,7 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+moduleFiles = {}
 for x in os.listdir( "third_party" ):
     if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
         continue
@@ -780,7 +784,7 @@ for x in os.listdir( "third_party" ):
 
 
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles }
+    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
     
     options_topass["windows"] = windows
     options_topass["nix"] = nix
@@ -962,7 +966,7 @@ def doConfigure( myenv , shell=False ):
                     found = True
                     break
             if not found:
-                raise "can't find a static %s" % l
+                raise RuntimeError("can't find a static %s" % l)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
@@ -1095,7 +1099,7 @@ Default( mongod )
 
 # tools
 allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
-normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" ]
+normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" , "oplog" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
     env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
@@ -1180,7 +1184,7 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
-    mongo = shellEnv.Program( "mongo" , coreShellFiles )
+    mongo = shellEnv.Program( "mongo" , moduleFiles["pcre"] + coreShellFiles )
 
 
 #  ---- RUNNING TESTS ----

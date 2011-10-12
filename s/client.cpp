@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    /* todo: rename this file clientinfo.cpp would be more intuitive? */
+
     ClientInfo::ClientInfo() {
         _cur = &_a;
         _prev = &_b;
@@ -81,6 +83,11 @@ namespace mongo {
         }
         return info;
     }
+
+    ClientBasic* ClientBasic::getCurrent() {
+        return ClientInfo::get();
+    }
+
 
     void ClientInfo::disconnect() {
         // should be handled by TL cleanup

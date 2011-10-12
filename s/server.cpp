@@ -129,6 +129,13 @@ namespace mongo {
         dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
 
+    // this gets called when new fails to allocate memory
+    void my_new_handler() {
+        rawOut( "out of memory, printing stack and exiting:" );
+        printStackTrace();
+        ::exit(EXIT_ABRUPT);
+    }
+
     void setupSignals( bool inFork ) {
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
@@ -142,6 +149,8 @@ namespace mongo {
 #if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
 #endif
+
+        set_new_handler( my_new_handler );
     }
 
     void init() {
@@ -226,7 +235,15 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( params.count( "chunkSize" ) ) {
-        Chunk::MaxChunkSize = params["chunkSize"].as<int>() * 1024 * 1024;
+    	int csize = params["chunkSize"].as<int>();
+	
+	// validate chunksize before proceeding
+	if ( csize == 0 ) {
+		out() << "error: need a non-zero chunksize" << endl;
+		return 11;
+	}
+
+        Chunk::MaxChunkSize = csize * 1024 * 1024;
     }
 
     if ( params.count( "ipv6" ) ) {

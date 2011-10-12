@@ -37,11 +37,12 @@
 #include "../scripting/engine.h"
 
 namespace mongo {
-
+  
     Client* Client::syncThread;
     mongo::mutex Client::clientsMutex("clientsMutex");
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
-    boost::thread_specific_ptr<Client> currentClient;
+
+    TSP_DEFINE(Client, currentClient)
 
 #if defined(_DEBUG)
     struct StackChecker;
@@ -285,13 +286,9 @@ namespace mongo {
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
-        if( theReplSet ) {
-            b.append("lastOp" , (long long) _lastOp);
-        }
-        else {
-            OpTime lo(_lastOp);
-            if ( ! lo.isNull() )
-                b.appendTimestamp( "lastOp" , lo.asDate() );
+        // _lastOp is never set if replication is off
+        if( theReplSet || ! _lastOp.isNull() ) {
+            b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
 
@@ -467,6 +464,10 @@ namespace mongo {
         }
     }
 
+    ClientBasic* ClientBasic::getCurrent() {
+        return currentClient.get();
+    }
+
     class HandshakeCmd : public Command {
     public:
         void help(stringstream& h) const { h << "internal"; }
@@ -577,9 +578,9 @@ namespace mongo {
 
         time = min( time , 1000000 );
 
-        // there has been a kill request for this op - we should yield to allow the op to stop
+        // if there has been a kill request for this op - we should yield to allow the op to stop
         // This function returns empty string if we aren't interrupted
-        if ( killCurrentOp.checkForInterruptNoAssert( false )[0] != '\0' ) {
+        if ( *killCurrentOp.checkForInterruptNoAssert() ) {
             return 100;
         }
 

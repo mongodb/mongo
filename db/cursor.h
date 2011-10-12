@@ -99,6 +99,8 @@ namespace mongo {
 
         virtual bool isMultiKey() const = 0;
 
+        virtual bool autoDedup() const { return true; }
+
         /**
          * return true if the keys in the index have been modified from the main doc
          * if you have { a : 1 , b : [ 1 , 2 ] }

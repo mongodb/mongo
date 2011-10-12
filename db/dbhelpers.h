@@ -139,7 +139,7 @@ namespace mongo {
 
 
     /**
-     * user for saving deletd bson objects to a flat file
+     * user for saving deleted bson objects to a flat file
      */
     class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
     public:

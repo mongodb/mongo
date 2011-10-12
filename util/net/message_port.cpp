@@ -248,6 +248,10 @@ again:
         return true;
     }
 
+    void MessagingPort::assertStillConnected() { 
+        uassert(15901, "client disconnected during operation", Socket::stillConnected());
+    }
+
     void MessagingPort::say(Message& toSend, int responseTo) {
         assert( !toSend.empty() );
         mmm( log() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )

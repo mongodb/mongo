@@ -53,7 +53,7 @@ namespace mongo {
             unsigned long long curFileId() const { return _curFileId; }
 
             void assureLogFileOpen() {
-                mutex::scoped_lock lk(_curLogFileMutex);
+                SimpleMutex::scoped_lock lk(_curLogFileMutex);
                 if( _curLogFile == 0 )
                     _open();
             }
@@ -74,7 +74,7 @@ namespace mongo {
             unsigned long long _written; // bytes written so far to the current journal (log) file
             unsigned _nextFileNumber;
         public:
-            mutex _curLogFileMutex;
+            SimpleMutex _curLogFileMutex;
             bool _ageOut;
         private:
 

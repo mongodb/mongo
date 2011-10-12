@@ -27,6 +27,7 @@
 #include "../curop-inl.h"
 #include "../matcher.h"
 #include "core.h"
+#include "../../util/timer.h"
 
 #define GEOQUADDEBUG(x)
 //#define GEOQUADDEBUG(x) cout << x << endl

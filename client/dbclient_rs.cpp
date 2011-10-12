@@ -24,6 +24,7 @@
 #include "connpool.h"
 #include "dbclient_rs.h"
 #include "../util/background.h"
+#include "../util/timer.h"
 
 namespace mongo {
 
@@ -219,6 +220,7 @@ namespace mongo {
         // make sure its valid
 
         bool wasFound = false;
+        bool wasMaster = false;
 
         // This is always true, since checked in port()
         assert( prev.port() >= 0 );
@@ -233,12 +235,15 @@ namespace mongo {
                 if ( _nodes[i].okForSecondaryQueries() )
                     return prev;
 
+                wasMaster = _nodes[i].ok && ! _nodes[i].secondary;
+
                 break;
             }
         }
         
         if( prev.host().size() ){
-            if( wasFound ){ LOG(1) << "slave '" << prev << "' is no longer ok to use" << endl; }
+            if( wasFound ){ LOG(1) << "slave '" << prev << ( wasMaster ? "' is master node, trying to find another node" :
+                                                                         "' is no longer ok to use" ) << endl; }
             else{ LOG(1) << "slave '" << prev << "' was not found in the replica set" << endl; }
         }
         else LOG(1) << "slave '" << prev << "' is not initialized or invalid" << endl;
@@ -247,39 +252,24 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
+        LOG(2) << "dbclient_rs getSlave " << getServerAddress() << endl;
 
-        LOG(2) << "selecting new slave from replica set " << getServerAddress() << endl;
+        scoped_lock lk( _lock );
 
-        // Logic is to retry three times for any secondary node, if we can't find any secondary, we'll take
-        // any "ok" node
-        // TODO: Could this query hidden nodes?
-        const int MAX = 3;
-        for ( int xxx=0; xxx<MAX; xxx++ ) {
-
-            {
-                scoped_lock lk( _lock );
-                
-                unsigned i = 0;
-                for ( ; i<_nodes.size(); i++ ) {
-                    _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
-                    if ( _nextSlave == _master ){
-                        LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is the current master" << endl;
-                        continue;
-                    }
-                    if ( _nodes[ _nextSlave ].okForSecondaryQueries() || ( _nodes[ _nextSlave ].ok && ( xxx + 1 ) >= MAX ) )
-                        return _nodes[ _nextSlave ].addr;
-                    
-                    LOG(2) << "not selecting " << _nodes[_nextSlave] << " as it is not ok to use" << endl;
-                }
-                
+        for ( unsigned ii = 0; ii < _nodes.size(); ii++ ) {
+            _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+            if ( _nextSlave != _master ) {
+                if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
+                    return _nodes[ _nextSlave ].addr;
+                LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
             }
-
-            check(false);
         }
-        
-        LOG(2) << "no suitable slave nodes found, returning default node " << _nodes[ 0 ] << endl;
+        uassert(15899, str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, _master >= 0 && _nodes[_master].ok);
 
-        return _nodes[0].addr;
+        // Fall back to primary
+        assert( static_cast<unsigned>(_master) < _nodes.size() );
+        LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
+        return _nodes[_master].addr;
     }
 
     /**
@@ -296,9 +286,16 @@ namespace mongo {
     void ReplicaSetMonitor::_checkStatus(DBClientConnection *conn) {
         BSONObj status;
 
-        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ||
-                !status.hasField("members") ||
-                status["members"].type() != Array) {
+        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ) {
+            LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
+            return;
+        }
+        if( !status.hasField("members") ) { 
+            log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;
+            return;
+        }
+        if( status["members"].type() != Array) {
+            log() << "dbclient_rs error expected members field in replSetGetStatus result to be an array" << endl;
             return;
         }
 
@@ -309,15 +306,18 @@ namespace mongo {
 
             int m = -1;
             if ((m = _find(host)) < 0) {
+                LOG(1) << "dbclient_rs _checkStatus couldn't _find(" << host << ')' << endl;
                 continue;
             }
 
             double state = member["state"].Number();
             if (member["health"].Number() == 1 && (state == 1 || state == 2)) {
+                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = true " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = true;
             }
             else {
+                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = false " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = false;
             }

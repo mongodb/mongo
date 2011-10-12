@@ -266,11 +266,14 @@ doneCheckOrder:
     }
 
     void QueryPlan::registerSelf( long long nScanned ) const {
-        // FIXME SERVER-2864 Otherwise no query pattern can be generated.
-        if ( _frs.matchPossible() ) {
-            SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-            NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
+        // Impossible query constraints can be detected before scanning, and we
+        // don't have a reserved pattern enum value for impossible constraints.
+        if ( _impossible ) {
+            return;
         }
+
+        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
     }
     
     /**
@@ -658,10 +661,10 @@ doneCheckOrder:
         if ( ! _plans._mayYield ) 
             return;
         
-        if ( ! _plans._yieldSometimesTracker.ping() ) 
+        if ( ! _plans._yieldSometimesTracker.intervalHasElapsed() ) 
             return;
         
-        int micros = ClientCursor::yieldSuggest();
+        int micros = ClientCursor::suggestYieldMicros();
         if ( micros <= 0 ) 
             return;
         
@@ -677,7 +680,9 @@ doneCheckOrder:
         
         if ( _plans._bestGuessOnly ) {
             shared_ptr<QueryOp> op( _op.createChild() );
-            op->setQueryPlan( _plans.getBestGuess().get() );
+            shared_ptr<QueryPlan> plan = _plans.getBestGuess();
+            massert( 15894, "no index matches QueryPlanSet's sort with _bestGuessOnly", plan.get() );
+            op->setQueryPlan( plan.get() );
             _ops.push_back( op );
         }
         else {

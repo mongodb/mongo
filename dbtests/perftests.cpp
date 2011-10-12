@@ -119,13 +119,11 @@ namespace PerfTests {
 
         // optional 2nd test phase to be timed separately
         // return name of it
-        virtual string timed2() { return ""; }
+        virtual string timed2(DBClientBase&) { return ""; }
 
         virtual void post() { }
 
         virtual string name() = 0;
-        virtual unsigned long long expectation() { return 0; }
-        virtual int expectationTimeMillis() { return -1; }
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
         virtual int howLongMillis() { return profiling ? 60000 : 5000; } 
@@ -177,7 +175,7 @@ namespace PerfTests {
                         }
                     }
 
-                    DBClientConnection *c = new DBClientConnection(false, 0, 10);
+                    DBClientConnection *c = new DBClientConnection(false, 0, 60);
                     string err;
                     if( c->connect("perfdb.10gen.cc", err) ) { 
                         if( !c->auth("perf", "perf", pwd, err) ) { 
@@ -275,6 +273,11 @@ namespace PerfTests {
                 }
             }
         }
+
+        virtual bool testThreaded() { return false; }
+
+        unsigned long long n;
+
         void run() {
             _ns = string("perftest.") + name();
             client().dropCollection(ns());
@@ -290,7 +293,7 @@ namespace PerfTests {
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
             mongo::Timer t;
-            unsigned long long n = 0;
+            n = 0;
             const unsigned Batch = batchSize();
 
             if( hlm == 0 ) { 
@@ -303,7 +306,7 @@ namespace PerfTests {
                     for( i = 0; i < Batch; i++ )
                         timed();
                     n += i;
-                } while( t.millis() < hlm );
+                } while( t.micros() < (unsigned) hlm * 1000 );
             }
 
             client().getLastError(); // block until all ops are finished
@@ -311,22 +314,10 @@ namespace PerfTests {
 
             say(n, ms, name());
 
-            int etm = expectationTimeMillis();
-            DEV { 
-            }
-            else if( etm > 0 ) { 
-                if( ms > etm*2 ) { 
-                    cout << "test  " << name() << " seems slow expected ~" << etm << "ms" << endl;
-                }
-            }
-            else if( n < expectation() ) {
-                cout << "test  " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
-            }
-
             post();
 
+            string test2name = timed2(client());
             {
-                string test2name = timed2();
                 if( test2name.size() != 0 ) {
                     dur::stats.curr->reset();
                     mongo::Timer t;
@@ -334,7 +325,7 @@ namespace PerfTests {
                     while( 1 ) {
                         unsigned i;
                         for( i = 0; i < Batch; i++ )
-                            timed2();
+                            timed2(client());
                         n += i;
                         if( t.millis() > hlm )
                             break;
@@ -343,6 +334,33 @@ namespace PerfTests {
                     say(n, ms, test2name);
                 }
             }
+
+            if( testThreaded() ) {
+                cout << "testThreaded" << endl;
+                mongo::Timer t;
+                launchThreads(8);
+                //cout << "threaded done " << t.millis() << "ms" << endl;
+                //cout << n * 1000 / t.millis() << " per second" << endl;
+                say(n, t.millis(), test2name+"-threaded");
+
+            }
+        }
+
+        void thread() { 
+            DBClientType c;
+            Client::initThreadIfNotAlready("perftestthr");
+            for( unsigned long long i = 0; i < n/8; i++ ) { 
+                timed2(c);
+            }
+            cc().shutdown();
+        }
+
+        void launchThreads(int remaining) {
+            if (!remaining) 
+                return;
+            boost::thread athread(boost::bind(&B::thread, this));
+            launchThreads(remaining - 1);
+            athread.join();
         }
     };
 
@@ -443,6 +461,18 @@ namespace PerfTests {
         }
     };
 
+    class Sleep0Ms : public B { 
+    public:
+        string name() { return "Sleep0Ms"; }
+        virtual int howLongMillis() { return 400; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            sleepmillis(0);
+            mongo::Timer t;
+            aaa++;
+        }
+    };
+
     RWLock lk("testrw");
     SimpleMutex m("simptst");
     mongo::mutex mtest("mtest");
@@ -475,7 +505,19 @@ namespace PerfTests {
             mongo::scoped_spinlock lk(s);
         }
     };    
-
+    int cas;
+    class casspeed : public B { 
+    public:
+        string name() { return "compareandswap"; }
+        virtual int howLongMillis() { return 500; } 
+        virtual bool showDurStats() { return false; }
+        void timed() {
+#ifdef __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
+#define RUNCOMPARESWAP 1
+            __sync_bool_compare_and_swap(&cas, 0, 0);
+#endif
+        }
+    };    
     class rlock : public B { 
     public:
         string name() { return "rlock"; }
@@ -579,35 +621,57 @@ namespace PerfTests {
         void timed() {
             dontOptimizeOutHopefully++;
         }
-        unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
     };
 
     // test thread local speed
+#if defined(_WIN32)
+    __declspec( thread ) int x;
+    class TLS2 : public B {
+    public:
+        virtual int howLongMillis() { return 3000; } 
+        string name() { return "thread-local-storage2"; }
+        void timed() {
+            if( x )
+                dontOptimizeOutHopefully++;
+        }
+        virtual bool showDurStats() { return false; }
+    };
+#endif
+
+    // test thread local speed
     class TLS : public B {
     public:
-        TLS() { }
         virtual int howLongMillis() { return 3000; } 
         string name() { return "thread-local-storage"; }
         void timed() {
             if( &cc() )
                 dontOptimizeOutHopefully++;
         }
-        unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
     };
 
-    class Malloc : public B {
+    class New128 : public B {
     public:
-        Malloc() { }
-        virtual int howLongMillis() { return 4000; } 
-        string name() { return "malloc"; }
+        virtual int howLongMillis() { return 14000; } 
+        string name() { return "new128"; }
         void timed() {
             char *p = new char[128];
             if( dontOptimizeOutHopefully++ > 0 )
                 delete p;
         }
-        unsigned long long expectation() { return 1000000; }
+        virtual bool showDurStats() { return false; }
+    };
+
+    class New8 : public B {
+    public:
+        virtual int howLongMillis() { return 14000; } 
+        string name() { return "new8"; }
+        void timed() {
+            char *p = new char[8];
+            if( dontOptimizeOutHopefully++ > 0 )
+                delete p;
+        }
         virtual bool showDurStats() { return false; }
     };
 
@@ -620,7 +684,6 @@ namespace PerfTests {
         string name() { return "compress"; }
         virtual bool showDurStats() { return false; }
         virtual int howLongMillis() { return 4000; } 
-        unsigned long long expectation() { return 1000000; }
         void prep() { 
             p = malloc(sz);
             // this isn't a fair test as it is mostly rands but we just want a rough perf check
@@ -660,7 +723,6 @@ namespace PerfTests {
         ChecksumTest() : sz(1024*1024*100+3) { }
         string name() { return "checksum"; }
         virtual int howLongMillis() { return 2000; } 
-        int expectationTimeMillis() { return 5000; }
         virtual bool showDurStats() { return false; }
         virtual unsigned batchSize() { return 1; }
 
@@ -724,7 +786,6 @@ namespace PerfTests {
         void post() {
             assert( client().count(ns()) == 1 );
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     class Insert1 : public B {
@@ -732,16 +793,24 @@ namespace PerfTests {
         OID oid;
         BSONObj query;
     public:
+        virtual int howLongMillis() { return 30000; } 
         Insert1() : x( BSON("x" << 99) ) { 
             oid.init();
             query = BSON("_id" << oid);
+            i = 0;
         }
         string name() { return "insert-simple"; }
+        unsigned i;
         void timed() {
-            client().insert( ns(), x );
+            BSONObj o = BSON( "_id" << i++ << "x" << 99 );
+            client().insert( ns(), o );
+            //client().insert( ns(), x );
         }
-        string timed2() {
-            client().findOne(ns(), query);
+        virtual bool testThreaded() { return true; }
+        string timed2(DBClientBase& c) {
+            Query q = QUERY( "_id" << (unsigned) Security::getNonce() % i );
+            c.findOne(ns(), q);
+            //client().findOne(ns(), query);
             return "findOne_by_id";
         }
         void post() {
@@ -749,7 +818,6 @@ namespace PerfTests {
             assert( client().count(ns()) > 50 );
 #endif
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     class InsertBig : public B {
@@ -771,11 +839,11 @@ namespace PerfTests {
         void timed() {
             client().insert( ns(), x );
         }
-        unsigned long long expectation() { return 20; }
     };
 
     class InsertRandom : public B {
     public:
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; } 
         string name() { return "random-inserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
@@ -786,7 +854,6 @@ namespace PerfTests {
             BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
             client().insert(ns(), y);
         }
-        unsigned long long expectation() { return 1000; }
     };
 
     /** upserts about 32k records and then keeps updating them
@@ -809,40 +876,28 @@ namespace PerfTests {
             client().update(ns(), q, y, /*upsert*/true);
         }
 
-        virtual string timed2() {
+        virtual string timed2(DBClientBase& c) {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
 
             // test some $inc's
 
             int x = rand();
             BSONObj q = BSON("x" << x);
-            client().update(ns(), q, I);
+            c.update(ns(), q, I);
 
             return name()+"-inc";
         }
-
-        unsigned long long expectation() { return 1000; }
     };
 
     template <typename T>
     class MoreIndexes : public T {
     public:
-        string name() { return T::name() + "-with-more-indexes"; }
+        string name() { return T::name() + "-more-indexes"; }
         void prep() {
             T::prep();
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
-        
-        /*
-        virtual string timed2() {
-            string x = T::timed2();
-            if ( x.size() == 0 )
-                return x;
-            
-            return x + "-with-more-indexes";
-        }
-        */        
     };
 
     void t() {
@@ -883,21 +938,30 @@ namespace PerfTests {
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
             if( profiling ) { 
-                add< Update1 >();
+                add< New8 >();
+                add< New128 >();
             }
             else {
                 add< Dummy >();
                 add< ChecksumTest >();
                 add< Compress >();
                 add< TLS >();
-                add< Malloc >();
+#if defined(_WIN32)
+                add< TLS2 >();
+#endif
+                add< New8 >();
+                add< New128 >();
                 add< Timer >();
+                add< Sleep0Ms >();
                 add< rlock >();
                 add< wlock >();
                 //add< ulock >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
                 add< spinlockspeed >();
+#ifdef RUNCOMPARESWAP
+                add< casspeed >();
+#endif
                 add< CTM >();
                 add< KeyTest >();
                 add< Bldr >();

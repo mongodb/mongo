@@ -436,6 +436,34 @@ namespace JsobjTests {
             void run() {
                 const long long billion = 1000*1000*1000;
 
+                long long n = 0x3333111122224444LL;
+                {
+                    double d = (double) n;
+                    BSONObj a = BSON( "x" << n );
+                    BSONObj b = BSON( "x" << d );
+
+                    long long back = (long long) d;
+//3717
+//////                    int res = a.woCompare(b);
+
+                    ASSERT( n > back );
+                    //ASSERT( res > 0 );  // SERVER-3717
+
+                    keyTest(a, false);
+
+                    KeyV1Owned A(a);
+                    KeyV1Owned B(b);
+//3717
+//////                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
+                    // ASSERT( res2 > 0 ); // SERVER-3717
+
+                    // fixing requires an index v# change.
+
+                    cout << "todo fix SERVER-3717 and uncomment test in AppendIntOrLL" << endl;
+
+                    n++;
+                }
+
                 {
                     BSONObjBuilder b;
                     b.appendIntOrLL("L4", -4*billion);

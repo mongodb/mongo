@@ -42,6 +42,8 @@ namespace mongo {
         static OpTime skewed();
     public:
         static void setLast(const Date_t &date) {
+            notifier().notify_all(); // won't really do anything until write-lock released
+
             last = OpTime(date);
         }
         unsigned getSecs() const {
@@ -74,6 +76,8 @@ namespace mongo {
         }
         // it isn't generally safe to not be locked for this. so use now(). some tests use this.
         static OpTime now_inlock() {
+            notifier().notify_all(); // won't really do anything until write-lock released
+
             unsigned t = (unsigned) time(0);
             if ( last.secs == t ) {
                 last.i++;
@@ -89,6 +93,16 @@ namespace mongo {
             DEV dbMutex.assertWriteLocked();
             return now_inlock();
         }
+
+        static OpTime last_inlock(){
+            DEV dbMutex.assertAtLeastReadLocked();
+            return last;
+        }
+
+        // Waits for global OpTime to be different from *this
+        // Must be atLeastReadLocked
+        // Defined in instance.cpp (only current user) as it needs dbtemprelease
+        void waitForDifferent(unsigned millis);
 
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
          64 bit "container" for these values.  While these are not really "Dates", that seems a
@@ -146,6 +160,17 @@ namespace mongo {
         bool operator>=(const OpTime& r) const {
             return !(*this < r);
         }
+    private:
+
+        // The following functions are to get around the need to define class-level statics in a cpp
+        static boost::condition& notifier() {
+            static boost::condition* holder = new boost::condition();
+            return *holder;
+        };
+        static boost::mutex& notifyMutex() {
+            static boost::mutex* holder = new boost::mutex();
+            return *holder;
+        };
     };
 #pragma pack()
 

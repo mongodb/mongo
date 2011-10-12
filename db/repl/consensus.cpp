@@ -146,10 +146,10 @@ namespace mongo {
 
     const time_t LeaseTime = 30;
 
-    mutex Consensus::lyMutex("ly");
+    SimpleMutex Consensus::lyMutex("ly");
 
     unsigned Consensus::yea(unsigned memberId) { /* throws VoteException */
-        mutex::scoped_lock lk(lyMutex);
+        SimpleMutex::scoped_lock lk(lyMutex);
         LastYea &L = this->ly.ref(lk);
         time_t now = time(0);
         if( L.when + LeaseTime >= now && L.who != memberId ) {
@@ -166,7 +166,7 @@ namespace mongo {
        place instead of leaving it for a long time.
        */
     void Consensus::electionFailed(unsigned meid) {
-        mutex::scoped_lock lk(lyMutex);
+        SimpleMutex::scoped_lock lk(lyMutex);
         LastYea &L = ly.ref(lk);
         DEV assert( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
         if( L.who == meid )

@@ -753,6 +753,21 @@ namespace mongo {
         return n;
     }
 
+    bool BSONObj::couldBeArray() const {
+        BSONObjIterator i( *this );
+        int index = 0;
+        while( i.moreWithEOO() ){
+            BSONElement e = i.next();
+            if( e.eoo() ) break;
+
+            // TODO:  If actually important, may be able to do int->char* much faster
+            if( strcmp( e.fieldName(), ((string)( str::stream() << index )).c_str() ) != 0 )
+                return false;
+            index++;
+        }
+        return true;
+    }
+
     BSONObj BSONObj::clientReadable() const {
         BSONObjBuilder b;
         BSONObjIterator i( *this );

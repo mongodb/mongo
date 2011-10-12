@@ -22,8 +22,21 @@
 #include "optime.h"
 #include "time_support.h"
 #include "mongoutils/str.h"
+#include "timer.h"
 
 namespace mongo {
+
+#if defined(_WIN32)
+    unsigned long long Timer::countsPerSecond;
+    struct AtStartup {
+        AtStartup() {
+            LARGE_INTEGER x;
+            bool ok = QueryPerformanceFrequency(&x);
+            assert(ok);
+            Timer::countsPerSecond = x.QuadPart;
+        }
+    } atstartuputil;
+#endif
 
     string hexdump(const char *data, unsigned len) {
         assert( len < 1000000 );

@@ -119,6 +119,39 @@ namespace mongo {
         }
     }
 
+    void Manager::checkAuth() {
+        int down = 0, authIssue = 0, total = 0;
+
+        for( Member *m = rs->head(); m; m=m->next() ) {
+            total++;
+
+            // all authIssue servers will also be not up
+            if (!m->hbinfo().up()) {
+                down++;
+                if (m->hbinfo().authIssue) {
+                    authIssue++;
+                }
+            }
+        }
+
+        // if all nodes are down or failed auth AND at least one failed
+        // auth, go into recovering.  If all nodes are down, stay a
+        // secondary.
+        if (authIssue > 0 && down == total) {
+            log() << "replset error could not reach/authenticate against any members" << endl;
+
+            if (rs->box.getPrimary() == rs->_self) {
+                log() << "auth problems, relinquishing primary" << rsLog;
+                rs->relinquish();
+            }
+
+            rs->blockSync(true);
+        }
+        else {
+            rs->blockSync(false);
+        }
+    }
+
     /** called as the health threads get new results */
     void Manager::msgCheckNewState() {
         {
@@ -130,7 +163,8 @@ namespace mongo {
             if( busyWithElectSelf ) return;
             
             checkElectableSet();
-            
+            checkAuth();
+
             const Member *p = rs->box.getPrimary();
             if( p && p != rs->_self ) {
                 if( !p->hbinfo().up() ||
@@ -201,9 +235,11 @@ namespace mongo {
                 return;
             }
 
-            if( !rs->iAmPotentiallyHot() ) // if not we never try to be primary
+            if( !rs->iAmPotentiallyHot() ) { // if not we never try to be primary
+                OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself" << endl;
                 return;
-            
+            }
+
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) {
                 static time_t last;

@@ -1,7 +1,7 @@
 // mostly for testing mongos w/replica sets
 
 
-s = new ShardingTest( "rs2" , 2 , 1 , 1 , { rs : true , chunksize : 1 } )
+s = new ShardingTest( "rs2" , 2 , 2 , 1 , { rs : true , chunksize : 1 } )
 
 db = s.getDB( "test" )
 t = db.foo

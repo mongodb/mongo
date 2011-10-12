@@ -40,6 +40,7 @@ namespace mongo {
         void doQuery( Request& r , const Shard& shard );
 
         void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 , bool safe=false );
+        void insert( const Shard& shard , const char * ns , const vector<BSONObj>& v , int flags=0 , bool safe=false );
         void update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags=0, bool safe=false );
 
     };

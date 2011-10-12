@@ -157,38 +157,6 @@ namespace mongo {
     typedef void *HANDLE;
 #endif
 
-    /* thread local "value" rather than a pointer
-       good for things which have copy constructors (and the copy constructor is fast enough)
-       e.g.
-         ThreadLocalValue<int> myint;
-    */
-    template<class T>
-    class ThreadLocalValue {
-    public:
-        ThreadLocalValue( T def = 0 ) : _default( def ) { }
-
-        T get() const {
-            T * val = _val.get();
-            if ( val )
-                return *val;
-            return _default;
-        }
-
-        void set( const T& i ) {
-            T *v = _val.get();
-            if( v ) {
-                *v = i;
-                return;
-            }
-            v = new T(i);
-            _val.reset( v );
-        }
-
-    private:
-        boost::thread_specific_ptr<T> _val;
-        const T _default;
-    };
-
     class ProgressMeter : boost::noncopyable {
     public:
         ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {

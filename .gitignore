@@ -79,6 +79,7 @@ mongosniff
 mongobridge
 mongostat
 mongotop
+mongooplog
 bsondump
 
 *.tgz

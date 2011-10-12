@@ -299,7 +299,7 @@ namespace mongo {
 	}
 
         if ( currentClient.get() )
-            currentClient->shutdown();
+            currentClient.get()->shutdown();
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );
@@ -402,7 +402,7 @@ namespace mongo {
             // findOne throws an AssertionException if it's not authenticated.
             if (_coll.size() > 0) {
                 // BSONTools don't have a collection
-                conn().findOne(getNS(), Query("{}"));
+                conn().findOne(getNS(), Query("{}"), 0, QueryOption_SlaveOk);
             }
             return;
         }

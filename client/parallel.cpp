@@ -67,7 +67,7 @@ namespace mongo {
         assert( cursor );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            throw StaleConfigException( _ns , "ClusteredCursor::query" );
+            throw StaleConfigException( _ns , "ClusteredCursor::_checkCursor" );
         }
         
         if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
@@ -90,7 +90,7 @@ namespace mongo {
             
             if ( conn.setVersion() ) {
                 conn.done();
-                throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+                throw StaleConfigException( _ns , "ClusteredCursor::query" , true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -490,7 +490,7 @@ namespace mongo {
 
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
-                    staleConfigExs.push_back( StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + StaleConfigException( _ns , "ParallelCursor::_init" , true ).what() + errLoc );
                     break;
                 }
 
@@ -592,7 +592,7 @@ namespace mongo {
                     // when we throw our exception
                     allConfigStale = true;
 
-                    staleConfigExs.push_back( e.what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + e.what() + errLoc );
                     _cursors[i].reset( NULL );
                     conns[i]->done();
                     continue;

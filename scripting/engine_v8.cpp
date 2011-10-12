@@ -267,7 +267,18 @@ namespace mongo {
 
     // --- engine ---
 
+//    void fatalHandler(const char* s1, const char* s2) {
+//        cout << "Fatal handler " << s1 << " " << s2;
+//    }
+
     V8ScriptEngine::V8ScriptEngine() {
+        int K = 1024;
+        v8::ResourceConstraints rc;
+        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size(64 * K * K);
+        v8::SetResourceConstraints(&rc);
+        v8::V8::IgnoreOutOfMemoryException();
+//        v8::V8::SetFatalErrorHandler(fatalHandler);
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -353,6 +364,7 @@ namespace mongo {
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
         V8STR_RO = getV8Str( "_ro" );
         V8STR_MODIFIED = getV8Str( "_mod" );
+        V8STR_FULLNAME = getV8Str( "_fullName" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -385,6 +397,12 @@ namespace mongo {
         lzArrayTemplate.Dispose();
         roObjectTemplate.Dispose();
         internalFieldObjects.Dispose();
+    }
+
+    bool V8Scope::hasOutOfMemoryException() {
+        if (!_context.IsEmpty())
+            return _context->HasOutOfMemoryException();
+        return false;
     }
 
     /**
@@ -701,7 +719,7 @@ namespace mongo {
         if (recv != 0)
             v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
         else
-            v8recv = _emptyObj;
+            v8recv = _global;
 
         enableV8Interrupt(); // because of v8 locker we can check interrupted, then enable
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( v8recv , nargs , nargs ? args.get() : 0 );
@@ -922,7 +940,7 @@ namespace mongo {
         }
         else if ( array ) {
             // NOTE Looks like it's impossible to add interceptors to v8 arrays.
-            readOnly = false;
+            // so array itself will never be read only, but its values can be
             o = v8::Array::New();
         }
         else if ( !readOnly ) {
@@ -967,7 +985,7 @@ namespace mongo {
                 break;
 
             case CodeWScope:
-                if ( f.codeWScopeObject().isEmpty() )
+                if ( !f.codeWScopeObject().isEmpty() )
                     log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
                 o->Set( name, newFunction( f.codeWScopeCode() ) );
                 break;
@@ -1064,7 +1082,8 @@ namespace mongo {
                 unsigned long long val = f.numberLong();
                 v8::Function* numberLong = getNamedCons( "NumberLong" );
                 double floatApprox = (double)(long long)val;
-                if ( (long long)val == (long long)floatApprox ) {
+                // values above 2^53 are not accurately represented in JS
+                if ( (long long)val == (long long)floatApprox && val < 9007199254740992ULL ) {
                     v8::Handle<v8::Value> argv[1];
                     argv[0] = v8::Number::New( floatApprox );
                     o->Set( name, numberLong->NewInstance( 1, argv ) );
@@ -1114,7 +1133,7 @@ namespace mongo {
 
         }
 
-        if ( readOnly ) {
+        if ( !array && readOnly ) {
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );
         }
@@ -1174,7 +1193,7 @@ namespace mongo {
             return newFunction( f.valuestr() );
 
         case CodeWScope:
-            if ( f.codeWScopeObject().isEmpty() )
+            if ( !f.codeWScopeObject().isEmpty() )
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction( f.codeWScopeCode() );
 
@@ -1247,7 +1266,8 @@ namespace mongo {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
             unsigned long long val = f.numberLong();
             v8::Function* numberLong = getNamedCons( "NumberLong" );
-            if ( (long long)val == (long long)(double)(long long)(val) ) {
+            // values above 2^53 are not accurately represented in JS
+            if ( (long long)val == (long long)(double)(long long)(val) && val < 9007199254740992ULL ) {
                 v8::Handle<v8::Value> argv[1];
                 argv[0] = v8::Number::New( (double)(long long)( val ) );
                 return numberLong->NewInstance( 1, argv );
@@ -1388,7 +1408,7 @@ namespace mongo {
             else if ( value->ToObject()->GetPrototype()->IsObject() &&
                       value->ToObject()->GetPrototype()->ToObject()->HasRealNamedProperty( V8STR_ISOBJECTID ) ) {
                 OID oid;
-                oid.init( toSTLString( value ) );
+                oid.init( toSTLString( value->ToObject()->Get(getV8Str("str")) ) );
                 b.appendOID( sname , &oid );
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERLONG ).IsEmpty() ) {
@@ -1454,15 +1474,14 @@ namespace mongo {
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
         BSONObj* originalBSON = 0;
-        if (o->HasNamedLookupInterceptor()) {
+        if (o->InternalFieldCount() > 0) {
             originalBSON = unwrapBSONObj(o);
-        }
 
-        if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
-                (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
-            // object was readonly, use bson as is
-            if (originalBSON)
+            if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
+                    (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
+                // object was readonly, use bson as is
                 return *originalBSON;
+            }
         }
 
         BSONObjBuilder b;

@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    mutex DiagStr::m("diags");
+#if defined(_DEBUG)
 
     // intentional leak. otherwise destructor orders can be problematic at termination.
     MutexDebugger &mutexDebugger = *(new MutexDebugger());
@@ -50,5 +50,7 @@ namespace mongo {
             cout.flush();
         }
     }
+
+#endif
 
 }

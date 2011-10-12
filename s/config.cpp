@@ -185,9 +185,9 @@ namespace mongo {
         return true;
     }
 
-    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload ){
+    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload, bool forceReload ){
         try{
-            return getChunkManager( ns, shouldReload );
+            return getChunkManager( ns, shouldReload, forceReload );
         }
         catch( AssertionException& e ){
             warning() << "chunk manager not found for " << ns << causedBy( e ) << endl;
@@ -195,7 +195,7 @@ namespace mongo {
         }
     }
 
-    ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
+    ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload, bool forceReload ) {
         BSONObj key;
         bool unique;
         ShardChunkVersion oldVersion;
@@ -205,7 +205,7 @@ namespace mongo {
             
             CollectionInfo& ci = _collections[ns];
             
-            bool earlyReload = ! ci.isSharded() && shouldReload;
+            bool earlyReload = ! ci.isSharded() && ( shouldReload || forceReload );
             if ( earlyReload ) {
                 // this is to catch cases where there this is a new sharded collection
                 _reload();
@@ -214,7 +214,7 @@ namespace mongo {
             massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
             assert( ! ci.key().isEmpty() );
             
-            if ( ! shouldReload || earlyReload )
+            if ( ! ( shouldReload || forceReload ) || earlyReload )
                 return ci.getCM();
 
             key = ci.key().copy();
@@ -225,7 +225,7 @@ namespace mongo {
         
         assert( ! key.isEmpty() );
         
-        if ( oldVersion > 0 ) {
+        if ( oldVersion > 0 && ! forceReload ) {
             ScopedDbConnection conn( configServer.modelServer() , 30.0 );
             BSONObj newest = conn->findOne( ShardNS::chunk , 
                                             Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
@@ -240,7 +240,11 @@ namespace mongo {
                     return ci.getCM();
                 }
             }
-            
+
+        }
+        else if( oldVersion == 0 ){
+            warning() << "version 0 found when " << ( forceReload ? "reloading" : "checking" ) << " chunk manager"
+                      << ", collection '" << ns << "' initially detected as sharded" << endl;
         }
 
         // we are not locked now, and want to load a new ChunkManager
@@ -257,8 +261,15 @@ namespace mongo {
         CollectionInfo& ci = _collections[ns];
         massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
         
-        if ( temp->getVersion() > ci.getCM()->getVersion() ) {
-            // we only want to reset if we're newer
+        bool forced = false;
+        if ( temp->getVersion() > ci.getCM()->getVersion() ||
+            (forced = (temp->getVersion() == ci.getCM()->getVersion() && forceReload ) ) ) {
+
+            if( forced ){
+                warning() << "chunk manager reload forced for collection '" << ns << "', config version is " << temp->getVersion() << endl;
+            }
+
+            // we only want to reset if we're newer or equal and forced
             // otherwise we go into a bad cycle
             ci.resetCM( temp.release() );
         }
@@ -695,8 +706,17 @@ namespace mongo {
             string name = o["_id"].valuestrsafe();
             got.insert( name );
             if ( name == "chunksize" ) {
-                LOG(1) << "MaxChunkSize: " << o["value"] << endl;
-                Chunk::MaxChunkSize = o["value"].numberInt() * 1024 * 1024;
+		int csize = o["value"].numberInt();
+
+		// validate chunksize before proceeding
+		if ( csize == 0 ) {
+			// setting was not modified; mark as such
+			got.erase(name);
+			log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
+		} else {
+			LOG(1) << "MaxChunkSize: " << csize << endl;
+			Chunk::MaxChunkSize = csize * 1024 * 1024;
+		}
             }
             else if ( name == "balancer" ) {
                 // ones we ignore here

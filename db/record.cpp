@@ -112,7 +112,8 @@ namespace mongo {
         class Rolling {
             
         public:
-            Rolling() {
+            Rolling() 
+                : _lock( "ps::Rolling" ){
                 _curSlice = 0;
                 _lastRotate = Listener::getElapsedTimeMillis();
             }
@@ -126,8 +127,8 @@ namespace mongo {
             bool access( size_t region , short offset , bool doHalf ) {
                 int regionHash = hash(region);
                 
-                scoped_spinlock lk( _lock );
-                
+                SimpleMutex::scoped_lock lk( _lock );
+
                 static int rarely_count = 0;
                 if ( rarely_count++ % 2048 == 0 ) {
                     long long now = Listener::getElapsedTimeMillis();
@@ -174,7 +175,7 @@ namespace mongo {
             long long _lastRotate;
             Slice _slices[NumSlices];
 
-            SpinLock _lock;
+            SimpleMutex _lock;
         } rolling;
         
     }
@@ -200,11 +201,11 @@ namespace mongo {
 
     }
 
+    const bool blockSupported = ProcessInfo::blockCheckSupported();
+
     bool Record::likelyInPhysicalMemory() {
         if ( ! MemoryTrackingEnabled )
             return true;
-
-        static bool blockSupported = ProcessInfo::blockCheckSupported();
 
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;

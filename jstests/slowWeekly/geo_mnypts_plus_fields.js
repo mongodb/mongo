@@ -1,6 +1,6 @@
 // Test sanity of geo queries with a lot of points
 
-var maxFields = 2;
+var maxFields = 3;
 
 for( var fields = 1; fields < maxFields; fields++ ){
     

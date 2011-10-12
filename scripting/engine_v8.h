@@ -95,6 +95,7 @@ namespace mongo {
         virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false );
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError() { return _error; }
+        virtual bool hasOutOfMemoryException();
 
         virtual void injectNative( const char *field, NativeFunction func, void* data = 0 );
         void injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj, void* data = 0 );
@@ -150,6 +151,7 @@ namespace mongo {
         Handle<v8::String> V8STR_WRAPPER;
         Handle<v8::String> V8STR_RO;
         Handle<v8::String> V8STR_MODIFIED;
+        Handle<v8::String> V8STR_FULLNAME;
 
     private:
         void _startCall();

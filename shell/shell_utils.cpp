@@ -878,6 +878,13 @@ namespace mongo {
 #endif
         }
 
+        const char* getUserDir() {
+#ifdef _WIN32
+            return getenv( "USERPROFILE" );
+#else
+            return getenv( "HOME" );
+#endif
+        }
         BSONObj getHostName(const BSONObj& a, void* data) {
             uassert( 13411, "getHostName accepts no arguments", a.nFields() == 0 );
             char buf[260]; // HOST_NAME_MAX is usually 255

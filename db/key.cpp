@@ -232,6 +232,13 @@ namespace mongo {
         _keyData = (const unsigned char *) b.buf();
     }
 
+    KeyV1Owned::KeyV1Owned(const KeyV1& rhs) {
+        b.appendBuf( rhs.data(), rhs.dataSize() );
+        _keyData = (const unsigned char *) b.buf();
+        dassert( b.len() == dataSize() ); // check datasize method is correct
+        dassert( (*_keyData & cNOTUSED) == 0 );
+    }
+
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
         BSONObj::iterator i(obj);

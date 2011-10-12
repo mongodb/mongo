@@ -213,6 +213,7 @@ namespace mongo {
     }
 
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
+        // [dm] i don't think mallinfo works. (64 bit.)  ??
         struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
         info.append("heap_usage_bytes", malloc_info.uordblks);
 

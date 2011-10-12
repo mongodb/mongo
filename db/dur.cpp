@@ -83,7 +83,7 @@ namespace mongo {
         */
         static void groupCommit();
 
-        CommitJob commitJob;
+        CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
         Stats stats;
 
@@ -685,6 +685,7 @@ namespace mongo {
             }
         }
 
+        extern int groupCommitIntervalMs;
         filesystem::path getJournalDir();
 
         void durThread() {
@@ -699,6 +700,8 @@ namespace mongo {
             }
 
             while( !inShutdown() ) {
+                RACECHECK
+
                 unsigned ms = cmdLine.journalCommitInterval;
                 if( ms == 0 ) { 
                     // use default
@@ -734,7 +737,10 @@ namespace mongo {
 
         void recover();
 
+        unsigned notesThisLock = 0;
+
         void releasingWriteLock() {
+            DEV notesThisLock = 0;
             // implicit commitIfNeeded check on each write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {

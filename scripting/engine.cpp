@@ -26,7 +26,7 @@ namespace mongo {
 
     int Scope::_numScopes = 0;
 
-    Scope::Scope() : _localDBName("") , _loadedVersion(0) {
+    Scope::Scope() : _localDBName("") , _loadedVersion(0), _numTimeUsed(0) {
         _numScopes++;
     }
 
@@ -284,12 +284,21 @@ namespace mongo {
         void done( const string& pool , Scope * s ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
-            if ( l.size() > 10 ) {
+            bool oom = s->hasOutOfMemoryException();
+
+            // do not keep too many contexts, or use them for too long
+            if ( l.size() > 10 || s->getTimeUsed() > 100 || oom ) {
                 delete s;
             }
             else {
                 l.push_back( s );
                 s->reset();
+            }
+
+            if (oom) {
+                // out of mem, make some room
+                log() << "Clearing all idle JS contexts due to out of memory" << endl;
+                clear();
             }
         }
 
@@ -302,6 +311,7 @@ namespace mongo {
             Scope * s = l.back();
             l.pop_back();
             s->reset();
+            s->incTimeUsed();
             return s;
         }
 
@@ -418,11 +428,15 @@ namespace mongo {
          * @return 0 on success
          */
         int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
-            return _real->invoke( func , args , recv, timeoutMs , ignoreReturn );
+            return _real->invoke( func , args , recv, timeoutMs , ignoreReturn, readOnlyArgs, readOnlyRecv );
         }
 
         string getError() {
             return _real->getError();
+        }
+
+        bool hasOutOfMemoryException() {
+            return _real->hasOutOfMemoryException();
         }
 
         bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) {

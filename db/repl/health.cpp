@@ -333,17 +333,17 @@ namespace mongo {
 
     const Member* ReplSetImpl::findById(unsigned id) const {
         if( _self && id == _self->id() ) return _self;
-        
+
         for( Member *m = head(); m; m = m->next() )
             if( m->id() == id )
                 return m;
         return 0;
     }
-    
+
     const OpTime ReplSetImpl::lastOtherOpTime() const {
         OpTime closest(0,0);
-        
-        for( Member *m = _members.head(); m; m=m->next() ) {                
+
+        for( Member *m = _members.head(); m; m=m->next() ) {
             if (!m->hbinfo().up()) {
                 continue;
             }
@@ -362,16 +362,27 @@ namespace mongo {
         const Member *_self = this->_self;
         assert( _self );
 
+        MemberState myState = box.getState();
+
         // add self
         {
             BSONObjBuilder bb;
             bb.append("_id", (int) _self->id());
             bb.append("name", _self->fullName());
             bb.append("health", 1.0);
-            bb.append("state", (int) box.getState().s);
-            bb.append("stateStr", box.getState().toString());
-            bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
-            bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
+            bb.append("state", (int)myState.s);
+            bb.append("stateStr", myState.toString());
+            bb.append("uptime", (unsigned)(time(0) - cmdLine.started));
+            if (!_self->config().arbiterOnly) {
+                bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
+                bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);
+            }
+
+            int maintenance = _maintenanceMode;
+            if (maintenance) {
+                bb.append("maintenanceMode", maintenance);
+            }
+
             string s = _self->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -395,22 +406,29 @@ namespace mongo {
                 bb.append("stateStr", m->state().toString());
             }
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
-            bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
-            bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            if (!m->config().arbiterOnly) {
+                bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
+                bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            }
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
             bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
+
+            if (m->hbinfo().authIssue) {
+                bb.append("authenticated", false);
+            }
+
             v.push_back(bb.obj());
             m = m->next();
         }
         sort(v.begin(), v.end());
         b.append("set", name());
         b.appendTimeT("date", time(0));
-        b.append("myState", box.getState().s);
+        b.append("myState", myState.s);
         const Member *syncTarget = _currentSyncTarget;
-        if (syncTarget) {
+        if (syncTarget && myState != MemberState::RS_PRIMARY) {
             b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);

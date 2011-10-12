@@ -245,13 +245,12 @@ namespace mongo {
 
         int nToReturn = (int) c.toNumber( argv[3] );
         int nToSkip = (int) c.toNumber( argv[4] );
-        bool slaveOk = c.getBoolean( obj , "slaveOk" );
         int batchSize = (int) c.toNumber( argv[5] );
         int options = (int)c.toNumber( argv[6] );
 
         try {
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , options , batchSize );
             if ( ! cursor.get() ) {
                 log() << "query failed : " << ns << " " << q << " to: " << conn->toString() << endl;
                 JS_ReportError( cx , "error doing query: failed" );
@@ -314,11 +313,35 @@ namespace mongo {
         string ns = c.toString( argv[0] );
 
         try {
-            BSONObj o = c.toObject( argv[1] );
-            // TODO: add _id
+            JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
 
-            conn->insert( ns , o );
-            return JS_TRUE;
+            if( JS_IsArrayObject( cx, insertObj ) ){
+                vector<BSONObj> bos;
+
+                jsuint len;
+                JSBool gotLen = JS_GetArrayLength( cx, insertObj, &len );
+                smuassert( cx, "could not get length of array", gotLen );
+
+                for( jsuint i = 0; i < len; i++ ){
+
+                    jsval el;
+                    JSBool inserted = JS_GetElement( cx, insertObj, i, &el);
+                    smuassert( cx, "could not find element in array object", inserted );
+
+                    bos.push_back( c.toObject( el ) );
+                }
+
+                conn->insert( ns, bos );
+
+                return JS_TRUE;
+            }
+            else {
+                BSONObj o = c.toObject( argv[1] );
+                // TODO: add _id
+
+                conn->insert( ns , o );
+                return JS_TRUE;
+            }
         }
         catch ( std::exception& e ) {
             stringstream ss;
@@ -548,20 +571,15 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
-    JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        return (JSBool) (*rval = c.getProperty( obj , "str" ));
-    }
-
-    JSFunctionSpec object_id_functions[] = {
-        { "toString" , object_id_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { 0 }
-    };
-
     // dbpointer
 
     JSBool dbpointer_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &dbpointer_class , 0 ) ) {
+            obj = JS_NewObject( cx , &dbpointer_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "dbpointer_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
 
@@ -594,6 +612,11 @@ namespace mongo {
 
     JSBool dbref_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &dbref_class , 0 ) ) {
+            obj = JS_NewObject( cx , &dbref_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "dbref_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
             JSObject * o = JS_NewObject( cx , NULL , NULL, NULL );
@@ -693,6 +716,11 @@ zzz
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         Convertor c( cx );
+        if ( ! JS_InstanceOf( cx , obj , &bindata_class , 0 ) ) {
+            obj = JS_NewObject( cx , &bindata_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "bindata_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
 
         if ( argc == 2 ) {
 
@@ -865,7 +893,6 @@ zzz
         return JS_TRUE;
     }
 
-
     JSClass numberlong_class = {
         "NumberLong" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -995,19 +1022,10 @@ zzz
         return *rval = c.toval( ret.c_str() );
     }
 
-    JSBool numberint_tojson(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        Convertor c(cx);
-        int val = c.toNumberInt( obj );
-        string ret = str::stream() << val;
-        return *rval = c.toval( ret.c_str() );
-    }
-
-
     JSFunctionSpec numberint_functions[] = {
         { "valueOf" , numberint_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toNumber" , numberint_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "toString" , numberint_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "tojson" , numberint_tojson , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
 
@@ -1066,7 +1084,7 @@ zzz
             c.setProperty( obj , "_batchSize" , JSVAL_ZERO );
 
         if ( argc > 9 && JSVAL_IS_NUMBER( argv[9] ) )
-            c.setProperty( obj , "_options" , argv[8] );
+            c.setProperty( obj , "_options" , argv[9] );
         else
             c.setProperty( obj , "_options" , JSVAL_ZERO );
 
@@ -1106,7 +1124,7 @@ zzz
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , object_id_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );

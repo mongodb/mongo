@@ -142,8 +142,8 @@ namespace mongo {
          */
         bool isSharded( const string& ns );
 
-        ChunkManagerPtr getChunkManager( const string& ns , bool reload = false );
-        ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false );
+        ChunkManagerPtr getChunkManager( const string& ns , bool reload = false, bool forceReload = false );
+        ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false, bool forceReload = false );
 
         /**
          * @return the correct for shard for the ns

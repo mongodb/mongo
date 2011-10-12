@@ -232,7 +232,10 @@ namespace mongo {
                 mmf = (MongoMMF*)file;
             }
             else {
-                assert(_recovering);
+                if( !_recovering ) {
+                    log() << "journal error applying writes, file " << fn << " is not open" << endl;
+                    assert(false);
+                }
                 boost::shared_ptr<MongoMMF> sp (new MongoMMF);
                 assert(sp->open(fn, false));
                 _mmfs.push_back(sp);
@@ -372,11 +375,23 @@ namespace mongo {
                     // read file header
                     JHeader h;
                     br.read(h);
+
+                    /* [dm] not automatically handled.  we should eventually handle this automatically.  i think:
+                       (1) if this is the final journal file
+                       (2) and the file size is just the file header in length (or less) -- this is a bit tricky to determine if prealloced
+                       then can just assume recovery ended cleanly and not error out (still should log).
+                    */
+                    uassert(13537, 
+                        "journal file header invalid. This could indicate corruption in a journal file, or perhaps a crash where sectors in file header were in flight written out of order at time of crash (unlikely but possible).", 
+                        h.valid());
+
                     if( !h.versionOk() ) {
-                        log() << "journal file version number mismatch. recover with old version of mongod, terminate cleanly, then upgrade." << endl;
+                        log() << "journal file version number mismatch got:" << hex << h._version                             
+                            << " expected:" << hex << (unsigned) JHeader::CurrentVersion 
+                            << ". if you have just upgraded, recover with old version of mongod, terminate cleanly, then upgrade." 
+                            << endl;
                         uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
                     }
-                    uassert(13537, "journal header invalid", h.valid());
                     fileId = h.fileId;
                     if(cmdLine.durOptions & CmdLine::DurDumpJournal) { 
                         log() << "JHeader::fileId=" << fileId << endl;

@@ -150,9 +150,9 @@ namespace mongo {
 
     bool checkNsFilesOnLoad = true;
 
-    void NamespaceIndex::init() {
-        if ( ht )
-            return;
+    NOINLINE_DECL void NamespaceIndex::_init() {
+        assert( !ht );
+
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
            local.*.
@@ -255,6 +255,17 @@ namespace mongo {
         }
     }
 
+    /* predetermine location of the next alloc without actually doing it. 
+        if cannot predetermine returns null (so still call alloc() then)
+    */
+    DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc) {
+        if ( !capped ) {
+            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+            return __stdAlloc(lenToAlloc, true);
+        }
+        return DiskLoc();
+    }
+
     /** allocate space for a new record from deleted lists.
         @param lenToAlloc is WITH header
         @param extentLoc OUT returns the extent location
@@ -303,9 +314,10 @@ namespace mongo {
     }
 
     /* for non-capped collections.
+       @param willBeAt just look up where and don't reserve
        returned item is out of the deleted list upon return
     */
-    DiskLoc NamespaceDetails::__stdAlloc(int len) {
+    DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
         DiskLoc *prev;
         DiskLoc *bestprev = 0;
         DiskLoc bestmatch;
@@ -368,7 +380,7 @@ namespace mongo {
         }
 
         /* unlink ourself from the deleted list */
-        {
+        if( !peekOnly ) {
             const DeletedRecord *bmr = bestmatch.drec();
             *getDur().writing(bestprev) = bmr->nextDeleted;
             bmr->nextDeleted.writing().setInvalid(); // defensive.
@@ -435,7 +447,7 @@ namespace mongo {
     /* alloc with capped table handling. */
     DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
         if ( !capped )
-            return __stdAlloc(len);
+            return __stdAlloc(len, false);
 
         return cappedAlloc(ns,len);
     }

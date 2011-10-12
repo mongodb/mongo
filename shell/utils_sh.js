@@ -23,6 +23,22 @@ sh._adminCommand = function( cmd , skipCheck ) {
     return res;
 }
 
+
+sh._dataFormat = function( bytes ){
+   if( bytes < 1024 ) return Math.floor( bytes ) + "b"
+   if( bytes < 1024 * 1024 ) return Math.floor( bytes / 1024 ) + "kb"
+   if( bytes < 1024 * 1024 * 1024 ) return Math.floor( ( Math.floor( bytes / 1024 ) / 1024 ) * 100 ) / 100 + "Mb"
+   return Math.floor( ( Math.floor( bytes / ( 1024 * 1024 ) ) / 1024 ) * 100 ) / 100 + "Gb"
+}
+
+sh._collRE = function( coll ){
+   return RegExp( "^" + (coll + "").replace(/\./g, "\\.") + "-.*" )
+}
+
+sh._pchunk = function( chunk ){
+   return "[" + tojson( chunk.min ) + " -> " + tojson( chunk.max ) + "]"
+}
+
 sh.help = function() {
     print( "\tsh.addShard( host )                       server:port OR setname/server:port" )
     print( "\tsh.enableSharding(dbname)                 enables sharding on the database dbname" )
@@ -78,7 +94,7 @@ sh.splitAt = function( fullName , middle ) {
 
 sh.moveChunk = function( fullName , find , to ) {
     sh._checkFullName( fullName );
-    sh._adminCommand( { moveChunk : fullName , find : find , to : to } )
+    return sh._adminCommand( { moveChunk : fullName , find : find , to : to } )
 }
 
 sh.setBalancerState = function( onOrNot ) { 
@@ -96,3 +112,32 @@ sh.isBalancerRunning = function() {
     var x = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
     return x.state > 0;
 }
+
+sh.stopBalancer = function( timeout, interval ) {
+    sh.setBalancerState( false )
+    sh.waitForBalancer( false, timeout, interval )
+}
+
+sh.startBalancer = function( timeout, interval ) {
+    sh.setBalancerState( true )
+    sh.waitForBalancer( true, timeout, interval )
+}
+
+sh.waitForBalancer = function( onOrNot, timeout, interval ){
+    
+    // Can also wait for particular balancer state
+    var state = null
+    if( ! onOrNot ) state = 0
+    else if( onOrNot == true ) state = 2
+    else state = onOrNot
+    
+    assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
+                             return ( lock == null && state == 0 ) || ( lock != null && lock.state == state ) 
+                 },
+                 "waited too long for balancer to " + ( state > 0 ? "start" : "stop" ) + " [ state : " + state + "]",
+                 timeout,
+                 interval
+    )
+    
+}
+

@@ -124,7 +124,7 @@ dodouble:
             int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
             int rsz = r.objsize();
             if ( lsz - rsz != 0 ) return lsz - rsz;
-            return memcmp(l.value()+4, r.value()+4, lsz+1);
+            return memcmp(l.value()+4, r.value()+4, lsz+1 /*+1 for subtype byte*/);
         }
         case RegEx: {
             int c = strcmp(l.regex(), r.regex());
@@ -150,7 +150,9 @@ dodouble:
         return -1;
     }
 
-    /* wo = "well ordered" */
+    /* wo = "well ordered" 
+       note: (mongodb related) : this can only change in behavior when index version # changes
+    */
     inline int BSONElement::woCompare( const BSONElement &e,
                                 bool considerFieldName ) const {
         int lt = (int) canonicalType();

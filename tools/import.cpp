@@ -47,17 +47,6 @@ class Import : public Tool {
     vector<string> _upsertFields;
     static const int BUF_SIZE = 1024 * 1024 * 4;
 
-    string trimWhitespace(const string& str) {
-        if (str.size() == 0) {
-            return str;
-        }
-        size_t begin = 0;
-        size_t end = str.size() - 1;
-        while (begin < str.size() && isspace(str[begin])) { ++begin; } // Finds index of first non-whitespace character
-        while (end > 0 && isspace(str[end])) { --end; } // Finds index of last non-whitespace character
-        return str.substr(begin, end - begin + 1);
-    }
-
     void csvTokenizeRow(const string& row, vector<string>& tokens) {
         bool inQuotes = false;
         bool prevWasQuote = false;
@@ -87,7 +76,8 @@ class Import : public Tool {
 
                 if (element == ',' && !inQuotes) {
                     if (!tokenQuoted) { // If token was quoted, it's already been added
-                        tokens.push_back(trimWhitespace(curtoken));
+                        boost::trim(curtoken);
+                        tokens.push_back(curtoken);
                     }
                     curtoken = "";
                     tokenQuoted = false;
@@ -97,7 +87,8 @@ class Import : public Tool {
             }
         }
         if (!tokenQuoted || (inQuotes && prevWasQuote)) {
-            tokens.push_back(trimWhitespace(curtoken));
+            boost::trim(curtoken);
+            tokens.push_back(curtoken);
         }
     }
 
@@ -282,9 +273,14 @@ public:
         _jsonArray = false;
     }
 
+    virtual void printExtraHelp( ostream & out ) {
+        out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
+    }
+
     int run() {
         string filename = getParam( "file" );
         long long fileSize = 0;
+        int headerRows = 0;
 
         istream * in = &cin;
 
@@ -363,8 +359,12 @@ public:
 
         if ( _type == CSV || _type == TSV ) {
             _headerLine = hasParam( "headerline" );
-            if ( ! _headerLine )
+            if ( _headerLine ) {
+                headerRows = 1;
+            }
+            else {
                 needFields();
+            }
         }
 
         if (_type == JSON && hasParam("jsonArray")) {
@@ -396,7 +396,7 @@ public:
                         break;
                     }
                     len += bytesProcessed;
-                    line += len;
+                    line += bytesProcessed;
                 }
                 else {
                     if (!parseRow(in, o, len)) {
@@ -445,7 +445,7 @@ public:
             }
         }
 
-        cout << "imported " << num << " objects" << endl;
+        cout << "imported " << ( num - headerRows ) << " objects" << endl;
 
         conn().getLastError();
 

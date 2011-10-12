@@ -31,6 +31,7 @@
 #include "../util/processinfo.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
+#include "../util/timer.h"
 
 #include "../client/connpool.h"
 
@@ -422,7 +423,7 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
-                // Sharding interacts with indexing in at least two ways:
+                // Sharding interacts with indexing in at least three ways:
                 //
                 // 1. A unique index must have the sharding key as its prefix. Otherwise maintaining uniqueness would
                 // require coordinated access to all shards. Trying to shard a collection with such an index is not
@@ -433,6 +434,8 @@ namespace mongo {
                 // be slow. Requiring the index upfront allows the admin to plan before sharding and perhaps use
                 // background index construction. One exception to the rule: empty collections. It's fairly easy to
                 // create the index as part of the sharding process.
+                //
+                // 3. If unique : true is specified, we require that the sharding index be unique or created as unique.
                 //
                 // We enforce both these conditions in what comes next.
 
@@ -474,13 +477,14 @@ namespace mongo {
                         if ( proposedKey.isPrefixOf( idx["key"].embeddedObjectUserCheck() ) )
                             continue;
 
-                        errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
+                        errmsg = str::stream() << "can't shard collection '" << ns << "' with unique index on: " + idx.toString()
+                                               << ", uniqueness can't be maintained across unless shard key index is a prefix";
                         conn.done();
                         return false;
                     }
-                    
+
                     if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
-                        errmsg = (string)"can't shard collection " + ns + ", index not unique";
+                        errmsg = (string)"can't shard collection " + ns + ", shard key index not unique and unique index explicitly specified";
                         conn.done();
                         return false;
                     }
@@ -820,6 +824,37 @@ namespace mongo {
 
                 ScopedDbConnection conn( configServer.getPrimary() );
 
+                if (conn->count("config.shards", BSON("_id" << NE << s.getName() << ShardFields::draining(true)))){
+                    conn.done();
+                    errmsg = "Can't have more than one draining shard at a time";
+                    return false;
+                }
+
+                if (conn->count("config.shards", BSON("_id" << NE << s.getName())) == 0){
+                    conn.done();
+                    errmsg = "Can't remove last shard";
+                    return false;
+                }
+
+                BSONObj primaryDoc = BSON( "_id" << NE << "local" << "primary" << s.getName() );
+                BSONObj dbInfo; // appended at end of result on success
+                {
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query("config.databases", primaryDoc));
+                    if (cursor->more()) { // skip block and allocations if empty
+                        BSONObjBuilder dbInfoBuilder;
+                        dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
+                        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+
+                        while (cursor->more()){
+                            BSONObj db = cursor->nextSafe();
+                            dbs.append(db["_id"]);
+                        }
+                        dbs.doneFast();
+
+                        dbInfo = dbInfoBuilder.obj();
+                    }
+                }
+
                 // If the server is not yet draining chunks, put it in draining mode.
                 BSONObj searchDoc = BSON( "_id" << s.getName() );
                 BSONObj drainingDoc = BSON( "_id" << s.getName() << ShardFields::draining(true) );
@@ -838,11 +873,24 @@ namespace mongo {
                         return false;
                     }
 
+                    BSONObj primaryLocalDoc = BSON("_id" << "local" <<  "primary" << s.getName() );
+                    PRINT(primaryLocalDoc);
+                    if (conn->count("config.databases", primaryLocalDoc)) {
+                        log() << "This shard is listed as primary of local db. Removing entry." << endl;
+                        conn->remove("config.databases", BSON("_id" << "local"));
+                        errmsg = conn->getLastError();
+                        if ( errmsg.size() ) {
+                            log() << "error removing local db: " << errmsg << endl;
+                            return false;
+                        }
+                    }
+
                     Shard::reloadShardInfo();
 
                     result.append( "msg"   , "draining started successfully" );
                     result.append( "state" , "started" );
                     result.append( "shard" , s.getName() );
+                    result.appendElements(dbInfo);
                     conn.done();
                     return true;
                 }
@@ -851,7 +899,6 @@ namespace mongo {
                 // Check not only for chunks but also databases.
                 BSONObj shardIDDoc = BSON( "shard" << shardDoc[ "_id" ].str() );
                 long long chunkCount = conn->count( "config.chunks" , shardIDDoc );
-                BSONObj primaryDoc = BSON( "primary" << shardDoc[ "_id" ].str() );
                 long long dbCount = conn->count( "config.databases" , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
@@ -881,6 +928,7 @@ namespace mongo {
                 inner.append( "chunks" , chunkCount );
                 inner.append( "dbs" , dbCount );
                 result.append( "remaining" , inner.obj() );
+                result.appendElements(dbInfo);
 
                 conn.done();
                 return true;
@@ -934,9 +982,6 @@ namespace mongo {
                 return true;
             }
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() {
-                return false;
-            }
             virtual void help( stringstream &help ) const {
                 help << "{whatsmyuri:1}";
             }
@@ -950,7 +995,6 @@ namespace mongo {
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -967,7 +1011,6 @@ namespace mongo {
         class CmdShardingGetLastError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -998,7 +1041,6 @@ namespace mongo {
         CmdShardingResetError() : Command( "resetError" , false , "reseterror" ) {}
 
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool slaveOk() const {
             return true;
         }

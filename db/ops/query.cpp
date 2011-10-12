@@ -102,7 +102,7 @@ namespace mongo {
         int n = 0;
 
         if ( unlikely(!cc) ) {
-            log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+            LOGSOME << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
         }

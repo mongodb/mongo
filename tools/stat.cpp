@@ -55,6 +55,7 @@ namespace mongo {
         }
 
         virtual void printExtraHelp( ostream & out ) {
+            out << "View live MongoDB performance statistics.\n" << endl;
             out << "usage: " << _name << " [options] [sleep time]" << endl;
             out << "sleep time: time to wait (in seconds) between calls" << endl;
         }
@@ -82,13 +83,13 @@ namespace mongo {
             out << "   conn     \t- number of open connections\n";
             out << "   set      \t- replica set name\n";
             out << "   repl     \t- replication type \n";
-            out << "            \t    M   - master\n";
+            out << "            \t    M   - master (primary)\n";
             out << "            \t    SEC - secondary\n";
             out << "            \t    REC - recovering\n";
             out << "            \t    UNK - unknown\n";
             out << "            \t    SLV - slave\n";
+            out << "            \t    RTR - mongos process (\"router\")\n";
         }
-
 
         BSONObj stats() {
             if ( _http ) {
@@ -422,6 +423,8 @@ namespace mongo {
             bool showHeaders = ! hasParam( "noheaders" );
             int rowCount = getParam( "rowcount" , 0 );
             int rowNum = 0;
+
+            auth();
 
             BSONObj prev = stats();
             if ( prev.isEmpty() )

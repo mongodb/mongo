@@ -92,7 +92,7 @@ namespace mongo {
         }
 
         if ( maxOpsQueued ) {
-            log() << "biggest shard has unprocessed writebacks, waiting for completion of migrate" << endl;
+            log() << "biggest shard " << max.first << " has unprocessed writebacks, waiting for completion of migrate" << endl;
             return NULL;
         }
 
@@ -107,8 +107,11 @@ namespace mongo {
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can
         // be draining at once but we choose only one of them to cater to per round.
+        // Important to start balanced, so when there are few chunks any imbalance must be fixed.
         const int imbalance = max.second - min.second;
-        const int threshold = balancedLastTime ? 2 : 8;
+        int threshold = 8;
+        if (balancedLastTime || max.second < 20) threshold = 2;
+        else if (max.second < 80) threshold = 4;
         string from, to;
         if ( imbalance >= threshold ) {
             from = max.first;

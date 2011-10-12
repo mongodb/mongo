@@ -329,6 +329,7 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
+        _blockSync(false),
         _hbmsgTime(0),
         _self(0),
         _maintenanceMode(0),
@@ -353,11 +354,13 @@ namespace mongo {
         }
         for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
             if( i->isSelf() ) {
-                if( sss == 1 )
+                if( sss == 1 ) {
                     LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+                }
             }
-            else
+            else {
                 log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            }
         }
     }
 
@@ -527,6 +530,9 @@ namespace mongo {
             if( m.h.isSelf() ) {
                 assert( me++ == 0 );
                 mi = new Member(m.h, m._id, &m, true);
+                if (!reconf) {
+                    log() << "replSet I am " << m.h.toString() << rsLog;
+                }
                 setSelfTo(mi);
 
                 if( (int)mi->id() == oldPrimaryId )
@@ -632,10 +638,12 @@ namespace mongo {
                         startupStatusMsg.set("can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         static unsigned once;
-                        if( ++once == 1 )
+                        if( ++once == 1 ) {
                             log() << "replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done" << rsLog;
-                        if( _seeds->size() == 0 )
+                        }
+                        if( _seeds->size() == 0 ) {
                             LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
+                        }
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;

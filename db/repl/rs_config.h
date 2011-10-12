@@ -75,11 +75,28 @@ namespace mongo {
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
-                for (set<TagSubgroup*>::iterator it = _groups.begin(); it != _groups.end(); it++) {
+                RACECHECK
+                for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
                     ((TagSubgroup*)(*it))->updateLast(last);
                 }
             }
             bool operator==(const MemberCfg& r) const {
+                if (!tags.empty() || !r.tags.empty()) {
+                    if (tags.size() != r.tags.size()) {
+                        return false;
+                    }
+
+                    // if they are the same size and not equal, at least one
+                    // element in A must be different in B
+                    for (map<string,string>::const_iterator lit = tags.begin(); lit != tags.end(); lit++) {
+                        map<string,string>::const_iterator rit = r.tags.find((*lit).first);
+
+                        if (rit == r.tags.end() || (*lit).second != (*rit).second) {
+                            return false;
+                        }
+                    }
+                }
+
                 return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
                        arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
                        buildIndexes == buildIndexes;
@@ -119,9 +136,20 @@ namespace mongo {
 
         BSONObj asBson() const;
 
+        /**
+         * Getter and setter for _majority. This is almost always
+         * members.size()/2+1, but can be the number of non-arbiter members if
+         * there are more arbiters than non-arbiters (writing to 3 out of 7
+         * servers is safe if 4 of the servers are arbiters).
+         */
+        void setMajority();
+        int getMajority() const;
+
         bool _constructed;
     private:
         bool _ok;
+        int _majority;
+
         void from(BSONObj);
         void clear();
 

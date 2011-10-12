@@ -122,11 +122,10 @@ namespace mongo {
         }
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
-            const int flags = d.reservedField();
-            bool keepGoing = flags & InsertOption_ContinueOnError; // modified before assertion if should abort
-
-            while ( d.moreJSObjs() ) {
-                try {
+            const int flags = d.reservedField() | InsertOption_ContinueOnError; // ContinueOnError is always on when using sharding.
+            map<ChunkPtr, vector<BSONObj> > insertsForChunk; // Group bulk insert for appropriate shards
+            try {
+                while ( d.moreJSObjs() ) {
                     BSONObj o = d.nextJsObj();
                     if ( ! manager->hasShardKey( o ) ) {
 
@@ -149,30 +148,36 @@ namespace mongo {
 
                     // Many operations benefit from having the shard key early in the object
                     o = manager->getShardKey().moveToFront(o);
-
+                    insertsForChunk[manager->findChunk(o)].push_back(o);
+                }
+                for (map<ChunkPtr, vector<BSONObj> >::iterator it = insertsForChunk.begin(); it != insertsForChunk.end(); ++it) {
+                    ChunkPtr c = it->first;
+                    vector<BSONObj> objs = it->second;
                     const int maxTries = 30;
 
                     bool gotThrough = false;
                     for ( int i=0; i<maxTries; i++ ) {
                         try {
-                            ChunkPtr c = manager->findChunk( o );
-                            LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                            insert( c->getShard() , r.getns() , o , flags);
+                            LOG(4) << "  server:" << c->getShard().toString() << " bulk insert " << objs.size() << " documents" << endl;
+                            insert( c->getShard() , r.getns() , objs , flags);
 
-                            r.gotInsert();
+                            int bytesWritten = 0;
+                            for (vector<BSONObj>::iterator vecIt = objs.begin(); vecIt != objs.end(); ++vecIt) {
+                                r.gotInsert(); // Record the correct number of individual inserts
+                                bytesWritten += (*vecIt).objsize();
+                            }
                             if ( r.getClientInfo()->autoSplitOk() )
-                                c->splitIfShould( o.objsize() );
+                                c->splitIfShould( bytesWritten );
                             gotThrough = true;
                             break;
                         }
                         catch ( StaleConfigException& e ) {
                             int logLevel = i < ( maxTries / 2 );
-                            LOG( logLevel ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
+                            LOG( logLevel ) << "retrying bulk insert of " << objs.size() << " documents because of StaleConfigException: " << e << endl;
                             r.reset();
 
                             manager = r.getChunkManager();
                             if( ! manager ) {
-                                keepGoing = false;
                                 uasserted(14804, "collection no longer sharded");
                             }
 
@@ -184,12 +189,12 @@ namespace mongo {
                     }
 
                     assert( inShutdown() || gotThrough ); // not caught below
-                } catch (const UserException&){
-                    if (!keepGoing || !d.moreJSObjs()){
-                        throw;
-                    }
-                    // otherwise ignore and keep going
                 }
+            } catch (const UserException&){
+                if (!d.moreJSObjs()){
+                    throw;
+                }
+                // Ignore and keep going. ContinueOnError is implied with sharding.
             }
         }
 
@@ -226,6 +231,7 @@ namespace mongo {
                     ChunkPtr c = manager->findChunk( o );
                     LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                     insert( c->getShard() , ns , o , flags, safe);
+                    c->splitIfShould( o.objsize() );
                     break;
                 }
                 catch ( StaleConfigException& e ) {

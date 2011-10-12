@@ -203,7 +203,7 @@ namespace mongo {
         BtreeBucket<V> * btreemod() const { 
             return DiskLoc(*this).btreemod<V>();
         }
-        operator DiskLoc() const { 
+        operator const DiskLoc() const { 
             // endian
             if( isNull() ) return DiskLoc();
             unsigned a = *((unsigned *) (_a-1));
@@ -572,6 +572,9 @@ namespace mongo {
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
     };
 
+    template< class V>
+    struct Continuation;
+
     /**
      * This class adds functionality for manipulating buckets that are assembled
      * in a tree.  The requirements for const and non const functions and
@@ -603,6 +606,7 @@ namespace mongo {
     template< class V >
     class BtreeBucket : public BucketBasics<V> {
         friend class BtreeCursor;
+        friend struct Continuation<V>;
     public:
 	// make compiler happy:
         typedef typename V::Key Key;
@@ -679,6 +683,11 @@ namespace mongo {
                       const BSONObj& key, const Ordering &order, bool dupsAllowed,
                       IndexDetails& idx, bool toplevel = true) const;
 
+        /** does the insert in two steps - can then use an upgradable lock for step 1, which 
+            is the part which may have page faults.  also that step is most of the computational work.
+        */
+        void twoStepInsert(DiskLoc thisLoc, Continuation<V> &c, bool dupsAllowed) const;
+
         /**
          * Preconditions:
          *  - 'key' has a valid schema for this index, and may have objsize() > KeyMax.
@@ -721,7 +730,7 @@ namespace mongo {
         void advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) const;
 
         /** Locate a key with fields comprised of a combination of keyBegin fields and keyEnd fields. */
-        void customLocate(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) const;
+        static void customLocate(DiskLoc &locInOut, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) ;
 
         /** @return head of the btree by traversing from current bucket. */
         const DiskLoc getHead(const DiskLoc& thisLoc) const;
@@ -926,7 +935,7 @@ namespace mongo {
          *  - The bucket may be packed or split, invalidating the specified value
          *    of keypos.
          * This function will always modify thisLoc, but it's marked const because
-         * it commonly relies on the specialized write intent mechanism of basicInsert().
+         * it commonly relies on the specialized writ]e intent mechanism of basicInsert().
          */
         void insertHere(const DiskLoc thisLoc, int keypos,
                         const DiskLoc recordLoc, const Key& key, const Ordering &order,
@@ -937,8 +946,10 @@ namespace mongo {
                     const Key& key, const Ordering &order, bool dupsAllowed,
                     const DiskLoc lChild, const DiskLoc rChild, IndexDetails &idx) const;
 
+        void insertStepOne(DiskLoc thisLoc, Continuation<V>& c, bool dupsAllowed) const;
+
         bool find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, const Ordering &order, int& pos, bool assertIfDup) const;        
-        bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) const;
+        static bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) ;
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
         static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
         
@@ -989,12 +1000,14 @@ namespace mongo {
     class BtreeCursor : public Cursor {
     protected:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false);
     public:
         virtual ~BtreeCursor();
         /** makes an appropriate subclass depending on the index version */
+        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false );
         static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false );
 
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
@@ -1062,6 +1075,7 @@ namespace mongo {
 
         /** for debugging only */
         const DiskLoc getBucket() const { return bucket; }
+        int getKeyOfs() const { return keyOfs; }
 
         // just for unit tests
         virtual bool curKeyHasChild() = 0;
@@ -1112,6 +1126,38 @@ namespace mongo {
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;
         long long _nscanned;
+    };
+
+    template< class V >
+    struct Continuation { 
+        //Continuation(const typename V::Key & k);
+        Continuation(DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
+                     Ordering _order, IndexDetails& _idx) :
+            bLoc(thisLoc), recordLoc(_recordLoc), key(_key), order(_order), idx(_idx) { 
+            op = Nothing;
+        }
+
+        DiskLoc bLoc;
+        DiskLoc recordLoc;
+        typename V::KeyOwned key;
+        const Ordering order;
+        IndexDetails& idx;
+        enum Op { Nothing, SetUsed, InsertHere } op;
+
+        int pos;
+        const BtreeBucket<V> *b;
+
+        void stepTwo() {
+            if( op == Nothing )
+                return;
+            else if( op == SetUsed ) {
+                const typename V::_KeyNode& kn = b->k(pos);
+                kn.writing().setUsed();
+            }
+            else {
+                b->insertHere(bLoc, pos, recordLoc, key, order, DiskLoc(), DiskLoc(), idx);
+            }
+        }
     };
 
     /** Renames the index namespace for this btree's index. */

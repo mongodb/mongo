@@ -77,7 +77,6 @@ namespace mongo {
     class CmdResetError : public Command {
     public:
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -108,7 +107,6 @@ namespace mongo {
     public:
         CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
         virtual LockType locktype() const { return NONE;  }
-        virtual bool requiresAuth()       { return false; }
         virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
         virtual void help( stringstream& help ) const {
@@ -238,7 +236,6 @@ namespace mongo {
     class CmdGetPrevError : public Command {
     public:
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -419,9 +416,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus", true) {
-            started = time(0);
-        }
+        CmdServerStatus() : Command("serverStatus", true) {}
 
         virtual LockType locktype() const { return NONE; }
 
@@ -439,7 +434,7 @@ namespace mongo {
             result.append( "host" , prettyHostName() );
             result.append("version", versionString);
             result.append("process","mongod");
-            result.append("uptime",(double) (time(0)-started));
+            result.append("uptime",(double) (time(0)-cmdLine.started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
 
@@ -510,9 +505,11 @@ namespace mongo {
                     t.appendNumber( "mappedWithJournal" , m );
                 }
                 
-                if( v - m > 5000 ) { 
+                int overhead = v - m - connTicketHolder.used();
+
+                if( overhead > 4000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
-                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large. could indicate a memory leak" << endl;
+                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
                 }
 
                 t.done();
@@ -627,7 +624,6 @@ namespace mongo {
 
             return true;
         }
-        time_t started;
     } cmdServerStatus;
 
     class CmdGetOpTime : public Command {
@@ -949,7 +945,7 @@ namespace mongo {
             }
 
             list<BSONObj> all;
-            auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
+            auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
             BSONObjBuilder b;
             while ( i->more() ) {
                 BSONObj o = i->next().removeField("v").getOwned();
@@ -966,6 +962,7 @@ namespace mongo {
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
+                log(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
                 theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
@@ -1104,6 +1101,10 @@ namespace mongo {
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str(), query, sort);
+            if ( ! cursor ) {
+                errmsg = "need an index on { files_id : 1 , n : 1 }";
+                return false;
+            }
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
             int n = 0;
@@ -1558,9 +1559,6 @@ namespace mongo {
             return true;
         }
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() {
-            return false;
-        }
         virtual void help( stringstream &help ) const {
             help << "{whatsmyuri:1}";
         }
@@ -1757,9 +1755,30 @@ namespace mongo {
         }
     } emptyCappedCmd;
 
+    bool _execCommand(Command *c, const string& dbname, BSONObj& cmdObj, int queryOptions, BSONObjBuilder& result, bool fromRepl) {
+
+        try {
+            string errmsg;
+            if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
+                result.append( "errmsg" , errmsg );
+                return false;
+            }
+        }
+        catch ( DBException& e ) {
+            stringstream ss;
+            ss << "exception: " << e.what();
+            result.append( "errmsg" , ss.str() );
+            result.append( "code" , e.getCode() );
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * this handles
      - auth
+     - maintenance mode
      - locking
      - context
      then calls run()
@@ -1815,6 +1834,7 @@ namespace mongo {
             theReplSet->setMaintenanceMode(true);
         }
 
+        bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
 
@@ -1827,47 +1847,25 @@ namespace mongo {
             }
 
             client.curop()->ensureStarted();
-            string errmsg;
-            int ok = c->run( dbname , cmdObj , queryOptions, errmsg , result , fromRepl );
-            if ( ! ok )
-                result.append( "errmsg" , errmsg );
 
-            if (c->maintenanceMode() && theReplSet) {
-                theReplSet->setMaintenanceMode(false);
+            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+        }
+        else {
+            bool needWriteLock = c->locktype() == Command::WRITE;
+
+            if ( ! needWriteLock ) {
+                assert( ! c->logTheOp() );
             }
 
-            return ok;
-        }
+            mongolock lk( needWriteLock );
+            client.curop()->ensureStarted();
+            Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
 
-        bool needWriteLock = c->locktype() == Command::WRITE;
+            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
 
-        if ( ! needWriteLock ) {
-            assert( ! c->logTheOp() );
-        }
-
-        mongolock lk( needWriteLock );
-        client.curop()->ensureStarted();
-        Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
-
-        bool retval = true;
-
-        try {
-            string errmsg;
-            if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
-                result.append( "errmsg" , errmsg );
-                retval = false;
+            if ( retval && c->logTheOp() && ! fromRepl ) {
+                logOp("c", cmdns, cmdObj);
             }
-        }
-        catch ( DBException& e ) {
-            stringstream ss;
-            ss << "exception: " << e.what();
-            result.append( "errmsg" , ss.str() );
-            result.append( "code" , e.getCode() );
-            retval = false;
-        }
-
-        if ( retval && c->logTheOp() && ! fromRepl ) {
-            logOp("c", cmdns, cmdObj);
         }
 
         if (c->maintenanceMode() && theReplSet) {

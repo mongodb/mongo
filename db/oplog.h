@@ -130,5 +130,5 @@ namespace mongo {
      * used for applying from an oplog
      * @param fromRepl really from replication or for testing/internal/command/etc...
      */
-    void applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
+    bool applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
 }

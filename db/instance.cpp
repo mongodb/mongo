@@ -54,7 +54,7 @@ namespace mongo {
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
 
     int nloggedsome = 0;
-#define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
+#define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
     string dbExecCommand;
 
@@ -181,7 +181,7 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ok = false;
             op.debug().exceptionInfo = e.getInfo();
-            LOGSOME {
+            LOGWITHRATELIMIT {
                 log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
                 if( q.ntoskip || q.ntoreturn )
@@ -353,20 +353,19 @@ namespace mongo {
         }
         currentOp.ensureStarted();
         currentOp.done();
-        int ms = currentOp.totalTimeMillis();
+        debug.executionTime = currentOp.totalTimeMillis();
 
         //DEV log = true;
-        if ( log || ms > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 4300 && !log ) {
+        if ( log || debug.executionTime > logThreshold ) {
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && debug.executionTime < 4300 && !log ) {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
-                debug.executionTime = ms;
                 mongo::tlog() << debug << endl;
             }
         }
 
-        if ( currentOp.shouldDBProfile( ms ) ) {
+        if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if ( dbMutex.getState() < 0 ) {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
@@ -503,6 +502,28 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
+    void OpTime::waitForDifferent(unsigned millis){
+        DEV dbMutex.assertAtLeastReadLocked();
+
+        if (*this != last) return; // check early
+
+        boost::xtime timeout;
+        boost::xtime_get(&timeout, TIME_UTC);
+
+        timeout.nsec += millis * 1000*1000;
+        if (timeout.nsec >= 1000*1000*1000){
+            timeout.nsec -= 1000*1000*1000;
+            timeout.sec += 1;
+        }
+
+        do {
+            dbtemprelease tmp;
+            boost::mutex::scoped_lock lk(notifyMutex());
+            if (!notifier().timed_wait(lk, timeout))
+                return; // timed out
+        } while (*this != last);
+    }
+
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
@@ -520,9 +541,18 @@ namespace mongo {
         int pass = 0;
         bool exhaust = false;
         QueryResult* msgdata;
+        OpTime last;
         while( 1 ) {
             try {
                 readlock lk;
+
+                if (str::startsWith(ns, "local.oplog.")){
+                    if (pass == 0)
+                        last = OpTime::last_inlock();
+                    else
+                        last.waitForDifferent(1000/*ms*/);
+                }
+
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
@@ -540,15 +570,14 @@ namespace mongo {
                 }
                 else {
                     if( time(0) - start >= 4 ) {
-                        // after about 4 seconds, return.  this is a sanity check.  pass stops at 1000 normally
-                        // for DEV this helps and also if sleep is highly inaccurate on a platform.  we want to
-                        // return occasionally so slave can checkpoint.
+                        // after about 4 seconds, return. pass stops at 1000 normally.
+                        // we want to return occasionally so slave can checkpoint.
                         pass = 10000;
                     }
                 }
                 pass++;
-                DEV
-                sleepmillis(20);
+                if (debug)
+                    sleepmillis(20);
                 else
                     sleepmillis(2);
                 continue;
@@ -586,26 +615,22 @@ namespace mongo {
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(DbMessage& d, const char *ns, const BSONObj& _js) { 
-        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-        int n = 0;
-        BSONObj js(_js);
-        while( 1 ) {
+    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
+        size_t i;
+        for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(ns, js);
-                ++n;
+                checkAndInsert(ns, objs[i]);
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
-                if (!keepGoing || !d.moreJSObjs()){
-                    globalOpCounters.incInsertInWriteLock(n);
+                if (!keepGoing || i == objs.size()-1){
+                    globalOpCounters.incInsertInWriteLock(i);
                     throw;
                 }
                 // otherwise ignore and keep going
             }
-            if( !d.moreJSObjs() )
-                break;
-            js = d.nextJsObj(); // TODO: refactor to do objcheck outside of writelock
         }
+
+        globalOpCounters.incInsertInWriteLock(i);
     }
 
     void receivedInsert(Message& m, CurOp& op) {
@@ -617,7 +642,14 @@ namespace mongo {
             // strange.  should we complain?
             return;
         }
-        BSONObj js = d.nextJsObj();
+        BSONObj first = d.nextJsObj();
+
+        vector<BSONObj> multi;
+        while (d.moreJSObjs()){
+            if (multi.empty()) // first pass
+                multi.push_back(first);
+            multi.push_back( d.nextJsObj() );
+        }
 
         writelock lk(ns);
 
@@ -629,12 +661,13 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        if( d.moreJSObjs() ) { 
-            insertMulti(d, ns, js);
+        if( !multi.empty() ) {
+            const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+            insertMulti(keepGoing, ns, multi);
             return;
         }
 
-        checkAndInsert(ns, js);
+        checkAndInsert(ns, first);
         globalOpCounters.incInsertInWriteLock(1);
     }
 
@@ -868,10 +901,12 @@ namespace mongo {
             tryToOutputFatal( "shutdown failed with exception" );
         }
 
+#if defined(_DEBUG)
         try {
             mutexDebugger.programEnding();
         }
         catch (...) { }
+#endif
 
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
@@ -913,7 +948,7 @@ namespace mongo {
                 (LPSTR)&msg, 0, NULL);
             string m = msg;
             str::stripTrailing(m, "\r\n");
-            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?" );
+            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << ". Is a mongod instance already running?" );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
@@ -924,7 +959,7 @@ namespace mongo {
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
             lockFile = 0;
-            uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
+            uassert( 10310 ,  "Unable to lock file: " + name + ". Is a mongod instance already running?",  0 );
         }
 #endif
 

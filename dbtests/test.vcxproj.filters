@@ -322,6 +322,9 @@
     <ClInclude Include="..\util\compress.h">
       <Filter>misc and third party</Filter>
     </ClInclude>
+    <ClInclude Include="..\third_party\pcre-7.4\pcrecpp.h" />
+    <ClInclude Include="..\third_party\pcre-7.4\config.h" />
+    <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -813,6 +816,81 @@
       <Filter>misc and third party\snappy</Filter>
     </ClCompile>
     <ClCompile Include="..\db\scanandorder.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcrecpp.cc">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_chartables.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_compile.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_config.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_dfa_exec.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_exec.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_fullinfo.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_get.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_globals.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_info.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_maketables.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_newline.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_ord2utf8.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_refcount.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_scanner.cc">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_stringpiece.cc">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_study.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_tables.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_try_flipped.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_valid_utf8.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_version.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcre_xclass.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\pcre-7.4\pcreposix.c">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\cloud.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

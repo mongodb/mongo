@@ -25,13 +25,19 @@ namespace mongo {
 
     struct Target {
         Target(string hostport) : toHost(hostport), ok(false) { }
-        Target() : ok(false) { }
-        string toHost;
+        //Target() : ok(false) { }
+        const string toHost;
         bool ok;
         BSONObj result;
     };
 
-    /* -- implementation ------------- */
+    /** send a command to several servers in parallel.  waits for all to complete before 
+        returning.  
+        
+        in: Target::toHost
+        out: Target::result and Target::ok
+    */
+    void multiCommand(BSONObj cmd, list<Target>& L);
 
     class _MultiCommandJob : public BackgroundJob {
     public:

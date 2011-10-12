@@ -63,17 +63,6 @@ namespace mongo {
         return true;
     }
 
-    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
-        AuthenticationInfo *ai = ClientInfo::get()->getAuthenticationInfo();
-
-        if ( readOnly ) {
-            ai->authorizeReadOnly( dbname , user );
-        }
-        else {
-            ai->authorize( dbname , user );
-        }
-    }
-
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( !isLocalHost ) {
             return false;

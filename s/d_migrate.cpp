@@ -166,8 +166,8 @@ namespace mongo {
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
-            ReplTime lastOpApplied = cc().getLastOp();
             
+            ReplTime lastOpApplied = cc().getLastOp().asDate();
             Timer t;
             for ( int i=0; i<3600; i++ ) {
                 if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
@@ -488,7 +488,7 @@ namespace mongo {
                 scoped_spinlock lk( _trackerLocks );
                 set<DiskLoc>::iterator i = _cloneLocs.begin();
                 for ( ; i!=_cloneLocs.end(); ++i ) {
-                    if (tracker.ping()) // should I yield?
+                    if (tracker.intervalHasElapsed()) // should I yield?
                         break;
 
                     DiskLoc dl = *i;
@@ -1310,7 +1310,7 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied = cc().getLastOp();
+            ReplTime lastOpApplied = cc().getLastOp().asDate();
 
             {
                 // 4. do bulk of mods
@@ -1466,7 +1466,7 @@ namespace mongo {
 
                     Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
 
-                    *lastOpApplied = cx.getClient()->getLastOp();
+                    *lastOpApplied = cx.getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }
@@ -1481,7 +1481,7 @@ namespace mongo {
 
                     Helpers::upsert( ns , it );
 
-                    *lastOpApplied = cx.getClient()->getLastOp();
+                    *lastOpApplied = cx.getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }

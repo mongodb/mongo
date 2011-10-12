@@ -34,3 +34,4 @@ assert.eq(0, db.system.users.find({user:'user2'}).count(), "didn't drop users")
 assert.eq(1, db.system.indexes.count(), "didn't maintain indexes")
 
 t.stop();
+

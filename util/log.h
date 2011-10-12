@@ -345,7 +345,7 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
-#define MONGO_LOG(level) if ( MONGO_unlikely(logLevel >= (level)) ) log( level )
+#define MONGO_LOG(level) if ( MONGO_likely(logLevel < (level)) ) { } else log( level )
 #define LOG MONGO_LOG
 
     inline Nullstream& log( LogLevel l ) {
@@ -507,6 +507,12 @@ namespace mongo {
                 int x = errno;
                 cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
             }
+
+#ifdef POSIX_FADV_DONTNEED
+            // This only applies to pages that have already been flushed
+            RARELY posix_fadvise(fileno(logfile), 0, 0, POSIX_FADV_DONTNEED);
+#endif
+
         }
         _init();
     }

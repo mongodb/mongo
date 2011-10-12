@@ -30,6 +30,13 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
+        static void phasedBegin();
+        virtual void phasedQueueItemToInsert(
+            int idxNo,
+            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
+            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) = 0;
+        static void phasedFinish();
+
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;

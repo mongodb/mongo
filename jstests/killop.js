@@ -1,7 +1,7 @@
 t = db.jstests_killop
 t.drop();
 
-if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
+//if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
 
 function debug( x ) {
 //    printjson( x );
@@ -40,4 +40,4 @@ s2();
 // don't want to pass if timeout killed the js function
 assert( ( new Date() ) - start < 30000 );
 
-}
+//}

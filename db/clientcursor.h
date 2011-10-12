@@ -191,7 +191,7 @@ namespace mongo {
          */
         bool yieldSometimes( RecordNeeds need, bool *yielded = 0 );
 
-        static int yieldSuggest();
+        static int suggestYieldMicros();
         static void staticYield( int micros , const StringData& ns , Record * rec );
 
         struct YieldData { CursorId _id; bool _doingDeletes; };
@@ -392,7 +392,7 @@ namespace mongo {
         */
         unsigned _pinValue;
 
-        bool _doingDeletes;
+        bool _doingDeletes; // when true we are the delete and aboutToDelete shouldn't manipulate us
         ElapsedTracker _yieldSometimesTracker;
 
         ShardChunkManagerPtr _chunkManager;

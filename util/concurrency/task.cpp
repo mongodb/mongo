@@ -86,9 +86,9 @@ namespace mongo {
 
         /* to get back a return value */
         struct Ret {
-            Ret() : done(false) { }
+            Ret() : done(false),m("Ret") { }
             bool done;
-            boost::mutex m;
+            mongo::mutex m;
             boost::condition c;
             const lam *msg;
             void f() {
@@ -104,16 +104,17 @@ namespace mongo {
             lam f = boost::bind(&Ret::f, &r);
             send(f);
             {
-                boost::mutex::scoped_lock lk(r.m);
+                scoped_lock lk(r.m);
                 while( !r.done )
-                    r.c.wait(lk);
+                    r.c.wait(lk.boost());
             }
         }
 
         void Server::send( lam msg ) {
             {
-                boost::mutex::scoped_lock lk(m);
+                scoped_lock lk(m);
                 d.push_back(msg);
+                wassert( d.size() < 1024 );
             }
             c.notify_one();
         }
@@ -123,9 +124,9 @@ namespace mongo {
             while( 1 ) {
                 lam f;
                 try {
-                    boost::mutex::scoped_lock lk(m);
+                    scoped_lock lk(m);
                     while( d.empty() )
-                        c.wait(lk);
+                        c.wait(lk.boost());
                     f = d.front();
                     d.pop_front();
                 }
@@ -137,7 +138,7 @@ namespace mongo {
                     if( rq ) {
                         rq = false;
                         {
-                            boost::mutex::scoped_lock lk(m);
+                            scoped_lock lk(m);
                             d.push_back(f);
                         }
                     }

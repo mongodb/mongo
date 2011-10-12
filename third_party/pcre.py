@@ -30,6 +30,7 @@ def configure( env , fileLists , options ):
     myenv = env.Clone()
     myenv.Append( CPPDEFINES=["HAVE_CONFIG_H"] )
     fileLists["commonFiles"] += [ myenv.Object(f) for f in getFiles() ]
+    fileLists["moduleFiles"]["pcre"] = [ myenv.Object(f) for f in getFiles() ]
 
 
 

@@ -31,7 +31,42 @@ namespace mongo {
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
+        typedef Continuation<V> Cont;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
+
+        Cont *c[NamespaceDetails::NIndexesMax];
+        int n;
+
+    public:
+        IndexInterfaceImpl() { n = 0; }
+
+        /* lacking CONCURRENCY WRITE this supports only one writer */
+        void _phasedBegin() {
+            // we do this here as phasedFinish can throw exceptions (we could catch there, but just as easy to do here)
+            for( int i = 0; i < n; i++ ) {
+                delete c[i];
+                c[i] = 0; // defensive
+            }
+            n = 0;
+        }
+        void phasedQueueItemToInsert(
+            int idxNo,
+            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
+            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) 
+        { 
+            if( idxNo >= n )
+                n = idxNo + 1;
+            Cont *C = c[idxNo] = new Cont(thisLoc, _recordLoc, _key, _order, _idx);
+            thisLoc.btree<V>()->twoStepInsert(thisLoc, *C, dupsAllowed);
+        }
+        void _phasedFinish() {
+            for( int i = 0; i < n; i++ ) {
+                // if mixing v0 and v1 indexes, in that case (only) there could be nulls in the list
+                if( c[i] ) {
+                    c[i]->stepTwo();
+                }
+            }
+        }
 
 /*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
             int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
@@ -67,7 +102,16 @@ namespace mongo {
         // for geo:
         virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
         virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
-            typename BtreeBucket<V>::KeyNode kn = thisLoc.btree<V>()->keyNode(pos);
+            recordLoc = DiskLoc();
+            const BtreeBucket<V>* bucket = thisLoc.btree<V>();
+            int n = bucket->nKeys();
+
+            if( pos < 0 || pos >= n || n == 0xffff /* bucket deleted */ || ! bucket->isUsed( pos ) ){
+                // log() << "Pos: " << pos << " n " << n << endl;
+                return;
+            }
+
+            typename BtreeBucket<V>::KeyNode kn = bucket->keyNode(pos);
             key = kn.key.toBson();
             recordLoc = kn.recordLoc;
         }
@@ -99,6 +143,15 @@ namespace mongo {
     IndexInterfaceImpl<V1> iii_v1;
 
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
+
+    void IndexInterface::phasedBegin() { 
+        iii_v0._phasedBegin();
+        iii_v1._phasedBegin();
+    }
+    void IndexInterface::phasedFinish() { 
+        iii_v0._phasedFinish();
+        iii_v1._phasedFinish();
+    }
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";

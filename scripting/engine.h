@@ -86,13 +86,14 @@ namespace mongo {
          * @return 0 on success
          */
         virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false ) = 0;
-        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
-            int res = invoke( func , args , recv, timeoutMs, readOnlyArgs, readOnlyRecv );
+        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
+            int res = invoke( func , args , recv, timeoutMs, ignoreReturn, readOnlyArgs, readOnlyRecv );
             if ( res == 0 )
                 return;
             throw UserException( 9004 , (string)"invoke failed: " + getError() );
         }
         virtual string getError() = 0;
+        virtual bool hasOutOfMemoryException() = 0;
 
         int invoke( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 );
         void invokeSafe( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 ) {
@@ -132,6 +133,11 @@ namespace mongo {
 
         static void validateObjectIdString( const string &str );
 
+        /** increments the number of times a scope was used */
+        void incTimeUsed() { ++_numTimeUsed; }
+        /** gets the number of times a scope was used */
+        int getTimeUsed() { return _numTimeUsed; }
+
     protected:
 
         virtual ScriptingFunction _createFunction( const char * code ) = 0;
@@ -141,6 +147,7 @@ namespace mongo {
         set<string> _storedNames;
         static long long _lastVersion;
         map<string,ScriptingFunction> _cachedFunctions;
+        int _numTimeUsed;
 
         static int _numScopes;
     };
@@ -168,7 +175,12 @@ namespace mongo {
 
         static void setup();
 
+        /** gets a scope from the pool or a new one if pool is empty
+         * @param pool An identifier for the pool, usually the db name
+         * @return the scope */
         auto_ptr<Scope> getPooledScope( const string& pool );
+
+        /** call this method to release some JS resources when a thread is done */
         void threadDone();
 
         struct Unlocker { virtual ~Unlocker() {} };

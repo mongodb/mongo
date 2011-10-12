@@ -62,6 +62,9 @@ try {
     after = db.system.profile.count()
     assert.eq( before + 3 , after , "X1" )
 
+    assert.lte( 120 , db.system.profile.findOne( { "command.$eval" : "sleep(120)" } ).millis );
+    assert.lte( 25 , db.system.profile.findOne( { "command.$eval" : "sleep(25)" } ).millis );
+
     /* sleep() could be inaccurate on certain platforms.  let's check */
     print("\nsleep 2 time actual:");
     for (var i = 0; i < 4; i++) {

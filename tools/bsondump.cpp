@@ -48,6 +48,7 @@ public:
     }
 
     virtual void printExtraHelp(ostream& out) {
+        out << "Display BSON objects in a data file.\n" << endl;
         out << "usage: " << _name << " [options] <bson filename>" << endl;
     }
 

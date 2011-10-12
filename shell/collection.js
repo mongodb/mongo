@@ -50,6 +50,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
+    print("\tdb." + shortName + ".insert(obj)");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".remove(query)");
     print("\tdb." + shortName + ".renameCollection( newName , <dropTarget> ) renames the collection.");
@@ -62,6 +63,8 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
+    print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
+    print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
     return __magicNoPrint;
 }
 
@@ -140,14 +143,14 @@ DBCollection.prototype._validateForStorage = function( o ){
 };
 
 
-DBCollection.prototype.find = function( query , fields , limit , skip ){
+DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
     return new DBQuery( this._mongo , this._db , this ,
-                        this._fullName , this._massageObject( query ) , fields , limit , skip );
+                        this._fullName , this._massageObject( query ) , fields , limit , skip , batchSize , options || this.getQueryOptions() );
 }
 
-DBCollection.prototype.findOne = function( query , fields ){
+DBCollection.prototype.findOne = function( query , fields, options ){
     var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , 
-        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , 0 /* options */ );
+        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , options || this.getQueryOptions() /* options */ );
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();
@@ -163,15 +166,17 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
     if ( ! _allow_dot ) {
         this._validateForStorage( obj );
     }
-    if ( typeof( obj._id ) == "undefined" ){
+    if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
         var tmp = obj; // don't want to modify input
         obj = {_id: new ObjectId()};
         for (var key in tmp){
             obj[key] = tmp[key];
         }
     }
+    this._db._initExtraInfo();
     this._mongo.insert( this._fullName , obj );
     this._lastID = obj._id;
+    this._db._getExtraInfo("Inserted");
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
@@ -180,7 +185,9 @@ DBCollection.prototype.remove = function( t , justOne ){
             throw "can't have _id set to undefined in a remove expression"
         }
     }
+    this._db._initExtraInfo();
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
+    this._db._getExtraInfo("Removed");
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -197,7 +204,9 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         // we're basically inserting a brand new object, do full validation
         this._validateForStorage( obj );
     }
+    this._db._initExtraInfo();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
+    this._db._getExtraInfo("Updated");
 }
 
 DBCollection.prototype.save = function( obj ){
@@ -654,3 +663,203 @@ DBCollection.autocomplete = function(obj){
     }
     return ret;
 }
+
+
+// Sharding additions
+
+/* 
+Usage :
+
+mongo <mongos>
+> load('path-to-file/shardingAdditions.js')
+Loading custom sharding extensions...
+true
+
+> var collection = db.getMongo().getCollection("foo.bar")
+> collection.getShardDistribution() // prints statistics related to the collection's data distribution
+
+> collection.getSplitKeysForChunks() // generates split points for all chunks in the collection, based on the
+                                     // default maxChunkSize or alternately a specified chunk size
+> collection.getSplitKeysForChunks( 10 ) // Mb
+
+> var splitter = collection.getSplitKeysForChunks() // by default, the chunks are not split, the keys are just
+                                                    // found.  A splitter function is returned which will actually
+                                                    // do the splits.
+                                                    
+> splitter() // ! Actually executes the splits on the cluster !
+                                                    
+*/
+
+DBCollection.prototype.getShardDistribution = function(){
+
+   var stats = this.stats()
+   
+   if( ! stats.sharded ){
+       print( "Collection " + this + " is not sharded." )
+       return
+   }
+   
+   var config = this.getMongo().getDB("config")
+       
+   var numChunks = 0
+   
+   for( var shard in stats.shards ){
+       
+       var shardDoc = config.shards.findOne({ _id : shard })
+       
+       print( "\nShard " + shard + " at " + shardDoc.host ) 
+       
+       var shardStats = stats.shards[ shard ]
+               
+       var chunks = config.chunks.find({ _id : sh._collRE( coll ), shard : shard }).toArray()
+       
+       numChunks += chunks.length
+       
+       var estChunkData = shardStats.size / chunks.length
+       var estChunkCount = Math.floor( shardStats.count / chunks.length )
+       
+       print( " data : " + sh._dataFormat( shardStats.size ) +
+              " docs : " + shardStats.count +
+              " chunks : " +  chunks.length )
+       print( " estimated data per chunk : " + sh._dataFormat( estChunkData ) )
+       print( " estimated docs per chunk : " + estChunkCount )
+       
+   }
+   
+   print( "\nTotals" )
+   print( " data : " + sh._dataFormat( stats.size ) +
+          " docs : " + stats.count +
+          " chunks : " +  numChunks )
+   for( var shard in stats.shards ){
+   
+       var shardStats = stats.shards[ shard ]
+       
+       var estDataPercent = Math.floor( shardStats.size / stats.size * 100 ) / 100
+       var estDocPercent = Math.floor( shardStats.count / stats.count * 100 ) / 100
+       
+       print( " Shard " + shard + " data : " + estDataPercent + "%, docs : " + estDocPercent + "%" + 
+              ", avg obj size : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
+   }
+   
+   print( "\n" )
+   
+}
+
+
+DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
+       
+   var stats = this.stats()
+   
+   if( ! stats.sharded ){
+       print( "Collection " + this + " is not sharded." )
+       return
+   }
+   
+   var config = this.getMongo().getDB("config")
+   
+   if( ! chunkSize ){
+       chunkSize = config.settings.findOne({ _id : "chunksize" }).value
+       print( "Chunk size not set, using default of " + chunkSize + "Mb" )
+   }
+   else{
+       print( "Using chunk size of " + chunkSize + "Mb" )
+   }
+    
+   var shardDocs = config.shards.find().toArray()
+   
+   var allSplitPoints = {}
+   var numSplits = 0    
+   
+   for( var i = 0; i < shardDocs.length; i++ ){
+       
+       var shardDoc = shardDocs[i]
+       var shard = shardDoc._id
+       var host = shardDoc.host
+       var sconn = new Mongo( host )
+       
+       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
+       
+       print( "\nGetting split points for chunks on shard " + shard + " at " + host )
+               
+       var splitPoints = []
+       
+       for( var j = 0; j < chunks.length; j++ ){
+           var chunk = chunks[j]
+           var result = sconn.getDB("admin").runCommand({ splitVector : this + "", min : chunk.min, max : chunk.max, maxChunkSize : chunkSize })
+           if( ! result.ok ){
+               print( " Had trouble getting split keys for chunk " + sh._pchunk( chunk ) + " :\n" )
+               printjson( result )
+           }
+           else{
+               splitPoints = splitPoints.concat( result.splitKeys )
+               
+               if( result.splitKeys.length > 0 )
+                   print( " Added " + result.splitKeys.length + " split points for chunk " + sh._pchunk( chunk ) )
+           }
+       }
+       
+       print( "Total splits for shard " + shard + " : " + splitPoints.length )
+       
+       numSplits += splitPoints.length
+       allSplitPoints[ shard ] = splitPoints
+       
+   }
+   
+   // Get most recent migration
+   var migration = config.changelog.find({ what : /^move.*/ }).sort({ time : -1 }).limit( 1 ).toArray()
+   if( migration.length == 0 ) 
+       print( "\nNo migrations found in changelog." )
+   else {
+       migration = migration[0]
+       print( "\nMost recent migration activity was on " + migration.ns + " at " + migration.time )
+   }
+   
+   var admin = this.getMongo().getDB("admin") 
+   var coll = this
+   var splitFunction = function(){
+       
+       // Turn off the balancer, just to be safe
+       print( "Turning off balancer..." )
+       config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
+       print( "Sleeping for 30s to allow balancers to detect change.  To be extra safe, check config.changelog" +
+              " for recent migrations." )
+       sleep( 30000 )
+              
+       for( shard in allSplitPoints ){
+           for( var i = 0; i < allSplitPoints[ shard ].length; i++ ){
+               var splitKey = allSplitPoints[ shard ][i]
+               print( "Splitting at " + tojson( splitKey ) )
+               printjson( admin.runCommand({ split : coll + "", middle : splitKey }) )
+           }
+       }
+       
+       print( "Turning the balancer back on." )
+       config.settings.update({ _id : "balancer" }, { $set : { stopped : false } } )
+       sleep( 1 )
+   }
+   
+   print( "\nGenerated " + numSplits + " split keys, run output function to perform splits.\n" +
+          " ex : \n" + 
+          "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
+          "  > splitter() // Execute splits on cluster !\n" )
+       
+   return splitFunction
+   
+}
+
+DBCollection.prototype.setSlaveOk = function( value ) {
+    if( value == undefined ) value = true;
+    this._slaveOk = value;
+}
+
+DBCollection.prototype.getSlaveOk = function() {
+    if (this._slaveOk != undefined) return this._slaveOk;
+    return this._db.getSlaveOk();
+}
+
+DBCollection.prototype.getQueryOptions = function() {
+    var options = 0;
+    if (this.getSlaveOk()) options |= 4;
+    return options;
+}
+

@@ -32,37 +32,50 @@ namespace mongo {
         }
     }
 
-    /* apply the log op that is in param o */
-    void ReplSetImpl::syncApply(const BSONObj &o) {
+    /* apply the log op that is in param o 
+       @return bool failedUpdate
+    */
+    bool ReplSetImpl::syncApply(const BSONObj &o) {
         const char *ns = o.getStringField("ns");
         if ( *ns == '.' || *ns == 0 ) {
             blank(o);
-            return;
+            return false;
         }
 
         Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
-        applyOperation_inlock(o);
+        return applyOperation_inlock(o);
     }
 
     /* initial oplog application, during initial sync, after cloning.
        @return false on failure.
        this method returns an error and doesn't throw exceptions (i think).
     */
-    bool ReplSetImpl::initialSyncOplogApplication(
-        const Member *source,
-        OpTime applyGTE,
-        OpTime minValid) {
-        if( source == 0 ) return false;
-
-        const string hn = source->h().toString();
+    bool ReplSetImpl::initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid) {
+        Member *source = 0;
         OplogReader r;
-        try {
-            if( !r.connect(hn) ) {
-                log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
-                return false;
+
+        // keep trying to initial sync from oplog until we run out of targets
+        while ((source = _getOplogReader(r, applyGTE.isNull())) != 0) {
+            if (_initialSyncOplogApplication(r, source, applyGTE, minValid)) {
+                return true;
             }
 
+            r.resetConnection();
+            veto(source->fullName(), 60);
+            log() << "replSet applying oplog from " << source->fullName() << " failed, trying again" << endl;
+        }
+
+        log() << "replSet initial sync error: couldn't find oplog to sync from" << rsLog;
+        return false;
+    }
+
+    bool ReplSetImpl::_initialSyncOplogApplication(OplogReader& r, const Member *source,
+        const OpTime& applyGTE, const OpTime& minValid) {
+
+        const string hn = source->fullName();
+        OplogReader missingObjReader;
+        try {
             r.tailingQueryGTE( rsoplog, applyGTE );
             if ( !r.haveCursor() ) {
                 log() << "replSet initial sync oplog query error" << rsLog;
@@ -113,12 +126,9 @@ namespace mongo {
                 if( !r.more() )
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-                {
-                    ts = o["ts"]._opTime();
+                ts = o["ts"]._opTime();
 
-                    /* if we have become primary, we dont' want to apply things from elsewhere
-                        anymore. assumePrimary is in the db lock so we are safe as long as
-                        we check after we locked above. */
+                {
                     if( (source->state() != MemberState::RS_PRIMARY &&
                             source->state() != MemberState::RS_SECONDARY) ||
                             replSetForceInitialSyncFailure ) {
@@ -133,9 +143,48 @@ namespace mongo {
                         throw DBException("primary changed",0);
                     }
 
-                    if( ts >= applyGTE ) {
-                        // optimes before we started copying need not be applied.
-                        syncApply(o);
+                    if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
+                        bool failedUpdate = syncApply(o);
+                        if( failedUpdate ) {
+                            // we don't have the object yet, which is possible on initial sync.  get it.
+                            log() << "replSet info adding missing object" << endl; // rare enough we can log
+                            if( !missingObjReader.connect(hn) ) { // ok to call more than once
+                                log() << "replSet initial sync fails, couldn't connect to " << hn << endl;
+                                return false;
+                            }
+                            const char *ns = o.getStringField("ns");
+                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj(); // might be more than just _id in the update criteria
+                            BSONObj missingObj;
+                            try {
+                                missingObj = missingObjReader.findOne(
+                                    ns, 
+                                    query );
+                            } catch(...) { 
+                                log() << "replSet assertion fetching missing object" << endl;
+                                throw;
+                            }
+                            if( missingObj.isEmpty() ) { 
+                                log() << "replSet missing object not found on source. presumably deleted later in oplog" << endl;
+                                log() << "replSet o2: " << o.getObjectField("o2").toString() << endl;
+                                log() << "replSet o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
+                            }
+                            else {
+                                Client::Context ctx(ns);
+                                try {
+                                    DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+                                    assert( !d.isNull() );
+                                } catch(...) { 
+                                    log() << "replSet assertion during insert of missing object" << endl;
+                                    throw;
+                                }
+                                // now reapply the update from above
+                                bool failed = syncApply(o);
+                                if( failed ) {
+                                    log() << "replSet update still fails after adding missing object " << ns << endl;
+                                    assert(false);
+                                }
+                            }
+                        }
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
                 }
@@ -149,7 +198,11 @@ namespace mongo {
                         start = now;
                     }
                 }
-                
+
+                if ( ts > minValid ) {
+                    break;
+                }
+
                 getDur().commitIfNeeded();
             }
             catch (DBException& e) {
@@ -160,6 +213,7 @@ namespace mongo {
                 
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
+                    log() << "replSet requerying oplog after cursor not found condition, ts: " << ts.toStringPretty() << endl;
                     r.resetCursor();
                     r.tailingQueryGTE(rsoplog, ts);
                     if( r.haveCursor() ) {
@@ -171,7 +225,7 @@ namespace mongo {
 
                 if( ts <= minValid ) {
                     // didn't make it far enough
-                    log() << "replSet initial sync failing, error applying oplog " << e.toString() << rsLog;
+                    log() << "replSet initial sync failing, error applying oplog : " << e.toString() << rsLog;
                     return false;
                 }
 
@@ -217,59 +271,68 @@ namespace mongo {
         return golive;
     }
 
-    bool ReplSetImpl::_isStale(OplogReader& r, const string& hn) {
-        BSONObj remoteOldestOp = r.findOne(rsoplog, Query());
-        OpTime ts = remoteOldestOp["ts"]._opTime();
-        DEV log() << "replSet remoteOldestOp:    " << ts.toStringLong() << rsLog;
-        else LOG(3) << "replSet remoteOldestOp: " << ts.toStringLong() << rsLog;
+    bool ReplSetImpl::_isStale(OplogReader& r, const OpTime& startTs, BSONObj& remoteOldestOp) {
+        remoteOldestOp = r.findOne(rsoplog, Query());
+        OpTime remoteTs = remoteOldestOp["ts"]._opTime();
+        DEV log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
+        else LOG(3) << "replSet remoteOldestOp: " << remoteTs.toStringLong() << rsLog;
         DEV {
             log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
             log() << "replSet our state: " << state().toString() << rsLog;
         }
-        if( lastOpTimeWritten >= ts ) {
+        if( startTs >= remoteTs ) {
             return false;
         }
 
-        // we're stale
-        log() << "replSet error RS102 too stale to catch up, at least from " << hn << rsLog;
-        log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-        log() << "replSet oldest at " << hn << " : " << ts.toStringLong() << rsLog;
-        log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-
-        // reset minvalid so that we can't become primary prematurely
-        {
-            writelock lk("local.replset.minvalid");
-            Helpers::putSingleton("local.replset.minvalid", remoteOldestOp);
-        }
-
-        sethbmsg("error RS102 too stale to catch up");
-        changeState(MemberState::RS_RECOVERING);
-        sleepsecs(120);
         return true;
     }
 
-    /**
-     * Tries to connect the oplog reader to a potential sync source.  If
-     * successful, it checks that we are not stale compared to this source.
-     *
-     * @param r reader to populate
-     * @param hn hostname to try
-     *
-     * @return if both checks pass, it returns true, otherwise false.
-     */
-    bool ReplSetImpl::_getOplogReader(OplogReader& r, string& hn) {
+    Member* ReplSetImpl::_getOplogReader(OplogReader& r, const OpTime& minTS) {
+        Member *target = 0, *stale = 0;
+        BSONObj oldest;
+
         assert(r.conn() == 0);
 
-        if( !r.connect(hn) ) {
-            LOG(2) << "replSet can't connect to " << hn << " to read operations" << rsLog;
-            r.resetConnection();
-            return false;
+        while ((target = getMemberToSyncTo()) != 0) {
+            string current = target->fullName();
+
+            if( !r.connect(current) ) {
+                log(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
+                r.resetConnection();
+                veto(current);
+                continue;
+            }
+
+            if( !minTS.isNull() && _isStale(r, minTS, oldest) ) {
+                r.resetConnection();
+                veto(current, 600);
+                stale = target;
+                continue;
+            }
+
+            // if we made it here, the target is up and not stale
+            return target;
         }
-        if( _isStale(r, hn)) {
-            r.resetConnection();
-            return false;
+
+        // the only viable sync target was stale
+        if (stale) {
+            log() << "replSet error RS102 too stale to catch up, at least from " << stale->fullName() << rsLog;
+            log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
+            log() << "replSet oldest at " << stale->fullName() << " : " << oldest["ts"]._opTime().toStringLong() << rsLog;
+            log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+
+            // reset minvalid so that we can't become primary prematurely
+            {
+                writelock lk("local.replset.minvalid");
+                Helpers::putSingleton("local.replset.minvalid", oldest);
+            }
+
+            sethbmsg("error RS102 too stale to catch up");
+            changeState(MemberState::RS_RECOVERING);
+            sleepsecs(120);
         }
-        return true;
+
+        return 0;
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
@@ -277,20 +340,10 @@ namespace mongo {
         // todo : locking vis a vis the mgr...
         OplogReader r;
         string hn;
-        const Member *target = 0;
 
-        // if we cannot reach the master but someone else is more up-to-date
-        // than we are, sync from them.
-        target = getMemberToSyncTo();
-        if (target != 0) {
-            hn = target->h().toString();
-            if (!_getOplogReader(r, hn)) {
-                // we might be stale wrt the primary, but could still sync from
-                // a secondary
-                target = 0;
-            }
-        }
-            
+        // find a target to sync from the last op time written
+        Member* target = _getOplogReader(r, lastOpTimeWritten);
+
         // no server found
         if (target == 0) {
             // if there is no one to sync from
@@ -330,6 +383,7 @@ namespace mongo {
                 }
                 catch(DBException& e) {
                     log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
+                    veto(target->fullName());
                     sleepsecs(2);
                 }
                 return;
@@ -433,6 +487,7 @@ namespace mongo {
                     }
                     catch (DBException& e) {
                         sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
+                        veto(target->fullName(), 300);
                         sleepsecs(30);
                         return;
                     }
@@ -458,7 +513,7 @@ namespace mongo {
             sleepsecs(1);
             return;
         }
-        if( sp.state.fatal() || sp.state.startup() ) {
+        if( _blockSync || sp.state.fatal() || sp.state.startup() ) {
             sleepsecs(5);
             return;
         }
@@ -528,6 +583,15 @@ namespace mongo {
     void GhostSync::starting() {
         Client::initThread("rsGhostSync");
         replLocalAuth();
+    }
+
+    void ReplSetImpl::blockSync(bool block) {
+        _blockSync = block;
+        if (_blockSync) {
+            // syncing is how we get into SECONDARY state, so we'll be stuck in
+            // RECOVERING until we unblock
+            changeState(MemberState::RS_RECOVERING);
+        }
     }
 
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {

@@ -254,6 +254,11 @@ namespace mongo {
 
         BSONElement getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const;
 
+        /** arrays are bson objects with numeric and increasing field names
+            @return true if field names are numeric and increasing
+         */
+        bool couldBeArray() const;
+
         /** @return the raw data of the object */
         const char *objdata() const {
             return _objdata;
@@ -325,6 +330,11 @@ namespace mongo {
         const char * firstElementFieldName() const { 
             const char *p = objdata() + 4;
             return *p == EOO ? "" : p+1;
+        }
+
+        BSONType firstElementType() const { 
+            const char *p = objdata() + 4;
+            return (BSONType) *p;
         }
 
         /** Get the _id field from the object.  For good performance drivers should

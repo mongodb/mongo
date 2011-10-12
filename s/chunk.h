@@ -152,6 +152,15 @@ namespace mongo {
          *  talks to mongod to do this
          */
         long getPhysicalSize() const;
+        
+
+        /**
+         * marks this chunk as a jumbo chunk
+         * that means the chunk will be inelligble for migrates
+         */
+        void markAsJumbo() const;
+
+        bool isJumbo() const { return _jumbo; }
 
         //
         // public constants
@@ -186,6 +195,7 @@ namespace mongo {
         BSONObj _max;
         Shard _shard;
         ShardChunkVersion _lastmod;
+        mutable bool _jumbo;
 
         // transient stuff
 

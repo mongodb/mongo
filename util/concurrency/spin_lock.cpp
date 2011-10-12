@@ -54,7 +54,9 @@ namespace mongo {
 
         // wait for lock
         int wait = 1000;
-        while ((wait-- > 0) && (_locked)) {}
+        while ((wait-- > 0) && (_locked)) {
+            asm volatile ( "pause" ) ;
+        }
 
         // if failed to grab lock, sleep
         struct timespec t;

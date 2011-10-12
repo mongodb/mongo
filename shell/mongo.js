@@ -25,8 +25,12 @@ if ( typeof mongoInject == "function" ){
 }
 
 Mongo.prototype.setSlaveOk = function( value ) {
-    if( value == undefined ) value = true
-    this.slaveOk = value
+    if( value == undefined ) value = true;
+    this.slaveOk = value;
+}
+
+Mongo.prototype.getSlaveOk = function() {
+    return this.slaveOk || false;
 }
 
 Mongo.prototype.getDB = function( name ){

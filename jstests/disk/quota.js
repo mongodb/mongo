@@ -5,7 +5,7 @@ port = allocatePorts( 1 )[ 0 ];
 baseName = "jstests_disk_quota";
 dbpath = "/data/db/" + baseName;
 
-m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--quotaFiles", "1", "--smallfiles" );
+m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--quotaFiles", "2", "--smallfiles" );
 db = m.getDB( baseName );
 
 big = new Array( 10000 ).toString();

@@ -83,6 +83,12 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
+
+            // for now, skip the "v" field so that v:0 indexes will be upgraded to v:1
+            if ( string("v") == e.fieldName() ) {
+                continue;
+            }
+
             if ( string("ns") == e.fieldName() ) {
                 uassert( 10024 , "bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
@@ -332,6 +338,11 @@ namespace mongo {
                 else {
                     conn.reset( new DBDirectClient() );
                 }
+                // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
+                //       only would be relevant if a thousands of collections -- maybe even then it is hard
+                //       to exceed a single cursor batch.
+                //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl 
+                //       doesnt not use snapshot=true).
                 c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? QueryOption_SlaveOk : 0 );
             }
 
@@ -435,6 +446,7 @@ namespace mongo {
                  rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
                  is dubious here at the moment.
         */
+        // won't need a snapshot of the query of system.indexes as there can never be very many.
         copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, mayYield, mayBeInterrupted, BSON( "name" << NE << "_id_" ) );
 
         return true;
@@ -468,7 +480,7 @@ namespace mongo {
                were to clone it would get a different point-in-time and not match.
                */
             return cloneFrom(from.c_str(), errmsg, dbname,
-                             /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true, /*mayBeInterrupted*/false);
+                             /*logForReplication=*/!fromRepl, /*slaveOk*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true, /*mayBeInterrupted*/false);
         }
     } cmdclone;
 

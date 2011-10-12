@@ -131,6 +131,12 @@ DBQuery.prototype.objsLeftInBatch = function(){
     return ret;
 }
 
+DBQuery.prototype.readOnly = function(){
+    this._exec();
+    this._cursor.readOnly();
+    return this;
+}
+
 DBQuery.prototype.toArray = function(){
     if ( this._arr )
         return this._arr;
@@ -290,20 +296,25 @@ DBQuery.prototype.pretty = function(){
 
 DBQuery.prototype.shellPrint = function(){
     try {
+        var start = new Date().getTime();
         var n = 0;
         while ( this.hasNext() && n < DBQuery.shellBatchSize ){
             var s = this._prettyShell ? tojson( this.next() ) : tojson( this.next() , "" , true );
             print( s );
             n++;
         }
-        if ( this.hasNext() ){
-            print( "has more" );
+        if (typeof _verboseShell !== 'undefined' && _verboseShell) {
+            var time = new Date().getTime() - start;
+            print("Fetched " + n + " record(s) in " + time + "ms");
+        }
+         if ( this.hasNext() ){
+            print( "Type \"it\" for more" );
             ___it___  = this;
         }
         else {
             ___it___  = null;
         }
-    }
+   }
     catch ( e ){
         print( e );
     }

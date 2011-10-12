@@ -430,8 +430,11 @@ namespace mongo {
             return checkConfigOrInit( configdb , authoritative , errmsg , result , true );
         }
         
-        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string errmsg ) {
+        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string& errmsg ) {
             if ( id.type() != jstOID ) {
+                if ( ! info->hasID() ) {
+                    warning() << "bad serverID set in setShardVersion and none in info: " << id << endl;
+                }
                 // TODO: fix this
                 //errmsg = "need serverID to be an OID";
                 //return 0;
@@ -465,6 +468,10 @@ namespace mongo {
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
+            // make sure we have the mongos id for writebacks
+            if ( ! checkMongosID( info , cmdObj["serverID"] , errmsg ) ) 
+                return false;
+
             bool authoritative = cmdObj.getBoolField( "authoritative" );
             
             // check config server is ok or enable sharding
@@ -477,10 +484,6 @@ namespace mongo {
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
             
-            // make sure we have the mongos id for writebacks
-            if ( ! checkMongosID( info , cmdObj["serverID"] , errmsg ) )
-                return false;
-
             // step 2
             
             string ns = cmdObj["setShardVersion"].valuestrsafe();

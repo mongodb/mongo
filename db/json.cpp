@@ -113,6 +113,7 @@ namespace mongo {
         string regex;
         string regexOptions;
         Date_t date;
+        OpTime timestamp;
     };
 
     struct objectStart {
@@ -227,11 +228,12 @@ namespace mongo {
         fieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
             string name = b.popString();
-            massert( 10338 ,  "Invalid use of reserved field name",
+            massert( 10338 ,  "Invalid use of reserved field name: " + name,
                      name != "$oid" &&
                      name != "$binary" &&
                      name != "$type" &&
                      name != "$date" &&
+                     name != "$timestamp" &&
                      name != "$regex" &&
                      name != "$options" );
             b.fieldNames.back() = name;
@@ -368,6 +370,14 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
+    struct timestampEnd {
+        timestampEnd( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.back()->appendTimestamp( b.fieldName(), b.timestamp.asDate() );
+        }
+        ObjectBuilder &b;
+    };
+
     struct binDataBinary {
         binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
@@ -391,6 +401,22 @@ namespace mongo {
         void operator() ( const char *start, const char *end ) const {
             b.back()->appendBinData( b.fieldName(), b.binData.length(),
                                      b.binDataType, b.binData.data() );
+        }
+        ObjectBuilder &b;
+    };
+
+    struct timestampSecs {
+        timestampSecs( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( unsigned long long x) const {
+            b.timestamp = OpTime( (unsigned) (x/1000) , 0);
+        }
+        ObjectBuilder &b;
+    };
+
+    struct timestampInc {
+        timestampInc( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( unsigned x) const {
+            b.timestamp = OpTime(b.timestamp.getSecs(), x);
         }
         ObjectBuilder &b;
     };
@@ -478,6 +504,7 @@ namespace mongo {
                     oid[ oidEnd( self.b ) ] |
                     bindata[ binDataEnd( self.b ) ] |
                     dbref[ dbrefEnd( self.b ) ] |
+                    timestamp[ timestampEnd( self.b ) ] |
                     regex[ regexEnd( self.b ) ] |
                     object[ subobjectEnd( self.b ) ] ;
                 // NOTE lexeme_d and rules don't mix well, so we have this mess.
@@ -528,6 +555,10 @@ namespace mongo {
                 dbrefT = str_p( "Dbref" ) >> '(' >> str[ dbrefNS( self.b ) ] >> ',' >>
                          quotedOid >> ')';
 
+                timestamp = ch_p( '{' ) >> "\"$timestamp\"" >> ':' >> '{' >>
+                    "\"t\"" >> ':' >> uint_parser<unsigned long long, 10, 1, -1>()[ timestampSecs(self.b) ] >> ',' >>
+                    "\"i\"" >> ':' >> uint_parser<unsigned int, 10, 1, -1>()[ timestampInc(self.b) ] >> '}' >>'}';
+
                 oid = oidS | oidT;
                 oidS = ch_p( '{' ) >> "\"$oid\"" >> ':' >> quotedOid >> '}';
                 oidT = str_p( "ObjectId" ) >> '(' >> quotedOid >> ')';
@@ -561,8 +592,9 @@ namespace mongo {
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
             rule< ScannerT > object, members, array, elements, value, str, number, integer,
-                  dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-                  regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
+                  dbref, dbrefS, dbrefT, timestamp, timestampS, timestampT, oid, oidS, oidT, 
+                  bindata, date, dateS, dateT, regex, regexS, regexT, quotedOid, fieldName, 
+                  unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {
                 return object;
             }

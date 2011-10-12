@@ -16,9 +16,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include "../pch.h"
 #include "writeback_listener.h"
 #include "../db/security.h"
+#include "../db/client_common.h"
 
 namespace mongo {
 
@@ -27,7 +30,7 @@ namespace mongo {
      * 1 per client socket
      * currently implemented with a thread local
      */
-    class ClientInfo {
+    class ClientInfo : public ClientBasic {
     public:
         ClientInfo();
         ~ClientInfo();
@@ -37,6 +40,8 @@ namespace mongo {
 
         /** client disconnected */
         void disconnect();
+
+        bool hasRemote() const { return true; }
 
         /**
          * @return remote socket address of the client
@@ -83,7 +88,8 @@ namespace mongo {
         void noAutoSplit() { _autoSplitOk = false; }
 
         static ClientInfo * get();
-        AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
+        const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
+        AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
     private:
         AuthenticationInfo _ai;

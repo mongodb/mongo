@@ -527,6 +527,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t pos = 0;
     size_t len = 0;
     size_t cols = getColumns();
+    // cols is 0 in certain circumstances like inside debugger, which creates further issues
+    cols = cols > 0 ? cols : 80;
 
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
@@ -561,6 +563,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         }
 
         switch(c) {
+        case 10:
         case 13:    /* enter */
             history_len--;
             free(history[history_len]);

@@ -17,15 +17,15 @@
 
 #pragma once
 
-#include <map>
-#include <set>
 #include "../heapcheck.h"
+#include "threadlocal.h"
+#if defined(_DEBUG)
+#include "mutexdebugger.h"
+#endif
 
 namespace mongo {
 
     void printStackTrace( ostream &o );
-
-    class mutex;
 
     inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
@@ -38,105 +38,6 @@ namespace mongo {
         }
         return xt;
     }
-
-    /** only used on _DEBUG builds.
-        MutexDebugger checks that we always acquire locks for multiple mutexes in a consistant (acyclic) order.
-        If we were inconsistent we could deadlock.
-    */
-    class MutexDebugger {
-        typedef const char * mid; // mid = mutex ID
-        typedef map<mid,int> Preceeding;
-        map< mid, int > maxNest;
-        boost::thread_specific_ptr< Preceeding > us;
-        map< mid, set<mid> > followers;
-        boost::mutex &x;
-        unsigned magic;
-        void aBreakPoint() { } // for debugging
-    public:
-        // set these to create an assert that
-        //   b must never be locked before a
-        //   so
-        //     a.lock(); b.lock(); is fine
-        //     b.lock(); alone is fine too
-        //   only checked on _DEBUG builds.
-        string a,b;
-
-        /** outputs some diagnostic info on mutexes (on _DEBUG builds) */
-        void programEnding();
-
-        MutexDebugger();
-
-        void entering(mid m) {
-            if( this == 0 ) return;
-            assert( magic == 0x12345678 );
-
-            Preceeding *_preceeding = us.get();
-            if( _preceeding == 0 )
-                us.reset( _preceeding = new Preceeding() );
-            Preceeding &preceeding = *_preceeding;
-
-            if( a == m ) {
-                aBreakPoint();
-                if( preceeding[b.c_str()] ) {
-                    cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << endl;
-                    assert(false);
-                }
-            }
-
-            preceeding[m]++;
-            if( preceeding[m] > 1 ) {
-                // recursive re-locking.
-                if( preceeding[m] > maxNest[m] )
-                    maxNest[m] = preceeding[m];
-                return;
-            }
-
-            bool failed = false;
-            string err;
-            {
-                boost::mutex::scoped_lock lk(x);
-                followers[m];
-                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
-                    if( m != i->first && i->second > 0 ) {
-                        followers[i->first].insert(m);
-                        if( followers[m].count(i->first) != 0 ) {
-                            failed = true;
-                            stringstream ss;
-                            mid bad = i->first;
-                            ss << "mutex problem" <<
-                               "\n  when locking " << m <<
-                               "\n  " << bad << " was already locked and should not be."
-                               "\n  set a and b above to debug.\n";
-                            stringstream q;
-                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
-                                if( i->first != m && i->first != bad && i->second > 0 )
-                                    q << "  " << i->first << '\n';
-                            }
-                            string also = q.str();
-                            if( !also.empty() )
-                                ss << "also locked before " << m << " in this thread (no particular order):\n" << also;
-                            err = ss.str();
-                            break;
-                        }
-                    }
-                }
-            }
-            if( failed ) {
-                cout << err << endl;
-                assert( 0 );
-            }
-        }
-        void leaving(mid m) {
-            if( this == 0 ) return; // still in startup pre-main()
-            Preceeding& preceeding = *us.get();
-            preceeding[m]--;
-            if( preceeding[m] < 0 ) {
-                cout << "ERROR: lock count for " << m << " is " << preceeding[m] << endl;
-                assert( preceeding[m] >= 0 );
-            }
-        }
-    };
-    extern MutexDebugger &mutexDebugger;
 
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so _destroyingStatics will be set
@@ -154,12 +55,8 @@ namespace mongo {
      */
     class mutex : boost::noncopyable {
     public:
-#if defined(_DEBUG)
         const char * const _name;
         mutex(const char *name) : _name(name)
-#else
-        mutex(const char *)
-#endif
         {
             _m = new boost::timed_mutex();
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
@@ -240,19 +137,45 @@ namespace mongo {
         SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
         ~SimpleMutex() { DeleteCriticalSection(&_cs); }
 
-        void lock() { EnterCriticalSection(&_cs); }
-        void unlock() { LeaveCriticalSection(&_cs); }
+#if defined(_DEBUG)
+        ThreadLocalValue<int> _nlocksByMe;
+        void lock() { 
+            assert( _nlocksByMe.get() == 0 ); // indicates you rae trying to lock recursively
+            _nlocksByMe.set(1);
+            EnterCriticalSection(&_cs); 
+        }
+        void dassertLocked() const { 
+            assert( _nlocksByMe.get() == 1 );
+        }
+        void unlock() { 
+            dassertLocked();
+            _nlocksByMe.set(0);
+            LeaveCriticalSection(&_cs); 
+        }
+#else
+        void dassertLocked() const { }
+        void lock() { 
+            EnterCriticalSection(&_cs); 
+        }
+        void unlock() { 
+            LeaveCriticalSection(&_cs); 
+        }
+#endif
 
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
+# if defined(_DEBUG)
+            const SimpleMutex& m() const { return _m; }
+# endif
         };
     };
 #else
     class SimpleMutex : boost::noncopyable {
     public:
+        void dassertLocked() const { }
         SimpleMutex(const char* name) { assert( pthread_mutex_init(&_lock,0) == 0 ); }
         ~SimpleMutex(){ 
             if ( ! StaticObserver::_destroyingStatics ) { 
@@ -262,12 +185,13 @@ namespace mongo {
 
         void lock() { assert( pthread_mutex_lock(&_lock) == 0 ); }
         void unlock() { assert( pthread_mutex_unlock(&_lock) == 0 ); }
-        
+    public:
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
+            const SimpleMutex& m() const { return _m; }
         };
 
     private:

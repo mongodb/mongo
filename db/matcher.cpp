@@ -167,6 +167,16 @@ namespace mongo {
 
     }
 
+    int ElementMatcher::inverseOfNegativeCompareOp() const {
+        verify( 15892, negativeCompareOp() );
+        return _compareOp == BSONObj::NE ? BSONObj::Equality : BSONObj::opIN;
+    }
+
+    bool ElementMatcher::negativeCompareOpContainsNull() const {
+        verify( 15893, negativeCompareOp() );
+        return (_compareOp == BSONObj::NE && _toMatch.type() != jstNULL) ||
+        (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
+    }
 
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
@@ -301,21 +311,56 @@ namespace mongo {
 
     bool Matcher::parseClause( const BSONElement &e ) {
         const char *ef = e.fieldName();
+
         if ( ef[ 0 ] != '$' )
             return false;
+        
+        // $and
         if ( ef[ 1 ] == 'a' && ef[ 2 ] == 'n' && ef[ 3 ] == 'd' ) {
             parseExtractedClause( e, _andMatchers );
+            return true;
         }
-        else if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
+
+        // $or
+        if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
             parseExtractedClause( e, _orMatchers );
+            return true;
         }
-        else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
+        
+        // $nor
+        if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
             parseExtractedClause( e, _norMatchers );
+            return true;
+        }
+        
+        // $comment
+        if ( ef[ 1 ] == 'c' && ef[ 2 ] == 'o' && ef[ 3 ] == 'm' && str::equals( ef , "$comment" ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // $where: function()...
+    NOINLINE_DECL void Matcher::parseWhere( const BSONElement &e ) { 
+        uassert(15902 , "$where expression has an unexpected type", e.type() == String || e.type() == CodeWScope || e.type() == Code );
+        uassert( 10066 , "$where may only appear once in query", _where == 0 );
+        uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
+        massert( 13089 , "no current client needed for $where" , haveClient() );
+        _where = new Where();
+        _where->scope = globalScriptEngine->getPooledScope( cc().ns() );
+        _where->scope->localConnect( cc().database()->name.c_str() );
+            
+        if ( e.type() == CodeWScope ) {
+            _where->setFunc( e.codeWScopeCode() );
+            _where->jsScope = new BSONObj( e.codeWScopeScopeData() );
         }
         else {
-            return false;
+            const char *code = e.valuestr();
+            _where->setFunc(code);
         }
-        return true;
+            
+        _where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
     }
     
     void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
@@ -325,32 +370,15 @@ namespace mongo {
         if ( parseClause( e ) ) {
             return;   
         }
-        
-        if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
-            // $where: function()...
-            uassert( 10066 , "$where may only appear once in query", _where == 0 );
-            uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
-            massert( 13089 , "no current client needed for $where" , haveClient() );
-            _where = new Where();
-            _where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-            _where->scope->localConnect( cc().database()->name.c_str() );
-            
-            if ( e.type() == CodeWScope ) {
-                _where->setFunc( e.codeWScopeCode() );
-                _where->jsScope = new BSONObj( e.codeWScopeScopeData() );
-            }
-            else {
-                const char *code = e.valuestr();
-                _where->setFunc(code);
-            }
-            
-            _where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
-            
+
+        const char *fn = e.fieldName();
+        if ( str::equals(fn, "$where") ) {
+            parseWhere(e);
             return;
         }
-        
+
         if ( e.type() == RegEx ) {
-            addRegex( e.fieldName(), e.regex(), e.regexFlags() );
+            addRegex( fn, e.regex(), e.regexFlags() );
             return;
         }
         
@@ -413,10 +441,12 @@ namespace mongo {
         if ( e.type() == Array ) {
             _hasArray = true;
         }
-        else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
-            uassert( 14844, "$atomic specifier must be a top level field", !nested );
-            _atomic = e.trueValue();
-            return;
+        else if( *fn == '$' ) {
+            if( str::equals(fn, "$atomic") || str::equals(fn, "$isolated") ) {
+                uassert( 14844, "$atomic specifier must be a top level field", !nested );
+                _atomic = e.trueValue();
+                return;
+            }
         }
         
         // normal, simple case e.g. { a : "foo" }
@@ -556,12 +586,12 @@ namespace mongo {
         return (op & z);
     }
 
-    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) const {
-        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm , false , details );
-        if ( bm._toMatch.type() != jstNULL )
-            return ( ret <= 0 ) ? 1 : 0;
-        else
-            return -ret;
+    int Matcher::inverseMatch(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) const {
+        int inverseRet = matchesDotted( fieldName, toMatch, obj, bm.inverseOfNegativeCompareOp(), bm , false , details );
+        if ( bm.negativeCompareOpContainsNull() ) {
+            return ( inverseRet <= 0 ) ? 1 : 0;
+        }
+        return -inverseRet;
     }
 
     int retExistsFound( const ElementMatcher &bm ) {
@@ -573,7 +603,7 @@ namespace mongo {
        fieldName - field to match "a.b" if we are reaching into an embedded object.
        toMatch   - element we want to match.
        obj       - database object to check against
-       compareOp - Equality, LT, GT, etc.
+       compareOp - Equality, LT, GT, etc.  This may be different than, and should supersede, the compare op in em. 
        isArr     -
 
        Special forms:
@@ -649,26 +679,8 @@ namespace mongo {
             return 1;
         } // end opALL
 
-        if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, em , details );
-        if ( compareOp == BSONObj::NIN ) {
-            for( set<BSONElement,element_lt>::const_iterator i = em._myset->begin(); i != em._myset->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, em , details );
-                if ( ret != 1 )
-                    return ret;
-            }
-            if ( em._myregex.get() ) {
-                BSONElementSet s;
-                obj.getFieldsDotted( fieldName, s );
-                for( vector<RegexMatcher>::const_iterator i = em._myregex->begin(); i != em._myregex->end(); ++i ) {
-                    for( BSONElementSet::const_iterator j = s.begin(); j != s.end(); ++j ) {
-                        if ( regexMatches( *i, *j ) ) {
-                            return -1;
-                        }
-                    }
-                }
-            }
-            return 1;
+        if ( compareOp == BSONObj::NE || compareOp == BSONObj::NIN ) {
+            return inverseMatch( fieldName, toMatch, obj, em , details );
         }
 
         BSONElement e;
@@ -792,7 +804,7 @@ namespace mongo {
                 return 1;
             }
             if ( compareOp == BSONObj::opIN && valuesMatch( e, toMatch, compareOp, em ) ) {
-             	return 1;   
+             	return 1;
             }
         }
         else if ( e.eoo() ) {
@@ -825,8 +837,9 @@ namespace mongo {
                 return false;
             if ( cmp == 0 ) {
                 /* missing is ok iff we were looking for null */
-                if ( m.type() == jstNULL || m.type() == Undefined || ( bm._compareOp == BSONObj::opIN && bm._myset->count( staticNull.firstElement() ) > 0 ) ) {
-                    if ( ( bm._compareOp == BSONObj::NE ) ^ bm._isNot ) {
+                if ( m.type() == jstNULL || m.type() == Undefined ||
+                    ( ( bm._compareOp == BSONObj::opIN || bm._compareOp == BSONObj::NIN ) && bm._myset->count( staticNull.firstElement() ) > 0 ) ) {
+                    if ( bm.negativeCompareOp() ^ bm._isNot ) {
                         return false;
                     }
                 }

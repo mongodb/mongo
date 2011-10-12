@@ -1,23 +1,11 @@
 #pragma once
 
 #include "../goodies.h" // printStackTrace
+#include "mutexdebugger.h"
 
 namespace mongo {
 
-    /** some self-testing of synchronization and attempts to catch race conditions.
-
-        use something like:
-
-        CodeBlock myBlock;
-
-        void foo() { 
-            CodeBlock::Within w(myBlock);
-            ...
-        }
-
-        In _DEBUG builds, will (sometimes/maybe) fail if two threads are in the same code block at 
-        the same time. Also detects and disallows recursion.
-    */
+    namespace race {
 
 #ifdef _WIN32
     typedef unsigned threadId_t;
@@ -25,91 +13,65 @@ namespace mongo {
     typedef pthread_t threadId_t;
 #endif
 
-
 #if defined(_DEBUG)
 
-    namespace race {
-
-        class CodePoint { 
-        public:
-            string lastName;
-            threadId_t lastTid;
-            string file;
-            CodePoint(string f) : lastTid(0), file(f) { }
-        };
-        class Check {
-        public:
-            Check(CodePoint& p) {
-                threadId_t t = GetCurrentThreadId();
-                if( p.lastTid == 0 ) {
-                    p.lastTid = t;
-                    p.lastName = getThreadName();
+        class Block { 
+            volatile int n;
+            unsigned ncalls;
+            const string file;
+            const unsigned line;
+            void fail() { 
+                log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):\n"
+                    << mutexDebugger.currentlyLocked() << endl;
+                printStackTrace();
+                ::abort();
+            }
+            void enter() { 
+                if( ++n != 1 ) fail();
+                ncalls++;
+                if( ncalls < 100 ) {
+                    sleepmillis(0);
                 }
-                else if( t != p.lastTid ) { 
-                    log() << "\n\n\n\n\nRACE? error assert\n  " << p.file << '\n' 
-                        << "  " << p.lastName
-                        << "  " << getThreadName() << "\n\n" << endl;
-                    mongoAbort("racecheck");
+                else {
+                    RARELY {
+                        sleepmillis(0);
+                        if( ncalls < 128 * 20 ) {
+                            OCCASIONALLY { 
+                                sleepmillis(3);
+                            }
+                        }
+                    }
                 }
+            }
+            void leave() {
+                if( --n != 0 ) fail();
+            }
+        public:
+            Block(string f, unsigned l) : n(0), ncalls(0), file(f), line(l) { }
+            ~Block() { 
+                if( ncalls > 1000000 ) { 
+                    // just so we know if we are slowing things down
+                    log() << "race::Block lots of calls " << file << ' ' << line << " n:" << ncalls << endl;
+                }
+            }
+            class Within { 
+                Block& _s;
+            public:
+                Within(Block& s) : _s(s) { _s.enter(); }
+                ~Within() { _s.leave(); }
             };
         };
+ 
+        /* in a rwlock situation this will fail, so not appropriate for things like that. */
+# define RACECHECK \
+        static race::Block __cp(__FILE__, __LINE__); \
+        race::Block::Within __ck(__cp);
+
+#else
+        /* !_DEBUG */
+# define RACECHECK
+
+#endif
 
     }
-
-#define RACECHECK
-        // dm TODO - the right code for this file is in a different branch at the moment (merge)
-        //#define RACECHECK 
-        //static race::CodePoint __cp(__FILE__); 
-        //race::Check __ck(__cp);
-
-    class CodeBlock { 
-        volatile int n;
-        threadId_t tid;
-        void fail() { 
-            log() << "synchronization (race condition) failure" << endl;
-            printStackTrace();
-            ::abort();
-        }
-        void enter() { 
-            if( ++n != 1 ) fail();
-#if defined(_WIN32)
-            tid = GetCurrentThreadId();
-#endif
-        }
-        void leave() {
-            if( --n != 0 ) fail();
-        }
-    public:
-        CodeBlock() : n(0) { }
-
-        class Within { 
-            CodeBlock& _s;
-        public:
-            Within(CodeBlock& s) : _s(s) { _s.enter(); }
-            ~Within() { _s.leave(); }
-        };
-
-        void assertWithin() {
-            assert( n == 1 );
-#if defined(_WIN32)
-            assert( GetCurrentThreadId() == tid );
-#endif
-        }
-    };
-    
-#else
-
-#define RACECHECK
-
-    class CodeBlock{ 
-    public:
-        class Within { 
-        public:
-            Within(CodeBlock&) { }
-        };
-        void assertWithin() { }
-    };
-
-#endif
-
-} // namespace
+}

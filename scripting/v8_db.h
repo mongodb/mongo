@@ -51,6 +51,7 @@ namespace mongo {
     v8::Handle<v8::Value> internalCursorNext(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorObjsLeftInBatch(V8Scope* scope, const v8::Arguments& args);
+    v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args);
 
     // DB members
 
@@ -84,7 +85,8 @@ namespace mongo {
     v8::Handle<v8::Value> dbQueryInit( V8Scope* scope, const v8::Arguments& args );
     v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info );
 
-    v8::Handle<v8::Value> collectionFallback( v8::Local<v8::String> name, const v8::AccessorInfo &info);
+    v8::Handle<v8::Value> collectionGetter( v8::Local<v8::String> name, const v8::AccessorInfo &info);
+    v8::Handle<v8::Value> collectionSetter( Local<v8::String> name, Local<Value> value, const AccessorInfo& info );
 
     v8::Handle<v8::Value> bsonsize( V8Scope* scope, const v8::Arguments& args );
 

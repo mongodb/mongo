@@ -21,6 +21,7 @@
 #include "distlock.h"
 #include "../db/commands.h"
 #include "../util/bson_util.h"
+#include "../util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail
 #include <boost/config.hpp>
@@ -195,6 +196,7 @@ namespace mongo {
             boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomSkew(gen, boost::uniform_int<>(0, skewRange));
             boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomWait(gen, boost::uniform_int<>(1, threadWait));
             boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomSleep(gen, boost::uniform_int<>(1, threadSleep));
+            boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomNewLock(gen, boost::uniform_int<>(0, 3));
 
 
             int skew = 0;
@@ -262,7 +264,7 @@ namespace mongo {
                         }
                         else {
                             log() << "**** Not unlocking for thread " << threadId << endl;
-                            DistributedLock::killPinger( *myLock );
+                            assert( DistributedLock::killPinger( *myLock ) );
                             // We're simulating a crashed process...
                             break;
                         }
@@ -272,6 +274,12 @@ namespace mongo {
                 catch( LockException& e ) {
                     log() << "*** !Could not try distributed lock." << causedBy( e ) << endl;
                     break;
+                }
+
+                // Create a new lock 1/3 of the time
+                if( randomNewLock() > 1 ){
+                    lock.reset(new DistributedLock( hostConn, lockName, takeoverMS, true ));
+                    myLock = lock.get();
                 }
 
                 sleepmillis(randomSleep());

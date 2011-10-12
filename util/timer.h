@@ -21,13 +21,14 @@
 
 namespace mongo {
 
+#if !defined(_WIN32)
+
     /**
      *  simple scoped timer
      */
     class Timer /*copyable*/ {
     public:
         Timer() { reset(); }
-        Timer( unsigned long long startMicros ) { old = startMicros; }
         int seconds() const { return (int)(micros() / 1000000); }
         int millis() const { return (int)(micros() / 1000); }
         int minutes() const { return seconds() / 60; }
@@ -54,51 +55,61 @@ namespace mongo {
             return n - old;
         }
 
-        unsigned long long startTime() const { return old; }
         void reset() { old = curTimeMicros64(); }
     private:
         unsigned long long old;
     };
 
-#if 1
-    class DevTimer {
+#else
+
+    class Timer /*copyable*/ {
     public:
-        class scoped { 
-        public:
-            scoped(DevTimer& dt) { }
-            ~scoped() { }
-        };
-        DevTimer(string) { }
-        ~DevTimer() { }
-    };
-#elif defined(_WIN32)
-    class DevTimer {
-        const string _name;
-    public:
-        unsigned long long _ticks;
-        class scoped { 
-            DevTimer& _dt;
-            unsigned long long _start;
-        public:
-            scoped(DevTimer& dt) : _dt(dt) { 
-                LARGE_INTEGER i;
-                QueryPerformanceCounter(&i);
-                _start = i.QuadPart;
-            }
-            ~scoped() { 
-                LARGE_INTEGER i;
-                QueryPerformanceCounter(&i);
-                _dt._ticks += (i.QuadPart - _start);
-            }
-        };
-        DevTimer(string name) : _name(name), _ticks(0) { 
+        Timer() { reset(); }
+
+        int seconds() const { 
+            int s = static_cast<int>((now() - old) / countsPerSecond);
+            return s;
         }
-        ~DevTimer() {
-            LARGE_INTEGER freq;
-            assert( QueryPerformanceFrequency(&freq) );
-            cout << "devtimer\t" << _name << '\t' << _ticks*1000.0/freq.QuadPart << "ms" << endl;
+
+        int millis() const { 
+            return (int)
+                    ((now() - old) * 1000.0 / countsPerSecond);
         }
+
+        int minutes() const { return seconds() / 60; }
+        
+        /** gets time interval and resets at the same time.  this way we can call curTimeMicros
+              once instead of twice if one wanted millis() and then reset().
+            @return time in millis
+        */
+        int millisReset() { 
+            unsigned long long nw = now();
+            int m = static_cast<int>((nw - old) * 1000.0 / countsPerSecond);
+            old = nw;
+            return m;
+       } 
+
+        void reset() { 
+            old = now();
+        }            
+
+        unsigned long long micros() const {
+            return (unsigned long long)
+                    ((now() - old) * 1000000.0 / countsPerSecond);
+        }
+
+        static unsigned long long countsPerSecond;
+
+    private:
+        unsigned long long now() const {
+            LARGE_INTEGER i;
+            QueryPerformanceCounter(&i);
+            return i.QuadPart;
+        }
+
+        unsigned long long old;
     };
+
 #endif
 
 }  // namespace mongo

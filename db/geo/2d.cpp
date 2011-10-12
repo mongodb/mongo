@@ -26,7 +26,9 @@
 #include "../btree.h"
 #include "../curop-inl.h"
 #include "../matcher.h"
+#include "../queryutil.h"
 #include "core.h"
+#include "../../util/timer.h"
 
 // Note: we use indexinterface herein to talk to the btree code. In the future it would be nice to 
 //       be able to use the V1 key class (see key.h) instead of toBson() which has some cost.
@@ -38,7 +40,9 @@ namespace mongo {
     class GeoKeyNode { 
         GeoKeyNode();
     public:
-        GeoKeyNode(DiskLoc r, BSONObj k) : recordLoc(r), _key(k) { }
+        GeoKeyNode( DiskLoc bucket, int keyOfs, DiskLoc r, BSONObj k) : _bucket( bucket ), _keyOfs( keyOfs ), recordLoc(r), _key(k) { }
+        const DiskLoc _bucket;
+        const int _keyOfs;
         const DiskLoc recordLoc;
         const BSONObj _key;
     };
@@ -48,6 +52,12 @@ namespace mongo {
 //    typedef GeoBtreeBucket::KeyNode GeoKeyNode;
 
 //#define BTREE btree<V0>
+
+#if 0
+# define CDEBUG -1
+#else
+# define CDEBUG 10
+#endif
 
 #if 0
 # define GEODEBUGGING
@@ -145,6 +155,7 @@ namespace mongo {
 
             // Error in radians
             _errorSphere = deg2rad( _error );
+
         }
 
         double _configval( const IndexSpec* spec , const string& name , double def ) {
@@ -805,23 +816,23 @@ namespace mongo {
     class GeoPoint {
     public:
 
-        GeoPoint() : _distance( -1 ), _exact( false )
+        GeoPoint() : _distance( -1 ), _exact( false ), _dirty( false )
         {}
 
         //// Distance not used ////
 
         GeoPoint( const GeoKeyNode& node )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( -1 ) , _exact( false ) {
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( -1 ) , _exact( false ), _dirty( false ), _bucket( node._bucket ), _pos( node._keyOfs ) {
         }
 
         //// Immediate initialization of distance ////
 
         GeoPoint( const GeoKeyNode& node, double distance, bool exact )
-            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( distance ), _exact( exact ) {
+            : _key( node._key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _distance( distance ), _exact( exact ), _dirty( false ) {
         }
 
         GeoPoint( const GeoPoint& pt, double distance, bool exact )
-            : _key( pt.key() ) , _loc( pt.loc() ) , _o( pt.obj() ), _distance( distance ), _exact( exact ) {
+            : _key( pt.key() ) , _loc( pt.loc() ) , _o( pt.obj() ), _distance( distance ), _exact( exact ), _dirty( false ) {
         }
 
         bool operator<( const GeoPoint& other ) const {
@@ -842,7 +853,12 @@ namespace mongo {
             return _key;
         }
 
+        bool hasLoc() const {
+            return _loc.isNull();
+        }
+
         DiskLoc loc() const {
+            assert( ! _dirty );
             return _loc;
         }
 
@@ -858,8 +874,100 @@ namespace mongo {
             return _o.isEmpty();
         }
 
+        bool isCleanAndEmpty() {
+            return isEmpty() && ! isDirty();
+        }
+
         string toString() const {
-            return str::stream() << "Point from " << _o << " dist : " << _distance << ( _exact ? " (ex)" : " (app)" );
+            return str::stream() << "Point from " << _key << " - " << _o << " dist : " << _distance << ( _exact ? " (ex)" : " (app)" );
+        }
+
+
+        // TODO:  Recover from yield by finding all the changed disk locs here, modifying the _seenPts array.
+        // Not sure yet the correct thing to do about _seen.
+        // Definitely need to re-find our current max/min locations too
+        bool unDirty( const Geo2dType* g, DiskLoc& oldLoc ){
+
+            assert( _dirty );
+            assert( ! _id.isEmpty() );
+
+            oldLoc = _loc;
+            _loc = DiskLoc();
+
+            // Fast undirty
+            IndexInterface& ii = g->getDetails()->idxInterface();
+            // Check this position and the one immediately preceding
+            for( int i = 0; i < 2; i++ ){
+                if( _pos - i < 0 ) continue;
+
+                // log() << "bucket : " << _bucket << " pos " << _pos << endl;
+
+                BSONObj key;
+                DiskLoc loc;
+                ii.keyAt( _bucket, _pos - i, key, loc );
+
+                // log() << "Loc: " << loc << " Key : " << key << endl;
+
+                if( loc.isNull() ) continue;
+
+                if( key.binaryEqual( _key ) && loc.obj()["_id"].wrap( "" ).binaryEqual( _id ) ){
+                    _pos = _pos - i;
+                    _loc = loc;
+                    _dirty = false;
+                    _o = loc.obj();
+                    return true;
+                }
+            }
+
+            // Slow undirty
+            scoped_ptr<BtreeCursor> cursor( BtreeCursor::make( nsdetails( g->getDetails()->parentNS().c_str() ),
+                                            *( g->getDetails() ), _key, _key, true, 1 ) );
+
+            int count = 0;
+            while( cursor->ok() ){
+                count++;
+                if( cursor->current()["_id"].wrap( "" ).binaryEqual( _id ) ){
+                    _bucket = cursor->getBucket();
+                    _pos = cursor->getKeyOfs();
+                    _loc = cursor->currLoc();
+                    _o = _loc.obj();
+                    break;
+                }
+                else{
+                    LOG( CDEBUG + 1 ) << "Key doesn't match : " << cursor->current()["_id"] << " saved : " << _id << endl;
+                }
+                cursor->advance();
+            }
+
+            if( ! count ) { LOG( CDEBUG ) << "No key found for " << _key << endl; }
+
+            _dirty = false;
+
+            return _loc == oldLoc;
+        }
+
+        bool isDirty(){
+            return _dirty;
+        }
+
+        bool makeDirty(){
+            if( ! _dirty ){
+                assert( ! obj()["_id"].eoo() );
+                assert( ! _bucket.isNull() );
+                assert( _pos >= 0 );
+
+                if( _id.isEmpty() ){
+                    _id = obj()["_id"].wrap( "" ).getOwned();
+                }
+                _o = BSONObj();
+                _key = _key.getOwned();
+                _pt = _pt.getOwned();
+                _dirty = true;
+
+                return true;
+            }
+
+            return false;
         }
 
         BSONObj _key;
@@ -869,6 +977,11 @@ namespace mongo {
 
         double _distance;
         bool _exact;
+
+        BSONObj _id;
+        bool _dirty;
+        DiskLoc _bucket;
+        int _pos;
     };
 
     // GeoBrowse subclasses this
@@ -876,7 +989,6 @@ namespace mongo {
     public:
         GeoAccumulator( const Geo2dType * g , const BSONObj& filter, bool uniqueDocs, bool needDistance )
             : _g(g) ,
-              _keysChecked(0) ,
               _lookedAt(0) ,
               _matchesPerfd(0) ,
               _objectsLoaded(0) ,
@@ -892,25 +1004,6 @@ namespace mongo {
         }
 
         virtual ~GeoAccumulator() { }
-
-        /** Check if we've already looked at a key.  ALSO marks as seen, anticipating a follow-up call 
-            to add().  This is broken out to avoid some work extracting the key bson if it's an
-            already seen point.
-        */
-    private:
-        set< pair<DiskLoc,int> > _seen;
-    public:
-        bool seen(DiskLoc bucket, int pos) {
-
-            _keysChecked++;
-
-            pair< set<pair<DiskLoc,int> >::iterator, bool > seenBefore = _seen.insert( make_pair(bucket,pos) );
-            if ( ! seenBefore.second ) {
-                GEODEBUG( "\t\t\t\t already seen : " << bucket.toString() << ' ' << pos ); // node.key.toString() << " @ " << Point( _g, GeoHash( node.key.firstElement() ) ).toString() << " with " << node.recordLoc.obj()["_id"] );
-                return true;
-            }
-            return false;
-        }
 
         enum KeyResult { BAD, BORDER, GOOD };
 
@@ -1023,7 +1116,6 @@ namespace mongo {
         map<DiskLoc, bool> _matched;
         shared_ptr<CoveredIndexMatcher> _matcher;
 
-        long long _keysChecked;
         long long _lookedAt;
         long long _matchesPerfd;
         long long _objectsLoaded;
@@ -1035,18 +1127,16 @@ namespace mongo {
 
     };
 
+
     struct BtreeLocation {
-        BtreeLocation() : ii(0) { }
-        IndexInterface *ii;
-        int pos;
-        bool found;
-        DiskLoc bucket;
+        BtreeLocation() { }
+
+        scoped_ptr<BtreeCursor> _cursor;
+        scoped_ptr<FieldRangeSet> _frs;
+        scoped_ptr<IndexSpec> _spec;
 
         BSONObj key() {
-            if ( bucket.isNull() )
-                return BSONObj();
-            return ii->keyAt(bucket, pos);
-            //return bucket.btree<V>()->keyNode( pos ).key.toBson();
+            return _cursor->currKey();
         }
 
         bool hasPrefix( const GeoHash& hash ) {
@@ -1057,42 +1147,31 @@ namespace mongo {
             return GeoHash( e ).hasPrefix( hash );
         }
 
-        bool advance( int direction , int& totalFound , GeoAccumulator* all ) {
+        bool checkAndAdvance( const GeoHash& hash, int& totalFound, GeoAccumulator* all ){
+            if( ! _cursor->ok() || ! hasPrefix( hash ) ) return false;
 
-            if ( bucket.isNull() )
-                return false;
-            bucket = ii->advance( bucket , pos , direction , "btreelocation" );
-
-            if ( all )
-                return checkCur( totalFound , all );
-
-            return ! bucket.isNull();
-        }
-
-        bool checkCur( int& totalFound , GeoAccumulator* all ) {
-            if ( bucket.isNull() )
-                return false;
-
-            if ( ii->isUsed(bucket, pos) ) {
+            if( all ){
                 totalFound++;
-                if( !all->seen(bucket, pos) ) { 
-                    BSONObj o;
-                    DiskLoc recLoc;
-                    ii->keyAt(bucket, pos, o, recLoc);
-                    GeoKeyNode n(recLoc, o);
-                    all->add(n);
-                }
+                GeoKeyNode n( _cursor->getBucket(), _cursor->getKeyOfs(), _cursor->currLoc(), _cursor->currKey() );
+                all->add( n );
             }
-            else {
-                GEODEBUG( "\t\t\t\t not used: " << key() );
-            }
+            _cursor->advance();
 
             return true;
         }
 
+        void save(){
+            _cursor->noteLocation();
+        }
+
+        void restore(){
+            _cursor->checkLocation();
+        }
+
         string toString() {
             stringstream ss;
-            ss << "bucket: " << bucket.toString() << " pos: " << pos << " found: " << found;
+            ss << "bucket: " << _cursor->getBucket().toString() << " pos: " << _cursor->getKeyOfs() <<
+               ( _cursor->ok() ? ( str::stream() << " k: " << _cursor->currKey() << " o : " << _cursor->current()["_id"] ) : (string)"[none]" ) << endl;
             return ss.str();
         }
 
@@ -1104,26 +1183,54 @@ namespace mongo {
                              GeoHash start ,
                              int & found , GeoAccumulator * hopper ) {
 
-            Ordering ordering = Ordering::make(spec->_order);
+            //Ordering ordering = Ordering::make(spec->_order);
 
-            IndexInterface *ii = &id.idxInterface();
-            min.ii = ii;
-            max.ii = ii;
+            // Would be nice to build this directly, but bug in max/min queries SERVER-3766 and lack of interface
+            // makes this easiest for now.
+            BSONObj minQuery = BSON( spec->_geo << BSON( "$gt" << MINKEY << start.wrap( "$lte" ).firstElement() ) );
+            BSONObj maxQuery = BSON( spec->_geo << BSON( "$lt" << MAXKEY << start.wrap( "$gt" ).firstElement() ) );
 
-            min.bucket = ii->locate( id , id.head , start.wrap() ,
-                                     ordering , min.pos , min.found , minDiskLoc, -1 );
+            // log() << "MinQuery: " << minQuery << endl;
+            // log() << "MaxQuery: " << maxQuery << endl;
 
-            if (hopper) min.checkCur( found , hopper );
+            min._frs.reset( new FieldRangeSet( spec->getDetails()->parentNS().c_str(),
+                                  minQuery,
+                                  true,
+                                  false ) );
 
-            // TODO: Might be able to avoid doing a full lookup in some cases here,
-            // but would add complexity and we're hitting pretty much the exact same data.
-            // Cannot set this = min in general, however.
-            max.bucket = ii->locate( id , id.head , start.wrap() ,
-                                     ordering , max.pos , max.found , minDiskLoc, 1 );
+            max._frs.reset( new FieldRangeSet( spec->getDetails()->parentNS().c_str(),
+                                  maxQuery,
+                                  true,
+                                  false ) );
 
-            if (hopper) max.checkCur( found , hopper );
 
-            return ! min.bucket.isNull() || ! max.bucket.isNull();
+            BSONObjBuilder bob;
+            bob.append( spec->_geo, 1 );
+            for( vector<string>::const_iterator i = spec->_other.begin(); i != spec->_other.end(); i++ ){
+                bob.append( *i, 1 );
+            }
+            BSONObj iSpec = bob.obj();
+
+            min._spec.reset( new IndexSpec( iSpec ) );
+            max._spec.reset( new IndexSpec( iSpec ) );
+
+            shared_ptr<FieldRangeVector> frvMin( new FieldRangeVector( *(min._frs), *(min._spec), -1 ) );
+            shared_ptr<FieldRangeVector> frvMax( new FieldRangeVector( *(max._frs), *(max._spec), 1 ) );
+
+            min._cursor.reset(
+                            BtreeCursor::make( nsdetails( spec->getDetails()->parentNS().c_str() ), *( spec->getDetails() ),
+                                               frvMin, -1, true )
+                    );
+
+            max._cursor.reset(
+                           BtreeCursor::make( nsdetails( spec->getDetails()->parentNS().c_str() ), *( spec->getDetails() ),
+                                              frvMax, 1, true )
+                   );
+
+            // if( hopper ) min.checkCur( found, hopper );
+            // if( hopper ) max.checkCur( found, hopper );
+
+            return min._cursor->ok() || max._cursor->ok();
         }
     };
 
@@ -1160,7 +1267,7 @@ namespace mongo {
         virtual bool modifiedKeys() const { return true; }
         virtual bool isMultiKey() const { return false; }
 
-
+        virtual bool autoDedup() const { return false; }
 
         const Geo2dType * _spec;
         const IndexDetails * _id;
@@ -1174,8 +1281,8 @@ namespace mongo {
     class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
     public:
 
-        // The max points which should be added to an expanding box
-        static const int maxPointsHeuristic = 300;
+        // The max points which should be added to an expanding box at one time
+        static const int maxPointsHeuristic = 50;
 
         // Expand states
         enum State {
@@ -1187,7 +1294,7 @@ namespace mongo {
 
         GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj(), bool uniqueDocs = true, bool needDistance = false )
             : GeoCursorBase( g ), GeoAccumulator( g , filter, uniqueDocs, needDistance ) ,
-              _type( type ) , _filter( filter ) , _firstCall(true), _nscanned(), _centerPrefix(0, 0, 0) {
+              _type( type ) , _filter( filter ) , _firstCall(true), _noted( false ), _nscanned(), _nDirtied(0), _nChangedOnYield(0), _nRemovedOnYield(0), _centerPrefix(0, 0, 0) {
 
             // Set up the initial expand state
             _state = START;
@@ -1201,28 +1308,45 @@ namespace mongo {
         }
 
         virtual bool ok() {
+
+            bool filled = false;
+
+            LOG( CDEBUG ) << "Checking cursor, in state " << (int) _state << ", first call " << _firstCall <<
+                             ", empty : " << _cur.isEmpty() << ", dirty : " << _cur.isDirty() << ", stack : " << _stack.size() << endl;
+
             bool first = _firstCall;
             if ( _firstCall ) {
                 fillStack( maxPointsHeuristic );
+                filled = true;
                 _firstCall = false;
             }
-            if ( ! _cur.isEmpty() || _stack.size() ) {
+            if ( ! _cur.isCleanAndEmpty() || _stack.size() ) {
                 if ( first ) {
                     ++_nscanned;
                 }
+
+                if( _noted && filled ) noteLocation();
                 return true;
             }
 
             while ( moreToDo() ) {
+
+                LOG( CDEBUG ) << "Refilling stack..." << endl;
+
                 fillStack( maxPointsHeuristic );
-                if ( ! _cur.isEmpty() ) {
+                filled = true;
+
+                if ( ! _cur.isCleanAndEmpty() ) {
                     if ( first ) {
                         ++_nscanned;
                     }
+
+                    if( _noted && filled ) noteLocation();
                     return true;
                 }
             }
 
+            if( _noted && filled ) noteLocation();
             return false;
         }
 
@@ -1239,14 +1363,150 @@ namespace mongo {
             if ( ! moreToDo() )
                 return false;
 
-            while ( _cur.isEmpty() && moreToDo() )
+            bool filled = false;
+            while ( _cur.isCleanAndEmpty() && moreToDo() ){
                 fillStack( maxPointsHeuristic );
-            return ! _cur.isEmpty() && ++_nscanned;
+                filled = true;
+            }
+
+            if( _noted && filled ) noteLocation();
+            return ! _cur.isCleanAndEmpty() && ++_nscanned;
         }
 
-        virtual Record* _current() { assert(ok()); return _cur._loc.rec(); }
-        virtual BSONObj current() { assert(ok()); return _cur._o; }
-        virtual DiskLoc currLoc() { assert(ok()); return _cur._loc; }
+        virtual void noteLocation() {
+            _noted = true;
+
+            LOG( CDEBUG ) << "Noting location with " << _stack.size() << ( _cur.isEmpty() ? "" : " + 1 " ) << " points " << endl;
+
+            // Make sure we advance past the point we're at now,
+            // since the current location may move on an update/delete
+            // if( _state == DOING_EXPAND ){
+            //     if( _min.hasPrefix( _prefix ) ){ _min.advance( -1, _foundInExp, this ); }
+            //    if( _max.hasPrefix( _prefix ) ){ _max.advance(  1, _foundInExp, this ); }
+            // }
+
+            // Remember where our _max, _min are
+            _min.save();
+            _max.save();
+
+            LOG( CDEBUG ) << "Min " << _min.toString() << endl;
+            LOG( CDEBUG ) << "Max " << _max.toString() << endl;
+
+            // Dirty all our queued stuff
+            for( list<GeoPoint>::iterator i = _stack.begin(); i != _stack.end(); i++ ){
+
+                LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
+
+                if( i->makeDirty() ) _nDirtied++;
+                assert( i->isDirty() );
+            }
+
+            // Check current item
+            if( ! _cur.isEmpty() ){
+                if( _cur.makeDirty() ) _nDirtied++;
+            }
+
+            // Our cached matches become invalid now
+            _matched.clear();
+        }
+
+        void fixMatches( DiskLoc oldLoc, DiskLoc newLoc ){
+            map<DiskLoc, bool>::iterator match = _matched.find( oldLoc );
+            if( match != _matched.end() ){
+                bool val = match->second;
+                _matched.erase( oldLoc );
+                _matched[ newLoc ] = val;
+            }
+        }
+
+        /* called before query getmore block is iterated */
+        virtual void checkLocation() {
+
+            LOG( CDEBUG ) << "Restoring location with " << _stack.size() << ( ! _cur.isDirty() ? "" : " + 1 " ) << " points " << endl;
+
+            // We can assume an error was thrown earlier if this database somehow disappears
+
+            // Recall our _max, _min
+            _min.restore();
+            _max.restore();
+
+            LOG( CDEBUG ) << "Min " << _min.toString() << endl;
+            LOG( CDEBUG ) << "Max " << _max.toString() << endl;
+
+            // If the current key moved, we may have been advanced past the current point - need to check this
+            // if( _state == DOING_EXPAND ){
+            //    if( _min.hasPrefix( _prefix ) ){ _min.advance( -1, _foundInExp, this ); }
+            //    if( _max.hasPrefix( _prefix ) ){ _max.advance(  1, _foundInExp, this ); }
+            //}
+
+            // Undirty all the queued stuff
+            // Dirty all our queued stuff
+            list<GeoPoint>::iterator i = _stack.begin();
+            while( i != _stack.end() ){
+
+                LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
+
+                DiskLoc oldLoc;
+                if( i->unDirty( _spec, oldLoc ) ){
+                    // Document is in same location
+                    LOG( CDEBUG ) << "Undirtied " << oldLoc << endl;
+
+                    i++;
+                }
+                else if( ! i->loc().isNull() ){
+
+                    // Re-found document somewhere else
+                    LOG( CDEBUG ) << "Changed location of " << i->_id << " : " << i->loc() << " vs " << oldLoc << endl;
+
+                    _nChangedOnYield++;
+                    fixMatches( oldLoc, i->loc() );
+                    i++;
+                }
+                else {
+
+                    // Can't re-find document
+                    LOG( CDEBUG ) << "Removing document " << i->_id << endl;
+
+                    _nRemovedOnYield++;
+                    _found--;
+                    assert( _found >= 0 );
+
+                    // Can't find our key again, remove
+                    i = _stack.erase( i );
+                }
+            }
+
+            if( _cur.isDirty() ){
+                LOG( CDEBUG ) << "Undirtying cur point with id : " << _cur._id << endl;
+            }
+
+            // Check current item
+            DiskLoc oldLoc;
+            if( _cur.isDirty() && ! _cur.unDirty( _spec, oldLoc ) ){
+                if( _cur.loc().isNull() ){
+
+                    // Document disappeared!
+                    LOG( CDEBUG ) << "Removing cur point " << _cur._id << endl;
+
+                    _nRemovedOnYield++;
+                    advance();
+                }
+                else{
+
+                    // Document moved
+                    LOG( CDEBUG ) << "Changed location of cur point " << _cur._id << " : " << _cur.loc() << " vs " << oldLoc << endl;
+
+                    _nChangedOnYield++;
+                    fixMatches( oldLoc, _cur.loc() );
+                }
+            }
+
+            _noted = false;
+        }
+
+        virtual Record* _current() { assert(ok()); LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
+        virtual BSONObj current() { assert(ok()); LOG( CDEBUG + 1 ) << "current " << _cur._o << endl; return _cur._o; }
+        virtual DiskLoc currLoc() { assert(ok()); LOG( CDEBUG + 1 ) << "currLoc " << _cur._loc << endl; return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
         virtual CoveredIndexMatcher* matcher() const {
@@ -1329,8 +1589,8 @@ namespace mongo {
                     _expPrefix.reset( new GeoHash( _prefix ) );
 
                     // Find points inside this prefix
-                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
-                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
+                    while ( _min.checkAndAdvance( _prefix, _foundInExp, this ) && _foundInExp < maxFound && _found < maxAdded );
+                    while ( _max.checkAndAdvance( _prefix, _foundInExp, this ) && _foundInExp < maxFound && _found < maxAdded );
 
 #ifdef GEODEBUGGING
 
@@ -1355,7 +1615,7 @@ namespace mongo {
                     }
 
                     // If we won't fit in the box, and we're not doing a sub-scan, increase the size
-                    if ( ! fitsInBox( _g->sizeEdge( _prefix ) ) && _fringe.size() <= 1 ) {
+                    if ( ! fitsInBox( _g->sizeEdge( _prefix ) ) && _fringe.size() == 0 ) {
 
                         // If we're still not expanded bigger than the box size, expand again
                         // TODO: Is there an advantage to scanning prior to expanding?
@@ -1363,6 +1623,8 @@ namespace mongo {
                         continue;
 
                     }
+
+                    // log() << "finished box prefix [" << _prefix << "]" << endl;
 
                     // We're done and our size is large enough
                     _state = DONE_NEIGHBOR;
@@ -1403,10 +1665,17 @@ namespace mongo {
                     int j = (_neighbor % 3) - 1;
 
                     if ( ( i == 0 && j == 0 ) ||
-                            ( i < 0 && _centerBox._min._x <= _g->_min ) ||
-                            ( j < 0 && _centerBox._min._y <= _g->_min ) ||
-                            ( i > 0 && _centerBox._max._x >= _g->_max ) ||
-                            ( j > 0 && _centerBox._max._y >= _g->_max ) ) {
+                         ( i < 0 && _centerPrefix.atMinX() ) ||
+                         ( i > 0 && _centerPrefix.atMaxX() ) ||
+                         ( j < 0 && _centerPrefix.atMinY() ) ||
+                         ( j > 0 && _centerPrefix.atMaxY() ) ) {
+
+                        //log() << "not moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() << " " << _centerPrefix << endl;
+                        //log() << _centerPrefix.atMinX() << " "
+                        //        << _centerPrefix.atMinY() << " "
+                        //        << _centerPrefix.atMaxX() << " "
+                        //        << _centerPrefix.atMaxY() << " " << endl;
+
                         continue; // main box or wrapped edge
                         // TODO:  We may want to enable wrapping in future, probably best as layer on top of
                         // this search.
@@ -1418,7 +1687,9 @@ namespace mongo {
                     GeoHash _neighborPrefix = _centerPrefix;
                     _neighborPrefix.move( i, j );
 
-                    GEODEBUG( "moving to " << i << " , " << j << " fringe : " << _fringe.size() );
+                    //log() << "moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() << " " << _centerPrefix << " " << _neighborPrefix << endl;
+
+                    GEODEBUG( "moving to neighbor " << _neighbor << " @ " << i << " , " << j << " fringe : " << _fringe.size() );
                     PREFIXDEBUG( _centerPrefix, _g );
                     PREFIXDEBUG( _neighborPrefix , _g );
                     while( _fringe.size() > 0 ) {
@@ -1436,10 +1707,10 @@ namespace mongo {
                             _fringe.pop_back();
                             continue;
                         }
-                        // Large intersection, refine search
-                        else if( intAmt > 0.5 && _prefix.canRefine() && _fringe.back().size() < 4 /* two bits */ ) {
+                        // Small intersection, refine search
+                        else if( intAmt < 0.5 && _prefix.canRefine() && _fringe.back().size() < 4 /* two bits */ ) {
 
-                            GEODEBUG( "Adding to fringe: " << _fringe.back() << " curr prefix : " << _prefix << " bits : " << _prefix.getBits() );
+                            GEODEBUG( "Intersection small : " << intAmt << ", adding to fringe: " << _fringe.back() << " curr prefix : " << _prefix << " bits : " << _prefix.getBits() );
 
                             // log() << "Diving to level : " << ( _fringe.back().size() / 2 + 1 ) << endl;
 
@@ -1494,19 +1765,36 @@ namespace mongo {
         // The amount the current box overlaps our search area
         virtual double intersectsBox( Box& cur ) = 0;
 
-        virtual int addSpecific( const GeoKeyNode& node , const Point& keyP , bool onBounds , double keyD , bool newDoc ) {
+        bool remembered( BSONObj o ){
+            BSONObj seenId = o["_id"].wrap("").getOwned();
+            if( _seenIds.find( seenId ) != _seenIds.end() ){
+                LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " already seen." << endl;
+                return true;
+            }
+            else{
+                _seenIds.insert( seenId );
+                LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " remembered." << endl;
+                return false;
+            }
+        }
+
+        virtual int addSpecific( const GeoKeyNode& node , const Point& keyP , bool onBounds , double keyD , bool potentiallyNewDoc ) {
 
             int found = 0;
 
             // We need to handle every possible point in this method, even those not in the key value, to
             // avoid us tracking which hashes we've already seen.
-            if( ! newDoc ){
+            if( ! potentiallyNewDoc ){
                 // log() << "Already handled doc!" << endl;
                 return 0;
             }
 
+            // Final check for new doc
+            // OK to touch, since we're probably returning this object now
+            if( remembered( node.recordLoc.obj() ) ) return 0;
+
             if( _uniqueDocs && ! onBounds ) {
-                // log() << "Added ind to " << _type << endl;
+                //log() << "Added ind to " << _type << endl;
                 _stack.push_front( GeoPoint( node ) );
                 found++;
             }
@@ -1536,7 +1824,7 @@ namespace mongo {
                     }
 
                     if( ! needExact || exactDocCheck( p, d ) ){
-                        // log() << "Added mult to " << _type << endl;
+                        //log() << "Added mult to " << _type << endl;
                         _stack.push_front( GeoPoint( node ) );
                         found++;
                         // If returning unique, just exit after first point is added
@@ -1545,7 +1833,7 @@ namespace mongo {
                 }
             }
 
-            if ( _cur.isEmpty() && _stack.size() > 0 ){
+            while( _cur.isCleanAndEmpty() && _stack.size() > 0 ){
                 _cur = _stack.front();
                 _stack.pop_front();
             }
@@ -1561,11 +1849,13 @@ namespace mongo {
         }
 
         virtual void explainDetails( BSONObjBuilder& b ){
-            b << "keysChecked" << _keysChecked;
             b << "lookedAt" << _lookedAt;
             b << "matchesPerfd" << _matchesPerfd;
             b << "objectsLoaded" << _objectsLoaded;
             b << "pointsLoaded" << _pointsLoaded;
+            b << "pointsSavedForYield" << _nDirtied;
+            b << "pointsChangedOnYield" << _nChangedOnYield;
+            b << "pointsRemovedOnYield" << _nRemovedOnYield;
         }
 
         virtual BSONObj prettyIndexBounds() const {
@@ -1592,11 +1882,16 @@ namespace mongo {
         string _type;
         BSONObj _filter;
         list<GeoPoint> _stack;
+        set<BSONObj> _seenIds;
 
         GeoPoint _cur;
         bool _firstCall;
+        bool _noted;
 
         long long _nscanned;
+        long long _nDirtied;
+        long long _nChangedOnYield;
+        long long _nRemovedOnYield;
 
         // The current box we're expanding (-1 is first/center box)
         int _neighbor;
@@ -1686,7 +1981,7 @@ namespace mongo {
             return _farthest;
         }
 
-        virtual int addSpecific( const GeoKeyNode& node, const Point& keyP, bool onBounds, double keyD, bool newDoc ) {
+        virtual int addSpecific( const GeoKeyNode& node, const Point& keyP, bool onBounds, double keyD, bool potentiallyNewDoc ) {
 
             // Unique documents
 
@@ -1779,6 +2074,8 @@ namespace mongo {
         double _distError;
         double _farthest;
 
+        // Safe to use currently since we don't yield in $near searches.  If we do start to yield, we may need to
+        // replace dirtied disklocs in our holder / ensure our logic is correct.
         map< DiskLoc , Holder::iterator > _seenPts;
 
     };
@@ -1814,6 +2111,15 @@ namespace mongo {
             assert( _scanDistance > 0 );
 
         }
+
+
+        /** Check if we've already looked at a key.  ALSO marks as seen, anticipating a follow-up call
+            to add().  This is broken out to avoid some work extracting the key bson if it's an
+            already seen point.
+        */
+    private:
+        set< pair<DiskLoc,int> > _seen;
+    public:
 
         void exec() {
 
@@ -2540,7 +2846,7 @@ namespace mongo {
                         shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query, uniqueDocs ) );
                         return c;
                     }
-                    throw UserException( 13058 , (string)"unknown $within type: " + type );
+                    throw UserException( 13058 , str::stream() << "unknown $within information : " << context << ", a shape must be specified." );
                 }
                 default:
                     // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center
@@ -2647,7 +2953,10 @@ namespace mongo {
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
                 bb.append( "dis" , dis );
-                if( includeLocs ) bb.append( "loc" , p._pt );
+                if( includeLocs ){
+                    if( p._pt.couldBeArray() ) bb.append( "loc", BSONArray( p._pt ) );
+                    else bb.append( "loc" , p._pt );
+                }
                 bb.append( "obj" , p._o );
                 bb.done();
             }

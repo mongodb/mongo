@@ -93,6 +93,7 @@ namespace mongo {
 
         void noteARemoteIsPrimary(const Member *);
         void checkElectableSet();
+        void checkAuth();
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
@@ -151,7 +152,7 @@ namespace mongo {
             time_t when;
             unsigned who;
         };
-        static mutex lyMutex;
+        static SimpleMutex lyMutex;
         Guarded<LastYea,lyMutex> ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void electionFailed(unsigned meid);
@@ -345,8 +346,12 @@ namespace mongo {
         /**
          * Find the closest member (using ping time) with a higher latest optime.
          */
-        const Member* getMemberToSyncTo();
+        Member* getMemberToSyncTo();
+        void veto(const string& host, unsigned secs=10);
         Member* _currentSyncTarget;
+
+        bool _blockSync;
+        void blockSync(bool block);
 
         // set of electable members' _ids
         set<unsigned> _electableSet;
@@ -484,19 +489,28 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        /* pulling data from primary related - see rs_sync.cpp */
-        bool initialSyncOplogApplication(const Member *primary, OpTime applyGTE, OpTime minValid);
+        bool initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid);
+        bool _initialSyncOplogApplication(OplogReader& r, const Member *source, const OpTime& applyGTE, const OpTime& minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
-        void syncApply(const BSONObj &o);
+        bool syncApply(const BSONObj &o);
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
-        bool _getOplogReader(OplogReader& r, string& hn);
-        bool _isStale(OplogReader& r, const string& hn);
+
+        // get an oplog reader for a server with an oplog entry timestamp greater
+        // than or equal to minTS, if set.
+        Member* _getOplogReader(OplogReader& r, const OpTime& minTS);
+
+        // check lastOpTimeWritten against the remote's earliest op, filling in
+        // remoteOldestOp.
+        bool _isStale(OplogReader& r, const OpTime& minTS, BSONObj& remoteOldestOp);
+
+        // keep a list of hosts that we've tried recently that didn't work
+        map<string,time_t> _veto;
     public:
         void syncThread();
         const OpTime lastOtherOpTime() const;
@@ -577,7 +591,7 @@ namespace mongo {
          * that still need to be checked for auth.
          */
         bool checkAuth(string& errmsg, BSONObjBuilder& result) {
-            if( !noauth && adminOnly() ) {
+            if( !noauth ) {
                 AuthenticationInfo *ai = cc().getAuthenticationInfo();
                 if (!ai->isAuthorizedForLock("admin", locktype())) {
                     errmsg = "replSet command unauthorized";
@@ -590,6 +604,9 @@ namespace mongo {
         bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) {
                 errmsg = "not running with --replSet";
+                if( cmdLine.configsvr ) { 
+                    result.append("info", "configsvr"); // for shell prompt
+                }
                 return false;
             }
 

@@ -140,6 +140,14 @@ namespace mongo {
             version = manager->getVersion( Shard::make( conn->getServerAddress() ) );
         }
 
+        if( version == 0 ){
+            LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
+                      ( ! isSharded ? "no longer sharded" :
+                      ( ! manager ? "no chunk manager found" :
+                                    "version is zero" ) ) << endl;
+        }
+
+
         LOG(2) << " have to set shard version for conn: " << conn << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()

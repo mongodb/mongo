@@ -232,6 +232,7 @@ namespace ThreadedTests {
 
             writelocktry lk( "" , 0 );
             ASSERT( lk.got() );
+            ASSERT( dbMutex.isWriteLocked() );
         }
     };
 
@@ -248,17 +249,17 @@ namespace ThreadedTests {
     class RWLockTest2 { 
     public:
         
-        static void worker1( const RWLock * lk , AtomicUInt * x ) {
+        static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
             (*x)++; // 1
             //cout << "lock b try" << endl;
-            rwlock b( *lk , true ); 
+            RWLockRecursiveNongreedy::Exclusive b(*lk);
             //cout << "lock b got" << endl;
             (*x)++; // 2
         }
 
-        static void worker2( const RWLock * lk , AtomicUInt * x ) {
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
             //cout << "lock c try" << endl;
-            rwlock c( *lk , false );
+            RWLockRecursiveNongreedy::Shared c(*lk);
             (*x)++;
             //cout << "lock c got" << endl;
         }
@@ -268,10 +269,10 @@ namespace ThreadedTests {
              * note: this test will deadlock if the code breaks
              */
             
-            RWLock lk( "eliot2" , 120 * 1000 );
+            RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
 
-            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );
             
             AtomicUInt x1 = 0;
             cout << "A : " << &x1 << endl;
@@ -307,10 +308,10 @@ namespace ThreadedTests {
     class RWLockTest3 { 
     public:
         
-        static void worker2( RWLock * lk , AtomicUInt * x ) {
-    	    assert( ! lk->lock_try(0) );
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
+    	    assert( ! lk->__lock_try(0) );
             //cout << "lock c try" << endl;
-            rwlock c( *lk , false );
+            RWLockRecursiveNongreedy::Shared c( *lk  );
             (*x)++;
             //cout << "lock c got" << endl;
         }
@@ -320,9 +321,9 @@ namespace ThreadedTests {
              * note: this test will deadlock if the code breaks
              */
             
-            RWLock lk( "eliot2" , 120 * 1000 );
+            RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             
-            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
             
             AtomicUInt x2 = 0;
 
@@ -464,7 +465,7 @@ namespace ThreadedTests {
         }
     };
 
-#if 0
+#if 1
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
     public:
@@ -474,26 +475,29 @@ namespace ThreadedTests {
         virtual void subthread(int x) {
             Client::initThread("utest");
 
-            /* r = read lock 
+            /* r = get a read lock 
                R = get a read lock and we expect it to be fast
-               w = write lock
+               u = get upgradable 
+               U = get upgradable and we expect it to be fast
+               w = get a write lock
             */
             //                    /-- verify upgrade can be done instantly while in a read lock already
             //                    |  /-- verify upgrade acquisition isn't greedy
-            //                    |  | /-- verify writes aren't greedy while in upgradable
+            //                    |  | /-- verify writes aren't greedy while in upgradable (or are they?)
             //                    v  v v
             const char *what = " RURuRwR";
 
             sleepmillis(100*x);
 
-            log() << x << what[x] << " request" << endl;
-            switch( what[x] ) { 
+            log() << x << ' ' << what[x] << " request" << endl;
+            char ch = what[x];
+            switch( ch ) { 
             case 'w':
                 {
                     m.lock();
-                    log() << x << " W got" << endl;
+                    log() << x << " w got" << endl;
                     sleepmillis(100);
-                    log() << x << " W unlock" << endl;
+                    log() << x << " w unlock" << endl;
                     m.unlock();
                 }
                 break;
@@ -501,9 +505,9 @@ namespace ThreadedTests {
             case 'U':
                 {
                     Timer t;
-                    m.lockAsUpgradable();
-                    log() << x << " U got" << endl;
-                    if( what[x] == 'U' ) {
+                    RWLock::Upgradable u(m);
+                    log() << x << ' ' << ch << " got" << endl;
+                    if( ch == 'U' ) {
                         if( t.millis() > 20 ) {
                             DEV {
                                 // a _DEBUG buildbot might be slow, try to avoid false positives
@@ -515,8 +519,7 @@ namespace ThreadedTests {
                         }
                     }
                     sleepsecs(1);
-                    log() << x << " U unlock" << endl;
-                    m.unlockFromUpgradable();
+                    log() << x << ' ' << ch << " unlock" << endl;
                 }
                 break;
             case 'r':
@@ -524,14 +527,14 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     m.lock_shared();
-                    log() << x << " R got " << endl;
+                    log() << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
                             log() << "warning: when in upgradable write locks are still greedy on this platform" << endl;
                         }
                     }
                     sleepmillis(200);
-                    log() << x << " R unlock" << endl;
+                    log() << x << ' ' << ch << " unlock" << endl;
                     m.unlock_shared();
                 }
                 break;
@@ -585,7 +588,7 @@ namespace ThreadedTests {
 
         void setupTests() {
             add< WriteLocksAreGreedy >();
-            //add< UpgradableTest >();
+            add< UpgradableTest >();
             add< List1Test >();
             add< List1Test2 >();
 

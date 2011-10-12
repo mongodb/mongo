@@ -149,6 +149,8 @@ namespace mongo {
         FieldRange &range( const char *fieldName );
         /** @return the number of nontrivial ranges. */
         int nNontrivialRanges() const;
+        /** @return the field ranges comprising this set. */
+        const map<string,FieldRange> &ranges() const { return _ranges; }
         /** 
          * @return true if a match could be possible on every field. Generally this
          * is not useful information for a single key FieldRangeSet and
@@ -309,6 +311,8 @@ namespace mongo {
         /** @return a client readable representation of 'this' */
         BSONObj obj() const;
         
+        const IndexSpec& getSpec(){ return _indexSpec; }
+
         /**
          * @return true iff the provided document matches valid ranges on all
          * of this FieldRangeVector's fields, which is the case iff this document

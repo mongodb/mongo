@@ -30,6 +30,7 @@
 #include "commands.h"
 #include "repl_block.h"
 #include "../util/processinfo.h"
+#include "../util/timer.h"
 
 namespace mongo {
 
@@ -406,7 +407,7 @@ namespace mongo {
         _c->noteLocation();
     }
 
-    int ClientCursor::yieldSuggest() {
+    int ClientCursor::suggestYieldMicros() {
         int writers = 0;
         int readers = 0;
 
@@ -414,9 +415,11 @@ namespace mongo {
 
         if ( micros > 0 && writers == 0 && dbMutex.getState() <= 0 ) {
             // we have a read lock, and only reads are coming on, so why bother unlocking
-            micros = 0;
+            return 0;
         }
 
+        wassert( micros < 10000000 );
+        dassert( micros <  1000001 );
         return micros;
     }
     
@@ -451,18 +454,19 @@ namespace mongo {
         if ( yielded ) {
             *yielded = false;   
         }
-        if ( ! _yieldSometimesTracker.ping() ) {
+        if ( ! _yieldSometimesTracker.intervalHasElapsed() ) {
             Record* rec = _recordForYield( need );
             if ( rec ) {
+                // yield for page fault
                 if ( yielded ) {
                     *yielded = true;   
                 }
-                return yield( yieldSuggest() , rec );
+                return yield( suggestYieldMicros() , rec );
             }
             return true;
         }
 
-        int micros = yieldSuggest();
+        int micros = suggestYieldMicros();
         if ( micros > 0 ) {
             if ( yielded ) {
                 *yielded = true;   
@@ -476,8 +480,10 @@ namespace mongo {
         killCurrentOp.checkForInterrupt( false );
         {
             auto_ptr<RWLockRecursive::Shared> lk;
-            if ( rec )
+            if ( rec ) {
+                // need to lock this else rec->touch won't be safe file could disapear etc.
                 lk.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+            }
             
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
@@ -553,15 +559,15 @@ namespace mongo {
         return true;
     }
 
+    /** @return true if cursor is still ok */
     bool ClientCursor::yield( int micros , Record * recordToLoad ) {
-        if ( ! _c->supportYields() )
+
+        if ( ! _c->supportYields() ) // so me cursors (geo@oct2011) don't support yielding
             return true;
 
         YieldData data;
         prepareToYield( data );
-
         staticYield( micros , _ns , recordToLoad );
-
         return ClientCursor::recoverFromYield( data );
     }
 

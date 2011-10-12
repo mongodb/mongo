@@ -661,6 +661,8 @@ namespace mongo {
             }
             case CodeWScope: {
                 JSFunction * func = compileFunction( e.codeWScopeCode() );
+                if ( !func )
+                    return JSVAL_NULL;
 
                 BSONObj extraScope = e.codeWScopeObject();
                 if ( ! extraScope.isEmpty() ) {
@@ -1297,6 +1299,11 @@ namespace mongo {
                 _initFieldNames.insert( e.fieldName() );
             }
 
+        }
+
+        bool hasOutOfMemoryException() {
+            string err = getError();
+            return err.find("out of memory") != string::npos;
         }
 
         void externalSetup() {

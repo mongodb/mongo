@@ -71,6 +71,22 @@ namespace mongo {
 
     	static LabeledLevel logLvl;
 
+    	typedef boost::tuple<string, Date_t, Date_t, OID> PingData;
+
+    	class LastPings {
+    	public:
+    	    LastPings() : _mutex( "DistributedLock::LastPings" ) {}
+    	    ~LastPings(){}
+
+    	    PingData getLastPing( const ConnectionString& conn, const string& lockName );
+    	    void setLastPing( const ConnectionString& conn, const string& lockName, const PingData& pd );
+
+    	    mongo::mutex _mutex;
+    	    map< std::pair<string, string>, PingData > _lastPings;
+    	};
+
+    	static LastPings lastPings;
+
         /**
          * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.
          * Construction does trigger a lock "pinging" mechanism, though.
@@ -145,16 +161,12 @@ namespace mongo {
 
     private:
 
-        void resetLastPing(){
-            scoped_lock lk( _mutex );
-            _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>();
-        }
+        void resetLastPing(){ lastPings.setLastPing( _conn, _name, PingData() ); }
+        void setLastPing( const PingData& pd ){ lastPings.setLastPing( _conn, _name, pd ); }
+        PingData getLastPing(){ return lastPings.getLastPing( _conn, _name ); }
 
-        mongo::mutex _mutex;
-
-        // Data from last check of process with ping time
-        boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
         // May or may not exist, depending on startup
+        mongo::mutex _mutex;
         string _threadId;
 
     };

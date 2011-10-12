@@ -31,6 +31,7 @@
 #include "../util/password.h"
 #include "../util/version.h"
 #include "../util/goodies.h"
+#include "../util/file.h"
 #include "../db/repl/rs_member.h"
 
 using namespace std;
@@ -92,10 +93,103 @@ void completionHook(const char* text , linenoiseCompletions* lc ) {
 }
 #endif
 
+#ifndef _WIN32
+static void edit(const string& var){
+    static const char * editor = getenv("EDITOR");
+    if (!editor) {
+        cout << "please define the EDITOR environment variable" << endl;
+        return;
+    }
+
+    for (const char* p=var.data(); *p ; p++){
+        if (! (isalnum(*p) || *p == '_' || *p == '.')){
+            cout << "can only edit variable or property" << endl;
+            return;
+        }
+    }
+
+    if (!shellMainScope->exec("__jsout__ = tojson("+var+")", "tojs", false, false, false))
+        return; // Error already printed
+
+    const string js = shellMainScope->getString("__jsout__");
+
+    if (strstr(js.c_str(), "[native code]")) {
+        cout << "Can't edit native functions" << endl;
+        return;
+    }
+
+    string filename;
+    int fd;
+    for (int i=0; i < 10; i++){
+        StringBuilder sb;
+        sb << "/tmp/mongo_edit" << time(0)+i << ".js";
+        filename = sb.str();
+        fd = open(filename.c_str(), O_RDWR|O_CREAT|O_EXCL, 0600);
+        if (fd > 0)
+            break;
+
+        if (errno != EEXIST) {
+            cout << "couldn't open temp file: " << errnoWithDescription() << endl;
+            return;
+        }
+    }
+
+    if (fd == -1){
+        cout << "couldn't create unique temp file after 10 attempts" << endl;
+        return;
+    }
+
+    // just to make sure this gets closed no matter what
+    File holder;
+    holder.fd = fd;
+
+    if (write(fd, js.data(), js.size()) != (int)js.size()){
+        cout << "failed to write to temp file: " << errnoWithDescription() << endl;
+        return;
+    }
+
+    StringBuilder sb;
+    sb << editor << " " << filename;
+    int ret = ::system(sb.str().c_str());
+    int systemErrno = errno;
+    remove(filename.c_str()); // file already open, deleted on close
+    if (ret){
+        if (ret == -1) {
+            cout << "failed to launch $EDITOR (" << editor << "): " << errnoWithDescription(systemErrno) << endl;
+            return;
+        }
+
+        cout << "editor exited with error, not applying changes" << endl;
+        return;
+
+    }
+
+    lseek(fd, 0, SEEK_SET);
+
+    sb.reset();
+    sb << var << " = ";
+    int bytes;
+    do {
+        char buf[1024];
+        bytes = read(fd, buf, sizeof(buf));
+        if (bytes < 0) {
+            cout << "failed to read temp file: " << errnoWithDescription() << endl;
+            return;
+        }
+        sb.append( StringData(buf, bytes) );
+    }while (bytes);
+
+    const string code = sb.str();
+    if (!shellMainScope->exec(code, "tojs", false, false, false))
+        return; // Error already printed
+
+}
+#endif
+
 void shellHistoryInit() {
 #ifdef USE_LINENOISE
     stringstream ss;
-    char * h = getenv( "HOME" );
+    const char * h = shellUtils::getUserDir();
     if ( h )
         ss << h << "/";
     ss << ".dbshell";
@@ -398,13 +492,14 @@ string finishCode( string code ) {
     while ( ! isBalanced( code ) ) {
         inMultiLine = 1;
         code += "\n";
+        // cancel multiline if two blank lines are entered
+        if ( code.find("\n\n\n") != string::npos )
+            return ";";
         char * line = shellReadline("... " , 1 );
         if ( gotInterrupted )
             return "";
         if ( ! line )
             return "";
-        if ( code.find("\n\n") != string::npos ) // cancel multiline if two blank lines are entered
-            return ";";
 
         while (startsWith(line, "... "))
             line += 4;
@@ -455,8 +550,10 @@ string sayReplSetMemberState() {
                 MemberState ms(s);
                 return ms.toString();
             }
-            else if( str::equals(info.getStringField("info"), "mongos") ) { 
-                return "mongos";
+            else {
+                string s = info.getStringField("info");
+                if( s.size() < 20 )
+                    return s; // "mongos", "configsvr"
             }
         }
     }
@@ -743,8 +840,23 @@ int _main(int argc, char* argv[]) {
             if ( code == "exit" || code == "exit;" ) {
                 break;
             }
+
             if ( code.size() == 0 )
                 continue;
+
+#ifndef _WIN32
+            if (startsWith(line, "edit ")){
+                shellHistoryAdd( line );
+
+                const char* s = line + 5; // skip "edit "
+                while(*s && isspace(*s))
+                    s++;
+
+
+                edit(s);
+                continue;
+            }
+#endif
 
             code = finishCode( code );
             if ( gotInterrupted ) {
