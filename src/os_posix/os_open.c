@@ -90,7 +90,6 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	fh->fd = fd;
 	fh->refcnt = 1;
-	*fhp = fh;
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, fh, &fh->file_size));
@@ -99,6 +98,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_lock(session, conn->mtx);
 	TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
 	__wt_unlock(session, conn->mtx);
+
+	*fhp = fh;
 
 	if (0) {
 err:		if (fh != NULL) {
