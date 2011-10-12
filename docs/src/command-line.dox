@@ -97,39 +97,37 @@ file.
 
 @section utility_load wt load: load data into a file or table
 
-The \c load command loads data into the specified file, or a table as
-described by the output of the \c dump command.  See @ref dump_formats
-for details of the dump file formats.
+The \c load command reads the standard input for data and loads it into
+the specified file or table.  The data should be the format produced by
+the \c dump command; see @ref dump_formats for details.
+
+Data already existing in the file or table will be overwritten by the
+new data (use the \c -s option for a "safe" load).
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-aR] [-c config] [-f input] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-as] [-c config] [-f input] uri</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
 
 @par <code>-a</code>
-By default the specified file is removed and re-created: if the \c -a
-option is specified, the input is added to an existing file.  Already
-existing items may be overwritten, that is, the \c -a option supports
-both appending new data and updating old data.  The \c -a option is only
-applicable when loading a file.
+If the \c -a option is specified, record number keys in the input are
+ignored and the data is appended to the object and assigned new record
+number keys.  The \c -a option is only applicable when loading an object
+where the primary key is a record number.
 
 @par <code>-c</code>
 Include a configuration string to be passed to WT_SESSION::create when
-the object is re-created.  (The \c -c option may not be specified with
-the \c -a option, because the \c -a option does not remove and re-create
-the file.)
+the object is re-created.
 
 @par <code>-f</code>
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
 
-@par <code>-R</code>
-By default, when loading rows into a column-store file, new record
-numbers are assigned sequentially as the rows are read: if the \c -R
-option is specified, the input is read in pairs, first a record number
-line and then a value line, allowing specific records to be loaded.  The
-\c -R option is only applicable when loading a file.
+@par <code>-s</code>
+By default, input data overwrites existing data where the key/value pair
+already exists in the object; the \c -s option causes any attempt to
+overwrite data to fail.
 
 
 @section utility_printlog wt printlog: output the database log

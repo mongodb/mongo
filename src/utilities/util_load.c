@@ -9,26 +9,29 @@
 #include "util.h"
 
 static int format(void);
-static int load_data(WT_CURSOR *, const char *, int);
+static int load_data(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
 static int read_schema(char ***, int *);
 static int usage(void);
 
+static int append;		/* Append (ignore record number keys). */
+static int safe;		/* Safe (don't overwrite existing data). */
+
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
-	int append, ch, ret, read_recno;
+	int ch, ret;
 	const char *config;
 	char *name;
 
-	append = read_recno = ret = 0;
+	ret = 0;
 	config = NULL;
 	name = NULL;
 
-	while ((ch = util_getopt(argc, argv, "ac:f:R")) != EOF)
+	while ((ch = util_getopt(argc, argv, "ac:f:s")) != EOF)
 		switch (ch) {
-		case 'a':	/* append */
+		case 'a':	/* append (ignore record number keys) */
 			append = 1;
 			break;
 		case 'c':	/* command-line table configuration option */
@@ -41,8 +44,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 				return (1);
 			}
 			break;
-		case 'R':
-			read_recno = 1;
+		case 's':	/* safe (don't overwrite existing data) */
+			safe = 1;
 			break;
 		case '?':
 		default:
@@ -51,20 +54,9 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	/*
-	 * If we have another argument, the user is loading a single file or
-	 * table, otherwise, we're reading a WiredTiger dump.
-	 */
-	if (argc == 0) {
-		if (append || config != NULL || read_recno) {
-			fprintf(stderr,
-			    "%s: the -a, -c and  -R options to the load "
-			    "command do not apply when loading WiredTiger "
-			    "dumps\n",
-			    progname);
-			return (1);
-		}
-		ret = load_dump(session);
+	ret = load_dump(session);
+
+#if 0
 	} else {
 		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
 			goto err;
@@ -76,15 +68,14 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			    progname);
 			return (1);
 		}
-#if 0
 static int load_file(WT_SESSION *, const char *, const char *, int, int);
 		ret = load_file(session, name, config, read_recno, append);
-#endif
 	}
-
 	if (0) {
 err:		ret = 1;
 	}
+
+#endif
 
 	if (name != NULL)
 		free(name);
@@ -101,7 +92,7 @@ load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	int hex, ret, tret;
-	char **entry, **list, *p, *uri;
+	char **entry, **list, *p, *uri, config[64];
 
 	if ((ret = read_schema(&list, &hex)) != 0)
 		return (ret);
@@ -144,14 +135,27 @@ load_dump(WT_SESSION *session)
 		}
 
 	/* Open the insert cursor. */
-	if ((ret = session->open_cursor(session, uri, NULL, hex ?
-	    "dump=hex,overwrite" : "dump=print,overwrite", &cursor)) != 0) {
+	(void)snprintf(config, sizeof(config),
+	    "dump=%s,%s", hex ? "hex" : "print", safe ? "" : "overwrite");
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: session.open: %s: %s\n", 
 		    progname, uri, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	ret = load_data(cursor, uri, 1);
+	/*
+	 * Check the append flag (it only applies to objects where the primary
+	 * key is a record number).
+	 */
+	if (append && strcmp(cursor->key_format, "r") != 0) {
+		fprintf(stderr,
+		    "%s: %s: -a option illegal unless the primary key is a "
+		    "record number",
+		    progname, uri);
+		ret = EINVAL;
+	} else
+		ret = load_data(cursor, uri);
 
 	/*
 	 * Technically, we don't have to close the cursor because the session
@@ -315,7 +319,7 @@ load_file(WT_SESSION *session,
  *	Load the data.
  */
 static int
-load_data(WT_CURSOR *cursor, const char *name, int read_key)
+load_data(WT_CURSOR *cursor, const char *name)
 {
 	WT_BUF key, value;
 	uint64_t insert_count;
@@ -326,14 +330,14 @@ load_data(WT_CURSOR *cursor, const char *name, int read_key)
 	
 	/* Read key/value pairs and insert them into the file. */
 	for (insert_count = 0;;) {
-		if (read_key) {
+		if (!append) {
 			if (read_line(&key, 1, &eof))
 				return (1);
 			if (eof == 1)
 				break;
 			cursor->set_key(cursor, &key);
 		}
-		if (read_line(&value, read_key ? 0 : 1, &eof))
+		if (read_line(&value, append ? 1 : 0, &eof))
 			return (1);
 		if (eof == 1)
 			break;
