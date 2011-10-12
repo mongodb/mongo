@@ -455,11 +455,9 @@ namespace mongo {
      * for an old one
      */
     v8::Handle< v8::Value > V8Scope::v8Callback( const v8::Arguments &args ) {
-        disableV8Interrupt(); // we don't want to have to audit all v8 calls for termination exceptions, so we don't allow these exceptions during the callback
-        if ( globalScriptEngine->interrupted() ) {
-            v8::V8::TerminateExecution(); // experimentally it seems that TerminateExecution() will override the return value
-            return v8::Undefined();
-        }
+        // originally v8 interrupt where disabled here cause: don't want to have to audit all v8 calls for termination exceptions
+        // but we do need to keep interrupt because much time may be spent here (e.g. sleep)
+
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_v8_function" ) ) );
         v8Function function = (v8Function)(f->Value());
         Local< External > scp = External::Cast( *args.Data() );
@@ -479,11 +477,10 @@ namespace mongo {
         enableV8Interrupt();
         if ( globalScriptEngine->interrupted() ) {
             v8::V8::TerminateExecution();
-            return v8::Undefined();
+            return v8::ThrowException( v8::String::New( "Interruption in V8 native callback" ) );
         }
         if ( !exception.empty() ) {
-            // technically, ThrowException is supposed to be the last v8 call before returning
-            ret = v8::ThrowException( v8::String::New( exception.c_str() ) );
+            return v8::ThrowException( v8::String::New( exception.c_str() ) );
         }
         return ret;
     }
