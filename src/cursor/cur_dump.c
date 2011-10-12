@@ -157,7 +157,7 @@ dump_to_raw(WT_CURSOR *cursor, const char *src, WT_BUF **bufp)
 			}
 		}
 
-	tmp->size = WT_PTRDIFF32(dest, tmp->data);
+	tmp->size = WT_PTRDIFF32(dest, tmp->mem);
 	*bufp = tmp;
 	return (0);
 
