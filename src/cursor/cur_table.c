@@ -97,11 +97,11 @@ err:	API_END(session);
 }
 
 /*
- * __curtable_set_key --
+ * __wt_curtable_set_key --
  *	WT_CURSOR->set_key implementation for tables.
  */
-static void
-__curtable_set_key(WT_CURSOR *cursor, ...)
+void
+__wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_BUF *buf;
 	WT_CURSOR **cp;
@@ -160,11 +160,11 @@ err:	API_END(session);
 }
 
 /*
- * __curtable_set_value --
+ * __wt_curtable_set_value --
  *	WT_CURSOR->set_value implementation for tables.
  */
-static void
-__curtable_set_value(WT_CURSOR *cursor, ...)
+void
+__wt_curtable_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR **cp;
 	WT_CURSOR_TABLE *ctable;
@@ -177,7 +177,8 @@ __curtable_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)) {
 		item = va_arg(ap, WT_ITEM *);
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;
@@ -557,8 +558,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		NULL,
 		__wt_curtable_get_key,
 		__wt_curtable_get_value,
-		__curtable_set_key,
-		__curtable_set_value,
+		__wt_curtable_set_key,
+		__wt_curtable_set_value,
 		__curtable_first,
 		__curtable_last,
 		__curtable_next,

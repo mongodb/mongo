@@ -9,13 +9,10 @@
 #include "util.h"
 
 static int format(void);
-static int load_col(WT_CURSOR *, const char *, int);
-static int load_file(WT_SESSION *, const char *, const char *, int, int);
-static int load_row(WT_CURSOR *, const char *);
-static int load_table(WT_SESSION *);
+static int load_data(WT_CURSOR *, const char *, int);
+static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
 static int read_schema(char ***, int *);
-static int str2recno(const char *, uint64_t *);
 static int usage(void);
 
 int
@@ -67,7 +64,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			    progname);
 			return (1);
 		}
-		ret = load_table(session);
+		ret = load_dump(session);
 	} else {
 		if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
 			goto err;
@@ -79,7 +76,10 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			    progname);
 			return (1);
 		}
+#if 0
+static int load_file(WT_SESSION *, const char *, const char *, int, int);
 		ret = load_file(session, name, config, read_recno, append);
+#endif
 	}
 
 	if (0) {
@@ -93,32 +93,37 @@ err:		ret = 1;
 }
 
 /*
- * load_table --
- *	Load a table.
+ * load_dump --
+ *	Load from the WiredTiger dump format.
  */
 static int
-load_table(WT_SESSION *session)
+load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	int hex, ret, tret;
-	const char *fmt;
-	char **entry, **list, *name, *p;
+	char **entry, **list, *p, *uri;
 
 	if ((ret = read_schema(&list, &hex)) != 0)
 		return (ret);
 
-	/* Find the table name, and remove it from the database. */
+	/*
+	 * Search for a table name -- if we find one, then it's table dump,
+	 * otherwise, it's a single file dump.
+	 */
 	for (entry = list; *entry != NULL; ++entry)
 		if (strncmp(*entry, "table:", strlen("table:")) == 0)
 			break;
-	if (*entry == NULL)
-		return (format());
-	if ((ret = session->drop(session, *entry, "force")) != 0) {
-		fprintf(stderr, "%s: session.drop: %s: %s\n", 
-		    progname, *entry, wiredtiger_strerror(ret));
-		return (1);
+	if (*entry == NULL) {
+		/*
+		 * Single file dumps can only have two lines, the file name and
+		 * the configuration information.
+		 */
+		if (list[0] == NULL || list[1] == NULL || list[2] != NULL ||
+		    strncmp(list[0], "file:", strlen("file:")) != 0)
+			return (format());
+
+		entry = list;
 	}
-	name = *entry;
 
 	/*
 	 * Make sure the table key/value pair comes first, then we can just
@@ -129,6 +134,8 @@ load_table(WT_SESSION *session)
 		p = list[0]; list[0] = entry[0]; entry[0] = p;
 		p = list[1]; list[1] = entry[1]; entry[1] = p;
 	}
+	uri = list[0];
+
 	for (entry = list; *entry != NULL; entry += 2)
 		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
 			fprintf(stderr, "%s: session.create: %s: %s\n",
@@ -137,20 +144,14 @@ load_table(WT_SESSION *session)
 		}
 
 	/* Open the insert cursor. */
-	if ((ret = session->open_cursor(session, name, NULL, hex ?
+	if ((ret = session->open_cursor(session, uri, NULL, hex ?
 	    "dump=hex,overwrite" : "dump=print,overwrite", &cursor)) != 0) {
 		fprintf(stderr, "%s: session.open: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, uri, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	/* Find out if we're loading a table with record number primary keys. */
-	fmt = "key_format=r";
-	if ((p = strstr(list[1], fmt)) != NULL &&
-	    (p[strlen(fmt)] == '\0' || p[strlen(fmt)] == ','))
-		ret = load_col(cursor, name, 1);
-	else
-		ret = load_row(cursor, name);
+	ret = load_data(cursor, uri, 1);
 
 	/*
 	 * Technically, we don't have to close the cursor because the session
@@ -159,13 +160,13 @@ load_table(WT_SESSION *session)
 	 */
 	if ((tret = cursor->close(cursor, NULL)) != 0) {
 		fprintf(stderr, "%s: cursor.close: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, uri, wiredtiger_strerror(ret));
 		if (ret == 0)
 			ret = tret;
 	}
-	if (ret == 0 && (ret = session->sync(session, name, NULL)) != 0)
+	if (ret == 0 && (ret = session->sync(session, uri, NULL)) != 0)
 		fprintf(stderr, "%s: session.sync: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, uri, wiredtiger_strerror(ret));
 		
 	return (ret);
 }
@@ -194,11 +195,12 @@ read_schema(char ***listp, int *hexp)
 	/* Header line #2: "Format={hex,print}". */
 	if (read_line(&l, 0, &eof))
 		return (1);
-	if (strcmp(l.data, "Format=print") != 0) {
-		if (strcmp(l.data, "Format=hex") != 0)
-			return (format());
+	if (strcmp(l.data, "Format=print") == 0)
+		*hexp = 0;
+	else if (strcmp(l.data, "Format=hex") == 0)
 		*hexp = 1;
-	}
+	else
+		return (format());
 
 	/* Header line #3: "Header". */
 	if (read_line(&l, 0, &eof))
@@ -247,6 +249,7 @@ format(void)
 	return (1);
 }
 
+#if 0
 /*
  * load_file --
  *	Load a single file.
@@ -257,7 +260,6 @@ load_file(WT_SESSION *session,
 {
 	WT_CURSOR *cursor;
 	int ret, tret;
-	const char *fmt, *p;
 
 	/* Optionally remove and re-create the file. */
 	if (!append) {
@@ -286,14 +288,8 @@ load_file(WT_SESSION *session,
 	 * it's obvious, otherwise we check the table configuation for a record
 	 * number format.
 	 */
-	fmt = "key_format=r";
-	if (read_recno ||
-	    (config != NULL &&
-	    (p = strstr(config, fmt)) != NULL &&
-	    (p[strlen(fmt)] == '\0' || p[strlen(fmt)] == ',')))
-		ret = load_col(cursor, name, read_recno);
-	else
-		ret = load_row(cursor, name);
+	ret = load_data(cursor, name, 
+	    read_recno || strcmp(cursor->key_format, "r") == 0 ? 1 : 0);
 
 	/*
 	 * Technically, we don't have to close the cursor because the session
@@ -312,66 +308,14 @@ load_file(WT_SESSION *session,
 		
 	return (ret);
 }
+#endif
 
 /*
- * load_col --
- *	Load a file/table with a record number key.
+ * load_data --
+ *	Load the data.
  */
 static int
-load_col(WT_CURSOR *cursor, const char *name, int read_recno)
-{
-	WT_BUF key, value;
-	uint64_t insert_count, recno;
-	int eof, ret;
-
-	memset(&key, 0, sizeof(key));
-	memset(&value, 0, sizeof(value));
-	
-	/* Read key/value pairs and insert them into the file. */
-	for (insert_count = 0;;) {
-		if (read_recno) {
-			if (read_line(&key, 1, &eof))
-				return (1);
-			if (eof == 1)
-				break;
-			if (str2recno(key.data, &recno))
-				return (1);
-			key.data = &recno;
-			key.size = sizeof(recno);
-			cursor->set_key(cursor, &key);
-		}
-		if (read_line(&value, read_recno ? 0 : 1, &eof))
-			return (1);
-		if (eof == 1)
-			break;
-
-		/* Report on progress every 100 inserts. */
-		if (verbose && ++insert_count % 100 == 0) {
-			printf("\r\t%s: %" PRIu64, name, insert_count);
-			fflush(stdout);
-		}
-	
-		cursor->set_value(cursor, &value);
-		if ((ret = cursor->insert(cursor)) != 0) {
-			fprintf(stderr,
-			    "%s: %s: cursor.insert: %s\n",
-			    progname, name, wiredtiger_strerror(ret));
-			return (1);
-		}
-	}
-
-	if (verbose)
-		printf("\r\t%s: %" PRIu64 "\n", name, insert_count);
-
-	return (0);
-}
-
-/*
- * load_row --
- *	Load a file/table with a variable-length byte-string key.
- */
-static int
-load_row(WT_CURSOR *cursor, const char *name)
+load_data(WT_CURSOR *cursor, const char *name, int read_key)
 {
 	WT_BUF key, value;
 	uint64_t insert_count;
@@ -382,12 +326,17 @@ load_row(WT_CURSOR *cursor, const char *name)
 	
 	/* Read key/value pairs and insert them into the file. */
 	for (insert_count = 0;;) {
-		if (read_line(&key, 1, &eof))
+		if (read_key) {
+			if (read_line(&key, 1, &eof))
+				return (1);
+			if (eof == 1)
+				break;
+			cursor->set_key(cursor, &key);
+		}
+		if (read_line(&value, read_key ? 0 : 1, &eof))
 			return (1);
 		if (eof == 1)
 			break;
-		if (read_line(&value, 0, &eof))
-			return (1);
 
 		/* Report on progress every 100 inserts. */
 		if (verbose && ++insert_count % 100 == 0) {
@@ -395,7 +344,6 @@ load_row(WT_CURSOR *cursor, const char *name)
 			fflush(stdout);
 		}
 	
-		cursor->set_key(cursor, &key);
 		cursor->set_value(cursor, &value);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr,
@@ -465,40 +413,6 @@ read_line(WT_BUF *l, int eof_expected, int *eofp)
 
 	l->data = l->mem;
 	l->size = len;
-	return (0);
-}
-
-/*
- * str2recno --
- *	Convert a string to a record number.
- */
-static int
-str2recno(const char *p, uint64_t *recnop)
-{
-	uint64_t recno;
-	char *endptr;
-
-	/*
-	 * strtouq takes lots of things like hex values, signs and so on and so
-	 * forth -- none of them are OK with us.  Check the string starts with
-	 * digit, that turns off the special processing.
-	 */
-	if (!isdigit(p[0]))
-		goto format;
-
-	errno = 0;
-	recno = strtouq(p, &endptr, 0);
-	if (recno == ULLONG_MAX && errno == ERANGE) {
-		fprintf(stderr,
-		    "%s: %s: %s\n", progname, p, wiredtiger_strerror(ERANGE));
-		return (1);
-	}
-	if (endptr[0] != '\0') {
-format:		fprintf(stderr,
-		    "%s: %s: invalid record number format\n", progname, p);
-		return (1);
-	}
-	*recnop = recno;
 	return (0);
 }
 

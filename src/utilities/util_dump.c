@@ -8,200 +8,57 @@
 #include "wiredtiger.h"
 #include "util.h"
 
+static int cursor_err(const char *, const char *, int);
+static int schema(WT_SESSION *, const char *);
+static int schema_file(WT_CURSOR *, const char *);
+static int schema_table(WT_CURSOR *, const char *);
+static int sys_err(void);
 static int usage(void);
 
 static inline int
-dump_forward(WT_CURSOR *cursor, int dump_key)
+dump_forward(WT_CURSOR *cursor, const char *name)
 {
 	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		if (dump_key) {
-			if ((ret = cursor->get_key(cursor, &key)) != 0)
-				return (ret);
-			if (puts(key) == EOF)
-				return (errno);
-		}
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (cursor_err(name, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		if (puts(value) == EOF)
-			return (errno);
+			return (cursor_err(name, "get_value", ret));
+		if (printf("%s\n%s\n", key, value) < 0)
+			return (sys_err());
 	}
-	return (ret);
+	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "next", ret));
 }
 
 static inline int
-dump_reverse(WT_CURSOR *cursor, int dump_key)
+dump_reverse(WT_CURSOR *cursor, const char *name)
 {
 	const char *key, *value;
 	int ret;
 
 	while ((ret = cursor->prev(cursor)) == 0) {
-		if (dump_key) {
-			if ((ret = cursor->get_key(cursor, &key)) != 0)
-				return (ret);
-			if (puts(key) == EOF)
-				return (errno);
-		}
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (ret);
-		if (puts(value) == EOF)
-			return (errno);
-	}
-	return (ret);
-}
-
-/*
- * schema --
- *	Dump the schema for the table.
- */
-static int
-schema(WT_SESSION *session, const char *name)
-{
-	struct {
-		char *key;			/* Schema key */
-		char *value;			/* Schema value */
-	} *list;
-	WT_CURSOR *cursor;
-	const char *key, *value;
-	int i, elem, list_elem, ret, tret;
-	char *append, *buf, *filename, *p, *t;
-
-	ret = 0;
-
-	/* Open the schema file. */
-	if ((ret = session->open_cursor(
-	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0)
-		return (ret);
-
-	/*
-	 * XXX
-	 * We're walking the entire schema file: I'd rather call the search_near
-	 * function, but it doesn't guarantee less-than-or-equal-to semantics so
-	 * the loop is hard to write.
-	 */
-	list = NULL;
-	elem = list_elem = 0;
-	for (; (ret = cursor->next(cursor)) == 0; free(buf)) {
-		/* Get the key and duplicate it, we want to overwrite it. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			goto err;
-		if ((buf = strdup(key)) == NULL)
-			goto err;
-			
-		/* Check for the dump table's column groups or indices. */
-		if ((p = strchr(buf, ':')) == NULL)
-			continue;
-		*p++ = '\0';
-		if (strcmp(buf, "index") != 0 && strcmp(buf, "colgroup") != 0)
-			continue;
-		if ((t = strchr(p, ':')) == NULL)
-			continue;
-		*t++ = '\0';
-		if (strcmp(p, name) != 0)
-			continue;
-
-		/* Found one, save it for review. */
+			return (cursor_err(name, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			goto err;
-		if (elem == list_elem && (list = realloc(list,
-		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
-			goto err;
-		if ((list[elem].key = strdup(key)) == NULL)
-			goto err;
-		if ((list[elem].value = strdup(value)) == NULL)
-			goto err;
-		++elem;
+			return (cursor_err(name, "get_value", ret));
+		if (printf("%s\n%s\n", key, value) < 0)
+			return (sys_err());
 	}
-	if (ret != WT_NOTFOUND)
-		goto err;
-	ret = 0;
-
-	/*
-	 * Dump out the schema information: first, dump the table's information
-	 * (requires a lookup).
-	 */
-	if ((buf = malloc(strlen("table:") + strlen(name) + 10)) == NULL)
-		goto err;
-	strcpy(buf, "table:");
-	strcpy(buf + strlen("table:"), name);
-	cursor->set_key(cursor, buf);
-	if ((ret = cursor->search(cursor)) != 0) {
-		fprintf(stderr,
-		    "%s: unable to find schema reference for table %s\n",
-		    progname, name);
-		goto err;
-	}
-	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		goto err;
-	if ((ret = cursor->get_value(cursor, &value)) != 0)
-		goto err;
-	printf("%s\n%s\n", key, value);
-
-	/*
-	 * Second, dump the column group and index key/value pairs: for each
-	 * one, look up the related file information and append it to the base
-	 * record.
-	 */
-	for (i = 0; i < elem; ++i) {
-		if ((filename = strstr(list[i].value, "filename=")) == NULL) {
-			fprintf(stderr,
-			    "%s: %s: has no underlying file configuration\n",
-			    progname, list[i].key);
-			goto err;
-		}
-
-		/*
-		 * Nul-terminate the filename if necessary, create the file
-		 * URI, then look it up.
-		 */
-		if ((append = strchr(filename, ',')) != NULL)
-			*append = '\0';
-		p = filename + strlen("filename=");
-		p -= strlen("file:");
-		memcpy(p, "file:", strlen("file:"));
-		cursor->set_key(cursor, p);
-		if ((ret = cursor->search(cursor)) != 0) {
-			fprintf(stderr,
-			    "%s: %s: unable to find schema reference for the "
-			    "underlying file %s\n",
-			    progname, list[i].key, p);
-			goto err;
-		}
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			goto err;
-
-		/*
-		 * The dumped configuration string is the original key plus the
-		 * file's configuration.   Discard the file name, a new one is
-		 * chosen during the load process.
-		 */
-		*filename = '\0';
-		printf("%s\n%s,%s%s%s\n",
-		    list[i].key, list[i].value,
-		    append == NULL ? "" : append + 1,
-		    append == NULL ? "" : ",", value);
-	}
-
-err:	if (cursor != NULL &&
-	    (tret = cursor->close(cursor, NULL)) != 0 && ret == 0)
-		ret = tret;
-
-	/* Leak the memory, I don't care. */
-	return (ret);
+	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "prev", ret));
 }
 
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
-	int ch, dump_key, hex, ret, reverse;
+	int ch, hex, ret, reverse;
 	char *name;
 
-	dump_key = hex = reverse = 0;
+	hex = reverse = 0;
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "f:Rrx")) != EOF)
+	while ((ch = util_getopt(argc, argv, "f:rx")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL) {
@@ -209,9 +66,6 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 				    progname, util_optarg, strerror(errno));
 				return (1);
 			}
-			break;
-		case 'R':
-			dump_key = 1;
 			break;
 		case 'r':
 			reverse = 1;
@@ -233,17 +87,12 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		goto err;
 
-	if (strncmp(name, "table:", strlen("table:")) == 0) {
-		dump_key = 1;
-
-		printf("WiredTiger Dump %s\n",
-		    wiredtiger_version(NULL, NULL, NULL));
-		printf("Format=%s\n", hex ? "hex" : "print");
-		printf("Header\n");
-		if ((ret = schema(session, *argv)) != 0)
-			goto err;
-		printf("Data\n");
-	}
+	printf("WiredTiger Dump %s\n", wiredtiger_version(NULL, NULL, NULL));
+	printf("Format=%s\n", hex ? "hex" : "print");
+	printf("Header\n");
+	if ((ret = schema(session, name)) != 0)
+		goto err;
+	printf("Data\n");
 
 	if ((ret = session->open_cursor(session,
 	    name, NULL, hex ? "dump=hex" : "dump=print", &cursor)) != 0) {
@@ -252,21 +101,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-	if (strcmp(cursor->key_format, "r") != 0)
-		dump_key = 1;
-
 	if (reverse)
-		ret = dump_reverse(cursor, dump_key);
+		ret = dump_reverse(cursor, name);
 	else
-		ret = dump_forward(cursor, dump_key);
-
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	else {
-		fprintf(stderr, "%s: %s: %s\n",
-		    progname, name, wiredtiger_strerror(ret));
-		goto err;
-	}
+		ret = dump_forward(cursor, name);
 
 	if (0) {
 err:		ret = 1;
@@ -278,12 +116,206 @@ err:		ret = 1;
 	return (ret);
 }
 
+/*
+ * schema --
+ *	Dump the schema for the uri.
+ */
+static int
+schema(WT_SESSION *session, const char *uri)
+{
+	WT_CURSOR *cursor;
+	int ret, tret;
+
+	ret = 0;
+
+	/* Open the schema file. */
+	if ((ret = session->open_cursor(
+	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
+		    progname, "file:__schema.wt", wiredtiger_strerror(ret));
+		return (1);
+	}
+
+	/* Dump the schema. */
+	if (strncmp(uri, "table:", strlen("table:")) == 0)
+		ret = schema_table(cursor, uri);
+	else
+		ret = schema_file(cursor, uri);
+
+	if ((tret = cursor->close(cursor, NULL)) != 0 && ret == 0)
+		ret = tret;
+
+	return (ret);
+}
+
+/*
+ * schema_table --
+ *	Dump the schema for a table.
+ */
+static int
+schema_table(WT_CURSOR *cursor, const char *uri)
+{
+	struct {
+		char *key;			/* Schema key */
+		char *value;			/* Schema value */
+	} *list;
+	int i, elem, list_elem, ret;
+	const char *key, *name, *value;
+	char *append, *buf, *filename, *p, *t;
+
+	ret = 0;
+
+	/* Get the name. */
+	if ((name = strchr(uri, ':')) == NULL) {
+		fprintf(stderr, "%s: %s: corrupted uri\n", progname, uri);
+		return (1);
+	}
+	++name;
+
+	list = NULL;
+	elem = list_elem = 0;
+	for (; (ret = cursor->next(cursor)) == 0; free(buf)) {
+		/* Get the key and duplicate it, we want to overwrite it. */
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (cursor_err(uri, "get_key", ret));
+		if ((buf = strdup(key)) == NULL)
+			return (sys_err());
+			
+		/* Check for the dump table's column groups or indices. */
+		if ((p = strchr(buf, ':')) == NULL)
+			continue;
+		*p++ = '\0';
+		if (strcmp(buf, "index") != 0 && strcmp(buf, "colgroup") != 0)
+			continue;
+		if ((t = strchr(p, ':')) == NULL)
+			continue;
+		*t++ = '\0';
+		if (strcmp(p, name) != 0)
+			continue;
+
+		/* Found one, save it for review. */
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (cursor_err(uri, "get_value", ret));
+		if (elem == list_elem && (list = realloc(list,
+		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
+			return (sys_err());
+		if ((list[elem].key = strdup(key)) == NULL)
+			return (sys_err());
+		if ((list[elem].value = strdup(value)) == NULL)
+			return (sys_err());
+		++elem;
+	}
+	if (ret != WT_NOTFOUND)
+		return (cursor_err(uri, "next", ret));
+	ret = 0;
+
+	/*
+	 * Dump out the schema information: first, dump the uri entry itself
+	 * (requires a lookup).
+	 */
+	cursor->set_key(cursor, uri);
+	if ((ret = cursor->search(cursor)) != 0)
+		return (cursor_err(uri, "search", ret));
+	if ((ret = cursor->get_key(cursor, &key)) != 0)
+		return (cursor_err(uri, "get_key", ret));
+	if ((ret = cursor->get_value(cursor, &value)) != 0)
+		return (cursor_err(uri, "get_value", ret));
+	printf("%s\n%s\n", key, value);
+
+	/*
+	 * Second, dump the column group and index key/value pairs: for each
+	 * one, look up the related file information and append it to the base
+	 * record.
+	 */
+	for (i = 0; i < elem; ++i) {
+		if ((filename = strstr(list[i].value, "filename=")) == NULL) {
+			fprintf(stderr,
+			    "%s: %s: has no underlying file configuration\n",
+			    progname, list[i].key);
+			return (1);
+		}
+
+		/*
+		 * Nul-terminate the filename if necessary, create the file
+		 * URI, then look it up.
+		 */
+		if ((append = strchr(filename, ',')) != NULL)
+			*append = '\0';
+		p = filename + strlen("filename=");
+		p -= strlen("file:");
+		memcpy(p, "file:", strlen("file:"));
+		cursor->set_key(cursor, p);
+		if ((ret = cursor->search(cursor)) != 0) {
+			fprintf(stderr,
+			    "%s: %s: unable to find schema reference for the "
+			    "underlying file %s\n",
+			    progname, list[i].key, p);
+			return (1);
+		}
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (cursor_err(uri, "get_value", ret));
+
+		/*
+		 * The dumped configuration string is the original key plus the
+		 * file's configuration.   Discard the file name, a new one is
+		 * chosen during the load process.
+		 */
+		*filename = '\0';
+		printf("%s\n%s,%s%s%s\n",
+		    list[i].key, list[i].value,
+		    append == NULL ? "" : append + 1,
+		    append == NULL ? "" : ",", value);
+	}
+
+	/* Leak the memory, I don't care. */
+	return (0);
+}
+
+/*
+ * schema_file --
+ *	Dump the schema for a file.
+ */
+static int
+schema_file(WT_CURSOR *cursor, const char *uri)
+{
+	const char *key, *value;
+	int ret;
+
+	ret = 0;
+
+	cursor->set_key(cursor, uri);
+	if ((ret = cursor->search(cursor)) != 0)
+		return (cursor_err(uri, "search", ret));
+	if ((ret = cursor->get_key(cursor, &key)) != 0)
+		return (cursor_err(uri, "get_key", ret));
+	if ((ret = cursor->get_value(cursor, &value)) != 0)
+		return (cursor_err(uri, "get_value", ret));
+	printf("%s\n%s\n", key, value);
+
+	return (0);
+}
+
+static int
+cursor_err(const char *name, const char *op, int ret)
+{
+	fprintf(stderr, "%s: %s: cursor.%s: %s\n",
+	    progname, name, op, wiredtiger_strerror(ret));
+	return (1);
+}
+
+static int
+sys_err(void)
+{
+	fprintf(stderr, "%s: %s\n", progname, wiredtiger_strerror(errno));
+	return (1);
+}
+
 static int
 usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s%s "
-	    "dump [-Rrx] [-f output-file] uri\n",
+	    "dump [-rx] [-f output-file] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

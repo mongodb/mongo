@@ -322,6 +322,8 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 extern void __wt_cursor_init(WT_CURSOR *cursor,
     int is_public,
@@ -330,6 +332,8 @@ extern int __wt_cursor_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
+extern void __wt_curtable_set_key(WT_CURSOR *cursor, ...);
+extern void __wt_curtable_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

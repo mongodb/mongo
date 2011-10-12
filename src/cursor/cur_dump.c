@@ -8,12 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __raw_to_dump --
+ * raw_to_dump --
  *	We have a buffer where the data item contains a raw value, convert it
  * to a printable string.
  */
 static int
-__raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
+raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
 {
 	static const u_char hex[] = "0123456789abcdef";
 	WT_SESSION_IMPL *session;
@@ -65,75 +65,112 @@ __raw_to_dump(WT_CURSOR *cursor, WT_ITEM *from, WT_BUF *to)
 }
 
 /*
- * convert_from_dump --
+ * hex2byte --
+ *	Convert a pair of hex characters into a byte.
+ */
+static inline int
+hex2byte(const char *p, uint8_t *bytep)
+{
+	uint8_t byte;
+
+	switch (p[0]) {
+	case '0': byte = 0; break;
+	case '1': byte = 1 << 4; break;
+	case '2': byte = 2 << 4; break;
+	case '3': byte = 3 << 4; break;
+	case '4': byte = 4 << 4; break;
+	case '5': byte = 5 << 4; break;
+	case '6': byte = 6 << 4; break;
+	case '7': byte = 7 << 4; break;
+	case '8': byte = 8 << 4; break;
+	case '9': byte = 9 << 4; break;
+	case 'a': byte = 10 << 4; break;
+	case 'b': byte = 11 << 4; break;
+	case 'c': byte = 12 << 4; break;
+	case 'd': byte = 13 << 4; break;
+	case 'e': byte = 14 << 4; break;
+	case 'f': byte = 15 << 4; break;
+	default:
+		return (1);
+	}
+
+	switch (p[1]) {
+	case '0': break;
+	case '1': byte |= 1; break;
+	case '2': byte |= 2; break;
+	case '3': byte |= 3; break;
+	case '4': byte |= 4; break;
+	case '5': byte |= 5; break;
+	case '6': byte |= 6; break;
+	case '7': byte |= 7; break;
+	case '8': byte |= 8; break;
+	case '9': byte |= 9; break;
+	case 'a': byte |= 10; break;
+	case 'b': byte |= 11; break;
+	case 'c': byte |= 12; break;
+	case 'd': byte |= 13; break;
+	case 'e': byte |= 14; break;
+	case 'f': byte |= 15; break;
+	default:
+		return (1);
+	}
+	*bytep = byte;
+	return (0);
+}
+
+/*
+ * dump_to_raw --
  *	We have a scratch buffer where the data item contains a dump string,
  *	convert it to a raw value.
  */
 static int
-__convert_from_dump(WT_SESSION_IMPL *session, WT_BUF *buf)
+dump_to_raw(WT_CURSOR *cursor, const char *src, WT_BUF **bufp)
 {
-	uint8_t *dest, *end, *src;
-	int i;
+	WT_BUF *tmp;
+	WT_SESSION_IMPL *session;
+	size_t size;
+	uint8_t *dest;
 
-	WT_UNUSED(session);
+	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if (buf->size == 0)
-		return (0);
+	size = strlen(src);
+	WT_RET(__wt_scr_alloc(session, (uint32_t)size, &tmp));
 
-	/*
-	 * Overwrite in place: the converted string will always be smaller
-	 * than the printable representation, so dest <= src in this loop.
-	 */
-	src = dest = (uint8_t *)buf->data;
-	end = src + buf->size;
-	for (; src < end; ++src, ++dest) {
-		if (*src == '\\') {
-			if (src < end && src[1] == '\\') {
-				++src;
-				*dest = '\\';
+	dest = tmp->mem;
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_HEX)) {
+		if (size % 2 != 0)
+			goto format;
+		for (; src[0] != '\0'; src += 2, ++dest)
+			if (hex2byte(src, dest))
+				goto hexerr;
+	} else
+		for (; src[0] != '\0'; ++src, ++dest) {
+			if ((dest[0] = (uint8_t)src[0]) != '\\')
 				continue;
+			++src;
+			if (src[0] != '\\') {
+				if (src[0] == '\0' || src[1] == '\0')
+					goto format;
+				if (hex2byte(src, dest))
+					goto hexerr;
+				++src;
 			}
+		}
 
-			if (src + 2 >= end) {
-				__wt_errx(session,
-				    "Unexpected end of input in an escaped "
-				    "value");
-				return (EINVAL);
-			}
+	tmp->size = WT_PTRDIFF32(dest, tmp->data);
+	*bufp = tmp;
+	return (0);
 
-			*dest = 0;
-			for (i = 0; i < 2; i++) {
-				*dest <<= 4;
-				switch (*++src) {
-				case '0': *dest |= 0; break;
-				case '1': *dest |= 1; break;
-				case '2': *dest |= 2; break;
-				case '3': *dest |= 3; break;
-				case '4': *dest |= 4; break;
-				case '5': *dest |= 5; break;
-				case '6': *dest |= 6; break;
-				case '7': *dest |= 7; break;
-				case '8': *dest |= 8; break;
-				case '9': *dest |= 9; break;
-				case 'a': *dest |= 10; break;
-				case 'b': *dest |= 11; break;
-				case 'c': *dest |= 12; break;
-				case 'd': *dest |= 13; break;
-				case 'e': *dest |= 14; break;
-				case 'f': *dest |= 15; break;
-				default:
-					__wt_errx(session,
-					    "Invalid escaped value: expecting "
-					    "a hexadecimal value");
-					return (EINVAL);
-				}
-			}
-		} else
-			*dest = *src;
+hexerr:	__wt_errx(session,
+	    "Invalid escaped value: expecting a hexadecimal value");
+
+	if (0) {
+format:		__wt_errx(
+		    session, "Unexpected end of input in an escaped value");
 	}
 
-	buf->size = WT_PTRDIFF32(dest, buf->data);
-	return (0);
+	__wt_scr_free(&tmp);
+	return (EINVAL);
 }
 
 /*
@@ -145,29 +182,26 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
-	int key_recno, ret;
+	int ret;
 	uint64_t recno;
 	va_list ap;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
-	key_recno = (strcmp(cursor->key_format, "r") == 0);
-
-	if (!key_recno || F_ISSET(cursor, WT_CURSTD_RAW)) {
-		if (F_ISSET(cursor, WT_CURSTD_TABLE))
-			WT_ERR(__wt_curtable_get_key(cursor, &item));
-		else
-			WT_ERR(__wt_cursor_get_key(cursor, &item));
-
-		WT_ERR(__raw_to_dump(cursor, &item, &cursor->key));
-	} else {
+	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
 		if (F_ISSET(cursor, WT_CURSTD_TABLE))
 			WT_ERR(__wt_curtable_get_key(cursor, &recno));
 		else
 			WT_ERR(__wt_cursor_get_key(cursor, &recno));
 
-		__wt_buf_init(session, &cursor->key, 0);
 		WT_ERR(__wt_buf_fmt(session, &cursor->key, "%" PRIu64, recno));
+	} else {
+		if (F_ISSET(cursor, WT_CURSTD_TABLE))
+			WT_ERR(__wt_curtable_get_key(cursor, &item));
+		else
+			WT_ERR(__wt_cursor_get_key(cursor, &item));
+
+		WT_ERR(raw_to_dump(cursor, &item, &cursor->key));
 	}
 
 	va_start(ap, cursor);
@@ -181,6 +215,86 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 
 err:	API_END(session);
 	return (ret);
+}
+
+/*
+ * str2recno --
+ *	Convert a string to a record number.
+ */
+static int
+str2recno(WT_SESSION_IMPL *session, const char *p, uint64_t *recnop)
+{
+	uint64_t recno;
+	char *endptr;
+
+	/*
+	 * strtouq takes lots of things like hex values, signs and so on and so
+	 * forth -- none of them are OK with us.  Check the string starts with
+	 * digit, that turns off the special processing.
+	 */
+	if (!isdigit(p[0]))
+		goto format;
+
+	errno = 0;
+	recno = strtouq(p, &endptr, 0);
+	if (recno == ULLONG_MAX && errno == ERANGE) {
+		__wt_err(session, ERANGE, "%s: invalid record number", p);
+		return (ERANGE);
+	}
+	if (endptr[0] != '\0') {
+format:		__wt_errx(session, "%s: invalid record number", p);
+		return (EINVAL);
+	}
+	*recnop = recno;
+	return (0);
+}
+
+/*
+ * __curdump_set_key --
+ *	WT_CURSOR->set_key for dump cursors.
+ */
+static void
+__curdump_set_key(WT_CURSOR *cursor, ...)
+{
+	WT_BUF *tmp;
+	WT_SESSION_IMPL *session;
+	uint64_t recno;
+	va_list ap;
+	const char *p;
+	int ret;
+
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
+
+	va_start(ap, cursor);
+	if (F_ISSET(cursor, WT_CURSTD_RAW))
+		p = va_arg(ap, WT_ITEM *)->data;
+	else
+		p = *va_arg(ap, const char **);
+	va_end(ap);
+
+	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
+		WT_ERR(str2recno(session, p, &recno));
+
+		if (F_ISSET(cursor, WT_CURSTD_TABLE))
+			__wt_curtable_set_key(cursor, recno);
+		else
+			__wt_cursor_set_key(cursor, recno);
+	} else {
+		WT_ERR(dump_to_raw(cursor, p, &tmp));
+
+		if (F_ISSET(cursor, WT_CURSTD_TABLE))
+			__wt_curtable_set_key(cursor, (WT_ITEM *)tmp);
+		else
+			__wt_cursor_set_key(cursor, (WT_ITEM *)tmp);
+		__wt_scr_free(&tmp);
+	}
+
+	if (0) {
+err:		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_KEY_SET);
+	}
+
+	API_END(session);
 }
 
 /*
@@ -202,7 +316,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	else
 		WT_ERR(__wt_cursor_get_value(cursor, &item));
 
-	WT_ERR(__raw_to_dump(cursor, &item, &cursor->value));
+	WT_ERR(raw_to_dump(cursor, &item, &cursor->value));
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -218,55 +332,39 @@ err:	API_END(session);
 }
 
 /*
- * __curdump_set_key --
- *	WT_CURSOR->set_key for dump cursors.
- */
-static void
-__curdump_set_key(WT_CURSOR *cursor, ...)
-{
-	WT_SESSION_IMPL *session;
-	va_list ap;
-	int ret;
-
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
-
-	va_start(ap, cursor);
-	*(WT_ITEM *)&cursor->key = *va_arg(ap, WT_ITEM *);
-
-	if ((ret = __convert_from_dump(session, &cursor->key)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_KEY_RAW);
-	else {
-		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_KEY_SET);
-	}
-	va_end(ap);
-
-	API_END(session);
-}
-
-/*
  * __curdump_set_value --
  *	WT_CURSOR->set_value for dump cursors.
  */
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
+	WT_BUF *tmp;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
+	const char *p;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	*(WT_ITEM *)&cursor->value = *va_arg(ap, WT_ITEM *);
+	if (F_ISSET(cursor, WT_CURSTD_RAW))
+		p = va_arg(ap, WT_ITEM *)->data;
+	else
+		p = *va_arg(ap, const char **);
+	va_end(ap);
 
-	if ((ret = __convert_from_dump(session, &cursor->value)) == 0)
-		F_SET(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_RAW);
-	else {
-		cursor->saved_err = ret;
+	WT_ERR(dump_to_raw(cursor, p, &tmp));
+
+	if (F_ISSET(cursor, WT_CURSTD_TABLE))
+		__wt_curtable_set_value(cursor, (WT_ITEM *)tmp);
+	else
+		__wt_cursor_set_value(cursor, (WT_ITEM *)tmp);
+	__wt_scr_free(&tmp);
+
+	if (0) {
+err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
-	va_end(ap);
 
 	API_END(session);
 }

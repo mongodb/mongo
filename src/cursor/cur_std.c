@@ -89,11 +89,11 @@ err:	API_END(session);
 }
 
 /*
- * __cursor_set_key --
+ * __wt_cursor_set_key --
  *	WT_CURSOR->set_key default implementation.
  */
-static void
-__cursor_set_key(WT_CURSOR *cursor, ...)
+void
+__wt_cursor_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_SESSION_IMPL *session;
 	WT_BUF *buf;
@@ -167,11 +167,11 @@ err:		cursor->saved_err = ret;
 }
 
 /*
- * __cursor_set_value --
+ * __wt_cursor_set_value --
  *	WT_CURSOR->set_value default implementation.
  */
-static void
-__cursor_set_value(WT_CURSOR *cursor, ...)
+void
+__wt_cursor_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_SESSION_IMPL *session;
 	WT_BUF *buf;
@@ -184,7 +184,9 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
+	fmt = F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
+	    "u" : cursor->value_format;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
@@ -276,9 +278,9 @@ __wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *cfg[])
 	if (cursor->get_value == NULL)
 		cursor->get_value = __wt_cursor_get_value;
 	if (cursor->set_key == NULL)
-		cursor->set_key = __cursor_set_key;
+		cursor->set_key = __wt_cursor_set_key;
 	if (cursor->set_value == NULL)
-		cursor->set_value = __cursor_set_value;
+		cursor->set_value = __wt_cursor_set_value;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 

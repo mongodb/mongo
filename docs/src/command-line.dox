@@ -60,7 +60,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-Rrx] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -68,10 +68,6 @@ The following are command-specific options for the \c dump command:
 @par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
 the \c -f option re-directs the output to the specified file.
-
-@par <code>-R</code>
-By default, when dumping a column-store file, record numbers are not included
-in the output; the \c -R option causes record numbers to be included.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
