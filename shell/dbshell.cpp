@@ -453,7 +453,10 @@ bool isBalanced( string code ) {
             }
             break;
         }
-
+        if (i>=code.size()) {
+            danglingOp = false;
+            break;
+        }
         if ( isOpSymbol( code[i] )) danglingOp = true;
         else if (! std::isspace( code[i] )) danglingOp = false;
     }
