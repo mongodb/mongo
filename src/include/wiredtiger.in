@@ -385,16 +385,14 @@ struct wt_cursor {
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
-#define	WT_CURSTD_DUMP_HEX	0x0001
-#define	WT_CURSTD_DUMP_PRINT	0x0002
-#define	WT_CURSTD_KEY_RAW	0x0004
-#define	WT_CURSTD_KEY_SET	0x0008
-#define	WT_CURSTD_OVERWRITE	0x0010
-#define	WT_CURSTD_PUBLIC	0x0020
-#define	WT_CURSTD_RAW		0x0040
-#define	WT_CURSTD_TABLE		0x0080
-#define	WT_CURSTD_VALUE_RAW	0x0100
-#define	WT_CURSTD_VALUE_SET	0x0200
+#define	WT_CURSTD_DUMP_HEX	0x001
+#define	WT_CURSTD_DUMP_PRINT	0x002
+#define	WT_CURSTD_KEY_SET	0x004
+#define	WT_CURSTD_OVERWRITE	0x008
+#define	WT_CURSTD_PUBLIC	0x010
+#define	WT_CURSTD_RAW		0x020
+#define	WT_CURSTD_TABLE		0x040
+#define	WT_CURSTD_VALUE_SET	0x080
 	uint32_t flags;
 #endif
 };
