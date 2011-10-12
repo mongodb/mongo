@@ -505,9 +505,11 @@ namespace mongo {
                     t.appendNumber( "mappedWithJournal" , m );
                 }
                 
-                if( v - m > 5000 ) { 
+                int overhead = v - m - connTicketHolder.used();
+
+                if( overhead > 4000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
-                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large. could indicate a memory leak" << endl;
+                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
                 }
 
                 t.done();
