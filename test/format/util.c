@@ -21,11 +21,18 @@ key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 	    sprintf(g.key_gen_buf, "%010" PRIu64 ".%02d", keyno,
                 (int)MMRAND(1, 15)) :
 	    sprintf(g.key_gen_buf, "%010" PRIu64 ".00", keyno);
-	g.key_gen_buf[len] = '/';
 
+	/*
+	 * In a column-store, the key is only used for BDB, and so it doesn't
+	 * need a random length.
+	 */
+	if (g.c_file_type == ROW) {
+		g.key_gen_buf[len] = '/';
+		len = g.key_rand_len[keyno %
+		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+	}
 	*(void **)keyp = g.key_gen_buf;
-	*sizep = g.key_rand_len[keyno %
-	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+	*sizep = len;
 }
 
 void
