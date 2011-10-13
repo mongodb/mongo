@@ -470,6 +470,7 @@ namespace mongo {
         char * buf = buf_holder.get();
 
         ProgressMeter m( fileLength );
+        m.setUnits( "bytes" );
 
         while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);

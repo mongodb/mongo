@@ -110,6 +110,7 @@ public:
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
         ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
+        m.setUnits("objects");
 
         doCollection(coll, f, &m);
 
@@ -251,6 +252,7 @@ public:
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         ProgressMeter m( nsd->stats.nrecords * 2 );
+        m.setUnits("objects");
         
         Writer w( f , &m );
 
