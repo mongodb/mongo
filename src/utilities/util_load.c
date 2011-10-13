@@ -134,7 +134,7 @@ load_dump(WT_SESSION *session)
 	if (append && strcmp(cursor->key_format, "r") != 0) {
 		fprintf(stderr,
 		    "%s: %s: -a option illegal unless the primary key is a "
-		    "record number",
+		    "record number\n",
 		    progname, uri);
 		ret = EINVAL;
 	} else
@@ -275,7 +275,7 @@ schema_update(char **list)
 		    strstr(p[1], "value_format=")) {
 			fprintf(stderr,
 			    "%s: the command line configuration string may not "
-			    "modify the object's key or value format",
+			    "modify the object's key or value format\n",
 			    progname);
 			return (1);
 		}
@@ -301,7 +301,7 @@ schema_update(char **list)
 		if (!found) {
 			fprintf(stderr,
 			    "%s: the command line object name %s was not "
-			    "matched by any loaded object name",
+			    "matched by any loaded object name\n",
 			    progname, *p);
 			return (1);
 		}
