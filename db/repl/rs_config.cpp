@@ -286,11 +286,6 @@ namespace mongo {
 
         uassert(13433, "can't find self in new replset config", me == 1);
 
-        /* TODO : MORE CHECKS HERE */
-
-        DEV log() << "replSet TODO : don't allow removal of a node until we handle it at the removed node end?" << endl;
-        // we could change its votes to zero perhaps instead as a short term...
-
         return true;
     }
 
