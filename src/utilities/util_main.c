@@ -114,6 +114,8 @@ main(int argc, char *argv[])
 	case 'l':
 		if (strcmp(command, "load") == 0)
 			ret = util_load(session, argc, argv);
+		else if (strcmp(command, "loadtext") == 0)
+			ret = util_loadtext(session, argc, argv);
 		else
 			ret = usage();
 		break;

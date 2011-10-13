@@ -9,7 +9,6 @@
 #include "util.h"
 
 static int format(void);
-static int load_data(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
 static int schema_read(char ***, int *);
@@ -17,16 +16,16 @@ static int schema_update(char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
-static int	safe;		/* -s safe (don't overwrite existing data) */
 static char    *cmdname;	/* -n name (object's name, or rename) */
 static char   **cmdconfig;	/* configuration pairs */
+static int	overwrite;	/* -o overwrite existing data */
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch;
 
-	while ((ch = util_getopt(argc, argv, "af:n:s")) != EOF)
+	while ((ch = util_getopt(argc, argv, "af:n:o")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
@@ -39,8 +38,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 		case 'n':	/* -n name (object's name, or rename) */
 			cmdname = util_optarg;
 			break;
-		case 's':	/* safe (don't overwrite existing data) */
-			safe = 1;
+		case 'o':	/* -o (overwrite existing data) */
+			overwrite = 1;
 			break;
 		case '?':
 		default:
@@ -68,7 +67,7 @@ load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	int hex, ret, tret;
-	char **entry, **list, *p, *uri, curconfig[64];
+	char **entry, **list, *p, *uri, config[64];
 
 	/* Read the schema file. */
 	if ((ret = schema_read(&list, &hex)) != 0)
@@ -113,10 +112,10 @@ load_dump(WT_SESSION *session)
 			return (util_err(ret, "%s: session.create", entry[0]));
 
 	/* Open the insert cursor. */
-	(void)snprintf(curconfig, sizeof(curconfig),
-	    "dump=%s,%s", hex ? "hex" : "print", safe ? "" : "overwrite");
+	(void)snprintf(config, sizeof(config),
+	    "dump=%s%s", hex ? "hex" : "print", overwrite ? ",overwrite" : "");
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, curconfig, &cursor)) != 0)
+	    session, uri, NULL, config, &cursor)) != 0)
 		return(util_err(ret, "%s: session.open", uri));
 
 	/*
@@ -130,7 +129,7 @@ load_dump(WT_SESSION *session)
 		    progname, uri);
 		ret = 1;
 	} else
-		ret = load_data(cursor, uri);
+		ret = util_insert(cursor, uri, 1, append);
 
 	/*
 	 * Technically, we don't have to close the cursor because the session
@@ -305,73 +304,12 @@ format(void)
 	return (util_err(0, "input does not match WiredTiger dump format"));
 }
 
-#if 0
 /*
- * load_file --
- *	Load a single file.
+ * util_insert --
+ *	Read and insert data.
  */
-static int
-load_file(WT_SESSION *session,
-    const char *name, const char *config, int read_recno, int append)
-{
-	WT_CURSOR *cursor;
-	int ret, tret;
-
-	/* Optionally remove and re-create the file. */
-	if (!append) {
-		if ((ret = session->drop(session, name, "force")) != 0) {
-			fprintf(stderr, "%s: session.drop: %s: %s\n", 
-			    progname, name, wiredtiger_strerror(ret));
-			return (1);
-		}
-		if ((ret = session->create(session, name, config)) != 0) {
-			fprintf(stderr, "%s: session.create: %s: %s\n", 
-			    progname, name, wiredtiger_strerror(ret));
-			return (1);
-		}
-	}
-
-	/* Open the insert cursor. */
-	if ((ret = session->open_cursor(
-	    session, name, NULL, "overwrite,raw", &cursor)) != 0) {
-		fprintf(stderr, "%s: session.open: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
-		return (1);
-	}
-
-	/*
-	 * Find out if we're loading a column-store file.  If read_recno is set,
-	 * it's obvious, otherwise we check the table configuation for a record
-	 * number format.
-	 */
-	ret = load_data(cursor, name, 
-	    read_recno || strcmp(cursor->key_format, "r") == 0 ? 1 : 0);
-
-	/*
-	 * Technically, we don't have to close the cursor because the session
-	 * handle will do it for us, but I'd like to see the flush to disk and
-	 * the close succeed, it's better to fail early when loading files.
-	 */
-	if ((tret = cursor->close(cursor, NULL)) != 0) {
-		fprintf(stderr, "%s: cursor.close: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
-		if (ret == 0)
-			ret = tret;
-	}
-	if (ret == 0 && (ret = session->sync(session, name, NULL)) != 0)
-		fprintf(stderr, "%s: session.sync: %s: %s\n", 
-		    progname, name, wiredtiger_strerror(ret));
-		
-	return (ret);
-}
-#endif
-
-/*
- * load_data --
- *	Load the data.
- */
-static int
-load_data(WT_CURSOR *cursor, const char *name)
+int
+util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 {
 	WT_BUF key, value;
 	uint64_t insert_count;
@@ -382,14 +320,22 @@ load_data(WT_CURSOR *cursor, const char *name)
 	
 	/* Read key/value pairs and insert them into the file. */
 	for (insert_count = 0;;) {
-		if (!append) {
+		/*
+		 * Three modes: in row-store, we always read a key and use it,
+		 * in column-store, we might read it (a dump), we might read
+		 * and ignore it (a dump with "append" set), or not read it at
+		 * all (flat-text load).
+		 */
+		if (readkey) {
 			if (read_line(&key, 1, &eof))
 				return (1);
 			if (eof == 1)
 				break;
-			cursor->set_key(cursor, &key);
+
+			if (!ignorekey)
+				cursor->set_key(cursor, &key);
 		}
-		if (read_line(&value, append ? 1 : 0, &eof))
+		if (read_line(&value, readkey ? 1 : 0, &eof))
 			return (1);
 		if (eof == 1)
 			break;
