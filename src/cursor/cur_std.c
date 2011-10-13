@@ -124,7 +124,8 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (F_ISSET(cursor, WT_CURSTD_RAW))
+		if (F_ISSET(cursor,
+		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
 			fmt = "u";
 		if (strcmp(fmt, "S") == 0) {
 			str = va_arg(ap, const char *);
