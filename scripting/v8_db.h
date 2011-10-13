@@ -93,6 +93,7 @@ namespace mongo {
     // call with v8 mutex:
     void enableV8Interrupt();
     void disableV8Interrupt();
-
+    bool pauseV8Interrupt();
+    bool resumeV8Interrupt();
 }
 

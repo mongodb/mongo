@@ -293,6 +293,12 @@ namespace mongo {
     void V8ScriptEngine::interrupt( unsigned opSpec ) {
         v8::Locker l;
         if ( __interruptSpecToThreadId.count( opSpec ) ) {
+            int thread = __interruptSpecToThreadId[ opSpec ];
+            if ( thread == -2 || thread == -3) {
+                // just mark as interrupted
+                __interruptSpecToThreadId[ opSpec ] = -3;
+                return;
+            }
             V8::TerminateExecution( __interruptSpecToThreadId[ opSpec ] );
         }
     }
@@ -457,6 +463,7 @@ namespace mongo {
     v8::Handle< v8::Value > V8Scope::v8Callback( const v8::Arguments &args ) {
         // originally v8 interrupt where disabled here cause: don't want to have to audit all v8 calls for termination exceptions
         // but we do need to keep interrupt because much time may be spent here (e.g. sleep)
+        bool paused = pauseV8Interrupt();
 
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_v8_function" ) ) );
         v8Function function = (v8Function)(f->Value());
@@ -474,10 +481,12 @@ namespace mongo {
         catch( ... ) {
             exception = "unknown exception";
         }
-        enableV8Interrupt();
-        if ( globalScriptEngine->interrupted() ) {
-            v8::V8::TerminateExecution();
-            return v8::ThrowException( v8::String::New( "Interruption in V8 native callback" ) );
+        if (paused) {
+            bool resume = resumeV8Interrupt();
+            if ( !resume || globalScriptEngine->interrupted() ) {
+                v8::V8::TerminateExecution();
+                return v8::ThrowException( v8::String::New( "Interruption in V8 native callback" ) );
+            }
         }
         if ( !exception.empty() ) {
             return v8::ThrowException( v8::String::New( exception.c_str() ) );
