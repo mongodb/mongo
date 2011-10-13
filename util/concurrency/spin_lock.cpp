@@ -45,7 +45,36 @@ namespace mongo {
 #if defined(_WIN32)
         EnterCriticalSection(&_cs);
 #elif defined(__USE_XOPEN2K)
-        pthread_spin_lock( &_lock );
+        
+        /**
+         * this is designed to perform close to the default spin lock
+         * the reason for the mild insanity is to prevent horrible performance
+         * when contention spikes 
+         * it allows spinlocks to be used in many more places
+         * which is good because even with this change they are about 8x faster on linux
+         */
+        
+        if ( pthread_spin_trylock( &_lock ) == 0 )
+            return;
+        
+        for ( int i=0; i<1000; i++ ) 
+            if ( pthread_spin_trylock( &_lock ) == 0 )
+                return;
+
+        for ( int i=0; i<1000; i++ ) {
+            if ( pthread_spin_trylock( &_lock ) == 0 )
+                return;
+            pthread_yield();
+        }
+        
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 5000000;
+
+        while ( pthread_spin_trylock( &_lock ) != 0 ) {
+            nanosleep(&t, NULL);
+        }
+            
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         // fast path
         if (!_locked && !__sync_lock_test_and_set(&_locked, true)) {
