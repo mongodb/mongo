@@ -12,7 +12,7 @@ static int format(void);
 static int load_data(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
-static int read_schema(char ***, int *);
+static int schema_read(char ***, int *);
 static int schema_update(char **);
 static int usage(void);
 
@@ -73,7 +73,7 @@ load_dump(WT_SESSION *session)
 	char **entry, **list, *p, *uri, curconfig[64];
 
 	/* Read the schema file. */
-	if ((ret = read_schema(&list, &hex)) != 0)
+	if ((ret = schema_read(&list, &hex)) != 0)
 		return (ret);
 
 	/*
@@ -159,11 +159,11 @@ load_dump(WT_SESSION *session)
 }
 
 /*
- * read_schema --
+ * schema_read --
  *	Read the schema lines and do some basic validation.
  */
 static int
-read_schema(char ***listp, int *hexp)
+schema_read(char ***listp, int *hexp)
 {
 	WT_BUF l;
 	int entry, eof, max_entry;
@@ -263,6 +263,21 @@ schema_update(char **list)
 			snprintf(buf, len, "%s:%s%s",
 			    *t, cmdname, sep == NULL ? "" : sep);
 			*t = buf;
+		}
+
+	/*
+	 * It's possible to update everything except the key/value formats.
+	 * If there were command-line configuration pairs, walk the list of
+	 * command-line configuration strings, and check.
+	 */
+	for (p = cmdconfig; cmdconfig != NULL && *p != NULL; p += 2)
+		if (strstr(p[1], "key_format=") ||
+		    strstr(p[1], "value_format=")) {
+			fprintf(stderr,
+			    "%s: the command line configuration string may not "
+			    "modify the object's key or value format",
+			    progname);
+			return (1);
 		}
 
 	/*
