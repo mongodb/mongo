@@ -10,7 +10,7 @@
 
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-C config ][-h home]";
+const char *usage_prefix = "[-Vv] [-C config] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
