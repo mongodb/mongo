@@ -464,6 +464,13 @@ namespace mongo {
 
                         // Is index key over the sharding key? Remember that.
                         if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ) {
+
+                            if( idx["sparse"].trueValue() ){
+                                errmsg = (string)"can't shard collection " + ns + " with sparse shard key index";
+                                conn.done();
+                                return false;
+                            }
+
                             hasShardIndex = true;
                             hasUniqueShardIndex = uniqueIndex;
                             continue;
