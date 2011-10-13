@@ -205,20 +205,20 @@ namespace mongo {
 
                     if ( key.type() && key.type() != jstNULL )
                         continue;
-                    
+
                     BSONObj obj = c->current();
                     BSONObjIterator j( keyPattern );
                     BSONElement real;
                     for ( int x=0; x<n; x++ )
                         real = j.next();
-                    
+
                     real = obj.getFieldDotted( real.fieldName() );
 
                     if ( real.type() )
                         continue;
                     
                     ostringstream os;
-                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: " << real["_id"];
+                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: " << ( obj["_id"].eoo() ? obj.toString() : obj["_id"].toString() );
                     log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
                     
                     errmsg = os.str();
