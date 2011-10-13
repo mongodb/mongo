@@ -141,7 +141,7 @@ namespace mongo {
         }
 
         if( version == 0 ){
-            LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
+            LOG(2) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
                       ( ! isSharded ? "no longer sharded" :
                       ( ! manager ? "no chunk manager found" :
                                     "version is zero" ) ) << endl;
