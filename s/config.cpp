@@ -706,17 +706,17 @@ namespace mongo {
             string name = o["_id"].valuestrsafe();
             got.insert( name );
             if ( name == "chunksize" ) {
-		int csize = o["value"].numberInt();
+                int csize = o["value"].numberInt();
 
-		// validate chunksize before proceeding
-		if ( csize == 0 ) {
-			// setting was not modified; mark as such
-			got.erase(name);
-			log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
-		} else {
-			LOG(1) << "MaxChunkSize: " << csize << endl;
-			Chunk::MaxChunkSize = csize * 1024 * 1024;
-		}
+                // validate chunksize before proceeding
+                if ( csize == 0 ) {
+                    // setting was not modified; mark as such
+                    got.erase(name);
+                    log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
+                } else {
+                    LOG(1) << "MaxChunkSize: " << csize << endl;
+                    Chunk::MaxChunkSize = csize * 1024 * 1024;
+                }
             }
             else if ( name == "balancer" ) {
                 // ones we ignore here
