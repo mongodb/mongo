@@ -92,7 +92,8 @@ MongoRunner.logicalOptions = { runId : true,
                                useHostName : true,
                                useHostname : true,
                                noReplSet : true,
-                               forgetPort : true }
+                               forgetPort : true,
+                               arbiter : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
@@ -261,6 +262,7 @@ MongoRunner.mongodOptions = function( opts ){
         opts.nojournal = ""
             
     if( opts.noReplSet ) opts.replSet = null
+    if( opts.arbiter ) opts.oplogSize = 1
             
     return opts
 }
@@ -492,7 +494,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         if( isObject( numShards ) ){
             var len = 0
             for( var i in numShards ){
-                otherParams[ "" + i + len ] = numShards[i]
+                otherParams[ "" + i ] = numShards[i]
                 len++
             }
             numShards = len
@@ -501,21 +503,21 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         if( isObject( numMongos ) ){
             var len = 0
             for( var i in numMongos ){
-                otherParams[ "" + i + len ] = numMongos[i]
+                otherParams[ "" + i ] = numMongos[i]
                 len++
             }
             numMongos = len
         }
         else if( Array.isArray( numMongos ) ){
             for( var i = 0; i < numMongos.length; i++ )
-                otherParams[ "m" + i ] = numMongos[i]
+                otherParams[ "s" + i ] = numMongos[i]
             numMongos = numMongos.length
         }
         
         if( isObject( params.config ) ){
             var len = 0
             for( var i in params.config ){
-                otherParams[ "" + i + len ] = params.config[i]
+                otherParams[ "" + i ] = params.config[i]
                 len++
             }
             
@@ -543,7 +545,15 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     
     var pathOpts = this.pathOpts = { testName : testName }
 
-    if( otherParams.rs ){
+    var hasRS = false
+    for( var k in otherParams ){
+        if( k.startsWith( "rs" ) ){
+            hasRS = true
+            break
+        }
+    }
+    
+    if( hasRS ){
         otherParams.separateConfig = true
         otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname
     }
@@ -555,7 +565,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     this._shardServers = this._connections
     this._rs = []
     this._rsObjects = []
-        
+
     for ( var i = 0; i < numShards; i++ ) {
         if( otherParams.rs || otherParams["rs" + i] ){
             
@@ -580,6 +590,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), useHostName : otherParams.useHostname, keyFile : keyFile } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
+            this["rs" + i] = rs
             
             this._rsObjects[i] = rs
             
@@ -602,6 +613,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             this._alldbpaths.push( testName +i )
             this._connections.push( conn );
             this["shard" + i] = conn
+            this["d" + i] = conn
             
             this._rs[i] = null
             this._rsObjects[i] = null
@@ -621,6 +633,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         rsConn.name = rs.getURL();
         this._connections[i] = rsConn
         this["shard" + i] = rsConn
+        rsConn.rs = rs
     }
     
     
@@ -658,6 +671,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this._configServers.push( conn );
         this._configNames.push( conn.name )
         this["config" + i] = conn
+        this["c" + i] = conn
     }
     
     printjson( this._configDB = this._configNames.join( "," ) )
@@ -682,7 +696,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
         options = Object.merge( options, otherParams.mongosOptions )
         options = Object.merge( options, otherParams.extraOptions )
-        options = Object.merge( options, otherParams["m" + i] )
+        options = Object.merge( options, otherParams["s" + i] )
         
         var conn = MongoRunner.runMongos( options )
 
@@ -1522,6 +1536,22 @@ ReplSetTest = function( opts ){
 
     this.startPort = opts.startPort || 31000;
 
+    this.nodeOptions = {}    
+    if( isObject( this.numNodes ) ){
+        var len = 0
+        for( var i in this.numNodes ){
+            var options = this.nodeOptions[ "n" + len ] = this.numNodes[i]
+            if( i.startsWith( "a" ) ) options.arbiter = true
+            len++
+        }
+        this.numNodes = len
+    }
+    else if( Array.isArray( this.numNodes ) ){
+        for( var i = 0; i < this.numNodes.length; i++ )
+            this.nodeOptions[ "n" + i ] = this.numNodes[i]
+        this.numNodes = this.numNodes.length
+    }
+    
     if(this.bridged) {
         this.bridgePorts = [];
 
@@ -1623,6 +1653,9 @@ ReplSetTest.prototype.getReplSetConfig = function() {
           var port = this.ports[i];
 
         member['host'] = this.host + ":" + port;
+        if( this.nodeOptions[ "n" + i ] && this.nodeOptions[ "n" + i ].arbiter )
+            member['arbiterOnly'] = true
+            
         cfg.members.push(member);
     }
 
@@ -2047,13 +2080,14 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
                  replSet : this.useSeedList ? this.getURL() : this.name,
                  dbpath : "$set-$node" }
     
-    options = Object.merge( defaults, options )
-            
-    options.restart = restart
-    
     // TODO : should we do something special if we don't currently know about this node?
     n = this.getNodeId( n )
-        
+    
+    options = Object.merge( defaults, options )
+    options = Object.merge( options, this.nodeOptions[ "n" + n ] )
+    
+    options.restart = restart
+            
     var pathOpts = { node : n, set : this.name }
     options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts )
     
