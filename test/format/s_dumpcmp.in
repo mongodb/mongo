@@ -34,15 +34,16 @@ if test $dump_bdb -eq 1; then
 			-e '/DATA=END/d' \
 			-e 's/^ //' > __bdb_dump
 	else
-		# Discard record numbers from the output.
+		# Format stores record numbers in Berkeley DB as string keys,
+		# it's simpler that way.  Convert record numbers from strings
+		# to numbers.
 		$bdb/db_dump -p __bdb |
 		    sed -e '1,/HEADER=END/d' \
 			-e '/DATA=END/d' \
 			-e 's/^ //' |
-		    sed -n \
-			-e '$p' \
-			-e n \
-			-e p > __bdb_dump
+		    sed -e 's/^0*//' \
+			-e 's/\.00$//' \
+			-e N > __bdb_dump
 	fi
 fi
 
@@ -53,6 +54,7 @@ if test -e $bzext ; then
 fi
 config='extensions=['$ext']'
 
-$build_top/wt -C "$config" dump file:__wt > __wt_dump
+$build_top/wt -C "$config" dump file:__wt |
+    sed -e '1,/^Data$/d' > __wt_dump
 cmp __wt_dump __bdb_dump > /dev/null
 exit $?
