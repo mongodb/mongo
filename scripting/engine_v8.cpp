@@ -855,7 +855,7 @@ namespace mongo {
     void V8Scope::gc() {
         cout << "in gc" << endl;
         V8Lock l;
-        while( !V8::IdleNotification() );
+        V8::LowMemoryNotification();
     }
 
     // ----- db access -----
@@ -1552,7 +1552,7 @@ namespace mongo {
 
     Handle<v8::Value> V8Scope::GCV8(V8Scope* scope, const Arguments& args) {
         V8Lock l;
-        while( !V8::IdleNotification() );
+        v8::V8::LowMemoryNotification();
         return v8::Undefined();
     }
 
