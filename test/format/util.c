@@ -32,7 +32,7 @@ key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 	}
 	*(void **)keyp = g.key_gen_buf;
-	*sizep = len;
+	*sizep = (uint32_t)len;
 }
 
 void
