@@ -870,7 +870,7 @@ int _main(int argc, char* argv[]) {
             bool wascmd = false;
             {
                 string cmd = line;
-                if ( cmd.find( " " ) != string::npos )
+                if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
 
                 if ( cmd.find( "\"" ) == string::npos ) {
