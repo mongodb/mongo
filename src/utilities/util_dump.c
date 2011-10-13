@@ -26,7 +26,7 @@ dump_forward(WT_CURSOR *cursor, const char *name)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (cursor_err(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
-			return (util_syserr());
+			return (util_err(EIO, NULL));
 	}
 	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "next", ret));
 }
@@ -43,7 +43,7 @@ dump_reverse(WT_CURSOR *cursor, const char *name)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (cursor_err(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
-			return (util_syserr());
+			return (util_err(EIO, NULL));
 	}
 	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "prev", ret));
 }
@@ -60,11 +60,9 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	while ((ch = util_getopt(argc, argv, "f:rx")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
-			if (freopen(util_optarg, "w", stdout) == NULL) {
-				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, util_optarg, strerror(errno));
-				return (1);
-			}
+			if (freopen(util_optarg, "w", stdout) == NULL)
+				return (
+				    util_err(errno, "%s: reopen", util_optarg));
 			break;
 		case 'r':
 			reverse = 1;
@@ -178,7 +176,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			return (cursor_err(uri, "get_key", ret));
 		if ((buf = strdup(key)) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 			
 		/* Check for the dump table's column groups or indices. */
 		if ((p = strchr(buf, ':')) == NULL)
@@ -197,11 +195,11 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 			return (cursor_err(uri, "get_value", ret));
 		if (elem == list_elem && (list = realloc(list,
 		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 		if ((list[elem].key = strdup(key)) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 		if ((list[elem].value = strdup(value)) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 		++elem;
 	}
 	if (ret != WT_NOTFOUND)
@@ -297,16 +295,14 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 static int
 cursor_err(const char *name, const char *op, int ret)
 {
-	fprintf(stderr, "%s: %s: cursor.%s: %s\n",
-	    progname, name, op, wiredtiger_strerror(ret));
-	return (1);
+	return (util_err(ret, "%s: cursor.%s", name, op));
 }
 
 static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "dump [-rx] [-f output-file] uri\n",
 	    progname, usage_prefix);
 	return (1);

@@ -44,7 +44,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "create [-c configuration] uri\n",
 	    progname, usage_prefix);
 	return (1);

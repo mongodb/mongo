@@ -55,7 +55,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "verify file\n",
 	    progname, usage_prefix);
 	return (1);

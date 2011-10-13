@@ -40,7 +40,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "drop uri\n",
 	    progname, usage_prefix);
 	return (1);

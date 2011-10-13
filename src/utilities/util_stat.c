@@ -120,7 +120,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "stat [-p prefix] [file]\n",
 	    progname, usage_prefix);
 	return (1);

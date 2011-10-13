@@ -32,11 +32,9 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			append = 1;
 			break;
 		case 'f':	/* input file */
-			if (freopen(util_optarg, "r", stdin) == NULL) {
-				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, util_optarg, strerror(errno));
-				return (1);
-			}
+			if (freopen(util_optarg, "r", stdin) == NULL)
+				return (
+				    util_err(errno, "%s: reopen", util_optarg));
 			break;
 		case 'n':	/* -n name (object's name, or rename) */
 			cmdname = util_optarg;
@@ -111,21 +109,15 @@ load_dump(WT_SESSION *session)
 
 	uri = list[0];
 	for (entry = list; *entry != NULL; entry += 2)
-		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
-			fprintf(stderr, "%s: session.create: %s: %s\n",
-			    progname, entry[0], wiredtiger_strerror(ret));
-			return (1);
-		}
+		if ((ret = session->create(session, entry[0], entry[1])) != 0)
+			return (util_err(ret, "%s: session.create", entry[0]));
 
 	/* Open the insert cursor. */
 	(void)snprintf(curconfig, sizeof(curconfig),
 	    "dump=%s,%s", hex ? "hex" : "print", safe ? "" : "overwrite");
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, curconfig, &cursor)) != 0) {
-		fprintf(stderr, "%s: session.open: %s: %s\n", 
-		    progname, uri, wiredtiger_strerror(ret));
-		return (1);
-	}
+	    session, uri, NULL, curconfig, &cursor)) != 0)
+		return(util_err(ret, "%s: session.open", uri));
 
 	/*
 	 * Check the append flag (it only applies to objects where the primary
@@ -136,7 +128,7 @@ load_dump(WT_SESSION *session)
 		    "%s: %s: -a option illegal unless the primary key is a "
 		    "record number\n",
 		    progname, uri);
-		ret = EINVAL;
+		ret = 1;
 	} else
 		ret = load_data(cursor, uri);
 
@@ -146,16 +138,14 @@ load_dump(WT_SESSION *session)
 	 * the close succeed, it's better to fail early when loading files.
 	 */
 	if ((tret = cursor->close(cursor, NULL)) != 0) {
-		fprintf(stderr, "%s: cursor.close: %s: %s\n", 
-		    progname, uri, wiredtiger_strerror(ret));
+		tret = util_err(tret, "%s: cursor.close", uri);
 		if (ret == 0)
 			ret = tret;
 	}
 	if (ret == 0 && (ret = session->sync(session, uri, NULL)) != 0)
-		fprintf(stderr, "%s: session.sync: %s: %s\n", 
-		    progname, uri, wiredtiger_strerror(ret));
+		ret = util_err(ret, "%s: session.sync", uri);
 		
-	return (ret);
+	return (ret == 0 ? 0 : 1);
 }
 
 /*
@@ -206,9 +196,9 @@ schema_read(char ***listp, int *hexp)
 		if ((max_entry == 0 || entry == max_entry - 1) &&
 		    (list = realloc(list,
 		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 		if ((list[entry] = strdup(l.data)) == NULL)
-			return (util_syserr());
+			return (util_err(errno, NULL));
 	}
 	list[entry] = NULL;
 	*listp = list;
@@ -251,7 +241,7 @@ schema_update(char **list)
 			/* Allocate room. */
 			len = strlen(*t) + strlen(cmdname) + 10;
 			if ((buf = malloc(len)) == NULL)
-				return (util_syserr());
+				return (util_err(errno, NULL));
 
 			/*
 			 * Find the separating colon characters, but not the
@@ -272,13 +262,10 @@ schema_update(char **list)
 	 */
 	for (p = cmdconfig; cmdconfig != NULL && *p != NULL; p += 2)
 		if (strstr(p[1], "key_format=") ||
-		    strstr(p[1], "value_format=")) {
-			fprintf(stderr,
-			    "%s: the command line configuration string may not "
-			    "modify the object's key or value format\n",
-			    progname);
-			return (1);
-		}
+		    strstr(p[1], "value_format="))
+			return (util_err(0,
+			    "the command line configuration string may not "
+			    "modify the object's key or value format"));
 
 	/*
 	 * If there were command-line configuration pairs, walk the list of
@@ -294,17 +281,14 @@ schema_update(char **list)
 				found = 1;
 				len = strlen(p[1]) + strlen(t[1]) + 10;
 				if ((buf = malloc(len)) == NULL)
-					return (util_syserr());
+					return (util_err(errno, NULL));
 				snprintf(buf, len, "%s,%s", t[1], p[1]);
 				t[1] = buf;
 			}
-		if (!found) {
-			fprintf(stderr,
-			    "%s: the command line object name %s was not "
-			    "matched by any loaded object name\n",
-			    progname, *p);
-			return (1);
-		}
+		if (!found)
+			return (util_err(0,
+			    "the command line object name %s was not matched "
+			    "by any loaded object name", *p));
 	}
 
 	/* Leak the memory, I don't care. */
@@ -318,9 +302,7 @@ schema_update(char **list)
 static int
 format(void)
 {
-	fprintf(stderr,
-	    "%s: input does not match WiredTiger dump format\n", progname);
-	return (1);
+	return (util_err(0, "input does not match WiredTiger dump format"));
 }
 
 #if 0
@@ -419,12 +401,8 @@ load_data(WT_CURSOR *cursor, const char *name)
 		}
 	
 		cursor->set_value(cursor, &value);
-		if ((ret = cursor->insert(cursor)) != 0) {
-			fprintf(stderr,
-			    "%s: %s: cursor.insert: %s\n",
-			    progname, name, wiredtiger_strerror(ret));
-			return (1);
-		}
+		if ((ret = cursor->insert(cursor)) != 0)
+			return (util_err(ret, "%s: cursor.insert", name));
 	}
 
 	if (verbose)
@@ -454,15 +432,11 @@ read_line(WT_BUF *l, int eof_expected, int *eofp)
 					*eofp = 1;
 					return (0);
 				}
-				fprintf(stderr,
-				    "%s: line %llu: unexpected end-of-file\n",
-				    progname, line);
-				return (1);
+				return (util_err(0, 
+				    "line %llu: unexpected end-of-file", line));
 			}
-			fprintf(stderr,
-			    "%s: line %llu: no newline terminator\n",
-			    progname, line);
-			return (1);
+			return (util_err(0,
+			    "line %llu: no newline terminator", line));
 		}
 		if (ch == '\n')
 			break;
@@ -474,7 +448,7 @@ read_line(WT_BUF *l, int eof_expected, int *eofp)
 		if (l->memsize == 0 || len >= l->memsize - 1) {
 			if ((l->mem =
 			    realloc(l->mem, l->memsize + 1024)) == NULL)
-				return (util_syserr());
+				return (util_err(errno, NULL));
 			l->memsize += 1024;
 		}
 		((uint8_t *)l->mem)[len] = (uint8_t)ch;
@@ -491,7 +465,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "load [-as] [-f input-file] [-n name] [object configuration ...]\n",
 	    progname, usage_prefix);
 	return (1);

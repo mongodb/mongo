@@ -61,7 +61,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "dumpfile [-f output-file] file\n",
 	    progname, usage_prefix);
 	return (1);

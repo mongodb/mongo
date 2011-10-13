@@ -59,7 +59,7 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s%s "
+	    "usage: %s %s "
 	    "salvage [-F] file\n",
 	    progname, usage_prefix);
 	return (1);
