@@ -13,11 +13,10 @@ static int usage(void);
 int
 util_create(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch;
+	int ch, ret;
 	const char *config, *uri;
 
 	config = NULL;
-
 	while ((ch = util_getopt(argc, argv, "c:")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line configuration */
@@ -31,13 +30,17 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	/* The remaining argument is the URI to create. */
+	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
 
-	uri = *argv;
+	if ((uri =
+	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+		return (1);
 
-	return (session->create(session, uri, config));
+	if ((ret = session->create(session, uri, config)) != 0)
+		return (util_err(ret, "%s: session.create", uri));
+	return (0);
 }
 
 static int
