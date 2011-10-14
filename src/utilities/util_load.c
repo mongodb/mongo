@@ -17,7 +17,7 @@ static int schema_update(char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
-static char    *cmdname;	/* -n name (object's name, or rename) */
+static char    *cmdname;	/* -r rename */
 static char   **cmdconfig;	/* configuration pairs */
 static int	overwrite;	/* -o overwrite existing data */
 
@@ -26,7 +26,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch;
 
-	while ((ch = util_getopt(argc, argv, "af:n:o")) != EOF)
+	while ((ch = util_getopt(argc, argv, "af:r:o")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
@@ -36,7 +36,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 				return (
 				    util_err(errno, "%s: reopen", util_optarg));
 			break;
-		case 'n':	/* -n name (object's name, or rename) */
+		case 'r':	/* -r rename */
 			cmdname = util_optarg;
 			break;
 		case 'o':	/* -o (overwrite existing data) */
@@ -454,7 +454,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "load [-as] [-f input-file] [-n name] [object configuration ...]\n",
+	    "load [-as] [-f input-file] [-r name] [object configuration ...]\n",
 	    progname, usage_prefix);
 	return (1);
 }

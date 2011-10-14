@@ -107,7 +107,7 @@ table cannot be overwritten by the new data (use the \c -o option to
 overwrite existing data).
 
 @subsection utility_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-ao] [-f input] [-n name] [uri configuration ...]</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-ao] [-f input] [-r name] [uri configuration ...]</code>
 
 @subsection utility_load_options Options
 The following are command-specific options for the \c load command:
@@ -122,9 +122,9 @@ where the primary key is a record number.
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
 
-@par <code>-n</code>
+@par <code>-r</code>
 By default, the \c load command uses the file or table name taken from
-the input; the \c -n option specifies a new name to be used instead.
+the input; the \c -r option renames the object.
 
 @par <code>-o</code>
 By default, input data will not overwrite existing data where the
