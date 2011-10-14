@@ -8,9 +8,14 @@
 #include "wiredtiger.h"
 #include "util.h"
 
+typedef struct {
+	void   *mem;				/* Managed memory chunk */
+	size_t	memsize;			/* Managed memory size */
+} LINE;
+
 static int format(void);
 static int load_dump(WT_SESSION *);
-static int read_line(WT_BUF *, int, int *);
+static int read_line(LINE *, int, int *);
 static int schema_read(char ***, int *);
 static int schema_rename(char **, const char *);
 static int schema_update(char **);
@@ -155,7 +160,7 @@ load_dump(WT_SESSION *session)
 static int
 schema_read(char ***listp, int *hexp)
 {
-	WT_BUF l;
+	LINE l;
 	int entry, eof, max_entry;
 	const char *s;
 	char **list;
@@ -166,15 +171,15 @@ schema_read(char ***listp, int *hexp)
 	if (read_line(&l, 0, &eof))
 		return (1);
 	s = "WiredTiger Dump ";
-	if (strncmp(l.data, s, strlen(s)) != 0)
+	if (strncmp(l.mem, s, strlen(s)) != 0)
 		return (format());
 
 	/* Header line #2: "Format={hex,print}". */
 	if (read_line(&l, 0, &eof))
 		return (1);
-	if (strcmp(l.data, "Format=print") == 0)
+	if (strcmp(l.mem, "Format=print") == 0)
 		*hexp = 0;
-	else if (strcmp(l.data, "Format=hex") == 0)
+	else if (strcmp(l.mem, "Format=hex") == 0)
 		*hexp = 1;
 	else
 		return (format());
@@ -182,14 +187,14 @@ schema_read(char ***listp, int *hexp)
 	/* Header line #3: "Header". */
 	if (read_line(&l, 0, &eof))
 		return (1);
-	if (strcmp(l.data, "Header") != 0)
+	if (strcmp(l.mem, "Header") != 0)
 		return (format());
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
 		if (read_line(&l, 0, &eof))
 			return (1);
-		if (strcmp(l.data, "Data") == 0)
+		if (strcmp(l.mem, "Data") == 0)
 			break;
 
 		/* Grow the array of header lines as necessary. */
@@ -197,7 +202,7 @@ schema_read(char ***listp, int *hexp)
 		    (list = realloc(list,
 		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
 			return (util_err(errno, NULL));
-		if ((list[entry] = strdup(l.data)) == NULL)
+		if ((list[entry] = strdup(l.mem)) == NULL)
 			return (util_err(errno, NULL));
 	}
 	list[entry] = NULL;
@@ -353,7 +358,7 @@ format(void)
 int
 util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 {
-	WT_BUF key, value;
+	LINE key, value;
 	uint64_t insert_count;
 	int eof, ret;
 
@@ -373,24 +378,24 @@ util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 				return (1);
 			if (eof == 1)
 				break;
-
 			if (!ignorekey)
-				cursor->set_key(cursor, &key);
+				cursor->set_key(cursor, key.mem);
 		}
+
 		if (read_line(&value, readkey ? 1 : 0, &eof))
 			return (1);
 		if (eof == 1)
 			break;
+		cursor->set_value(cursor, value.mem);
+
+		if ((ret = cursor->insert(cursor)) != 0)
+			return (util_err(ret, "%s: cursor.insert", name));
 
 		/* Report on progress every 100 inserts. */
 		if (verbose && ++insert_count % 100 == 0) {
 			printf("\r\t%s: %" PRIu64, name, insert_count);
 			fflush(stdout);
 		}
-	
-		cursor->set_value(cursor, &value);
-		if ((ret = cursor->insert(cursor)) != 0)
-			return (util_err(ret, "%s: cursor.insert", name));
 	}
 
 	if (verbose)
@@ -401,10 +406,10 @@ util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 
 /*
  * read_line --
- *	Read a line from stdin into a WT_BUF.
+ *	Read a line from stdin into a LINE.
  */
 static int
-read_line(WT_BUF *l, int eof_expected, int *eofp)
+read_line(LINE *l, int eof_expected, int *eofp)
 {
 	static unsigned long long line = 0;
 	uint32_t len;
@@ -444,8 +449,6 @@ read_line(WT_BUF *l, int eof_expected, int *eofp)
 
 	((uint8_t *)l->mem)[len] = '\0';		/* nul-terminate */
 
-	l->data = l->mem;
-	l->size = len;
 	return (0);
 }
 

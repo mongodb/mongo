@@ -274,7 +274,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
 		p = va_arg(ap, WT_ITEM *)->data;
 	else
-		p = *va_arg(ap, const char **);
+		p = va_arg(ap, const char *);
 	va_end(ap);
 
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -354,7 +354,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
 		p = va_arg(ap, WT_ITEM *)->data;
 	else
-		p = *va_arg(ap, const char **);
+		p = va_arg(ap, const char *);
 	va_end(ap);
 
 	WT_ERR(dump_to_raw(cursor, p, &item));
