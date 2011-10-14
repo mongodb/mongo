@@ -8,7 +8,6 @@
 #include "wiredtiger.h"
 #include "util.h"
 
-static int cursor_err(const char *, const char *, int);
 static int dump_prefix(int);
 static int dump_suffix(void);
 static int schema(WT_SESSION *, const char *);
@@ -24,13 +23,13 @@ dump_forward(WT_CURSOR *cursor, const char *name)
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (cursor_err(name, "get_key", ret));
+			return (util_cerr(name, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (cursor_err(name, "get_value", ret));
+			return (util_cerr(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
 			return (util_err(EIO, NULL));
 	}
-	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "next", ret));
+	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "next", ret));
 }
 
 static inline int
@@ -41,13 +40,13 @@ dump_reverse(WT_CURSOR *cursor, const char *name)
 
 	while ((ret = cursor->prev(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (cursor_err(name, "get_key", ret));
+			return (util_cerr(name, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (cursor_err(name, "get_value", ret));
+			return (util_cerr(name, "get_value", ret));
 		if (printf("%s\n%s\n", key, value) < 0)
 			return (util_err(EIO, NULL));
 	}
-	return (ret == WT_NOTFOUND ? 0 : cursor_err(name, "prev", ret));
+	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "prev", ret));
 }
 
 int
@@ -174,7 +173,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 	for (; (ret = cursor->next(cursor)) == 0; free(buf)) {
 		/* Get the key and duplicate it, we want to overwrite it. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (cursor_err(uri, "get_key", ret));
+			return (util_cerr(uri, "get_key", ret));
 		if ((buf = strdup(key)) == NULL)
 			return (util_err(errno, NULL));
 			
@@ -192,7 +191,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 
 		/* Found one, save it for review. */
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (cursor_err(uri, "get_value", ret));
+			return (util_cerr(uri, "get_value", ret));
 		if (elem == list_elem && (list = realloc(list,
 		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
 			return (util_err(errno, NULL));
@@ -203,7 +202,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		++elem;
 	}
 	if (ret != WT_NOTFOUND)
-		return (cursor_err(uri, "next", ret));
+		return (util_cerr(uri, "next", ret));
 	ret = 0;
 
 	/*
@@ -212,11 +211,11 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 	 */
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) != 0)
-		return (cursor_err(uri, "search", ret));
+		return (util_cerr(uri, "search", ret));
 	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		return (cursor_err(uri, "get_key", ret));
+		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
-		return (cursor_err(uri, "get_value", ret));
+		return (util_cerr(uri, "get_value", ret));
 	if (printf("%s\n%s\n", key, value) < 0)
 		return (util_err(EIO, NULL));
 
@@ -255,7 +254,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 			return (1);
 		}
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (cursor_err(uri, "get_value", ret));
+			return (util_cerr(uri, "get_value", ret));
 
 		/*
 		 * The dumped configuration string is the original key plus the
@@ -284,11 +283,11 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) != 0)
-		return (cursor_err(uri, "search", ret));
+		return (util_cerr(uri, "search", ret));
 	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		return (cursor_err(uri, "get_key", ret));
+		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
-		return (cursor_err(uri, "get_value", ret));
+		return (util_cerr(uri, "get_value", ret));
 	if (printf("%s\n%s\n", key, value) < 0)
 		return (util_err(EIO, NULL));
 
@@ -325,12 +324,6 @@ dump_suffix(void)
 	if (printf("Data\n") < 0)
 		return (util_err(EIO, NULL));
 	return (0);
-}
-
-static int
-cursor_err(const char *name, const char *op, int ret)
-{
-	return (util_err(ret, "%s: cursor.%s", name, op));
 }
 
 static int
