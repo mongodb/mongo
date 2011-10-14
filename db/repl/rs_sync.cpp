@@ -407,92 +407,100 @@ namespace mongo {
         }
 
         while( 1 ) {
-            while( 1 ) {
-                if( !r.moreInCurrentBatch() ) {
-                    /* we need to occasionally check some things. between
-                       batches is probably a good time. */
-
-                    /* perhaps we should check this earlier? but not before the rollback checks. */
-                    if( state().recovering() ) {
-                        /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
-                        OpTime minvalid;
-                        bool golive = ReplSetImpl::tryToGoLiveAsASecondary(minvalid);
-                        if( golive ) {
-                            ;
-                        }
-                        else {
-                            sethbmsg(str::stream() << "still syncing, not yet to minValid optime" << minvalid.toString());
-                        }
-
-                        /* todo: too stale capability */
-                    }
-
-                    if( !target->hbinfo().hbstate.readable() ) {
-                        return;
-                    }
-                }
-                if( !r.more() )
-                    break;
-                {
-                    BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-
-                    int sd = myConfig().slaveDelay;
-                    // ignore slaveDelay if the box is still initializing. once
-                    // it becomes secondary we can worry about it.
-                    if( sd && box.getState().secondary() ) {
-                        const OpTime ts = o["ts"]._opTime();
-                        long long a = ts.getSecs();
-                        long long b = time(0);
-                        long long lag = b - a;
-                        long long sleeptime = sd - lag;
-                        if( sleeptime > 0 ) {
-                            uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
-                            if( sleeptime < 60 ) {
-                                sleepsecs((int) sleeptime);
+            {
+                Timer timeInWriteLock;
+                writelock lk("");
+                while( 1 ) {
+                    if( !r.moreInCurrentBatch() ) {
+                        dbtemprelease tempRelease;
+                        {
+                            // we need to occasionally check some things. between
+                            // batches is probably a good time.                            
+                            if( state().recovering() ) { // perhaps we should check this earlier? but not before the rollback checks.
+                                /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
+                                OpTime minvalid;
+                                bool golive = ReplSetImpl::tryToGoLiveAsASecondary(minvalid);
+                                if( golive ) {
+                                    ;
+                                }
+                                else {
+                                    sethbmsg(str::stream() << "still syncing, not yet to minValid optime" << minvalid.toString());
+                                }
+                                // todo: too stale capability
                             }
-                            else {
-                                log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
-                                // sleep(hours) would prevent reconfigs from taking effect & such!
-                                long long waitUntil = b + sleeptime;
-                                while( 1 ) {
-                                    sleepsecs(6);
-                                    if( time(0) >= waitUntil )
-                                        break;
+                            if( !target->hbinfo().hbstate.readable() ) {
+                                return;
+                            }
+                        }
+                        r.more(); // to make the requestmore outside the db lock, which obviously is quite important
+                    }
+                    if( timeInWriteLock.micros() > 1000 ) {
+                        dbtemprelease tempRelease;
+                        timeInWriteLock.reset();
+                    }
+                    if( !r.more() )
+                        break;
+                    {
+                        BSONObj o = r.nextSafe(); // note we might get "not master" at some point
 
-                                    if( !target->hbinfo().hbstate.readable() ) {
-                                        break;
-                                    }
+                        int sd = myConfig().slaveDelay;
+                        // ignore slaveDelay if the box is still initializing. once
+                        // it becomes secondary we can worry about it.
+                        if( sd && box.getState().secondary() ) {
+                            const OpTime ts = o["ts"]._opTime();
+                            long long a = ts.getSecs();
+                            long long b = time(0);
+                            long long lag = b - a;
+                            long long sleeptime = sd - lag;
+                            if( sleeptime > 0 ) {
+                                dbtemprelease tempRelease;
+                                uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
+                                if( sleeptime < 60 ) {
+                                    sleepsecs((int) sleeptime);
+                                }
+                                else {
+                                    log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
+                                    // sleep(hours) would prevent reconfigs from taking effect & such!
+                                    long long waitUntil = b + sleeptime;
+                                    while( 1 ) {
+                                        sleepsecs(6);
+                                        if( time(0) >= waitUntil )
+                                            break;
+
+                                        if( !target->hbinfo().hbstate.readable() ) {
+                                            break;
+                                        }
                                     
-                                    if( myConfig().slaveDelay != sd ) // reconf
-                                        break;
+                                        if( myConfig().slaveDelay != sd ) // reconf
+                                            break;
+                                    }
                                 }
                             }
+                        } // endif slaveDelay
+
+                        dbMutex.assertWriteLocked();
+                        try {
+                            /* if we have become primary, we dont' want to apply things from elsewhere
+                               anymore. assumePrimary is in the db lock so we are safe as long as
+                               we check after we locked above. */
+                            if( box.getState().primary() ) {
+                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                                return;
+                            }
+
+                            syncApply(o);
+                            _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
                         }
-
-                    }
-
-                    try {
-                        writelock lk("");
-
-                        /* if we have become primary, we dont' want to apply things from elsewhere
-                           anymore. assumePrimary is in the db lock so we are safe as long as
-                           we check after we locked above. */
-                        if( box.getState().primary() ) {
-                            log(0) << "replSet stopping syncTail we are now primary" << rsLog;
+                        catch (DBException& e) {
+                            sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
+                            veto(target->fullName(), 300);
+                            sleepsecs(30);
                             return;
                         }
+                    }
+                } // end while
+            } // end writelock scope
 
-                        syncApply(o);
-                        _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
-                    }
-                    catch (DBException& e) {
-                        sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
-                        veto(target->fullName(), 300);
-                        sleepsecs(30);
-                        return;
-                    }
-                }
-            }
             r.tailCheck();
             if( !r.haveCursor() ) {
                 LOG(1) << "replSet end syncTail pass with " << hn << rsLog;

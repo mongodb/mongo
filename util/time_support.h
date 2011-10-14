@@ -96,6 +96,8 @@ namespace mongo {
 
 #if defined(_WIN32)
     inline void sleepsecs(int s) {
+        // todo : add an assert here that we are not locked in dbMutex.  there may be debugging things where we 
+        //        are but otherwise it's quite likely that would be a mistake.
         Sleep(s*1000);
     }
     inline void sleepmillis(long long s) {
