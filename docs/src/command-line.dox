@@ -24,7 +24,8 @@ Set verbose output.
 The \c wt tool supports several commands.
 
 
-@section utility_create wt create: create a table or file
+@section utility_create wt create
+Create a table or file.
 
 The \c create command creates the specified \c uri with the specified
 configuration.  It is equivalent to a call to WT_SESSION::create with
@@ -40,7 +41,8 @@ The following are command-specific options for the \c create command:
 Include a configuration string to be passed to WT_SESSION::create.
 
 
-@section utility_drop wt drop: drop a table or file
+@section utility_drop wt drop
+Drop a table or file.
 
 The \c drop command drops the specified \c uri.  It is equivalent to a
 call to WT_SESSION::drop with the "force" configuration argument.
@@ -52,7 +54,8 @@ call to WT_SESSION::drop with the "force" configuration argument.
 There are no command-specific options for the \c drop command.
 
 
-@section utility_dump wt dump: export data in a text format
+@section utility_dump wt dump
+Export data in a text format.
 
 The \c dump command outputs the specified table in a portable format
 which can be re-loaded into a new table using the \c load command.
@@ -77,7 +80,8 @@ Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
 
 
-@section utility_dumpfile wt dumpfile: dump the file in a debugging format
+@section utility_dumpfile wt dumpfile
+Dump a file in a debugging format.
 
 The \c dumpfile command dumps the specified physical file in a non-portable,
 debugging format, exiting success if the file is correct, and failure if the
@@ -95,14 +99,15 @@ output; the \c -f option re-directs the output to the specified
 file.
 
 
-@section utility_load wt load: load data into a file or table
+@section utility_load wt load
+Load a table or file from dump output.
 
 The \c load command reads the standard input for data and loads it into
-a file or table, creating the file or table if it does not yet exist.
+a table or file, creating the table or file if it does not yet exist.
 The data should be the format produced by the \c dump command; see @ref
 dump_formats for details.
 
-By default, if the file or table already exists, data in the file or
+By default, if the table or file already exists, data in the file or
 table cannot be overwritten by the new data (use the \c -o option to
 overwrite existing data).
 
@@ -123,7 +128,7 @@ By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
 
 @par <code>-r</code>
-By default, the \c load command uses the file or table name taken from
+By default, the \c load command uses the table or file name taken from
 the input; the \c -r option renames the object.
 
 @par <code>-o</code>
@@ -134,25 +139,26 @@ existing data.
 
 Additionally, \c uri and \c configuration pairs may be specified to the
 \c load command.  Each of these pairs may be used to modify the
-configuration of an object in the file or table.  For each of the pairs,
+configuration of an object in the table or file.  For each of the pairs,
 the configuration string will be appended to the WT_SESSION::create call
 for the object matching the uri.
 
 
-@section utility_loadtext wt loadtext: load text into a file or table
+@section utility_loadtext wt loadtext
+Load text into a table or file.
 
 The \c loadtext command reads the standard input for text and loads it
-into a file or table.  The input data should be printable characters,
+into a table or file.  The input data should be printable characters,
 with newline delimiters for each key or value.
 
 The \c loadtext command does not create the file if it does not yet
 exist.
 
-In the case of inserting values into a column-store file or table, each
-value is appended to the file or table; in the case of inserting values
-into a row-store file or table, lines are handled in pairs, where the
+In the case of inserting values into a column-store table or file, each
+value is appended to the table or file; in the case of inserting values
+into a row-store table or file, lines are handled in pairs, where the
 first line is the key and the second line is the value.  If the
-row-store file or table already exists, data in the file or table will
+row-store table or file already exists, data in the table or file will
 be overwritten by the new data.
 
 @subsection utility_loadtext_synopsis Synopsis
@@ -166,7 +172,8 @@ By default, the \c loadtext command reads from the standard input; the
 \c -f option reads the input from the specified file.
 
 
-@section utility_printlog wt printlog: output the database log
+@section utility_printlog wt printlog
+Output the database log.
 
 The \c printlog command outputs the database log.
 
@@ -184,7 +191,8 @@ output; the \c -f option re-directs the output to the specified file.
 Display the log in a printable format.
 
 
-@section utility_salvage wt salvage: recover data from a corrupted file
+@section utility_salvage wt salvage
+Recover data from a corrupted file.
 
 The \c salvage command salvages the specified file, discarding any data
 that cannot be recovered.  Underlying files are re-written in place,
@@ -202,7 +210,8 @@ By default, salvage will refuse to salvage files that fail basic tests
 The \c -F option forces the salvage of the file, regardless.
 
 
-@section utility_stat wt stat: output statistics for the specified object
+@section utility_stat wt stat
+Output statistics.
 
 The \c stat command outputs run-time statistics for the WiredTiger
 engine, or, if specified, for the command-line file.
@@ -220,7 +229,8 @@ statistics where the statistic's description field begins with the
 argument \c prefix will be printed.
 
 
-@section utility_verify wt verify: check the structural integrity of a table or file
+@section utility_verify wt verify
+Check the structural integrity of a table or file.
 
 The \c verify command verifies the specified table or file, exiting
 success if the object is correct, and failure if the object is corrupted.
