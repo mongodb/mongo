@@ -469,6 +469,14 @@ namespace mongo {
         _databases.clear();
     }
 
+    BSONObj Grid::getConfigSetting( string name ) const {
+        ScopedDbConnection conn( configServer.getPrimary() );
+        BSONObj result = conn->findOne( ShardNS::settings, BSON( "_id" << name ) );
+        conn.done();
+
+        return result;
+    }
+
     Grid grid;
 
 

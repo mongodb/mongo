@@ -82,6 +82,15 @@ namespace mongo {
          */
         bool shouldBalance() const;
 
+        /**
+         * 
+         * Obtain grid configuration and settings data.
+         *
+         * @param name identifies a particular type of configuration data.
+         * @return a BSON object containing the requested data.
+         */
+        BSONObj getConfigSetting( string name ) const;
+
         unsigned long long getNextOpTime() const;
         
         void flushConfig();
