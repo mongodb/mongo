@@ -220,7 +220,7 @@ schema_update(char **list)
 {
 	size_t len;
 	int found;
-	char *buf, **p, *sep, *s1, *s2, **t;
+	char *buf, **configp, **listp, *p, *t;
 
 #define MATCH(s, tag)                                           	\
 	(strncmp(s, tag, strlen(tag)) == 0)
@@ -230,15 +230,15 @@ schema_update(char **list)
 	 * index, file and table names with the new name.
 	 */
 	if (cmdname != NULL)
-		for (t = list; *t != NULL; t += 2) {
-			if (!MATCH(*t, "colgroup:") &&
-			    !MATCH(*t, "file:") &&
-			    !MATCH(*t, "index:") &&
-			    !MATCH(*t, "table:"))
+		for (listp = list; *listp != NULL; listp += 2) {
+			if (!MATCH(*listp, "colgroup:") &&
+			    !MATCH(*listp, "file:") &&
+			    !MATCH(*listp, "index:") &&
+			    !MATCH(*listp, "table:"))
 				continue;
 
 			/* Allocate room. */
-			len = strlen(*t) + strlen(cmdname) + 10;
+			len = strlen(*listp) + strlen(cmdname) + 10;
 			if ((buf = malloc(len)) == NULL)
 				return (util_err(errno, NULL));
 
@@ -246,24 +246,24 @@ schema_update(char **list)
 			 * Find the separating colon characters, but not the
 			 * trailing one may not be there.
 			 */
-			sep = strchr(*t, ':');
-			*sep = '\0';
-			sep = strchr(sep + 1, ':');
+			p = strchr(*listp, ':');
+			*p = '\0';
+			p = strchr(p + 1, ':');
 			snprintf(buf, len, "%s:%s%s",
-			    *t, cmdname, sep == NULL ? "" : sep);
-			*t = buf;
+			    *listp, cmdname, p == NULL ? "" : p);
+			*listp = buf;
 		}
 
 	/*
 	 * Remove all "filename=" configurations from the values, new filenames
 	 * are chosen as part of table load.
 	 */
-	for (t = list; *t != NULL; t += 2)
-		if ((s1 = strstr(t[1], "filename=")) != NULL) {
-			if ((s2 = strchr(s1, ',')) == NULL)
-				*s1 = '\0';
+	for (listp = list; *listp != NULL; listp += 2)
+		if ((p = strstr(listp[1], "filename=")) != NULL) {
+			if ((t = strchr(p, ',')) == NULL)
+				*p = '\0';
 			else
-				strcpy(s1, s2 + 1);
+				strcpy(p, t + 1);
 		}
 
 	/*
@@ -271,9 +271,10 @@ schema_update(char **list)
 	 * If there were command-line configuration pairs, walk the list of
 	 * command-line configuration strings, and check.
 	 */
-	for (p = cmdconfig; cmdconfig != NULL && *p != NULL; p += 2)
-		if (strstr(p[1], "key_format=") ||
-		    strstr(p[1], "value_format="))
+	for (configp = cmdconfig;
+	    cmdconfig != NULL && *configp != NULL; configp += 2)
+		if (strstr(configp[1], "key_format=") ||
+		    strstr(configp[1], "value_format="))
 			return (util_err(0,
 			    "the command line configuration string may not "
 			    "modify the object's key or value format"));
@@ -285,21 +286,25 @@ schema_update(char **list)
 	 * It is an error if a command-line URI doesn't find a match, that's
 	 * likely a mistake.
 	 */
-	for (p = cmdconfig; cmdconfig != NULL && *p != NULL; p += 2) {
+	for (configp = cmdconfig;
+	    cmdconfig != NULL && *configp != NULL; configp += 2) {
 		found = 0;
-		for (t = list; *t != NULL; t += 2)
-			if (strncmp(*p, t[0], strlen(*p)) == 0) {
+		for (listp = list; *listp != NULL; listp += 2)
+			if (strncmp(
+			    *configp, listp[0], strlen(*configp)) == 0) {
 				found = 1;
-				len = strlen(p[1]) + strlen(t[1]) + 10;
+				len =
+				    strlen(configp[1]) + strlen(listp[1]) + 10;
 				if ((buf = malloc(len)) == NULL)
 					return (util_err(errno, NULL));
-				snprintf(buf, len, "%s,%s", t[1], p[1]);
-				t[1] = buf;
+				snprintf(
+				    buf, len, "%s,%s", listp[1], configp[1]);
+				listp[1] = buf;
 			}
 		if (!found)
 			return (util_err(0,
 			    "the command line object name %s was not matched "
-			    "by any loaded object name", *p));
+			    "by any loaded object name", *configp));
 	}
 
 	/* Leak the memory, I don't care. */
