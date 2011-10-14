@@ -21,6 +21,11 @@
 #define	UTIL_FILE_OK	0x01		/* file: prefix OK */
 #define	UTIL_TABLE_OK	0x02		/* table: prefix OK */
 
+typedef struct {
+	void   *mem;				/* Managed memory chunk */
+	size_t	memsize;			/* Managed memory size */
+} ULINE;
+
 extern const char *progname;		/* Program name */
 extern const char *usage_prefix;	/* Global arguments */
 extern int verbose;			/* Verbose flag */
@@ -44,11 +49,12 @@ int	 util_dump(WT_SESSION *, int, char *[]);
 int	 util_dumpfile(WT_SESSION *, int, char *[]);
 int	 util_err(int, const char *, ...);
 int	 util_getopt(int, char * const *, const char *);
-int	 util_insert(WT_CURSOR *, const char *, int, int);
 int	 util_load(WT_SESSION *, int, char *[]);
 int	 util_loadtext(WT_SESSION *, int, char *[]);
 char	*util_name(const char *, const char *, u_int);
 int	 util_printlog(WT_SESSION *, int, char *[]);
+int	 util_read(WT_SESSION *, int, char *[]);
+int	 util_read_line(ULINE *, int, int *);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
 int	 util_verify(WT_SESSION *, int, char *[]);

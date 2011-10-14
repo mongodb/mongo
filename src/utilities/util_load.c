@@ -8,14 +8,9 @@
 #include "wiredtiger.h"
 #include "util.h"
 
-typedef struct {
-	void   *mem;				/* Managed memory chunk */
-	size_t	memsize;			/* Managed memory size */
-} LINE;
-
 static int format(void);
+static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
-static int read_line(LINE *, int, int *);
 static int schema_read(char ***, int *);
 static int schema_rename(char **, const char *);
 static int schema_update(char **);
@@ -135,7 +130,7 @@ load_dump(WT_SESSION *session)
 		    progname, uri);
 		ret = 1;
 	} else
-		ret = util_insert(cursor, uri, 1, append);
+		ret = insert(cursor, uri);
 
 	/*
 	 * Technically, we don't have to close the cursor because the session
@@ -160,7 +155,7 @@ load_dump(WT_SESSION *session)
 static int
 schema_read(char ***listp, int *hexp)
 {
-	LINE l;
+	ULINE l;
 	int entry, eof, max_entry;
 	const char *s;
 	char **list;
@@ -168,14 +163,14 @@ schema_read(char ***listp, int *hexp)
 	memset(&l, 0, sizeof(l));
 
 	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
-	if (read_line(&l, 0, &eof))
+	if (util_read_line(&l, 0, &eof))
 		return (1);
 	s = "WiredTiger Dump ";
 	if (strncmp(l.mem, s, strlen(s)) != 0)
 		return (format());
 
 	/* Header line #2: "Format={hex,print}". */
-	if (read_line(&l, 0, &eof))
+	if (util_read_line(&l, 0, &eof))
 		return (1);
 	if (strcmp(l.mem, "Format=print") == 0)
 		*hexp = 0;
@@ -185,14 +180,14 @@ schema_read(char ***listp, int *hexp)
 		return (format());
 
 	/* Header line #3: "Header". */
-	if (read_line(&l, 0, &eof))
+	if (util_read_line(&l, 0, &eof))
 		return (1);
 	if (strcmp(l.mem, "Header") != 0)
 		return (format());
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
-		if (read_line(&l, 0, &eof))
+		if (util_read_line(&l, 0, &eof))
 			return (1);
 		if (strcmp(l.mem, "Data") == 0)
 			break;
@@ -352,13 +347,13 @@ format(void)
 }
 
 /*
- * util_insert --
+ * insert --
  *	Read and insert data.
  */
-int
-util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
+static int
+insert(WT_CURSOR *cursor, const char *name)
 {
-	LINE key, value;
+	ULINE key, value;
 	uint64_t insert_count;
 	int eof, ret;
 
@@ -373,19 +368,15 @@ util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 		 * and ignore it (a dump with "append" set), or not read it at
 		 * all (flat-text load).
 		 */
-		if (readkey) {
-			if (read_line(&key, 1, &eof))
-				return (1);
-			if (eof == 1)
-				break;
-			if (!ignorekey)
-				cursor->set_key(cursor, key.mem);
-		}
-
-		if (read_line(&value, readkey ? 1 : 0, &eof))
+		if (util_read_line(&key, 1, &eof))
 			return (1);
 		if (eof == 1)
 			break;
+		if (!append)
+			cursor->set_key(cursor, key.mem);
+
+		if (util_read_line(&value, 0, &eof))
+			return (1);
 		cursor->set_value(cursor, value.mem);
 
 		if ((ret = cursor->insert(cursor)) != 0)
@@ -405,11 +396,11 @@ util_insert(WT_CURSOR *cursor, const char *name, int readkey, int ignorekey)
 }
 
 /*
- * read_line --
- *	Read a line from stdin into a LINE.
+ * util_read_line --
+ *	Read a line from stdin into a ULINE.
  */
-static int
-read_line(LINE *l, int eof_expected, int *eofp)
+int
+util_read_line(ULINE *l, int eof_expected, int *eofp)
 {
 	static unsigned long long line = 0;
 	uint32_t len;
