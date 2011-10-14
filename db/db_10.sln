@@ -29,6 +29,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoutils test program", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_client_demo", "..\client\examples\simple_client_demo.vcxproj", "{89C30BC3-2874-4F2C-B4DA-EB04E9782236}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo", "..\shell\msvc\mongo.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -121,6 +123,18 @@ Global
 		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Win32.ActiveCfg = Release|Win32
 		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Win32.Build.0 = Release|Win32
 		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|x64.ActiveCfg = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Win32.Build.0 = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|x64.ActiveCfg = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Any CPU.ActiveCfg = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Win32.ActiveCfg = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Win32.Build.0 = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
