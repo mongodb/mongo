@@ -37,6 +37,7 @@ extern int   util_optopt;		/* character checked for validity */
 extern int   util_optreset;		/* reset getopt */
 extern char *util_optarg;		/* argument associated with option */
 
+int	 util_cerr(const char *, const char *, int);
 int	 util_create(WT_SESSION *, int, char *[]);
 int	 util_drop(WT_SESSION *, int, char *[]);
 int	 util_dump(WT_SESSION *, int, char *[]);

@@ -8,6 +8,12 @@
 #include "wiredtiger.h"
 #include "util.h"
 
+int
+util_cerr(const char *uri, const char *op, int ret)
+{
+	return (util_err(ret, "%s: cursor.%s", uri, op));
+}
+
 /*
  * util_err --
  * 	Report an error.
