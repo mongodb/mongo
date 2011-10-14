@@ -57,7 +57,7 @@ load_text(WT_SESSION *session, const char *uri)
 		return (util_err(ret, "%s: session.open", uri));
 
 	/* Row-store tables have keys. */
-	if (strcmp(cursor->key_format, "r")) {
+	if (strcmp(cursor->key_format, "r") == 0) {
 		readkey = 0;
 		ignorekey = 1;
 	} else {
