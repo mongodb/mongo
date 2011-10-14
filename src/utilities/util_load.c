@@ -12,6 +12,7 @@ static int format(void);
 static int load_dump(WT_SESSION *);
 static int read_line(WT_BUF *, int, int *);
 static int schema_read(char ***, int *);
+static int schema_rename(char **, const char *);
 static int schema_update(char **);
 static int usage(void);
 
@@ -229,30 +230,25 @@ schema_update(char **list)
 	 * If the object has been renamed, replace all of the column group,
 	 * index, file and table names with the new name.
 	 */
-	if (cmdname != NULL)
-		for (listp = list; *listp != NULL; listp += 2) {
-			if (!MATCH(*listp, "colgroup:") &&
-			    !MATCH(*listp, "file:") &&
-			    !MATCH(*listp, "index:") &&
-			    !MATCH(*listp, "table:"))
-				continue;
+	if (cmdname != NULL) {
+		for (listp = list; *listp != NULL; listp += 2)
+			if (MATCH(*listp, "colgroup:") ||
+			    MATCH(*listp, "file:") ||
+			    MATCH(*listp, "index:") ||
+			    MATCH(*listp, "table:"))
+				if (schema_rename(listp, cmdname))
+					return (1);
 
-			/* Allocate room. */
-			len = strlen(*listp) + strlen(cmdname) + 10;
-			if ((buf = malloc(len)) == NULL)
-				return (util_err(errno, NULL));
-
-			/*
-			 * Find the separating colon characters, but not the
-			 * trailing one may not be there.
-			 */
-			p = strchr(*listp, ':');
-			*p = '\0';
-			p = strchr(p + 1, ':');
-			snprintf(buf, len, "%s:%s%s",
-			    *listp, cmdname, p == NULL ? "" : p);
-			*listp = buf;
-		}
+		/*
+		 * If the object was renamed, and there are configuration pairs,
+		 * rename the configuration pairs as well, because we don't know
+		 * if the user used the old or new names for the pair's URI.
+		 */
+		for (configp = cmdconfig;
+		    cmdconfig != NULL && *configp != NULL; configp += 2)
+			if (schema_rename(configp, cmdname))
+				return (1);
+	}
 
 	/*
 	 * Remove all "filename=" configurations from the values, new filenames
@@ -308,6 +304,35 @@ schema_update(char **list)
 	}
 
 	/* Leak the memory, I don't care. */
+	return (0);
+}
+
+/*
+ * schema_rename --
+ *	Update the URI name.
+ */
+static int
+schema_rename(char **urip, const char *name)
+{
+	size_t len;
+	char *buf, *p;
+
+	/* Allocate room. */
+	len = strlen(*urip) + strlen(name) + 10;
+	if ((buf = malloc(len)) == NULL)
+		return (util_err(errno, NULL));
+
+	/*
+	 * Find the separating colon characters, but not the trailing one may
+	 * not be there.
+	 */
+	if ((p = strchr(*urip, ':')) == NULL)
+		return (format());
+	*p = '\0';
+	p = strchr(p + 1, ':');
+	snprintf(buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p);
+	*urip = buf;
+
 	return (0);
 }
 
