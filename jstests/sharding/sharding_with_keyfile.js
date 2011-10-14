@@ -6,21 +6,24 @@ var st = new ShardingTest({ name : jsTestName(),
                             keyFile : keyFile = "jstests/sharding/" + jsTestName() + ".key" })
 
 // Make sure all our instances got the key
-var configs = st._configDB.split(",")
-for( var i = 0; i < configs.length; i++ ) configs[i] = new Mongo( configs[i] )
+var configs = st._configServers
 var shards = st._connections
 var mongoses = st._mongos
 
 for( var i = 0; i < configs.length; i++ ){
-    printjson( configs[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
-    assert.eq( configs[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
+    printjson( new Mongo( "localhost:" + configs[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
+    assert.eq( new Mongo( "localhost:" + configs[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
 }
 
-for( var i = 0; i < shards.length; i++ )
-    assert.eq( shards[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
-
-for( var i = 0; i < mongoses.length; i++ )
-    assert.eq( mongoses[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
+for( var i = 0; i < shards.length; i++ ){
+    printjson( new Mongo( "localhost:" + shards[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
+    assert.eq( new Mongo( "localhost:" + shards[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
+}
+    
+for( var i = 0; i < mongoses.length; i++ ){
+    printjson( new Mongo( "localhost:" + mongoses[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
+    assert.eq( new Mongo( "localhost:" + mongoses[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
+}
 
 var mongos = st.s0
 var coll = mongos.getCollection( "test.foo" )
