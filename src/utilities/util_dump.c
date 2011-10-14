@@ -86,10 +86,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		goto err;
 
-	dump_prefix(hex);
-	if ((ret = schema(session, name)) != 0)
+	if (dump_prefix(hex) != 0 ||
+	    schema(session, name) != 0 ||
+	    dump_suffix() != 0)
 		goto err;
-	dump_suffix();
 
 	if ((ret = session->open_cursor(session,
 	    name, NULL, hex ? "dump=hex" : "dump=print", &cursor)) != 0) {
@@ -217,7 +217,8 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		return (cursor_err(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (cursor_err(uri, "get_value", ret));
-	printf("%s\n%s\n", key, value);
+	if (printf("%s\n%s\n", key, value) < 0)
+		return (util_err(EIO, NULL));
 
 	/*
 	 * Second, dump the column group and index key/value pairs: for each
@@ -260,7 +261,9 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		 * The dumped configuration string is the original key plus the
 		 * file's configuration.
 		 */
-		printf("%s\n%s,%s\n", list[i].key, list[i].value, value);
+		if (printf(
+		    "%s\n%s,%s\n", list[i].key, list[i].value, value) < 0)
+			return (util_err(EIO, NULL));
 	}
 
 	/* Leak the memory, I don't care. */
@@ -286,7 +289,8 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 		return (cursor_err(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (cursor_err(uri, "get_value", ret));
-	printf("%s\n%s\n", key, value);
+	if (printf("%s\n%s\n", key, value) < 0)
+		return (util_err(EIO, NULL));
 
 	return (0);
 }
@@ -298,13 +302,13 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 static int
 dump_prefix(int hex)
 {
-	int major, minor, patch;
+	int vmajor, vminor, vpatch;
 
-	(void)wiredtiger_version(&major, &minor, &patch);
+	(void)wiredtiger_version(&vmajor, &vminor, &vpatch);
 
 	if (printf(
 	    "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n",
-	    major, minor, patch) < 0 ||
+	    vmajor, vminor, vpatch) < 0 ||
 	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
 	    printf("Header\n") < 0)
 		return (util_err(EIO, NULL));
