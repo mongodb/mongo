@@ -11,8 +11,10 @@ for( var i = 0; i < configs.length; i++ ) configs[i] = new Mongo( configs[i] )
 var shards = st._connections
 var mongoses = st._mongos
 
-for( var i = 0; i < configs.length; i++ )
+for( var i = 0; i < configs.length; i++ ){
+    printjson( configs[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
     assert.eq( configs[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
+}
 
 for( var i = 0; i < shards.length; i++ )
     assert.eq( shards[i].getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
