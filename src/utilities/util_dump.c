@@ -9,6 +9,8 @@
 #include "util.h"
 
 static int cursor_err(const char *, const char *, int);
+static int dump_prefix(int);
+static int dump_suffix(void);
 static int schema(WT_SESSION *, const char *);
 static int schema_file(WT_CURSOR *, const char *);
 static int schema_table(WT_CURSOR *, const char *);
@@ -84,12 +86,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
 		goto err;
 
-	printf("WiredTiger Dump %s\n", wiredtiger_version(NULL, NULL, NULL));
-	printf("Format=%s\n", hex ? "hex" : "print");
-	printf("Header\n");
+	dump_prefix(hex);
 	if ((ret = schema(session, name)) != 0)
 		goto err;
-	printf("Data\n");
+	dump_suffix();
 
 	if ((ret = session->open_cursor(session,
 	    name, NULL, hex ? "dump=hex" : "dump=print", &cursor)) != 0) {
@@ -288,6 +288,38 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 		return (cursor_err(uri, "get_value", ret));
 	printf("%s\n%s\n", key, value);
 
+	return (0);
+}
+
+/*
+ * dump_prefix --
+ *	Output the dump file header prefix.
+ */
+static int
+dump_prefix(int hex)
+{
+	int major, minor, patch;
+
+	(void)wiredtiger_version(&major, &minor, &patch);
+
+	if (printf(
+	    "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n",
+	    major, minor, patch) < 0 ||
+	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
+	    printf("Header\n") < 0)
+		return (util_err(EIO, NULL));
+	return (0);
+}
+
+/*
+ * dump_suffix --
+ *	Output the dump file header suffix.
+ */
+static int
+dump_suffix(void)
+{
+	if (printf("Data\n") < 0)
+		return (util_err(EIO, NULL));
 	return (0);
 }
 
