@@ -395,54 +395,6 @@ insert(WT_CURSOR *cursor, const char *name)
 	return (0);
 }
 
-/*
- * util_read_line --
- *	Read a line from stdin into a ULINE.
- */
-int
-util_read_line(ULINE *l, int eof_expected, int *eofp)
-{
-	static unsigned long long line = 0;
-	uint32_t len;
-	int ch;
-
-	++line;
-	*eofp = 0;
-
-	for (len = 0;; ++len) {
-		if ((ch = getchar()) == EOF) {
-			if (len == 0) {
-				if (eof_expected) {
-					*eofp = 1;
-					return (0);
-				}
-				return (util_err(0, 
-				    "line %llu: unexpected end-of-file", line));
-			}
-			return (util_err(0,
-			    "line %llu: no newline terminator", line));
-		}
-		if (ch == '\n')
-			break;
-		/*
-		 * We nul-terminate the string so it's easier to convert the
-		 * line into a record number, that means we always need one
-		 * extra byte at the end.
-		 */
-		if (l->memsize == 0 || len >= l->memsize - 1) {
-			if ((l->mem =
-			    realloc(l->mem, l->memsize + 1024)) == NULL)
-				return (util_err(errno, NULL));
-			l->memsize += 1024;
-		}
-		((uint8_t *)l->mem)[len] = (uint8_t)ch;
-	}
-
-	((uint8_t *)l->mem)[len] = '\0';		/* nul-terminate */
-
-	return (0);
-}
-
 static int
 usage(void)
 {
