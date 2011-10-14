@@ -220,7 +220,7 @@ schema_update(char **list)
 {
 	size_t len;
 	int found;
-	char *buf, **p, *sep, **t;
+	char *buf, **p, *sep, *s1, *s2, **t;
 
 #define MATCH(s, tag)                                           	\
 	(strncmp(s, tag, strlen(tag)) == 0)
@@ -252,6 +252,18 @@ schema_update(char **list)
 			snprintf(buf, len, "%s:%s%s",
 			    *t, cmdname, sep == NULL ? "" : sep);
 			*t = buf;
+		}
+
+	/*
+	 * Remove all "filename=" configurations from the values, new filenames
+	 * are chosen as part of table load.
+	 */
+	for (t = list; *t != NULL; t += 2)
+		if ((s1 = strstr(t[1], "filename=")) != NULL) {
+			if ((s2 = strchr(s1, ',')) == NULL)
+				*s1 = '\0';
+			else
+				strcpy(s1, s2 + 1);
 		}
 
 	/*

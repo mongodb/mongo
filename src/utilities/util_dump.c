@@ -158,7 +158,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 	} *list;
 	int i, elem, list_elem, ret;
 	const char *key, *name, *value;
-	char *append, *buf, *filename, *p, *t;
+	char *buf, *filename, *p, *t, *sep;
 
 	ret = 0;
 
@@ -236,9 +236,13 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		 * Nul-terminate the filename if necessary, create the file
 		 * URI, then look it up.
 		 */
-		if ((append = strchr(filename, ',')) != NULL)
-			*append = '\0';
-		p = filename + strlen("filename=");
+		if ((sep = strchr(filename, ',')) != NULL)
+			*sep = '\0';
+		if ((t = strdup(filename)) == NULL)
+			return (util_err(errno, NULL));
+		if (sep != NULL)
+			*sep = ',';
+		p = t + strlen("filename=");
 		p -= strlen("file:");
 		memcpy(p, "file:", strlen("file:"));
 		cursor->set_key(cursor, p);
@@ -254,14 +258,9 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 
 		/*
 		 * The dumped configuration string is the original key plus the
-		 * file's configuration.   Discard the file name, a new one is
-		 * chosen during the load process.
+		 * file's configuration.
 		 */
-		*filename = '\0';
-		printf("%s\n%s,%s%s%s\n",
-		    list[i].key, list[i].value,
-		    append == NULL ? "" : append + 1,
-		    append == NULL ? "" : ",", value);
+		printf("%s\n%s,%s\n", list[i].key, list[i].value, value);
 	}
 
 	/* Leak the memory, I don't care. */
