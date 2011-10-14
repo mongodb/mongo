@@ -504,6 +504,26 @@ namespace mongo {
         }
     }
 
+    void Chunk::refreshChunkSize() {
+        BSONObj o = grid.getConfigSetting("chunksize");
+
+        if ( o.isEmpty() ) {
+           return;
+        }
+
+        int csize = o["value"].numberInt();
+
+        // validate chunksize before proceeding
+        if ( csize == 0 ) {
+            // setting was not modified; mark as such
+            log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
+            return;
+        }
+
+        LOG(1) << "MaxChunkSize: " << csize << endl;
+        Chunk::MaxChunkSize = csize * 1024 * 1024;
+    }
+
     // -------  ChunkManager --------
 
     AtomicUInt ChunkManager::NextSequenceNumber = 1;

@@ -152,7 +152,6 @@ namespace mongo {
          *  talks to mongod to do this
          */
         long getPhysicalSize() const;
-        
 
         /**
          * marks this chunk as a jumbo chunk
@@ -161,6 +160,11 @@ namespace mongo {
         void markAsJumbo() const;
 
         bool isJumbo() const { return _jumbo; }
+
+        /**
+         * Attempt to refresh maximum chunk size from config.
+         */
+         static void refreshChunkSize();
 
         //
         // public constants
