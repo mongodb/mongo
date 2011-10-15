@@ -25,10 +25,10 @@ for( var i = 0; i < mongoses.length; i++ ){
     assert.eq( new Mongo( "localhost:" + mongoses[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.keyFile, keyFile )
 }
 
-var mongos = st.s0
+var mongos = new Mongo( "localhost:" + st.s0.port )
 var coll = mongos.getCollection( "test.foo" )
 
-st.shardColl( coll, { _id : 1 } )
+st.shardColl( coll, { _id : 1 }, false )
 
 // Create an index so we can find by num later
 coll.ensureIndex({ insert : 1 })
