@@ -20,6 +20,6 @@ assert.eq( 1 , t.getIndexes().length , "B1" )
 benchRun( { ops :  [ { op : "createIndex" , ns : t.getFullName() , key : { x : 1 } } ] , parallel : 1 , seconds : 1 , host : db.getMongo().host } )
 assert.eq( 2 , t.getIndexes().length , "B2" )
 benchRun( { ops :  [ { op : "dropIndex" , ns : t.getFullName() , key : { x : 1 } } ] , parallel : 1 , seconds : 1 , host : db.getMongo().host } )
-assert.eq( 1 , t.getIndexes().length , "B3" )
+assert.soon( function(){ return t.getIndexes().length == 1; } );
 
 
