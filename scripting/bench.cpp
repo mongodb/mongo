@@ -322,6 +322,12 @@ namespace mongo {
                                                    result["code"].eoo() ? 0 : result["code"].Int() );
                         }
                     }
+                    else if ( op == "createIndex" ) {
+                        conn->ensureIndex( ns , e["key"].Obj() , false , "" , false );
+                    }
+                    else if ( op == "dropIndex" ) {
+                        conn->dropIndex( ns , e["key"].Obj()  );
+                    }
                     else {
                         log() << "don't understand op: " << op << endl;
                         config->error = true;
