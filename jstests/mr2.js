@@ -65,3 +65,27 @@ res.drop();
 
 assert( ! ( "result" in res ) , "B4" )
 
+var final2 = function(key, res) {
+    res.avg = res.totalSize / res.num;
+    if (res.avg < 18) return null;
+    return res;
+}
+res = t.mapReduce( m , r , { finalize : final2 , out : "mr2_out" } );
+printjson( res )
+x = reformat( res );
+assert( x.a == undefined , "C1" );
+assert( x.b == undefined , "C2" );
+assert.eq( 18 , x.c.avg , "C3" );
+res.drop();
+
+var final2 = function(key, res) {
+    return null;
+}
+res = t.mapReduce( m , r , { finalize : final2 , out : { inline : 1 } } );
+printjson( res )
+x = reformat( res );
+assert( x.a == undefined , "D1" );
+assert( x.b == undefined , "D2" );
+assert( x.c == undefined , "D3" );
+res.drop();
+
