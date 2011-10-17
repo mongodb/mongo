@@ -400,7 +400,7 @@ namespace mongo {
         catch( ... ){
             error() << "Exception not handled in benchRun thread." << endl;
         }
-
+        conn->getLastError();
         config->threadsActive--;
         conn.done();
 
