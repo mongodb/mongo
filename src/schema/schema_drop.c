@@ -7,26 +7,24 @@
 
 #include "wt_internal.h"
 
-/*
- * __drop_file --
- *	WT_SESSION::drop for a file.
- */
 static int
-__drop_file(WT_SESSION_IMPL *session, const char *uri)
+__drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 {
 	WT_BTREE_SESSION *btree_session;
-	const char *name;
+	const char *filename;
 	int exist, ret;
 
-	name = uri;
-	if (!WT_PREFIX_SKIP(name, "file:")) {
-		__wt_errx(session, "Expected a 'file:' URI: %s", uri);
+	WT_UNUSED(cfg);
+
+	filename = fileuri;
+	if (!WT_PREFIX_SKIP(filename, "file:")) {
+		__wt_errx(session, "Expected a 'file:' URI: %s", fileuri);
 		return (EINVAL);
 	}
 
 	/* If open, close the btree handle. */
 	switch ((ret = __wt_session_find_btree(session,
-	    name, strlen(name), NULL, WT_BTREE_EXCLUSIVE,
+	    filename, strlen(filename), NULL, WT_BTREE_EXCLUSIVE,
 	    &btree_session))) {
 	case 0:
 		/*
@@ -44,13 +42,36 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri)
 		return (ret);
 	}
 
-	WT_ERR(__wt_schema_table_remove(session, uri));
+	WT_ERR(__wt_schema_table_remove(session, fileuri));
 
-	WT_ERR(__wt_exist(session, name, &exist));
+	WT_ERR(__wt_exist(session, filename, &exist));
 	if (exist)
-		ret = __wt_remove(session, name);
+		ret = __wt_remove(session, filename);
 
 err:	return (ret);
+}
+
+static int
+__drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *cfg[])
+{
+	WT_BUF uribuf;
+	const char *fileuri;
+	int ret;
+
+	ret = 0;
+	WT_CLEAR(uribuf);
+	WT_RET(__wt_buf_fmt(session, &uribuf, "file:%s", btree->filename));
+	fileuri = uribuf.data;
+
+	/* Remove the schema table entry. */
+	WT_TRET(__wt_schema_table_remove(session, btree->name));
+
+	/* Remove the file. */
+	WT_TRET(__drop_file(session, fileuri, cfg));
+
+	__wt_buf_free(session, &uribuf);
+
+	return (ret);
 }
 
 /*
@@ -58,75 +79,45 @@ err:	return (ret);
  *	WT_SESSION::drop for a table.
  */
 static int
-__drop_table(WT_SESSION_IMPL *session, const char *uri)
+__drop_table(
+    WT_SESSION_IMPL *session, const char *tableuri, const char *cfg[])
 {
-	WT_BUF *tmp;
-	WT_CURSOR *cursor;
+	WT_BTREE *btree;
 	WT_TABLE *table;
-	const char *key, *name, *value;
-	int ret;
+	const char *tablename;
+	int i, ret;
 
-	tmp = NULL;
-	cursor = NULL;
+	WT_UNUSED(cfg);
 	ret = 0;
 
-	name = uri;
-	if (!WT_PREFIX_SKIP(name, "table:")) {
-		__wt_errx(session, "Expected a 'table:' URI: %s", uri);
+	tablename = tableuri;
+	if (!WT_PREFIX_SKIP(tablename, "table:")) {
+		__wt_errx(session, "Expected a 'table:' URI: %s", tableuri);
 		return (EINVAL);
 	}
 
-	/* Close the table if it's open. */
-	if (__wt_schema_find_table(session, name, strlen(name), &table) == 0)
-		WT_RET(__wt_schema_remove_table(session, table));
+	WT_RET(__wt_schema_get_table(session,
+	    tablename, strlen(tablename), &table));
 
-	WT_RET(__wt_scr_alloc(session, 100, &tmp));
-
-	/*
-	 * Open a cursor on the schema file and walk it, removing all table
-	 * references.  For each index or colgroup, find the underlying file
-	 * and remove it as well.
-	 */
-	WT_ERR(__wt_schema_table_cursor(session, &cursor));
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0) {
-			__wt_err(session, ret, "schema cursor.get_key");
-			WT_ERR(ret);
-		}
-
-#define	__MATCH(key, s, name)						\
-	(strncmp(key, s, strlen(s)) == 0 &&				\
-	    strncmp(key + strlen(s), name, strlen(name)) == 0 ? 1 : 0)
-		if (__MATCH(key, "table:", name)) {
-			WT_ERR(cursor->remove(cursor));
+	/* Drop the column groups. */
+	for (i = 0; i < WT_COLGROUPS(table); i++) {
+		if ((btree = table->colgroup[i]) == NULL)
 			continue;
-		}
-		if (!__MATCH(key, "index:", name) &&
-		    !__MATCH(key, "colgroup:", name))
-			continue;
-
-		if ((ret = cursor->get_value(cursor, &value)) != 0) {
-			__wt_err(session, ret, "schema cursor.get_value");
-			WT_ERR(ret);
-		}
-		if ((value = strstr(value, "filename=")) == NULL) {
-			__wt_err(session,
-			    ret, "corrupted schema file: %s missing filename "
-			    "configuration string",
-			    key);
-			WT_ERR(EINVAL);
-		}
-		WT_ERR(__wt_buf_fmt(
-		    session, tmp, "file:%s", value + strlen("filename=")));
-		WT_ERR(__drop_file(session, tmp->data));
-
-		WT_ERR(cursor->remove(cursor));
+		table->colgroup[i] = NULL;
+		WT_TRET(__drop_tree(session, btree, cfg));
 	}
 
-err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor, NULL));
+	/* Drop the indices. */
+	WT_TRET(__wt_schema_open_index(session, table, NULL, 0));
+	for (i = 0; i < table->nindices; i++) {
+		btree = table->index[i];
+		table->index[i] = NULL;
+		WT_TRET(__drop_tree(session, btree, cfg));
+	}
 
-	__wt_scr_free(&tmp);
+	WT_TRET(__wt_schema_remove_table(session, table));
+	WT_TRET(__wt_schema_table_remove(session, tableuri));
+
 	return (ret);
 }
 
@@ -136,9 +127,9 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
-		return (__drop_file(session, uri));
+		return (__drop_file(session, uri, cfg));
 	if (WT_PREFIX_MATCH(uri, "table:"))
-		return (__drop_table(session, uri));
+		return (__drop_table(session, uri, cfg));
 
 	__wt_errx(session, "Unknown object type: %s", uri);
 	return (EINVAL);
