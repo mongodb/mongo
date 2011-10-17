@@ -303,7 +303,7 @@ int setup(char *name, const char *kf, const char *vf, const char *cconfig, WT_CU
 
   creating = (kf != NULL);
 
-  if((ret = wiredtiger_open(NULL, NULL, NULL, &conn) != 0) ||
+  if((ret = wiredtiger_open(NULL, NULL, "create", &conn) != 0) ||
     (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
     return ret;
 
