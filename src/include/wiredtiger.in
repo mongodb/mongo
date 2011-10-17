@@ -263,7 +263,7 @@ struct wt_cursor {
 	 */
 	int __F(prev)(WT_CURSOR *cursor);
 
-	/*! Return a record; the key must first be set.
+	/*! Return the record matching the key; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->prev
@@ -275,7 +275,10 @@ struct wt_cursor {
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
-	/*! Return a record, or a nearby record; the key must first be set.
+	/*!
+	 * Return the record matching the key if it exists, else the largest
+	 * record smaller than the key if it exists, else, the smallest record
+	 * larger than the key; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->search
