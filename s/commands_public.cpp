@@ -1202,16 +1202,14 @@ namespace mongo {
                         }
 
                         BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
-                        if (!final.isEmpty()) {
-                            if (config.outType == mr_shard::Config::MERGE) {
-                                BSONObj id = final["_id"].wrap();
-                                s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
-                            } else {
-                                // insert into temp collection, but using final collection's shard chunks
-                                s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
-                            }
-                            ++finalCount;
+                        if (config.outType == mr_shard::Config::MERGE) {
+                            BSONObj id = final["_id"].wrap();
+                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
+                        } else {
+                            // insert into temp collection, but using final collection's shard chunks
+                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
                         }
+                        ++finalCount;
                         values.clear();
                         if (!t.isEmpty()) {
                             values.push_back( t );

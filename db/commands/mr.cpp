@@ -142,10 +142,6 @@ namespace mongo {
 
             if ( finalizer ) {
                 res = finalizer->finalize( res );
-                if (res.getField("value").isNull()) {
-                    // this means to throw away result
-                    return BSONObj();
-                }
             }
 
             return res;
@@ -408,9 +404,6 @@ namespace mongo {
                 BSONObj key = i->first;
                 BSONList& all = i->second;
 
-                // may not be a value due to finalize
-                if (all.size() == 0)
-                    continue;
                 assert( all.size() == 1 );
 
                 BSONObjIterator vi( all[0] );
@@ -507,9 +500,7 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        BSONObj res = _config.reducer->finalReduce( values , _config.finalizer.get() );
-                        if (!res.isEmpty())
-                            Helpers::upsert( _config.finalLong , res );
+                        Helpers::upsert( _config.finalLong , _config.reducer->finalReduce( values , _config.finalizer.get() ) );
                     }
                     else {
                         Helpers::upsert( _config.finalLong , temp );
@@ -654,8 +645,7 @@ namespace mongo {
                 return;
 
             BSONObj res = _config.reducer->finalReduce( values , _config.finalizer.get() );
-            if (!res.isEmpty())
-                insert( _config.tempLong , res );
+            insert( _config.tempLong , res );
         }
 
         BSONObj _nativeToTemp( const BSONObj& args, void* data ) {
@@ -704,11 +694,10 @@ namespace mongo {
                         assert( all.size() == 1 );
 
                         BSONObj res = _config.finalizer->finalize( all[0] );
+
                         all.clear();
-                        if ( !res.getField("value").isNull() ) {
-                            all.push_back( res );
-                            size += res.objsize();
-                        }
+                        all.push_back( res );
+                        size += res.objsize();
                     }
                     _size = size;
                 }
@@ -1130,6 +1119,12 @@ namespace mongo {
                     if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
                     result.append( "counts" , countsBuilder.obj() );
 
+                    if ( finalCount == 0 && shouldHaveData ) {
+                        result.append( "cmd" , cmd );
+                        errmsg = "there were emits but no data!";
+                        return false;
+                    }
+
                 }
                 // TODO:  The error handling code for queries is v. fragile,
                 // *requires* rethrow AssertionExceptions - should probably fix.
@@ -1250,12 +1245,10 @@ namespace mongo {
                             }
 
                             BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
-                            if (!res.isEmpty()) {
-                                if (state.isOnDisk())
-                                    state.insertToInc(res);
-                                else
-                                    state.emit(res);
-                            }
+                            if (state.isOnDisk())
+                                state.insertToInc(res);
+                            else
+                                state.emit(res);
                             values.clear();
                             if (!t.isEmpty())
                                 values.push_back( t );

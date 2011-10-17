@@ -117,8 +117,6 @@ namespace mongo {
 
             if ( finalizer ) {
                 res = finalizer->finalize( res );
-                if (res.getField("value").isNull())
-                    return BSONObj();
             }
 
             return res;
