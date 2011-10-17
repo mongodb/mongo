@@ -232,7 +232,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 		 */
 		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
 			continue;
-		WT_ERR(__wt_buf_fmt(
+		WT_ERR(__wt_buf_catfmt(
 		    session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
