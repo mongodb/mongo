@@ -261,6 +261,7 @@ schema_update(char **list)
 			else
 				strcpy(p, t + 1);
 		}
+	
 
 	/*
 	 * It's possible to update everything except the key/value formats.
@@ -288,7 +289,7 @@ schema_update(char **list)
 		for (listp = list; *listp != NULL; listp += 2)
 			if (strncmp(
 			    *configp, listp[0], strlen(*configp)) == 0) {
-				found = 1;
+				++found;
 				len =
 				    strlen(configp[1]) + strlen(listp[1]) + 10;
 				if ((buf = malloc(len)) == NULL)
@@ -297,10 +298,19 @@ schema_update(char **list)
 				    buf, len, "%s,%s", listp[1], configp[1]);
 				listp[1] = buf;
 			}
-		if (!found)
+		switch (found) {
+		case 0:
 			return (util_err(0,
 			    "the command line object name %s was not matched "
 			    "by any loaded object name", *configp));
+		case 1:
+			break;
+		default:
+			return (util_err(0,
+			    "the command line object name %s was not unique, "
+			    "it matche more than a single loaded object name",
+			    *configp));
+		}
 	}
 
 	/* Leak the memory, I don't care. */
