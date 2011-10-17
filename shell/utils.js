@@ -1193,7 +1193,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         try {
             __autocomplete__ = worker(prefix).sort();
         }catch (e){
-            print("exception durring autocomplete: " + tojson(e.message));
+            print("exception during autocomplete: " + tojson(e.message));
             __autocomplete__ = [];
         }
     }
