@@ -776,6 +776,12 @@ namespace mongo {
             timing.done(1);
 
             // 2.
+            
+            if ( migrateFromStatus.isActive() ) {
+                errmsg = "migration already in progress";
+                return false;
+            }
+
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
             dist_lock_try dlk;
 
