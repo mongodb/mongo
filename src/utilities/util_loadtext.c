@@ -54,13 +54,21 @@ text(WT_SESSION *session, const char *uri)
 
 	/* Open the insert cursor. */
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, "dump=print,overwrite", &cursor)) != 0)
+	    session, uri, NULL, "overwrite", &cursor)) != 0)
 		return (util_err(ret, "%s: session.open", uri));
 
 	/*
+	 * We're about to load strings, make sure the formats match.
+	*
 	 * Row-store tables have key/value pairs, column-store tables only have
 	 * values.
 	 */
+	if (strcmp(cursor->value_format, "S") != 0 ||
+	    (strcmp(cursor->key_format, "S") != 0 &&
+	    strcmp(cursor->key_format, "r") != 0))
+		return (util_err(EINVAL,
+		    "the loadtext command can only load objects configured "
+		    "for record number or string keys, and string values"));
 	readkey = strcmp(cursor->key_format, "r") == 0 ? 0 : 1;
 
 	/* Insert the records */
