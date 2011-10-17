@@ -24,6 +24,7 @@ Set verbose output.
 The \c wt tool supports several commands.
 
 
+<hr>
 @section utility_create wt create
 Create a table or file.
 
@@ -41,6 +42,7 @@ The following are command-specific options for the \c create command:
 Include a configuration string to be passed to WT_SESSION::create.
 
 
+<hr>
 @section utility_drop wt drop
 Drop a table or file.
 
@@ -54,6 +56,7 @@ call to WT_SESSION::drop with the "force" configuration argument.
 There are no command-specific options for the \c drop command.
 
 
+<hr>
 @section utility_dump wt dump
 Export data in a text format.
 
@@ -80,6 +83,7 @@ Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
 
 
+<hr>
 @section utility_dumpfile wt dumpfile
 Dump a file in a debugging format.
 
@@ -99,6 +103,7 @@ output; the \c -f option re-directs the output to the specified
 file.
 
 
+<hr>
 @section utility_load wt load
 Load a table or file from dump output.
 
@@ -144,6 +149,7 @@ the configuration string will be appended to the WT_SESSION::create call
 for the object matching the uri.
 
 
+<hr>
 @section utility_loadtext wt loadtext
 Load text into a table or file.
 
@@ -172,6 +178,7 @@ By default, the \c loadtext command reads from the standard input; the
 \c -f option reads the input from the specified file.
 
 
+<hr>
 @section utility_printlog wt printlog
 Output the database log.
 
@@ -191,6 +198,24 @@ output; the \c -f option re-directs the output to the specified file.
 Display the log in a printable format.
 
 
+<hr>
+@section utility_read wt read
+Read records from a table or file.
+
+The \c read command prints out the records associated with the specified
+keys from the specified object.
+
+The object must be configured with string or record number keys and
+string values.
+
+@subsection utility_read_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] read uri key ...</code>
+
+@subsection utility_read_options Options
+The \c read command has no command-specific options.
+
+
+<hr>
 @section utility_salvage wt salvage
 Recover data from a corrupted file.
 
@@ -210,6 +235,7 @@ By default, salvage will refuse to salvage files that fail basic tests
 The \c -F option forces the salvage of the file, regardless.
 
 
+<hr>
 @section utility_stat wt stat
 Output statistics.
 
@@ -229,6 +255,7 @@ statistics where the statistic's description field begins with the
 argument \c prefix will be printed.
 
 
+<hr>
 @section utility_verify wt verify
 Check the structural integrity of a table or file.
 

@@ -18,6 +18,7 @@ wt_SOURCES =\
 	src/utilities/util_main.c \
 	src/utilities/util_misc.c \
 	src/utilities/util_printlog.c \
+	src/utilities/util_read.c \
 	src/utilities/util_salvage.c \
 	src/utilities/util_stat.c \
 	src/utilities/util_verbose.c \

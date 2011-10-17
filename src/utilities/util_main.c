@@ -125,6 +125,12 @@ main(int argc, char *argv[])
 		else
 			ret = usage();
 		break;
+	case 'r':
+		if (strcmp(command, "read") == 0)
+			ret = util_read(session, argc, argv);
+		else
+			ret = usage();
+		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
 			ret = util_salvage(session, argc, argv);
