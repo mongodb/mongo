@@ -150,7 +150,7 @@ namespace mongo {
             }
             catch( std::exception &e ){
                 
-                warning() << "could not get last error." << causedBy( e ) << endl;
+                warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
                 
                 // Catch everything that happens here, since we need to ensure we return our connection when we're
             	// finished.
@@ -172,7 +172,14 @@ namespace mongo {
                     continue;
 
                 ShardConnection conn( temp , "" );
-                _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+
+                try {
+                    _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+                }
+                catch( std::exception &e ){
+                    warning() << "could not clear last error from shard " << temp << causedBy( e ) << endl;
+                }
+
                 conn.done();
             }
             clearSinceLastGetError();
@@ -223,7 +230,7 @@ namespace mongo {
         	    // Safe to return here, since we haven't started any extra processing yet, just collecting
         	    // responses.
                 
-        	    warning() << "could not get last error." << causedBy( e ) << endl;
+        	    warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
                 conn.done();
                 
                 return false;
@@ -262,8 +269,12 @@ namespace mongo {
                 continue;
 
             ShardConnection conn( temp , "" );
-            _addWriteBack( writebacks, conn->getLastErrorDetailed() );
-            conn.done();
+            try {
+                _addWriteBack( writebacks, conn->getLastErrorDetailed() );
+            }
+            catch( std::exception &e ){
+                warning() << "could not clear last error from a shard " << temp << causedBy( e ) << endl;
+            }
         }
         clearSinceLastGetError();
 
