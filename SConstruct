@@ -1046,13 +1046,6 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
 # --- targets ----
 
-clientEnv = env.Clone();
-clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Prepend( LIBS=[ "mongoclient"] )
-clientEnv.Prepend( LIBPATH=["."] )
-clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
-l = clientEnv[ "LIBS" ]
-
 # profile guided
 #if windows:
 #    if release:
@@ -1097,11 +1090,19 @@ env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
 
 # c++ library
-clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
+clientLib = env.Library( "mongoclient" , allClientFiles )
+clientLibName = str( clientLib[0] )
 if has_option( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
+
+clientEnv = env.Clone();
+clientEnv.Append( CPPPATH=["../"] )
+clientEnv.Prepend( LIBS=[ clientLib ] )
+clientEnv.Prepend( LIBPATH=["."] )
+clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
+l = clientEnv[ "LIBS" ]
 
 clientTests = []
 
