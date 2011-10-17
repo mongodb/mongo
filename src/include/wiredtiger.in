@@ -276,9 +276,9 @@ struct wt_cursor {
 	int __F(search)(WT_CURSOR *cursor);
 
 	/*!
-	 * Return the record matching the key if it exists, else the largest
-	 * record smaller than the key if it exists, else, the smallest record
-	 * larger than the key; the key must first be set.
+	 * Return the record matching the key if it exists, else the smallest
+	 * record larger than the key if it exists, else the largest record
+	 * smaller than the key if it exists; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip ->search
@@ -287,7 +287,7 @@ struct wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @param exactp the status of the search: 0 if an exact match is
-	 * found, -1 if a smaller key is found, +1 if a larger key is found
+	 * found, < 1 if a smaller key is found, > 1 if a larger key is found
 	 * @errors
 	 */
 	int __F(search_near)(WT_CURSOR *cursor, int *exactp);

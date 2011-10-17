@@ -30,9 +30,9 @@ struct __wt_cursor_btree {
 
 	/*
 	 * The search function sets compare to:
-	 *	-1 if the found key is less than the specified key
-	 *	 0 if the found key matches the specified key
-	 *	+1 if the found key is larger than the specified key
+	 *	< 1 if the found key is less than the specified key
+	 *	  0 if the found key matches the specified key
+	 *	> 1 if the found key is larger than the specified key
 	 */
 	int	compare;
 

@@ -53,15 +53,14 @@ cursor_ops(WT_CURSOR *cursor)
 
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
-	if (ret == 0)
-		switch (exact) {
-		case 0:			/* an exact match */
-			break;
-		case -1:		/* returned smaller key */
-			break;
-		case 1:			/* returned larger key */
-			break;
-		}
+	if (ret == 0) {
+		if (exact == 0)		/* an exact match */
+			;
+		else if (exact < 0)	/* returned smaller key */
+			;
+		else if (exact > 0)	/* returned larger key */
+			;
+	}
 
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
