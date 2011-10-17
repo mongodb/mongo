@@ -8,11 +8,6 @@ WT_SESSION and WT_CURSOR handles cannot be shared between threads:
 applications should open one WT_SESSION for each thread that accesses a
 database.  Applications may open multiple WT_CURSOR handles in a thread.
 
-By default, WiredTiger configures for single-threaded access, and only a
-single WT_SESSION handle may be opened at a time.  To configure WiredTiger
-for multi-threaded access, specify the <code>"multithread"</code>
-configuration string to the @ref wiredtiger_open function.
-
 @todo expand
 
 @section threads_example Code Samples

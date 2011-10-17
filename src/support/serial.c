@@ -20,6 +20,10 @@ int
 __wt_session_serialize_func(WT_SESSION_IMPL *session,
     wq_state_t op, void (*func)(WT_SESSION_IMPL *), void *args)
 {
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
 	/*
 	 * Threads serializing access to data using a function:
 	 *	set a function/argument pair in the WT_SESSION_IMPL handle,
@@ -35,12 +39,13 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	session->wq_sleeping = op == WT_WORKQ_FUNC ? 0 : 1;
 
 	/*
-	 * If we're multithreaded, the workQ has to schedule all functions; if
-	 * not multithreaded, functions are called directly, only communication
-	 * with other threads goes through serialization.
+	 * Functions are called directly (holding a spinlock), only
+	 * communication with other threads goes through serialization.
 	 */
-	if (!F_ISSET(S2C(session), WT_MULTITHREAD) && op == WT_WORKQ_FUNC) {
+	if (op == WT_WORKQ_FUNC) {
+		__wt_spin_lock(&conn->workq_lock);
 		func(session);
+		__wt_spin_unlock(&conn->workq_lock);
 		return (session->wq_ret);
 	}
 

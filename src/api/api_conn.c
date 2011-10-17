@@ -445,10 +445,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val;
 
-	WT_ERR(__wt_config_gets(session, cfg, "multithread", &cval));
-	if (cval.val != 0)
-		F_SET(conn, WT_MULTITHREAD);
-
 	/* Configure verbose flags. */
 	conn->verbose = 0;
 #ifdef HAVE_VERBOSE

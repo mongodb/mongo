@@ -155,6 +155,7 @@ struct __wt_connection_impl {
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
+	WT_SPINLOCK workq_lock;		/* workQ spinlock */
 	pthread_t workq_tid;		/* workQ thread ID */
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
@@ -185,7 +186,6 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
 	void		 *session_array;	/* Session array */
 	uint32_t	  session_cnt;		/* Session count */
-	uint32_t	  app_session_cnt;	/* Application session count */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
@@ -276,7 +276,6 @@ extern WT_PROCESS __wt_process;
  * API flags section: BEGIN
  */
 #define	WT_BUF_INUSE					0x00000001
-#define	WT_MULTITHREAD					0x00000004
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_EVICT					0x00000004
 #define	WT_REC_LOCKED					0x00000002

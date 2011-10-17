@@ -84,10 +84,6 @@ static CONFIG c[] = {
 	  "maximum size of Btree leaf nodes",
 	  0, 0, 9, 17, &g.c_leaf_node_max },
 
-	{ "multithread",
-	  "configured for multi-threading",		/* 50% */
-	  0, C_BOOL, 50, 0, &g.c_multithread },
-
 	{ "ops",
 	  "the number of modification operations done per run",
 	  0, 0, 0, M(2), &g.c_ops },

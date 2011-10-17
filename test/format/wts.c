@@ -76,9 +76,8 @@ wts_open(WT_CONNECTION **connp, WT_SESSION **sessionp)
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
-	    "extensions=[\"%s\",\"%s\"],%s,%s",
+	    "extensions=[\"%s\",\"%s\"],%s",
 	    g.progname, g.c_cache, ext1, ext2,
-	    g.c_multithread ? "multithread" : "",
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {

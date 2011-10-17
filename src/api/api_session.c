@@ -72,9 +72,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	*tp = conn->sessions[conn->session_cnt];
 	conn->sessions[conn->session_cnt] = NULL;
 
-	if (!F_ISSET(session, WT_SESSION_INTERNAL))
-		--conn->app_session_cnt;
-
 	/*
 	 * Publish, making the session array entry available for re-use.  There
 	 * must be a barrier here to ensure the cleanup above completes before
@@ -436,20 +433,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		    conn->session_size);
 		ret = WT_ERROR;
 		goto err;
-	}
-
-	/* Check for multiple sessions without multithread support. */
-	if (!internal) {
-		if (!F_ISSET(conn, WT_MULTITHREAD) &&
-		    conn->app_session_cnt > 0) {
-			__wt_errx(session,
-			    "wiredtiger_open not configured with 'multithread':"
-			    " only a single session is permitted");
-			ret = WT_ERROR;
-			goto err;
-		}
-
-		++conn->app_session_cnt;
 	}
 
 	/*

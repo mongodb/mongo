@@ -314,11 +314,6 @@ methods = {
 		RPC server for primary processes and use RPC for secondary
 		processes)''',
 		type='boolean'),
-	Config('multithread', 'false', r'''
-		permit sharing between threads of control (will automatically
-		serialize as necessary to allow multiple threads of control
-		simultaneous access to the database)''',
-		type='boolean'),
 	Config('session_max', '50', r'''
 		maximum expected number of sessions (including server
 		threads)''',
@@ -359,7 +354,7 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'MULTITHREAD', 'SERVER_RUN', 'WORKQ_RUN' ],
+	'conn' : [ 'SERVER_RUN', 'WORKQ_RUN' ],
 	'buf' : [ 'BUF_INUSE' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }
