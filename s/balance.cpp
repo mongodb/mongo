@@ -300,6 +300,9 @@ namespace mongo {
 
                 // use fresh shard state
                 Shard::reloadShardInfo();
+                    
+                // refresh chunk size (even though another balancer might be active)
+                Chunk::refreshChunkSize();
 
                 {
                     dist_lock_try lk( &balanceLock , "doing balance round" );
@@ -312,7 +315,7 @@ namespace mongo {
                     }
                     
                     LOG(1) << "*** start balancing round" << endl;
-                    
+
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
