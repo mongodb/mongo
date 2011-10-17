@@ -1198,7 +1198,7 @@ const StringData _jscode_raw_utils =
 "try {\n" 
 "__autocomplete__ = worker(prefix).sort();\n" 
 "}catch (e){\n" 
-"print(\"exception durring autocomplete: \" + tojson(e.message));\n" 
+"print(\"exception during autocomplete: \" + tojson(e.message));\n" 
 "__autocomplete__ = [];\n" 
 "}\n" 
 "}\n" 
