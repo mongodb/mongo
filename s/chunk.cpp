@@ -520,7 +520,7 @@ namespace mongo {
             return;
         }
 
-        LOG(1) << "MaxChunkSize: " << csize << endl;
+        LOG(1) << "Refreshing MaxChunkSize: " << csize << endl;
         Chunk::MaxChunkSize = csize * 1024 * 1024;
     }
 
