@@ -22,16 +22,37 @@ _parsePort = function() {
 }
 
 connectionURLTheSame = function( a , b ){
+    
     if ( a == b )
         return true;
 
     if ( ! a || ! b )
         return false;
-
-    a = a.split( "/" )[0]
-    b = b.split( "/" )[0]
-
-    return a == b;
+    
+    if( a.host ) return connectionURLTheSame( a.host, b )
+    if( b.host ) return connectionURLTheSame( a, b.host )
+    
+    if( a.name ) return connectionURLTheSame( a.name, b )
+    if( b.name ) return connectionURLTheSame( a, b.name )
+    
+    if( a.indexOf( "/" ) < 0 && b.indexOf( "/" ) < 0 ){
+        a = a.split( ":" )
+        b = b.split( ":" )
+        
+        if( a.length != b.length ) return false
+        
+        if( a.length == 2 && a[1] != b[1] ) return false
+                
+        if( a[0] == "localhost" || a[0] == "127.0.0.1" ) a[0] = getHostName()
+        if( b[0] == "localhost" || b[0] == "127.0.0.1" ) b[0] = getHostName()
+        
+        return a[0] == b[0]
+    }
+    else {
+        a0 = a.split( "/" )[0]
+        b0 = b.split( "/" )[0]
+        return a0 == b0
+    }
 }
 
 assert( connectionURLTheSame( "foo" , "foo" ) )
@@ -1113,26 +1134,25 @@ ShardingTest.prototype.chunkDiff = function( collName , dbName ){
     return max - min;
 }
 
-ShardingTest.prototype.getShard = function( coll, query ){
-    var shards = this.getShards( coll, query )
+ShardingTest.prototype.getShard = function( coll, query, includeEmpty ){
+    var shards = this.getShards( coll, query, includeEmpty )
     assert.eq( shards.length, 1 )
     return shards[0]
 }
 
 // Returns the shards on which documents matching a particular query reside
-ShardingTest.prototype.getShards = function( coll, query ){
+ShardingTest.prototype.getShards = function( coll, query, includeEmpty ){
     if( ! coll.getDB )
         coll = this.s.getCollection( coll )
     
     var explain = coll.find( query ).explain()
-    
     var shards = []
         
     if( explain.shards ){
         
         for( var shardName in explain.shards ){           
             for( var i = 0; i < explain.shards[shardName].length; i++ ){
-                if( explain.shards[shardName][i].n && explain.shards[shardName][i].n > 0 )
+                if( includeEmpty || ( explain.shards[shardName][i].n && explain.shards[shardName][i].n > 0 ) )
                     shards.push( shardName )
             }
         }
@@ -1141,7 +1161,7 @@ ShardingTest.prototype.getShards = function( coll, query ){
     
     for( var i = 0; i < shards.length; i++ ){
         for( var j = 0; j < this._connections.length; j++ ){
-            if ( connectionURLTheSame(  this._connections[j].name , shards[i] ) ){
+            if ( connectionURLTheSame(  this._connections[j] , shards[i] ) ){
                 shards[i] = this._connections[j]
                 break;
             }
