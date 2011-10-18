@@ -970,6 +970,15 @@ namespace mongo {
                 return b.obj();
             }
 
+            ChunkPtr insertSharded( ChunkManagerPtr manager, const char* ns, BSONObj& o, int flags, bool safe ) {
+                // note here, the MR output process requires no splitting / migration during process, hence StaleConfigException should not happen
+                Strategy* s = SHARDED;
+                ChunkPtr c = manager->findChunk( o );
+                LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                s->insert( c->getShard() , ns , o , flags, safe);
+                return c;
+            }
+
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 Timer t;
 
@@ -1147,18 +1156,6 @@ namespace mongo {
                     finalCmd.append("postProcessCollection", postProcessCollection);
                     tempns = dbName + "." + postProcessCollection;
 
-//                    if (config.outType == mr_shard::Config::REPLACE) {
-//                        // drop previous collection
-//                        BSONObj dropColCmd = BSON("drop" << config.finalShort);
-//                        BSONObjBuilder dropColResult(32);
-//                        string outdbCmd = outdb + ".$cmd";
-//                        bool res = Command::runAgainstRegistered(outdbCmd.c_str(), dropColCmd, dropColResult);
-//                        if (!res) {
-//                            errmsg = str::stream() << "Could not drop sharded output collection " << outns << ": " << dropColResult.obj().toString();
-//                            return false;
-//                        }
-//                    }
-
                     BSONObj sortKey = BSON( "_id" << 1 );
                     if (!conf->isSharded(outns)) {
                         // create the sharded collection
@@ -1178,9 +1175,11 @@ namespace mongo {
                     state.init();
 
                     mr_shard::BSONList values;
-                    Strategy* s = SHARDED;
                     long long finalCount = 0;
                     int currentSize = 0;
+                    map<ChunkPtr, long int> sizePerChunk;
+                    ChunkManagerPtr manager = conf->getChunkManager(outns.c_str());
+
                     while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
                         if ( cursor.more() ) {
@@ -1202,12 +1201,17 @@ namespace mongo {
                         }
 
                         BSONObj final = config.reducer->finalReduce(values, config.finalizer.get());
-                        if (config.outType == mr_shard::Config::MERGE) {
-                            BSONObj id = final["_id"].wrap();
-                            s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
-                        } else {
-                            // insert into temp collection, but using final collection's shard chunks
-                            s->insertSharded(conf, tempns.c_str(), final, 0, true, outns.c_str());
+                        // as a future optimization we can have a mode where record goes right into the final collection
+                        // this would be for MERGE mode and could be much more efficient
+//                        if (config.outNonAtomic && config.outType == mr_shard::Config::MERGE) {
+//                                BSONObj id = final["_id"].wrap();
+//                                s->updateSharded(conf, outns.c_str(), id, final, UpdateOption_Upsert, true);
+//                        }
+
+                        // insert into temp collection, but using final collection's shard chunks
+                        ChunkPtr chunk = insertSharded(manager, tempns.c_str(), final, 0, true);
+                        if (chunk) {
+                            sizePerChunk[chunk] += final.objsize();
                         }
                         ++finalCount;
                         values.clear();
@@ -1217,7 +1221,7 @@ namespace mongo {
                         }
                     }
 
-                    if (config.outType == mr_shard::Config::REDUCE || config.outType == mr_shard::Config::REPLACE) {
+                    {
                         // results were written to temp collection, need post processing
                         vector< shared_ptr<ShardConnection> > shardConns;
                         list< shared_ptr<Future::CommandResult> > futures;
@@ -1250,6 +1254,15 @@ namespace mongo {
                             return 0;
                     }
 
+                    // check on splitting, now that results are in the final collection
+                    for ( map< ChunkPtr, long int >::iterator it = sizePerChunk.begin(); it != sizePerChunk.end(); ++it ) {
+                        ChunkPtr c = it->first;
+                        long int size = it->second;
+                        cout << "Splitting for chunk " << c << " with size " << size;
+                        c->splitIfShould(size);
+                    }
+
+                    // drop collections with tmp results on each shard
                     for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
                         ScopedDbConnection conn( i->_server );
                         conn->dropCollection( dbName + "." + shardedOutputCollection );

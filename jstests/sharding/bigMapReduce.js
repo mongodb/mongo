@@ -78,16 +78,11 @@ assert( gotAGoodOne , "no good for out db" )
 // sharded output
 
 function map2() { emit(this._id, 1); }
-
+gotAGoodOne = false;
 for ( iter=0; iter<5; iter++ ){
     try {
-        out = db.foo.mapReduce(map2, reduce, { out : { replace: "mrShardedOut", sharded: true }});
-        gotAGoodOne = true; 
-        assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
-
-        // make sure it's sharded and split
-        // disable test temporarily, it's not splitting reliably on every box
-        //assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
+        res = db.foo.mapReduce(map2, reduce, { out : { replace: "mrShardedOut", sharded: true }});
+        gotAGoodOne = true;
     }
     catch ( e ){
         if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
@@ -98,7 +93,15 @@ for ( iter=0; iter<5; iter++ ){
         printjson( __mrerror__ );
         throw e;
     }
-}
+
+    printjson(res);
+
+    outColl = db["mrShardedOut"];
+    assert.eq( 51200 , outColl.count() , "Received wrong result " );
+    // make sure it's sharded and split
+    print("Number of chunks: " + config.chunks.count({ns: db.mrShardedOut._fullName}));
+    assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
+ }
 assert( gotAGoodOne , "no good for sharded" )
 
 s.stop()
