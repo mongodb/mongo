@@ -4,9 +4,10 @@ t.drop()
 
 t.save( { _id : 1 , a : [] } )
 
-var s = "";
+var inc = "asdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdas";
+var s = inc;
 while ( s.length < 100000 )
-    s += "asdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdas";
+    s += inc;
 
 gotError = null;
 
