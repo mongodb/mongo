@@ -43,9 +43,11 @@ namespace mongo {
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         BSONObj L = extractKey(lObject);
-        uassert( 10198 , "left object doesn't have full shard key", L.nFields() == (int)patternfields.size());
+        uassert( 10198 , str::stream() << "left object ("  << lObject << ") doesn't have full shard key (" << pattern << ')',
+                L.nFields() == (int)patternfields.size());
         BSONObj R = extractKey(rObject);
-        uassert( 10199 , "right object doesn't have full shard key", R.nFields() == (int)patternfields.size());
+        uassert( 10199 , str::stream() << "right object (" << rObject << ") doesn't have full shard key (" << pattern << ')',
+                R.nFields() == (int)patternfields.size());
         return L.woCompare(R);
     }
 
