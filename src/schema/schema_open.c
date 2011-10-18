@@ -268,7 +268,7 @@ __wt_schema_open_index(
 {
 	WT_CURSOR *cursor;
 	int i, match, ret, skipped;
-	const char *idxconf, *uri;
+	const char *idxconf, *name, *uri;
 
 	cursor = NULL;
 	skipped = 0;
@@ -286,14 +286,15 @@ __wt_schema_open_index(
 	/* Open each index. */
 	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
 		WT_ERR(cursor->get_key(cursor, &uri));
-		if (!WT_PREFIX_SKIP(uri, "index:") ||
-		    !WT_PREFIX_SKIP(uri, table->name) ||
-		    !WT_PREFIX_SKIP(uri, ":"))
+		name = uri;
+		if (!WT_PREFIX_SKIP(name, "index:") ||
+		    !WT_PREFIX_SKIP(name, table->name) ||
+		    !WT_PREFIX_SKIP(name, ":"))
 			continue;
 
 		/* Is this the index we are looking for? */
 		match = (len > 0 &&
-		   strncmp(uri, idxname, len) == 0 && strlen(uri) == len);
+		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
 
 		if (i * sizeof(WT_BTREE *) >= table->index_alloc)
 			WT_ERR(__wt_realloc(session, &table->index_alloc,
