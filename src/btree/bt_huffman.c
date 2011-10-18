@@ -132,22 +132,19 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
  *	Configure Huffman encoding for the tree.
  */
 int
-__wt_btree_huffman_open(WT_SESSION_IMPL *session)
+__wt_btree_huffman_open(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_BTREE *btree;
 	u_int entries, numbytes;
 	struct __wt_huffman_table *table;
 	WT_CONFIG_ITEM key_conf, value_conf;
-	const char *config;
 	int ret;
 
 	btree = session->btree;
-	config = btree->config;
 
-	WT_RET(__wt_config_getones(session,
-	    config, "huffman_key", &key_conf));
-	WT_RET(__wt_config_getones(session,
-	    config, "huffman_value", &value_conf));
+	WT_RET(__wt_config_getones(session, config, "huffman_key", &key_conf));
+	WT_RET(__wt_config_getones(
+	    session, config, "huffman_value", &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
 

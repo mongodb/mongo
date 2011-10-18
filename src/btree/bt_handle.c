@@ -11,7 +11,7 @@ static int __btree_alloc(WT_SESSION_IMPL *, const char *, const char *);
 static int __btree_conf(WT_SESSION_IMPL *, const char *);
 static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
-static int __btree_page_sizes(WT_SESSION_IMPL *);
+static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -184,9 +184,6 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 	btree = session->btree;
 	conn = S2C(session);
 
-	/* Take the config string: it will be freed with the btree handle. */
-	btree->config = config;
-
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
 	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
@@ -202,7 +199,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
 		WT_RET(__wt_config_getones(
-		    session, btree->config, "collator", &cval));
+		    session, config, "collator", &cval));
 		if (cval.len > 0) {
 			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
 				if (strncmp(
@@ -218,7 +215,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 			}
 		}
 		WT_RET(__wt_config_getones(
-		    session, btree->config, "key_gap", &cval));
+		    session, config, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
 	}
 	/* Check for fixed-size data. */
@@ -238,12 +235,15 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 		}
 	}
 
-	WT_RET(__btree_page_sizes(session));		/* Page sizes */
+	/* Page sizes */
+	WT_RET(__btree_page_sizes(session, config));
 
-	WT_RET(__wt_btree_huffman_open(session));	/* Huffman encoding */
+	/* Huffman encoding */
+	WT_RET(__wt_btree_huffman_open(session, config));
 
-	WT_RET(__wt_config_getones(			/* Page compressor */
-	    session, btree->config, "block_compressor", &cval));
+	/* Page compressor */
+	WT_RET(__wt_config_getones(
+	    session, config, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
 			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
@@ -265,6 +265,9 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 	btree->free_addr = WT_ADDR_INVALID;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
+
+	/* Take the config string: it will be freed with the btree handle. */
+	btree->config = config;
 
 	return (0);
 }
@@ -509,15 +512,13 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
  *	Verify the page sizes.
  */
 static int
-__btree_page_sizes(WT_SESSION_IMPL *session)
+__btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	uint32_t split_pct, split_size;
-	const char *config;
 
 	btree = session->btree;
-	config = btree->config;
 
 	WT_RET(__wt_config_getones(session, config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
