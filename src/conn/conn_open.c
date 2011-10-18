@@ -74,11 +74,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	ret = 0;
 
 	/* Complain if WT_BTREE handles weren't closed. */
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		__wt_errx(session,
-		    "Connection has open btree handle: %s", btree->name);
-
+	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		WT_SET_BTREE_IN_SESSION(session, btree);
+
+		if (F_ISSET(btree, WT_BTREE_OPEN))
+			__wt_errx(session, "Connection has open btree handle");
+
 		WT_TRET(__wt_btree_close(session));
 	}
 
@@ -93,6 +94,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		__wt_errx(session,
 		    "Connection has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(session, fh));
+		fh = TAILQ_FIRST(&conn->fhqh);
 	}
 
 	/* Shut down the server threads. */
