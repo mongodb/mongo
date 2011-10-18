@@ -104,7 +104,7 @@ __col_insert_search(
 
 /*
  * __col_last_recno --
- *	Return the last record number for a variable-length column-store page.
+ *	Return the last record number for a column-store page.
  */
 static inline uint64_t
 __col_last_recno(WT_PAGE *page)
