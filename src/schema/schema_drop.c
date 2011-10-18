@@ -7,8 +7,12 @@
 
 #include "wt_internal.h"
 
-static int
-__drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
+/*
+ * __wt_drop_file --
+ *	Drop a file.
+ */
+int
+__wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 {
 	WT_BTREE_SESSION *btree_session;
 	const char *filename;
@@ -51,6 +55,10 @@ __drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 err:	return (ret);
 }
 
+/*
+ * __drop_tree --
+ *	Drop a btree handle (which may be an index or colgroup).
+ */
 static int
 __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *cfg[])
 {
@@ -67,7 +75,7 @@ __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *cfg[])
 	WT_TRET(__wt_schema_table_remove(session, btree->name));
 
 	/* Remove the file. */
-	WT_TRET(__drop_file(session, fileuri, cfg));
+	WT_TRET(__wt_drop_file(session, fileuri, cfg));
 
 	__wt_buf_free(session, &uribuf);
 
@@ -127,7 +135,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
-		return (__drop_file(session, uri, cfg));
+		return (__wt_drop_file(session, uri, cfg));
 	if (WT_PREFIX_MATCH(uri, "table:"))
 		return (__drop_table(session, uri, cfg));
 

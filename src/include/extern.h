@@ -417,6 +417,9 @@ extern void __wt_yield(void);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);
+extern int __wt_drop_file(WT_SESSION_IMPL *session,
+    const char *fileuri,
+    const char *cfg[]);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);

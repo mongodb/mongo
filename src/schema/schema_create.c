@@ -12,6 +12,7 @@ __create_file(WT_SESSION_IMPL *session,
     const char *name, const char *fileuri, const char *config)
 {
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+	const char *dropcfg[] = API_CONF_DEFAULTS(session, drop, "force");
 	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
 	int is_schema, ret;
@@ -36,7 +37,7 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_RET(__wt_btree_create(session, filename));
 
 	if (is_schema)
-		WT_RET(__wt_strdup(session, config, &treeconf));
+		WT_ERR(__wt_strdup(session, config, &treeconf));
 	else
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
 	WT_ERR(__wt_schema_table_insert(session, fileuri, treeconf));
@@ -46,7 +47,12 @@ __create_file(WT_SESSION_IMPL *session,
 	treeconf = NULL;
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
-err:    __wt_free(session, treeconf);
+	if (0) {
+		/* If something goes wrong, throw away anything we created. */
+err:		(void)__wt_drop_file(session, fileuri, dropcfg);
+	}
+
+	__wt_free(session, treeconf);
 	return (ret);
 }
 
