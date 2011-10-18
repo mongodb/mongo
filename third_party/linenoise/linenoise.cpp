@@ -410,6 +410,10 @@ static char linenoiseReadChar(int fd){
                 } else {
                     return -1;
                 }
+            } else if (seq[1] == 72) { /* home (konsole) */
+                return 1; /* ctrl-a */
+            } else if (seq[1] == 70) { /* end (konsole) */
+                return 5; /* ctrl-e */
             } else {
                 return -1;
             }
