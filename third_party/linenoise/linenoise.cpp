@@ -653,6 +653,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             break; /* should be handled by linenoiseReadChar */
         default:
             if (len < buflen) {
+                if ((unsigned char)c < 32) { /* Unhandled control character */
+                    beep();
+                    break;
+                }
                 if (len == pos) {
                     buf[pos] = c;
                     pos++;
