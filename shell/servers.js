@@ -744,6 +744,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                 x = admin.runCommand( { addshard : n } );
                 printjson( x )
                 shardNames.push( x.shardAdded )
+                z.shardName = x.shardAdded
             }
         );
     }
