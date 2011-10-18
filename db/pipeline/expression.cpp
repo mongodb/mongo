@@ -1141,7 +1141,7 @@ namespace mongo {
 			    intrusive_ptr<Document> pD(
 				pChild->evaluateDocument(
 				    field.second->getDocument()));
-			    pResult->addField(field.first,
+			    pResult->addField(vFieldName[i],
 					      Value::createDocument(pD));
 			}
 			else if (valueType == Array) {
@@ -1160,7 +1160,7 @@ namespace mongo {
 				result.push_back(Value::createDocument(pD));
 			    }
 
-			    pResult->addField(field.first,
+			    pResult->addField(vFieldName[i],
 					      Value::createArray(result));
 			}
 		    }
