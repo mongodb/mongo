@@ -38,12 +38,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	/*
 	 * Modify: allocate an update array as necessary, build a WT_UPDATE
-	 * structure in per-thread memory, and schedule the workQ to insert
-	 * the WT_UPDATE structure.
+	 * structure, and schedule the workQ to insert the WT_UPDATE structure.
 	 *
 	 * Insert: allocate an insert array as necessary, build a WT_INSERT
-	 * and WT_UPDATE structure pair in per-thread memory, and schedule
-	 * the workQ to insert the WT_INSERT structure.
+	 * and WT_UPDATE structure pair, and schedule the workQ to insert the
+	 * WT_INSERT structure.
 	 */
 	if (cbt->compare == 0) {
 		new_upd_size = 0;
