@@ -307,7 +307,7 @@ struct wt_cursor {
 	 *
 	 * @dontinclude ex_all.c
 	 * @skip cursor_search_near(WT_CURSOR *cursor)
-	 * @skipline Search for an exact or adjacent match 
+	 * @skipline Search for an exact or adjacent match
 	 * @until }
 	 *
 	 * @until the rest of the scan
