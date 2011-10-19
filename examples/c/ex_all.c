@@ -110,7 +110,7 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 
-			/* Insert a new record or overwrite an existing record */
+		/* Insert a new record or overwrite an existing record */
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, "overwrite", &cursor);
 	cursor->set_key(cursor, key);
