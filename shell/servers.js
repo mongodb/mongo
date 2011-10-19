@@ -364,6 +364,11 @@ MongoRunner.runMongos = function( opts ){
 
 MongoRunner.stopMongod = function( port, signal ){
     
+    if( ! port ) {
+        print( "Cannot stop mongo process " + port )
+        return
+    }
+    
     signal = signal || 15
     
     if( port.port )
@@ -563,6 +568,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
 
     this._testName = testName
+    this._otherParams = otherParams
     
     var pathOpts = this.pathOpts = { testName : testName }
 
@@ -863,6 +869,11 @@ ShardingTest.prototype.stop = function(){
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){
             if( this._rs[i] ) this._rs[i].test.stopSet( 15 );
+        }
+    }
+    if( this._otherParams.separateConfig ){
+        for ( var i=0; i<this._configServers.length; i++ ){
+            MongoRunner.stopMongod( this._configServers[i] )
         }
     }
     if ( this._alldbpaths ){
