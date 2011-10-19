@@ -30,14 +30,12 @@ function run( createInBackground ) {
     
     block();
     
-    as.runCommand( { "godinsert" : collName , obj : { _id : 101 , x : 20 } } );
-    as.runCommand( { "godinsert" : collName , obj : { _id : 100 , x : 20 } } );
-    as.getLastError();
-    
     am.runCommand( { "godinsert" : collName , obj : { _id : 100 , x : 20 } } );
     am.runCommand( { "godinsert" : collName , obj : { _id : 101 , x : 20 } } );
-    am.getLastError();
 
+    as.runCommand( { "godinsert" : collName , obj : { _id : 101 , x : 20 } } );
+    as.runCommand( { "godinsert" : collName , obj : { _id : 100 , x : 20 } } );
+    
     assert.eq( as[collName].count() , am[collName].count() );
     
     function mymap(z) {
