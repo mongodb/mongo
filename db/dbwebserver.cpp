@@ -79,11 +79,10 @@ namespace mongo {
         }
 
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
-            if ( from.isLocalHost() )
+            if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
+                cmdAuthenticate.authenticate( "admin", "RestUser", false );
                 return true;
-
-            if ( ! _webUsers->haveAdminUsers() )
-                return true;
+            }
 
             string auth = getHeader( rq , "Authorization" );
 
@@ -118,8 +117,10 @@ namespace mongo {
                     r << ha2;
                     string r1 = md5simpledigest( r.str() );
 
-                    if ( r1 == parms["response"] )
+                    if ( r1 == parms["response"] ) {
+                        cmdAuthenticate.authenticate( "admin", user["user"].str(), user[ "readOnly" ].isBoolean() && user[ "readOnly" ].boolean() );
                         return true;
+                    }
                 }
             }
 
