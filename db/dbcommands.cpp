@@ -1582,6 +1582,7 @@ namespace mongo {
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
+            log() << "test only command godinsert invoked coll:" << coll << endl;
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
