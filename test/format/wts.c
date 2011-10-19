@@ -524,7 +524,7 @@ wts_ops(void)
 	uint64_t cnt, keyno;
 	uint32_t op;
 	u_int np;
-	int insert, notfound;
+	int dir, insert, notfound;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		if (cnt % 10 == 0)
@@ -591,12 +591,13 @@ wts_ops(void)
 
 		/*
 		 * If we did any operation, we've set the cursor, do a small
-		 * number of next/prev cursor operations.
+		 * number of next/prev cursor operations in a random direction.
 		 */
-		for (np = 0; np < MMRAND(1, 4); ++np) {
+		dir = MMRAND(0, 1);
+		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
-			if (wts_np(MMRAND(0, 1), insert, &notfound))
+			if (wts_np(dir, insert, &notfound))
 				return (1);
 		}
 
