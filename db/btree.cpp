@@ -203,7 +203,7 @@ namespace mongo {
             wassert( foo >= 0 && this->n < Size() );
             foo = this->emptySize;
             wassert( foo >= 0 && this->emptySize < V::BucketSize );
-            wassert( this->topSize >= this->n && this->topSize <= V::BucketSize );
+            wassert( this->topSize <= V::BucketSize );
         }
 
         // this is very slow so don't do often
