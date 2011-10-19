@@ -173,6 +173,10 @@ methods = {
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
+	Config('append', 'false', r'''
+		only supported by cursors with record number keys: append the
+		value as a new record, creating a new record number key''',
+		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads''',
 		type='boolean'),

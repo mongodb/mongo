@@ -174,23 +174,32 @@ retry:	__cursor_func_init(cbt, 1);
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		/*
-		 * If WT_CURSTD_OVERWRITE not set, insert a new record (ignoring
-		 * the application's record number), return the record number.
-		 *
-		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair,
-		 * (where the key must be specified by the application).
+		 * If WT_CURSTD_APPEND set insert a new record (ignoring the
+		 * application's record number), return the record number.
 		 */
-		if (F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			WT_ERR(__wt_col_search(session, cbt, 1));
-			if ((ret = __wt_col_modify(session,
-			    cbt, cbt->compare == 0 ? 3 : 1)) == WT_RESTART)
-				goto retry;
-		} else {
+		if (F_ISSET(cursor, WT_CURSTD_APPEND)) {
 			if ((ret =
 			    __wt_col_modify(session, cbt, 1)) == WT_RESTART)
 				goto retry;
 			cbt->iface.recno = cbt->recno;
+			break;
 		}
+
+		/*
+		 * If WT_CURSTD_OVERWRITE not set, fail if the key exists, else
+		 * insert the key/value pair.
+		 *
+		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
+		 */
+		WT_ERR(__wt_col_search(session, cbt, 1));
+		if (cbt->compare == 0 &&
+		    !__cursor_invalid(cbt) &&
+		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+			ret = WT_DUPLICATE_KEY;
+			break;
+		}
+		if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
+			goto retry;
 		break;
 	case BTREE_ROW:
 		/*

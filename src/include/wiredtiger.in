@@ -388,14 +388,15 @@ struct wt_cursor {
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
-#define	WT_CURSTD_DUMP_HEX	0x001
-#define	WT_CURSTD_DUMP_PRINT	0x002
-#define	WT_CURSTD_KEY_SET	0x004
-#define	WT_CURSTD_OVERWRITE	0x008
-#define	WT_CURSTD_PUBLIC	0x010
-#define	WT_CURSTD_RAW		0x020
-#define	WT_CURSTD_TABLE		0x040
-#define	WT_CURSTD_VALUE_SET	0x080
+#define	WT_CURSTD_APPEND	0x0001
+#define	WT_CURSTD_DUMP_HEX	0x0002
+#define	WT_CURSTD_DUMP_PRINT	0x0004
+#define	WT_CURSTD_KEY_SET	0x0008
+#define	WT_CURSTD_OVERWRITE	0x0010
+#define	WT_CURSTD_PUBLIC	0x0020
+#define	WT_CURSTD_RAW		0x0040
+#define	WT_CURSTD_TABLE		0x0080
+#define	WT_CURSTD_VALUE_SET	0x0100
 	uint32_t flags;
 #endif
 };
@@ -475,6 +476,9 @@ struct wt_session {
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}
+	 * @config{append, only supported by cursors with record number keys:
+	 * append the value as a new record\, creating a new record number key.
+	 * The value must be a boolean flag.,\c false}
 	 * @config{bulk, configure the cursor for bulk loads. The value must be
 	 * a boolean flag.,\c false}
 	 * @config{dump, configure the cursor for dump format inputs and

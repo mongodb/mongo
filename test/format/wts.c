@@ -174,32 +174,33 @@ wts_startup(int open_cursors)
 		return (1);
 	}
 
+	cursor = cursor_insert = NULL;
 	if (open_cursors) {
 		/*
-		 * We open 2 cursors, one configured for overwriting, one not
-		 * configured for overwriting.  The reason is that for
-		 * row-store and column-store files where we're testing with
-		 * existing records, we don't track if a record was deleted or
-		 * not, which means we need to use cursor->insert with
-		 * overwriting configured.  But, in column-store files where
-		 * we're testing with new, appended records, we don't want to
-		 * have to specify the record number, which means we can't
-		 * configure with overwriting.
+		 * We open two cursors: one configured for overwriting and one
+		 * configured for append if we're dealing with a column-store.
+		 *
+		 * The reason is when testing with existing records, we don't
+		 * track if a record was deleted or not, which means we need to
+		 * use cursor->insert with overwriting configured.  But, in
+		 * column-store files where we're testing with new, appended
+		 * records, we don't want to have to specify the record number,
+		 * which requires an append configuration.
 		 */
-		if ((ret = session->open_cursor(
-		    session, WT_TABLENAME, NULL, NULL, &cursor_insert)) != 0) {
-			fprintf(stderr, "%s: open_cursor: %s\n",
-			    g.progname, wiredtiger_strerror(ret));
-			return (1);
-		}
 		if ((ret = session->open_cursor(
 		    session, WT_TABLENAME, NULL, "overwrite", &cursor)) != 0) {
 			fprintf(stderr, "%s: open_cursor: %s\n",
 			    g.progname, wiredtiger_strerror(ret));
 			return (1);
 		}
-	} else
-		cursor = cursor_insert = NULL;
+		if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
+		    (ret = session->open_cursor(session,
+		    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0) {
+			fprintf(stderr, "%s: open_cursor: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
+			return (1);
+		}
+	}
 
 	if (g.logging) {
 		(void)time(&now);

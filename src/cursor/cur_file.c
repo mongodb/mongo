@@ -136,8 +136,7 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
-	if (cbt->btree->type == BTREE_ROW ||
-	    F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
@@ -271,6 +270,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cbt->btree = session->btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
+
+	/* The append flag is ignored by row-store. */
+	if (btree->type != BTREE_ROW) {
+		WT_ERR(__wt_config_gets(session, cfg, "append", &cval));
+		if (cval.val != 0)
+			F_SET(cursor, WT_CURSTD_APPEND);
+	}
 
 	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {

@@ -49,6 +49,12 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
+	/* -a and -o are mutually exclusive. */
+	if (append == 1 && overwrite == 1)
+		return (util_err(EINVAL,
+		    "the -a (append) and -o (overwrite) flags are mutually "
+		    "exclusive"));
+
 	/* The remaining arguments are configuration uri/string pairs. */
 	if (argc != 0) {
 		if (argc % 2 != 0)
@@ -114,7 +120,9 @@ load_dump(WT_SESSION *session)
 
 	/* Open the insert cursor. */
 	(void)snprintf(config, sizeof(config),
-	    "dump=%s%s", hex ? "hex" : "print", overwrite ? ",overwrite" : "");
+	    "dump=%s%s%s",
+	    hex ? "hex" : "print",
+	    append ? ",append" : "", overwrite ? ",overwrite" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0)
 		return(util_err(ret, "%s: session.open", uri));

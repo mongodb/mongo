@@ -31,7 +31,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	page = cbt->page;
 
 	switch (op) {
-	case 1:						/* Insert */
+	case 1:						/* Append */
 		page = btree->last_page;
 		__cursor_search_clear(cbt);
 
@@ -47,10 +47,19 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			value = NULL;
 		recno = cbt->iface.recno;		/* App specified */
 		break;
-	case 3:						/* Update */
+	case 3:						/* Insert/Update */
 	default:
 		value = (WT_ITEM *)&cbt->iface.value;
 		recno = cbt->iface.recno;		/* App specified */
+
+		/*
+		 * There's some chance the application specified a record past
+		 * the last record on the page.  If that's the case, and we're
+		 * inserting a new WT_INSERT/WT_UPDATE pair, it goes on the
+		 * append list, not the update list.
+		 */
+		if (recno > __col_last_recno(page))
+			op = 1;
 		break;
 	}
 
@@ -62,14 +71,27 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 	/*
 	 * Delete, insert or update a column-store entry.
+	 *
+	 * If modifying a previously modified record, create a new WT_UPDATE
+	 * entry and have the workQ link it into an existing WT_INSERT entry's
+	 * WT_UPDATE list.
+	 *
+	 * Else, allocate an insert array as necessary, build a WT_INSERT and
+	 * WT_UPDATE structure pair, and schedule the workQ to insert the
+	 * WT_INSERT structure.
 	 */
-	if (cbt->ins == NULL) {
+	if (cbt->compare == 0 && cbt->ins != NULL) {
+		WT_ERR(__wt_update_alloc(session, value, &upd));
+
+		/* workQ: insert the WT_UPDATE structure. */
+		ret = __wt_update_serial(session, page,
+		    cbt->write_gen, &cbt->ins->upd, NULL, 0, upd);
+	} else {
 		/* There may be no WT_INSERT_HEAD, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
 			if (page == NULL || page->u.col_leaf.append == NULL) {
-				new_inslist_size = 1 *
-				    sizeof(WT_INSERT_HEAD *);
+				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
@@ -78,8 +100,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			cbt->ins_head = *inshead;
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (page->u.col_leaf.update == NULL) {
-				new_inslist_size = 1 *
-				    sizeof(WT_INSERT_HEAD *);
+				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
@@ -87,8 +108,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 				inshead = &page->u.col_leaf.update[0];
 		} else {
 			if (page->u.col_leaf.update == NULL) {
-				new_inslist_size = page->entries *
-				    sizeof(WT_INSERT_HEAD *);
+				new_inslist_size =
+				    page->entries * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_inslist));
 				inshead = &new_inslist[cbt->slot];
@@ -135,17 +156,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			    inshead, cbt->ins_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size, ins, skipdepth));
-	} else {
-		/*
-		 * If changing an already changed record, create a new WT_UPDATE
-		 * entry and have the workQ link it into an existing WT_INSERT
-		 * entry's WT_UPDATE list.
-		 */
-		WT_ERR(__wt_update_alloc(session, value, &upd));
-
-		/* workQ: insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, upd);
 	}
 
 	if (ret != 0) {

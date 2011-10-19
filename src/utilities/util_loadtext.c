@@ -52,14 +52,19 @@ text(WT_SESSION *session, const char *uri)
 	WT_CURSOR *cursor;
 	int readkey, ret, tret;
 
-	/* Open the insert cursor. */
+	/*
+	 * Open the cursor, configured to append new records (in the case of
+	 * column-store objects), or to overwrite existing strings (in the
+	 * case of row-store objects).  The two flags are mutually exclusive,
+	 * but the library doesn't currently care that we set both of them.
+	 */
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, "overwrite", &cursor)) != 0)
+	    session, uri, NULL, "append,overwrite", &cursor)) != 0)
 		return (util_err(ret, "%s: session.open", uri));
 
 	/*
 	 * We're about to load strings, make sure the formats match.
-	*
+	 *
 	 * Row-store tables have key/value pairs, column-store tables only have
 	 * values.
 	 */

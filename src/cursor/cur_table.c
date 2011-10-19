@@ -649,6 +649,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
 
+	/* The append flag is ignored by row-store. */
+	if (session->btree->type != BTREE_ROW) {
+		WT_ERR(__wt_config_gets(session, cfg, "append", &cval));
+		if (cval.val != 0)
+			F_SET(cursor, WT_CURSTD_APPEND);
+	}
+
 	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
 		__wt_curdump_init(cursor);

@@ -186,13 +186,13 @@ __wt_confchk_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "bulk=false,dump=,isolation=read-committed,overwrite=false,raw=false,"
-    "statistics=false";
+    "append=false,bulk=false,dump=,isolation=read-committed,overwrite=false,"
+    "raw=false,statistics=false";
 
 const char *
 __wt_confchk_session_open_cursor =
-    "bulk=(type=boolean),dump=(choices=[\"hex\",\"print\"]),"
-    "isolation=(choices=[\"snapshot\",\"read-committed\","
+    "append=(type=boolean),bulk=(type=boolean),dump=(choices=[\"hex\","
+    "\"print\"]),isolation=(choices=[\"snapshot\",\"read-committed\","
     "\"read-uncommitted\"]),overwrite=(type=boolean),raw=(type=boolean),"
     "statistics=(type=boolean)";
 
