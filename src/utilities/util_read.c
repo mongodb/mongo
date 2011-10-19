@@ -5,7 +5,6 @@
  *	All rights reserved.
  */
 
-#include "wiredtiger.h"
 #include "util.h"
 
 static int str2recno(const char *, uint64_t *);

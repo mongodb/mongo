@@ -5,7 +5,6 @@
  *	All rights reserved.
  */
 
-#include "wiredtiger.h"
 #include "util.h"
 
 const char *progname;				/* Program name */

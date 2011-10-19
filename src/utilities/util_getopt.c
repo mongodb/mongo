@@ -56,7 +56,6 @@
  * SUCH DAMAGE.
  */
 
-#include <wiredtiger.h>
 #include "util.h"
 
 int	util_opterr = 1,	/* if error message should be printed */

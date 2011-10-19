@@ -5,7 +5,6 @@
  *	All rights reserved.
  */
 
-#include "wiredtiger.h"
 #include "util.h"
 
 void

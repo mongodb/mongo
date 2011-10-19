@@ -5,7 +5,6 @@
  *	All rights reserved.
  */
 
-#include "wiredtiger.h"
 #include "util.h"
 
 static int insert(WT_CURSOR *, const char *, int);

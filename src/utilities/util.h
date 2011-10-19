@@ -13,6 +13,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <wiredtiger.h>
+
 /*
  * Quiet compiler warnings about unused parameters.
  */
