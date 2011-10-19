@@ -65,7 +65,7 @@ if __name__ == '__main__':
 		tests.addTests(generate_scenarios(loader.discover(suitedir)))
 
 	# Otherwise, turn numbers and ranges into test module names
-	preserve = timestamp = False
+	preserve = timestamp = debug = False
 	for arg in sys.argv[1:]:
 		from unittest import defaultTestLoader as loader
 
@@ -78,9 +78,15 @@ if __name__ == '__main__':
 			if option == 'timestamp' or option == 't':
 				timestamp = True
 				continue
+                        if option == 'debug' or option == 'd':
+                                import pdb
+                                debug = True
+                                continue
 
 		testsFromArg(tests, loader, arg)
 
+        if debug:
+                pdb.set_trace()
 	wttest.WiredTigerTestCase.globalSetup(preserve, timestamp)
 	result = wttest.runsuite(tests)
 	sys.exit(not result.wasSuccessful())
