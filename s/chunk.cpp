@@ -649,44 +649,65 @@ namespace mongo {
         return _key.hasShardKey( obj );
     }
 
-    void ChunkManager::createFirstChunk( const Shard& shard ) const {
+    void ChunkManager::createFirstChunks( const Shard& shard ) const {
         // TODO distlock?
         assert( _chunkMap.size() == 0 );
 
-        Chunk c (this, _key.globalMin(), _key.globalMax(), shard);
+        unsigned long long numObjects = 0;
+        {
+            // get stats to see if there is any data
+            ScopedDbConnection shardConn( shard.getConnString() );
+            numObjects = shardConn->count( getns() );
+            shardConn.done();
+        }
 
         // this is the first chunk; start the versioning from scratch
         ShardChunkVersion version;
         version.incMajor();
 
-        // build update for the chunk collection
-        BSONObjBuilder chunkBuilder;
-        c.serialize( chunkBuilder , version );
-        BSONObj chunkCmd = chunkBuilder.obj();
+        Chunk c(this, _key.globalMin(), _key.globalMax(), shard);
 
-        log() << "about to create first chunk for: " << _ns << endl;
+        vector<BSONObj> splitPoints;
+        if ( numObjects > 0 )
+            c.pickSplitVector( splitPoints , Chunk::MaxChunkSize );
+        
+        log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns << endl;
+        
 
-        ScopedDbConnection conn( configServer.modelServer() );
-        BSONObj res;
-        conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << c.genID() ), chunkCmd,  true, false );
+        ScopedDbConnection conn( configServer.modelServer() );        
+
+        for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
+            BSONObj min = i == 0 ? _key.globalMin() : splitPoints[i-1];
+            BSONObj max = i < splitPoints.size() ? splitPoints[i] : _key.globalMax();
+            
+            Chunk temp( this , min , max , shard );
+        
+            BSONObjBuilder chunkBuilder;
+            temp.serialize( chunkBuilder , version );
+            BSONObj chunkObj = chunkBuilder.obj();
+        
+            conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << temp.genID() ), chunkObj,  true, false );
+
+            version.incMinor();
+        }
 
         string errmsg = conn->getLastError();
         if ( errmsg.size() ) {
-            stringstream ss;
-            ss << "saving first chunk failed.  cmd: " << chunkCmd << " result: " << errmsg;
-            log( LL_ERROR ) << ss.str() << endl;
-            msgasserted( 13592 , ss.str() );
+            string ss = str::stream() << "creating first chunks failed. result: " << errmsg;
+            error() << ss << endl;
+            msgasserted( 15903 , ss );
         }
-
+        
         conn.done();
 
-        // the ensure index will have the (desired) indirect effect of creating the collection on the
-        // assigned shard, as it sets up the index over the sharding keys.
-        ScopedDbConnection shardConn( c.getShard().getConnString() );
-        shardConn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false /* do not cache ensureIndex SERVER-1691 */ );
-        shardConn.done();
+        if ( numObjects == 0 ) {
+            // the ensure index will have the (desired) indirect effect of creating the collection on the
+            // assigned shard, as it sets up the index over the sharding keys.
+            ScopedDbConnection shardConn( c.getShard().getConnString() );
+            shardConn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false ); // do not cache ensureIndex SERVER-1691 
+            shardConn.done();
+        }
 
-        log() << "successfully created first chunk for " << c.toString() << endl;
     }
 
     ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) const {
@@ -866,26 +887,6 @@ namespace mongo {
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
-    }
-
-    void ChunkManager::maybeChunkCollection() const {
-        uassert( 13346 , "can't pre-split already splitted collection" , (_chunkMap.size() == 1) );
-
-        ChunkPtr soleChunk = _chunkMap.begin()->second;
-        vector<BSONObj> splitPoints;
-        soleChunk->pickSplitVector( splitPoints , Chunk::MaxChunkSize );
-        if ( splitPoints.empty() ) {
-            LOG(1) << "not enough data to warrant chunking " << getns() << endl;
-            return;
-        }
-
-        BSONObj res;
-        ChunkPtr p;
-        bool worked = soleChunk->multiSplit( splitPoints , res );
-        if (!worked) {
-            log( LL_WARNING ) << "could not split '" << getns() << "': " << res << endl;
-            return;
-        }
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {

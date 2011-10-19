@@ -306,14 +306,12 @@ namespace mongo {
         int numChunks() const { return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunk( const Shard& shard ) const; // only call from DBConfig::shardCollection
+        void createFirstChunks( const Shard& shard ) const; // only call from DBConfig::shardCollection
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique() const { return _unique; }
-
-        void maybeChunkCollection() const;
 
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( set<Shard>& all ) const;
