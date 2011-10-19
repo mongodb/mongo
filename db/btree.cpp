@@ -338,34 +338,45 @@ namespace mongo {
         // and we are assuming that the last key points to the last allocated
         // bson region.
         this->emptySize += sizeof(_KeyNode);
-        _unalloc(keysize);
+        if (this->n <= 0 || k(this->n-1).keyDataOfs() != k(this->n).keyDataOfs())
+            _unalloc(keysize);
     }
 
     /** add a key.  must be > all existing.  be careful to set next ptr right. */
     template< class V >
     bool BucketBasics<V>::_pushBack(const DiskLoc recordLoc, const Key& key, const Ordering &order, const DiskLoc prevChild) {
-        int bytesNeeded = key.dataSize() + sizeof(_KeyNode);
+        int cmpResult = -1;
+        if ( this->n ) {
+            cmpResult = keyNode(this->n-1).key.woCompare(key, order);
+        }
+
+        int bytesNeeded = sizeof(_KeyNode);
+        if ( cmpResult != 0 )
+            bytesNeeded += key.dataSize();
         if ( bytesNeeded > this->emptySize )
             return false;
         assert( bytesNeeded <= this->emptySize );
-        if( this->n ) {
-            const KeyNode klast = keyNode(this->n-1);
-            if(  klast.key.woCompare(key, order) > 0 ) { 
-                log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
-                log() << "  klast: " << keyNode(this->n-1).key.toString() << endl;
-                log() << "  key:   " << key.toString() << endl;
-                DEV klast.key.woCompare(key, order);
-                assert(false);
-            }
+        if( cmpResult > 0 ) {
+            log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
+            log() << "  klast: " << keyNode(this->n-1).key.toString() << endl;
+            log() << "  key:   " << key.toString() << endl;
+            DEV keyNode(this->n-1).key.woCompare(key, order);
+            assert(false);
         }
         this->emptySize -= sizeof(_KeyNode);
-        _KeyNode& kn = k(this->n++);
+        _KeyNode& kn = k(this->n);
         kn.prevChildBucket = prevChild;
         kn.recordLoc = recordLoc;
-        kn.setKeyDataOfs( (short) _alloc(key.dataSize()) );
-        short ofs = kn.keyDataOfs();
-        char *p = dataAt(ofs);
-        memcpy(p, key.data(), key.dataSize());
+        if ( cmpResult == 0 ) {
+            kn.setKeyDataOfs( k(this->n-1).keyDataOfs() );
+        }
+        else {
+            kn.setKeyDataOfs( (short) _alloc(key.dataSize()) );
+            short ofs = kn.keyDataOfs();
+            char *p = dataAt(ofs);
+            memcpy(p, key.data(), key.dataSize());
+        }
+        this->n++;
 
         return true;
     }
@@ -382,9 +393,21 @@ namespace mongo {
     bool BucketBasics<V>::basicInsert(const DiskLoc thisLoc, int &keypos, const DiskLoc recordLoc, const Key& key, const Ordering &order) const {
         check( this->n < 1024 );
         check( keypos >= 0 && keypos <= this->n );
-        int bytesNeeded = key.dataSize() + sizeof(_KeyNode);
+
+        bool equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
+        int bytesNeeded = sizeof(_KeyNode);
+        if ( !equalWithLastKey )
+            bytesNeeded += key.dataSize();
+
         if ( bytesNeeded > this->emptySize ) {
             _pack(thisLoc, order, keypos);
+            // we have to re-check, because:
+            // 1. 'keypos' could be changed.
+            // 2. the equality might not hold anymore when previous one is marked as unused before _pack().
+            equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
+            bytesNeeded = sizeof(_KeyNode);
+            if ( !equalWithLastKey )
+                bytesNeeded += key.dataSize();
             if ( bytesNeeded > this->emptySize )
                 return false;
         }
@@ -414,10 +437,15 @@ namespace mongo {
         _KeyNode& kn = b->k(keypos);
         kn.prevChildBucket.Null();
         kn.recordLoc = recordLoc;
-        kn.setKeyDataOfs((short) b->_alloc(key.dataSize()) );
-        char *p = b->dataAt(kn.keyDataOfs());
-        getDur().declareWriteIntent(p, key.dataSize());
-        memcpy(p, key.data(), key.dataSize());
+        if ( equalWithLastKey ) {
+            kn.setKeyDataOfs( b->k(keypos-1).keyDataOfs() );
+        }
+        else {
+            kn.setKeyDataOfs((short) b->_alloc(key.dataSize()) );
+            char *p = b->dataAt(kn.keyDataOfs());
+            getDur().declareWriteIntent(p, key.dataSize());
+            memcpy(p, key.data(), key.dataSize());
+        }
         return true;
     }
 
@@ -435,12 +463,18 @@ namespace mongo {
         if ( this->flags & Packed ) {
 	  return V::BucketSize - this->emptySize - headerSize();
         }
+        short lastOfs = -1;
         int size = 0;
         for( int j = 0; j < this->n; ++j ) {
             if ( mayDropKey( j, refPos ) ) {
                 continue;
             }
-            size += keyNode( j ).key.dataSize() + sizeof( _KeyNode );
+            size += sizeof( _KeyNode );
+            short curOfs = k( j ).keyDataOfs();
+            if( curOfs != lastOfs ) {
+                lastOfs = curOfs;
+                size += keyNode( j ).key.dataSize();
+            }
         }
         return size;
     }
@@ -477,6 +511,7 @@ namespace mongo {
         int ofs = tdz;
         this->topSize = 0;
         int i = 0;
+        short lastOldOfs = -1;
         for ( int j = 0; j < this->n; j++ ) {
             if( mayDropKey( j, refPos ) ) {
                 continue; // key is unused and has no children - drop it
@@ -488,10 +523,14 @@ namespace mongo {
                 k( i ) = k( j );
             }
             short ofsold = k(i).keyDataOfs();
-            int sz = keyNode(i).key.dataSize();
-            ofs -= sz;
-            this->topSize += sz;
-            memcpy(temp+ofs, dataAt(ofsold), sz);
+            if ( ofsold != lastOldOfs ) {
+                lastOldOfs = ofsold;
+
+                int sz = keyNode(i).key.dataSize();
+                ofs -= sz;
+                this->topSize += sz;
+                memcpy(temp+ofs, dataAt(ofsold), sz);
+            }
             k(i).setKeyDataOfsSavingUse( ofs );
             ++i;
         }
@@ -551,9 +590,15 @@ namespace mongo {
         // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split.
         // see SERVER-983
         // TODO I think we only want to do the 90% split on the rhs node of the tree.
+        short lastOfs = -1;
         int rightSizeLimit = ( this->topSize + sizeof( _KeyNode ) * this->n ) / ( keypos == this->n ? 10 : 2 );
         for( int i = this->n - 1; i > -1; --i ) {
-            rightSize += keyNode( i ).key.dataSize() + sizeof( _KeyNode );
+            short currOfs = k( i ).keyDataOfs();
+            rightSize += sizeof( _KeyNode );
+            if ( currOfs != lastOfs ) {
+                lastOfs = currOfs;
+                rightSize += keyNode( i ).key.dataSize();
+            }
             if ( rightSize > rightSizeLimit ) {
                 split = i;
                 break;
@@ -585,10 +630,15 @@ namespace mongo {
         _KeyNode &kn = k( i );
         kn.recordLoc = recordLoc;
         kn.prevChildBucket = prevChildBucket;
-        short ofs = (short) _alloc( key.dataSize() );
-        kn.setKeyDataOfs( ofs );
-        char *p = dataAt( ofs );
-        memcpy( p, key.data(), key.dataSize() );
+        if ( i && key.woEqual( keyNode(i-1).key ) ) {
+            kn.setKeyDataOfs( k(i-1).keyDataOfs() );
+        }
+        else {
+            short ofs = (short) _alloc( key.dataSize() );
+            kn.setKeyDataOfs( ofs );
+            char *p = dataAt( ofs );
+            memcpy( p, key.data(), key.dataSize() );
+        }
     }
 
     template< class V >
