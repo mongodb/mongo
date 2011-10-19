@@ -59,7 +59,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_check_here(cursor)
         self.cur_check_forward(cursor, 2)
 
-        self.cur_dump_here(cursor, 'after second next: ')
+        #self.cur_dump_here(cursor, 'after second next: ')
         cursor.close(None)
 
     def test_insert_and_remove(self):
@@ -95,10 +95,10 @@ class test_cursor02(TestCursorTracker):
         Test iterating an empty table
         """
         cursor = self.create_session_and_cursor(0)
-        self.cur_first(cursor)
+        self.cur_first(cursor, wiredtiger.WT_NOTFOUND)
         self.cur_check_forward(cursor, -1)
         self.cur_check_backward(cursor, -1)
-        self.cur_last(cursor)
+        self.cur_last(cursor, wiredtiger.WT_NOTFOUND)
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
         cursor.close(None)

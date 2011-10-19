@@ -72,6 +72,11 @@ class test_cursor01(wttest.WiredTigerTestCase):
         else:
             return 'value' + str(i)
 
+    def assertCursorHasNoKeyValue(self, cursor):
+        print('Expect to see messages: \'requires key/value to be set\'')
+        self.assertRaises(WiredTigerError, cursor.get_key)
+        self.assertRaises(WiredTigerError, cursor.get_value)
+        
     def test_forward_iter(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
@@ -80,8 +85,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
 
         # TODO: these should fail regardless of table type
         if self.tablekind == 'row':
-            self.assertRaises(WiredTigerError, cursor.get_key)
-            self.assertRaises(WiredTigerError, cursor.get_value)
+            self.assertCursorHasNoKeyValue(cursor)
 
         for i in range(0, self.nentries):
             cursor.set_key(self.genkey(i))
@@ -92,8 +96,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         # iterate using the basic API.
 
         # 1. Calling first() should place us on the first k/v pair.
-        cursor.first()
-        nextret = 0
+        nextret = cursor.first()
         i = 0
         while nextret == 0:
             key = cursor.get_key()
@@ -108,14 +111,11 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertEqual(i, self.nentries)
 
         # After an error, we can no longer access the key or value
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertCursorHasNoKeyValue(cursor)
 
         # 2. Setting reset() should place us just before first pair.
         cursor.reset()
-
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertCursorHasNoKeyValue(cursor)
             
         nextret = cursor.next()
         i = 0
@@ -136,8 +136,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         Create entries, and read back in a cursor: key=string, value=string
         """
         cursor = self.create_session_and_cursor()
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertCursorHasNoKeyValue(cursor)
 
         for i in range(0, self.nentries):
             cursor.set_key(self.genkey(i))
@@ -147,9 +146,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         # Don't use the builtin 'for ... in cursor',
         # iterate using the basic API.
 
-        # 1. Calling first() should place us on the first k/v pair.
-        cursor.last()
-        prevret = 0
+        # 1. Calling last() should place us on the last k/v pair.
+        prevret = cursor.last()
         i = self.nentries - 1
         while prevret == 0:
             key = cursor.get_key()
@@ -163,14 +161,11 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertEqual(i, -1)
 
         # After an error, we can no longer access the key or value
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertCursorHasNoKeyValue(cursor)
 
-        # 2. Setting reset() should place us just before first pair.
+        # 2. Setting reset() should place us just after last pair.
         cursor.reset()
-
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertCursorHasNoKeyValue(cursor)
             
         prevret = cursor.prev()
         i = self.nentries - 1
