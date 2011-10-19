@@ -157,14 +157,16 @@ struct wt_cursor {
 	/*!
 	 * The format of the data packed into key items.  See @ref packing for
 	 * details.  If not set, a default value of "u" is assumed, and
-	 * applications use WT_ITEM to manipulate raw byte arrays.
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
 	 */
 	const char *key_format;
 
 	/*!
 	 * The format of the data packed into value items.  See @ref packing
 	 * for details.  If not set, a default value of "u" is assumed, and
-	 * applications use WT_ITEM to manipulate raw byte arrays.
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
 	 */
 	const char *value_format;
 
@@ -174,7 +176,12 @@ struct wt_cursor {
 	/*! Get the key for the current record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline get_key
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Get the cursor's string format key
+	 * @until get_key
+	 *
+	 * @skipline Get the cursor's record number format key
+	 * @until get_key
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -184,7 +191,12 @@ struct wt_cursor {
 	/*! Get the value for the current record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline get_value
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Get the cursor's string format value
+	 * @until get_value
+	 *
+	 * @skipline Get the cursor's record number format value
+	 * @until get_value
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -194,7 +206,11 @@ struct wt_cursor {
 	/*! Set the key for the next operation.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip key =
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Set the cursor's string format key
+	 * @until set_key
+	 *
+	 * @skipline Set the cursor's record number format key
 	 * @until set_key
 	 *
 	 * @param cursor the cursor handle
@@ -205,10 +221,14 @@ struct wt_cursor {
 	 */
 	void __F(set_key)(WT_CURSOR *cursor, ...);
 
-	/*! Set the data for the next operation.
+	/*! Set the value for the next operation.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip value =
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Set the cursor's string format value
+	 * @until set_value
+	 *
+	 * @skipline Set the cursor's record number format value
 	 * @until set_value
 	 *
 	 * @param cursor the cursor handle
@@ -226,7 +246,8 @@ struct wt_cursor {
 	/*! Return the first record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->first
+	 * @skipline Return the first key/value pair
+	 * @until ->first
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -236,7 +257,8 @@ struct wt_cursor {
 	/*! Return the last record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->last
+	 * @skipline Return the last key/value pair
+	 * @until ->last
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -246,7 +268,8 @@ struct wt_cursor {
 	/*! Return the next record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->next
+	 * @skipline Return the next key/value pair
+	 * @until ->next
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -256,7 +279,8 @@ struct wt_cursor {
 	/*! Return the previous record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->prev
+	 * @skipline Return the previous key/value pair
+	 * @until ->prev
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -266,8 +290,8 @@ struct wt_cursor {
 	/*! Return the record matching the key; the key must first be set.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip ->prev
-	 * @skip ->set_key
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Search for an exact match
 	 * @until ->search
 	 *
 	 * @param cursor the cursor handle
@@ -276,18 +300,24 @@ struct wt_cursor {
 	int __F(search)(WT_CURSOR *cursor);
 
 	/*!
-	 * Return the record matching the key if it exists, else the smallest
-	 * record larger than the key if it exists, else the largest record
-	 * smaller than the key if it exists; the key must first be set.
+	 * Return the record matching the key if it exists, otherwise the
+	 * smallest record larger than the key or the largest record smaller
+	 * than the key (in other words, a logically adjacent key); the key
+	 * must first be set.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip ->search
-	 * @skip ->set_key
+	 * @skip cursor_search_near(WT_CURSOR *cursor)
+	 * @skipline Search for an exact or adjacent match 
 	 * @until }
+	 *
+	 * @until the rest of the scan
+	 *
+	 * @until the rest of the scan
 	 *
 	 * @param cursor the cursor handle
 	 * @param exactp the status of the search: 0 if an exact match is
-	 * found, < 1 if a smaller key is found, > 1 if a larger key is found
+	 * found, < 0 if a smaller key is returned, > 0 if a larger key is
+	 * returned
 	 * @errors
 	 */
 	int __F(search_near)(WT_CURSOR *cursor, int *exactp);
@@ -296,29 +326,29 @@ struct wt_cursor {
 	/*! @name Data modification
 	 * @{
 	 */
-	/*! Insert a record.
-	 * In a row-store, if the cursor was not configured with "overwrite",
-	 * both the key and value must be set, the record must not already
-	 * exist, and the key/value pair will be inserted.
+	/*! Insert a record, and optionally overwrite an existing record.
+	 * If the cursor was not configured with "overwrite", both the key and
+	 * value must be set and the record must not already exist; the
+	 * key/value pair will be inserted.
 	 *
-	 * In a row-store, if the cursor was configured with "overwrite",
-	 * both the key and value must be set; if the record already exists, the
-	 * key's value will be updated, otherwise, the key/value pair will be
-	 * inserted.
+	 * If the cursor was configured with "overwrite", both the key and value
+	 * must be set; if the record already exists, the key's value will be
+	 * updated, otherwise, the key/value pair will be inserted.
 	 *
-	 * In a column-store, if the cursor was not configured with "overwrite",
-	 * the value must be set; a new record will be appended to the table
-	 * and the new record's number returned as the key value.
-	 *
-	 * In a column-store, if the cursor was configured with "overwrite",
-	 * both the key and value must be set; if the record already exists, the
-	 * key's value will be updated, otherwise, the key/value pair will be
-	 * inserted.
+	 * In table or file with a record number key, if the cursor was
+	 * configured with "append", the value must be set; a new record will
+	 * be appended and its number returned as the key value.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip ->search_near
-	 * @skip ->set_key
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Insert a new record
 	 * @until ->insert
+	 *
+	 * @skipline Insert a new record or overwrite an existing record
+	 * @until ->insert
+	 *
+	 * @skipline Create a new record and return the record number
+	 * @until ->get_key
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -329,8 +359,7 @@ struct wt_cursor {
 	 * exist, and the value of the key's record will be updated.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skip ->insert
-	 * @skip ->set_value
+	 * @skipline Update an existing record
 	 * @until ->update
 	 *
 	 * @param cursor the cursor handle
@@ -342,7 +371,9 @@ struct wt_cursor {
 	 * record will be removed.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->remove
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Remove a record
+	 * @until ->remove
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -357,7 +388,9 @@ struct wt_cursor {
 	 * closing the session in which they were opened.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline cursor->close
+	 * @skip cursor_ops(WT_SESSION *session)
+	 * @skipline Close the cursor
+	 * @until ->close
 	 *
 	 * @param cursor the cursor handle
 	 * @configstart{cursor.close, see dist/api_data.py}

@@ -19,38 +19,133 @@
 
 #include <wiredtiger.h>
 
-void cursor_ops(WT_CURSOR *cursor);
-void session_ops(WT_SESSION *session);
-void add_cursor_type(WT_CONNECTION *conn);
 void add_collator(WT_CONNECTION *conn);
 void add_compressor(WT_CONNECTION *conn);
+void add_cursor_type(WT_CONNECTION *conn);
 void add_extractor(WT_CONNECTION *conn);
 void connection_ops(WT_CONNECTION *conn);
+void cursor_ops(WT_SESSION *session);
+void cursor_search_near(WT_CURSOR *cursor);
+void session_ops(WT_SESSION *session);
 
 void
-cursor_ops(WT_CURSOR *cursor)
+cursor_ops(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	uint64_t recno;
+	int ret;
+	const char *key, *value;
+
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+
+	{
+			/* Get the cursor's string format key */
+	const char *key;
+	ret = cursor->get_key(cursor, &key);
+	}
+	{
+			/* Get the cursor's record number format key */
+	uint64_t recno;
+	ret = cursor->get_key(cursor, &recno);
+	}
+
+	{
+			/* Get the cursor's string format value */
+	const char *value;
+	ret = cursor->get_value(cursor, &value);
+	}
+
+	{
+			/* Get the cursor's record number format value */
+	uint64_t recno;
+	ret = cursor->get_value(cursor, &recno);
+	}
+
+	{
+			/* Set the cursor's string format key */
+	const char *key;
+	key = "another key";
+	cursor->set_key(cursor, key);
+	}
+
+	{
+			/* Set the cursor's record number format key */
+	uint64_t recno;
+	recno = 37;
+	cursor->set_key(cursor, recno);
+	}
+
+	{
+			/* Set the cursor's string format value */
+	const char *value;
+	value = "another value";
+	cursor->set_value(cursor, value);
+	}
+
+	{
+			/* Set the cursor's record number format value */
+	uint64_t recno;
+	recno = 37;
+	cursor->set_value(cursor, recno);
+	}
+
+			/* Return the first key/value pair */
+	ret = cursor->first(cursor);
+			/* Return the last key/value pair */
+	ret = cursor->last(cursor);
+			/* Return the next key/value pair */
+	ret = cursor->next(cursor);
+			/* Return the previous key/value pair */
+	ret = cursor->prev(cursor);
+
+			/* Search for an exact match */
+	cursor->set_key(cursor, key);
+	ret = cursor->search(cursor);
+
+	cursor_search_near(cursor);
+
+			/* Insert a new record */
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->insert(cursor);
+
+			/* Insert a new record or overwrite an existing record */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "overwrite", &cursor);
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->insert(cursor);
+
+			/* Create a new record and return the record number */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "append", &cursor);
+	cursor->set_value(cursor, value);
+	ret = cursor->insert(cursor);
+	if (ret == 0)
+		recno = cursor->get_key(cursor, &recno);
+
+			/* Update an existing record */
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->update(cursor);
+
+			/* Remove a record */
+	cursor->set_key(cursor, key);
+	ret = cursor->remove(cursor);
+
+			/* Close the cursor */
+	ret = cursor->close(cursor, NULL);
+}
+
+void
+cursor_search_near(WT_CURSOR *cursor)
 {
 	int exact, ret;
 	const char *key;
 	const char *value;
 
-	ret = cursor->get_key(cursor, &key);
-	ret = cursor->get_value(cursor, &value);
-	printf("Got key %s, value %s\n", key, value);
-
-	key = "another key";
-	cursor->set_key(cursor, key);
-	value = "another value";
-	cursor->set_value(cursor, value);
-
-	ret = cursor->first(cursor);
-	ret = cursor->last(cursor);
-	ret = cursor->next(cursor);
-	ret = cursor->prev(cursor);
-
-	cursor->set_key(cursor, key);
-	ret = cursor->search(cursor);
-
+				/* Search for an exact or adjacent match */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0) {
@@ -62,16 +157,28 @@ cursor_ops(WT_CURSOR *cursor)
 			;
 	}
 
+	/*
+	 * An example of a forward scan through the table, where all keys
+	 * greater than or equal to a specified prefix are included in the
+	 * scan.
+	 */
 	cursor->set_key(cursor, key);
-	cursor->set_value(cursor, value);
-	ret = cursor->insert(cursor);
+	ret = cursor->search_near(cursor, &exact);
+	if (ret == 0 && exact >= 0)
+		;		/* include first key returned in the scan */
+	while ((ret = cursor->next(cursor)) == 0)
+		;		/* the rest of the scan */
 
-	cursor->set_value(cursor, value);
-	ret = cursor->update(cursor);
-
-	ret = cursor->remove(cursor);
-
-	ret = cursor->close(cursor, NULL);
+	/*
+	 * An example of a backward scan through the table, where all keys
+	 * less than a specified prefix are included in the scan.
+	 */
+	cursor->set_key(cursor, key);
+	ret = cursor->search_near(cursor, &exact);
+	if (ret == 0 && exact < 0)
+		;		/* include first key returned in the scan */
+	while ((ret = cursor->prev(cursor)) == 0)
+		;		/* the rest of the scan */
 }
 
 void
@@ -79,11 +186,7 @@ session_ops(WT_SESSION *session)
 {
 	int ret;
 
-	WT_CURSOR *cursor;
-	ret = session->open_cursor(session, "table:mytable",
-	    NULL, NULL, &cursor);
-
-	cursor_ops(cursor);
+	cursor_ops(session);
 
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S");
