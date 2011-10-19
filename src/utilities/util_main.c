@@ -26,6 +26,7 @@ main(int argc, char *argv[])
 	const char *config;
 
 	conn = NULL;
+	ret = 0;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -82,6 +83,16 @@ main(int argc, char *argv[])
 	/* Reset getopt. */
 	util_optreset = 1;
 	util_optind = 1;
+
+	/* The copyright option doesn't require a database. */
+	switch (command[0]) {
+	case 'c':
+		if (strcmp(command, "copyright") == 0) {
+			util_copyright();
+			return (EXIT_SUCCESS);
+		}
+		break;
+	}
 
 	/* The "create" and "load" commands can create the database. */
 	if (config == NULL &&
@@ -170,6 +181,7 @@ usage(void)
 	    "\t-v\tverbose\n");
 	fprintf(stderr,
 	    "commands:\n"
+	    "\tcopyright copyright information\n"
 	    "\tcreate\t  create an object\n"
 	    "\tdrop\t  drop a table\n"
 	    "\tdump\t  dump a table\n"
