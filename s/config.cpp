@@ -143,25 +143,14 @@ namespace mongo {
 
             log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
-            // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first
-            // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
-            // chunks will be created as a by-product of splitting.
             ci.shard( ns , fieldsAndOrder , unique );
             ChunkManagerPtr cm = ci.getCM();
             uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
-            cm->createFirstChunk( getPrimary() );
+            cm->createFirstChunks( getPrimary() );
             _save();
         }
 
-        try {
-            getChunkManager(ns, true)->maybeChunkCollection();
-        }
-        catch ( UserException& e ) {
-            // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
-            log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
-        }
-
-        return getChunkManager(ns);
+        return getChunkManager(ns,true,true);
     }
 
     bool DBConfig::removeSharding( const string& ns ) {
