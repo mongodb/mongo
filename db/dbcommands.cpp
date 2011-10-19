@@ -1573,16 +1573,10 @@ namespace mongo {
     class GodInsert : public Command {
     public:
         GodInsert() : Command( "godinsert" ) { }
-        virtual bool logTheOp() {
-            return true;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool requiresAuth() {
-            return true;
-        }
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return true; }
         virtual void help( stringstream &help ) const {
             help << "internal. for testing only.";
         }
@@ -1591,11 +1585,15 @@ namespace mongo {
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            {
+                dblock lk;
+                Client::Context ctx( ns );
+                theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            }
             return true;
         }
     } cmdGodInsert;
-
+    
     class DBHashCmd : public Command {
     public:
         DBHashCmd() : Command( "dbHash", false, "dbhash" ) {}
@@ -1824,6 +1822,7 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "errmsg" , "not master" );
+            result.append( "note" , "from execCommand" );
             return false;
         }
 
