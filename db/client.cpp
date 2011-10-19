@@ -485,27 +485,26 @@ namespace mongo {
 
     class ClientListPlugin : public WebStatusPlugin {
     public:
-        ClientListPlugin() : WebStatusPlugin( "clients" , 20 ) {}
+        ClientListPlugin() : WebStatusPlugin( "clients" , 20, "Connections to the database, both internal and external" ) {}
         virtual void init() {}
 
         virtual void run( stringstream& ss ) {
             using namespace mongoutils::html;
 
-            ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
-            ss << "<tr align='left'>"
-               << th( a("", "Connections to the database, both internal and external.", "Client") )
-               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
-               << "<th>Active</th>"
-               << "<th>LockType</th>"
-               << "<th>Waiting</th>"
-               << "<th>SecsRunning</th>"
-               << "<th>Op</th>"
-               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "Namespace") )
-               << "<th>Query</th>"
+            ss << "\n<table>";
+            ss << "<tr>"
+               << "<th>client</th>"
+               << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "opid") )
+               << "<th class=c>active</th>"
+               << "<th class=c>lock</th>"
+               << "<th class=c>waiting</th>"
+               << "<th class=c>time(s)</th>"
+               << "<th>op</th>"
+               << th( a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "", "ns") )
+               << "<th>query</th>"
                << "<th>client</th>"
                << "<th>msg</th>"
                << "<th>progress</th>"
-
                << "</tr>\n";
             {
                 scoped_lock bl(Client::clientsMutex);
@@ -515,17 +514,17 @@ namespace mongo {
                     ss << "<tr><td>" << c->desc() << "</td>";
 
                     tablecell( ss , co.opNum() );
-                    tablecell( ss , co.active() );
+                    tablecell( ss , co.active(), true );
                     {
                         int lt = co.getLockType();
-                        if( lt == -1 ) tablecell(ss, "R");
-                        else if( lt == 1 ) tablecell(ss, "W");
+                        if( lt == -1 ) tablecell(ss, "R", true );
+                        else if( lt == 1 ) tablecell(ss, "W", true) ;
                         else
-                            tablecell( ss ,  lt);
+                            tablecell( ss ,  lt, true);
                     }
-                    tablecell( ss , co.isWaitingForLock() );
+                    tablecell( ss , co.isWaitingForLock(), true  );
                     if ( co.active() )
-                        tablecell( ss , co.elapsedSeconds() );
+                        tablecell( ss , co.elapsedSeconds(), true );
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getOp() );

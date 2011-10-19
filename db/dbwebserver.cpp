@@ -70,12 +70,11 @@ namespace mongo {
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
-            ss << "<pre>";
-            ss << mongodVersion() << '\n';
-            ss << "git hash: " << gitVersion() << '\n';
-            ss << "sys info: " << sysInfo() << '\n';
-            ss << "uptime: " << time(0)-started << " seconds\n";
-            ss << "</pre>";
+            ss << h2("information");
+            ss << labelValue("db version", mongodVersion());
+            ss << labelValue("git hash", gitVersion());
+            ss << labelValue("uptime", boost::lexical_cast<std::string>(time(0)-started) + " seconds");
+            ss << labelValue("sys info", sysInfo());
         }
 
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
@@ -206,24 +205,19 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << cmdLine.binaryName << ' ' << prettyHostName();
+                z << prettyHostName();
                 dbname = z.str();
             }
-            ss << start(dbname) << h2(dbname);
-            ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
-            ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
+            ss << start(dbname) << h1(dbname);
+            ss << "<div id=\"menu\"><a href=\"/_commands\">list all commands</a> | \n";
+            ss << "<a href=\"/_replSet\">replica set status</a></div>\n";
 
             //ss << "<a href=\"/_status\">_status</a>";
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
-                    ss <<
-                       a("",
-                         "These read-only context-less commands can be executed from the web interface. "
-                         "Results are json format, unless ?text=1 is appended in which case the result is output as text "
-                         "for easier human viewing",
-                         "Commands")
-                       << ": ";
+                    ss << "<h2>readonly commands</h2>";
+                    ss << "<div id=\"commandList\">";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) {
                         stringstream h;
                         i->second->help(h);
@@ -233,7 +227,7 @@ namespace mongo {
                             ss << " title=\"" << help << '"';
                         ss << ">" << i->first << "</a> ";
                     }
-                    ss << '\n';
+                    ss << "</div>\n";
                 }
             }
             ss << '\n';
@@ -292,13 +286,9 @@ namespace mongo {
 
         for ( unsigned i=0; i<_plugins->size(); i++ ) {
             WebStatusPlugin * p = (*_plugins)[i];
-            ss << "<hr>\n"
-               << "<b>" << p->_name << "</b>";
-
-            ss << " " << p->_subHeading;
-
-            ss << "<br>\n";
-
+            ss << "<h2>" << p->_name;
+            ss << "<div class=\"note\">" << p->_subHeading << "</div>";
+            ss << "</h2>";
             p->run(ss);
         }
 
@@ -310,7 +300,7 @@ namespace mongo {
 
     class LogPlugin : public WebStatusPlugin {
     public:
-        LogPlugin() : WebStatusPlugin( "Log" , 100 ), _log(0) {
+        LogPlugin() : WebStatusPlugin( "log" , 100 ), _log(0) {
         }
 
         virtual void init() {
@@ -448,12 +438,16 @@ namespace mongo {
 
             stringstream ss;
             ss << start("Commands List");
-            ss << p( a("/", "back", "Home") );
-            ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
+            ss << h1("command list");
+            ss << "<div id=\"menu\">";
+            ss << a("/", "back", "home");
+            ss << " | ";
+            ss << "<a href=\"http://www.mongodb.org/display/DOCS/Commands\">online docs</a>";
+            ss << "</div>";
             const map<string, Command*> *m = Command::commandsByBestName();
-            ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
+            ss << "<div id=\"legend\"><span>S:slave-ok</span><span>R:read-lock</span><span>W:write-lock</span><span>A:admin-only</span></div>\n";
             ss << table();
-            ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
+            ss << "<tr><th>command</th><th>attr</th><th>help</th></tr>\n";
             for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ )
                 i->second->htmlHelp(ss);
             ss << _table() << _end();

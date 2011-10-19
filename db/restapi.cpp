@@ -163,7 +163,8 @@ namespace mongo {
             if( html )  {
                 string title = string("query ") + ns;
                 out << start(title)
-                    << p(title)
+                    << h1(title)
+                    << h2("results")
                     << "<pre>";
             }
             else {
@@ -253,31 +254,25 @@ namespace mongo {
 
     class LowLevelMongodStatus : public WebStatusPlugin {
     public:
-        LowLevelMongodStatus() : WebStatusPlugin( "overview" , 5 , "(only reported if can acquire read lock quickly)" ) {}
+        LowLevelMongodStatus() : WebStatusPlugin( "overview" , 5 , "only reported if can acquire read lock quickly" ) {}
 
         virtual void init() {}
 
         void _gotLock( int millis , stringstream& ss ) {
-            ss << "<pre>\n";
-            ss << "time to get readlock: " << millis << "ms\n";
-            ss << "# databases: " << dbHolder.size() << '\n';
-            ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
-            ss << "replication: ";
-            if( *replInfo )
-                ss << "\nreplInfo:  " << replInfo << "\n\n";
-            if( replSet ) {
-                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine._replSet;
+            ss << labelValue("time to get readlock", boost::lexical_cast<std::string>(millis) + "ms");
+            ss << labelValue("databases", boost::lexical_cast<std::string>(dbHolder.size()));
+            ss << labelValue("cursors", boost::lexical_cast<std::string>(ClientCursor::numCursors()));
+            if( *replInfo ) {
+              ss << labelValue("replInfo", replInfo);
             }
             if ( replAllDead )
-                ss << "\n<b>replication replAllDead=" << replAllDead << "</b>\n";
+              ss << labelValue("replication", replAllDead);
             else {
-                ss << "\nmaster: " << replSettings.master << '\n';
-                ss << "slave:  " << replSettings.slave << '\n';
-                ss << '\n';
+               ss << labelValue("master", replSettings.master ? "yes" : "no");
+               ss << labelValue("slave", replSettings.slave == 0 ? "no" : "yes");
             }
 
             BackgroundOperation::dump(ss);
-            ss << "</pre>\n";
         }
 
         virtual void run( stringstream& ss ) {

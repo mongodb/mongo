@@ -334,9 +334,14 @@ namespace mongo {
             int _id = (int) str::toUnsigned( parms["_id"].String() );
 
             stringstream s;
-            string t = "Replication oplog";
+            string t = "replication oplog";
             s << start(t);
-            s << p(t);
+            s << h1(t);
+            
+            s << "<div id=\"menu\">";
+            s << a("/", "back", "home") + " | ";
+            s << a("/_replSet", "", "replica set");
+            s << "</div>";
 
             if( theReplSet == 0 ) {
                 if( cmdLine._replSet.empty() )
@@ -363,11 +368,13 @@ namespace mongo {
         string _replSet() {
             stringstream s;
             s << start("Replica Set Status " + prettyHostName());
-            s << p( a("/", "back", "Home") + " | " +
-                    a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
-                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
-                  );
+            s << h1("replica set status");
+            s << "<div id=\"menu\">";
+            s << a("/", "back", "home") + " | " +
+                    a("/local/system.replset?text=1", "", "config") + " | " +
+                    a("/replSetGetStatus?text=1", "", "status") + " | " +
+                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "online docs");
+            s << "</div>";
 
             if( theReplSet == 0 ) {
                 if( cmdLine._replSet.empty() )
@@ -383,7 +390,7 @@ namespace mongo {
                 }
                 catch(...) { s << "error summarizing replset status\n"; }
             }
-            s << p("Recent replset log activity:");
+            s << h2("recent replset log activity");
             fillRsLog(s);
             s << _end();
             return s.str();
