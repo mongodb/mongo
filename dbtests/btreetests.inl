@@ -5,8 +5,8 @@
     }
 
     // dummy, valid record loc
-    const DiskLoc recordLoc() {
-        return DiskLoc( 0, 2 );
+    const DiskLoc recordLoc( int i = 2 ) {
+        return DiskLoc( 0, i );
     }
 
     class Ensure {
@@ -65,25 +65,25 @@
         void dump() {
             bt()->dumpTree( dl(), order() );
         }
-        void insert( BSONObj &key ) {
+        void insert( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
             const BtreeBucket *b = bt();
 
 #if defined(TESTTWOSTEP)
             {
-                Continuation c(dl(), recordLoc(), key, Ordering::make(order()), id());
+                Continuation c(dl(), recLoc, key, Ordering::make(order()), id());
                 b->twoStepInsert(dl(), c, true);
                 c.stepTwo();
             }
 #else
             {
-                b->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
+                b->bt_insert( dl(), recLoc, key, Ordering::make(order()), true, id(), true );
             }
 #endif
             getDur().commitIfNeeded();
         }
-        bool unindex( BSONObj &key ) {
+        bool unindex( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
             getDur().commitIfNeeded();
-            return bt()->unindex( dl(), id(), key, recordLoc() );
+            return bt()->unindex( dl(), id(), key, recLoc );
         }
         static BSONObj simpleKey( char c, int n = 1 ) {
             BSONObjBuilder builder;
