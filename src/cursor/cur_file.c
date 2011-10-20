@@ -271,8 +271,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
 
-	/* The append flag is ignored by row-store. */
-	if (btree->type != BTREE_ROW) {
+	/* The append flag is only relevant to column stores. */
+	if (WT_CURSOR_RECNO(cursor)) {
 		WT_ERR(__wt_config_gets(session, cfg, "append", &cval));
 		if (cval.val != 0)
 			F_SET(cursor, WT_CURSTD_APPEND);
