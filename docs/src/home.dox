@@ -30,7 +30,7 @@ cause failures.
 
 The WiredTiger home directory optionally includes a file named \c
 WiredTiger.config.  If this file exists when ::wiredtiger_open is
-called, it is read for configuration strings.  See @ref config_file
+called, it is read for configuration strings.  See @subpage config_file
 for details.
 
 */
