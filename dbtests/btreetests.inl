@@ -162,6 +162,31 @@
         }
     };
 
+    class SimpleInsertDeleteDupKey : public Base {
+    public:
+        void run() {
+            for (int i = 1; i <= 20; ++i ) {
+                BSONObj key = simpleKey( simpleToken( i ), 1 );
+
+                insert( key, recordLoc( 4 * i ) );
+                insert( key, recordLoc( 4 * i + 2 ) );
+            }
+            checkValid( 40 );
+
+            BSONObj key = simpleKey( simpleToken( 20 ), 1 );
+            unindex( key, recordLoc( 4 * 20 + 2 ) );
+
+            BSONObj newKey = simpleKey( simpleToken( 10 ), 1 );
+            insert( newKey );
+
+            checkValid( 40 );
+        }
+    private:
+        static char simpleToken( int i ) {
+            return 'a' + i;
+        }
+    };
+
     class SplitUnevenBucketBase : public Base {
     public:
         virtual ~SplitUnevenBucketBase() {}
@@ -1632,6 +1657,7 @@
         void setupTests() {
             add< Create >();
             add< SimpleInsertDelete >();
+            add< SimpleInsertDeleteDupKey >();
             add< SplitRightHeavyBucket >();
             add< SplitLeftHeavyBucket >();
             add< MissingLocate >();
