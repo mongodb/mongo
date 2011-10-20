@@ -169,7 +169,7 @@ void
 cursor_search_near(WT_CURSOR *cursor)
 {
 	int exact, ret;
-	const char *key;
+	const char *key = "some key";
 
 	/*! [Search for an exact or adjacent match] */
 	cursor->set_key(cursor, key);
