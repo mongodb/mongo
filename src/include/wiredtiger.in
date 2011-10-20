@@ -659,7 +659,7 @@ struct wt_session {
 	int __F(sync)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a table. @notyet{session->rename}
+	/*! Truncate a table. @notyet{session->truncate}
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->truncate
