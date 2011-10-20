@@ -39,13 +39,18 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		__wt_writelock(session, btree->rwlock);
 		/*
-		 * Check if the handle needs to be reopened.  If the handle
-		 * was just opened, cfg is NULL, so there is no need to reopen
-		 * in that case.
+		 * Check if the handle needs to be reopened.  If the handle was
+		 * just opened, cfg is NULL, so there is no need to reopen in
+		 * that case.
+		 *
+		 * We do need to pick up the flags anyway, for example to set
+		 * WT_BTREE_BULK so the handle is closed correctly.
 		 */
 		if (cfg != NULL && LF_ISSET(
 		    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
 			return (__wt_btree_reopen(session, cfg, flags));
+		else
+			btree->flags = flags;
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
