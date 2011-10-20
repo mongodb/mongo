@@ -134,7 +134,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.keysizes = keysizes
         self.valuesizes = valuesizes
         if tablekind != None:
-            cursor = self.session.open_cursor('table:' + tablename, None, None)
+            cursor = self.session.open_cursor('table:' + tablename, None, 'append')
             for i in range(npairs):
                 wtkey = self.encode_key(i << 32)
                 wtval = self.encode_value(i << 32)

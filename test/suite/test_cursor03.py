@@ -48,7 +48,7 @@ class test_cursor03(TestCursorTracker):
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
         self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind, self.keysize, self.valsize)
-        return self.session.open_cursor(tablearg, None, None)
+        return self.session.open_cursor(tablearg, None, 'append')
 
     def setUpConnectionOpen(self, dir):
         wtopen_args = 'create,cache_size=' + str(self.cache_size);
