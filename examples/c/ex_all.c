@@ -32,9 +32,7 @@ void
 cursor_ops(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	uint64_t recno;
 	int ret;
-	const char *key, *value;
 
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, NULL, &cursor);
@@ -64,22 +62,19 @@ cursor_ops(WT_SESSION *session)
 
 	{
 			/* Set the cursor's string format key */
-	const char *key;
-	key = "another key";
+	const char *key = "another key";
 	cursor->set_key(cursor, key);
 	}
 
 	{
 			/* Set the cursor's record number format key */
-	uint64_t recno;
-	recno = 37;
+	uint64_t recno = 37;
 	cursor->set_key(cursor, recno);
 	}
 
 	{
 			/* Set the cursor's string format value */
-	const char *value;
-	value = "another value";
+	const char *value = "another value";
 	cursor->set_value(cursor, value);
 	}
 
@@ -99,40 +94,62 @@ cursor_ops(WT_SESSION *session)
 			/* Return the previous key/value pair */
 	ret = cursor->prev(cursor);
 
+	{
 			/* Search for an exact match */
+	const char *key = "some key";
 	cursor->set_key(cursor, key);
 	ret = cursor->search(cursor);
+	}
 
 	cursor_search_near(cursor);
 
+	{
 			/* Insert a new record */
+	const char *key = "some key";
+	const char *value = "some value";
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	}
 
+	{
 		/* Insert a new record or overwrite an existing record */
+	const char *key = "some key";
+	const char *value = "some value";
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, "overwrite", &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	}
 
+	{
 			/* Create a new record and return the record number */
+	uint64_t recno;
+	const char *value = "some value";
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, "append", &cursor);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret == 0)
 		recno = cursor->get_key(cursor, &recno);
+	}
 
+	{
 			/* Update an existing record */
+	const char *key = "some key";
+	const char *value = "some value";
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
+	}
 
+	{
 			/* Remove a record */
+	const char *key = "some key";
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
+	}
 
 			/* Close the cursor */
 	ret = cursor->close(cursor, NULL);
@@ -143,18 +160,18 @@ cursor_search_near(WT_CURSOR *cursor)
 {
 	int exact, ret;
 	const char *key;
-	const char *value;
 
 				/* Search for an exact or adjacent match */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0) {
-		if (exact == 0)		/* an exact match */
-			;
-		else if (exact < 0)	/* returned smaller key */
-			;
-		else if (exact > 0)	/* returned larger key */
-			;
+		if (exact == 0) {
+			/* an exact match */
+		} else if (exact < 0) {
+			/* returned smaller key */
+		} else if (exact > 0) {
+			/* returned larger key */
+		}
 	}
 
 	/*
@@ -164,10 +181,13 @@ cursor_search_near(WT_CURSOR *cursor)
 	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
-	if (ret == 0 && exact >= 0)
-		;		/* include first key returned in the scan */
-	while ((ret = cursor->next(cursor)) == 0)
-		;		/* the rest of the scan */
+	if (ret == 0 && exact >= 0) {
+		/* include first key returned in the scan */
+	}
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		/* the rest of the scan */
+	}
 
 	/*
 	 * An example of a backward scan through the table, where all keys
@@ -175,10 +195,13 @@ cursor_search_near(WT_CURSOR *cursor)
 	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
-	if (ret == 0 && exact < 0)
-		;		/* include first key returned in the scan */
-	while ((ret = cursor->prev(cursor)) == 0)
-		;		/* the rest of the scan */
+	if (ret == 0 && exact < 0) {
+		/* include first key returned in the scan */
+	}
+
+	while ((ret = cursor->prev(cursor)) == 0) {
+		/* the rest of the scan */
+	}
 }
 
 void
