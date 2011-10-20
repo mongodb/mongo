@@ -14,9 +14,9 @@
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
+	WT_BUF *key, *value;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
-	WT_ITEM *key, *value;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
@@ -24,8 +24,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	u_int skipdepth;
 	int i, ret;
 
-	key = (WT_ITEM *)&cbt->iface.key;
-	value = is_remove ? NULL : (WT_ITEM *)&cbt->iface.value;
+	key = &cbt->iface.key;
+	value = is_remove ? NULL : &cbt->iface.value;
 
 	page = cbt->page;
 
@@ -151,7 +151,7 @@ err:		if (ins != NULL)
  */
 int
 __wt_row_insert_alloc(
-    WT_SESSION_IMPL *session, WT_ITEM *key, u_int skipdepth, WT_INSERT **insp)
+    WT_SESSION_IMPL *session, WT_BUF *key, u_int skipdepth, WT_INSERT **insp)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -245,7 +245,7 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  *	buffer and fill it in.
  */
 int
-__wt_update_alloc(WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp)
+__wt_update_alloc(WT_SESSION_IMPL *session, WT_BUF *value, WT_UPDATE **updp)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;

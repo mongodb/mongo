@@ -17,9 +17,9 @@ int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
+	WT_BUF *value, _value;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
-	WT_ITEM *value, _value;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	size_t new_inshead_size, new_inslist_size;
@@ -35,7 +35,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		page = btree->last_page;
 		__cursor_search_clear(cbt);
 
-		value = (WT_ITEM *)&cbt->iface.value;
+		value = &cbt->iface.value;
 		recno = 0;				/* Engine allocates */
 		break;
 	case 2:						/* Remove */
@@ -49,7 +49,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		break;
 	case 3:						/* Insert/Update */
 	default:
-		value = (WT_ITEM *)&cbt->iface.value;
+		value = &cbt->iface.value;
 		recno = cbt->iface.recno;		/* App specified */
 
 		/*

@@ -160,7 +160,7 @@ __bulk_col_var(WT_CURSOR_BULK *cbulk)
 	 * Allocate an WT_UPDATE item and append the V object onto the page's
 	 * update list.
 	 */
-	WT_RET(__wt_update_alloc(session, (WT_ITEM *)&cursor->value, &upd));
+	WT_RET(__wt_update_alloc(session, &cursor->value, &upd));
 	(*cbulk->updp) = upd;
 	cbulk->updp = &upd->next;
 
@@ -197,10 +197,8 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
 	 * page's insert list.
 	 */
-	WT_RET(
-	    __wt_row_insert_alloc(session, (WT_ITEM *)&cursor->key, 1, &ins));
-	WT_ERR(
-	    __wt_update_alloc(session, (WT_ITEM *)&cursor->value, &ins->upd));
+	WT_RET(__wt_row_insert_alloc(session, &cursor->key, 1, &ins));
+	WT_ERR(__wt_update_alloc(session, &cursor->value, &ins->upd));
 	*cbulk->insp = ins;
 	cbulk->insp = &WT_SKIP_NEXT(ins);
 
