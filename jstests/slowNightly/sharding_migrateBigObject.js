@@ -51,7 +51,7 @@ assert.soon(
         return res.length > 1 && Math.abs( res[0].nChunks - res[1].nChunks ) <= 3;
 
     } , 
-    "never migrated" , 180000 , 1000 );
+    "never migrated" , 9 * 60 * 1000 , 1000 );
 
 stopMongod( 30000 );
 stopMongod( 29999 );
