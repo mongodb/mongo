@@ -756,33 +756,21 @@ namespace mongo {
                 FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
                 if ( !range.nontrivial() ) {
                     DEV PRINT(range.nontrivial());
-                    getAllShards(shards);
+                    getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
                     return;
                 }
             }
 
             BoundList ranges = frsp->singleKeyIndexBounds(_key.key(), 1);
             for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it) {
+
                 BSONObj minObj = it->first.replaceFieldNames(_key.key());
                 BSONObj maxObj = it->second.replaceFieldNames(_key.key());
 
-                ChunkRangeMap::const_iterator min, max;
-                min = _chunkRanges.upper_bound(minObj);
-                max = _chunkRanges.upper_bound(maxObj);
-
-                massert( 13507 , str::stream() << "invalid chunk config minObj: " << minObj , min != _chunkRanges.ranges().end());
-
-                // make max non-inclusive like end iterators
-                if(max != _chunkRanges.ranges().end())
-                    ++max;
-
-                for (ChunkRangeMap::const_iterator it=min; it != max; ++it) {
-                    shards.insert(it->second->getShard());
-                }
+                getShardsForRange( shards, minObj, maxObj, false );
 
                 // once we know we need to visit all shards no need to keep looping
-                //if (shards.size() == _shards.size())
-                //return;
+                if( shards.size() == _shards.size() ) return;
             }
 
             if (org.moreOrClauses())
@@ -792,19 +780,25 @@ namespace mongo {
         while (org.moreOrClauses());
     }
 
-    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) const {
-        uassert(13405, "min must have shard key", hasShardKey(min));
-        uassert(13406, "max must have shard key", hasShardKey(max));
+    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {
+
+        if( fullKeyReq ){
+            uassert(13405, str::stream() << "min value " << min << " does not have shard key", hasShardKey(min));
+            uassert(13406, str::stream() << "max value " << max << " does not have shard key", hasShardKey(max));
+        }
 
         ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
-        ChunkRangeMap::const_iterator end = _chunkRanges.lower_bound(max);
+        ChunkRangeMap::const_iterator end = _chunkRanges.upper_bound(max);
 
-        for (; it!=end; ++ it) {
+        massert( 13507 , str::stream() << "no chunks found between bounds " << min << " and " << max , it != _chunkRanges.ranges().end() );
+
+        if( end != _chunkRanges.ranges().end() ) ++end;
+
+        for( ; it != end; ++it ){
             shards.insert(it->second->getShard());
 
             // once we know we need to visit all shards no need to keep looping
-            if (shards.size() == _shards.size())
-                break;
+            if (shards.size() == _shards.size()) break;
         }
     }
 
