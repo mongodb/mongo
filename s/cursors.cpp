@@ -265,13 +265,16 @@ namespace mongo {
     void CursorCache::doTimeouts() {
         long long now = Listener::getElapsedTimeMillis();
         scoped_lock lk( _mutex );
-        for ( MapSharded::iterator i=_cursors.begin(); i!=_cursors.end(); ++i ) {
+        MapSharded::iterator i=_cursors.begin();
+        while ( i!=_cursors.end() ) {
+
             long long idleFor = i->second->idleTime( now );
             if ( idleFor < TIMEOUT ) {
+                ++i;
                 continue;
             }
             log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make log(1)
-            _cursors.erase( i );
+            _cursors.erase( i++ );
         }
     }
 
