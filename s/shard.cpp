@@ -370,7 +370,7 @@ namespace mongo {
         }
     }
 
-    void ShardingConnectionHook::onDestory( DBClientBase * conn ) {
+    void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {
         resetShardVersionCB( conn );
     }
 }
