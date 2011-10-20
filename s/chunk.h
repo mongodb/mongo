@@ -317,7 +317,7 @@ namespace mongo {
 
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( set<Shard>& all ) const;
-        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) const; // [min, max)
+        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq = true) const; // [min, max)
 
         string toString() const;
 
