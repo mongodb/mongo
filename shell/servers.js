@@ -861,7 +861,7 @@ ShardingTest.prototype.getFirstOther = function( one ){
 
 ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._mongos.length; i++ ){
-        stopMongoProgram( 31000 - i );
+        stopMongoProgram( 31000 - i - 1 );
     }
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
