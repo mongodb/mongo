@@ -41,27 +41,35 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Get the cursor's string key] */
-	const char *key;
+	const char *key;	/* Get the cursor's string key. */
 	ret = cursor->get_key(cursor, &key);
 	/*! [Get the cursor's string key] */
 	}
 
 	{
 	/*! [Get the cursor's record number key] */
-	uint64_t recno;
+	uint64_t recno;		/* Get the cursor's record number key. */
 	ret = cursor->get_key(cursor, &recno);
 	/*! [Get the cursor's record number key] */
 	}
 
 	{
 	/*! [Get the cursor's string value] */
-	const char *value;
+	const char *value;	/* Get the cursor's string value. */
 	ret = cursor->get_value(cursor, &value);
 	/*! [Get the cursor's string value] */
 	}
 
 	{
+	/*! [Get the cursor's raw value] */
+	WT_ITEM value;		/* Get the cursor's raw value. */
+	ret = cursor->get_value(cursor, &value);
+	/*! [Get the cursor's raw value] */
+	}
+
+	{
 	/*! [Set the cursor's string key] */
+				/* Set the cursor's string key. */
 	const char *key = "another key";
 	cursor->set_key(cursor, key);
 	/*! [Set the cursor's string key] */
@@ -69,16 +77,25 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Set the cursor's record number key] */
-	uint64_t recno = 37;
+	uint64_t recno = 37;	/* Set the cursor's record number key. */
 	cursor->set_key(cursor, recno);
 	/*! [Set the cursor's record number key] */
 	}
 
 	{
 	/*! [Set the cursor's string value] */
+				/* Set the cursor's string value. */
 	const char *value = "another value";
 	cursor->set_value(cursor, value);
 	/*! [Set the cursor's string value] */
+	}
+	{
+	/*! [Set the cursor's raw value] */
+	WT_ITEM value;		/* Set the cursor's raw value. */
+	value.data = "another value";
+	value.size = strlen("another value");
+	cursor->set_value(cursor, &value);
+	/*! [Set the cursor's raw value] */
 	}
 
 	/*! [Return the first key/value pair] */
@@ -109,6 +126,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Insert a new record] */
+	/* Insert a new record. */
 	const char *key = "some key";
 	const char *value = "some value";
 	cursor->set_key(cursor, key);
@@ -119,6 +137,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Insert a new record or overwrite an existing record] */
+	/* Insert a new record or overwrite an existing record. */
 	const char *key = "some key";
 	const char *value = "some value";
 	ret = session->open_cursor(
@@ -131,6 +150,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Insert a new record and assign a record number] */
+	/* Insert a new record and assign a record number. */
 	uint64_t recno;
 	const char *value = "some value";
 	ret = session->open_cursor(

@@ -188,6 +188,8 @@ struct wt_cursor {
 	 *
 	 * @snippet ex_all.c Get the cursor's string value
 	 *
+	 * @snippet ex_all.c Get the cursor's raw value
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
@@ -210,6 +212,8 @@ struct wt_cursor {
 	/*! Set the value for the next operation.
 	 *
 	 * @snippet ex_all.c Set the cursor's string value
+	 *
+	 * @snippet ex_all.c Set the cursor's raw value
 	 *
 	 * @param cursor the cursor handle
 	 *
@@ -326,8 +330,8 @@ struct wt_cursor {
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
-	/*! Remove a record.  Both key and value must be set, and the key's
-	 * record will be removed.
+	/*! Remove a record.  The key must be set, and the key's record will be
+	 * removed.
 	 *
 	 * @snippet ex_all.c Remove a record
 	 *
