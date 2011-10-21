@@ -52,7 +52,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		item = va_arg(ap, WT_ITEM *);
 		item->data = s->desc;
-		item->size = WT_STORE_SIZE(strlen(s->desc));
+		item->size = WT_STORE_SIZE(strlen(s->desc) + 1);
 	} else
 		*va_arg(ap, const char **) = s->desc;
 	va_end(ap);
