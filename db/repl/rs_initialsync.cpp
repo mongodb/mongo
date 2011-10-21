@@ -158,6 +158,7 @@ namespace mongo {
 
         for( Member *m = head(); m; m = m->next() ) {
             if (!m->hbinfo().up() ||
+                !m->config().buildIndexes ||
                     (m->state() != MemberState::RS_SECONDARY &&
                      m->state() != MemberState::RS_PRIMARY) ||
                     (secondaryOnly && m->state() != MemberState::RS_SECONDARY) ||
