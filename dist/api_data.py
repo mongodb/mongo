@@ -47,18 +47,21 @@ filename_meta = [
 
 format_meta = column_meta + [
 	Config('key_format', 'u', r'''
-		the format of the data packed into key items.  See @ref packing
-		for details.  By default, applications use the WT_ITEM struct
-		to manipulate raw byte arrays.  Key items of type \c 'r' are
-		record numbers and records will be stored using a column
-		store''',
+		the format of the data packed into key items.  See @ref
+		schema_format_types for details.  By default, the
+		key_format is \c 'u' and applications use WT_ITEM
+		structures to manipulate raw byte arrays. By default,
+		records are stored in row-store files: keys of type \c
+		'r' are record numbers and records referenced by record
+		number are stored in column-store files''',
 		type='format'),
 	Config('value_format', 'u', r'''
 		the format of the data packed into value items.  See @ref
-		packing for details.  By default, applications use the WT_ITEM
-		struct to manipulate raw byte arrays.  Value items of type
-		\c 't' are bitfields, and in column stores will be stored using
-		a fixed-length store''',
+		schema_format_types for details.
+		By default, the value_format is \c 'u' and applications use a
+		WT_ITEM structure to manipulate raw byte arrays. Value items
+		of type 't' are bitfields, and when configured with record
+		number type keys, will be stored using a fixed-length store''',
 		type='format'),
 ]
 

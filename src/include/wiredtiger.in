@@ -548,14 +548,12 @@ struct wt_session {
 	 * key size\, in bytes. The value must be an integer greater than or
 	 * equal to 40B.,\c 64B}
 	 * @config{key_format, the format of the data packed into key items.
-	 * See @ref schema_format_types for details.
-	 *
-	 * By default\, the key_format is \c 'u' and applications use
-	 * WT_ITEM structures to manipulate raw byte arrays. By default\,
-	 * records are stored in row-store files: keys of type \c 'r' are
-	 * record numbers and records referenced by record number are
-	 * stored in column-store files. The value must be a format
-	 * string.,\c u}
+	 * See @ref schema_format_types for details.  By default\, the
+	 * key_format is \c 'u' and applications use WT_ITEM structures to
+	 * manipulate raw byte arrays. By default\, records are stored in
+	 * row-store files: keys of type \c 'r' are record numbers and records
+	 * referenced by record number are stored in column-store files. The
+	 * value must be a format string.,\c u}
 	 * @config{key_gap, configure the maximum gap between instantiated keys
 	 * in a Btree leaf page\, constraining the number of keys processed to
 	 * instantiate a random Btree leaf page key. The value must be an
@@ -577,13 +575,11 @@ struct wt_session {
 	 * @config{type, configure the file type. The value must be a string\,
 	 * chosen from the following options: \c "btree".,\c btree}
 	 * @config{value_format, the format of the data packed into value items.
-	 * See @ref schema_format_types for details.
-	 *
-	 * By default\, the value_format is \c 'u' and applications use a
-	 * WT_ITEM structure to manipulate raw byte arrays. Value items
-	 * of type 't' are bitfields\, and when configured with record
-	 * number type keys\, will be stored using a fixed-length store.
-	 * The value must be a format string.,\c u}
+	 * See @ref schema_format_types for details. By default\, the
+	 * value_format is \c 'u' and applications use a WT_ITEM structure to
+	 * manipulate raw byte arrays. Value items of type 't' are bitfields\,
+	 * and when configured with record number type keys\, will be stored
+	 * using a fixed-length store. The value must be a format string.,\c u}
 	 * @configend
 	 * @errors
 	 */
