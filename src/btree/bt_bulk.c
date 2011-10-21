@@ -199,8 +199,8 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	 * the application doesn't accidentally corrupt the table.
 	 */
 	if (cbulk->keycmp.size != 0) {
-		WT_BTREE_CMP(session, session->btree,
-		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cbulk->keycmp, cmp);
+		WT_RET(WT_BTREE_CMP(session, session->btree,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cbulk->keycmp, cmp));
 		if (cmp <= 0)
 			return (__bulk_row_keycmp_err(cbulk));
 	}
