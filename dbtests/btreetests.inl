@@ -65,7 +65,7 @@
         void dump() {
             bt()->dumpTree( dl(), order() );
         }
-        void insert( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
+        void insert( BSONObj &key, const DiskLoc &recLoc = recordLoc() ) {
             const BtreeBucket *b = bt();
 
 #if defined(TESTTWOSTEP)
@@ -81,7 +81,7 @@
 #endif
             getDur().commitIfNeeded();
         }
-        bool unindex( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
+        bool unindex( BSONObj &key, const DiskLoc &recLoc = recordLoc() ) {
             getDur().commitIfNeeded();
             return bt()->unindex( dl(), id(), key, recLoc );
         }
