@@ -114,6 +114,7 @@ assert.eq( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor2" );
 print( "checkpoint E")
 
 x = db.runCommand( "connPoolStats" );
+printjson( x )
 for ( host in x.hosts ){
     var foo = x.hosts[host];
     assert.lt( 0 , foo.available , "pool: " + host );
