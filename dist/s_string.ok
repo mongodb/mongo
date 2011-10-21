@@ -283,6 +283,7 @@ ints
 inuse
 io
 ispo
+keycmp
 keyname
 keyv
 kv
