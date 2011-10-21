@@ -25,6 +25,7 @@
 #define	PRINT	0x02
 
 const char *progname;
+const char *bulk;
 u_int	flags =  0;
 int	bitcnt = 3;
 int	nrecs = 10;
@@ -58,8 +59,11 @@ main(int argc, char *argv[])
 	flags = PRINT;			/* Don't print table by default */
 #endif
 
-	while ((ch = getopt(argc, argv, "b:dn:pt:")) != EOF)
+	while ((ch = getopt(argc, argv, "Bb:dn:pt:")) != EOF)
 		switch (ch) {
+		case 'B':
+			bulk = "bulk";
+			break;
 		case 'b':
 			bitcnt = atoi(optarg);
 			break;
@@ -108,7 +112,8 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dp] [-b bits] [-n rows] [-t fix|var|row]\n", progname);
+	    "usage: %s [-Bdp] [-b bits] [-n rows] [-t fix|var|row]\n",
+	    progname);
 	return (EXIT_FAILURE);
 }
 
@@ -148,7 +153,7 @@ run(void)
 	}
 	assert(session->create(session, "file:" FILENAME, config) == 0);
 	assert(session->open_cursor(
-	    session, "file:" FILENAME, NULL, NULL, &cursor) == 0);
+	    session, "file:" FILENAME, NULL, bulk, &cursor) == 0);
 
 	/* Create the initial key/value pairs. */
 	start = clock();
