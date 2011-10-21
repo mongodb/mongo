@@ -50,7 +50,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session,
 		    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
 			return (__wt_btree_reopen(session, cfg, flags));
 		else
-			btree->flags = flags;
+			F_SET(btree, flags);
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
