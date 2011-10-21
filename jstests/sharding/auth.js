@@ -142,6 +142,9 @@ for (i=0; i<num; i++) {
     s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
 
+// Make sure all data gets sent through
+printjson( s.getDB("test").getLastError() )
+
 var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
 var totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
