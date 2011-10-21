@@ -45,8 +45,17 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 		return (WT_ERROR);
 	}
 
-	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
-	F_SET(btree, WT_BTREE_NO_EVICTION);
+#if 0
+	/*
+	 * The record count until row-store and variable length column-store
+	 * bulk-loads are reconciled is configurable.
+	 */
+	WT_RET(__wt_config_getones(
+	    session, cursor->config, "bulk_per_write", &cval));
+	cbulk->ipp = (uint32_t)cval.val;
+#else
+	cbulk->ipp = 1000000;				/* XXX */
+#endif
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -60,15 +69,16 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	case BTREE_ROW:
 		cbulk->page_type = WT_PAGE_ROW_LEAF;
 		cbulk->insp = &cbulk->ins_base;
-		cbulk->ipp = 50000;			/* XXX */
 		break;
 	case BTREE_COL_VAR:
 		cbulk->recno = 1;
 		cbulk->page_type = WT_PAGE_COL_VAR;
 		cbulk->updp = &cbulk->upd_base;
-		cbulk->ipp = 50000;			/* XXX */
 		break;
 	}
+
+	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
+	F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	return (0);
 }
