@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test_base03.py
+# test_base05.py
 # 	Cursor operations
 #
 
