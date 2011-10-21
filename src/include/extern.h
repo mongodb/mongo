@@ -614,6 +614,10 @@ extern int __wt_buf_set( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const void *data,
     size_t size);
+extern int __wt_buf_set_printable( WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const void *from_arg,
+    size_t size);
 extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *sizep);

@@ -11,6 +11,7 @@ static int __bulk_col_fix(WT_CURSOR_BULK *);
 static int __bulk_col_page(WT_CURSOR_BULK *);
 static int __bulk_col_var(WT_CURSOR_BULK *);
 static int __bulk_row(WT_CURSOR_BULK *);
+static int __bulk_row_keycmp_err(WT_CURSOR_BULK *);
 static int __bulk_row_page(WT_CURSOR_BULK *);
 
 /*
@@ -186,12 +187,25 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
-	int ret;
+	int cmp, ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 	ins = NULL;
 	upd = NULL;
+
+	/*
+	 * Compare each inserted key against the last key we saw to ensure
+	 * the application doesn't accidentally corrupt the table.
+	 */
+	if (cbulk->keycmp.size != 0) {
+		WT_BTREE_CMP(session, session->btree,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cbulk->keycmp, cmp);
+		if (cmp <= 0)
+			return (__bulk_row_keycmp_err(cbulk));
+	}
+	WT_RET(__wt_buf_set(
+	    session, &cbulk->keycmp, cursor->key.data, cursor->key.size));
 
 	/*
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
@@ -401,4 +415,33 @@ __bulk_col_page(WT_CURSOR_BULK *cbulk)
 
 	return (__wt_page_reconcile(
 	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+}
+
+/*
+ * __bulk_row_keycmp_err --
+ *	Error routine when keys inserted out-of-order.
+ */
+static int
+__bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
+{
+	WT_BUF a, b;
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	cursor = &cbulk->cbt.iface;
+
+	WT_CLEAR(a);
+	WT_CLEAR(b);
+
+	WT_RET(__wt_buf_set_printable(
+	    session, &a, cursor->key.data, cursor->key.size));
+	WT_RET(__wt_buf_set_printable(
+	    session, &b, cbulk->keycmp.data, cbulk->keycmp.size));
+
+	__wt_errx( session,
+	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
+	    "than previously inserted key %.*s",
+	    (int)a.size, (char *)a.data, (int)b.size, (char *)b.data);
+	return (WT_ERROR);
 }

@@ -196,6 +196,7 @@ run(void)
 			exit (EXIT_FAILURE);
 		}
 	}
+
 	stop = clock();
 	fprintf(stderr, "timer: %.2lf\n",
 	    (stop - start) / (double)CLOCKS_PER_SEC);

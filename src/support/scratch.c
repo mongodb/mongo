@@ -100,6 +100,35 @@ __wt_buf_set(
 }
 
 /*
+ * __wt_buf_set_printable --
+ *	Set the contents of the buffer to a printable representation.
+ */
+int
+__wt_buf_set_printable(
+    WT_SESSION_IMPL *session, WT_BUF *buf, const void *from_arg, size_t size)
+{
+	static const char hex[] = "0123456789abcdef";
+	const char *from;
+	char *to;
+
+	/*
+	 * The maximum size is the byte-string length, all hex characters, plus
+	 * a trailing nul byte.  Throw in a few extra bytes for fun.
+	 */
+	WT_RET(__wt_buf_init(session, buf, size * 2 + 20));
+
+	buf->size = 0;
+	for (from = from_arg, to = buf->mem; size > 0; --size, ++from)
+		if (isprint(from[0]))
+			to[buf->size++] = from[0];
+		else {
+			to[buf->size++] = hex[(from[0] & 0xf0) >> 4];
+			to[buf->size++] = hex[from[0] & 0x0f];
+		}
+	return (0);
+}
+
+/*
  * __wt_buf_steal --
  *	Steal a buffer for another purpose.
  */

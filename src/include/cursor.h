@@ -104,6 +104,8 @@ struct __wt_cursor_bulk {
 	uint32_t ref_next;			/* Next leaf page slot */
 	uint32_t ref_entries;			/* Total leaf page slots */
 	size_t   ref_allocated;			/* Bytes allocated */
+
+	WT_BUF keycmp;				/* Key comparisons. */
 };
 
 struct __wt_cursor_config {
