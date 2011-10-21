@@ -521,9 +521,9 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 static int
 __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 {
+	WT_CURSOR **cp, *primary;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	WT_CURSOR **cp;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	int i;
 
@@ -534,6 +534,13 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		WT_RET(__wt_schema_open_index(session, table, NULL, 0));
 	if (table->nindices == 0 || ctable->idx_cursors != NULL)
 		return (0);
+	/* Check for bulk cursors. */
+	primary = *ctable->cg_cursors;
+	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK)) {
+		__wt_errx(session,
+		    "Bulk load is not supported for tables with indices");
+		return (ENOTSUP);
+	}
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
 		session->btree = table->index[i];
