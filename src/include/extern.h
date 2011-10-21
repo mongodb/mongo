@@ -112,8 +112,7 @@ extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
-extern int __wt_session_lock_btree(WT_SESSION_IMPL *session,
-    WT_BTREE *btree,
+extern int __wt_session_lock_btree( WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);

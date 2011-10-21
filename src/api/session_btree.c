@@ -33,9 +33,14 @@ __wt_session_add_btree(
  *	Lock a btree handle.
  */
 int
-__wt_session_lock_btree(WT_SESSION_IMPL *session,
-    WT_BTREE *btree, const char *cfg[], uint32_t flags)
+__wt_session_lock_btree(
+    WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
+	WT_BTREE *btree;
+
+	btree = session->btree;
+	WT_ASSERT(session, btree != NULL);
+
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		__wt_writelock(session, btree->rwlock);
 		/*
@@ -105,8 +110,8 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
 		    btree->filename[namelen] == '\0') {
 			if (btree_sessionp != NULL)
 				*btree_sessionp = btree_session;
-			return (__wt_session_lock_btree(
-			    session, btree, cfg, flags));
+			session->btree = btree;
+			return (__wt_session_lock_btree(session, cfg, flags));
 		}
 	}
 
@@ -155,8 +160,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	else
 		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
 	WT_RET(__wt_btree_open(session, name, filename, treeconf, cfg, flags));
-	WT_RET(__wt_session_lock_btree(session, session->btree, NULL, flags));
-	WT_RET(__wt_session_add_btree(session, &btree_session));
+	WT_RET(__wt_session_lock_btree(session, NULL, flags));
+	WT_RET(__wt_session_add_btree(session, NULL));
 
 	return (0);
 }

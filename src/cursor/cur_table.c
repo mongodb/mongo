@@ -513,8 +513,6 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
 		session->btree = table->colgroup[i];
-		WT_RET(__wt_session_lock_btree(session,
-		    session->btree, NULL, 0));
 		WT_RET(__wt_curfile_create(session, 0, cfg_no_overwrite, cp));
 	}
 	return (0);
@@ -539,8 +537,6 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
 		session->btree = table->index[i];
-		WT_RET(__wt_session_lock_btree(session,
-		    session->btree, NULL, 0));
 		WT_RET(__wt_curfile_create(session, 0, cfg, cp));
 	}
 	return (0);
@@ -616,13 +612,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		    "Cannot open cursor '%s' on incomplete table", uri);
 		return (EINVAL);
 	} else if (table->is_simple) {
-		session->btree = table->colgroup[0];
-		WT_RET(__wt_session_lock_btree(session,
-		    session->btree, NULL, 0));
 		/*
 		 * The returned cursor should be public: it is not part of a
-		 * larger table cursor.
+		 * table cursor.
 		 */
+		session->btree = table->colgroup[0];
 		return (__wt_curfile_create(session, 1, cfg, cursorp));
 	}
 

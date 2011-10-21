@@ -255,8 +255,12 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
 
-	WT_ERR(__wt_config_gets(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
+
+	/* Lock the handle while the cursor is using it. */
+	WT_RET(__wt_session_lock_btree(session,
+	    NULL, bulk ? WT_BTREE_EXCLUSIVE | WT_BTREE_BULK : 0));
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -313,23 +317,14 @@ int
 __wt_curfile_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	WT_CONFIG_ITEM cval;
-	uint32_t open_flags;
-
-	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
-	if (cval.val != 0)
-		open_flags = WT_BTREE_EXCLUSIVE | WT_BTREE_BULK;
-	else
-		open_flags = 0;
-
 	/* TODO: handle projections. */
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		WT_RET(__wt_schema_get_btree(session,
-		    uri, strlen(uri), NULL, open_flags));
+		    uri, strlen(uri), NULL, WT_BTREE_NO_LOCK));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree(session,
-		     uri, uri, NULL, NULL, open_flags));
+		     uri, uri, NULL, NULL, WT_BTREE_NO_LOCK));
 	else
 		return (EINVAL);
 

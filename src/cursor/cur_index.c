@@ -357,8 +357,6 @@ __curindex_open_colgroups(
 		    cp[arg] != NULL)
 			continue;
 		session->btree = table->colgroup[arg];
-		WT_RET(__wt_session_lock_btree(session,
-		    session->btree, NULL, 0));
 		WT_RET(__wt_curfile_create(session, 0, cfg, &cp[arg]));
 	}
 
@@ -440,7 +438,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cindex->table = table;
 	cbt = &cindex->cbt;
 	cbt->btree = session->btree;
-	WT_RET(__wt_session_lock_btree(session, session->btree, NULL, 0));
+	WT_RET(__wt_session_lock_btree(session, NULL, 0));
 	cindex->key_plan = session->btree->key_plan;
 	cindex->value_plan = session->btree->value_plan;
 
