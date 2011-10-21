@@ -102,8 +102,6 @@ static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
-static int  __slvg_load_byte_string(
-		WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_BUF *);
 static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
@@ -589,15 +587,13 @@ __slvg_trk_leaf(
 		    &trk->row_stop));
 
 		if (ss->verbose) {
-			WT_ERR(__slvg_load_byte_string(session,
-			    trk->row_start.data,
-			    trk->row_start.size, ss->vbuf));
+			WT_ERR(__wt_buf_set_printable(session, ss->vbuf,
+			    trk->row_start.data, trk->row_start.size));
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] start key %.*s",
 			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data);
-			WT_ERR(__slvg_load_byte_string(session,
-			    trk->row_stop.data,
-			    trk->row_stop.size, ss->vbuf));
+			WT_ERR(__wt_buf_set_printable(session, ss->vbuf,
+			    trk->row_stop.data, trk->row_stop.size));
 			WT_VERBOSE(session, SALVAGE,
 			    "[%" PRIu32 "] stop key %.*s",
 			    addr, (int)ss->vbuf->size, (char *)ss->vbuf->data);
@@ -1784,8 +1780,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			if (cmp >= 0)
 				break;
 			if (ss->verbose) {
-				WT_ERR(__slvg_load_byte_string(session,
-				    item->data, item->size, ss->vbuf));
+				WT_ERR(__wt_buf_set_printable(session,
+				    ss->vbuf, item->data, item->size));
 				WT_VERBOSE(session, SALVAGE,
 				    "[%" PRIu32 "] merge discarding leading "
 				    "key %.*s",
@@ -1814,8 +1810,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			if (cmp < 0)
 				break;
 			if (ss->verbose) {
-				WT_ERR(__slvg_load_byte_string(session,
-				    item->data, item->size, ss->vbuf));
+				WT_ERR(__wt_buf_set_printable(session,
+				    ss->vbuf, item->data, item->size));
 				WT_VERBOSE(session, SALVAGE,
 				    "[%" PRIu32 "] merge discarding trailing "
 				    "key %.*s",
@@ -2235,52 +2231,5 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 	__wt_free(session, trk->ovfl);
 	__wt_free(session, trk);
 
-	return (0);
-}
-
-/*
- * __slvg_load_byte_string --
- *	Load a single byte string into a buffer, in printable characters,
- * where possible.
- */
-static int
-__slvg_load_byte_string(
-    WT_SESSION_IMPL *session, const uint8_t *data, uint32_t size, WT_BUF *buf)
-{
-	static const char hex[] = "0123456789abcdef";
-	uint32_t avail;
-	int ch, len;
-	char *p;
-
-	/*
-	 * The maximum size is the byte-string length, all hex characters, plus
-	 * a trailing nul byte.  Throw in a few extra bytes for fun.
-	 *
-	 * The underlying functions use type int, not uint32_t, check we're
-	 * not in trouble, just out of sheer, raving paranoia.
-	 */
-	if ((uint64_t)size * 4 + 20 >= UINT32_MAX)
-		return (ENOMEM);
-	avail = size * 4 + 20;
-	WT_RET(__wt_buf_init(session, buf, avail));
-
-	for (p = buf->mem; size > 0; --size, ++data) {
-		ch = data[0];
-		if (isprint(ch))
-			len = snprintf(p, avail, "%c", ch);
-		else
-			len = snprintf(p, avail, "%x%x",
-			    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
-		/*
-		 * Be paranoid about buffer overflow: even if our calculation
-		 * is off, or snprintf(3) returns large length values, don't
-		 * overflow the end of the buffer.
-		 */
-		if ((u_int)len >= avail)
-			break;
-		p += len;
-		buf->size += (u_int)len;
-		avail -= (u_int)len;
-	}
 	return (0);
 }
