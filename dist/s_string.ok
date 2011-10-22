@@ -341,6 +341,7 @@ packv
 patchp
 pfx
 posint
+posix
 prepended
 printf
 priv
