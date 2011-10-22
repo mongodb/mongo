@@ -21,35 +21,23 @@ int
 __wt_config_concat(
     WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
 {
+	WT_BUF buf;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
-	size_t len;
 	int ret;
 	const char **cp;
-	char *config, *end, *p;
 
+	WT_CLEAR(buf);
 	ret = 0;
 
-	/*
-	 * Be conservative when allocating the buffer: it can't be longer
-	 * than the sum of the lengths of the layered configurations.
-	 * Add 2 to allow for a trailing comma and NUL.
-	 */
-	for (cp = cfg, len = 2; *cp != NULL; ++cp)
-		len += strlen(*cp);
-
-	WT_RET(__wt_calloc_def(session, len, &config));
-	p = config;
-	end = config + len;
-
 	for (cp = cfg; *cp != NULL; ++cp) {
-		WT_RET(__wt_config_init(session, &cparser, *cp));
+		WT_ERR(__wt_config_init(session, &cparser, *cp));
 		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 			if (k.type != ITEM_STRING && k.type != ITEM_ID) {
 				__wt_errx(session,
 				    "Invalid configuration key found: '%s'\n",
 				    k.str);
-				return (EINVAL);
+				WT_ERR(EINVAL);
 			}
 			WT_ERR(__wt_config_get(session, cfg, &k, &v));
 			/* Include the quotes around string values. */
@@ -57,20 +45,30 @@ __wt_config_concat(
 				--v.str;
 				v.len += 2;
 			}
-			p += snprintf(p, (size_t)(end - p), "%.*s=%.*s,",
-			    (int)k.len, k.str, (int)v.len, v.str);
+			WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s=%.*s,",
+			    (int)k.len, k.str, (int)v.len, v.str));
 		}
+		if (ret != WT_NOTFOUND)
+			goto err;
 	}
 
-	if (ret == WT_NOTFOUND) {
-		ret = 0;
-		/* Strip off the trailing comma and NUL-terminate. */
-		if (p > config)
-			--p;
-		*p = '\0';
-		*config_ret = config;
-	} else {
-err:		__wt_free(session, config);
+	/*
+	 * If the caller passes us no configuration strings, we end up here with
+	 * ret == 0 and no allocated memory to return, that is, the above loop
+	 * exits "normally" when __wt_config_next returns WT_NOTFOUND.  Check
+	 * the final buffer size as well: configuration strings that don't have
+	 * configuration values are possible, and paranoia is good.
+	 */
+	if (ret == 0 || buf.size == 0) {
+		WT_RET(__wt_calloc_def(session, 1, config_ret));
+		return (0);
 	}
+
+	/* Strip off the trailing comma and NUL-terminate. */
+	((uint8_t *)buf.mem)[--buf.size] = '\0';
+	*config_ret = buf.mem;
+	return (0);
+
+err:	__wt_buf_free(session, &buf);
 	return (ret);
 }
