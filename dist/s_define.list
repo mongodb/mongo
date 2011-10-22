@@ -1,4 +1,4 @@
-# List of #defines that are "unused", but it's OK.
+# List of WiredTiger #defines that are "unused", but it's OK.
 API_CALL
 API_CALL_NOCONF
 API_SESSION_INIT
@@ -6,6 +6,17 @@ FLD_CLR
 FLD_ISSET
 LF_CLR
 LF_SET
+LLONG_MAX
+LLONG_MIN
+WT_MAX
+WT_MIN
+WT_SKIP_PROBABILITY
+WT_STAT_INCRV
+__F
+__WIREDTIGER_EXT_H_
+__WIREDTIGER_H_
+
+# List of queue.h #defines that are "unused", but it's OK.
 LIST_EMPTY
 LIST_ENTRY
 LIST_FIRST
@@ -57,11 +68,4 @@ TAILQ_HEAD_INITIALIZER
 TAILQ_INSERT_AFTER
 TRACEBUF
 TRASHIT
-WT_MAX
-WT_MIN
-WT_SKIP_PROBABILITY
-WT_STAT_INCRV
 _DB_QUEUE_H_
-__F
-__WIREDTIGER_H_
-__WIREDTIGER_EXT_H_
