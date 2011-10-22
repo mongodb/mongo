@@ -237,8 +237,8 @@ namespace mongo {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
-            assert( VERSION == 4 );
-            assert( VERSION_MINOR == 5 );
+            assert( PDFILE_VERSION == 4 );
+            assert( PDFILE_VERSION_MINOR == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -290,7 +290,7 @@ namespace mongo {
                 log() << "****" << endl;
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+                      << "new version: " << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR << endl;
                 if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
