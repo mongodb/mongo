@@ -723,43 +723,54 @@ namespace Plan {
 } // namespace Plan
 
 namespace Memmove {
-    // this is an extreme test, we suppose all 8k data is _KeyNode
-    // and then we shift one right to see how these two cases differ.
+
+    typedef BtreeBucket<V1>::_KeyNode _KeyNode;
+
+    template <int Loops, int Total, int Insert>
     class CopyEachTime {
     public:
         void run() {
-            int iterations = 1000*1000*50;
-            BtreeBucket<V1>::_KeyNode *data = (BtreeBucket<V1>::_KeyNode*)buf;
-            while(iterations--){
-                int n = (8192/sizeof(*data)-1);
-                while(n){
+            int iterations = L;
+            _KeyNode *data = (_KeyNode*)buf;
+            while (iterations--) {
+                int n = N;
+                while (n > M) {
                     data[n] = data[n-1];
                     n--;
                 }
             }
         }
-        char buf[8192];
+    private:
+        enum { L = Loops, N = Total, M = Insert };
+        char buf[ sizeof(_KeyNode) * (N + 1) ];
     };
 
+    template <int Loops, int Total, int Insert>
     class MemmoveTime {
     public:
         void run() {
-            int iterations = 1000*1000*50;
-            BtreeBucket<V1>::_KeyNode *data = (BtreeBucket<V1>::_KeyNode*)buf;
-            while(iterations--){
-                int n = (8192/sizeof(*data)-1);
-                memmove((char*)data+sizeof(*data), data, sizeof(*data)*(n-1));
+            int iterations = L;
+            _KeyNode *data = (_KeyNode*)buf;
+            while (iterations--) {
+                int n = N - M;
+                memmove(&data[M + 1], &data[M], sizeof(_KeyNode) * n);
             }
         }
-        char buf[8192];
+    private:
+        enum { L = Loops, N = Total, M = Insert };
+        char buf[ sizeof(_KeyNode) * (N + 1) ];
     };
 
     class All : public RunnerSuite {
     public:
         All() : RunnerSuite("memmove") {}
         void setupTests() {
-            add< CopyEachTime >();
-            add< MemmoveTime >();
+            // insert into the middle node
+            add< CopyEachTime<1000*1000*50, 100, 50> >();
+            add< MemmoveTime<1000*1000*50, 100, 50> >();
+            // insert into the first node
+            add< CopyEachTime<1000*1000*50, 100, 0> >();
+            add< MemmoveTime<1000*1000*50, 100, 0> >();
         }
     } all;
 } // namespace Memmove
