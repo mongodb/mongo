@@ -12,7 +12,7 @@ static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int schema_read(char ***, int *);
 static int schema_rename(char **, const char *);
-static int schema_update(char **);
+static int schema_update(WT_SESSION *, char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
@@ -109,7 +109,7 @@ load_dump(WT_SESSION *session)
 	}
 
 	/* Update the schema based on any command-line configuration. */
-	if ((ret = schema_update(list)) != 0)
+	if ((ret = schema_update(session, list)) != 0)
 		return (ret);
 
 	uri = list[0];
@@ -218,17 +218,20 @@ schema_read(char ***listp, int *hexp)
 	return (0);
 }
 
+/* We call an unpublished WiredTiger API inside load. */
+extern int __wt_config_concat(WT_SESSION *, const char **, char **);
+
 /*
  * schema_update --
  *	Reconcile and update the command line configuration against the
  * schema we found.
  */
 static int
-schema_update(char **list)
+schema_update(WT_SESSION *session, char **list)
 {
-	size_t len;
 	int found;
-	char *buf, **configp, **listp, *p, *t;
+	const char *cfg[] = { NULL, NULL, NULL };
+	char **configp, **listp, *p, *t;
 
 #define MATCH(s, tag)                                           	\
 	(strncmp(s, tag, strlen(tag)) == 0)
@@ -268,7 +271,6 @@ schema_update(char **list)
 			else
 				strcpy(p, t + 1);
 		}
-	
 
 	/*
 	 * It's possible to update everything except the key/value formats.
@@ -286,25 +288,33 @@ schema_update(char **list)
 	/*
 	 * If there were command-line configuration pairs, walk the list of
 	 * command-line URIs and find a matching dump URI.  For each match,
-	 * append the command-line configuration to the dump configuration.
-	 * It is an error if a command-line URI doesn't find a match, that's
-	 * likely a mistake.
+	 * rewrite the dump configuration as described by the command-line
+	 * configuration.  It is an error if a command-line URI doesn't find
+	 * a single, exact match, that's likely a mistake.
 	 */
 	for (configp = cmdconfig;
 	    cmdconfig != NULL && *configp != NULL; configp += 2) {
 		found = 0;
-		for (listp = list; *listp != NULL; listp += 2)
-			if (strncmp(
-			    *configp, listp[0], strlen(*configp)) == 0) {
-				++found;
-				len =
-				    strlen(configp[1]) + strlen(listp[1]) + 10;
-				if ((buf = malloc(len)) == NULL)
-					return (util_err(errno, NULL));
-				snprintf(
-				    buf, len, "%s,%s", listp[1], configp[1]);
-				listp[1] = buf;
-			}
+		for (listp = list; *listp != NULL; listp += 2) {
+			if (strncmp(*configp, listp[0], strlen(*configp)) != 0)
+				continue;
+			/*
+			 * !!!
+			 * We support JSON configuration strings, which leads to
+			 * configuration strings with brackets.  Unfortunately,
+			 * that implies we can't simply append new configuration
+			 * strings to existing ones.  We call an unpublished
+			 * WiredTiger API to do the concatentation: if anyone
+			 * else ever needs it we can make it public, but I think
+			 * that's unlikely.  We're also playing fast and loose
+			 * with types, but it should work.
+			 */
+			cfg[0] = listp[1];
+			cfg[1] = configp[1];
+			if (__wt_config_concat(session, cfg, &listp[1]) != 0)
+				return (1);
+			++found;
+		}
 		switch (found) {
 		case 0:
 			return (util_err(0,
@@ -315,7 +325,7 @@ schema_update(char **list)
 		default:
 			return (util_err(0,
 			    "the command line object name %s was not unique, "
-			    "it matche more than a single loaded object name",
+			    "matching more than a single loaded object name",
 			    *configp));
 		}
 	}
