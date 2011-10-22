@@ -218,9 +218,6 @@ schema_read(char ***listp, int *hexp)
 	return (0);
 }
 
-/* We call an unpublished WiredTiger API inside load. */
-extern int __wt_config_concat(WT_SESSION *, const char **, char **);
-
 /*
  * schema_update --
  *	Reconcile and update the command line configuration against the
@@ -311,7 +308,9 @@ schema_update(WT_SESSION *session, char **list)
 			 */
 			cfg[0] = listp[1];
 			cfg[1] = configp[1];
-			if (__wt_config_concat(session, cfg, &listp[1]) != 0)
+			if (__wt_config_concat(
+			    (WT_SESSION_IMPL *)session, cfg,
+			    (const char **)&listp[1]) != 0)
 				return (1);
 			++found;
 		}

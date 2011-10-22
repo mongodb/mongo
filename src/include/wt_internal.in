@@ -149,6 +149,7 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "posix.h"
 #include "misc.h"
 
 #include "btdsk.h"
