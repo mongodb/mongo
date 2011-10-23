@@ -400,14 +400,17 @@ namespace mongo {
             bytesNeeded += key.dataSize();
 
         if ( bytesNeeded > this->emptySize ) {
+            int oldkeypos = keypos;
             _pack(thisLoc, order, keypos);
-            // we have to re-check, because:
-            // 1. 'keypos' could be changed.
-            // 2. the equality might not hold anymore when previous one is marked as unused before _pack().
-            equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
-            bytesNeeded = sizeof(_KeyNode);
-            if ( !equalWithLastKey )
-                bytesNeeded += key.dataSize();
+            if ( oldkeypos != keypos ) {
+                // we have to re-check, because:
+                // 1. 'keypos' could be changed.
+                // 2. the equality might not hold anymore when previous one is marked as unused before _pack().
+                equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
+                bytesNeeded = sizeof(_KeyNode);
+                if ( !equalWithLastKey )
+                    bytesNeeded += key.dataSize();
+            }
             if ( bytesNeeded > this->emptySize )
                 return false;
         }
