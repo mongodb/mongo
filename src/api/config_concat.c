@@ -39,34 +39,34 @@ __wt_config_concat(
 				    k.str);
 				WT_ERR(EINVAL);
 			}
-			WT_ERR(__wt_config_get(session, cfg, &k, &v));
-			/* Include the quotes around string values. */
+			/* Include the quotes around string keys/values. */
+			if (k.type == ITEM_STRING) {
+				--k.str;
+				k.len += 2;
+			}
 			if (v.type == ITEM_STRING) {
 				--v.str;
 				v.len += 2;
 			}
-			WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s=%.*s,",
-			    (int)k.len, k.str, (int)v.len, v.str));
+			WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s%s%.*s,",
+			    (int)k.len, k.str,
+			    (v.len > 0) ? "=" : "",
+			    (int)v.len, v.str));
 		}
 		if (ret != WT_NOTFOUND)
 			goto err;
 	}
 
 	/*
-	 * If the caller passes us no configuration strings, we end up here with
-	 * ret == 0 and no allocated memory to return, that is, the above loop
-	 * exits "normally" when __wt_config_next returns WT_NOTFOUND.  Check
-	 * the final buffer size as well: configuration strings that don't have
-	 * configuration values are possible, and paranoia is good.
+	 * If the caller passes us no valid configuration strings, we end up
+	 * here with no allocated memory to return.  Check the final buffer
+	 * size: empty configuration strings are possible, and paranoia is
+	 * good.
 	 */
-	if (ret == 0 || buf.size == 0) {
-		WT_RET(__wt_calloc_def(session, 1, config_ret));
-		return (0);
-	}
+	if (buf.size == 0)
+		WT_RET(__wt_buf_initsize(session, &buf, 1));
 
-	/* Strip off the trailing comma and NUL-terminate. */
-	((uint8_t *)buf.mem)[--buf.size] = '\0';
-	*config_ret = buf.mem;
+	*config_ret = buf.data;
 	return (0);
 
 err:	__wt_buf_free(session, &buf);
