@@ -273,7 +273,7 @@ namespace mongo {
         }
 
         bool DurableImpl::commitIfNeeded() {
-            if ( ! dbMutex.isWriteLocked() ) // we implicitly commit if needed when releasing write lock
+            if ( !dbMutex.isWriteLocked() )
                 return false;
 
             DEV commitJob._nSinceCommitIfNeededCall = 0;
