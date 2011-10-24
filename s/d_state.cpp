@@ -484,6 +484,13 @@ namespace mongo {
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
             
+
+            // Handle initial shard connection
+            if( cmdObj["version"].eoo() && cmdObj["init"].trueValue() ){
+                result.append( "initialized", true );
+                return true;
+            }
+
             // step 2
             
             string ns = cmdObj["setShardVersion"].valuestrsafe();
