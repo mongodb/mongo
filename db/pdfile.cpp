@@ -1756,14 +1756,10 @@ namespace mongo {
         uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
         if ( strstr(ns, ".system.") ) {
             // later:check for dba-type permissions here if have that at some point separate
-            if ( strstr(ns, ".system.indexes" ) ){
+            if ( strstr(ns, ".system.indexes" ) )
                 wouldAddIndex = true;
-            }
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
-                    static const BSONObj userPattern = BSON("user" << 1);
-                    Helpers::ensureIndex(ns, userPattern, false, "user_1");
-
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
                     uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
                     uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );

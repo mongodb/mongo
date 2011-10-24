@@ -79,7 +79,9 @@ namespace mongo {
             pwd = internalSecurity.pwd;
         }
         else {
+            // static BSONObj userPattern = fromjson("{\"user\":1}");
             string systemUsers = dbname + ".system.users";
+            // OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
                 b << "user" << user;
