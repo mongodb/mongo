@@ -373,7 +373,7 @@ namespace mongo {
             bool ok = initShardVersionCB( *conn, result );
 
             // assert that we actually successfully setup sharding
-            uassert( 15903, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
+            uassert( 15907, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
                         ( result["errmsg"].type() == String ? causedBy( result["errmsg"].String() ) :
                                                               causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
 
