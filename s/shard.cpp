@@ -365,12 +365,26 @@ namespace mongo {
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
         }
 
-        if ( _shardedConnections ) {
-            conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+        if ( _shardedConnections && isVersionableCB( conn ) ) {
+
+            // We must initialize sharding on all connections, so that we get exceptions if sharding is enabled on
+            // the collection.
+            BSONObj result;
+            bool ok = initShardVersionCB( *conn, result );
+
+            // assert that we actually successfully setup sharding
+            uassert( 15903, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
+                        ( result["errmsg"].type() == String ? causedBy( result["errmsg"].String() ) :
+                                                              causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
+
         }
     }
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {
-        resetShardVersionCB( conn );
+
+        if( _shardedConnections && isVersionableCB( conn ) ){
+            resetShardVersionCB( conn );
+        }
+
     }
 }

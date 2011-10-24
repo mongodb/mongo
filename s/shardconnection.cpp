@@ -29,6 +29,14 @@ namespace mongo {
     //
     // TODO: better encapsulate this mechanism.
 
+    bool defaultIsVersionable( DBClientBase * conn ){
+        return false;
+    }
+
+    bool defaultInitShardVersion( DBClientBase & conn, BSONObj& result ){
+        return false;
+    }
+
     bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ) {
         // no-op in mongod
         return false;
@@ -38,6 +46,8 @@ namespace mongo {
         // no-op in mongod
     }
 
+    boost::function1<bool, DBClientBase* > isVersionableCB = defaultIsVersionable;
+    boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB = defaultInitShardVersion;
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 
@@ -71,7 +81,7 @@ namespace mongo {
                     /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
                     if ( inShutdown() ) {
-                        resetShardVersionCB( ss->avail );
+                        if( isVersionableCB( ss->avail ) ) resetShardVersionCB( ss->avail );
                         delete ss->avail;
                     }
                     else
@@ -226,7 +236,7 @@ namespace mongo {
             return;
         _finishedInit = true;
 
-        if ( _ns.size() ) {
+        if ( _ns.size() && isVersionableCB( _conn ) ) {
             _setVersion = checkShardVersionCB( *_conn , _ns , false , 1 );
         }
         else {
@@ -245,7 +255,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
-            resetShardVersionCB( _conn );
+            if( isVersionableCB( _conn ) ) resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;
