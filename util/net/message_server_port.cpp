@@ -90,6 +90,10 @@ namespace mongo {
                 log() << "ClockSkewException - shutting down" << endl;
                 exitCleanly( EXIT_CLOCK_SKEW );
             }
+            catch ( const DBException& e ) { // must be right above std::exception to avoid catching subclasses
+                log() << "DBException handling request, closing client connection: " << e << endl;
+                p->shutdown();
+            }
             catch ( std::exception &e ) {
                 error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
                 dbexit( EXIT_UNCAUGHT );
