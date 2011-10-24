@@ -1157,6 +1157,7 @@ namespace mongo {
 
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                ShardedConnectionInfo::addHook();
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
                 bool postProcessOnly = !(postProcessCollection.empty());
