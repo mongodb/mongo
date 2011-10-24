@@ -1573,6 +1573,7 @@ namespace mongo {
     class GodInsert : public Command {
     public:
         GodInsert() : Command( "godinsert" ) { }
+        virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
