@@ -993,7 +993,7 @@ printShardingStatus = function( configDB , verbose ){
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
+                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
