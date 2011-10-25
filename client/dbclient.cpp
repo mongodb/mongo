@@ -557,7 +557,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
+        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( ns , "findN stale config" );
