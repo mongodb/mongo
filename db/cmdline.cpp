@@ -144,8 +144,10 @@ namespace mongo {
 
 
     void CmdLine::launchOk() {
-        // killing leader will propagate to parent
-        assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+        if ( cmdLine.doFork ) {
+            // killing leader will propagate to parent
+            assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+        }
     }
 #endif
 
@@ -266,6 +268,8 @@ namespace mongo {
         }
 
         if (params.count("fork")) {
+            cmdLine.doFork = true;
+
             if ( ! params.count( "logpath" ) ) {
                 cout << "--fork has to be used with --logpath" << endl;
                 ::exit(-1);
