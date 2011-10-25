@@ -140,10 +140,11 @@ namespace mongo {
 
     SockAddr::SockAddr(const char * _iporhost , int port) {
         string target = _iporhost;
+        bool cloudName = *_iporhost == '#';
         if( target == "localhost" ) {
             target = "127.0.0.1";
         }
-        else if( *_iporhost == '#' ) {
+        else if( cloudName ) {
             target = dynHostNames.get(target);
         }
 
@@ -175,15 +176,15 @@ namespace mongo {
 #else
             int nodata = false;
 #endif
-            if (ret == EAI_NONAME || nodata) {
+            if ( (ret == EAI_NONAME || nodata) && !cloudName ) {
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
                 ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
             }
 
             if (ret) {
-                // don't log if this as it is a CRT construction and log() may not work yet.
-                if( target != "0.0.0.0" ) {
+                // we were unsuccessful
+                if( target != "0.0.0.0" ) { // don't log if this as it is a CRT construction and log() may not work yet.
                     log() << "getaddrinfo(\"" << target << "\") failed: " << gai_strerror(ret) << endl;
                 }
                 *this = SockAddr(port);

@@ -10,7 +10,8 @@ namespace mongo {
     /** 
       { cloud:1, nodes: {
           name : <ip>, ...
-        }
+        },
+        me : <mylogicalname>
       }
     */
     class CmdCloud  : public Command {
