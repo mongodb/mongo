@@ -367,7 +367,9 @@ int _main(int argc, char* argv[]) {
     
     init();
 
+#ifndef _WIN32
     CmdLine::launchOk();
+#endif
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 

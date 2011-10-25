@@ -125,12 +125,29 @@ namespace mongo {
         return;
     }
 
+#ifndef _WIN32
+    // support for exit value propagation with fork
+    void launchSignal( int sig ) {
+        if ( sig == SIGUSR2 ) {
+            pid_t cur = getpid();
+            
+            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
+                // signal indicates successful start allowing us to exit
+                _exit(0);
+            } 
+        }
+    }
+
+    void setupLaunchSignals() {
+        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
+    }
+
+
     void CmdLine::launchOk() {
-#if !defined(_WIN32)
         // killing leader will propagate to parent
         assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
-#endif
     }
+#endif
 
     bool CmdLine::store( int argc , char ** argv ,
                          boost::program_options::options_description& visible,
@@ -434,27 +451,10 @@ namespace mongo {
 
     void ignoreSignal( int sig ) {}
 
-    void launchSignal( int sig ) {
-        if ( sig == SIGUSR2 ) {
-            pid_t cur = getpid();
-            
-            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
-                // signal indicates successful start allowing us to exit
-                _exit(0);
-            } 
-        }
-    }
-
     void setupCoreSignals() {
 #if !defined(_WIN32)
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
         assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
-#endif
-    }
-
-    void setupLaunchSignals() {
-#if !defined(_WIN32)
-        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
 #endif
     }
 

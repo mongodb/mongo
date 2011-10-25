@@ -107,10 +107,12 @@ namespace mongo {
         bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
+        bool keyFile;
+
+#ifndef _WIN32
         pid_t parentProc;       // --fork pid of initial process
         pid_t leaderProc;       // --fork pid of leader process
-
-        bool keyFile;
+#endif
 
 #ifdef MONGO_SSL
         bool sslOnNormalPorts;      // --sslOnNormalPorts
