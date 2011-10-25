@@ -107,6 +107,9 @@ namespace mongo {
         bool noUnixSocket;     // --nounixsocket
         string socket;         // UNIX domain socket directory
 
+        pid_t parentProc;       // --fork pid of initial process
+        pid_t leaderProc;       // --fork pid of leader process
+
         bool keyFile;
 
 #ifdef MONGO_SSL
@@ -116,6 +119,8 @@ namespace mongo {
 
         SSLManager* sslServerManager; // currently leaks on close
 #endif
+        
+        static void launchOk();
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
                                       boost::program_options::options_description& hidden );
@@ -165,6 +170,7 @@ namespace mongo {
             
     extern CmdLine cmdLine;
 
+    void setupLaunchSignals();
     void setupCoreSignals();
 
     string prettyHostName();

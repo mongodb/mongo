@@ -26,6 +26,9 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 
 #define MAX_LINE_LENGTH 256
@@ -121,7 +124,12 @@ namespace mongo {
         return;
     }
 
-
+    void CmdLine::launchOk() {
+#if !defined(_WIN32)
+        // killing leader will propagate to parent
+        assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+#endif
+    }
 
     bool CmdLine::store( int argc , char ** argv ,
                          boost::program_options::options_description& visible,
@@ -262,10 +270,26 @@ namespace mongo {
 
             cout.flush();
             cerr.flush();
+            
+            cmdLine.parentProc = getpid();
+            
+            // facilitate clean exit when child starts successfully
+            setupLaunchSignals();
 
             pid_t c = fork();
             if ( c ) {
-                _exit(0);
+                int pstat;
+                waitpid(c, &pstat, 0);
+
+                if ( WIFEXITED(pstat) ) {
+                    if ( ! WEXITSTATUS(pstat) ) {
+                        cout << "child process started successfully, parent exiting" << endl;
+                    }
+
+                    _exit( WEXITSTATUS(pstat) );
+                }
+
+                _exit(50);
             }
 
             if ( chdir("/") < 0 ) {
@@ -273,11 +297,20 @@ namespace mongo {
                 ::exit(-1);
             }
             setsid();
+            
+            cmdLine.leaderProc = getpid();
 
             pid_t c2 = fork();
             if ( c2 ) {
+                int pstat;
                 cout << "forked process: " << c2 << endl;
-                _exit(0);
+                waitpid(c2, &pstat, 0);
+
+                if ( WIFEXITED(pstat) ) {
+                    _exit( WEXITSTATUS(pstat) );
+                }
+
+                _exit(51);
             }
 
             // stdout handled in initLogging
@@ -400,10 +433,27 @@ namespace mongo {
 
     void ignoreSignal( int sig ) {}
 
+    void launchSignal( int sig ) {
+        if ( sig == SIGUSR2 ) {
+            pid_t cur = getpid();
+            
+            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
+                // signal indicates successful start allowing us to exit
+                _exit(0);
+            } 
+        }
+    }
+
     void setupCoreSignals() {
 #if !defined(_WIN32)
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
         assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
+#endif
+    }
+
+    void setupLaunchSignals() {
+#if !defined(_WIN32)
+        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
 #endif
     }
 
