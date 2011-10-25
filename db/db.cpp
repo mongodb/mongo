@@ -479,6 +479,8 @@ namespace mongo {
         snapshotThread.go();
         clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
+        
+        CmdLine::launchOk();
 
         listen(listenPort);
 

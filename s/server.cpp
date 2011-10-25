@@ -357,8 +357,10 @@ int _main(int argc, char* argv[]) {
         return configError;
     }
     configServer.reloadSettings();
-
+    
     init();
+
+    CmdLine::launchOk();
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
