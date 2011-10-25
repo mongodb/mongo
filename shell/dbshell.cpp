@@ -549,9 +549,12 @@ string sayReplSetMemberState() {
             if( latestConn->runCommand("admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
                 stringstream ss;
                 ss << info["set"].String() << ':';
+                
                 int s = info["myState"].Int();
                 MemberState ms(s);
-                return ms.toString();
+                ss << ms.toString();
+
+                return ss.str();
             }
             else {
                 string s = info.getStringField("info");
