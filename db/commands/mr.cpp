@@ -326,7 +326,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Client::GodScope _;
+            Client::GodScope godScope;
             if (_config.incLong != _config.tempLong) {
                 // create the inc collection and make sure we have index on "0" key
                 _db.dropCollection( _config.incLong );
@@ -433,7 +433,8 @@ namespace mongo {
 
             if (_config.outNonAtomic) {
                 postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
-            } else {
+            }
+            else {
                 writelock lock;
                 postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
             }
@@ -446,7 +447,7 @@ namespace mongo {
                 return;
 
             if ( newOutColl ) {
-                Client::GodScope _; // OK to output to new collection even if don't have write permission
+                Client::GodScope godScope; // OK to output to new collection even if don't have write permission
                 writelock lock;
                 BSONObj info;
                 if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
@@ -529,7 +530,7 @@ namespace mongo {
          * Insert doc into the inc collection, taking proper lock
          */
         void State::insertToInc( BSONObj& o ) {
-            Client::GodScope _;
+            Client::GodScope godScope;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
             _insertToInc(o);
@@ -619,7 +620,8 @@ namespace mongo {
                 // emit function that stays in JS
                 _scope->setFunction("emit", "function(key, value) { if (typeof(key) === 'object') { _bailFromJS(key, value); return; }; ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } else { ++_dupCt; } list.push(value); }");
                 _scope->injectNative("_bailFromJS", _bailFromJS, this);
-            } else {
+            }
+            else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );
             }
@@ -670,14 +672,15 @@ namespace mongo {
          */
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
 
-            Client::GodScope _;
+            Client::GodScope godScope;
             if (_jsMode) {
                 // apply the reduce within JS
                 if (_onDisk) {
                     _scope->injectNative("_nativeToTemp", _nativeToTemp, this);
                     _scope->invoke(_reduceAndFinalizeAndInsert, 0, 0, 0, true);
                     return;
-                } else {
+                }
+                else {
                     _scope->invoke(_reduceAndFinalize, 0, 0, 0, true);
                     return;
                 }
@@ -804,7 +807,7 @@ namespace mongo {
                 return;
             }
 
-            Client::GodScope _;
+            Client::GodScope godScope;
             auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             _dupCount = 0;
@@ -845,7 +848,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Client::GodScope _;
+            Client::GodScope godScope;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
 
@@ -882,7 +885,7 @@ namespace mongo {
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
-            Client::GodScope _;
+            Client::GodScope godScope;
             if (_jsMode) {
                 // try to reduce if it is beneficial
                 int dupCt = _scope->getNumberInt("_dupCt");
@@ -892,7 +895,8 @@ namespace mongo {
                     // too many keys for JS, switch to mixed
                     _bailFromJS(BSONObj(), this);
                     // then fall through to check map size
-                } else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
+                }
+                else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
                     return;
@@ -1184,7 +1188,8 @@ namespace mongo {
                         // nothing to do
                         return 1;
                     }
-                } else {
+                }
+                else {
                     set<ServerAndQuery> servers;
                     vector< auto_ptr<DBClientCursor> > shardCursors;
 
