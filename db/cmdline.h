@@ -105,13 +105,14 @@ namespace mongo {
         double syncdelay;      // seconds between fsyncs
 
         bool noUnixSocket;     // --nounixsocket
+        bool doFork;           // --fork
         string socket;         // UNIX domain socket directory
 
         bool keyFile;
 
 #ifndef _WIN32
-        pid_t parentProc;       // --fork pid of initial process
-        pid_t leaderProc;       // --fork pid of leader process
+        pid_t parentProc;      // --fork pid of initial process
+        pid_t leaderProc;      // --fork pid of leader process
 #endif
 
 #ifdef MONGO_SSL
@@ -149,7 +150,7 @@ namespace mongo {
         port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), preallocj(true), smallfiles(sizeof(int*) == 4),
         configsvr(false),
         quota(false), quotaFiles(8), cpu(false), durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-        syncdelay(60), noUnixSocket(false), socket("/tmp") 
+        syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp") 
     {
         started = time(0);
 
