@@ -417,7 +417,7 @@ namespace mongo {
                         setMinValid(newMinValid);
                     }
                 }
-                catch (DBException& e) {
+                catch (DBException&) {
                     err = "can't get/set minvalid";
                 }
                 if( h.rbid != getRBID(r.conn()) ) {
