@@ -72,6 +72,7 @@ namespace mongo {
         ;
         
         hidden.add_options()
+        ("cloud", po::value<string>(), "custom dynamic host naming")
 #ifdef MONGO_SSL
         ("sslOnNormalPorts" , "use ssl on configured ports" )
         ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )

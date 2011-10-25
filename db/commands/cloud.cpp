@@ -20,7 +20,10 @@ namespace mongo {
         virtual bool adminOnly() const { return true; } // very important
         virtual bool localHostOnlyIfNoAuth(const BSONObj&) { return true; }
         virtual bool slaveOk() const { return true; }
-        virtual void help( stringstream& help ) const { help << "internal"; }
+        virtual void help( stringstream& help ) const { 
+            help << "internal\n"; 
+            help << "{cloud:1,nodes:...,me:<my_logical_name>}";
+        }
         CmdCloud() : Command("cloud") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             assert(!fromRepl);
@@ -47,4 +50,11 @@ namespace mongo {
         }
     } cmdCloud;
 
+    BSONObj fromjson(const string &str);
+
+    void cloudCmdLineParamIs(string cmd) {
+        string errmsg;
+        BSONObjBuilder res;
+        cmdCloud.run("", fromjson(cmd), 0, errmsg, res, false);
+    }
 }

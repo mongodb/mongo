@@ -19,6 +19,7 @@
 #include "sock.h"
 #include "../background.h"
 #include "../concurrency/value.h"
+#include "../mongoutils/str.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -40,7 +41,11 @@
 #include <openssl/ssl.h>
 #endif
 
+using namespace mongoutils;
+
 namespace mongo {
+
+    mapsf<string,string> dynHostNames;
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
@@ -133,17 +138,22 @@ namespace mongo {
         addressSize = sizeof(sockaddr_in);
     }
 
-    SockAddr::SockAddr(const char * iporhost , int port) {
-        if (!strcmp(iporhost, "localhost"))
-            iporhost = "127.0.0.1";
+    SockAddr::SockAddr(const char * _iporhost , int port) {
+        string target = _iporhost;
+        if( target == "localhost" ) {
+            target = "127.0.0.1";
+        }
+        else if( *_iporhost == '#' ) {
+            target = dynHostNames.get(target);
+        }
 
-        if (strchr(iporhost, '/')) {
+        if( str::contains(target, '/') ) {
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
 #endif
-            uassert(13079, "path to unix socket too long", strlen(iporhost) < sizeof(as<sockaddr_un>().sun_path));
+            uassert(13079, "path to unix socket too long", target.size() < sizeof(as<sockaddr_un>().sun_path));
             as<sockaddr_un>().sun_family = AF_UNIX;
-            strcpy(as<sockaddr_un>().sun_path, iporhost);
+            strcpy(as<sockaddr_un>().sun_path, target.c_str());
             addressSize = sizeof(sockaddr_un);
         }
         else {
@@ -157,7 +167,7 @@ namespace mongo {
 
             StringBuilder ss;
             ss << port;
-            int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+            int ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
 
             // old C compilers on IPv6-capable hosts return EAI_NODATA error
 #ifdef EAI_NODATA
@@ -168,13 +178,13 @@ namespace mongo {
             if (ret == EAI_NONAME || nodata) {
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
-                ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+                ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
             }
 
             if (ret) {
                 // don't log if this as it is a CRT construction and log() may not work yet.
-                if( strcmp("0.0.0.0", iporhost) ) {
-                    log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
+                if( target != "0.0.0.0" ) {
+                    log() << "getaddrinfo(\"" << target << "\") failed: " << gai_strerror(ret) << endl;
                 }
                 *this = SockAddr(port);
             }
@@ -280,8 +290,6 @@ namespace mongo {
     }
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
-
-    mapsf<string,string> dynHostNames;
 
     // ------ hostname -------------------
 
