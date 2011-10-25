@@ -118,7 +118,7 @@ namespace mongo {
             SimpleMutex::scoped_lock lk(m);
             typename map<K,V>::iterator i = val.find(k);
             if( i == val.end() )
-                return K();
+                return V();
             return i->second;
         }
         // think about deadlocks when using ref.  the other methods
