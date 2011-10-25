@@ -55,6 +55,7 @@ namespace mongo {
     void cloudCmdLineParamIs(string cmd) {
         string errmsg;
         BSONObjBuilder res;
-        cmdCloud.run("", fromjson(cmd), 0, errmsg, res, false);
+        BSONObj o = fromjson(cmd);
+        cmdCloud.run("", o, 0, errmsg, res, false);
     }
 }
