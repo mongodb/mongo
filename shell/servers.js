@@ -378,11 +378,34 @@ MongoRunner.stopMongod = function( port, signal ){
         var opts = MongoRunner.savedOptions( port )
         if( opts ) port = parseInt( opts.port )
     }
-        
-    return stopMongod( parseInt( port ), parseInt( signal ) )
+    
+    var exitCode = stopMongod( parseInt( port ), parseInt( signal ) )
+    
+    delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
+    
+    return exitCode
 }
 
 MongoRunner.stopMongos = MongoRunner.stopMongod
+
+MongoRunner.isStopped = function( port ){
+    
+    if( ! port ) {
+        print( "Cannot detect if process " + port + " is stopped." )
+        return
+    }
+    
+    if( port.port )
+        port = parseInt( port.port )
+    
+    if( port instanceof ObjectId ){
+        var opts = MongoRunner.savedOptions( port )
+        if( opts ) port = parseInt( opts.port )
+    }
+    
+    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? true : false
+    
+}
 
 __nextPort = 27000;
 startMongodTest = function (port, dirname, restart, extraOptions ) {
