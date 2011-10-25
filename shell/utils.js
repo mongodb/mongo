@@ -1060,6 +1060,24 @@ jsTestLog = function(msg){
     print( "\n\n----\n" + msg + "\n----\n\n" )
 }
 
+jsTest = {}
+
+jsTest.name = jsTestName
+jsTest.file = jsTestFile
+jsTest.path = jsTestPath
+jsTest.options = jsTestOptions
+jsTest.log = jsTestLog
+
+jsTest.dir = function(){
+    return jsTest.path().replace( /\/[^\/]+$/, "/" )
+}
+
+jsTest.randomize = function( seed ) {
+    if( seed == undefined ) seed = new Date().getTime()
+    Random.srand( seed )
+    print( "Random seed for test : " + seed ) 
+}
+
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
         // Make sure that we have a db var before we use it
