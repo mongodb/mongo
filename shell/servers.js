@@ -239,6 +239,13 @@ MongoRunner.mongoOptions = function( opts ){
         opts.runId = opts.remember
         opts.remember = true
     }
+    else if( opts.remember == undefined ){
+        // Remember by default if we're restarting
+        opts.remember = opts.restart
+    }
+    
+    // If we passed in restart : <conn> or runId : <conn>
+    if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId
     
     if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
 
@@ -255,6 +262,8 @@ MongoRunner.mongoOptions = function( opts ){
     }
     
     opts.port = opts.port || MongoRunner.nextOpenPort()
+    MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
+    
     opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
     
     return opts
@@ -358,7 +367,7 @@ MongoRunner.runMongos = function( opts ){
     mongos.port = parseInt( mongos.commandLine.port ) 
     mongos.runId = runId || ObjectId()
     mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ]
-    
+        
     return mongos
 }
 
@@ -382,7 +391,7 @@ MongoRunner.stopMongod = function( port, signal ){
     var exitCode = stopMongod( parseInt( port ), parseInt( signal ) )
     
     delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
-    
+
     return exitCode
 }
 
@@ -403,8 +412,7 @@ MongoRunner.isStopped = function( port ){
         if( opts ) port = parseInt( opts.port )
     }
     
-    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? true : false
-    
+    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
 }
 
 __nextPort = 27000;
@@ -583,6 +591,14 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             otherParams.separateConfig = true
             if( params.config.length == 3 ) otherParams.sync = true
             else otherParams.sync = false
+        }
+        else if( params.config ) {
+            
+            if( params.config == 3 ){
+                otherParams.separateConfig = otherParams.separateConfig || true
+                otherParams.sync = true
+            }
+            
         }
     }
     else {

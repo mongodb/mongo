@@ -84,7 +84,7 @@ namespace mongo {
 
         BSONObj ops;
 
-        bool active; // true at starts, gets set to false when should stop
+        volatile bool active; // true at starts, gets set to false when should stop
         AtomicUInt threadsReady;
 
         bool error;
@@ -483,9 +483,11 @@ namespace mongo {
 
         void done(){
 
-            log() << "Ending!" << endl;
+            log() << "Ending! (waiting for " << threads.size() << " threads)" << endl;
 
+            scoped_lock lock( config._mutex );
             config.active = false;
+
             for ( unsigned i = 0; i < threads.size(); i++ ) threads[i]->join();
 
             // Get final stats
