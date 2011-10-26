@@ -113,6 +113,10 @@ namespace mongo {
             SimpleMutex::scoped_lock lk(m);
             val.swap(rhs);
         }
+        bool empty() { 
+            SimpleMutex::scoped_lock lk(m);
+            return val.empty(); 
+        }
         // safe as we pass by value:
         V get(K k) { 
             SimpleMutex::scoped_lock lk(m);

@@ -309,7 +309,12 @@ namespace mongo {
    
     //  --- my --
 
+    DiagStr _hostNameCached;
+
     string getHostName() {
+        if( !dynHostNames.empty() ) // cloud cmd in use
+            return _hostNameCached;
+
         char buf[256];
         int ec = gethostname(buf, 127);
         if ( ec || *buf == 0 ) {
@@ -319,7 +324,6 @@ namespace mongo {
         return buf;
     }
 
-    DiagStr _hostNameCached;
     static void _hostNameCachedInit() {
         _hostNameCached = getHostName();
     }
