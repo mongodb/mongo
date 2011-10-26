@@ -1064,8 +1064,6 @@ namespace mongo {
 
         virtual BSONObj prettyIndexBounds() const;
 
-        void forgetEndKey() { endKey = BSONObj(); }
-
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
 

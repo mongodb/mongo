@@ -220,140 +220,6 @@ namespace mongo {
         return qr;
     }
 
-    class CountOp : public QueryOp {
-    public:
-        CountOp( const string& ns , const BSONObj &spec ) :
-            _ns(ns), _capped(false), _count(), _myCount(),
-            _skip( spec["skip"].numberLong() ),
-            _limit( spec["limit"].numberLong() ),
-            _nscanned(),
-            _bc(),
-            _yieldRecoveryFailed() {
-        }
-
-        virtual void _init() {
-            _c = qp().newCursor();
-            _capped = _c->capped();
-            if ( qp().exactKeyMatch() && ! matcher( _c )->needRecord() ) {
-                _query = qp().simplifiedQuery( qp().indexKey() );
-                _bc = dynamic_cast< BtreeCursor* >( _c.get() );
-                _bc->forgetEndKey();
-            }
-        }
-
-        virtual long long nscanned() {
-            return _c.get() ? _c->nscanned() : _nscanned;
-        }
-
-        virtual bool prepareToYield() {
-            if ( _c && !_cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _ns.c_str() ) );
-            }
-            if ( _cc ) {
-	            return _cc->prepareToYield( _yieldData );
-            }
-            // no active cursor - ok to yield
-            return true;
-        }
-
-        virtual void recoverFromYield() {
-            if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
-                _yieldRecoveryFailed = true;
-                _c.reset();
-                _cc.reset();
-
-                if ( _capped ) {
-                    msgassertedNoTrace( 13337, str::stream() << "capped cursor overrun during count: " << _ns );
-                }
-                else if ( qp().mustAssertOnYieldFailure() ) {
-                    msgassertedNoTrace( 15891, str::stream() << "CountOp::recoverFromYield() failed to recover: " << _ns );
-                }
-                else {
-                    // we don't fail query since we're fine with returning partial data if collection dropped
-                }
-            }
-        }
-
-        virtual void next() {
-            if ( ! _c || !_c->ok() ) {
-                setComplete();
-                return;
-            }
-
-            _nscanned = _c->nscanned();
-            if ( _bc ) {
-                if ( _firstMatch.isEmpty() ) {
-                    _firstMatch = _bc->currKey().getOwned();
-                    // if not match
-                    if ( _query.woCompare( _firstMatch, BSONObj(), false ) ) {
-                        setComplete();
-                        return;
-                    }
-                    _gotOne();
-                }
-                else {
-                    if ( ! _firstMatch.equal( _bc->currKey() ) ) {
-                        setComplete();
-                        return;
-                    }
-                    _gotOne();
-                }
-            }
-            else {
-                if ( !matcher( _c )->matchesCurrent( _c.get() ) ) {
-                }
-                else if( !_c->getsetdup(_c->currLoc()) ) {
-                    _gotOne();
-                }
-            }
-            _c->advance();
-        }
-        virtual QueryOp *_createChild() const {
-            CountOp *ret = new CountOp( _ns , BSONObj() );
-            ret->_count = _count;
-            ret->_skip = _skip;
-            ret->_limit = _limit;
-            return ret;
-        }
-        long long count() const { return _count; }
-        virtual bool mayRecordPlan() const {
-            return !_yieldRecoveryFailed && ( ( _myCount > _limit / 2 ) || ( complete() && !stopRequested() ) );
-        }
-    private:
-
-        void _gotOne() {
-            if ( _skip ) {
-                _skip--;
-                return;
-            }
-
-            if ( _limit > 0 && _count >= _limit ) {
-                setStop();
-                return;
-            }
-
-            _count++;
-            _myCount++;
-        }
-
-        string _ns;
-        bool _capped;
-
-        long long _count;
-        long long _myCount;
-        long long _skip;
-        long long _limit;
-        long long _nscanned;
-        shared_ptr<Cursor> _c;
-        BSONObj _query;
-        BtreeCursor * _bc;
-        BSONObj _firstMatch;
-
-        ClientCursor::CleanupPointer _cc;
-        ClientCursor::YieldData _yieldData;
-        bool _yieldRecoveryFailed;
-    };
-
     /* { count: "collectionname"[, query: <query>] }
        returns -1 on ns does not exist error.
     */
@@ -370,16 +236,59 @@ namespace mongo {
         if ( query.isEmpty() ) {
             return applySkipLimit( d->stats.nrecords , cmd );
         }
-        MultiPlanScanner mps( ns, query, BSONObj(), 0, true, BSONObj(), BSONObj(), false, true );
-        CountOp original( ns , cmd );
-        shared_ptr< CountOp > res = mps.runOp( original );
-        if ( !res->complete() ) {
-            log() << "Count with ns: " << ns << " and query: " << query
-                  << " failed with exception: " << res->exception()
-                  << endl;
-            return 0;
+        
+        string exceptionInfo;
+        long long count = 0;
+        long long skip = cmd["skip"].numberLong();
+        long long limit = cmd["limit"].numberLong();
+        bool simpleEqualityMatch;
+        shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, &simpleEqualityMatch );
+        ClientCursor::CleanupPointer ccPointer;
+        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+        try {
+            while( cursor->ok() ) {
+                if ( !ccPointer->yieldSometimes( simpleEqualityMatch ? ClientCursor::DontNeed : ClientCursor::MaybeCovered ) ||
+                    !cursor->ok() ) {
+                    break;
+                }
+
+                // With simple equality matching there is no need to use the matcher because the bounds
+                // are enforced by the FieldRangeVectorIterator and only key fields have constraints.  There
+                // is no need do key deduping because an exact value is specified in the query for all key
+                // fields and duplicate keys are not allowed per document.
+                // NOTE In the distant past we used a min/max bounded BtreeCursor with a shallow
+                // equality comparison to check for matches in the simple match case.  That may be
+                // more performant, but I don't think we've measured the performance.
+                if ( simpleEqualityMatch ||
+                    ( ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() ) ) &&
+                        !cursor->getsetdup( cursor->currLoc() ) ) ) {
+                        
+                    if ( skip > 0 ) {
+                        --skip;
+                    }
+                    else {
+                        ++count;
+                        if ( limit > 0 && count >= limit ) {
+                            break;
+                        }
+                    }
+                }
+                cursor->advance();
+            }
+            ccPointer.reset();
+            return count;
+            
+        } catch ( const DBException &e ) {
+            exceptionInfo = e.toString();
+        } catch ( const std::exception &e ) {
+            exceptionInfo = e.what();
+        } catch ( ... ) {
+            exceptionInfo = "unknown exception";
         }
-        return res->count();
+        log() << "Count with ns: " << ns << " and query: " << query
+            << " failed with exception: " << exceptionInfo
+            << endl;
+        return 0;
     }
 
     class ExplainBuilder {
