@@ -711,7 +711,7 @@ DBCollection.prototype.getShardDistribution = function(){
        
        var shardStats = stats.shards[ shard ]
                
-       var chunks = config.chunks.find({ _id : sh._collRE( coll ), shard : shard }).toArray()
+       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
        
        numChunks += chunks.length
        
