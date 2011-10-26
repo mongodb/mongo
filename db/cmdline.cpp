@@ -486,7 +486,7 @@ namespace mongo {
         return s.str();
     }
 
-    casi< map<string,ParameterValidator*> * > pv_all = 0;
+    casi< map<string,ParameterValidator*> * > pv_all (NULL);
 
     ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
         if ( ! pv_all)

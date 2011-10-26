@@ -81,7 +81,7 @@ namespace mongo {
     */
     static unsigned long long nThreads = 0;
     void assertStartingUp() { 
-        dassert( nThreads <= 1 );
+        assert( nThreads <= 1 );
     }
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
 #if defined(_DEBUG)
