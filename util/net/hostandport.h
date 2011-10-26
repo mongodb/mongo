@@ -38,13 +38,9 @@ namespace mongo {
         /** @param p port number. -1 is ok to use default. */
         HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
 
-        HostAndPort(const SockAddr& sock )
-            : _host( sock.getAddr() ) , _port( sock.getPort() ) {
-        }
+        HostAndPort(const SockAddr& sock ) : _host( sock.getAddr() ) , _port( sock.getPort() ) { }
 
-        static HostAndPort me() {
-            return HostAndPort("localhost", cmdLine.port);
-        }
+        static HostAndPort me() { return HostAndPort("localhost", cmdLine.port); }
 
         /* uses real hostname instead of localhost */
         static HostAndPort Me();
@@ -57,13 +53,9 @@ namespace mongo {
             return false;
         }
 
-        bool operator==(const HostAndPort& r) const {
-            return _host == r._host && port() == r.port();
-        }
+        bool operator==(const HostAndPort& r) const { return _host == r._host && port() == r.port(); }
 
-        bool operator!=(const HostAndPort& r) const {
-            return _host != r._host || port() != r.port();
-        }
+        bool operator!=(const HostAndPort& r) const { return _host != r._host || port() != r.port(); }
 
         /* returns true if the host/port combo identifies this process instance. */
         bool isSelf() const; // defined in message.cpp

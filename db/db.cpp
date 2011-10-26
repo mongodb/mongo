@@ -600,7 +600,6 @@ int main(int argc, char* argv[]) {
 #endif
 
     replication_options.add_options()
-    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
     ;
 
@@ -624,7 +623,8 @@ int main(int argc, char* argv[]) {
     ;
 
     hidden_options.add_options()
-    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
+    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
+    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling (currently the default)")
@@ -632,8 +632,8 @@ int main(int argc, char* argv[]) {
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
     ("nopreallocj", "don't preallocate journal files")
-    ("dur", "enable journaling") // deprecated version
-    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
+    ("dur", "enable journaling") // old name for --journal
+    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated name
     // deprecated pairing command line options
     ("pairwith", "DEPRECATED")
     ("arbiter", "DEPRECATED")
