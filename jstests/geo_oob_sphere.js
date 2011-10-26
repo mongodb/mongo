@@ -16,17 +16,17 @@ t.insert({ loc : { x : 30, y : 91 } })
 t.ensureIndex({ loc : "2d" })
 assert.isnull( db.getLastError() )
 
-t.find({ loc : { $nearSphere : [ 30, 91 ], $maxDistance : 0.25 } }).count()
+assert.throws( function() { t.find({ loc : { $nearSphere : [ 30, 91 ], $maxDistance : 0.25 } }).count() } );
 var err = db.getLastError()
 assert( err != null )
 printjson( err )
 
-t.find({ loc : { $nearSphere : [ 30, 89 ], $maxDistance : 0.25 } }).count()
+assert.throws( function() { t.find({ loc : { $nearSphere : [ 30, 89 ], $maxDistance : 0.25 } }).count() } );
 var err = db.getLastError()
 assert( err != null )
 printjson( err )
 
-t.find({ loc : { $within : { $centerSphere : [[ -180, -91 ], 0.25] } } }).count()
+assert.throws( function() { t.find({ loc : { $within : { $centerSphere : [[ -180, -91 ], 0.25] } } }).count() } );
 var err = db.getLastError()
 assert( err != null )
 printjson( err )
