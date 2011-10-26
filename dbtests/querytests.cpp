@@ -51,9 +51,11 @@ namespace QueryTests {
                     toDelete.push_back( c->currLoc() );
                 for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
                     theDataFileMgr.deleteRecord( ns(), i->rec(), *i, false );
+                DBDirectClient cl;
+                cl.dropIndexes( ns() );
             }
             catch ( ... ) {
-                FAIL( "Exception while cleaning up records" );
+                FAIL( "Exception while cleaning up collection" );
             }
         }
     protected:
@@ -141,12 +143,58 @@ namespace QueryTests {
             addIndex( BSON( "c" << 1 ) );
             insert( BSON( "b" << 2 << "_id" << 0 ) );
             insert( BSON( "c" << 3 << "_id" << 1 ) );
+            BSONObj query = fromjson( "{$or:[{b:2},{c:3}]}" );
             BSONObj ret;
-            ASSERT( Helpers::findOne( ns(), fromjson( "{$or:[{b:2},{c:3}]}" ), ret, true ) );
+            // Check findOne() returning object.
+            ASSERT( Helpers::findOne( ns(), query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
+            // Cross check with findOne() returning location.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, true ).obj() );
         }
     };
+    
+    class FindOneRequireIndex : public Base {
+    public:
+        void run() {
+            insert( BSON( "b" << 2 << "_id" << 0 ) );
+            BSONObj query = fromjson( "{b:2}" );
+            BSONObj ret;
 
+            // Check findOne() returning object, allowing unindexed scan.
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            // Check findOne() returning location, allowing unindexed scan.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+            
+            // Check findOne() returning object, requiring indexed scan without index.
+            ASSERT_EXCEPTION( Helpers::findOne( ns(), query, ret, true ), MsgAssertionException );
+            // Check findOne() returning location, requiring indexed scan without index.
+            ASSERT_EXCEPTION( Helpers::findOne( ns(), query, true ), MsgAssertionException );
+
+            addIndex( BSON( "b" << 1 ) );
+            // Check findOne() returning object, requiring indexed scan with index.
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            // Check findOne() returning location, requiring indexed scan with index.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+        }
+    };
+    
+    class FindOneEmptyObj : public Base {
+    public:
+        void run() {
+            // We don't normally allow empty objects in the database, but test that we can find
+            // an empty object (one might be allowed inside a reserved namespace at some point).
+            DBDirectClient cl;
+            BSONObj info;
+            ASSERT( cl.runCommand( "unittests", BSON( "godinsert" << "querytests" << "obj" << BSONObj() ), info ) );
+            insert( BSONObj() );
+            BSONObj query;
+            BSONObj ret;
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            ASSERT( ret.isEmpty() );
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+        }
+    };
+    
     class ClientBase {
     public:
         ClientBase() {
@@ -1358,6 +1406,8 @@ namespace QueryTests {
             add< CountQueryFields >();
             add< CountIndexedRegex >();
             add< FindOne >();
+            add< FindOneRequireIndex >();
+            add< FindOneEmptyObj >();
             add< BoundedKey >();
             add< GetMore >();
             add< PositiveLimit >();

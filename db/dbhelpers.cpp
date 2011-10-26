@@ -59,60 +59,14 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
     }
 
-    /** Simple QueryOp implementation to return first match.  Does not support yielding. */
-    class FindOne : public QueryOp {
-    public:
-        FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
-        virtual void _init() {
-            if ( requireIndex_ && strcmp( qp().indexKey().firstElementFieldName(), "$natural" ) == 0 )
-                throw MsgAssertionException( 9011 , "Not an index cursor" );
-            c_ = qp().newCursor();
-            if ( !c_->ok() ) {
-                setComplete();
-            }
-        }
-        virtual void next() {
-            if ( !c_->ok() ) {
-                setComplete();
-                return;
-            }
-            if ( matcher( c_ )->matchesCurrent( c_.get() ) ) {
-                one_ = c_->current();
-                loc_ = c_->currLoc();
-                setStop();
-            }
-            else {
-                c_->advance();
-            }
-        }
-        virtual long long nscanned() {
-            // We don't support yielding, so will always have c_.
-            assert( c_.get() );
-            return c_->nscanned();
-        }
-        virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *_createChild() const { return new FindOne( requireIndex_ ); }
-        BSONObj one() const { return one_; }
-        DiskLoc loc() const { return loc_; }
-    private:
-        bool requireIndex_;
-        shared_ptr<Cursor> c_;
-        BSONObj one_;
-        DiskLoc loc_;
-    };
-
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
     bool Helpers::findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
-        MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
-        FindOne original( requireIndex );
-        shared_ptr< FindOne > res = s.runOp( original );
-        if ( ! res->complete() )
-            throw MsgAssertionException( res->exception() );
-        if ( res->one().isEmpty() )
+        DiskLoc loc = findOne( ns, query, requireIndex );
+        if ( loc.isNull() )
             return false;
-        result = res->one();
+        result = loc.obj();
         return true;
     }
 
@@ -120,12 +74,14 @@ namespace mongo {
        set your db SavedContext first
     */
     DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
-        MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
-        FindOne original( requireIndex );
-        shared_ptr< FindOne > res = s.runOp( original );
-        if ( ! res->complete() )
-            throw MsgAssertionException( res->exception() );
-        return res->loc();
+        shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), requireIndex );
+        while( c->ok() ) {
+            if ( ( !c->matcher() || c->matcher()->matchesCurrent( c.get() ) ) && !c->getsetdup( c->currLoc() ) ) {
+                return c->currLoc();
+            }
+            c->advance();
+        }
+        return DiskLoc();
     }
 
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,

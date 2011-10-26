@@ -57,7 +57,7 @@ namespace mongo {
            @param query - the query to perform.  note this is the low level portion of query so "orderby : ..."
                           won't work.
 
-           @param requireIndex if true, complain if no index for the query.  a way to guard against
+           @param requireIndex if true, assert if no index for the query.  a way to guard against
            writing a slow query.
 
            @return true if object found
