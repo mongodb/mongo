@@ -46,7 +46,7 @@ namespace mongo {
 
     void Strategy::doQuery( Request& r , const Shard& shard ) {
 
-        r.checkAuth();
+        r.checkAuth( Auth::READ );
 
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();

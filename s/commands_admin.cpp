@@ -1002,6 +1002,8 @@ namespace mongo {
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
+
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1018,6 +1020,7 @@ namespace mongo {
         class CmdShardingGetLastError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }

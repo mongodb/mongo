@@ -1346,6 +1346,7 @@ namespace mongo {
             if( c->requiresAuth() && !ai->isAuthorized(cl)) {
                 ok = false;
                 errmsg = "unauthorized";
+                anObjBuilder.append( "note" , str::stream() << "need to authorized on db: " << cl << " for command: " << e.fieldName() );
             }
             else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost ) {
                 ok = false;
