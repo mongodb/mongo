@@ -40,7 +40,7 @@ for( i = 0; i < 15; ++i ) {
 }
 
 f2();
-// pattern should be recorded, since > half of results returned from this index
+// pattern should be recorded, since we transitioned to the takeover cursor and had over 50 matches
 assert( t.find( { c:2 } ).batchSize( 100 ).explain( true ).oldPlan );
 
 }
@@ -54,9 +54,9 @@ doTest( function() {
        );
 
 doTest( function() {
-       t.find( { $or: [ { a:2 }, { b:2 }, { c:2 } ] } ).limit( 100 ).count( true );
+       t.find( { $or: [ { a:2 }, { b:2 }, { c:2 } ] } ).limit(102).count( true );
        },
        function() {
-       t.find( { $or: [ { a:2 }, { c:2 } ] } ).limit( 100 ).count( true );       
+       t.find( { $or: [ { a:2 }, { c:2 } ] } ).limit(102).count( true );       
        }
        );
