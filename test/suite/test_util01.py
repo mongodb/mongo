@@ -150,19 +150,7 @@ class test_util01(wttest.WiredTigerTestCase):
                 
         self.assertTrue(self.compare_files("expect.out", "dump.out"))
 
-    def test_dump_process(self):
-        self.dump(False, False)
-
-    def test_dump_process_hex(self):
-        self.dump(False, True)
-
-    def test_dump_api(self):
-        self.dump(True, False)
- 
-    def test_dump_api_hex(self):
-        self.dump(True, True)
- 
-    def test_load_process(self):
+    def load_process(self, hexoutput):
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
@@ -184,7 +172,11 @@ class test_util01(wttest.WiredTigerTestCase):
 
         self.pr('calling dump')
         with open("dump.out", "w") as dumpout:
-            proc = subprocess.Popen(["../../wt", "dump", self.tablename], stdout=dumpout)
+            dumpargs = ["../../wt", "dump"]
+            if hexoutput:
+                dumpargs.append("-x")
+            dumpargs.append(self.tablename)
+            proc = subprocess.Popen(dumpargs, stdout=dumpout)
             self.assertEqual(proc.wait(), 0)
 
         # TODO: this shouldn't be needed.
@@ -210,6 +202,24 @@ class test_util01(wttest.WiredTigerTestCase):
             self.assertEqual(val, self.get_value(i))
             i += 1
         cursor.close()
+
+    def test_dump_process(self):
+        self.dump(False, False)
+
+    def test_dump_process_hex(self):
+        self.dump(False, True)
+
+    def test_dump_api(self):
+        self.dump(True, False)
+ 
+    def test_dump_api_hex(self):
+        self.dump(True, True)
+ 
+    def test_load_process(self):
+        self.load_process(False)
+
+    def test_load_process_hex(self):
+        self.load_process(True)
 
 if __name__ == '__main__':
     wttest.run()
