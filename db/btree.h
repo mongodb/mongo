@@ -1122,7 +1122,7 @@ namespace mongo {
         DiskLoc locAtKeyOfs;
         const shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVectorIterator > _boundsIterator;
-        const IndexSpec& _spec;
+        const IndexSpec *_spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;
         long long _nscanned;

@@ -296,7 +296,7 @@ namespace mongo {
         _order( _id.keyPattern() ),
         _ordering( Ordering::make( _order ) ),
         _direction( _direction ),
-        _spec( _id.getSpec() ),
+        _spec( &_id.getSpec() ),
         _independentFieldRanges( false ),
         _nscanned( 0 ) {
         audit();
@@ -313,10 +313,10 @@ namespace mongo {
         _direction( _direction ),
         _bounds( ( assert( _bounds.get() ), _bounds ) ),
         _boundsIterator( new FieldRangeVectorIterator( *_bounds  ) ),
-        _spec( useFRVSpec ? _bounds->getSpec() : _id.getSpec() ),
+        _spec( useFRVSpec ? &_bounds->getSpec() : &_id.getSpec() ),
         _independentFieldRanges( true ),
         _nscanned( 0 ) {
-        massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
+        massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec->getType() );
         audit();
         startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
@@ -333,10 +333,12 @@ namespace mongo {
     }
 
     void BtreeCursor::init() {
-        if ( _spec.getType() ) {
-            startKey = _spec.getType()->fixKey( startKey );
-            endKey = _spec.getType()->fixKey( endKey );
+        if ( _spec->getType() ) {
+            startKey = _spec->getType()->fixKey( startKey );
+            endKey = _spec->getType()->fixKey( endKey );
         }
+        // Avoid referencing an IndexSpec that may be invalidated.
+        _spec = 0;
         bucket = _locate(startKey, _direction > 0 ? minDiskLoc : maxDiskLoc);
         if ( ok() ) {
             _nscanned = 1;
