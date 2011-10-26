@@ -23,13 +23,13 @@
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "security_common.h"
-
 #ifdef _WIN32
 #include <direct.h>
 #else
 #include <sys/types.h>
 #include <sys/wait.h>
 #endif
+#include "globals.h"
 
 #define MAX_LINE_LENGTH 256
 
@@ -486,18 +486,19 @@ namespace mongo {
         return s.str();
     }
 
-    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
-        if ( ! _all )
-            _all = new map<string,ParameterValidator*>();
-        (*_all)[_name] = this;
-    }
+    casi< map<string,ParameterValidator*> * > pv_all = 0;
 
+    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
+        if ( ! pv_all)
+            pv_all.ref() = new map<string,ParameterValidator*>();
+        (*pv_all.ref())[_name] = this;
+    }
+    
     ParameterValidator * ParameterValidator::get( const string& name ) {
-        map<string,ParameterValidator*>::iterator i = _all->find( name );
-        if ( i == _all->end() )
+        map<string,ParameterValidator*>::const_iterator i = pv_all.get()->find( name );
+        if ( i == pv_all.get()->end() )
             return NULL;
         return i->second;
     }
-    map<string,ParameterValidator*> * ParameterValidator::_all = 0;
 
 }

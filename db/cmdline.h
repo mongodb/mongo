@@ -25,8 +25,6 @@ namespace mongo {
     class SSLManager;
 #endif
 
-
-
     /* command line options
     */
     /* concurrency: OK/READ */
@@ -197,10 +195,8 @@ namespace mongo {
         static ParameterValidator * get( const string& name );
 
     private:
-        string _name;
-
-        // don't need to lock since this is all done in static init
-        static map<string,ParameterValidator*> * _all;
+        const string _name;
     };
 
 }
+

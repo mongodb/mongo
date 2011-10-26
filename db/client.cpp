@@ -79,9 +79,14 @@ namespace mongo {
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
+    static unsigned long long nThreads = 0;
+    void assertStartingUp() { 
+        dassert( nThreads <= 1 );
+    }
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
 #if defined(_DEBUG)
         { 
+            nThreads++; // never decremented.  this is for casi class asserts
             if( sizeof(void*) == 8 ) {
                 StackChecker sc;
                 sc.init();

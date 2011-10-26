@@ -330,6 +330,7 @@
     </ClInclude>
     <ClInclude Include="..\third_party\pcre-7.4\config.h" />
     <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="globals.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
