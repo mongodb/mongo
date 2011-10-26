@@ -430,7 +430,14 @@ namespace mongo {
          * for this query, otherwise return an empty shared_ptr.
          */
         shared_ptr<Cursor> singleCursor() const;
-        
+
+        /**
+         * @return the query plan that would be used if the scanner would run a single
+         * cursor for this query, otherwise 0.  The returned plan is invalid if this
+         * MultiPlanScanner is destroyed, hence we return a raw pointer.
+         */
+        const QueryPlan *singlePlan() const;
+
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org->orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */

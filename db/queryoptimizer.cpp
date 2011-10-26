@@ -974,13 +974,21 @@ doneCheckOrder:
     }
     
     shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
-        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
-            return shared_ptr<Cursor>();
+        const QueryPlan *qp = singlePlan();
+        if ( !qp ) {
+            return shared_ptr<Cursor>();            
         }
         // If there is only one plan and it does not require an in memory
         // sort, we do not expect its cursor op to throw an exception and
         // so do not need a QueryOptimizerCursor to handle this case.
-        return _currentQps->firstPlan()->newCursor();
+        return qp->newCursor();
+    }
+
+    const QueryPlan *MultiPlanScanner::singlePlan() const {
+        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
+            return 0;
+        }
+        return _currentQps->firstPlan().get();
     }
 
     bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {

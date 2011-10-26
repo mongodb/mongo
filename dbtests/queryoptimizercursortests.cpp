@@ -25,7 +25,7 @@
 
 namespace mongo {
     void __forceLinkGeoPlugin();
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj(), bool requireIndex = false );
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
@@ -1665,15 +1665,24 @@ namespace QueryOptimizerCursorTests {
             void run() {
                 dblock lk;
                 Client::Context ctx( ns() );
-                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), query(), order() );
+                bool simpleEqualityMatch;
+                if ( expectException() ) {
+                    ASSERT_EXCEPTION( NamespaceDetailsTransient::getCursor( ns(), query(), order(), requireIndex(), &simpleEqualityMatch ), MsgAssertionException );
+                    return;
+                }
+                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), query(), order(), requireIndex(), &simpleEqualityMatch );
+                ASSERT_EQUALS( expectSimpleEquality(), simpleEqualityMatch );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
                 check( c );
             }
         protected:
-            virtual string expectedType() const = 0;
+            virtual string expectedType() const { return "TESTDUMMY"; }
+            virtual bool expectException() const { return false; }
+            virtual bool expectSimpleEquality() const { return false; }
             virtual BSONObj query() const { return BSONObj(); }
             virtual BSONObj order() const { return BSONObj(); }
+            virtual bool requireIndex() const { return false; }
             virtual void check( const shared_ptr<Cursor> &c ) {
                 ASSERT( c->ok() );
                 ASSERT( !c->matcher() );
@@ -1714,6 +1723,22 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 6, c->current().getIntField( "a" ) );
                 ASSERT( c->matcher()->matchesCurrent( c.get() ) );
                 ASSERT( !c->advance() );                    
+            }
+        };
+        
+        class SimpleKeyMatch : public Base {
+        public:
+            SimpleKeyMatch() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.update( ns(), BSONObj(), BSON( "$set" << BSON( "a" << true ) ) );
+            }
+            string expectedType() const { return "BtreeCursor a_1"; }
+            bool expectSimpleEquality() const { return true; }
+            BSONObj query() const { return BSON( "a" << true ); }
+            virtual void check( const shared_ptr<Cursor> &c ) {
+                ASSERT( c->ok() );
+                ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
+                ASSERT( !c->advance() );
             }
         };
         
@@ -1770,6 +1795,89 @@ namespace QueryOptimizerCursorTests {
             string expectedType() const { return "QueryOptimizerCursor"; }
             BSONObj query() const { return BSON( "_id" << GT << 0 << "a" << GT << 0 ); }
             void check( const shared_ptr<Cursor> &c ) {}
+        };
+        
+        class RequireIndexNoConstraints : public Base {
+            bool requireIndex() const { return true; }
+            bool expectException() const { return true; }
+        };
+
+        class RequireIndexSimpleId : public Base {
+            bool requireIndex() const { return true; }
+            string expectedType() const { return "BtreeCursor _id_"; }
+            BSONObj query() const { return BSON( "_id" << 5 ); }
+        };
+
+        class RequireIndexUnindexedQuery : public Base {
+            bool requireIndex() const { return true; }
+            bool expectException() const { return true; }
+            BSONObj query() const { return BSON( "a" << GTE << 5 ); }
+        };
+
+        class RequireIndexIndexedQuery : public Base {
+        public:
+            RequireIndexIndexedQuery() {
+                _cli.insert( ns(), BSON( "_id" << 6 << "a" << 6 << "c" << 4 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+            }
+            string expectedType() const { return "QueryOptimizerCursor"; }
+            bool requireIndex() const { return true; }
+            BSONObj query() const { return BSON( "a" << GTE << 5 << "c" << 4 ); }
+            void check( const shared_ptr<Cursor> &c ) {
+                ASSERT( c->ok() );
+                ASSERT( c->matcher() );
+                ASSERT_EQUALS( 6, c->current().getIntField( "_id" ) );
+                ASSERT( !c->advance() );
+            }
+        };
+
+        class RequireIndexSecondOrClauseIndexed : public Base {
+        public:
+            RequireIndexSecondOrClauseIndexed() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "b" << 1 ) );
+            }
+            bool requireIndex() const { return true; }
+            string expectedType() const { return "QueryOptimizerCursor"; }
+            BSONObj query() const { return fromjson( "{$or:[{a:1},{b:1}]}" ); }
+            void check( const shared_ptr<Cursor> &c ) {
+                ASSERT( c->ok() );
+                ASSERT( c->matcher() );
+                ASSERT( c->advance() );
+                ASSERT( !c->advance() ); // 2 matches exactly
+            }
+        };
+        
+        class RequireIndexSecondOrClauseUnindexed : public Base {
+        public:
+            RequireIndexSecondOrClauseUnindexed() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+            }
+            bool requireIndex() const { return true; }
+            bool expectException() const { return true; }
+            BSONObj query() const { return fromjson( "{$or:[{a:1},{b:1}]}" ); }
+        };
+
+        class RequireIndexSecondOrClauseUnindexedUndetected : public Base {
+        public:
+            RequireIndexSecondOrClauseUnindexedUndetected() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "b" << 1 ) );
+            }
+            bool requireIndex() const { return true; }
+            string expectedType() const { return "QueryOptimizerCursor"; }
+            BSONObj query() const { return fromjson( "{$or:[{a:1},{b:1}]}" ); }
+            void check( const shared_ptr<Cursor> &c ) {
+                ASSERT( c->ok() );
+                ASSERT( c->matcher() );
+                // An unindexed cursor is required for the second clause, but is not allowed.
+                ASSERT_EXCEPTION( c->advance(), MsgAssertionException );
+            }
         };
         
     } // namespace GetCursor
@@ -1844,10 +1952,18 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::GetCursor::NoConstraints>();
             add<QueryOptimizerCursorTests::GetCursor::SimpleId>();
             add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
+            add<QueryOptimizerCursorTests::GetCursor::SimpleKeyMatch>();
             add<QueryOptimizerCursorTests::GetCursor::Geo>();
             add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexNoConstraints>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexSimpleId>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexUnindexedQuery>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexIndexedQuery>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseIndexed>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseUnindexed>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseUnindexedUndetected>();
         }
     } myall;
     
