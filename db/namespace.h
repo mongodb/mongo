@@ -446,8 +446,16 @@ namespace mongo {
          * currKey() documents, the matcher(), and the isMultiKey() nature of the
          * cursor may change over the course of iteration.
          *
-         * @param order - If no index exists that satisfies this sort order, an
-         * empty shared_ptr will be returned.
+         * @param order - Required ordering spec for documents produced by this cursor,
+         * empty object default indicates no order requirement.  If no index exists that
+         * satisfies the required sort order, an empty shared_ptr is returned.
+         *
+         * @param requireIndex - If true, no unindexed (ie collection scan) cursors are
+         * used to generate the returned cursor.  If an unindexed cursor is required, an
+         * assertion is raised by the cursor during iteration.
+         *
+         * @param simpleEqualityMatch - Set to true for certain simple queries -
+         * see queryoptimizer.cpp.
          *
          * The returned cursor may @throw inside of advance() or recoverFromYield() in
          * certain error cases, for example if a capped overrun occurred during a yield.
@@ -458,7 +466,9 @@ namespace mongo {
          * - covered indexes
          * - in memory sorting
          */
-        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
+                                            const BSONObj &order = BSONObj(), bool requireIndex = false,
+                                            bool *simpleEqualityMatch = 0 );
                                      
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
