@@ -10,13 +10,26 @@ testUser = {
     password : "baz"
 };
 
-function login(userObj) {
-    var n = s.getDB(userObj.db).runCommand({getnonce: 1});
-    var a = s.getDB(userObj.db).runCommand({authenticate: 1, user: userObj.username, nonce: n.nonce, key: s.getDB("admin").__pwHash(n.nonce, userObj.username, userObj.password)});
+testUserReadOnly = {
+    db : "test",
+    username : "sad",
+    password : "bat"
+};
+
+
+function login(userObj , thingToUse ) {
+    if ( ! thingToUse )
+        thingToUse = s;
+    
+    var n = thingToUse.getDB(userObj.db).runCommand({getnonce: 1});
+    var a = thingToUse.getDB(userObj.db).runCommand({authenticate: 1, user: userObj.username, nonce: n.nonce, key: thingToUse.getDB("admin").__pwHash(n.nonce, userObj.username, userObj.password)});
     printjson(a);
 }
 
-function logout(userObj) {
+function logout(userObj, thingToUse ) {
+    if ( ! thingToUse )
+        thingToUse = s;
+
     s.getDB(userObj.db).runCommand({logout:1});
 }
 
@@ -97,7 +110,8 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-s.getDB(testUser.db).addUser(testUser.username, testUser.password);
+s.getDB(testUser.db).addUser(testUser.username, testUser.password , false );
+s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true);
 
 logout(adminUser);
 
@@ -121,8 +135,9 @@ assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});
-result = s.getDB("test").runCommand({getLastError : 1});
+result = s.getDB("test").getLastErrorObj();
 assert.eq(result.err, null);
+assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 
 logout(testUser);
 
@@ -181,5 +196,25 @@ var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUse
 
 print("result: "+x);
 
+// test read only users
+
+print( "starting read only tests" );
+
+readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host )
+readOnlyDB = readOnlyS.getDB( "test" );
+
+print( "   testing find that should fail" );
+assert.throws( function(){ readOnlyDB.foo.findOne(); } )
+
+print( "   logging in" );
+login( testUserReadOnly , readOnlyS );
+
+print( "   testing find that should work" );
+readOnlyDB.foo.findOne();
+
+print( "   testing write that should fail" );
+readOnlyDB.foo.insert( { eliot : 1 } );
+result = readOnlyDB.getLastError();
+assert( ! result.ok , tojson( result ) )
 
 s.stop();
