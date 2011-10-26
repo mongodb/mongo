@@ -802,6 +802,18 @@ ShardingTest.prototype.getRSEntry = function( setName ){
     throw "can't find rs: " + setName;
 }
 
+ShardingTest.prototype.getConfigIndex = function( config ){
+    
+    // Assume config is a # if not a conn object
+    if( ! isObject( config ) ) config = getHostName() + ":" + config
+    
+    for( var i = 0; i < this._configServers.length; i++ ){
+        if( connectionURLTheSame( this._configServers[i], config ) ) return i
+    }
+    
+    return -1
+}
+
 ShardingTest.prototype.getDB = function( name ){
     return this.s.getDB( name );
 }
