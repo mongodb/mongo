@@ -217,4 +217,18 @@ readOnlyDB.foo.insert( { eliot : 1 } );
 result = readOnlyDB.getLastError();
 assert( ! result.ok , tojson( result ) )
 
+print( "   testing read command (should succeed)" );
+assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
+
+print( "   testing write command (should fail)" );
+assert.commandFailed(readOnlyDB.runCommand(
+    {mapreduce : "foo",
+     map : function() { emit(this.y, 1); },
+     reduce : function(key, values) { return values.length; },
+     out:"blarg"
+    }));
+
+print( "   testing logout (should succeed)" );
+assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
+
 s.stop();

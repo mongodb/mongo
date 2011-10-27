@@ -1343,7 +1343,7 @@ namespace mongo {
 
             char cl[256];
             nsToDatabase(ns, cl);
-            if( c->requiresAuth() && !ai->isAuthorized(cl)) {
+            if( c->requiresAuth() && !ai->isAuthorizedForLock(cl, c->locktype())) {
                 ok = false;
                 errmsg = "unauthorized";
                 anObjBuilder.append( "note" , str::stream() << "need to authorized on db: " << cl << " for command: " << e.fieldName() );
