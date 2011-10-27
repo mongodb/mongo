@@ -394,23 +394,29 @@ namespace mongo {
         check( this->n < 1024 );
         check( keypos >= 0 && keypos <= this->n );
 
-        bool equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
+        int cmpDupKeyResult = 0;
+        if ( keypos && key.woEqual( keyNode(keypos-1).key ) )
+            cmpDupKeyResult = -1;
+        if ( keypos < this->n && key.woEqual( keyNode(keypos).key ) )
+            cmpDupKeyResult = 1;
+
         int bytesNeeded = sizeof(_KeyNode);
-        if ( !equalWithLastKey )
+        if ( !cmpDupKeyResult )
             bytesNeeded += key.dataSize();
 
         if ( bytesNeeded > this->emptySize ) {
-            int oldkeypos = keypos;
             _pack(thisLoc, order, keypos);
-            if ( oldkeypos != keypos ) {
-                // we have to re-check, because:
-                // 1. 'keypos' could be changed.
-                // 2. the equality might not hold anymore when previous one is marked as unused before _pack().
-                equalWithLastKey = (keypos && key.woEqual( keyNode(keypos-1).key ));
-                bytesNeeded = sizeof(_KeyNode);
-                if ( !equalWithLastKey )
-                    bytesNeeded += key.dataSize();
-            }
+            // we have to re-check, because: the equality might not hold anymore
+            // when previous or next one is marked as unused before we _pack().
+            cmpDupKeyResult = 0;
+            if ( keypos && key.woEqual( keyNode(keypos-1).key ) )
+                cmpDupKeyResult = -1;
+            if ( keypos < this->n && key.woEqual( keyNode(keypos).key ) )
+                cmpDupKeyResult = 1;
+
+            bytesNeeded = sizeof(_KeyNode);
+            if ( !cmpDupKeyResult )
+                bytesNeeded += key.dataSize();
             if ( bytesNeeded > this->emptySize )
                 return false;
         }
@@ -440,8 +446,13 @@ namespace mongo {
         _KeyNode& kn = b->k(keypos);
         kn.prevChildBucket.Null();
         kn.recordLoc = recordLoc;
-        if ( equalWithLastKey ) {
+        if ( cmpDupKeyResult < 0 ) {
+            // dup key with previous one
             kn.setKeyDataOfs( b->k(keypos-1).keyDataOfs() );
+        }
+        else if ( cmpDupKeyResult > 0 ) {
+            // dup key with next one
+            kn.setKeyDataOfs( b->k(keypos+1).keyDataOfs() );
         }
         else {
             kn.setKeyDataOfs((short) b->_alloc(key.dataSize()) );
