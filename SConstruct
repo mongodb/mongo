@@ -135,6 +135,8 @@ add_option( "staticlibpath", "comma separated list of dirs to search for staticl
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
+add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
+
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
@@ -1435,7 +1437,7 @@ def installBinary( e , name ):
     if (solaris or linux) and (not has_option("nostrip")):
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
 
-    if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+    if not has_option( "no-glibc-check" ) and linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
     if nix:
