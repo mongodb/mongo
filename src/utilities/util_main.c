@@ -122,7 +122,9 @@ main(int argc, char *argv[])
 			ret = usage();
 		break;
 	case 'l':
-		if (strcmp(command, "load") == 0)
+		if (strcmp(command, "list") == 0)
+			ret = util_list(session, argc, argv);
+		else if (strcmp(command, "load") == 0)
 			ret = util_load(session, argc, argv);
 		else if (strcmp(command, "loadtext") == 0)
 			ret = util_loadtext(session, argc, argv);
@@ -185,6 +187,7 @@ usage(void)
 	    "\tdrop\t  drop a table\n"
 	    "\tdump\t  dump a table\n"
 	    "\tdumpfile  dump a physical file in debugging format\n"
+	    "\tlist\t  list database objects\n"
 	    "\tload\t  load a table\n"
 	    "\tprintlog  display the database log\n"
 	    "\tsalvage\t  salvage a file\n"

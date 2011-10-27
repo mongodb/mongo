@@ -125,9 +125,9 @@ schema(WT_SESSION *session, const char *uri)
 
 	/* Open the schema file. */
 	if ((ret = session->open_cursor(
-	    session, "file:__schema.wt", NULL, NULL, &cursor)) != 0) {
+	    session, UTIL_SCHEMA, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, "file:__schema.wt", wiredtiger_strerror(ret));
+		    progname, UTIL_SCHEMA, wiredtiger_strerror(ret));
 		return (1);
 	}
 

@@ -15,17 +15,19 @@
 
 #include <wt_internal.h>
 
-#define	UTIL_FILE_OK	0x01		/* file: prefix OK */
-#define	UTIL_TABLE_OK	0x02		/* table: prefix OK */
+#define	UTIL_SCHEMA	"file:__schema.wt"	/* Schema file URI */
+
+#define	UTIL_FILE_OK	0x01			/* file: prefix OK */
+#define	UTIL_TABLE_OK	0x02			/* table: prefix OK */
 
 typedef struct {
 	void   *mem;				/* Managed memory chunk */
 	size_t	memsize;			/* Managed memory size */
 } ULINE;
 
-extern const char *progname;		/* Program name */
-extern const char *usage_prefix;	/* Global arguments */
-extern int verbose;			/* Verbose flag */
+extern const char *progname;			/* Program name */
+extern const char *usage_prefix;		/* Global arguments */
+extern int verbose;				/* Verbose flag */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
@@ -47,6 +49,7 @@ int	 util_dump(WT_SESSION *, int, char *[]);
 int	 util_dumpfile(WT_SESSION *, int, char *[]);
 int	 util_err(int, const char *, ...);
 int	 util_getopt(int, char * const *, const char *);
+int	 util_list(WT_SESSION *, int, char *[]);
 int	 util_load(WT_SESSION *, int, char *[]);
 int	 util_loadtext(WT_SESSION *, int, char *[]);
 char	*util_name(const char *, const char *, u_int);

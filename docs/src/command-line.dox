@@ -104,6 +104,21 @@ file.
 
 
 <hr>
+@section utility_read wt list
+List the tables and files in the database.
+
+The \c list command prints out the URIs for tables and files stored in
+the database.
+
+@subsection utility_list_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] list</code>
+
+@subsection utility_list_options Options
+The \c list command has no command-specific options.
+
+
+
+<hr>
 @section utility_load wt load
 Load a table or file from dump output.
 
