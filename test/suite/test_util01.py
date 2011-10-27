@@ -6,7 +6,7 @@
 #	All rights reserved.
 #
 # test_util01.py
-# 	Utilities, like wt [ dump | load ], as well as the dump cursor
+# 	Utilities: wt dump, as well as the dump cursor
 #
 
 import unittest
@@ -18,12 +18,17 @@ import string
 
 class test_util01(wttest.WiredTigerTestCase):
     """
-    Test wt
+    Test wt dump.  We check for specific output.
+    Note that we don't test dumping {key,value}_format that are integer
+    here.  That's because the integer values are encoded and we don't
+    want to duplicate the encoding/decoding algorithms.  Integer dump
+    is tested implicity by test_util02 (which loads dumps created
+    in various ways).
     """
 
     tablename = 'test_util01.a'
-    tablename2 = 'test_util01.b'
     nentries = 1000
+    stringclass = ''.__class__
 
     # python has a filecmp.cmp function, but different versions
     # of python approach file comparison differently.  To make
@@ -94,8 +99,11 @@ class test_util01(wttest.WiredTigerTestCase):
             result += '\\00\n'
         return result
 
+    def table_config(self):
+        return 'key_format=S,value_format=S'
+
     def dump(self, usingapi, hexoutput):
-        params = 'key_format=S,value_format=S'
+        params = self.table_config()
         self.session.create('table:' + self.tablename, params)
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         ver = wiredtiger.wiredtiger_version()
@@ -134,7 +142,7 @@ class test_util01(wttest.WiredTigerTestCase):
                 dumpcurs = self.session.open_cursor('table:' + self.tablename,
                                                     None, dumpopt)
                 for key, val in dumpcurs:
-                    dumpout.write(key + "\n" + val + "\n")
+                    dumpout.write(str(key) + "\n" + str(val) + "\n")
                 dumpcurs.close()
             else:
                 # we close the connection to guarantee everything is
@@ -150,59 +158,6 @@ class test_util01(wttest.WiredTigerTestCase):
                 
         self.assertTrue(self.compare_files("expect.out", "dump.out"))
 
-    def load_process(self, hexoutput):
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
-        cursor = self.session.open_cursor('table:' + self.tablename, None, None)
-        for i in range(0, self.nentries):
-            key = self.get_key(i)
-            value = self.get_value(i)
-            cursor.set_key(key)
-            cursor.set_value(value)
-            cursor.insert()
-        cursor.close()
-
-        # Create a placeholder for the new table.
-        self.session.create('table:' + self.tablename2, params)
-
-        # we close the connection to guarantee everything is
-        # flushed, and that we can open it from another process
-        self.conn.close(None)
-        self.conn = None
-
-        self.pr('calling dump')
-        with open("dump.out", "w") as dumpout:
-            dumpargs = ["../../wt", "dump"]
-            if hexoutput:
-                dumpargs.append("-x")
-            dumpargs.append(self.tablename)
-            proc = subprocess.Popen(dumpargs, stdout=dumpout)
-            self.assertEqual(proc.wait(), 0)
-
-        # TODO: this shouldn't be needed.
-        # The output of 'wt dump' includes 'colgroups=' and 'columns='
-        # which are not acceptable to 'wt load', so we need to patch that.
-        with open("dump.out", "r+") as f:
-            old = f.read()
-            f.seek(0)
-            new = old.replace("colgroups=,columns=,", "colgroups=(),columns=(),")
-            f.write(new)
-        # end TODO
-
-        proc = subprocess.Popen(["../../wt", "load", "-f", "dump.out", "-r", self.tablename2])
-        self.assertEqual(proc.wait(), 0)
-
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
-
-        cursor = self.session.open_cursor('table:' + self.tablename2, None, None)
-        i = 0
-        for key, val in cursor:
-            self.assertEqual(key, self.get_key(i))
-            self.assertEqual(val, self.get_value(i))
-            i += 1
-        cursor.close()
-
     def test_dump_process(self):
         self.dump(False, False)
 
@@ -215,11 +170,6 @@ class test_util01(wttest.WiredTigerTestCase):
     def test_dump_api_hex(self):
         self.dump(True, True)
  
-    def test_load_process(self):
-        self.load_process(False)
-
-    def test_load_process_hex(self):
-        self.load_process(True)
 
 if __name__ == '__main__':
     wttest.run()
