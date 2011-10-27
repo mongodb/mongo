@@ -22,7 +22,7 @@
 #include "../bson/util/builder.h"
 
 #ifndef _WIN32
-//#include <syslog.h>
+#include <syslog.h>
 #endif
 
 namespace mongo {
@@ -45,6 +45,27 @@ namespace mongo {
             return "UNKNOWN";
         }
     }
+    
+#ifndef _WIN32
+    inline const int logLevelToSysLogLevel( LogLevel l) {
+        switch ( l ) {
+        case LL_DEBUG:
+            return LOG_DEBUG;
+        case LL_INFO:
+            return LOG_INFO;
+        case LL_NOTICE:
+            return LOG_NOTICE;
+        case LL_WARNING:
+            return LOG_WARNING;
+        case LL_ERROR:
+            return LOG_ERR;
+        case LL_SEVERE:
+            return LOG_CRIT;
+        default:
+            return LL_INFO;
+        }
+    }
+#endif
 
     class LabeledLevel {
     public:
@@ -203,6 +224,7 @@ namespace mongo {
         static FILE* logfile;
         static boost::scoped_ptr<ostream> stream;
         static vector<Tee*> * globalTees;
+        static bool isSyslog;
     public:
         inline static void logLockless( const StringData& s );
 
@@ -210,7 +232,20 @@ namespace mongo {
             scoped_lock lk(mutex);
             logfile = f;
         }
+#ifndef _WIN32
+        static void useSyslog(const char * name) {
+            cout << "using syslog ident: " << name << endl;
+            
+            // openlog requires heap allocated non changing pointer
+            // this should only be called once per pragram execution
 
+            char * newName = (char *) malloc( strlen(name) + 1 );
+            strcpy( newName , name);
+            openlog( newName , LOG_ODELAY , LOG_USER );
+            isSyslog = true;
+        }
+#endif
+        
         static int magicNumber() {
             return 1717;
         }
@@ -442,6 +477,11 @@ namespace mongo {
             return;
 
         if ( doneSetup == 1717 ) {
+#ifndef _WIN32
+            if ( isSyslog ) {
+                syslog( LOG_INFO , "%s" , s.data() );
+            } else
+#endif
             if (fwrite(s.data(), s.size(), 1, logfile)) {
                 fflush(logfile);
             }
@@ -496,9 +536,10 @@ namespace mongo {
                 for ( unsigned i=0; i<globalTees->size(); i++ )
                     (*globalTees)[i]->write(logLevel,out);
             }
-
 #ifndef _WIN32
-            //syslog( LOG_INFO , "%s" , cc );
+            if ( useSyslog ) {
+                syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
+            } else
 #endif
             if(fwrite(out.data(), out.size(), 1, logfile)) {
                 fflush(logfile);
@@ -507,12 +548,10 @@ namespace mongo {
                 int x = errno;
                 cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
             }
-
 #ifdef POSIX_FADV_DONTNEED
             // This only applies to pages that have already been flushed
             RARELY posix_fadvise(fileno(logfile), 0, 0, POSIX_FADV_DONTNEED);
 #endif
-
         }
         _init();
     }
