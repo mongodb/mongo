@@ -360,7 +360,7 @@ namespace mongo {
         
         if (params.count("syslog")) {
             StringBuilder sb(128);
-            sb << cmdLine.binaryName << "[" << cmdLine.port << "]";
+            sb << cmdLine.binaryName << "." << cmdLine.port;
             Logstream::useSyslog( sb.str().c_str() );
         }
 #endif
