@@ -973,6 +973,10 @@ namespace mongo {
     BSONElement getErrField( const BSONObj& result );
     bool hasErrField( const BSONObj& result );
 
+    inline std::ostream& operator<<( std::ostream &s, const Query &q ) {
+        return s << q.toString();
+    }
+
 } // namespace mongo
 
 #include "dbclientcursor.h"
