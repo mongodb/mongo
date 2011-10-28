@@ -88,29 +88,35 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	btree = session->btree;
 	ret = 0;
 
+	/*
+	 * We're done if the file has no data pages (this is what happens if
+	 * we verify a file immediately after creation).
+	 */
+	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
+		if (btree->fh->file_size == WT_BTREE_DESC_SECTOR)
+			return (0);
+
+		__wt_errx(session, "the file is empty and cannot be verified");
+		return (WT_ERROR);
+	}
+
+	/*
+	 * The file size should be a multiple of the allocsize, offset by the
+	 * size of the descriptor sector, the first 512B of the file.
+	 */
+	if ((btree->fh->file_size -
+	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
+		__wt_errx(session,
+		    "the file size is not valid for the allocation size");
+		    return (WT_ERROR);
+	}
+
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
 
 	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	vs->max_addr = WT_ADDR_INVALID;
-
-	/*
-	 * If the file has no data pages, we're done.
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
-	 */
-	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
-		__wt_errx(session,
-		    "the file contains no data pages and cannot be verified");
-		goto err;
-	}
-	if ((btree->fh->file_size -
-	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
-		__wt_errx(session,
-		    "the file size is not valid for the allocation size");
-		    goto err;
-	}
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
