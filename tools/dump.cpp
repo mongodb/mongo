@@ -37,7 +37,7 @@ class Dump : public Tool {
         FILE* _f;
     };
 public:
-    Dump() : Tool( "dump" , ALL , "*" , "*" , false ) {
+    Dump() : Tool( "dump" , ALL , "*" , "*" , true ) {
         add_options()
         ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
         ("query,q", po::value<string>() , "json query" )
@@ -45,6 +45,19 @@ public:
         ("repair", "try to recover a crashed database" )
         ("forceTableScan", "force a table scan (do not use $snapshot)" )
         ;
+    }
+
+    virtual void preSetup() {
+        string out = getParam("out");
+        if ( out == "-" ) {
+                // write output to standard error to avoid mangling output
+                // must happen early to avoid sending junk to stdout
+                useStandardOutput(false);
+        }
+    }
+
+    virtual void printExtraHelp(ostream& out) {
+        out << "Export MongoDB data to BSON files.\n" << endl;
     }
 
     // This is a functor that writes a BSONObj to a file
