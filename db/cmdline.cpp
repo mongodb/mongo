@@ -68,6 +68,7 @@ namespace mongo {
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
+        ("syslog" , "log to system's syslog facility instead of file or stdout" )
 #endif
         ;
         
@@ -269,13 +270,12 @@ namespace mongo {
 
         if (params.count("fork")) {
             cmdLine.doFork = true;
-
-            if ( ! params.count( "logpath" ) ) {
-                cout << "--fork has to be used with --logpath" << endl;
+            if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
+                cout << "--fork has to be used with --logpath or --syslog" << endl;
                 ::exit(-1);
             }
 
-            {
+            if ( params.count( "logpath" ) ) {
                 // test logpath
                 logpath = params["logpath"].as<string>();
                 assert( logpath.size() );
@@ -357,9 +357,19 @@ namespace mongo {
             setupCoreSignals();
             setupSignals( true );
         }
-
+        
+        if (params.count("syslog")) {
+            StringBuilder sb(128);
+            sb << cmdLine.binaryName << "." << cmdLine.port;
+            Logstream::useSyslog( sb.str().c_str() );
+        }
 #endif
         if (params.count("logpath")) {
+            if ( params.count("syslog") ) {
+                cout << "Cant use both a logpath and syslog " << endl;
+                ::exit(-1);
+            }
+            
             if ( logpath.size() == 0 )
                 logpath = params["logpath"].as<string>();
             uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
