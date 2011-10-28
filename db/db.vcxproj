@@ -692,6 +692,7 @@
     <ClInclude Include="..\util\mongoutils\checksum.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
+    <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\paths.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
