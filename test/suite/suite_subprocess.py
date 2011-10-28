@@ -52,10 +52,10 @@ class suite_subprocess:
                 else:
                     procargs = ["../../wt"]
                 procargs.extend(args)
-                print "running: " + str(procargs)
                 if self._gdbSubprocess:
+                    print str(procargs)
                     print "*********************************************"
-                    print "**** Run via: run " + " ".join(procargs[3:]) + ">" + wtoutname + " 2>" + wterrname
+                    print "**** Run 'wt' via: run " + " ".join(procargs[3:]) + ">" + wtoutname + " 2>" + wterrname
                     print "*********************************************"
                     proc = subprocess.Popen(procargs)
                 else:

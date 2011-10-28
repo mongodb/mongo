@@ -12,11 +12,11 @@
 import unittest
 import wiredtiger
 import wttest
-import subprocess
+from suite_subprocess import suite_subprocess
 import os
 import string
 
-class test_util02(wttest.WiredTigerTestCase):
+class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt load
     """
@@ -139,22 +139,14 @@ class test_util02(wttest.WiredTigerTestCase):
             cursor.insert()
         cursor.close()
 
+        dumpargs = ["dump"]
+        if hexoutput:
+            dumpargs.append("-x")
+        dumpargs.append(self.tablename)
+        self.runWt(dumpargs, outfilename="dump.out")
+
         # Create a placeholder for the new table.
         self.session.create('table:' + self.tablename2, params)
-
-        # we close the connection to guarantee everything is
-        # flushed, and that we can open it from another process
-        self.conn.close(None)
-        self.conn = None
-
-        self.pr('calling dump')
-        with open("dump.out", "w") as dumpout:
-            dumpargs = ["../../wt", "dump"]
-            if hexoutput:
-                dumpargs.append("-x")
-            dumpargs.append(self.tablename)
-            proc = subprocess.Popen(dumpargs, stdout=dumpout)
-            self.assertEqual(proc.wait(), 0)
 
         # TODO: this shouldn't be needed.
         # The output of 'wt dump' includes 'colgroups=' and 'columns='
@@ -166,11 +158,7 @@ class test_util02(wttest.WiredTigerTestCase):
             f.write(new)
         # end TODO
 
-        proc = subprocess.Popen(["../../wt", "load", "-f", "dump.out", "-r", self.tablename2])
-        self.assertEqual(proc.wait(), 0)
-
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
+        self.runWt(["load", "-f", "dump.out", "-r", self.tablename2])
 
         cursor = self.session.open_cursor('table:' + self.tablename2, None, None)
         self.assertEqual(cursor.key_format, self.key_format)

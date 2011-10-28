@@ -12,10 +12,10 @@
 import unittest
 from wiredtiger import WiredTigerError
 import wttest
-import suite_subprocess
+from suite_subprocess import suite_subprocess
 import os
 
-class test_util05(wttest.WiredTigerTestCase, suite_subprocess.suite_subprocess):
+class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util05.a'
     nentries = 1000
 

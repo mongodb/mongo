@@ -12,18 +12,12 @@
 import unittest
 from wiredtiger import WiredTigerError
 import wttest
-import subprocess
+from suite_subprocess import suite_subprocess
 import os
 
-class test_util04(wttest.WiredTigerTestCase):
+class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util04.a'
     nentries = 1000
-
-    def check_empty_file(self, filename):
-        """
-        Raise an error if the file is not empty
-        """
-        self.assertEqual(os.path.getsize(filename), 0)
 
     def test_drop_process(self):
         """
@@ -32,21 +26,9 @@ class test_util04(wttest.WiredTigerTestCase):
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
 
-        # we close the connection to guarantee everything is
-        # flushed, and that we can open it from another process
-        self.conn.close(None)
-        self.conn = None
         self.assertTrue(os.path.exists(self.tablename + ".wt"))
-        with open("drop.err", "w") as droperr:
-            with open("drop.out", "w") as dropout:
-                args = ["../../wt", "drop"]
-                args.append('table:' + self.tablename)
-                proc = subprocess.Popen(args, stdout=dropout, stderr=droperr)
-                proc.wait()
-        self.check_empty_file("drop.out")
-        self.check_empty_file("drop.err")
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
+        self.runWt(["drop", "table:" + self.tablename])
+
         self.assertFalse(os.path.exists(self.tablename + ".wt"))
         self.assertRaises(WiredTigerError, lambda: self.session.open_cursor('table:' + self.tablename, None, None))
 

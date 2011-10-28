@@ -12,10 +12,9 @@
 import unittest
 from wiredtiger import WiredTigerError
 import wttest
-import subprocess
-import os
+from suite_subprocess import suite_subprocess
 
-class test_util03(wttest.WiredTigerTestCase):
+class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util03.a'
     nentries = 1000
 
@@ -26,46 +25,23 @@ class test_util03(wttest.WiredTigerTestCase):
         ('ri', dict(key_format='r',value_format='i')),
         ]
 
-    def check_empty_file(self, filename):
-        """
-        Raise an error if the file is not empty
-        """
-        filesize = os.path.getsize(filename)
-        if filesize > 0:
-            with open(filename, 'r') as f:
-                contents = f.read(1000)
-                print 'ERROR: ' + filename + ' should be empty, but contains:\n'
-                print contents + '...\n'
-        self.assertEqual(filesize, 0)
-
     def test_create_process(self):
         """
         Test create in a 'wt' process
         """
 
-        # we close the connection to guarantee everything is
-        # flushed, and that we can open it from another process
-        self.conn.close(None)
-        self.conn = None
-        with open("create.err", "w") as createerr:
-            with open("create.out", "w") as createout:
-                #args = ["gdb", "--args", "../../.libs/wt", "create"]
-                args = ["../../wt", "create"]
-                if self.key_format != None or self.value_format != None:
-                    args.append('-c')
-                    config = ''
-                    if self.key_format != None:
-                        config += 'key_format=' + self.key_format + ','
-                    if self.value_format != None:
-                        config += 'value_format=' + self.value_format
-                    args.append(config)
-                args.append('table:' + self.tablename)
-                proc = subprocess.Popen(args, stdout=createout, stderr=createerr)
-                proc.wait()
-        self.check_empty_file("create.out")
-        self.check_empty_file("create.err")
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
+        args = ["create"]
+        if self.key_format != None or self.value_format != None:
+            args.append('-c')
+            config = ''
+            if self.key_format != None:
+                config += 'key_format=' + self.key_format + ','
+            if self.value_format != None:
+                config += 'value_format=' + self.value_format
+            args.append(config)
+        args.append('table:' + self.tablename)
+        self.runWt(args)
+
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         if self.key_format != None:
             self.assertEqual(cursor.key_format, self.key_format)

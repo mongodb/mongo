@@ -12,11 +12,11 @@
 import unittest
 import wiredtiger
 import wttest
-import subprocess
+from suite_subprocess import suite_subprocess
 import os
 import string
 
-class test_util01(wttest.WiredTigerTestCase):
+class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output.
     Note that we don't test dumping {key,value}_format that are integer
@@ -145,16 +145,11 @@ class test_util01(wttest.WiredTigerTestCase):
                     dumpout.write(str(key) + "\n" + str(val) + "\n")
                 dumpcurs.close()
             else:
-                # we close the connection to guarantee everything is
-                # flushed, and that we can open it from another process
-                self.conn.close(None)
-                self.conn = None
-                dumpargs = ["../../wt", "dump"]
+                dumpargs = ["dump"]
                 if hexoutput:
                     dumpargs.append("-x")
                 dumpargs.append(self.tablename)
-                proc = subprocess.Popen(dumpargs, stdout=dumpout)
-                proc.wait()
+                self.runWt(dumpargs, outfilename="dump.out")
                 
         self.assertTrue(self.compare_files("expect.out", "dump.out"))
 
