@@ -79,10 +79,15 @@ namespace mongo {
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
+#if defined _DEBUG
     static unsigned long long nThreads = 0;
     void assertStartingUp() { 
         assert( nThreads <= 1 );
     }
+#else
+    void assertStartingUp() { }
+#endif
+
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
 #if defined(_DEBUG)
         { 

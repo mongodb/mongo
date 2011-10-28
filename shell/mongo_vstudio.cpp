@@ -4072,7 +4072,7 @@ const StringData _jscode_raw_collection =
 "\n" 
 "var shardStats = stats.shards[ shard ]\n" 
 "\n" 
-"var chunks = config.chunks.find({ _id : sh._collRE( coll ), shard : shard }).toArray()\n" 
+"var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()\n" 
 "\n" 
 "numChunks += chunks.length\n" 
 "\n" 
