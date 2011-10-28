@@ -30,7 +30,7 @@ class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
 
     @staticmethod
-    def globalSetup(preserveFiles = False, useTimestamp = False):
+    def globalSetup(preserveFiles = False, useTimestamp = False, gdbSub = False):
         WiredTigerTestCase._preserveFiles = preserveFiles
         if useTimestamp:
             d = 'WT_TEST.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
@@ -40,6 +40,7 @@ class WiredTigerTestCase(unittest.TestCase):
         os.makedirs(d)
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
+        WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._globalSetup = True
     
     def __init__(self, *args, **kwargs):
