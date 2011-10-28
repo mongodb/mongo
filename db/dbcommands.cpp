@@ -1772,7 +1772,14 @@ namespace mongo {
                 return false;
             }
         }
+        catch ( SendStaleConfigException& e ){
+            log(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
+            throw;
+        }
         catch ( DBException& e ) {
+
+            // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
+
             stringstream ss;
             ss << "exception: " << e.what();
             result.append( "errmsg" , ss.str() );

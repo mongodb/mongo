@@ -38,7 +38,7 @@ namespace mongo {
             conn.donotCheckVersion();
         else if ( conn.setVersion() ) {
             conn.done();
-            throw StaleConfigException( r.getns() , "doWrite" , true );
+            throw RecvStaleConfigException( r.getns() , "doWrite" , true );
         }
         conn->say( r.m() );
         conn.done();
@@ -61,7 +61,7 @@ namespace mongo {
             QueryResult *qr = (QueryResult *) response.singleData();
             if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
-                throw StaleConfigException( r.getns() , "Strategy::doQuery" );
+                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery" );
             }
         }
 
@@ -73,7 +73,7 @@ namespace mongo {
         ShardConnection dbcon( shard , ns );
         if ( dbcon.setVersion() ) {
             dbcon.done();
-            throw StaleConfigException( ns , "for insert" );
+            throw RecvStaleConfigException( ns , "for insert" );
         }
         dbcon->insert( ns , obj , flags);
         if (safe)
@@ -85,7 +85,7 @@ namespace mongo {
         ShardConnection dbcon( shard , ns );
         if ( dbcon.setVersion() ) {
             dbcon.done();
-            throw StaleConfigException( ns , "for insert" );
+            throw RecvStaleConfigException( ns , "for insert" );
         }
         dbcon->insert( ns , v , flags);
         if (safe)
@@ -100,7 +100,7 @@ namespace mongo {
         ShardConnection dbcon( shard , ns );
         if ( dbcon.setVersion() ) {
             dbcon.done();
-            throw StaleConfigException( ns , "for insert" );
+            throw RecvStaleConfigException( ns , "for insert" );
         }
         dbcon->update( ns , query , toupdate, upsert, multi);
         if (safe)

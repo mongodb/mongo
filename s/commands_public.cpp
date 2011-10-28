@@ -82,9 +82,9 @@ namespace mongo {
                 ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
-                if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
+                if ( ! ok && res["code"].numberInt() == SendStaleConfigCode ) {
                     conn.done();
-                    throw StaleConfigException("foo","command failed because of stale config");
+                    throw RecvStaleConfigException( res["ns"].toString(),"command failed because of stale config");
                 }
                 result.appendElements( res );
                 conn.done();
@@ -416,7 +416,7 @@ namespace mongo {
                         return true;
                     }
 
-                    if ( temp["code"].numberInt() != StaleConfigInContextCode ) {
+                    if ( temp["code"].numberInt() != SendStaleConfigCode ) {
                         errmsg = temp["errmsg"].String();
                         result.appendElements( temp );
                         return false;
@@ -469,7 +469,7 @@ namespace mongo {
                             continue;
                         }
 
-                        if ( StaleConfigInContextCode == temp["code"].numberInt() ) {
+                        if ( SendStaleConfigCode == temp["code"].numberInt() ) {
                             // my version is old
                             total = 0;
                             shardCounts.clear();
@@ -649,8 +649,8 @@ namespace mongo {
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
 
-                if (!ok && res.getIntField("code") == 9996) { // code for StaleConfigException
-                    throw StaleConfigException(fullns, "FindAndModify"); // Command code traps this and re-runs
+                if (!ok && res.getIntField("code") == RecvStaleConfigCode) { // code for RecvStaleConfigException
+                    throw RecvStaleConfigException(fullns, "FindAndModify"); // Command code traps this and re-runs
                 }
 
                 result.appendElements(res);

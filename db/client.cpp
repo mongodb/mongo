@@ -252,7 +252,7 @@ namespace mongo {
             if ( ! shardVersionOk( _ns , errmsg ) ) {
                 ostringstream os;
                 os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                msgassertedNoTrace( StaleConfigInContextCode , os.str().c_str() );
+                throw SendStaleConfigException( _ns, os.str() );
             }
         }
         }

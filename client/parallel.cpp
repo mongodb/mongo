@@ -67,7 +67,7 @@ namespace mongo {
         assert( cursor );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            throw StaleConfigException( _ns , "ClusteredCursor::_checkCursor" );
+            throw RecvStaleConfigException( _ns , "ClusteredCursor::_checkCursor" );
         }
         
         if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
@@ -90,7 +90,7 @@ namespace mongo {
             
             if ( conn.setVersion() ) {
                 conn.done();
-                throw StaleConfigException( _ns , "ClusteredCursor::query" , true );
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -490,7 +490,7 @@ namespace mongo {
 
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
-                    staleConfigExs.push_back( (string)"stale config detected for " + StaleConfigException( _ns , "ParallelCursor::_init" , true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , true ).what() + errLoc );
                     break;
                 }
 
@@ -560,6 +560,16 @@ namespace mongo {
 
                         continue;
                     }
+                }
+                catch ( StaleConfigException& e ){
+                    // Our stored configuration data is actually stale, we need to reload it
+                    // when we throw our exception
+                    allConfigStale = true;
+
+                    staleConfigExs.push_back( (string)"stale config detected when receiving response for " + e.what() + errLoc );
+                    _cursors[i].reset( NULL );
+                    conns[i]->done();
+                    continue;
                 }
                 catch ( MsgAssertionException& e ){
                     socketExs.push_back( e.what() + errLoc );
@@ -639,7 +649,7 @@ namespace mongo {
             }
 
             if( throwException && staleConfigExs.size() > 0 )
-                throw StaleConfigException( _ns , errMsg.str() , ! allConfigStale );
+                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale );
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );
             else

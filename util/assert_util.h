@@ -31,7 +31,8 @@ namespace mongo {
 
     enum CommonErrorCodes {
         DatabaseDifferCaseCode = 13297 ,
-        StaleConfigInContextCode = 13388
+        SendStaleConfigCode = 13388 ,
+        RecvStaleConfigCode = 9996
     };
 
     class AssertionCount {

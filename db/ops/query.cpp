@@ -55,7 +55,12 @@ namespace mongo {
         try {
             return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
+        catch( SendStaleConfigException& e ){
+            throw;
+        }
         catch ( AssertionException& e ) {
+            assert( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+
             e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
             curop.debug().exceptionInfo = e.getInfo();
         }

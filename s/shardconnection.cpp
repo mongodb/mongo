@@ -270,12 +270,9 @@ namespace mongo {
         assert( _conn );
         bool ok = _conn->runCommand( db , cmd , res );
         if ( ! ok ) {
-            if ( res["code"].numberInt() == StaleConfigInContextCode ) {
-                string big = res["errmsg"].String();
-                string ns,raw;
-                massert( 13409 , (string)"can't parse ns from: " + big  , StaleConfigException::parse( big , ns , raw ) );
+            if ( res["code"].numberInt() == SendStaleConfigCode ) {
                 done();
-                throw StaleConfigException( ns , raw );
+                throw RecvStaleConfigException( res["ns"].String() , res["errmsg"].String() );
             }
         }
         return ok;
