@@ -724,6 +724,12 @@ int _main(int argc, char* argv[]) {
         logLevel = 1;
     }
 
+    if ( url == "*" ) {
+        cout << "ERROR: " << "\"*\" is an invalid db address" << endl << endl;
+        show_help_text(argv[0], shell_options);
+        return mongo::EXIT_BADOPTIONS;
+    }
+
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
