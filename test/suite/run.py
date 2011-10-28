@@ -27,6 +27,22 @@ sys.path.append(os.path.join(wt_disttop, 'test', 'suiteutil'))
 import wttest
 from testscenarios.scenarios import generate_scenarios
 
+def usage():
+	print 'Usage:\n\
+  $ cd build_posix\n\
+  $ python ../test/suite/run.py [ options ] [ tests ]\n\
+\n\
+Options:\n\
+  -p | -preserve       preserve output files in WT_TEST/<testname>\n\
+  -t | -timestamp      name WT_TEST according to timestamp\n\
+  -d | -debug          run with \'pdb\', the python debugger\n\
+  -g | -gdb            all subprocesses (like calls to wt) invoke gdb\n\
+\n\
+Tests:\n\
+  may be a file name in test/suite: (e.g. test_base01.py)\n\
+  may be a subsuite name (e.g. \'base\' runs test_base*.py)\n\
+'
+
 def addScenarioTests(tests, loader, testname):
 	loaded = loader.loadTestsFromName(testname)
 	tests.addTests(generate_scenarios(loaded))
@@ -85,6 +101,8 @@ if __name__ == '__main__':
                         if option == 'gdb' or option == 'g':
                                 gdbSub = True
                                 continue
+                        usage()
+                        sys.exit(False)
 
 		testsFromArg(tests, loader, arg)
 
