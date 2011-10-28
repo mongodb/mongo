@@ -43,7 +43,6 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test verify in a 'wt' process, using an empty table
         """
-        self.skipTest('**** TODO: this test is broken, we expect verify to work on an empty table ****')
 
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
