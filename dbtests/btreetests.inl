@@ -519,9 +519,13 @@
     // Tool to construct custom trees for tests.
     class ArtificialTree : public BtreeBucket {
     public:
-        void push( const BSONObj &key, const DiskLoc &child ) {
+        void push( const BSONObj &key, const DiskLoc &child, DiskLoc diskLoc = recordLoc() ) {
             KeyOwned k(key);
-            pushBack( dummyDiskLoc(), k, Ordering::make( BSON( "a" << 1 ) ), child );
+            pushBack( diskLoc, k, Ordering::make( BSON( "a" << 1 ) ), child );
+        }
+        bool insertAtPos( DiskLoc thisLoc, int keypos, const BSONObj &key, DiskLoc diskLoc = recordLoc() ) {
+            KeyOwned k(key);
+            return basicInsert( thisLoc, keypos, diskLoc, k, Ordering::make( BSON( "a" << 1 ) ) );
         }
         void setNext( const DiskLoc &child ) {
             nextChild = child;
@@ -542,9 +546,14 @@
             DiskLoc node = make( id );
             ArtificialTree *n = ArtificialTree::is( node );
             BSONObjIterator i( spec );
+            DiskLoc diskLoc = recordLoc();
             while( i.more() ) {
                 BSONElement e = i.next();
                 DiskLoc child;
+                if ( e.fieldName() == string( "_diskloc" ) ) {
+                    diskLoc = recordLoc( e.numberInt() );
+                    continue;
+                }
                 if ( e.type() == Object ) {
                     child = makeTree( e.embeddedObject(), id );
                 }
@@ -552,7 +561,7 @@
                     n->setNext( child );
                 }
                 else {
-                    n->push( BSON( "" << expectedKey( e.fieldName() ) ), child );
+                    n->push( BSON( "" << expectedKey( e.fieldName() ) ), child, diskLoc );
                 }
             }
             n->fixParentPtrs( node );
@@ -582,8 +591,11 @@
             ArtificialTree *n = ArtificialTree::is( node );
             BSONObjIterator j( spec );
             for( int i = 0; i < n->n; ++i ) {
-                ASSERT( j.more() );
-                BSONElement e = j.next();
+                BSONElement e;
+                do {
+                    ASSERT( j.more() );
+                    e = j.next();
+                } while ( e.fieldName() == string( "_diskloc" ) );
                 KeyNode kn = n->keyNode( i );
                 string expected = expectedKey( e.fieldName() );
                 ASSERT( present( id, BSON( "" << expected ), 1 ) );
@@ -618,6 +630,7 @@
             id.head.btree()->locate( id, id.head, key, Ordering::make(id.keyPattern()), pos, found, recordLoc(), direction );
             return found;
         }
+        int getEmptySize() const { return emptySize; }
         int headerSize() const { return BtreeBucket::headerSize(); }
         int packedDataSize( int pos ) const { return BtreeBucket::packedDataSize( pos ); }
         void fixParentPtrs( const DiskLoc &thisLoc ) { BtreeBucket::fixParentPtrs( thisLoc ); }
@@ -626,8 +639,6 @@
             emptySize = 0;
             setNotPacked();
         }
-    private:
-        DiskLoc dummyDiskLoc() const { return DiskLoc( 0, 2 ); }
     };
 
     /**
