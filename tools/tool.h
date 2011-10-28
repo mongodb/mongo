@@ -82,9 +82,13 @@ namespace mongo {
             return _db + "." + _coll;
         }
 
+        void useStandardOutput( bool mode ) {
+            _usesstdout = mode;
+        }
+
         bool isMaster();
         bool isMongos();
-
+        
         virtual void preSetup() {}
 
         virtual int run() = 0;
