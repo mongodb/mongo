@@ -243,7 +243,7 @@ namespace mongo {
 
     void Shard::_setAddr( const string& addr ) {
         _addr = addr;
-        if ( _addr.size() ) {
+        if ( !_addr.empty() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
             _rsInit();
         }

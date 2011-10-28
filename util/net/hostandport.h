@@ -76,6 +76,7 @@ namespace mongo {
         void setPort( int port ) { _port = port; }
 
     private:
+        void init(const char *);
         // invariant (except full obj assignment):
         string _host;
         int _port; // -1 indicates unspecified
@@ -137,9 +138,9 @@ namespace mongo {
                );
     }
 
-    inline HostAndPort::HostAndPort(string s) {
-        const char *p = s.c_str();
-        uassert(13110, "HostAndPort: bad config string", *p);
+    inline void HostAndPort::init(const char *p) {
+        uassert(13110, "HostAndPort: bad host:port config string", *p);
+        assert( *p != '#' );
         const char *colon = strrchr(p, ':');
         if( colon ) {
             int port = atoi(colon+1);
@@ -151,6 +152,22 @@ namespace mongo {
             // no port specified.
             _host = p;
             _port = -1;
+        }
+    }
+
+    void dynHostResolve(string& name, int& port);
+
+    inline HostAndPort::HostAndPort(string s) {
+        const char *p = s.c_str();
+        if( *p == '#' ) {
+            _port = -1;
+            _host = s;
+            if( s.empty() ) 
+                return;
+            dynHostResolve(_host, _port);
+        }
+        else {
+            init(p);
         }
     }
 

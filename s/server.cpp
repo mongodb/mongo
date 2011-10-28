@@ -345,7 +345,7 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( ! configServer.ok( true ) ) {
-        cout << "configServer startup check failed" << endl;
+        cout << "configServer connection startup check failed" << endl;
         return 8;
     }
 

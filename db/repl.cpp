@@ -1117,7 +1117,7 @@ namespace mongo {
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
                  (!noauth && !replAuthenticate(_conn.get())) ) {
                 resetConnection();
-                log() << "repl:  " << errmsg << endl;
+                log() << "repl: " << errmsg << endl;
                 return false;
             }
         }
@@ -1164,7 +1164,7 @@ namespace mongo {
         ReplInfo r("sync");
         if ( !cmdLine.quiet ) {
             Nullstream& l = log();
-            l << "repl: from ";
+            l << "repl: syncing from ";
             if( sourceName() != "main" ) {
                 l << "source:" << sourceName() << ' ';
             }

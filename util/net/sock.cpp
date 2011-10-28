@@ -45,7 +45,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    mapsf<string,string> dynHostNames;
+    void dynHostResolve(string& name, int& port);
+    string dynHostMyName();
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
@@ -145,7 +146,7 @@ namespace mongo {
             target = "127.0.0.1";
         }
         else if( cloudName ) {
-            target = dynHostNames.get(target);
+            dynHostResolve(target, port);
         }
 
         if( str::contains(target, '/') ) {
@@ -238,7 +239,7 @@ namespace mongo {
             const int buflen=128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082, getAddrInfoStrError(ret), ret == 0);
+            massert(13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
             
@@ -292,11 +293,13 @@ namespace mongo {
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
-    // ------ hostname -------------------
-
+    // If an ip address is passed in, just return that.  If a hostname is passed
+    // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname) {
         if( *hostname == '#' ) {
-            string s = dynHostNames.get(hostname);
+            string s = hostname;
+            int port;
+            dynHostResolve(s, port);
             return s;
         }
 
@@ -312,8 +315,11 @@ namespace mongo {
     DiagStr _hostNameCached;
 
     string getHostName() {
-        if( !dynHostNames.empty() ) // cloud cmd in use
-            return _hostNameCached;
+        {
+            string s = dynHostMyName();
+            if( !s.empty() ) 
+                return s;
+        }
 
         char buf[256];
         int ec = gethostname(buf, 127);

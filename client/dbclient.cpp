@@ -583,13 +583,16 @@ namespace mongo {
 
     bool DBClientConnection::_connect( string& errmsg ) {
         _serverString = _server.toString();
+
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server.reset(new SockAddr(_server.host().c_str(), _server.port()));
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
-        if (server->getAddr() == "0.0.0.0") {
-            _failed = true;
+        if (_server.host().empty() || server->getAddr() == "0.0.0.0") {
+            stringstream s;
+            errmsg = 
+                str::stream() << "couldn't connect to server " << _server.toString();
             return false;
         }
 
@@ -598,9 +601,7 @@ namespace mongo {
         //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
         // }
         if ( !p->connect(*server) ) {
-            stringstream ss;
-            ss << "couldn't connect to server " << _serverString;
-            errmsg = ss.str();
+            errmsg = str::stream() << "couldn't connect to server " << _server.toString();
             _failed = true;
             return false;
         }

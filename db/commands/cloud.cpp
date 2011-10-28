@@ -1,11 +1,35 @@
 #include "../commands.h"
 #include <map>
 #include "../../util/concurrency/value.h"
+#include "../../util/mongoutils/str.h"
+#include "../../util/net/hostandport.h"
+
+using namespace mongoutils;
 
 namespace mongo {
 
-    extern mapsf<string,string> dynHostNames;
+    mapsf<string,string> dynHostNames;
     extern DiagStr _hostNameCached;
+
+    string dynHostMyName() { 
+        return _hostNameCached; 
+    }
+
+    void dynHostResolve(string& name, int& port) {
+        string n = str::before(name, ':');
+        string s = dynHostNames.get(n);
+        if( s.empty() ) { 
+            name.clear();
+            return;
+        }
+        assert( !str::startsWith(s, '#') );
+        HostAndPort hp(s);
+        if( hp.hasPort() ) {
+            port = hp.port();
+            log() << "info: dynhost in:" << name << " out:" << hp.toString() << endl;
+        }
+        name = hp.host();
+    }
 
     /** 
       { cloud:1, nodes: {

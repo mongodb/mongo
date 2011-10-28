@@ -27,8 +27,7 @@ namespace mongo {
     class ShardStatus;
 
     /*
-     * A "shard" is a database (replica pair typically) which represents
-     * one partition of the overall database.
+     * A "shard" one partition of the overall database (and a replica set typically).
      */
 
     class Shard {

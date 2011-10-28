@@ -69,6 +69,10 @@ namespace mongoutils {
         }
         inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
 
+        // while these are trivial today use in case we do different wide char things later
+        inline bool startsWith(const char *p, char ch) { return *p == ch; }
+        inline bool startsWith(string s, char ch) { return startsWith(s.c_str(), ch); }
+
         inline bool endsWith(string s, string p) {
             int l = p.size();
             int x = s.size();

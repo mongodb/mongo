@@ -507,6 +507,7 @@ namespace mongo {
     }
 
     bool ConfigServer::init( vector<string> configHosts ) {
+
         uassert( 10187 ,  "need configdbs" , configHosts.size() );
 
         string hn = getHostName();
