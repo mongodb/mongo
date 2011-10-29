@@ -513,7 +513,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
 		session->btree = table->colgroup[i];
-		WT_RET(__wt_curfile_create(session, 0, cfg_no_overwrite, cp));
+		WT_RET(__wt_curfile_create(session, cfg_no_overwrite, cp));
 	}
 	return (0);
 }
@@ -544,7 +544,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
 		session->btree = table->index[i];
-		WT_RET(__wt_curfile_create(session, 0, cfg, cp));
+		WT_RET(__wt_curfile_create(session, cfg, cp));
 	}
 	return (0);
 }
@@ -624,7 +624,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		 * table cursor.
 		 */
 		session->btree = table->colgroup[0];
-		return (__wt_curfile_create(session, 1, cfg, cursorp));
+		return (__wt_curfile_create(session, cfg, cursorp));
 	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
@@ -681,7 +681,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	__wt_cursor_init(cursor, 1, cfg);
+	__wt_cursor_init(cursor, 0, 1, cfg);
 	*cursorp = cursor;
 
 	if (0) {

@@ -214,7 +214,7 @@ err:	API_END(session);
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    int is_public, const char *cfg[], WT_CURSOR **cursorp)
+    const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -299,7 +299,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	__wt_cursor_init(cursor, is_public, cfg);
+	__wt_cursor_init(cursor, 1, 0, cfg);
 	*cursorp = cursor;
 
 	if (0) {
@@ -328,5 +328,5 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	else
 		return (EINVAL);
 
-	return (__wt_curfile_create(session, 1, cfg, cursorp));
+	return (__wt_curfile_create(session, cfg, cursorp));
 }

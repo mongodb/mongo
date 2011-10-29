@@ -357,7 +357,7 @@ __curindex_open_colgroups(
 		    cp[arg] != NULL)
 			continue;
 		session->btree = table->colgroup[arg];
-		WT_RET(__wt_curfile_create(session, 0, cfg, &cp[arg]));
+		WT_RET(__wt_curfile_create(session, cfg, &cp[arg]));
 	}
 
 	return (0);
@@ -452,7 +452,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cursor->key_format = cbt->btree->idxkey_format;
 	cursor->value_format = table->value_format;
 
-	__wt_cursor_init(cursor, 1, cfg);
+	__wt_cursor_init(cursor, 1, 1, cfg);
 	*cursorp = cursor;
 
 	return (0);

@@ -43,7 +43,7 @@ __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
-	return (__wt_curfile_create(session, 0, cfg, cursorp));
+	return (__wt_curfile_create(session, cfg, cursorp));
 }
 
 /*

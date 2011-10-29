@@ -16,8 +16,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session, **tp;
 	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session, **tp;
 	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
@@ -27,7 +27,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
+	/*
+	 * We first close all public cursors, then all remaining file cursors.
+	 * File cursors are special because the btree code looks inside them
+	 * to work out whether pages are in use.
+	 */
+	while ((cursor = TAILQ_FIRST(&session->public_cursors)) != NULL)
+		WT_TRET(cursor->close(cursor, config));
+
+	while ((cursor = TAILQ_FIRST(&session->file_cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
@@ -463,7 +471,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	session_ret->event_handler = session->event_handler;
 	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
 
-	TAILQ_INIT(&session_ret->cursors);
+	TAILQ_INIT(&session_ret->file_cursors);
+	TAILQ_INIT(&session_ret->public_cursors);
 	TAILQ_INIT(&session_ret->btrees);
 	if (event_handler != NULL)
 		session_ret->event_handler = event_handler;

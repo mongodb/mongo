@@ -248,7 +248,9 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	__wt_buf_free(session, &cursor->value);
 
 	if (F_ISSET(cursor, WT_CURSTD_PUBLIC))
-		TAILQ_REMOVE(&session->cursors, cursor, q);
+		TAILQ_REMOVE(&session->public_cursors, cursor, q);
+	else if (F_ISSET(cursor, WT_CURSTD_FILE))
+		TAILQ_REMOVE(&session->file_cursors, cursor, q);
 	__wt_free(session, cursor);
 
 err:	API_END(session);
@@ -267,7 +269,8 @@ err:	API_END(session);
  *	WT_SESSION->close that we prefer to avoid.
  */
 void
-__wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *cfg[])
+__wt_cursor_init(
+    WT_CURSOR *cursor, int is_file, int is_public, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
@@ -288,9 +291,12 @@ __wt_cursor_init(WT_CURSOR *cursor, int is_public, const char *cfg[])
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	if (is_public) {
+	if (is_file) {
+		F_SET(cursor, WT_CURSTD_FILE);
+		TAILQ_INSERT_HEAD(&session->file_cursors, cursor, q);
+	} else if (is_public) {
 		F_SET(cursor, WT_CURSTD_PUBLIC);
-		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+		TAILQ_INSERT_HEAD(&session->public_cursors, cursor, q);
 	}
 }
 

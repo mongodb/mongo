@@ -83,7 +83,10 @@ struct __wt_session_impl {
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
 	WT_CURSOR *cursor;		/* Current cursor */
-	TAILQ_HEAD(__cursors, wt_cursor) cursors;
+					/* All file cursors */
+	TAILQ_HEAD(__file_cursors, wt_cursor) file_cursors;
+					/* Cursors closed with the session */
+	TAILQ_HEAD(__public_cursors, wt_cursor) public_cursors;
 
 	WT_BTREE *schematab;		/* Schema tables */
 	TAILQ_HEAD(__tables, __wt_table) tables;

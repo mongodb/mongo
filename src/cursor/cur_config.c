@@ -161,7 +161,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	cursor->key_format = cursor->value_format = "S";
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
-	__wt_cursor_init(cursor, 1, cfg);
+	__wt_cursor_init(cursor, 0, 1, cfg);
 	*cursorp = cursor;
 
 	return (0);
