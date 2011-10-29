@@ -368,8 +368,12 @@ __btree_close_cache(WT_SESSION_IMPL *session)
 	 */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		WT_TRET(__wt_evict_file_serial(session, 1));
-	if (btree->root_page.page != NULL)
+	if (btree->root_page.page != NULL) {
 		__wt_page_out(session, btree->root_page.page, 0);
+		btree->root_page.addr = WT_ADDR_INVALID;
+		btree->root_page.page = NULL;
+		btree->root_page.state = WT_REF_DISK;
+	}
 
 	/*
 	 * Write out the free list.
