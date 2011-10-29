@@ -537,7 +537,7 @@ namespace mongo {
                     (*globalTees)[i]->write(logLevel,out);
             }
 #ifndef _WIN32
-            if ( useSyslog ) {
+            if ( isSyslog ) {
                 syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
             } else
 #endif
