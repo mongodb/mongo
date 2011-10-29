@@ -197,7 +197,13 @@ namespace mongo {
                     // ok
                 }
                 else {
-                    assert( v.size() == 1 );
+                    // this will usually be 1
+                    // it can be greater than 1 if a write to a different shard
+                    // than the last write op had a writeback
+                    // all we're going to report is the first
+                    // since that's the current write
+                    // but we block for all
+                    assert( v.size() >= 1 );
                     result.appendElements( v[0] );
                     result.appendElementsUnique( res );
                     result.append( "writebackGLE" , v[0] );
