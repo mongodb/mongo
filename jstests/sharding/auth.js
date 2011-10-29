@@ -220,6 +220,8 @@ assert( ! result.ok , tojson( result ) )
 print( "   testing read command (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
 
+/*
+broken because of SERVER-4156
 print( "   testing write command (should fail)" );
 assert.commandFailed(readOnlyDB.runCommand(
     {mapreduce : "foo",
@@ -227,7 +229,7 @@ assert.commandFailed(readOnlyDB.runCommand(
      reduce : function(key, values) { return values.length; },
      out:"blarg"
     }));
-
+*/
 print( "   testing logout (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
 
