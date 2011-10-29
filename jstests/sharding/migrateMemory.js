@@ -1,3 +1,4 @@
+/** tests for memory leaks in migration */
 
 s = new ShardingTest( "migrateMemory" , 2 , 1 , 1 , { chunksize : 1 });
 
@@ -19,6 +20,8 @@ num = 0;
 while ( data < ( 1024 * 1024 * 10 ) ){
     t.insert( { _id : num++ , s : str } )
     data += str.length
+    if ( num % 100 == 0 )
+        sh.splitAt( "test.foo" , { _id : num } );
 }
 
 db.getLastError()
