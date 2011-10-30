@@ -123,9 +123,7 @@ namespace mongo {
             return _name < o._name;
         }
 
-        bool ok() const {
-            return _addr.size() > 0 && _addr.size() > 0;
-        }
+        bool ok() const { return _addr.size() > 0; }
 
         BSONObj runCommand( const string& db , const string& simple ) const {
             return runCommand( db , BSON( simple << 1 ) );
