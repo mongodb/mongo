@@ -243,6 +243,7 @@
     <None Include="..\query.js" />
     <None Include="..\servers.js" />
     <None Include="..\utils.js" />
+    <None Include="..\utils_sh.js" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib">

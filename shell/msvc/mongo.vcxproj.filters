@@ -267,6 +267,9 @@
     <None Include="..\utils.js">
       <Filter>_js files</Filter>
     </None>
+    <None Include="..\utils_sh.js">
+      <Filter>_js files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib" />
