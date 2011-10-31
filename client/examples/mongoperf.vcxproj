@@ -84,8 +84,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\util\mmap.cpp" />
+    <ClCompile Include="..\..\util\mmap_win.cpp" />
     <ClCompile Include="..\mongo_client_lib.cpp" />
     <ClCompile Include="mongoperf.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\util\mmap.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -6,15 +6,29 @@
 
 #include <iostream>
 #include "../dbclient.h" // the mongo c++ driver
+#include "../../util/mmap.h"
+#include <assert.h>
 
 using namespace std;
 using namespace mongo;
 using namespace bson;
 
+MemoryMappedFile m;
+bo options;
+
 void writer() { 
 }
 
-void go(bo o) {
+void go() {
+    cout << "create test file" << endl;
+    unsigned long long len = options["fileSizeMB"].numberLong();
+    if( len == 0 ) len = 1;
+    void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
+    assert(p);
+
+    cout << "testing..."<< endl;
+
+    BSONObj& o = options;
     int w = o["w"].Int();
     for( int i = 0; i < w; i++ ) { 
         boost::thread w(writer);
@@ -28,15 +42,19 @@ int main(int argc, char *argv[]) {
 
         if( argc > 1 ) { 
             cout << "help\n" 
-                "  pipe a json object to mongoperf's stdin. this object specifies the options\n"
-                "  for the performance test\n"
-                "  options:\n"
-                "    w:<n> number of write threads"
+                "  usage:\n"
+                "    cat myjsonconfigfile | mongoperf\n"
+                "  where myjsonconfigfile contains a json document which specifies the test to run.\n"
+                "  json config doc fields:\n"
+                "    w:<n> number of write threads\n"
+                "    fileSizeMB:<n> test file size. if the file is small the heads will not move much\n"
+                "                   thus making the test not terribly informative.\n"
                 << endl;
             return 0;
         }
 
         cout << "use -h for help" << endl;
+        cout << "enter json operations object:" << endl;
 
         char input[1024];
         memset(input, 0, sizeof(input));
@@ -48,10 +66,10 @@ int main(int argc, char *argv[]) {
 
         string s = input;
         str::stripTrailing(s, "\n\r\0x1a");
-        bo options = fromjson(s);
+        options = fromjson(s);
         cout << "options:\n" << options.toString() << endl;
 
-        go(options);
+        go();
 #if 0
         cout << "connecting to localhost..." << endl;
         DBClientConnection c;
