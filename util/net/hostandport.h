@@ -165,7 +165,7 @@ namespace mongo {
     }
 
     inline string HostAndPort::toStringLong() const {
-        return dynString() + ':' + toString();
+        return _dynName + ':' + toString();
     }
 
     inline string HostAndPort::toString( bool includePort ) const {

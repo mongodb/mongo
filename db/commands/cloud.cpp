@@ -11,7 +11,9 @@ namespace mongo {
     mapsf<string,string> dynHostNames;
     extern DiagStr _hostNameCached;
 
-    string dynHostMyName() { 
+    string dynHostMyName() {
+        if( !str::startsWith(_hostNameCached, '#') )
+            return "";
         return _hostNameCached; 
     }
 
