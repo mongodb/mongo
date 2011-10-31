@@ -204,6 +204,16 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         // we're basically inserting a brand new object, do full validation
         this._validateForStorage( obj );
     }
+
+    // can pass options via object for improved readability    
+    if ( typeof(upsert) === 'object' ) {
+        assert( multi === undefined, "Fourth argument must be empty when specifying upsert and multi with an object." );
+
+        opts = upsert;
+        multi = opts.multi;
+        upsert = opts.upsert;
+    }
+
     this._db._initExtraInfo();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
     this._db._getExtraInfo("Updated");
