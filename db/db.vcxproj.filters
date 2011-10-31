@@ -291,7 +291,6 @@
     <ClInclude Include="..\scripting\v8_wrapper.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
-    <ClInclude Include="..\util\hostandport.h" />
     <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />
@@ -332,6 +331,9 @@
     <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\miniwebserver.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

@@ -693,6 +693,9 @@
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\miniwebserver.h" />
     <ClInclude Include="..\util\paths.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
@@ -798,7 +801,6 @@
     <ClInclude Include="..\scripting\v8_wrapper.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
-    <ClInclude Include="..\util\hostandport.h" />
     <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />
