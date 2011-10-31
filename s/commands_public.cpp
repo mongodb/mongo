@@ -1369,7 +1369,7 @@ namespace mongo {
                 }
                 catch (DBException& e) {
                     int code = e.getCode();
-                    if (code == 9996) { // code for StaleConfigException
+                    if (code == RecvStaleConfigCode) { // code for StaleConfigException
                         throw;
                     }
 
