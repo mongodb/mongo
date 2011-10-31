@@ -1,6 +1,5 @@
 sh = function() { return "try sh.help();" }
 
-
 sh._checkMongos = function() {
     var x = db.runCommand( "ismaster" );
     if ( x.msg != "isdbgrid" )
@@ -22,7 +21,6 @@ sh._adminCommand = function( cmd , skipCheck ) {
 
     return res;
 }
-
 
 sh._dataFormat = function( bytes ){
    if( bytes < 1024 ) return Math.floor( bytes ) + "b"
@@ -81,7 +79,6 @@ sh.shardCollection = function( fullName , key , unique ) {
     sh._adminCommand( cmd )
 }
 
-
 sh.splitFind = function( fullName , find ) {
     sh._checkFullName( fullName )
     sh._adminCommand( { split : fullName , find : find } )
@@ -108,8 +105,12 @@ sh.getBalancerState = function() {
     return ! x.stopped;
 }
 
-sh.isBalancerRunning = function() {
-    var x = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
+sh.isBalancerRunning = function () {
+    var x = db.getSisterDB("config").locks.findOne({ _id: "balancer" });
+    if (x == null) {
+        print("config.locks collection empty or missing. be sure you are connected to a mongos");
+        return false;
+    }
     return x.state > 0;
 }
 
@@ -123,8 +124,7 @@ sh.startBalancer = function( timeout, interval ) {
     sh.waitForBalancer( true, timeout, interval )
 }
 
-sh.waitForBalancer = function( onOrNot, timeout, interval ){
-    
+sh.waitForBalancer = function( onOrNot, timeout, interval ){    
     // Can also wait for particular balancer state
     var state = null
     if( ! onOrNot ) state = 0
@@ -140,4 +140,3 @@ sh.waitForBalancer = function( onOrNot, timeout, interval ){
     )
     
 }
-
