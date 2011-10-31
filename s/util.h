@@ -166,6 +166,7 @@ namespace mongo {
 
     extern boost::function1<bool, DBClientBase* > isVersionableCB;
     extern boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB;
+    extern boost::function1<bool, const string& > forceRemoteCheckShardVersionCB;
     extern boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB;
     extern boost::function1<void, DBClientBase*> resetShardVersionCB;
 

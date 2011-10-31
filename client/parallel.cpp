@@ -734,6 +734,10 @@ namespace mongo {
     Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn )
         :_server(server) ,_db(db) , _options(options), _cmd(cmd) ,_conn(conn) ,_done(false)
     {
+        init();
+    }
+
+    void Future::CommandResult::init(){
         try {
             if ( ! _conn ){
                 _connHolder.reset( new ScopedDbConnection( _server ) );
@@ -746,7 +750,7 @@ namespace mongo {
             }
             else {
                 _done = true; // we set _done first because even if there is an error we're done
-                _ok = _conn->runCommand( db , cmd , _res , options );
+                _ok = _conn->runCommand( _db , _cmd , _res , _options );
             }
         }
         catch ( std::exception& e ) {
@@ -756,29 +760,60 @@ namespace mongo {
         }
     }
 
-    bool Future::CommandResult::join() {
+    bool Future::CommandResult::join( int maxRetries ) {
         if (_done)
             return _ok;
 
-        try {
-            // TODO:  Allow retries?
-            bool retry = false;
-            bool finished = _cursor->initLazyFinish( retry );
 
-            // Shouldn't need to communicate with server any more
-            if ( _connHolder )
-                _connHolder->done();
+        _ok = false;
+        for( int i = 1; i <= maxRetries; i++ ){
 
-            uassert(14812,  str::stream() << "Error running command on server: " << _server, finished);
-            massert(14813, "Command returned nothing", _cursor->more());
+            try {
+                bool retry = false;
+                bool finished = _cursor->initLazyFinish( retry );
 
-            _res = _cursor->nextSafe();
-            _ok = _res["ok"].trueValue();
+                // Shouldn't need to communicate with server any more
+                if ( _connHolder )
+                    _connHolder->done();
 
-        }
-        catch ( std::exception& e ) {
-            error() << "Future::spawnComand (part 2) exception: " << e.what() << endl;
-            _ok = false;
+                uassert(14812,  str::stream() << "Error running command on server: " << _server, finished);
+                massert(14813, "Command returned nothing", _cursor->more());
+
+                _res = _cursor->nextSafe();
+                _ok = _res["ok"].trueValue();
+
+                break;
+            }
+            catch ( RecvStaleConfigException& e ){
+
+                assert( isVersionableCB( _conn ) );
+
+                if( i >= maxRetries ){
+                    error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
+                    throw e;
+                }
+
+                if( i >= maxRetries / 2 ){
+                    if( ! forceRemoteCheckShardVersionCB( e.getns() ) ){
+                        error() << "Future::spawnComand (part 2) no config detected" << causedBy( e ) << endl;
+                        throw e;
+                    }
+                }
+
+                checkShardVersionCB( *_conn, e.getns(), false, 1 );
+
+                LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
+
+                assert( _conn->lazySupported() );
+                _done = false;
+                init();
+                continue;
+            }
+            catch ( std::exception& e ) {
+                error() << "Future::spawnComand (part 2) exception: " << causedBy( e ) << endl;
+                break;
+            }
+
         }
 
         _done = true;

@@ -37,6 +37,10 @@ namespace mongo {
         return false;
     }
 
+    bool defaultForceRemoteCheckShardVersion( const string& ns ){
+        return true;
+    }
+
     bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ) {
         // no-op in mongod
         return false;
@@ -48,6 +52,7 @@ namespace mongo {
 
     boost::function1<bool, DBClientBase* > isVersionableCB = defaultIsVersionable;
     boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB = defaultInitShardVersion;
+    boost::function1<bool, const string& > forceRemoteCheckShardVersionCB = defaultForceRemoteCheckShardVersion;
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 

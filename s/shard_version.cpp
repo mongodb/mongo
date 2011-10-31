@@ -33,6 +33,7 @@ namespace mongo {
 
     static bool isVersionable( DBClientBase * conn );
     static bool initShardVersion( DBClientBase & conn, BSONObj& result );
+    static bool forceRemoteCheckShardVersion( const string& ns );
     static bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );
     static void resetShardVersion( DBClientBase * conn );
 
@@ -44,6 +45,7 @@ namespace mongo {
         //
         isVersionableCB = isVersionable;
         initShardVersionCB = initShardVersion;
+        forceRemoteCheckShardVersionCB = forceRemoteCheckShardVersion;
         checkShardVersionCB = checkShardVersion;
         resetShardVersionCB = resetShardVersion;
     }
@@ -137,6 +139,19 @@ namespace mongo {
         LOG(3) << "initial sharding result : " << result << endl;
 
         return ok;
+
+    }
+
+    bool forceRemoteCheckShardVersion( const string& ns ){
+
+        DBConfigPtr conf = grid.getDBConfig( ns );
+        if ( ! conf ) return false;
+        conf->reload();
+
+        ChunkManagerPtr manager = conf->getChunkManagerIfExists( ns, true, true );
+        if( ! manager ) return false;
+
+        return true;
 
     }
 
