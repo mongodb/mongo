@@ -980,6 +980,10 @@ namespace mongo {
             }
 
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                return run( dbName, cmdObj, errmsg, result, 0 );
+            }
+
+            bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int retry ) {
                 Timer t;
 
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -992,6 +996,16 @@ namespace mongo {
                 BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut , badShardedField );
 
                 bool customOutDB = customOut.hasField( "db" );
+
+                // Abort after two retries, m/r is an expensive operation
+                if( retry > 2 ){
+                    errmsg = "shard version errors preventing parallel mapreduce, check logs for further info";
+                    return false;
+                }
+                // Re-check shard version after 1st retry
+                if( retry > 0 ){
+                    forceRemoteCheckShardVersionCB( fullns );
+                }
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
@@ -1053,20 +1067,37 @@ namespace mongo {
                     BSONObjBuilder shardCountsB;
                     BSONObjBuilder aggCountsB;
                     for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
-                        shared_ptr<Future::CommandResult> res = *i;
-                        if ( ! res->join() ) {
-                            error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
-                            result.append( "cause" , res->result() );
-                            errmsg = "mongod mr failed: ";
-                            errmsg += res->result().toString();
-                            failed = true;
-                            continue;
+
+                        BSONObj mrResult;
+                        string server;
+
+                        try {
+                            shared_ptr<Future::CommandResult> res = *i;
+                            if ( ! res->join() ) {
+                                error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+                                result.append( "cause" , res->result() );
+                                errmsg = "mongod mr failed: ";
+                                errmsg += res->result().toString();
+                                failed = true;
+                                continue;
+                            }
+                            mrResult = res->result();
+                            server = res->getServer();
                         }
-                        BSONObj result = res->result();
-                        shardResultsB.append( res->getServer() , result );
-                        BSONObj counts = result["counts"].embeddedObjectUserCheck();
-                        shardCountsB.append( res->getServer() , counts );
-                        servers.insert(res->getServer());
+                        catch( RecvStaleConfigException& e ){
+
+                            // TODO: really should kill all the MR ops we sent if possible...
+
+                            log() << "restarting m/r due to stale config on a shard" << causedBy( e ) << endl;
+
+                            return run( dbName , cmdObj, errmsg, result, retry + 1 );
+
+                        }
+
+                        shardResultsB.append( server , mrResult );
+                        BSONObj counts = mrResult["counts"].embeddedObjectUserCheck();
+                        shardCountsB.append( server , counts );
+                        servers.insert( server );
 
                         // add up the counts for each shard
                         // some of them will be fixed later like output and reduce

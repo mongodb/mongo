@@ -1115,6 +1115,10 @@ namespace mongo {
                     }
 
                 }
+                catch( SendStaleConfigException& e ){
+                    log() << "mr detected stale config, should retry" << causedBy(e) << endl;
+                    throw e;
+                }
                 // TODO:  The error handling code for queries is v. fragile,
                 // *requires* rethrow AssertionExceptions - should probably fix.
                 catch ( AssertionException& e ){
