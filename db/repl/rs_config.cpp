@@ -77,7 +77,7 @@ namespace mongo {
     bo ReplSetConfig::MemberCfg::asBson() const {
         bob b;
         b << "_id" << _id;
-        b.append("host", h.toString());
+        b.append("host", h.dynString());
         if( votes != 1 ) b << "votes" << votes;
         if( priority != 1.0 ) b << "priority" << priority;
         if( arbiterOnly ) b << "arbiterOnly" << true;
@@ -493,7 +493,8 @@ namespace mongo {
                     string s = mobj["host"].String();
                     boost::trim(s);
                     m.h = HostAndPort(s);
-                    if (!m.h.hasPort()) {
+                    if ( !m.h.hasPort() ) {
+                        // make port explicit even if default 
                         m.h.setPort(m.h.port());
                     }
                 }
@@ -537,7 +538,7 @@ namespace mongo {
                 log() << "replSet " << o.toString() << rsLog;
                 uassert(13108, "bad replset config -- duplicate hosts in the config object?", false);
             }
-            hosts.insert(m.h.toString());
+            hosts.insert(m.h.dynString());
             ords.insert(m._id);
             this->members.push_back(m);
         }

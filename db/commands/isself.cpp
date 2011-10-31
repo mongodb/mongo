@@ -151,14 +151,20 @@ namespace mongo {
 
     bool HostAndPort::isSelf() const {
 
-        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
+        if( dyn() ) { 
+            LOG(2) << "isSelf " << _dynName << ' ' << dynHostMyName() << endl;
+            return dynHostMyName() == _dynName;
+        }
+
+        int _p = port();
+        int p = _p == -1 ? CmdLine::DefaultDBPort : _p;
 
         if( p != cmdLine.port ) {
             // shortcut - ports have to match at the very least
             return false;
         }
 
-        string host = str::stream() << _host << ":" << p;
+        string host = str::stream() << this->host() << ":" << p;
 
         {
             // check cache for this host
@@ -173,7 +179,7 @@ namespace mongo {
         // on linux and os x we can do a quick check for an ip match
 
         const vector<string> myaddrs = getMyAddrs();
-        const vector<string> addrs = getAllIPs(_host);
+        const vector<string> addrs = getAllIPs(host);
 
         for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i) {
             for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j) {
@@ -200,11 +206,8 @@ namespace mongo {
             return false;
         }
 
-
         try {
-
             isSelfCommand.init();
-
             DBClientConnection conn;
             string errmsg;
             if ( ! conn.connect( host , errmsg ) ) {
@@ -219,7 +222,6 @@ namespace mongo {
 
             BSONObj out;
             bool ok = conn.simpleCommand( "admin" , &out , "_isSelf" );
-
             bool me = ok && out["id"].type() == jstOID && isSelfCommand._id == out["id"].OID();
 
             // add to cache
@@ -234,7 +236,5 @@ namespace mongo {
 
         return false;
     }
-
-
 
 }

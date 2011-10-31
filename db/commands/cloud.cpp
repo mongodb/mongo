@@ -16,8 +16,10 @@ namespace mongo {
     }
 
     void dynHostResolve(string& name, int& port) {
-        string n = str::before(name, ':');
-        string s = dynHostNames.get(n);
+        assert( !name.empty() );
+        assert( !str::contains(name, ':') );
+        assert( str::startsWith(name, '#') );
+        string s = dynHostNames.get(name);
         if( s.empty() ) { 
             name.clear();
             return;
