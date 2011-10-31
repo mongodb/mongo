@@ -1051,8 +1051,14 @@ namespace mongo {
         // This constraint should be ensured by only calling this function
         // if we go below the low water mark.
         assert( rightSizeLimit < BtreeBucket<V>::bodySize() );
+        int lastOfs = -1;
         for( int i = r->n - 1; i > -1; --i ) {
-            rightSize += r->keyNode( i ).key.dataSize() + KNS;
+            rightSize += KNS;
+            short curOfs = r->k( i ).keyDataOfs();
+            if ( curOfs != lastOfs ) {
+                rightSize += r->keyNode( i ).key.dataSize();
+                lastOfs = curOfs;
+            }
             if ( rightSize > rightSizeLimit ) {
                 split = l->n + 1 + i;
                 break;
@@ -1065,8 +1071,14 @@ namespace mongo {
             }
         }
         if ( split == -1 ) {
+            lastOfs = -1;
             for( int i = l->n - 1; i > -1; --i ) {
-                rightSize += l->keyNode( i ).key.dataSize() + KNS;
+                rightSize += KNS;
+                short curOfs = l->k( i ).keyDataOfs();
+                if ( curOfs != lastOfs ) {
+                    rightSize += l->keyNode( i ).key.dataSize();
+                    lastOfs = curOfs;
+                }
                 if ( rightSize > rightSizeLimit ) {
                     split = i;
                     break;
