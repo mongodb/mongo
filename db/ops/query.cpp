@@ -55,7 +55,7 @@ namespace mongo {
         try {
             return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
-        catch( SendStaleConfigException& e ){
+        catch( SendStaleConfigException& ){
             throw;
         }
         catch ( AssertionException& e ) {
