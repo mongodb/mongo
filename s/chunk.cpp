@@ -374,11 +374,11 @@ namespace mongo {
             }
 
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
-                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")"
+                  << " on: " << splitPoint << " (splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
-                  << endl;
+                  << ( res["shouldMigrate"].eoo() ? "" : " (migrate suggested)" ) << endl;
 
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
             if (!shouldMigrate.eoo() && grid.shouldBalance()){
