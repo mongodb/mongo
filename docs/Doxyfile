@@ -637,6 +637,7 @@ WARN_LOGFILE           = doxygen.log
 
 INPUT                  = ../src/include/wiredtiger.in \
 			 ../src/include/wiredtiger_ext.h \
+			 ../lang/python/wiredtiger.py \
                          src
 
 # This tag can be used to specify the character encoding of the source files 
@@ -769,7 +770,7 @@ INPUT_FILTER           =
 # info on how filters are used. If FILTER_PATTERNS is empty or if 
 # non of the patterns match the file name, INPUT_FILTER is applied.
 
-FILTER_PATTERNS        = 
+FILTER_PATTERNS        = *.py=tools/pyfilter
 
 # If the FILTER_SOURCE_FILES tag is set to YES, the input filter (if set using 
 # INPUT_FILTER) will be used to filter the input files when producing source 

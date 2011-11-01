@@ -9,10 +9,20 @@
  *
  */
 
-%module wiredtiger
+%define DOCSTRING
+"@defgroup wt_python WiredTiger Python API
+Python wrappers aroung the WiredTiger C API.
+@{
+@cond IGNORE"
+%enddef
+
+%module(docstring=DOCSTRING) wiredtiger
+
+%feature("autodoc", "0");
 
 %pythoncode %{
 from packing import pack, unpack
+## @endcond
 %}
 
 /* Set the input argument to point to a temporary variable */ 
@@ -64,6 +74,9 @@ from packing import pack, unpack
 %define DESTRUCTOR(class, method)
 %feature("shadow") class::method %{
     def method(self, *args):
+        '''close(self, config) -> int
+        
+        @copydoc class::method'''
         try:
             return $action(self, *args)
         finally:
@@ -103,6 +116,7 @@ static PyObject *wtError;
 %pythoncode %{
 WiredTigerError = _wiredtiger.WiredTigerError
 
+## @cond DISABLE
 # Implements the iterable contract
 class IterableCursor:
         def __init__(self, cursor):
@@ -115,7 +129,7 @@ class IterableCursor:
                 if self.cursor.next() == WT_NOTFOUND:
                         raise StopIteration
                 return self.cursor.get_keys() + self.cursor.get_values()
-
+## @endcond
 %}
 
 %typemap(out) int {
@@ -229,21 +243,38 @@ SELFHELPER(struct wt_cursor)
 
 %pythoncode %{
         def get_key(self):
+            '''get_key(self) -> object
+            
+            @copydoc WT_CURSOR::get_key
+            Returns only the first column.'''
             return self.get_keys()[0]
 
         def get_keys(self):
+            '''get_keys(self) -> (object, ...)
+            
+            @copydoc WT_CURSOR::get_key'''
             if self.is_column:
                 return [self._get_recno(),]
             else:
                 return unpack(self.key_format, self._get_key())
 
         def get_value(self):
-                return self.get_values()[0]
+            '''get_value(self) -> object
+            
+            @copydoc WT_CURSOR::get_value
+            Returns only the first column.'''
+            return self.get_values()[0]
 
         def get_values(self):
-                return unpack(self.value_format, self._get_value())
+            '''get_values(self) -> (object, ...)
+            
+            @copydoc WT_CURSOR::get_value'''
+            return unpack(self.value_format, self._get_value())
 
         def set_key(self, *args):
+            '''set_key(self) -> None
+            
+            @copydoc WT_CURSOR::set_key'''
             if self.is_column:
                 self._set_recno(args[0])
             else:
@@ -252,19 +283,24 @@ SELFHELPER(struct wt_cursor)
                 self._set_key(self._key)
 
         def set_value(self, *args):
-                # Keep the Python string pinned
-                self._value = pack(self.value_format, *args)
-                self._set_value(self._value)
+            '''set_value(self) -> None
+            
+            @copydoc WT_CURSOR::set_value'''
+            # Keep the Python string pinned
+            self._value = pack(self.value_format, *args)
+            self._set_value(self._value)
 
         def __iter__(self):
-                if not hasattr(self, '_iterable'):
-                        self._iterable = IterableCursor(self)
-                return self._iterable
+            '''Cursor objects support iteration, equivalent to calling
+            WT_CURSOR::next until it returns ::WT_NOTFOUND.'''
+            if not hasattr(self, '_iterable'):
+                self._iterable = IterableCursor(self)
+            return self._iterable
 
-        # De-position the cursor so the next iteration starts from the beginning
         def reset(self):
-                self.last()
-                self.next()
+            '''Forget the current cursor position'''
+            self.last()
+            self.next()
 %}
 };
 
@@ -276,8 +312,9 @@ SELFHELPER(struct wt_cursor)
 
 %ignore wt_buf;
 %ignore wt_collator;
-%ignore wt_compressor;
 %ignore wt_connection::add_collator;
+%ignore wt_compressor;
+%ignore wt_connection::add_compressor;
 %ignore wt_cursor_type;
 %ignore wt_connection::add_cursor_type;
 %ignore wt_event_handler;
@@ -299,3 +336,8 @@ SELFHELPER(struct wt_cursor)
 %rename(Connection) wt_connection;
 
 %include "wiredtiger.h"
+
+%pythoncode %{
+## @}
+%}
+

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+tooldir=`dirname $0`
+
+python $tooldir/doxypy.py "$@" | python $tooldir/fixlinks.py
