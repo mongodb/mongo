@@ -732,6 +732,7 @@ if nix:
             print( "ERROR: clang pch is broken for now" )
             Exit(1)
         env['Gch'] = env.Gch( [ "pch.h" ] )[0]
+        env['GchSh'] = env.GchSh( [ "pch.h" ] )[0]
     elif os.path.exists('pch.h.gch'):
         print( "removing precompiled headers" )
         os.unlink('pch.h.gch') # gcc uses the file if it exists
