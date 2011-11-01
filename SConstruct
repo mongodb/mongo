@@ -329,7 +329,7 @@ if has_option( "full" ):
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
+commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
                  "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
@@ -345,8 +345,9 @@ coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/net/message_server_port.cpp" , 
                     "client/parallel.cpp" , "db/common.cpp", 
                     "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp" ]
-
+                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp",
+                    "db/security_common.cpp", "db/security_commands.cpp",
+                  ]
 mmapFiles = [ "util/mmap.cpp" ]
 
 if has_option( "mm" ):
