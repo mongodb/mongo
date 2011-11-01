@@ -31,20 +31,32 @@ class suite_subprocess:
                 print contents + '...\n'
         self.assertEqual(filesize, 0)
 
-    def runWt(self, args, outfilename=None, reopensession=True):
+    def check_non_empty_file(self, filename):
+        """
+        Raise an error if the file is empty
+        """
+        filesize = os.path.getsize(filename)
+        if filesize == 0:
+            print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
+        self.assertNotEqual(filesize, 0)
+
+    def runWt(self, args, outfilename=None, errfilename=None, reopensession=True):
         """
         Run the 'wt' process
         """
 
         # we close the connection to guarantee everything is
         # flushed, and that we can open it from another process
-        self.conn.close(None)
-        self.conn = None
+        if self.conn != None:
+            self.conn.close(None)
+            self.conn = None
 
-        wterrname = "wt.err"
         wtoutname = outfilename
         if wtoutname == None:
             wtoutname = "wt.out"
+        wterrname = errfilename
+        if wterrname == None:
+            wterrname = "wt.err"
         with open(wterrname, "w") as wterr:
             with open(wtoutname, "w") as wtout:
                 if self._gdbSubprocess:
@@ -61,7 +73,8 @@ class suite_subprocess:
                 else:
                     proc = subprocess.Popen(procargs, stdout=wtout, stderr=wterr)
                 proc.wait()
-        self.check_empty_file(wterrname)
+        if errfilename == None:
+            self.check_empty_file(wterrname)
         if outfilename == None:
             self.check_empty_file(wtoutname)
 
