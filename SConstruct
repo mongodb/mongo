@@ -1138,7 +1138,7 @@ if darwin or clientEnv["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Prepend( LIBPATH=["."] )
-    sniffEnv.Append( LIBS=[ "mongotestfiles" ] )
+    sniffEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
