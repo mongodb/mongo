@@ -823,15 +823,22 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
+            bool haveStringPrompt = false;
             promptType = scope->type("prompt");
-            if (promptType == String){
+            if( promptType == String ) {
                 prompt = scope->getString("prompt");
-            } else if (promptType  == Code) {
-                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
-                prompt = scope->getString("__prompt__");
-            } else {
-                prompt = sayReplSetMemberState()+"> ";
+                haveStringPrompt = true;
             }
+            else if( promptType == Code ) {
+                scope->exec("delete __prompt__;", "", false, false, false, 0);
+                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
+                if( scope->type("__prompt__") == String ) {
+                    prompt = scope->getString("__prompt__");
+                    haveStringPrompt = true;
+                }
+            }
+            if( !haveStringPrompt )
+                prompt = sayReplSetMemberState()+"> ";
 
             char * line = shellReadline( prompt.c_str() );
 
