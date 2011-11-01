@@ -575,14 +575,6 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 3:     /* ctrl-c */
             errno = EAGAIN;
             return -1;
-        case 127:   /* delete */
-            if (len > 0 && pos < len) {
-                memmove(buf+pos,buf+pos+1,len-pos-1);
-                len--;
-                buf[len] = '\0';
-                refreshLine(fd,prompt,buf,len,pos,cols);
-            }
-            break;
         case 8:     /* backspace or ctrl-h */
             if (pos > 0 && len > 0) {
                 memmove(buf+pos-1,buf+pos,len-pos);
@@ -592,13 +584,14 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 refreshLine(fd,prompt,buf,len,pos,cols);
             }
             break;
-        case 4:     /* ctrl-d, remove char at right of cursor */
-            if (len > 1 && pos < (len-1)) {
+        case 127:  // DEL and ctrl-d both delete the character under the cursor
+        case 4:    // on an empty line, DEL does nothing while ctrl-d will exit the shell
+            if( len > 0 && pos < len ) {
                 memmove(buf+pos,buf+pos+1,len-pos);
                 len--;
-                buf[len] = '\0';
                 refreshLine(fd,prompt,buf,len,pos,cols);
-            } else if (len == 0) {
+            }
+            else if( c == 4 && len == 0 ) {
                 history_len--;
                 free(history[history_len]);
                 return -1;
