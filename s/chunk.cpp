@@ -198,12 +198,12 @@ namespace mongo {
 
     BSONObj Chunk::singleSplit( bool force , BSONObj& res ) const {
         vector<BSONObj> splitPoint;
-        vector<BSONObj> candidates;
-        
+
         // if splitting is not obligatory we may return early if there are not enough data
         // we cap the number of objects that would fall in the first half (before the split point)
         // the rationale is we'll find a split point without traversing all the data
         if ( ! force ) {
+            vector<BSONObj> candidates;
             const int maxPoints = 2;
             pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , MaxObjectPerChunk );
             if ( candidates.size() <= 1 ) {
@@ -213,7 +213,7 @@ namespace mongo {
                 LOG(1) << "chunk not full enough to trigger auto-split " << ( candidates.size() == 0 ? "no split entry" : candidates[0].toString() ) << endl;
                 return BSONObj();
             }
-            
+
             splitPoint.push_back( candidates.front() );
 
         }
@@ -237,19 +237,10 @@ namespace mongo {
 
         }
         else if ( maxIsInf() ) {
-
-            if ( candidates.size() > 1 ) {
-                // this is so that we don't end up with a chunnk 
-                // that is larger than the max chunk size
-                splitPoint.clear();
-                splitPoint.push_back( candidates[1] );
-            }
-            else {
-                BSONObj key = _getExtremeKey( -1 );
-                if ( ! key.isEmpty() ) {
-                    splitPoint.clear();
-                    splitPoint.push_back( key );
-                }
+            splitPoint.clear();
+            BSONObj key = _getExtremeKey( -1 );
+            if ( ! key.isEmpty() ) {
+                splitPoint.push_back( key );
             }
         }
 
