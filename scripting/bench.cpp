@@ -135,6 +135,7 @@ namespace mongo {
         
     } 
     
+    // TODO:  Make recursively fixing
     static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
         BSONObjIterator i( obj );
         while ( i.more() ) {
@@ -219,6 +220,23 @@ namespace mongo {
                         }
 
                         if( ! config->hideResults || e["showResult"].trueValue() ) log() << "Result from benchRun thread [findOne] : " << result << endl;
+
+                    }
+                    if ( op == "command" ) {
+
+                        BSONObj result;
+                        // TODO
+                        /* bool ok = */ conn->runCommand( ns , /* fixQuery( */ e["command"].Obj() /* ) */, result, e["options"].numberInt() );
+
+                        if( check ){
+                            int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
+                            if( err ){
+                                log() << "Error checking in benchRun thread [command]" << causedBy( scope->getError() ) << endl;
+                                return;
+                            }
+                        }
+
+                        if( ! config->hideResults || e["showResult"].trueValue() ) log() << "Result from benchRun thread [command] : " << result << endl;
 
                     }
                     else if( op == "find" || op == "query" ) {
@@ -485,8 +503,10 @@ namespace mongo {
 
             log() << "Ending! (waiting for " << threads.size() << " threads)" << endl;
 
-            scoped_lock lock( config._mutex );
-            config.active = false;
+            {
+                scoped_lock lock( config._mutex );
+                config.active = false;
+            }
 
             for ( unsigned i = 0; i < threads.size(); i++ ) threads[i]->join();
 
