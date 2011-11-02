@@ -332,8 +332,8 @@ namespace mongo {
 	/* look for an initial $sort */
 	if (!sourceVector.size())
 	    return;
-	const intrusive_ptr<DocumentSource> &pSC = sourceVector.front();
 #ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
+	const intrusive_ptr<DocumentSource> &pSC = sourceVector.front();
 	const DocumentSourceSort *pSort = 
 	    dynamic_cast<DocumentSourceSort *>(pSC.get());
 
