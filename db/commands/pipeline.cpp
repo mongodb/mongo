@@ -333,10 +333,10 @@ namespace mongo {
 	if (!sourceVector.size())
 	    return;
 	const intrusive_ptr<DocumentSource> &pSC = sourceVector.front();
+#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
 	const DocumentSourceSort *pSort = 
 	    dynamic_cast<DocumentSourceSort *>(pSC.get());
 
-#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
 	if (pSort) {
 	    /* build the sort key */
 	    pSort->sortKeyToBson(pSortBuilder, false);
