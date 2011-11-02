@@ -248,8 +248,7 @@ extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
-    uint32_t size,
-    int quiet);
+    uint32_t size);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     int cacheonly,

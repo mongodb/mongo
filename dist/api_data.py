@@ -340,7 +340,7 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'block_read' : [ 'ERR_QUIET', 'VERIFY' ],
+	'block_read' : [ 'VERIFY' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],
 	'verbose' : [
@@ -361,5 +361,5 @@ flags = {
 ###################################################
 	'conn' : [ 'MULTITHREAD', 'SERVER_RUN', 'WORKQ_RUN' ],
 	'buf' : [ 'BUF_INUSE' ],
-	'session' : [ 'SESSION_INTERNAL' ],
+	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

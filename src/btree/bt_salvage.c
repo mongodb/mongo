@@ -157,6 +157,9 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	btree = session->btree;
 	ret = 0;
 
+				/* Set "silent on format error" flag. */
+	F_SET(session, WT_SESSION_SALVAGE_QUIET_ERR);
+
 	WT_CLEAR(stuff);
 	ss = &stuff;
 	ss->session = session;
@@ -332,6 +335,9 @@ err:		if (ret == 0)
 	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);
 
+				/* Clear "silent on format error" flag. */
+	F_CLR(session, WT_SESSION_SALVAGE_QUIET_ERR);
+
 	return (ret);
 }
 
@@ -405,8 +411,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 */
 		WT_ERR(__wt_buf_initsize(session, tmp, size));
 		if (__wt_block_read(session, tmp,
-		    WT_OFF_TO_ADDR(btree, off),
-		    size, WT_ERR_QUIET | WT_VERIFY)) {
+		    WT_OFF_TO_ADDR(btree, off), size, WT_VERIFY)) {
 skip:			WT_VERBOSE(session, SALVAGE,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);

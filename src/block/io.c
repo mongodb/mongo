@@ -48,7 +48,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		if (LF_ISSET(WT_ERR_QUIET))
+		if (F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 			return (WT_ERROR);
 		WT_FAILURE_RET(session, WT_ERROR,
 		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
@@ -83,8 +83,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 
 	/* Optionally verify the page: used by salvage and verify. */
 	if (LF_ISSET(WT_VERIFY))
-		WT_ERR(__wt_verify_dsk(session,
-		    buf->mem, addr, buf->size, LF_ISSET(WT_ERR_QUIET) ? 1 : 0));
+		WT_ERR(__wt_verify_dsk(session, buf->mem, addr, buf->size));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -121,7 +120,7 @@ __wt_block_write(
 	 * write a corrupted page.
 	 */
 	WT_ASSERT(session,
-	    __wt_verify_dsk(session, buf->mem, 0, buf->size, 0) == 0);
+	    __wt_verify_dsk(session, buf->mem, 0, buf->size) == 0);
 
 	/*
 	 * The WT_PAGE_DISK->type field is after the 32B we leave uncompressed
