@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../bson/stringxdata.h"
+#include "../bson/stringdata.h"
 
 namespace mongo {
 
