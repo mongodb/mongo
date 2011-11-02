@@ -165,13 +165,16 @@ namespace mongo {
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
 
+                    // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
+                    ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
+
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
-                           << " mine : " << db->getChunkManager( ns )->getVersion().toString() 
+                           << " mine : " << ( manager ? manager->getVersion().toString() : "(unknown)" )
                            << endl;
 
                     LOG(1) << m.toString() << endl;
 
-                    if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ) {
+                    if ( needVersion.isSet() && manager && needVersion <= manager->getVersion() ) {
                         // this means when the write went originally, the version was old
                         // if we're here, it means we've already updated the config, so don't need to do again
                         //db->getChunkManager( ns , true ); // SERVER-1349
@@ -180,7 +183,7 @@ namespace mongo {
                         // we received a writeback object that was sent to a previous version of a shard
                         // the actual shard may not have the object the writeback operation is for
                         // we need to reload the chunk manager and get the new shard versions
-                        db->getChunkManager( ns , true );
+                        manager = db->getChunkManager( ns , true );
                     }
 
                     // do request and then call getLastError
