@@ -125,7 +125,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 */
 			return;
 		}
-	WT_FAILURE(session, "hazard reference not found");
+	__wt_errx(session, "hazard reference not found");
 }
 
 /*
@@ -187,7 +187,7 @@ __hazard_dump(WT_SESSION_IMPL *session)
 		}
 
 	if (fail)
-		WT_FAILURE(session, "unexpected hazard reference");
+		__wt_errx(session, "unexpected hazard reference");
 }
 
 /*
@@ -206,11 +206,10 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
 		for (hp = session->hazard;
 		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
-			if (hp->page == page) {
-				WT_FAILURE(session,
+			if (hp->page == page)
+				__wt_errx(session,
 				    "discarded page has hazard reference: "
 				    "(%p: %s, line %d)",
 				    hp->page, hp->file, hp->line);
-			}
 }
 #endif

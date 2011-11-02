@@ -741,8 +741,9 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_FAILURE_RET(session,
-			    WT_ERROR, "subtree page locked during eviction");
+			__wt_errx(session,
+			    "subtree page locked during eviction");
+			return (WT_ERROR);
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}
@@ -865,8 +866,9 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_FAILURE_RET(session,
-			    WT_ERROR, "subtree page locked during eviction");
+			__wt_errx(session,
+			    "subtree page locked during eviction");
+			return (WT_ERROR);
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}

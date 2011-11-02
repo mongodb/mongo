@@ -62,7 +62,10 @@ __wt_page_in_func(
 			__wt_yield();
 			break;
 		default:
-			WT_FAILURE_RET(session, WT_ERROR, "invalid page state");
+			WT_ASSERT_RET(session,
+			    ref->state == WT_REF_DISK ||
+			    ref->state == WT_REF_LOCKED ||
+			    ref->state == WT_REF_MEM);
 		}
 	/* NOTREACHED */
 }

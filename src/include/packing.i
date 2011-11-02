@@ -215,8 +215,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (__wt_vsize_uint(pv->u.u));
 	}
 
-	WT_FAILURE(session, "unknown pack-value type: %c", (int)pv->type);
-	return (0);
+	__wt_errx(session, "unknown pack-value type: %c", (int)pv->type);
+	return (EINVAL);
 }
 
 static inline int
@@ -303,9 +303,9 @@ __pack_write(
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	default:
-		WT_FAILURE(
+		__wt_errx(
 		    session, "unknown pack-value type: %c", (int)pv->type);
-		break;
+		return (EINVAL);
 	}
 
 	return (0);
@@ -371,9 +371,9 @@ __unpack_read(WT_SESSION_IMPL *session,
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	default:
-		WT_FAILURE(
+		__wt_errx(
 		    session, "unknown pack-value type: %c", (int)pv->type);
-		break;
+		return (EINVAL);
 	}
 
 	return (0);

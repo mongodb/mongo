@@ -100,10 +100,10 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				break;
 
 			default:
-				WT_FAILURE(session,
+				__wt_errx(session,
 				    "unexpected projection plan: %c",
 				    (int)*proj);
-				return (0);
+				return (EINVAL);
 			}
 		}
 	}
@@ -300,9 +300,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				buf->size += WT_STORE_SIZE(len);
 				break;
 			default:
-				WT_FAILURE(session,
+				__wt_errx(session,
 				    "unexpected projection plan: %c",
 				    (int)*proj);
+				return (EINVAL);
 			}
 		}
 	}

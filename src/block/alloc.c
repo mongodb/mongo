@@ -23,11 +23,13 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 
 	btree = session->btree;
 
-	if (size % btree->allocsize != 0)
-		WT_FAILURE_RET(session, WT_ERROR,
-		    "attempt to allocate a block size: %" PRIu32 " not a "
-		    "multiple of %" PRIu32,
+	if (size % btree->allocsize != 0) {
+		__wt_errx(session,
+		    "cannot allocate a block size %" PRIu32 " that is not "
+		    "a multiple of the allocation size %" PRIu32,
 		    size, btree->allocsize);
+		return (WT_ERROR);
+	}
 
 	WT_BSTAT_INCR(session, alloc);
 
@@ -104,7 +106,7 @@ __block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	/* We should never be allocating from an empty file. */
 	if (fh->file_size < WT_BTREE_DESC_SECTOR) {
 		__wt_errx(session,
-		    "attempt to allocate from a file with no description "
+		    "cannot allocate from a file with no description "
 		    "information");
 		return (WT_ERROR);
 	}
@@ -150,14 +152,18 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 	btree = session->btree;
 	new = NULL;
 
-	if (addr == WT_ADDR_INVALID)
-		WT_FAILURE_RET(session,
-		    WT_ERROR, "attempt to free an invalid file address");
-	if (size % btree->allocsize != 0)
-		WT_FAILURE_RET(session, WT_ERROR,
-		    "attempt to free a block size: %" PRIu32 " not a "
-		    "multiple of %" PRIu32,
+	if (addr == WT_ADDR_INVALID) {
+		__wt_errx(session,
+		    "attempt to free an invalid file address");
+		return (WT_ERROR);
+	}
+	if (size % btree->allocsize != 0) {
+		__wt_errx(session,
+		    "cannot free a block size %" PRIu32 " that is not a "
+		    "multiple of the allocation size %" PRIu32,
 		    size, btree->allocsize);
+		return (WT_ERROR);
+	}
 
 	WT_VERBOSE(session, ALLOCATE,
 	    "allocate: free %" PRIu32 "/%" PRIu32, addr, size);
@@ -245,12 +251,13 @@ combine:/*
 	    new->addr + (new->size / btree->allocsize) > fe->addr)) {
 		TAILQ_REMOVE(&btree->freeqa, new, qa);
 
-		WT_FAILURE_RET(session, WT_ERROR,
+		__wt_errx(session,
 		    "block free at addr range %" PRIu32 "-%" PRIu32
 		    " overlaps already free block at addr range "
 		    "%" PRIu32 "-%" PRIu32,
 		    new->addr, new->addr + (new->size / btree->allocsize),
 		    fe->addr, fe->addr + (fe->size / btree->allocsize));
+		return (WT_ERROR);
 	}
 #endif
 

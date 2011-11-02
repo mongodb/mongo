@@ -48,10 +48,11 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		if (F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
-			return (WT_ERROR);
-		WT_FAILURE_RET(session, WT_ERROR,
-		    "read checksum error: %" PRIu32 "/%" PRIu32, addr, size);
+		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+			__wt_errx(session,
+			    "read checksum error: %" PRIu32 "/%" PRIu32,
+			    addr, size);
+		return (WT_ERROR);
 	}
 
 	/*

@@ -25,7 +25,7 @@ static int __verify_dsk_row(
 
 #define	WT_VRFY_ERR(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
-		WT_FAILURE(session, __VA_ARGS__);			\
+		__wt_errx(session, __VA_ARGS__);			\
 } while (0)
 
 /*
