@@ -210,7 +210,7 @@ namespace mongo {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
-                LOG(1) << "chunk not full enough to trigger auto-split" << endl;
+                LOG(1) << "chunk not full enough to trigger auto-split " << ( candidates.size() == 0 ? "no split entry" : candidates[0].toString() ) << endl;
                 return BSONObj();
             }
 
@@ -354,8 +354,6 @@ namespace mongo {
 
             LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 
-            _dataWritten = 0; // reset so we check often enough
-
             BSONObj res;
             BSONObj splitPoint = singleSplit( false /* does not force a split if not enough data */ , res );
             if ( splitPoint.isEmpty() ) {
@@ -363,13 +361,22 @@ namespace mongo {
                 _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data
                 return false;
             }
+            
+            if ( maxIsInf() || minIsInf() ) {
+                // we don't want to reset _dataWritten since we kind of want to check the other side right away
+            }
+            else {
+                _dataWritten = 0; // we're splitting, so should wait a bit
+            }
+
+
 
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
-                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")"
+                  << " on: " << splitPoint << " (splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
-                  << endl;
+                  << ( res["shouldMigrate"].eoo() ? "" : " (migrate suggested)" ) << endl;
 
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
             if (!shouldMigrate.eoo() && grid.shouldBalance()){
@@ -989,7 +996,13 @@ namespace mongo {
 
         int nc = numChunks();
 
-        if ( nc < 10 ) {
+        if ( nc <= 1 ) {
+            return 1024;
+        }
+        else if ( nc < 3 ) {
+            return minChunkSize / 2;
+        }
+        else if ( nc < 10 ) {
             splitThreshold = max( splitThreshold / 4 , minChunkSize );
         }
         else if ( nc < 20 ) {

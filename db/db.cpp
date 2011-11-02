@@ -939,7 +939,7 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             out() << "****" << endl;
-            out() << "Replica Pairs have been deprecated." << endl;
+            out() << "Replica Pairs have been deprecated. Invalid options: --pairwith, --arbiter, and/or --opIdMem" << endl;
             out() << "<http://www.mongodb.org/display/DOCS/Replica+Pairs>" << endl;
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );

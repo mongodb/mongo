@@ -446,6 +446,9 @@ namespace mongo {
                 return b.obj();
             }
             else {
+            	stringstream host;
+            	host << getHostNameCached() << ":" << cmdLine.port;
+            	*_b << "server" << host.str();
                 _b->appendElements( suffix );
                 return _b->obj();
             }

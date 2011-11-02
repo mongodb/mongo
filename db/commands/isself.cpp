@@ -179,7 +179,7 @@ namespace mongo {
         // on linux and os x we can do a quick check for an ip match
 
         const vector<string> myaddrs = getMyAddrs();
-        const vector<string> addrs = getAllIPs(host);
+        const vector<string> addrs = getAllIPs(_host);
 
         for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i) {
             for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j) {

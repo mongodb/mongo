@@ -124,19 +124,41 @@ sh.startBalancer = function( timeout, interval ) {
     sh.waitForBalancer( true, timeout, interval )
 }
 
-sh.waitForBalancer = function( onOrNot, timeout, interval ){    
-    // Can also wait for particular balancer state
-    var state = null
-    if( ! onOrNot ) state = 0
-    else if( onOrNot == true ) state = 2
-    else state = onOrNot
+sh.waitForBalancer = function( onOrNot, timeout, interval ){
     
-    assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
-                             return ( lock == null && state == 0 ) || ( lock != null && lock.state == state ) 
-                 },
-                 "waited too long for balancer to " + ( state > 0 ? "start" : "stop" ) + " [ state : " + state + "]",
-                 timeout,
-                 interval
-    )
-    
+    if( onOrNot != undefined ){
+        
+        // Wait for balancer to be on or off
+        // Can also wait for particular balancer state
+        var state = null
+        if( ! onOrNot ) state = 0
+        else if( onOrNot == true ) state = 2
+        else state = onOrNot
+        
+        assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
+                                 return ( lock == null && state == 0 ) || ( lock != null && lock.state == state ) 
+                     },
+                     "waited too long for balancer to " + ( state > 0 ? "start" : "stop" ) + " [ state : " + state + "]",
+                     timeout,
+                     interval
+        )
+        
+    }
+    else{
+        
+        // Wait for balancer to run at least once
+        
+        var lock = db.getSisterDB( "config" ).locks.findOne({ _id : "balancer" })
+        var ts = lock ? lock.ts : ""
+        
+        assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne({ _id : "balancer" });
+                                 if( ! lock ) return false;
+                                 return lock.ts != ts
+                                },
+                                "waited too long for balancer to activate",
+                                timeout,
+                                interval
+        )        
+    }
 }
+

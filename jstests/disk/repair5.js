@@ -41,3 +41,5 @@ s();
 
 assert.eq( 20000, db[ baseName ].find().itcount() );
 assert( db[ baseName ].validate().valid );
+
+stopMongod( port )
