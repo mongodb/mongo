@@ -513,7 +513,7 @@ __verify_overflow(
 	tmp = NULL;
 	ret = 0;
 
-	/* Allocate enough memory to hold the overflow pages. */
+	/* Allocate enough memory to hold the overflow page. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read and verify the overflow item. */
