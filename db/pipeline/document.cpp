@@ -136,6 +136,15 @@ namespace mongo {
 	return intrusive_ptr<const Value>();
     }
 
+    size_t Document::getApproximateSize() const {
+	size_t size = sizeof(Document);
+	const size_t n = vpValue.size();
+	for(size_t i = 0; i < n; ++i)
+	    size += vpValue[i]->getApproximateSize();
+
+	return size;
+    }
+
     size_t Document::getFieldIndex(const string &fieldName) const {
 	const size_t n = vFieldName.size();
 	size_t i = 0;

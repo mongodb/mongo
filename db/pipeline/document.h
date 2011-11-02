@@ -146,7 +146,17 @@ namespace mongo {
 	  @returns the value of the field
 	*/
 	intrusive_ptr<const Value> getField(const string &fieldName) const;
-	
+
+	/*
+	  Get the approximate storage size of the document, in bytes.
+
+	  Under the assumption that field name strings are shared, they are
+	  not included in the total.
+
+	  @returns the approximate storage
+	*/
+	size_t getApproximateSize() const;
+
         /*
           Compare two documents.
 
@@ -166,7 +176,7 @@ namespace mongo {
 	  Meant to be used to create composite hashes suitable for
 	  boost classes such as unordered_map<>.
 
-	  @params seed value to augment with this' hash
+	  @param seed value to augment with this' hash
 	*/
 	void hash_combine(size_t &seed) const;
 

@@ -51,9 +51,9 @@ namespace mongo {
 	  is always the same, so a common implementation works, but requires
 	  knowing the operator name.
 
-	  @params pBuilder the builder to add to
-	  @params fieldName the projected name
-	  @params opName the operator name
+	  @param pBuilder the builder to add to
+	  @param fieldName the projected name
+	  @param opName the operator name
 	 */
 	void opToBson(
 	    BSONObjBuilder *pBuilder, string fieldName, string opName,

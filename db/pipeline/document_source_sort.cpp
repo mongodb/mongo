@@ -19,10 +19,12 @@
 #include "db/pipeline/document_source.h"
 
 #include "db/jsobj.h"
+#include "db/pipeline/doc_mem_monitor.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
+
 
 namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
@@ -140,10 +142,17 @@ namespace mongo {
 	/* make sure we've got a sort key */
 	assert(vSortKey.size()); // CW TODO error
 
+	/* track and warn about how much physical memory has been used */
+	DocMemMonitor dmm(this);
+
 	/* pull everything from the underlying source */
         for(bool hasNext = !pSource->eof(); hasNext;
-                hasNext = pSource->advance())
-	    documents.push_back(Carrier(this, pSource->getCurrent()));
+	    hasNext = pSource->advance()) {
+	    intrusive_ptr<Document> pDocument(pSource->getCurrent());
+	    documents.push_back(Carrier(this, pDocument));
+
+	    dmm.addToTotal(pDocument->getApproximateSize());
+	}
 
 	/* sort the list */
 	documents.sort(Carrier::lessThan);

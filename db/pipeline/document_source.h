@@ -25,6 +25,7 @@
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/value.h"
+#include "util/string_writer.h"
 
 namespace mongo {
     class Accumulator;
@@ -37,9 +38,19 @@ namespace mongo {
     class Matcher;
 
     class DocumentSource :
-        public IntrusiveCounter {
+        public IntrusiveCounter,
+	public StringWriter {
     public:
 	virtual ~DocumentSource();
+
+	// virtuals from StringWriter
+	/*
+	  Write out a string representation of this pipeline operator.
+
+	  @param ss string stream to write the string representation to
+	 */
+	virtual void writeString(stringstream &ss) const;
+
 
         /*
 	  Is the source at EOF?
@@ -112,10 +123,10 @@ namespace mongo {
 	  convert the inner part of the object which will be added to the
 	  array being built here.
 
-	  @params pBuilder the array builder to add the operation to.
+	  @param pBuilder the array builder to add the operation to.
          */
 	virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
-
+	
     protected:
 	/*
 	  Create an object that represents the document source.  The object
@@ -123,7 +134,7 @@ namespace mongo {
 	  will be used by the default implementation of addToBsonArray()
 	  to add this object to a pipeline being represented in BSON.
 
-	  @params pBuilder a blank object builder to write to
+	  @param pBuilder a blank object builder to write to
 	 */
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const = 0;
 
@@ -285,7 +296,7 @@ namespace mongo {
 	  format.  This conversion is used to move back to the low-level
 	  find() Cursor mechanism.
 
-	  @params pBuilder the builder to write to
+	  @param pBuilder the builder to write to
 	 */
 	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const = 0;
 
@@ -347,7 +358,7 @@ namespace mongo {
 	  format.  This conversion is used to move back to the low-level
 	  find() Cursor mechanism.
 
-	  @params pBuilder the builder to write to
+	  @param pBuilder the builder to write to
 	 */
 	void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
@@ -514,7 +525,7 @@ namespace mongo {
 	  format.  This conversion is used to move back to the low-level
 	  find() Cursor mechanism.
 
-	  @params pBuilder the builder to write to
+	  @param pBuilder the builder to write to
 	 */
 	void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
@@ -615,7 +626,7 @@ namespace mongo {
 	  This is a convenience for directly handling BSON, and relies on the
 	  above methods.
 
-	  @params pBsonElement the BSONElement with an object named $project
+	  @param pBsonElement the BSONElement with an object named $project
 	  @returns the created projection
 	 */
         static intrusive_ptr<DocumentSource> createFromBson(
@@ -666,8 +677,8 @@ namespace mongo {
 	  Adds a sort key field to the key being built up.  A concatenated
 	  key is built up by calling this repeatedly.
 
-	  @params fieldPath the field path to the key component
-	  @params ascending if true, use the key for an ascending sort,
+	  @param fieldPath the field path to the key component
+	  @param ascending if true, use the key for an ascending sort,
 	    otherwise, use it for descending
 	*/
 	void addKey(const string &fieldPath, bool ascending);
@@ -893,7 +904,7 @@ namespace mongo {
 	  This is a convenience for directly handling BSON, and relies on the
 	  above methods.
 
-	  @params pBsonElement the BSONElement with an object named $project
+	  @param pBsonElement the BSONElement with an object named $project
 	  @returns the created projection
 	 */
         static intrusive_ptr<DocumentSource> createFromBson(

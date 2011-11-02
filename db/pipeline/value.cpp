@@ -962,4 +962,57 @@ namespace mongo {
         /* NOTREACHED */
         return Undefined;
     }
+
+    size_t Value::getApproximateSize() const {
+        switch(type) {
+        case String:
+	    return sizeof(Value) + stringValue.length();
+
+        case Object:
+	    return sizeof(Value) + pDocumentValue->getApproximateSize();
+
+        case Array: {
+	    size_t size = sizeof(Value);
+            const size_t n = vpValue.size();
+            for(size_t i = 0; i < n; ++i) {
+		size += vpValue[i]->getApproximateSize();
+            }
+	    return size;
+        }
+
+	case NumberDouble:
+        case BinData:
+        case jstOID:
+        case Bool:
+        case Date:
+        case RegEx:
+        case Symbol:
+        case CodeWScope:
+        case NumberInt:
+        case Timestamp:
+        case NumberLong:
+        case jstNULL:
+        case Undefined:
+	    return sizeof(Value);
+
+            /* these shouldn't happen in this context */
+        case MinKey:
+        case EOO:
+        case DBRef:
+        case Code:
+        case MaxKey:
+            assert(false); // CW TODO better message
+	    return sizeof(Value);
+        }
+
+	/*
+	  We shouldn't get here.  In order to make the implementor think about
+	  these cases, they are all listed explicitly, above.  The compiler
+	  should complain if they aren't all listed, because there's no
+	  default.  However, not all the compilers seem to do that.  Therefore,
+	  this final catch-all is here.
+	 */
+	assert(false);
+	return sizeof(Value);
+    }
 }

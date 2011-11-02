@@ -356,6 +356,7 @@ else:
 
 coreServerFiles += mmapFiles
 
+# handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
 
 if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
@@ -366,6 +367,18 @@ else:
     processInfoFiles += [ "util/processinfo_none.cpp" ]
 
 coreServerFiles += processInfoFiles
+
+# handle systeminfo*
+systemInfoFiles = [ ]
+if os.path.exists( "util/systeminfo_" + os.sys.platform + ".cpp" ):
+    systemInfoFiles += [ "util/systeminfo_" + os.sys.platform + ".cpp" ]
+elif os.sys.platform == "linux3":
+    systemInfoFiles += [ "util/systeminfo_linux2.cpp" ]
+else:
+    systemInfoFiles += [ "util/systeminfo_none.cpp" ]
+
+coreServerFiles += systemInfoFiles
+
 
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]

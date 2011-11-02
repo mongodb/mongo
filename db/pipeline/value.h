@@ -264,12 +264,19 @@ namespace mongo {
         static BSONType getWidestNumeric(BSONType lType, BSONType rType);
 
 	/*
+	  Get the approximate storage size of the value, in bytes.
+
+	  @returns approximate storage size of the value.
+	 */
+	size_t getApproximateSize() const;
+
+	/*
 	  Calculate a hash value.
 
 	  Meant to be used to create composite hashes suitable for
 	  boost classes such as unordered_map<>.
 
-	  @params seed value to augment with this' hash
+	  @param seed value to augment with this' hash
 	*/
 	void hash_combine(size_t &seed) const;
 

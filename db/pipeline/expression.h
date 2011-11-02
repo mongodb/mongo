@@ -67,8 +67,8 @@ namespace mongo {
 	  may produce a scalar or another object, either of which will be
 	  substituted inline.
 
-	  @params pBuilder the builder to add the expression to
-	  @params fieldName the name the object should be given
+	  @param pBuilder the builder to add the expression to
+	  @param fieldName the name the object should be given
 	 */
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName,
@@ -82,7 +82,7 @@ namespace mongo {
 	  may produce a scalar or another object, either of which will be
 	  substituted inline.
 
-	  @params pBuilder the builder to add the expression to
+	  @param pBuilder the builder to add the expression to
 	 */
 	virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
 	    unsigned depth) const = 0;
@@ -103,7 +103,7 @@ namespace mongo {
 	  implementation is to fail with an assertion; only a subset of
 	  operators will be able to fulfill this request.
 
-	  @params pBuilder the builder to add the expression to.
+	  @param pBuilder the builder to add the expression to.
 	 */
 	virtual void toMatcherBson(
 	    BSONObjBuilder *pBuilder, unsigned depth) const;
@@ -259,8 +259,8 @@ namespace mongo {
 	  is added directly, without an array.  For more than one operand,
 	  a named array is created.  In both cases, the result is an object.
 
-	  @params pBuilder the (blank) builder to add the expression to
-	  @params pOpName the name of the operator
+	  @param pBuilder the (blank) builder to add the expression to
+	  @param pOpName the name of the operator
 	 */
 	virtual void toBson(BSONObjBuilder *pBuilder,
 			    const char *pOpName, unsigned depth) const;
@@ -920,7 +920,7 @@ namespace mongo {
 	  $project specification.  This creates a standalone object, which must
 	  be added to a containing object with a name
 
-	  @params pBuilder where to write the object to
+	  @param pBuilder where to write the object to
 	 */
 	void documentToBson(BSONObjBuilder *pBuilder, unsigned depth) const;
 
