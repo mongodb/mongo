@@ -22,6 +22,7 @@ namespace mongo {
 
     class StringWriter {
     public:
+	virtual ~StringWriter() {};
 	virtual void writeString(stringstream &ss) const = 0;
     };
 }
