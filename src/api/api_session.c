@@ -195,8 +195,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	if (!WT_PREFIX_MATCH(uri, "file:")) {
-		__wt_errx(session, "Unknown object type: %s", uri);
-		ret = EINVAL;
+		ret = __wt_unknown_object_type(session, uri);
 		goto err;
 	}
 
@@ -287,8 +286,7 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	if (!WT_PREFIX_MATCH(uri, "file:")) {
-		__wt_errx(session, "Unknown object type: %s", uri);
-		ret = EINVAL;
+		ret = __wt_unknown_object_type(session, uri);
 		goto err;
 	}
 

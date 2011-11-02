@@ -139,6 +139,5 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (WT_PREFIX_MATCH(uri, "table:"))
 		return (__drop_table(session, uri, cfg));
 
-	__wt_errx(session, "Unknown object type: %s", uri);
-	return (EINVAL);
+	return (__wt_unknown_object_type(session, uri));
 }

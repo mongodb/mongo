@@ -165,3 +165,14 @@ __wt_file_item_too_big(WT_SESSION_IMPL *session)
 	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);
 }
+
+/*
+ * __wt_unknown_object_type --
+ *	Print a standard error m essage when given an unknown object type.
+ */
+int
+__wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri)
+{
+	__wt_errx(session, "unknown object type: %s", uri);
+	return (EINVAL);
+}

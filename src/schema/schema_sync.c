@@ -26,12 +26,9 @@ int
 __wt_schema_sync(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_BTREE *cg;
-	WT_BUF uribuf;
 	WT_TABLE *table;
 	const char *tablename;
 	int i, ret;
-
-	WT_CLEAR(uribuf);
 
 	tablename = uri;
 	ret = 0;
@@ -62,11 +59,8 @@ __wt_schema_sync(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 			    cg->name, strlen(cg->name), cfg, 0));
 			WT_TRET(__sync_file(session, cfg));
 		}
-	} else {
-		__wt_errx(session, "Unknown object type: %s", uri);
-		return (EINVAL);
-	}
+	} else
+		return (__wt_unknown_object_type(session, uri));
 
-	__wt_buf_free(session, &uribuf);
 	return (ret);
 }

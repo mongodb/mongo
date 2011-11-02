@@ -328,8 +328,6 @@ __wt_schema_create(
 		return (__create_index(session, name, config));
 	else if (WT_PREFIX_MATCH(name, "table:"))
 		return (__create_table(session, name, config));
-	else {
-		__wt_errx(session, "Unknown object type: %s", name);
-		return (EINVAL);
-	}
+
+	return (__wt_unknown_object_type(session, name));
 }
