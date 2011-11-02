@@ -12,7 +12,6 @@
 import unittest
 import wiredtiger
 import wttest
-from random import Random
 
 class test_base05(wttest.WiredTigerTestCase):
     """
@@ -125,16 +124,15 @@ class test_base05(wttest.WiredTigerTestCase):
         The returned value should be a somewhat random looking
         mix, but must be repeatable for any given N.
         """
-        rand = Random()
-        rand.seed(n)
-        nstrings = 2 << rand.randint(0, 10)
+        nstrings = 2 << (n % 10)
         result = ''
-        for i in range(0, nstrings):
+        for i in range(nstrings):
             if (n + i) % 20 == 0:
                 reflist = self.non_english_strings
             else:
                 reflist = self.english_strings
-            result += reflist[rand.randint(0, len(reflist) - 1)]
+            choice = (n + i) % len(reflist)
+            result += reflist[choice]
         return result + ':' + str(n)
         
     def test_table_ss(self):
@@ -158,10 +156,11 @@ class test_base05(wttest.WiredTigerTestCase):
         for divisor in [3, 5, 7]:
             i = self.nentries / divisor
             key = self.mixed_string(i)
+            value = self.mixed_string(i+1)
             cursor.set_key(key)
             self.assertEqual(0, cursor.search())
             self.assertEqual(key, cursor.get_key())
-            self.assertEqual(self.mixed_string(i+1), cursor.get_value())
+            self.assertEqual(value, cursor.get_value())
 
         total = 0
         cursor.reset()
@@ -176,7 +175,6 @@ class test_base05(wttest.WiredTigerTestCase):
         self.assertEqual(total, self.nentries)
         self.assertEqual(0, len(numbers))
         cursor.close(None)
-
 
 if __name__ == '__main__':
     wttest.run()
