@@ -168,7 +168,7 @@ __wt_file_item_too_big(WT_SESSION_IMPL *session)
 
 /*
  * __wt_unknown_object_type --
- *	Print a standard error m essage when given an unknown object type.
+ *	Print a standard error message when given an unknown object type.
  */
 int
 __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri)
