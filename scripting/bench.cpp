@@ -222,7 +222,7 @@ namespace mongo {
                         if( ! config->hideResults || e["showResult"].trueValue() ) log() << "Result from benchRun thread [findOne] : " << result << endl;
 
                     }
-                    if ( op == "command" ) {
+                    else if ( op == "command" ) {
 
                         BSONObj result;
                         // TODO
