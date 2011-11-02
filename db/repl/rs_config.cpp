@@ -578,6 +578,8 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        LOG(2) << "ReplSetConfig load " << h.toStringLong() << rsLog;
+
         _constructed = false;
         clear();
         int level = 2;
