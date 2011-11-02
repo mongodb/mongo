@@ -119,7 +119,6 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         This is our only 'negative' test for verify using the API,
         it's uncertain that we can have reliable tests for this.
         """
-        self.skipTest('TODO: currently this test cause a memory access trap. Is the test even valid?')
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)

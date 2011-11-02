@@ -27,8 +27,8 @@ __wt_schema_verify(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_BTREE *cg;
 	WT_TABLE *table;
+	int i, ret, tret;
 	const char *tablename;
-	int i, ret;
 
 	tablename = uri;
 	ret = 0;
@@ -56,10 +56,12 @@ __wt_schema_verify(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 			if ((cg = table->colgroup[i]) == NULL)
 				continue;
 
-			WT_TRET(__wt_schema_get_btree(session,
+			tret = __wt_schema_get_btree(session,
 			    cg->name, strlen(cg->name), cfg,
-			    WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
-			WT_TRET(__verify_file(session, cfg));
+			    WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+			if (tret == 0)
+				tret = __verify_file(session, cfg);
+			WT_TRET(tret);
 		}
 	} else
 		return (__wt_unknown_object_type(session, uri));
