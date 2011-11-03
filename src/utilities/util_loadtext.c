@@ -123,7 +123,7 @@ insert(WT_CURSOR *cursor, const char *name, int readkey)
 				break;
 			cursor->set_key(cursor, key.mem);
 		}
-		if (util_read_line(&value, !readkey, &eof))
+		if (util_read_line(&value, readkey ? 0 : 1, &eof))
 			return (1);
 		if (eof == 1)
 			break;
