@@ -157,6 +157,12 @@ main(int argc, char *argv[])
 		else
 			ret = usage();
 		break;
+	case 'w':
+		if (strcmp(command, "write") == 0)
+			ret = util_write(session, argc, argv);
+		else
+			ret = usage();
+		break;
 	default:
 		ret = usage();
 		break;
@@ -184,15 +190,17 @@ usage(void)
 	    "commands:\n"
 	    "\tcopyright copyright information\n"
 	    "\tcreate\t  create an object\n"
-	    "\tdrop\t  drop a table\n"
-	    "\tdump\t  dump a table\n"
+	    "\tdrop\t  drop an object\n"
+	    "\tdump\t  dump an object\n"
 	    "\tdumpfile  dump a physical file in debugging format\n"
 	    "\tlist\t  list database objects\n"
-	    "\tload\t  load a table\n"
+	    "\tload\t  load an object\n"
 	    "\tprintlog  display the database log\n"
+	    "\tread\t  read values from an object\n"
 	    "\tsalvage\t  salvage a file\n"
-	    "\tstat\t  display statistics for a table\n"
-	    "\tverify\t  verify a file\n");
+	    "\tstat\t  display statistics for an object\n"
+	    "\tverify\t  verify an object\n"
+	    "\twrite\t  write values to an object\n");
 
 	return (EXIT_FAILURE);
 }

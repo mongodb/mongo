@@ -27,6 +27,7 @@ bdb
 bdbmap
 bool
 boolean
+br
 btree
 builtin
 cachesize

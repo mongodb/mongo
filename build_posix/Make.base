@@ -24,7 +24,8 @@ wt_SOURCES =\
 	src/utilities/util_salvage.c \
 	src/utilities/util_stat.c \
 	src/utilities/util_verbose.c \
-	src/utilities/util_verify.c
+	src/utilities/util_verify.c \
+	src/utilities/util_write.c
 
 include_HEADERS= wiredtiger.h
 INCLUDES = -I$(srcdir)/src/include

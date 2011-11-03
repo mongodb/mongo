@@ -83,3 +83,33 @@ util_read_line(ULINE *l, int eof_expected, int *eofp)
 
 	return (0);
 }
+
+/*
+ * util_str2recno --
+ *	Convert a string to a record number.
+ */
+int
+util_str2recno(const char *p, uint64_t *recnop)
+{
+	uint64_t recno;
+	char *endptr;
+
+	/*
+	 * strtouq takes lots of things like hex values, signs and so on and so
+	 * forth -- none of them are OK with us.  Check the string starts with
+	 * digit, that turns off the special processing.
+	 */
+	if (!isdigit(p[0]))
+		goto format;
+
+	errno = 0;
+	recno = strtouq(p, &endptr, 0);
+	if (recno == ULLONG_MAX && errno == ERANGE)
+		return (util_err(ERANGE, "%s: invalid record number", p));
+
+	if (endptr[0] != '\0')
+format:		return (util_err(EINVAL, "%s: invalid record number", p));
+
+	*recnop = recno;
+	return (0);
+}
