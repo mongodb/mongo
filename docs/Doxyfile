@@ -637,7 +637,6 @@ WARN_LOGFILE           = doxygen.log
 
 INPUT                  = ../src/include/wiredtiger.in \
 			 ../src/include/wiredtiger_ext.h \
-			 ../lang/python/wiredtiger.py \
                          src
 
 # This tag can be used to specify the character encoding of the source files 

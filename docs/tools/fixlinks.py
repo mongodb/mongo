@@ -20,7 +20,7 @@ def process(source):
 
     # Replace "char" with "string" in comments
 	while True:
-		newsource = re.sub(r'(\s+#.*)\bchar\b', '\1string', source)
+		newsource = re.sub(r'(\s+#.*)\bchar\b', r'\1string', source)
 		if newsource == source:
 			break
 		source = newsource

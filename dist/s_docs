@@ -32,10 +32,23 @@ spellchk()
 
 build()
 {
+	# Run doxygen to generate the Python API documentation.
+	(cd ../docs && (eval cat Doxyfile $filter ; cat <<EOF
+QUIET=YES
+OUTPUT_DIRECTORY=python
+INPUT=../lang/python/wiredtiger.py
+GENERATE_TAGFILE=python/python.tag
+EOF
+) | doxygen -)
+
 	# Run doxygen to generate HTML documentation.
 	(cd ../docs &&
-	    (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen -
-	test -s doxygen.log && cat doxygen.log) > $t 2>&1
+	    (eval cat Doxyfile $filter ; cat <<EOF
+QUIET=YES
+TAGFILES=python/python.tag=python
+EOF
+) | doxygen -
+	test -s doxygen.log && grep -v 'wiredtiger.py' doxygen.log) > $t 2>&1
 	test -s $t && {
 		cat $t
 		e=1
