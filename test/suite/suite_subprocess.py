@@ -19,6 +19,49 @@ import os
 class suite_subprocess:
     subproc = None
 
+    def has_error_in_file(self, filename):
+        """
+        Return whether the file contains 'ERROR'.
+        WT utilities issue a 'WT_ERROR' output string upon error.
+        """
+        with open(filename, 'r') as f:
+            for line in f:
+                if 'ERROR' in line:
+                    return True
+        return False
+
+    def check_no_error_in_file(self, filename):
+        """
+        Raise an error and show output context if the file contains 'ERROR'.
+        WT utilities issue a 'WT_ERROR' output string upon error.
+        """
+        lines = []
+        hasError = False
+        hasPrevious = False  # do we need to prefix an ellipsis?
+        hasNext = False  # do we need to suffix an ellipsis?
+        with open(filename, 'r') as f:
+            for line in f:
+                lines.append(line)
+                hasError = hasError or 'ERROR' in line
+                if hasError:
+                    if len(lines) > 10:
+                        hasNext = True
+                        break
+                else:
+                    if len(lines) > 5:
+                        lines.pop(0)
+                        hasPrevious = True
+        if hasError:
+            print '**************** ERROR in output file: ' + filename + ' ****************'
+            if hasPrevious:
+                print '...'
+            for line in lines:
+                print line,
+            if hasNext:
+                print '...'
+            print '********************************'
+            self.fail('ERROR found in output file: ' + filename)
+
     def check_empty_file(self, filename):
         """
         Raise an error if the file is not empty
