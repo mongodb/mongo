@@ -30,7 +30,7 @@ class suite_subprocess:
                     return True
         return False
 
-    def check_no_error_in_file(self, filename):
+    def check_no_error_in_file(self, filename, match='ERROR'):
         """
         Raise an error and show output context if the file contains 'ERROR'.
         WT utilities issue a 'WT_ERROR' output string upon error.
@@ -42,7 +42,7 @@ class suite_subprocess:
         with open(filename, 'r') as f:
             for line in f:
                 lines.append(line)
-                hasError = hasError or 'ERROR' in line
+                hasError = hasError or match in line
                 if hasError:
                     if len(lines) > 10:
                         hasNext = True
@@ -52,7 +52,7 @@ class suite_subprocess:
                         lines.pop(0)
                         hasPrevious = True
         if hasError:
-            print '**************** ERROR in output file: ' + filename + ' ****************'
+            print '**************** ' + match + ' in output file: ' + filename + ' ****************'
             if hasPrevious:
                 print '...'
             for line in lines:
@@ -61,6 +61,11 @@ class suite_subprocess:
                 print '...'
             print '********************************'
             self.fail('ERROR found in output file: ' + filename)
+
+    def check_file_content(self, filename, expect):
+        with open(filename, 'r') as f:
+            got = f.read(len(expect) + 100)
+            self.assertEqual(got, expect, filename + ': does not contain expected:\n\'' + expect + '\', but contains:\n\'' + got + '\'.')
 
     def check_empty_file(self, filename):
         """
