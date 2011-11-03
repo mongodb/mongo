@@ -69,17 +69,6 @@
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
-#elif defined(sun)
-#include <atomic.h>
-#define	WT_READ_BARRIER() do {						\
-	membar_enter();							\
-} while (0)
-#define	WT_READ_BARRIER() do {						\
-	membar_safe("#LoadLoad");					\
-} while (0)
-#define	WT_WRITE_BARRIER() do {						\
-	membar_safe("#StoreLoad");					\
-} while (0)
 #elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
 #define	WT_FULL_BARRIER() do {						\
 	asm volatile ("mfence" ::: "memory");				\
