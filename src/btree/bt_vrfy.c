@@ -211,17 +211,7 @@ __verify_tree(
 		__wt_progress(session, NULL, vs->fcnt);
 
 	/*
-	 * Update frags list.
-	 *
-	 * XXX
-	 * Verify currently walks the in-memory tree, which means we can see
-	 * pages that have not yet been written to disk.  That's not going to
-	 * work because in-flight pages don't map correctly to on-disk pages.
-	 * Verify will only work correctly on a clean tree -- make sure that
-	 * is what we're seeing.  This test can go away when verify takes a
-	 * file argument instead of an already opened tree (or a tree that's
-	 * known to be clean, assuming the upper-level is doing the open for
-	 * us.)
+	 * Update the fragment list.
 	 */
 	WT_ASSERT(session, ref->addr != WT_ADDR_INVALID);
 	WT_RET(__verify_addfrag(session, ref->addr, ref->size, vs));
