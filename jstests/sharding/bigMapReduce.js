@@ -13,30 +13,20 @@ for (i=0;i<4*1024;i++) { str=str+"a"; }
 for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({y:str})}
 db.getLastError();
 
+assert.eq( 51200, db.foo.find().itcount(), "Not all data was saved!" )
+
 s.printChunks();
 s.printChangeLog();
 
 function map() { emit('count', 1); } 
 function reduce(key, values) { return Array.sum(values) } 
 
-gotAGoodOne = false;
-
+// Test basic mapReduce
 for ( iter=0; iter<5; iter++ ){
-    try {
-        out = db.foo.mapReduce(map, reduce,"big_out") 
-        gotAGoodOne = true
-    }
-    catch ( e ){
-        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
-            // TODO: SERVER-2396
-            sleep( 1000 );
-            continue;
-        }
-        printjson( __mrerror__ );
-        throw e;
-    }
+
+    out = db.foo.mapReduce(map, reduce,"big_out") 
+
 }
-assert( gotAGoodOne , "no good for basic" )
 
 gotAGoodOne = false;
 // test output to a different DB
