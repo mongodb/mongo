@@ -23,33 +23,21 @@ function reduce(key, values) { return Array.sum(values) }
 
 // Test basic mapReduce
 for ( iter=0; iter<5; iter++ ){
-
     out = db.foo.mapReduce(map, reduce,"big_out") 
-
 }
 
-gotAGoodOne = false;
 // test output to a different DB
 // do it multiple times so that primary shard changes
 for (iter = 0; iter < 5; iter++) {
+    
+    assert.eq( 51200, db.foo.find().itcount(), "Not all data was found!" )
+    
     outCollStr = "mr_replace_col_" + iter;
     outDbStr = "mr_db_" + iter;
 
     print("Testing mr replace into DB " + iter)
 
-    try {
-        res = db.foo.mapReduce( map , reduce , { out : { replace: outCollStr, db: outDbStr } } )
-        gotAGoodOne = true;
-    }
-    catch ( e ){
-        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
-            // TODO: SERVER-2396
-            sleep( 1000 );
-            continue;
-        }
-        printjson( __mrerror__ );
-        throw e;
-    }
+    res = db.foo.mapReduce( map , reduce , { out : { replace: outCollStr, db: outDbStr } } )
     printjson(res);
 
     outDb = s.getDB(outDbStr);
@@ -63,27 +51,14 @@ for (iter = 0; iter < 5; iter++) {
     assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db);
 }
 
-assert( gotAGoodOne , "no good for out db" )
 
 // sharded output
 
 function map2() { emit(this._id, 1); }
-gotAGoodOne = false;
-for ( iter=0; iter<5; iter++ ){
-    try {
-        res = db.foo.mapReduce(map2, reduce, { out : { replace: "mrShardedOut", sharded: true }});
-        gotAGoodOne = true;
-    }
-    catch ( e ){
-        if ( __mrerror__ && __mrerror__.cause && __mrerror__.cause.code == 13388 ){
-            // TODO: SERVER-2396
-            sleep( 1000 );
-            continue;
-        }
-        printjson( __mrerror__ );
-        throw e;
-    }
 
+for ( iter=0; iter<5; iter++ ){
+
+    res = db.foo.mapReduce(map2, reduce, { out : { replace: "mrShardedOut", sharded: true }});
     printjson(res);
 
     outColl = db["mrShardedOut"];
@@ -92,8 +67,9 @@ for ( iter=0; iter<5; iter++ ){
     // make sure it's sharded and split
     print("Number of chunks: " + config.chunks.count({ns: db.mrShardedOut._fullName}));
     assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
- }
-assert( gotAGoodOne , "no good for sharded" )
+    
+}
+
 
 s.stop()
 
