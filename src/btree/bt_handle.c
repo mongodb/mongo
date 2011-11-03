@@ -71,7 +71,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 
 	/* Increment the reference count if we already have the btree open. */
 	matched = 0;
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(filename, btree->filename) == 0) {
 			++btree->refcnt;
@@ -81,7 +81,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		}
 	}
 	if (matched) {
-		__wt_unlock(session, conn->mtx);
+		__wt_spin_unlock(session, &conn->spinlock);
 
 		/* Check that the handle is open. */
 		__wt_readlock(session, btree->rwlock);
@@ -117,7 +117,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
 		++conn->btqcnt;
 	}
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (ret != 0)
 		return (ret);
@@ -461,13 +461,13 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	ret = 0;
 
 	/* Remove from the connection's list. */
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	inuse = (--btree->refcnt > 0);
 	if (!inuse) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
 	}
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 	if (inuse)
 		return (0);
 

@@ -70,9 +70,9 @@ __conn_load_extension(
 	WT_ERR(entry(&session->iface, &__api, config));
 
 	/* Link onto the environment's list of open libraries. */
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (0) {
 err:		if (dlh != NULL)
@@ -130,9 +130,9 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_strdup(session, name, &ncoll->name));
 	ncoll->collator = collator;
 
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 	ncoll = NULL;
 err:	API_END(session);
 	__wt_free(session, ncoll);
@@ -164,9 +164,9 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_strdup(session, name, &ncomp->name));
 	ncomp->compressor = compressor;
 
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 	ncomp = NULL;
 err:	API_END(session);
 	__wt_free(session, ncomp);

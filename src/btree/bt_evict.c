@@ -104,10 +104,6 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	cache = conn->cache;
 	session = &conn->default_session;
 
-	/* If the eviction server is running, there's nothing to do. */
-	if (cache->evict_pending)
-		return;
-
 	/*
 	 * If we're locking out reads, or over our cache limit, or forcing the
 	 * issue (when closing the environment), run the eviction server.
@@ -126,7 +122,6 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
 
-	cache->evict_pending = 1;
 	__wt_unlock(session, cache->mtx_evict);
 }
 
@@ -143,8 +138,7 @@ __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
 	cache = conn->cache;
 	session = &conn->default_session;
 
-	if (!cache->evict_pending)
-		__wt_unlock(session, cache->mtx_evict);
+	__wt_unlock(session, cache->mtx_evict);
 }
 
 /*
@@ -201,7 +195,6 @@ __wt_cache_evict_server(void *arg)
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, EVICTSERVER, "eviction server sleeping");
 		__wt_lock(session, cache->mtx_evict);
-		cache->evict_pending = 0;
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, EVICTSERVER, "eviction server waking");
@@ -281,8 +274,19 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = WT_STAT(conn->stats, cache_bytes_max);
 		if (cache->read_lockout) {
-			if (bytes_inuse <= bytes_max - (bytes_max / 20))
+			if (bytes_inuse <= bytes_max - (bytes_max / 20)) {
+#ifndef HAVE_WORKQ
+				/*
+				 * If there is no workQ and we have freed
+				 * enough space to unlock reads, ping the read
+				 * server.  If there is a workQ, it will wake
+				 * up the read server next time around its
+				 * loop.
+				 */
+				__wt_workq_read_server(conn, 0);
+#endif
 				break;
+			}
 		} else if (bytes_inuse < bytes_max)
 			break;
 
@@ -552,7 +556,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * it's not that slow.
 	 */
 	ret = 0;
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 
 	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
@@ -578,7 +582,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 			goto err;
 	}
 
-err:	__wt_unlock(session, conn->mtx);
+err:	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
 }
 

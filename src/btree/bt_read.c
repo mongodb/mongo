@@ -69,10 +69,8 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = WT_STAT(conn->stats, cache_bytes_max);
-	if (cache->read_lockout) {
-		if (bytes_inuse <= bytes_max - (bytes_max / 20))
-			cache->read_lockout = 0;
-	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
+	if (!cache->read_lockout &&
+	    bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(session, READSERVER,
 		    "workQ locks out reads: "
 		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
@@ -80,19 +78,30 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 		cache->read_lockout = 1;
 	}
 
-	/* If the cache read server is running, there's nothing to do. */
-	if (cache->read_pending)
-		return;
-
+#ifdef HAVE_WORKQ
 	/*
-	 * If reads are locked out and we're not forcing the issue (that's when
-	 * closing the environment, or if there's a priority read waiting to be
-	 * handled), we're done.
+	 * If there is a workQ thread, reads are locked out and we're not
+	 * forcing the issue (that's when closing the environment, or if
+	 * there's a priority read waiting to be handled), we're done.
 	 */
 	if (!force && cache->read_lockout)
 		return;
+#else
+	/*
+	 * Wait for eviction to free some space: there is no workQ to wake us
+	 * up later.
+	 */
+	while (!force && cache->read_lockout) {
+		if (__wt_cache_bytes_inuse(cache) <=
+		    bytes_max - (bytes_max / 20))
+			cache->read_lockout = 0;
+		else {
+			__wt_workq_evict_server(conn, 1);
+			__wt_yield();
+		}
+	}
+#endif
 
-	cache->read_pending = 1;
 	__wt_unlock(session, cache->mtx_read);
 }
 
@@ -109,8 +118,7 @@ __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
 	cache = conn->cache;
 	session = &conn->default_session;
 
-	if (!cache->read_pending)
-		__wt_unlock(session, cache->mtx_read);
+	__wt_unlock(session, cache->mtx_read);
 }
 
 /*
@@ -169,7 +177,6 @@ __wt_cache_read_server(void *arg)
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, READSERVER, "read server sleeping");
 		__wt_lock(session, cache->mtx_read);
-		cache->read_pending = 0;
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, READSERVER, "read server waking");

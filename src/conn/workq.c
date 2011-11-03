@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_WORKQ
+
 /*
  * __wt_workq_srvr --
  *      Routine to process the WT_SESSION_IMPL work queue.
@@ -97,3 +99,5 @@ __wt_workq_srvr(void *arg)
 	}
 	return (NULL);
 }
+
+#endif

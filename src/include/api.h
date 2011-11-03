@@ -146,7 +146,7 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL default_session;/* For operations without an
 					   application-supplied session. */
 
-	WT_MTX *mtx;			/* Connection mutex */
+	WT_SPINLOCK spinlock;		/* Connection spinlock */
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 

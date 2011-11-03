@@ -43,10 +43,7 @@ __wt_mtx_alloc(WT_SESSION_IMPL *session,
 	(void)pthread_condattr_destroy(&condattr);
 
 	mtx->name = name;
-
-	/* If the normal state of the mutex is locked, lock it immediately. */
-	if (is_locked)
-		__wt_lock(session, mtx);
+	mtx->locked = is_locked;
 
 	*mtxp = mtx;
 	return (0);
@@ -78,7 +75,7 @@ __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 	 * Check pthread_cond_wait() return for EINTR, ETIME and ETIMEDOUT,
 	 * it's known to return these errors on some systems.
 	 */
-	while (mtx->locked) {
+	while (mtx->locked > 0) {
 		ret = pthread_cond_wait(&mtx->cond, &mtx->mtx);
 		if (ret != 0 &&
 		    ret != EINTR &&
@@ -91,7 +88,7 @@ __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 		}
 	}
 
-	mtx->locked = 1;
+	++mtx->locked;
 	if (session != NULL)
 		WT_CSTAT_INCR(session, mtx_lock);
 
@@ -121,10 +118,8 @@ __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
-	WT_ASSERT(session, mtx->locked);
-	mtx->locked = 0;
-	WT_ERR(pthread_cond_signal(&mtx->cond));
-
+	if (--mtx->locked == 0)
+		WT_ERR(pthread_cond_signal(&mtx->cond));
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;
 

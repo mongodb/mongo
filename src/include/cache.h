@@ -46,12 +46,7 @@ struct __wt_read_req {
  * WiredTiger cache structure.
  */
 struct __wt_cache {
-	/*
-	 * The workQ thread sets evict_pending when it posts a message to
-	 * the cache thread, which clears it when the message is handled.
-	 */
 	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
-	u_int volatile evict_pending;	/* Message queued */
 
 	/*
 	 * File sync can temporarily fail when a tree is active, that is, we may
@@ -68,12 +63,7 @@ struct __wt_cache {
 	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
 					   slot available if session is NULL */
 
-	/*
-	 * The workQ thread sets read_pending when it posts a message to the
-	 * I/O thread, which clears it when the message is handled.
-	 */
 	WT_MTX *mtx_read;		/* Cache read server mutex */
-	u_int volatile read_pending;	/* Message queued */
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:

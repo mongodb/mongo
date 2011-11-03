@@ -38,17 +38,7 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	session->wq_func = func;
 	session->wq_sleeping = op == WT_WORKQ_FUNC ? 0 : 1;
 
-	/*
-	 * Functions are called directly (holding a spinlock), only
-	 * communication with other threads goes through serialization.
-	 */
-	if (op == WT_WORKQ_FUNC) {
-		__wt_spin_lock(&conn->workq_lock);
-		func(session);
-		__wt_spin_unlock(&conn->workq_lock);
-		return (session->wq_ret);
-	}
-
+#ifdef HAVE_WORKQ
 	/*
 	 * Publish: there must be a barrier to ensure the structure fields are
 	 * set before wq_state field change makes the entry visible to the workQ
@@ -72,6 +62,28 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 		WT_READ_BARRIER();
 	} else
 		__wt_lock(session, session->mtx);
+#else
+	/*
+	 * Functions are called directly (holding a spinlock), only
+	 * communication with other threads goes through serialization.
+	 */
+	__wt_spin_lock(session, &conn->workq_lock);
+	func(session);
+	__wt_spin_unlock(session, &conn->workq_lock);
+
+	switch (op) {
+	case WT_WORKQ_EVICT:
+		__wt_workq_evict_server(conn, 1);
+		__wt_lock(session, session->mtx);
+		break;
+	case WT_WORKQ_READ:
+		__wt_workq_read_server(conn, 0);
+		__wt_lock(session, session->mtx);
+		break;
+	default:
+		break;
+	}
+#endif
 
 	return (session->wq_ret);
 }

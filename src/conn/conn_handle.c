@@ -28,16 +28,12 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
 	/* workQ spinlock. */
-	WT_SPINLOCK_INIT(&conn->workq_lock);
+	__wt_spin_init(session, &conn->workq_lock);
 
-	/*
-	 * Connection mutex.
-	 *
-	 * !!!
-	 * Don't allocate the mutex until after we allocate statistics,
-	 * the lock functions update the statistics.
-	 */
-	return (__wt_mtx_alloc(session, "WT_CONNECTION_IMPL", 0, &conn->mtx));
+	/* Connection spinlock. */
+	__wt_spin_init(session, &conn->spinlock);
+
+	return (0);
 }
 
 /*
@@ -65,9 +61,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (conn->log_fh != NULL)
 		(void)__wt_close(session, conn->log_fh);
-
-	if (conn->mtx != NULL)
-		(void)__wt_mtx_destroy(session, conn->mtx);
 
 	/* Remove from the list of connections. */
 	__wt_lock(session, __wt_process.mtx);

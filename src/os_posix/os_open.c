@@ -29,7 +29,7 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (strcmp(name, fh->name) == 0) {
 			++fh->refcnt;
@@ -38,7 +38,7 @@ __wt_open(WT_SESSION_IMPL *session,
 			break;
 		}
 	}
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 	if (matched)
 		return (0);
 
@@ -95,9 +95,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_filesize(session, fh, &fh->file_size));
 
 	/* Link onto the environment's list of files. */
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 
 	*fhp = fh;
 
@@ -131,9 +131,9 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 		return (0);
 
 	/* Remove from the list and discard the memory. */
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_REMOVE(&conn->fhqh, fh, q);
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (close(fh->fd) != 0) {
 		__wt_err(session, errno, "%s", fh->name);

@@ -72,6 +72,16 @@ no)	db_cv_enable_verbose=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_verbose)
 
+AH_TEMPLATE(HAVE_WORKQ, [Define to 1 to enable the workQ thread.])
+AC_MSG_CHECKING(if --enable-workq option specified)
+AC_ARG_ENABLE(workq,
+	[AC_HELP_STRING([--enable-workq],
+	    [Configure the workQ thread.])], r=$enableval, r=no)
+case "$r" in
+yes)	AC_DEFINE(HAVE_WORKQ);;
+esac
+AC_MSG_RESULT($r)
+
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
 AC_ARG_WITH(spinlock,

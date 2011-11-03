@@ -43,7 +43,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_TRET(__wt_schema_close_tables(session));
 
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 	/* Unpin the current session buffer. */
 	if (session->sb != NULL)
 		__wt_sb_decrement(session, session->sb);
@@ -80,7 +80,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_PUBLISH(session->iface.connection, NULL);
 
 	session = &conn->default_session;
-	__wt_unlock(session, conn->mtx);
+	__wt_spin_unlock(session, &conn->spinlock);
 err:	API_END(session);
 
 	return (ret);
@@ -424,7 +424,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	session = &conn->default_session;
 	session_ret = NULL;
 
-	__wt_lock(session, conn->mtx);
+	__wt_spin_lock(session, &conn->spinlock);
 
 	/* Check to see if there's an available session slot. */
 	if (conn->session_cnt == conn->session_size - 1) {
@@ -479,6 +479,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*sessionp = session_ret;
 
-err:	__wt_unlock(session, conn->mtx);
+err:	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
 }
