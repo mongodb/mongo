@@ -114,7 +114,9 @@ MongoRunner.logicalOptions = { runId : true,
                                useHostname : true,
                                noReplSet : true,
                                forgetPort : true,
-                               arbiter : true }
+                               arbiter : true,
+                               noJournalPrealloc : true,
+                               noJournal : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
@@ -285,10 +287,10 @@ MongoRunner.mongodOptions = function( opts ){
         opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
     }
     
-    if( jsTestOptions().noJournalPrealloc )
+    if( jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc )
         opts.nopreallocj = ""
             
-    if( jsTestOptions().noJournal )
+    if( jsTestOptions().noJournal || opts.noJournal )
         opts.nojournal = ""
             
     if( opts.noReplSet ) opts.replSet = null
@@ -543,6 +545,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numMongos = params.mongos || 1
         
         keyFile = params.keyFile || otherParams.keyFile || otherParams.extraOptions.keyFile
+        otherParams.nopreallocj = params.nopreallocj || otherParams.nopreallocj
         otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
         otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
         
@@ -640,9 +643,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var setName = testName + "-rs" + i;
             
             rsDefaults = { useHostname : otherParams.useHostname,
+                           noJournalPrealloc : otherParams.nopreallocj, 
                            oplogSize : 40,
                            nodes : 3,
-                           pathOpts : Object.merge( pathOpts, { shard : i } ) }
+                           pathOpts : Object.merge( pathOpts, { shard : i } )}
             
             rsDefaults = Object.merge( rsDefaults, otherParams.rs )
             rsDefaults = Object.merge( rsDefaults, otherParams.rsOptions )
@@ -665,6 +669,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         }
         else {
             var options = { useHostname : otherParams.useHostname,
+                            noJournalPrealloc : otherParams.nopreallocj,
                             port : 30000 + i,
                             pathOpts : Object.merge( pathOpts, { shard : i } ),
                             dbpath : "$testName$shard",
@@ -716,6 +721,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         if( otherParams.separateConfig ){
             
             var options = { useHostname : otherParams.useHostname, 
+                            noJournalPrealloc : otherParams.nopreallocj, 
                             port : 40000 + i,
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
