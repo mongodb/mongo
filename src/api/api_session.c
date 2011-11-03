@@ -163,8 +163,7 @@ __session_rename(WT_SESSION *wt_session,
  *	WT_SESSION->drop method.
  */
 static int
-__session_drop(
-    WT_SESSION *wt_session, const char *name, const char *config)
+__session_drop(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
 	WT_CONFIG_ITEM cval;
