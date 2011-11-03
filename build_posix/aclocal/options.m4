@@ -72,4 +72,18 @@ no)	db_cv_enable_verbose=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_verbose)
 
+AC_MSG_CHECKING(if --with-spinlock option specified)
+AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
+AC_ARG_WITH(spinlock,
+	[AC_HELP_STRING([--with-spinlock],
+	    [Spinlock type (pthread_mutex or gcc).])],
+	    [],
+	    [with_spinlock=pthread])
+case "$with_spinlock" in
+pthread)	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX);;
+gcc)		AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_GCC);;
+*)		AC_MSG_ERROR([Unknown spinlock type "$with_spinlock"]);;
+esac
+AC_MSG_RESULT($with_spinlock)
+
 ])

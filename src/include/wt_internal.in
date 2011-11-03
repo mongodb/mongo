@@ -135,8 +135,6 @@ struct __wt_session_buffer;
     typedef struct __wt_session_buffer WT_SESSION_BUFFER;
 struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
-struct __wt_spinlock_ticket;
-    typedef struct __wt_spinlock_ticket WT_SPINLOCK_TICKET;
 struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
 struct __wt_table;
