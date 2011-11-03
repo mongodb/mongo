@@ -111,6 +111,9 @@ for ( i=0; i<100; i++ ){
 }
 assert.eq( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor2" );
 
+// Stop the balancer, otherwise it may grab some connections from the pool for itself
+s.stopBalancer()
+
 print( "checkpoint E")
 
 x = db.runCommand( "connPoolStats" );
