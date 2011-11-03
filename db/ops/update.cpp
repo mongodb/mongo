@@ -31,7 +31,7 @@
 
 namespace mongo {
 
-    const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
+    const char* Mod::modNames[] = { "$inc", "$set", "$iset", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
                                     "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename"
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
@@ -106,6 +106,16 @@ namespace mongo {
             break;
         }
 
+        case ISET: {
+            if ( !in.eoo() ) {
+                // There's an existing value; leave it as-is.
+                // Special-case: _id is copied by default, so don't copy it.
+                if ( strcmp( in.fieldName(), "_id" ) != 0) {
+                    b.append( in );
+                }
+            }
+            // Fall through to SET case!
+        }
         case SET: {
             _checkForAppending( elt );
             b.appendAs( elt , shortFieldName );
@@ -423,6 +433,10 @@ namespace mongo {
                                          m.elt.valuesize() == e.valuesize() );
                 break;
 
+            case Mod::ISET:
+                mss->amIInPlacePossible( !e.eoo() );
+                break;
+
             case Mod::PUSH:
             case Mod::PUSH_ALL:
                 uassert( 10141 ,  "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
@@ -596,6 +610,9 @@ namespace mongo {
                     BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
                 else
                     BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                break;
+            case Mod::ISET:
+                assert( !m.old.eoo() );
                 break;
             default:
                 uassert( 13478 ,  "can't apply mod in place - shouldn't have gotten here" , 0 );
@@ -815,7 +832,7 @@ namespace mongo {
                 const char * fieldName = f.fieldName();
 
                 uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
-                uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
+                uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 || op == Mod::ISET );
                 uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
                 uassert( 10150 ,  "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
                 uassert( 10151 ,  "have conflicting mods in update" , ! haveConflictingMod( fieldName ) );
