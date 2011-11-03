@@ -60,6 +60,9 @@
  * efficiently on either one than if ARCH_IS_BIG_ENDIAN is defined.
  */
 
+// Don't do this. Turns out its actually slower...
+// #define ARCH_IS_BIG_ENDIAN 0
+
 typedef unsigned char md5_byte_t; /* 8-bit byte */
 typedef unsigned int md5_word_t; /* 32-bit word */
 
