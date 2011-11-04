@@ -304,8 +304,8 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 	 * Also tell open that we're going to verify this handle, so it skips
 	 * loading metadata such as the free list, which could be corrupted.
 	 */
-	WT_ERR(__wt_session_get_btree(session, uri, uri, NULL, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+	WT_ERR(__wt_session_get_btree(session,
+	    uri, uri, NULL, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
 
 	WT_TRET(__wt_dumpfile(session, cfg));
 
