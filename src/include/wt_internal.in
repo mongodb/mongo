@@ -179,6 +179,7 @@ struct __wt_update;
 #include "column.i"
 #include "cursor.i"
 #include "log.i"
+#include "mutex.i"
 #include "packing.i"
 #include "progress.i"
 #include "serial.i"
