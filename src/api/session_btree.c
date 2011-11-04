@@ -139,7 +139,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), cfg, flags, &btree_session)) == 0) {
-		WT_ASSERT(session, !LF_ISSET(WT_BTREE_NO_EVICTION));
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
 		return (0);
