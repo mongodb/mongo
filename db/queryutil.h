@@ -290,7 +290,7 @@ namespace mongo {
     class IndexSpec;
 
     /**
-     * An ordered list of fields and their FieldRanges, correspoinding to valid
+     * An ordered list of fields and their FieldRanges, corresponding to valid
      * index keys for a given index spec.
      */
     class FieldRangeVector {

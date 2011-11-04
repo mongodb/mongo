@@ -58,27 +58,29 @@ namespace mongo {
     }
 
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
+
+        LOG(5) << "CoveredIndexMatcher::matches() " << key.toString() << ' ' << recLog.toString() << ' ' << keyUsable << endl;
+
         dassert( key.isValid() );
 
         if ( details )
             details->reset();
 
         if ( keyUsable ) {
-
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;
             }
-
             if ( ! _needRecord ) {
                 return true;
             }
-
         }
 
         if ( details )
             details->_loadedObject = true;
 
-        return _docMatcher->matches(recLoc.obj() , details );
+        bool res = _docMatcher->matches(recLoc.obj() , details );
+        LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
+        return res;
     }
 
     string CoveredIndexMatcher::toString() const {

@@ -1177,6 +1177,9 @@ namespace mongo {
     }
     
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
+
+        bool ok = false;
+
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
         // fields individually instead of constructing several bson objects using
@@ -1186,10 +1189,14 @@ namespace mongo {
         _indexSpec.getKeys( obj, keys );
         for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
             if ( matchesKey( *i ) ) {
-                return true;   
+                ok = true;
+                break;
             }
         }
-        return false;
+
+        LOG(5) << "FieldRangeVector::matches() returns " << ok << endl;
+
+        return ok;
     }
 
     BSONObj FieldRangeVector::firstMatch( const BSONObj &obj ) const {
