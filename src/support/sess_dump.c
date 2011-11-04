@@ -80,12 +80,8 @@ __wt_session_print_state(WT_SESSION_IMPL *session)
 	switch (session->wq_state) {
 	case WT_SERIAL_EVICT:
 		return ("evict");
-	case WT_SERIAL_EVICT_SCHED:
-		return ("evict scheduled");
 	case WT_SERIAL_READ:
 		return ("read");
-	case WT_SERIAL_READ_SCHED:
-		return ("read scheduled");
 	case WT_SERIAL_FUNC:
 		return ("function");
 	case WT_SERIAL_NONE:

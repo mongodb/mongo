@@ -45,6 +45,8 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	case WT_SERIAL_READ:
 		__wt_read_server_wake(conn, 0);
 		break;
+	case WT_SERIAL_FUNC:
+	case WT_SERIAL_NONE:
 	default:
 		return (session->wq_ret);
 	}

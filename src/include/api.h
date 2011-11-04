@@ -59,9 +59,7 @@ typedef	enum {
 	WT_SERIAL_NONE=0,		/* No request */
 	WT_SERIAL_FUNC=1,		/* Function, then return */
 	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
-	WT_SERIAL_EVICT_SCHED=3,	/* Waiting on evict to complete */
-	WT_SERIAL_READ=4,		/* Function, then schedule read */
-	WT_SERIAL_READ_SCHED=5		/* Waiting on read to complete */
+	WT_SERIAL_READ=3,		/* Function, then schedule read */
 } wq_state_t;
 
 /* Get the connection implementation for a session. */
