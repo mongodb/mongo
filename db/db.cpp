@@ -429,7 +429,12 @@ namespace mongo {
 
         {
             stringstream ss;
-            ss << "dbpath (" << dbpath << ") does not exist";
+            ss << endl;
+            ss << "*********************************************************************" << endl;
+            ss << " ERROR: dbpath (" << dbpath << ") does not exist." << endl;
+            ss << " Create this directory or give existing directory in --dbpath." << endl;
+            ss << " See http://www.mongodb.org/display/DOCS/Starting+and+Stopping+Mongo" << endl;
+            ss << "*********************************************************************" << endl;
             uassert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         }
         {

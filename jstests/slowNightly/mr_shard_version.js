@@ -15,6 +15,9 @@ for( var i = 0; i < numDocs; i++ ){
     coll.insert({ _id : i, key : "" + ( i % numKeys ), value : i % numKeys })
 }
 
+assert.eq( null, coll.getDB().getLastError() )
+assert.eq( numDocs, coll.find().itcount() )
+
 var halfId = coll.find().itcount() / 2
 
 // Shard collection in half
@@ -69,7 +72,7 @@ for( var t = 0; t < numTests; t++ ){
     // printjson( output )
     
     assert.eq( output.length, numKeys )
-    
+    printjson( output )
     for( var i = 0; i < output.length; i++ )
         assert.eq( parseInt( output[i]._id ) * ( numDocs / numKeys ), output[i].value )
     

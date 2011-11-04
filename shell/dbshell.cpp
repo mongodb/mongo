@@ -417,7 +417,16 @@ bool isOpSymbol( char c ) {
     return false;
 }
 
+bool isUseCmd( string code ) {
+    string cmd = code;
+    if ( cmd.find( " " ) > 0 )
+        cmd = cmd.substr( 0 , cmd.find( " " ) );
+    return cmd == "use";
+}
+
 bool isBalanced( string code ) {
+    if (isUseCmd( code ))
+        return true;  // don't balance "use <dbname>" in case dbname contains special chars
     int brackets = 0;
     int parens = 0;
     bool danglingOp = false;

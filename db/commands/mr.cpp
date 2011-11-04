@@ -943,7 +943,12 @@ namespace mongo {
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
+
+            /* why !replset ?
+               bad things happen with --slave (i think because of this)
+            */
             virtual bool slaveOk() const { return !replSet; }
+
             virtual bool slaveOverrideOk() { return true; }
 
             virtual void help( stringstream &help ) const {
@@ -951,7 +956,9 @@ namespace mongo {
                 help << "Note this is used for aggregation, not querying, in MongoDB.\n";
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
+
             virtual LockType locktype() const { return NONE; }
+
             bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
