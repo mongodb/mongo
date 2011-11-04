@@ -32,27 +32,28 @@ spellchk()
 
 build()
 {
-	# Run doxygen to generate the Python API documentation.
-	(cd ../docs && (eval cat Doxyfile $filter ; cat <<EOF
-QUIET=YES
-OUTPUT_DIRECTORY=python
-INPUT=../lang/python/wiredtiger.py
-GENERATE_TAGFILE=python/python.tag
-EOF
-) | doxygen -)
-
-	# Run doxygen to generate HTML documentation.
+	# Run doxygen to generate warnings for the base HTML documentation.
+	#
+	# We omit Python because warnings are expected there (the code generated
+	# by swig does not have named arguments, but we want to document them
+	# as if they do.
 	(cd ../docs &&
 	    (eval cat Doxyfile $filter ; cat <<EOF
 QUIET=YES
-TAGFILES=python/python.tag=python
 EOF
 ) | doxygen -
-	test -s doxygen.log && grep -v 'wiredtiger.py' doxygen.log) > $t 2>&1
+	test -s doxygen.log && cat doxygen.log) > $t 2>&1
 	test -s $t && {
 		cat $t
 		e=1
 	}
+
+	# Run again to generate the full documentation set (with Python).
+	(cd ../docs && (eval cat Doxyfile $filter ; cat <<EOF
+QUIET=YES
+INPUT+=../lang/python/wiredtiger.py
+EOF
+) | doxygen -)
 }
 
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
