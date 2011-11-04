@@ -109,8 +109,8 @@ struct __wt_connection_stats {
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_evict_hazard;
 	WT_STATS cache_evict_unmodified;
+	WT_STATS cond_wait;
 	WT_STATS file_open;
-	WT_STATS mtx_lock;
 	WT_STATS rwlock_rdlock;
 	WT_STATS rwlock_wrlock;
 	WT_STATS memalloc;

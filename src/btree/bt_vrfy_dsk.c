@@ -357,6 +357,7 @@ key_compare:	/* Compare the current key against the last key. */
 			current = last_ovfl;
 			last_ovfl = last;
 		}
+		WT_ASSERT(session, last != current);
 	}
 
 	if (0) {

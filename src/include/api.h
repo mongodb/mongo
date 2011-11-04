@@ -10,7 +10,7 @@
  *	Per-process information for the library.
  */
 struct __wt_process {
-	WT_MTX *mtx;			/* Per-process mutex */
+	WT_SPINLOCK spinlock;		/* Per-process spinlock */
 
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
@@ -74,7 +74,7 @@ typedef	enum {
 struct __wt_session_impl {
 	WT_SESSION iface;
 
-	WT_MTX	 *mtx;			/* Blocking mutex */
+	WT_CONDVAR *cond;		/* Condition variable */
 
 	const char *name;		/* Name */
 	WT_EVENT_HANDLER *event_handler;

@@ -30,7 +30,7 @@ connection_stats = [
 	Stat('file_open', 'files currently open'),
 	Stat('memalloc', 'total memory allocations'),
 	Stat('memfree', 'total memory frees'),
-	Stat('mtx_lock', 'mutex lock calls'),
+	Stat('cond_wait', 'condition wait calls'),
 	Stat('rwlock_rdlock', 'rwlock readlock calls'),
 	Stat('rwlock_wrlock', 'rwlock writelock calls'),
 	Stat('total_read_io', 'total read I/Os'),

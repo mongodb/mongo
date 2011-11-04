@@ -46,7 +46,7 @@ struct __wt_read_req {
  * WiredTiger cache structure.
  */
 struct __wt_cache {
-	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
+	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
 
 	/*
 	 * File sync can temporarily fail when a tree is active, that is, we may
@@ -63,7 +63,7 @@ struct __wt_cache {
 	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
 					   slot available if session is NULL */
 
-	WT_MTX *mtx_read;		/* Cache read server mutex */
+	WT_CONDVAR *read_cond;		/* Cache read server mutex */
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:

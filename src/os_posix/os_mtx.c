@@ -8,47 +8,36 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mtx_alloc --
- *	Allocate and initialize a pthread mutex.
+ * __wt_cond_alloc --
+ *	Allocate and initialize a condition variable.
  */
 int
-__wt_mtx_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_locked, WT_MTX **mtxp)
+__wt_cond_alloc(WT_SESSION_IMPL *session,
+    const char *name, int is_locked, WT_CONDVAR **condp)
 {
-	WT_MTX *mtx;
-	pthread_condattr_t condattr;
-	pthread_mutexattr_t mutexattr;
+	WT_CONDVAR *cond;
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
+	 * This function MUST handle a NULL session handle.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTX), &mtx));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
 
-	/*
-	 * Initialize the mutex.
-	 * Mutexes are shared between processes.
-	 */
-	if (pthread_mutexattr_init(&mutexattr) != 0)
+	/* Initialize the mutex. */
+	if (pthread_mutex_init(&cond->mtx, NULL) != 0)
 		goto err;
-	if (pthread_mutex_init(&mtx->mtx, &mutexattr) != 0)
-		goto err;
-	(void)pthread_mutexattr_destroy(&mutexattr);
 
-	/* Initialize the condition variable (mutexes are self-blocking). */
-	if (pthread_condattr_init(&condattr) != 0)
+	/* Initialize the condition variable to permit self-blocking. */
+	if (pthread_cond_init(&cond->cond, NULL) != 0)
 		goto err;
-	if (pthread_cond_init(&mtx->cond, &condattr) != 0)
-		goto err;
-	(void)pthread_condattr_destroy(&condattr);
 
-	mtx->name = name;
-	mtx->locked = is_locked;
+	cond->name = name;
+	cond->locked = is_locked;
 
-	*mtxp = mtx;
+	*condp = cond;
 	return (0);
 
-err:	__wt_free(session, mtx);
+err:	__wt_free(session, cond);
 	return (WT_ERROR);
 }
 
@@ -57,42 +46,42 @@ err:	__wt_free(session, mtx);
  *	Lock a mutex.
  */
 void
-__wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	int ret;
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
+	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL)
 		WT_VERBOSE(
-		    session, MUTEX, "lock %s mutex (%p)",  mtx->name, mtx);
+		    session, MUTEX, "lock %s mutex (%p)",  cond->name, cond);
 
-	WT_ERR(pthread_mutex_lock(&mtx->mtx));
+	WT_ERR(pthread_mutex_lock(&cond->mtx));
 
 	/*
 	 * Check pthread_cond_wait() return for EINTR, ETIME and ETIMEDOUT,
 	 * it's known to return these errors on some systems.
 	 */
-	while (mtx->locked > 0) {
-		ret = pthread_cond_wait(&mtx->cond, &mtx->mtx);
+	while (cond->locked) {
+		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 		if (ret != 0 &&
 		    ret != EINTR &&
 #ifdef ETIME
 		    ret != ETIME &&
 #endif
 		    ret != ETIMEDOUT) {
-			(void)pthread_mutex_unlock(&mtx->mtx);
+			(void)pthread_mutex_unlock(&cond->mtx);
 			goto err;
 		}
 	}
 
-	++mtx->locked;
+	cond->locked = 1;
 	if (session != NULL)
-		WT_CSTAT_INCR(session, mtx_lock);
+		WT_CSTAT_INCR(session, cond_wait);
 
-	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
+	WT_ERR(pthread_mutex_unlock(&cond->mtx));
 	return;
 
 err:	__wt_err(session, ret, "mutex lock failed");
@@ -100,27 +89,29 @@ err:	__wt_err(session, ret, "mutex lock failed");
 }
 
 /*
- * __wt_unlock --
- *	Release a mutex.
+ * __wt_cond_signal --
+ *	Signal a waiting thread.
  */
 void
-__wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx)
+__wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	int ret;
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL structure reference.
+	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL)
 		WT_VERBOSE(
-		    session, MUTEX, "unlock %s mutex (%p)",  mtx->name, mtx);
+		    session, MUTEX, "signal %s cond (%p)", cond->name, cond);
 
 	ret = 0;
-	WT_ERR(pthread_mutex_lock(&mtx->mtx));
-	if (--mtx->locked == 0)
-		WT_ERR(pthread_cond_signal(&mtx->cond));
-	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
+	WT_ERR(pthread_mutex_lock(&cond->mtx));
+	if (cond->locked) {
+		cond->locked = 0;
+		WT_ERR(pthread_cond_signal(&cond->cond));
+	}
+	WT_ERR(pthread_mutex_unlock(&cond->mtx));
 	return;
 
 err:	__wt_err(session, ret, "mutex unlock failed");
@@ -128,18 +119,18 @@ err:	__wt_err(session, ret, "mutex unlock failed");
 }
 
 /*
- * __wt_mtx_destroy --
- *	Destroy a mutex.
+ * __wt_cond_destroy --
+ *	Destroy a condition variable.
  */
 int
-__wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx)
+__wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	int ret;
 
-	ret = pthread_cond_destroy(&mtx->cond);
-	WT_TRET(pthread_mutex_destroy(&mtx->mtx));
+	ret = pthread_cond_destroy(&cond->cond);
+	WT_TRET(pthread_mutex_destroy(&cond->mtx));
 
-	__wt_free(session, mtx);
+	__wt_free(session, cond);
 
 	return ((ret == 0) ? 0 : WT_ERROR);
 

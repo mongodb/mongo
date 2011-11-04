@@ -89,7 +89,7 @@ __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
 		}
 	}
 
-	__wt_unlock(session, cache->mtx_read);
+	__wt_cond_signal(session, cache->read_cond);
 }
 
 /*
@@ -147,7 +147,7 @@ __wt_cache_read_server(void *arg)
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, READSERVER, "read server sleeping");
-		__wt_lock(session, cache->mtx_read);
+		__wt_cond_wait(session, cache->read_cond);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, READSERVER, "read server waking");

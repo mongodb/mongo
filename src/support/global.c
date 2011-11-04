@@ -13,12 +13,7 @@ static int __wt_pthread_once_failed;		/* If initialization failed */
 static void
 __wt_pthread_once(void)
 {
-	/*
-	 * Mutex allocation is the only thing we do that can fail (but, since
-	 * it's the first mutex we ever create, it's the one that will fail).
-	 */
-	__wt_pthread_once_failed = __wt_mtx_alloc(
-	    NULL, "WiredTiger process", 0, &__wt_process.mtx);
+	__wt_spin_init(NULL, &__wt_process.spinlock);
 
 	TAILQ_INIT(&__wt_process.connqh);
 

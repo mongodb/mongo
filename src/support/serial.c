@@ -50,11 +50,11 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If we are waiting on a server thread, block on the session
-	 * mutex: when the operation is complete, this will be unlocked
-	 * and we can continue.
+	 * If we are waiting on a server thread, block on the session condition
+	 * variable: when the operation is complete, this will be notified and
+	 * we can continue.
 	 */
-	__wt_lock(session, session->mtx);
+	__wt_cond_wait(session, session->cond);
 	return (session->wq_ret);
 }
 
@@ -93,5 +93,5 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)
-		__wt_unlock(session, session->mtx);
+		__wt_cond_signal(session, session->cond);
 }

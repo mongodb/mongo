@@ -22,8 +22,8 @@ The following statistics are available for the database in this release:
 @row{cache: pages currently held in the cache}
 @row{cache: pages selected for eviction not evicted because of a hazard reference}
 @row{cache: unmodified pages evicted}
+@row{condition wait calls}
 @row{files currently open}
-@row{mutex lock calls}
 @row{rwlock readlock calls}
 @row{rwlock writelock calls}
 @row{total memory allocations}

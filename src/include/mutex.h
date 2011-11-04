@@ -108,12 +108,12 @@
 } while (0)
 
 /*
- * Mutexes:
+ * Condition variables:
  *
- * WiredTiger uses standard pthread mutexes to lock data without any particular
- * performance requirements.
+ * WiredTiger uses standard pthread condition variables to signal between
+ * threads, and for locking operations that are expected to block.
  */
-struct __wt_mtx {
+struct __wt_condvar {
 	const char *name;		/* Mutex name for debugging */
 
 	pthread_mutex_t mtx;		/* Mutex */
@@ -152,11 +152,11 @@ struct __wt_rwlock {
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
-#define	WT_SPINLOCK	volatile int
+typedef	volatile int WT_SPINLOCK;
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
 
-#define	WT_SPINLOCK	pthread_mutex_t
+typedef pthread_mutex_t WT_SPINLOCK;
 
 #else
 

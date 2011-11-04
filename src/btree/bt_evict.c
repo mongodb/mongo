@@ -122,7 +122,7 @@ __wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force)
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
 
-	__wt_unlock(session, cache->mtx_evict);
+	__wt_cond_signal(session, cache->evict_cond);
 }
 
 /*
@@ -178,7 +178,7 @@ __wt_cache_evict_server(void *arg)
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, EVICTSERVER, "eviction server sleeping");
-		__wt_lock(session, cache->mtx_evict);
+		__wt_cond_wait(session, cache->evict_cond);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, EVICTSERVER, "eviction server waking");

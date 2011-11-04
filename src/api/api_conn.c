@@ -393,9 +393,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * the only thing ever looked at on that list is the database name,
 	 * and a NULL value is fine.
 	 */
-	__wt_lock(NULL, __wt_process.mtx);
+	__wt_spin_lock(NULL, &__wt_process.spinlock);
 	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
-	__wt_unlock(NULL, __wt_process.mtx);
+	__wt_spin_unlock(NULL, &__wt_process.spinlock);
 
 	session = &conn->default_session;
 	session->iface.connection = &conn->iface;
@@ -625,14 +625,14 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 
 	/* Check to see if another thread of control has this database open. */
 	ret = 0;
-	__wt_lock(session, __wt_process.mtx);
+	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_FOREACH(t, &__wt_process.connqh, q)
 		if (t->home != NULL &&
 		    t != conn && strcmp(t->home, conn->home) == 0) {
 			ret = EBUSY;
 			break;
 		}
-	__wt_unlock(session, __wt_process.mtx);
+	__wt_spin_unlock(session, &__wt_process.spinlock);
 	if (ret != 0) {
 		__wt_errx(session, "%s",
 		    "WiredTiger database is already being managed by another "

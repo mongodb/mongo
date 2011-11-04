@@ -24,10 +24,10 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;
 
-	WT_ERR(__wt_mtx_alloc(session,
-	    "cache eviction server", 1, &cache->mtx_evict));
-	WT_ERR(__wt_mtx_alloc(session,
-	    "cache read server", 1, &cache->mtx_read));
+	WT_ERR(__wt_cond_alloc(session,
+	    "cache eviction server", 1, &cache->evict_cond));
+	WT_ERR(__wt_cond_alloc(session,
+	    "cache read server", 1, &cache->read_cond));
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -75,10 +75,10 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache == NULL)
 		return;
 
-	if (cache->mtx_evict != NULL)
-		(void)__wt_mtx_destroy(session, cache->mtx_evict);
-	if (cache->mtx_read != NULL)
-		(void)__wt_mtx_destroy(session, cache->mtx_read);
+	if (cache->evict_cond != NULL)
+		(void)__wt_cond_destroy(session, cache->evict_cond);
+	if (cache->read_cond != NULL)
+		(void)__wt_cond_destroy(session, cache->read_cond);
 
 	__wt_free(session, conn->cache);
 }

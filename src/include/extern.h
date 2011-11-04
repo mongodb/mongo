@@ -372,13 +372,13 @@ extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
-extern int __wt_mtx_alloc(WT_SESSION_IMPL *session,
+extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name,
     int is_locked,
-    WT_MTX **mtxp);
-extern void __wt_lock(WT_SESSION_IMPL *session, WT_MTX *mtx);
-extern void __wt_unlock(WT_SESSION_IMPL *session, WT_MTX *mtx);
-extern int __wt_mtx_destroy(WT_SESSION_IMPL *session, WT_MTX *mtx);
+    WT_CONDVAR **condp);
+extern void __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
+extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
+extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
     const char *name,
     WT_RWLOCK **rwlockp);

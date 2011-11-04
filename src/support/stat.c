@@ -184,14 +184,14 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_pages_inuse.name = "cache_pages_inuse";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
+	stats->cond_wait.name = "cond_wait";
+	stats->cond_wait.desc = "condition wait calls";
 	stats->file_open.name = "file_open";
 	stats->file_open.desc = "files currently open";
 	stats->memalloc.name = "memalloc";
 	stats->memalloc.desc = "total memory allocations";
 	stats->memfree.name = "memfree";
 	stats->memfree.desc = "total memory frees";
-	stats->mtx_lock.name = "mtx_lock";
-	stats->mtx_lock.desc = "mutex lock calls";
 	stats->rwlock_rdlock.name = "rwlock_rdlock";
 	stats->rwlock_rdlock.desc = "rwlock readlock calls";
 	stats->rwlock_wrlock.name = "rwlock_wrlock";
@@ -217,10 +217,10 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;
+	stats->cond_wait.v = 0;
 	stats->file_open.v = 0;
 	stats->memalloc.v = 0;
 	stats->memfree.v = 0;
-	stats->mtx_lock.v = 0;
 	stats->rwlock_rdlock.v = 0;
 	stats->rwlock_wrlock.v = 0;
 	stats->total_read_io.v = 0;

@@ -54,11 +54,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Confirm we're not holding any hazard references. */
 	__wt_hazard_empty(session);
 
-	/* Unlock and destroy the thread's mutex. */
-	if (session->mtx != NULL) {
-		__wt_unlock(session, session->mtx);
-		(void)__wt_mtx_destroy(session, session->mtx);
-	}
+	/* Destroy the thread's mutex. */
+	if (session->cond != NULL)
+		(void)__wt_cond_destroy(session, session->cond);
 
 	/*
 	 * Replace the session reference we're closing with the last entry in
@@ -447,7 +445,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	/* Session entries are re-used, clear the old contents. */
 	WT_CLEAR(*session_ret);
 
-	WT_ERR(__wt_mtx_alloc(session, "session", 1, &session_ret->mtx));
+	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 	WT_ASSERT(session, session->event_handler != NULL);
